@@ -8,6 +8,8 @@ xcuserdata/
 
 # macOS
 .DS_Store
+rb-drive
+rb-drive
 
 # Local env
 .env

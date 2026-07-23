@@ -1,5 +1,8 @@
 # cmux agent notes
 
+# 🔵⋯ Read RBF
+Read and use @rbf/AGENTS.md
+
 ## Setup
 
 `./scripts/setup.sh` initializes submodules, builds GhosttyKit, and installs the pbxproj normalization pre-commit hook.

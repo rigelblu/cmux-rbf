@@ -1,0 +1,11 @@
+# Use $REPO/docs/conventions/metadata.md
+[repo]
+product = "@cmux-rbf"
+owner = "@tom-rigelblu"
+workblock_prefixes = ['NW', 'CM']
+
+[project]
+type = "product"
+product_id = ["cm"]
+project_type = "new capabilities"
+rb_drive_store = "cmux-rbf-drive"
