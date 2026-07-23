@@ -129,6 +129,8 @@ For iOS dev auth, `ios/scripts/reload.sh` and `scripts/mobile-dev-launch.sh` aut
 
 ## Regression test commit policy
 
+**Superseded in cmux-rbf — see @rbf/AGENTS.md.** This fork keeps the red proof but commits once; the two-commit structure below is upstream's.
+
 When adding a regression test for a bug fix, use a two-commit structure so CI proves the test catches the bug:
 
 1. **Commit 1:** Add the failing test only (no fix). CI should go red.
