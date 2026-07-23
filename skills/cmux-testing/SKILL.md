@@ -7,6 +7,8 @@ description: "cmux testing rules for Swift Testing, test target compilation, tes
 
 ## Regression test commit policy
 
+**Superseded in cmux-rbf — see `rbf/AGENTS.md`.** This fork keeps the red proof but commits once; the two-commit structure it describes is upstream's.
+
 A regression test for a bug fix ships as two commits so CI proves the test catches the bug:
 
 1. The failing test only, no fix. CI goes red.

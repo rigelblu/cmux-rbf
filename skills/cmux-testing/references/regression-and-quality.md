@@ -1,5 +1,7 @@
 # Regression and Test Quality
 
+**Superseded in cmux-rbf — see `rbf/AGENTS.md`.** This fork keeps the red proof but commits once; the two-commit structure it describes is upstream's.
+
 The two-commit policy, wiring requirement, and quality rules are in [../SKILL.md](../SKILL.md). This covers the judgment call.
 
 ## Is the test behavioral?

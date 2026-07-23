@@ -59,6 +59,8 @@ If the iPhone is unreachable at build time, the reload still completes: the sign
 
 ## Regression test commits
 
+**Superseded in cmux-rbf — see @rbf/AGENTS.md.** This fork keeps the red proof but commits once; the two-commit structure below is upstream's.
+
 Two commits, so CI proves the test catches the bug: commit 1 adds the failing test only (CI red), commit 2 adds the fix (CI green). This is visible in the PR Commits tab.
 
 ## First pass, then dogfood
