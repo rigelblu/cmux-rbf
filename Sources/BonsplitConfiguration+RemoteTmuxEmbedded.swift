@@ -19,12 +19,23 @@ extension BonsplitConfiguration {
         configuration.appearance.minimumPaneHeight = 1
         configuration.appearance.tabBarLeadingInset = 0
         configuration.appearance.enableAnimations = false
-        configuration.appearance.splitButtons = configuration.appearance.splitButtons.filter {
-            switch $0.action {
-            case .splitRight, .splitDown:
-                return true
+        // Keep configured Left/Up controls visible so the remote capability
+        // boundary is discoverable, but disable them before the nested mirror
+        // receives the configuration. Right/Down remain executable.
+        configuration.appearance.splitButtons = configuration.appearance.splitButtons.compactMap {
+            var button = $0
+            switch button.action {
+            case .splitRight, .splitDown,
+                 .custom("cmux.splitRight"), .custom("cmux.splitDown"):
+                return button
+            case .custom("cmux.splitLeft"), .custom("cmux.splitUp"):
+                button.isEnabled = false
+                button.tooltip = TerminalSplitUnsupportedReason
+                    .remoteMirrorCannotInsertBefore
+                    .localizedHelp
+                return button
             default:
-                return false
+                return nil
             }
         }
         return configuration

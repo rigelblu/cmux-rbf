@@ -744,6 +744,20 @@ final class RemoteTmuxController {
     func sessionMirror(workspaceId: UUID) -> RemoteTmuxSessionMirror? {
         sessionMirrors.values.first { $0.mirroredWorkspaceId == workspaceId }
     }
+#if DEBUG
+    /// Installs a fully constructed mirror without launching SSH. Test-only
+    /// seam for exercising app actions against the real session-mirror route.
+    func installSessionMirrorForTesting(_ mirror: RemoteTmuxSessionMirror) {
+        sessionMirrors[Self.connectionKey(host: mirror.host, sessionName: mirror.sessionName)] = mirror
+    }
+
+    func removeSessionMirrorForTesting(_ mirror: RemoteTmuxSessionMirror) {
+        let key = Self.connectionKey(host: mirror.host, sessionName: mirror.sessionName)
+        if sessionMirrors[key] === mirror {
+            sessionMirrors.removeValue(forKey: key)
+        }
+    }
+#endif
     /// Detaches a control client and removes its mirror workspace while leaving
     /// the remote session alive (#7364). Internal callers that already removed the
     /// mirror keep the low-level stop-only path, preserving their kill semantics.

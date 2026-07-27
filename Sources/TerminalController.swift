@@ -11984,8 +11984,18 @@ class TerminalController {
             }
 
             if tab.isRemoteTmuxMirror, direction.insertFirst {
-                // Routed tmux `split-window` cannot insert before the target
-                // pane; reject before mutating the remote session.
+                // cmux builds its remote split as `split-window -v|-h` and never
+                // emits tmux's `-b` (insert-before) flag, so the remote session
+                // can only append after the target pane. Reject rather than
+                // silently mutating the wrong side of a live remote layout.
+                //
+                // This is a cmux limit, not a tmux one — `split-window -b` has
+                // long existed. Lifting it needs the flag plumbed through
+                // `RemoteTmuxSplitFocusIntent.command`, a verified error path for
+                // remotes whose tmux predates `-b`, and a pinned version floor.
+                // The mirror's render side already reconciles insert-before
+                // layouts (`RemoteTmuxWindowMirror+Bonsplit.leafExpansion`), so
+                // only the request path is missing.
                 result = Self.v1MirrorDirectionError
                 return
             }

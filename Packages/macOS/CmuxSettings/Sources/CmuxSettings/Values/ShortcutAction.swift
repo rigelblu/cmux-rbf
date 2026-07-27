@@ -93,7 +93,9 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case focusRight
     case focusUp
     case focusDown
+    case splitLeft
     case splitRight
+    case splitUp
     case splitDown
     case toggleSplitZoom
     case equalizeSplits
@@ -195,7 +197,8 @@ extension ShortcutAction {
              .focusTextBoxInput, .cycleTextBoxSubmitAction, .attachTextBoxFile, .sendCtrlFToTerminal,
              .clearScreenKeepScrollback:
             return .navigation
-        case .focusLeft, .focusRight, .focusUp, .focusDown, .splitRight, .splitDown,
+        case .focusLeft, .focusRight, .focusUp, .focusDown,
+             .splitLeft, .splitRight, .splitUp, .splitDown,
              .toggleSplitZoom, .equalizeSplits, .splitBrowserRight, .splitBrowserDown,
              .toggleRightSidebar, .fileExplorerOpenSelection, .fileExplorerOpenSelectionFinderAlias,
              .toggleCanvasLayout, .canvasRevealFocusedPane, .canvasOverview,
@@ -400,7 +403,11 @@ extension ShortcutAction {
         case .focusRight: return "Focus Pane Right"
         case .focusUp: return "Focus Pane Up"
         case .focusDown: return "Focus Pane Down"
+        case .splitLeft:
+            return String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left")
         case .splitRight: return "Split Right"
+        case .splitUp:
+            return String(localized: "shortcut.splitUp.label", defaultValue: "Split Up")
         case .splitDown: return "Split Down"
         case .toggleSplitZoom: return "Toggle Pane Zoom"
         case .equalizeSplits: return "Equalize Splits"

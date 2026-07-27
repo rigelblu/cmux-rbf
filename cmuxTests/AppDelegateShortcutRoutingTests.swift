@@ -2018,7 +2018,7 @@ final class AppDelegateShortcutRoutingTests: XCTestCase {
         )
     }
 
-    func testPerformSplitShortcutSplitsFocusedTerminalSurfaceWhenSelectedWorkspaceIsStale() {
+    func testSharedSplitExecutorTargetsFocusedTerminalWhenWorkspaceSelectionIsStale() {
         guard let appDelegate = AppDelegate.shared else {
             XCTFail("Expected AppDelegate.shared")
             return
@@ -2074,8 +2074,12 @@ final class AppDelegateShortcutRoutingTests: XCTestCase {
         XCTAssertEqual(leftSurfaceView.tabId, workspace.id, "Expected focused Ghostty view to keep its workspace ID")
         XCTAssertEqual(leftSurfaceView.terminalSurface?.id, leftPanel.id, "Expected focused Ghostty view to keep its surface ID")
 
+        let splitResult = appDelegate.executeTerminalSplit(
+            direction: .right,
+            source: .focusedWindow(window)
+        )
         XCTAssertTrue(
-            appDelegate.performSplitShortcut(direction: .right, preferredWindow: window),
+            splitResult.didSucceed,
             "Split shortcut should use the focused terminal surface even when selectedTabId is stale"
         )
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.15))

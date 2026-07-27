@@ -6377,7 +6377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return context.tabManager
     }
 
-    private struct FocusedTerminalShortcutContext {
+    struct FocusedTerminalShortcutContext {
         let tabManager: TabManager
         let workspaceId: UUID
         let panelId: UUID
@@ -6425,7 +6425,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return nil
     }
 
-    private func focusedTerminalShortcutContext(preferredWindow: NSWindow? = nil) -> FocusedTerminalShortcutContext? {
+    func focusedTerminalShortcutContext(preferredWindow: NSWindow? = nil) -> FocusedTerminalShortcutContext? {
         let targetWindow = preferredWindow ?? shortcutRoutingActiveWindow
         let responder = shortcutRoutingFirstResponder(preferredWindow: targetWindow)
         guard let ghosttyView = responder.cmuxStrictOwningGhosttyView(),
@@ -11560,7 +11560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         writeGotoSplitTestData(updates)
     }
 
-    private func recordGotoSplitSplitIfNeeded(direction: SplitDirection) {
+    func recordGotoSplitSplitIfNeeded(direction: SplitDirection) {
         guard isGotoSplitUITestRecordingEnabled() else { return }
         guard let workspace = tabManager?.selectedWorkspace else { return }
 
@@ -13835,6 +13835,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
         // Configured split actions.
+        if matchConfiguredShortcut(event: event, action: .splitLeft) {
+#if DEBUG
+            cmuxDebugLog("shortcut.action name=splitLeft \(debugShortcutRouteSnapshot(event: event))")
+#endif
+            _ = performDirectionalTerminalSplitShortcut(direction: .left, event: event)
+            return true
+        }
+
+        if matchConfiguredShortcut(event: event, action: .splitUp) {
+#if DEBUG
+            cmuxDebugLog("shortcut.action name=splitUp \(debugShortcutRouteSnapshot(event: event))")
+#endif
+            _ = performDirectionalTerminalSplitShortcut(direction: .up, event: event)
+            return true
+        }
+
         if matchConfiguredShortcut(event: event, action: .splitRight) {
 #if DEBUG
             cmuxDebugLog("shortcut.action name=splitRight \(debugShortcutRouteSnapshot(event: event))")
@@ -13842,16 +13858,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             // When the Dock owns keyboard focus, split the focused Dock pane
             // instead of the main area (checked before the transient-focus
             // suppression, which only guards main-terminal states).
-            if routeSplitToFocusedDock(kind: .terminal, direction: .right, preferredWindow: event.window) {
-                return true
-            }
-            if shouldSuppressSplitShortcutForTransientTerminalFocusState(direction: .right) {
-                return true
-            }
-            _ = performSplitShortcut(
-                direction: .right,
-                preferredWindow: event.window ?? shortcutRoutingActiveWindow
-            )
+            _ = performDirectionalTerminalSplitShortcut(direction: .right, event: event)
             return true
         }
 
@@ -13859,16 +13866,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 #if DEBUG
             cmuxDebugLog("shortcut.action name=splitDown \(debugShortcutRouteSnapshot(event: event))")
 #endif
-            if routeSplitToFocusedDock(kind: .terminal, direction: .down, preferredWindow: event.window) {
-                return true
-            }
-            if shouldSuppressSplitShortcutForTransientTerminalFocusState(direction: .down) {
-                return true
-            }
-            _ = performSplitShortcut(
-                direction: .down,
-                preferredWindow: event.window ?? shortcutRoutingActiveWindow
-            )
+            _ = performDirectionalTerminalSplitShortcut(direction: .down, event: event)
             return true
         }
 
@@ -14110,6 +14108,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 
         return false
+    }
+
+    @discardableResult
+    private func performDirectionalTerminalSplitShortcut(
+        direction: SplitDirection,
+        event: NSEvent
+    ) -> Bool {
+        if focusedDockStoreForShortcut(preferredWindow: event.window) == nil,
+           shouldSuppressSplitShortcutForTransientTerminalFocusState(direction: direction) {
+            return true
+        }
+        let result = executeTerminalSplit(
+            direction: direction,
+            source: .focusedWindow(event.window ?? shortcutRoutingActiveWindow)
+        )
+        result.presentUserFeedback()
+        return result.isHandled
     }
 
 
@@ -14677,99 +14692,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         cmuxDebugLog(line)
     }
 #endif
-
-    @discardableResult
-    func performSplitShortcut(direction: SplitDirection, preferredWindow: NSWindow? = nil) -> Bool {
-        let targetWindow = preferredWindow ?? shortcutRoutingActiveWindow
-        let terminalContext = focusedTerminalShortcutContext(preferredWindow: targetWindow)
-        _ = synchronizeActiveMainWindowContext(preferredWindow: targetWindow)
-
-        let directionLabel: String
-        switch direction {
-        case .left: directionLabel = "left"
-        case .right: directionLabel = "right"
-        case .up: directionLabel = "up"
-        case .down: directionLabel = "down"
-        }
-
-        #if DEBUG
-        let keyWindow = shortcutRoutingKeyWindow
-        let firstResponder = keyWindow?.firstResponder
-        let firstResponderType = firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
-        let firstResponderPtr = firstResponder.map { String(describing: Unmanaged.passUnretained($0).toOpaque()) } ?? "nil"
-        let firstResponderWindow: Int = {
-            if let v = firstResponder as? NSView {
-                return v.window?.windowNumber ?? -1
-            }
-            if let w = firstResponder as? NSWindow {
-                return w.windowNumber
-            }
-            return -1
-        }()
-        let splitContext = "keyWin=\(keyWindow?.windowNumber ?? -1) mainWin=\(NSApp.mainWindow?.windowNumber ?? -1) fr=\(firstResponderType)@\(firstResponderPtr) frWin=\(firstResponderWindow)"
-        if let browser = tabManager?.focusedBrowserPanel {
-            let webWindow = browser.webView.window?.windowNumber ?? -1
-            let webSuperview = browser.webView.superview.map { String(describing: Unmanaged.passUnretained($0).toOpaque()) } ?? "nil"
-            cmuxDebugLog("split.shortcut dir=\(directionLabel) pre panel=\(browser.id.uuidString.prefix(5)) \(browser.debugDeveloperToolsStateSummary()) webWin=\(webWindow) webSuper=\(webSuperview) \(splitContext)")
-        } else {
-            cmuxDebugLog("split.shortcut dir=\(directionLabel) pre panel=nil \(splitContext)")
-        }
-        #endif
-
-        let didCreateSplit: Bool = {
-            if let terminalContext {
-                if let workspace = terminalContext.tabManager.tabs.first(where: { $0.id == terminalContext.workspaceId }),
-                   workspace.layoutMode == .canvas {
-                    return workspace.openNewCanvasPane(
-                        type: .terminal,
-                        focus: true,
-                        direction: direction.canvasDirection
-                    ) != nil
-                }
-                return terminalContext.tabManager.createSplit(
-                    tabId: terminalContext.workspaceId,
-                    surfaceId: terminalContext.panelId,
-                    direction: direction
-                ) != nil
-            }
-            if let workspace = tabManager?.selectedWorkspace,
-               workspace.layoutMode == .canvas {
-                return workspace.openNewCanvasPane(
-                    type: .terminal,
-                    focus: true,
-                    direction: direction.canvasDirection
-                ) != nil
-            }
-            return tabManager?.createSplit(direction: direction) != nil
-        }()
-#if DEBUG
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            let keyWindow = self?.shortcutRoutingKeyWindow
-            let firstResponder = keyWindow?.firstResponder
-            let firstResponderType = firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
-            let firstResponderPtr = firstResponder.map { String(describing: Unmanaged.passUnretained($0).toOpaque()) } ?? "nil"
-            let firstResponderWindow: Int = {
-                if let v = firstResponder as? NSView {
-                    return v.window?.windowNumber ?? -1
-                }
-                if let w = firstResponder as? NSWindow {
-                    return w.windowNumber
-                }
-                return -1
-            }()
-            let splitContext = "keyWin=\(keyWindow?.windowNumber ?? -1) mainWin=\(NSApp.mainWindow?.windowNumber ?? -1) fr=\(firstResponderType)@\(firstResponderPtr) frWin=\(firstResponderWindow)"
-            if let browser = self?.tabManager?.focusedBrowserPanel {
-                let webWindow = browser.webView.window?.windowNumber ?? -1
-                let webSuperview = browser.webView.superview.map { String(describing: Unmanaged.passUnretained($0).toOpaque()) } ?? "nil"
-                cmuxDebugLog("split.shortcut dir=\(directionLabel) post panel=\(browser.id.uuidString.prefix(5)) \(browser.debugDeveloperToolsStateSummary()) webWin=\(webWindow) webSuper=\(webSuperview) \(splitContext)")
-            } else {
-                cmuxDebugLog("split.shortcut dir=\(directionLabel) post panel=nil \(splitContext)")
-            }
-        }
-        recordGotoSplitSplitIfNeeded(direction: direction)
-#endif
-        return didCreateSplit
-    }
 
     /// Allow AppKit-backed browser surfaces (WKWebView) to route non-menu shortcuts
     /// through the same app-level shortcut handler used by the local key monitor.
@@ -15408,32 +15330,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
                 onExecuted?()
                 return true
-            case .splitRight:
-                if shouldSuppressSplitShortcutForTransientTerminalFocusState(
-                    direction: .right,
+            case .splitLeft, .splitUp, .splitRight, .splitDown:
+                let direction: SplitDirection
+                switch builtIn {
+                case .splitLeft: direction = .left
+                case .splitUp: direction = .up
+                case .splitRight: direction = .right
+                case .splitDown: direction = .down
+                default: return false
+                }
+                let focusedWindow = preferredWindow ?? shortcutRoutingActiveWindow
+                if focusedDockStoreForShortcut(preferredWindow: focusedWindow) == nil,
+                   shouldSuppressSplitShortcutForTransientTerminalFocusState(
+                    direction: direction,
                     tabManager: context.tabManager
                 ) {
                     return true
                 }
-                let didSplit = performSplitShortcut(
-                    direction: .right,
-                    preferredWindow: preferredWindow ?? shortcutRoutingActiveWindow
+                let result = executeTerminalSplit(
+                    direction: direction,
+                    source: .focusedWindow(focusedWindow)
                 )
-                if didSplit { onExecuted?() }
-                return didSplit
-            case .splitDown:
-                if shouldSuppressSplitShortcutForTransientTerminalFocusState(
-                    direction: .down,
-                    tabManager: context.tabManager
-                ) {
-                    return true
-                }
-                let didSplit = performSplitShortcut(
-                    direction: .down,
-                    preferredWindow: preferredWindow ?? shortcutRoutingActiveWindow
-                )
-                if didSplit { onExecuted?() }
-                return didSplit
+                result.presentUserFeedback()
+                if result.didSucceed { onExecuted?() }
+                return result.isHandled
             }
         case .command, .agent, .workspaceCommand, .workspace:
             guard let cmuxConfigStore = context.cmuxConfigStore else {

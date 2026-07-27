@@ -8,6 +8,8 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
     case mobileConnect = "cmux.mobileconnect"
     case newTerminal = "cmux.newTerminal"
     case newBrowser = "cmux.newBrowser"
+    case splitLeft = "cmux.splitLeft"
+    case splitUp = "cmux.splitUp"
     case splitRight = "cmux.splitRight"
     case splitDown = "cmux.splitDown"
 
@@ -28,6 +30,10 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             self = .newTerminal
         case "cmux.newBrowser", "newBrowser":
             self = .newBrowser
+        case "cmux.splitLeft", "splitLeft":
+            self = .splitLeft
+        case "cmux.splitUp", "splitUp":
+            self = .splitUp
         case "cmux.splitRight", "splitRight":
             self = .splitRight
         case "cmux.splitDown", "splitDown":
@@ -55,25 +61,32 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             return "terminal"
         case .newBrowser:
             return "globe"
+        case .splitLeft:
+            return "rectangle.lefthalf.inset.filled"
+        case .splitUp:
+            return "rectangle.tophalf.inset.filled"
         case .splitRight:
-            return "square.split.2x1"
+            return "rectangle.righthalf.inset.filled"
         case .splitDown:
-            return "square.split.1x2"
+            return "rectangle.bottomhalf.inset.filled"
         }
     }
 
     var bonsplitAction: BonsplitConfiguration.SplitActionButton.Action? {
         switch self {
-        case .newWorkspace, .newAgentChat, .cloudVM, .mobileConnect:
+        case .newWorkspace, .newAgentChat, .cloudVM, .mobileConnect,
+             .splitLeft, .splitUp:
+            // Bonsplit cannot express insert-before. Keep Left/Up custom so
+            // Workspace can preserve the clicked pane and full direction.
             return nil
-        case .newTerminal:
-            return .newTerminal
-        case .newBrowser:
-            return .newBrowser
         case .splitRight:
             return .splitRight
         case .splitDown:
             return .splitDown
+        case .newTerminal:
+            return .newTerminal
+        case .newBrowser:
+            return .newBrowser
         }
     }
 }

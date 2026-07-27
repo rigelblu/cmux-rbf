@@ -88,6 +88,10 @@ extension ShortcutAction {
         case .focusRight: return ShortcutStroke(key: "→", command: true, option: true)
         case .focusUp: return ShortcutStroke(key: "↑", command: true, option: true)
         case .focusDown: return ShortcutStroke(key: "↓", command: true, option: true)
+        // Left/Up ship unbound: the spatial chords are taken (Shift+Cmd+L opens a
+        // browser, Shift+Cmd+K clears the screen), and Reset must return them here
+        // rather than to a chord that displaces a shipped binding.
+        case .splitLeft, .splitUp: return nil
         case .splitRight: return ShortcutStroke(key: "d", command: true)
         case .splitDown: return ShortcutStroke(key: "d", command: true, shift: true)
         case .toggleSplitZoom: return ShortcutStroke(key: "\r", command: true, shift: true)

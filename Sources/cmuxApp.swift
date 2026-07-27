@@ -1025,8 +1025,16 @@ struct cmuxApp: App {
 
             Divider()
 
+            splitCommandButton(title: String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left"), shortcut: menuShortcut(for: .splitLeft)) {
+                performSplitFromMenu(direction: .left)
+            }
+
             splitCommandButton(title: String(localized: "menu.view.splitRight", defaultValue: "Split Right"), shortcut: menuShortcut(for: .splitRight)) {
                 performSplitFromMenu(direction: .right)
+            }
+
+            splitCommandButton(title: String(localized: "shortcut.splitUp.label", defaultValue: "Split Up"), shortcut: menuShortcut(for: .splitUp)) {
+                performSplitFromMenu(direction: .up)
             }
 
             splitCommandButton(title: String(localized: "menu.view.splitDown", defaultValue: "Split Down"), shortcut: menuShortcut(for: .splitDown)) {
@@ -1172,10 +1180,12 @@ struct cmuxApp: App {
     }
 
     private func performSplitFromMenu(direction: SplitDirection) {
-        if AppDelegate.shared?.performSplitShortcut(direction: direction) == true {
-            return
-        }
-        tabManager.createSplit(direction: direction)
+        guard let appDelegate = AppDelegate.shared else { return }
+        let result = appDelegate.executeTerminalSplit(
+            direction: direction,
+            source: .focusedWindow(NSApp.keyWindow ?? NSApp.mainWindow)
+        )
+        result.presentUserFeedback()
     }
 
     private func performBrowserSplitFromMenu(direction: SplitDirection) {

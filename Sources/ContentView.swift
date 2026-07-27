@@ -7837,6 +7837,24 @@ struct ContentView: View {
         )
         contributions.append(
             CommandPaletteCommandContribution(
+                commandId: "palette.terminalSplitLeft",
+                title: constant(String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left")),
+                subtitle: constant(String(localized: "command.terminalSplitRight.subtitle", defaultValue: "Terminal Layout")),
+                keywords: ["terminal", "split", "left"],
+                when: { $0.bool(CommandPaletteContextKeys.panelIsTerminal) }
+            )
+        )
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.terminalSplitUp",
+                title: constant(String(localized: "shortcut.splitUp.label", defaultValue: "Split Up")),
+                subtitle: constant(String(localized: "command.terminalSplitRight.subtitle", defaultValue: "Terminal Layout")),
+                keywords: ["terminal", "split", "up", "above"],
+                when: { $0.bool(CommandPaletteContextKeys.panelIsTerminal) }
+            )
+        )
+        contributions.append(
+            CommandPaletteCommandContribution(
                 commandId: "palette.terminalSplitRight",
                 title: constant(String(localized: "command.terminalSplitRight.title", defaultValue: "Split Right")),
                 subtitle: constant(String(localized: "command.terminalSplitRight.subtitle", defaultValue: "Terminal Layout")),
@@ -7921,7 +7939,7 @@ struct ContentView: View {
                 commandId: "palette.terminalSplitDown",
                 title: constant(String(localized: "command.terminalSplitDown.title", defaultValue: "Split Down")),
                 subtitle: constant(String(localized: "command.terminalSplitDown.subtitle", defaultValue: "Terminal Layout")),
-                keywords: ["terminal", "split", "down"],
+                keywords: ["terminal", "split", "down", "below"],
                 when: { $0.bool(CommandPaletteContextKeys.panelIsTerminal) }
             )
         )
@@ -8624,9 +8642,13 @@ struct ContentView: View {
             }
         }
         registry.register(commandId: "palette.terminalSplitRight") {
-            if !executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.splitRight.configID) {
-                tabManager.createSplit(direction: .right)
-            }
+            _ = executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.splitRight.configID)
+        }
+        registry.register(commandId: "palette.terminalSplitLeft") {
+            _ = executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.splitLeft.configID)
+        }
+        registry.register(commandId: "palette.terminalSplitUp") {
+            _ = executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.splitUp.configID)
         }
         registry.register(commandId: "palette.forkAgentConversationRight") {
             forkFocusedAgentConversationRight()
@@ -8647,9 +8669,7 @@ struct ContentView: View {
             forkFocusedAgentConversationToNewWorkspace()
         }
         registry.register(commandId: "palette.terminalSplitDown") {
-            if !executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.splitDown.configID) {
-                tabManager.createSplit(direction: .down)
-            }
+            _ = executeConfiguredAction(id: CmuxSurfaceTabBarBuiltInAction.splitDown.configID)
         }
         registry.register(commandId: "palette.terminalSplitBrowserRight") {
             _ = tabManager.createBrowserSplit(direction: .right)
@@ -8708,20 +8728,15 @@ struct ContentView: View {
 
     @discardableResult
     private func executeConfiguredAction(_ action: CmuxResolvedConfigAction) -> Bool {
-        let baseCwd = configuredActionBaseCwd()
-        return CmuxConfigExecutor.execute(
-            action: action,
-            commands: cmuxConfigStore.loadedCommands,
-            commandSourcePaths: cmuxConfigStore.commandSourcePaths,
-            tabManager: tabManager,
-            baseCwd: baseCwd,
-            globalConfigPath: cmuxConfigStore.globalConfigPath
+        guard let appDelegate = AppDelegate.shared,
+              let context = appDelegate.mainWindowContext(for: tabManager) else {
+            return false
+        }
+        return appDelegate.executeConfiguredCmuxAction(
+            action,
+            context: context,
+            preferredWindow: appDelegate.mainWindow(for: windowId)
         )
-    }
-
-    private func configuredActionBaseCwd() -> String {
-        tabManager.selectedWorkspace?.resolvedWorkingDirectory()
-            ?? FileManager.default.homeDirectoryForCurrentUser.path
     }
 
     var focusedPanelContext: (workspace: Workspace, panelId: UUID, panel: any Panel)? {
@@ -12220,10 +12235,24 @@ struct VerticalTabsSidebar: View, Equatable {
 
         case .splitTerminal(let workspaceId, let surfaceId, let direction):
             guard let splitDirection = splitDirection(from: direction),
-                  let panelId = tabManager.createSplit(tabId: workspaceId, surfaceId: surfaceId, direction: splitDirection) else {
+                  let appDelegate = AppDelegate.shared else {
                 return .rejected(String(localized: "sidebar.extensions.action.surfaceCreateRejected", defaultValue: "Surface could not be created"))
             }
-            return CmuxSidebarActionResult(accepted: true, message: panelId.uuidString)
+            let result = appDelegate.executeTerminalSplit(
+                direction: splitDirection,
+                source: .explicitWorkspacePane(workspaceId: workspaceId, panelId: surfaceId)
+            )
+            switch result {
+            case .created(let panelId):
+                return CmuxSidebarActionResult(accepted: true, message: panelId.uuidString)
+            case .routedToRemote:
+                return CmuxSidebarActionResult(
+                    accepted: true,
+                    message: String(localized: "sidebar.extensions.action.remoteTmuxPaneRequested", defaultValue: "Remote tmux pane requested")
+                )
+            case .unsupported, .failed:
+                return .rejected(String(localized: "sidebar.extensions.action.surfaceCreateRejected", defaultValue: "Surface could not be created"))
+            }
 
         case .splitBrowser(let workspaceId, let surfaceId, let direction, let urlString):
             let validatedURL = cmuxSidebarExtensionOptionalHTTPURL(from: urlString)

@@ -6889,6 +6889,10 @@ final class Workspace: Identifiable, ObservableObject {
         // veto in splitTabBar(_:shouldSplitPane:orientation:) can see — keeps
         // programmatic splits aimed at a background window-tab precise.
         if isRemoteTmuxMirror {
+            // Remote tmux routing currently carries only orientation. Reject
+            // insert-before here, at the mutation boundary, so every caller
+            // preserves Left/Up instead of silently collapsing them.
+            guard !insertFirst else { return .failed }
             let routed = AppDelegate.shared?.remoteTmuxController.handleMirrorTabSplitRequested(
                 workspaceId: id,
                 panelId: panelId,
@@ -12412,8 +12416,28 @@ extension Workspace: BonsplitDelegate {
                 _ = AppDelegate.shared?.performCloudVMAction(tabManager: owningTabManager, preferredWindow: presentingWindow, debugSource: "surfaceTabBar.cloudVM")
             case .mobileConnect:
                 MobilePairingWindowController.shared.show()
-            case .newTerminal, .newBrowser, .splitRight, .splitDown:
+            case .newTerminal, .newBrowser:
                 break
+            case .splitLeft, .splitUp, .splitRight, .splitDown:
+                guard let selectedTab = bonsplitController.selectedTab(inPane: pane),
+                      let panelId = panelIdFromSurfaceId(selectedTab.id),
+                      let appDelegate = AppDelegate.shared else {
+                    NSSound.beep()
+                    return
+                }
+                let direction: SplitDirection
+                switch builtInAction {
+                case .splitLeft: direction = .left
+                case .splitUp: direction = .up
+                case .splitRight: direction = .right
+                case .splitDown: direction = .down
+                default: return
+                }
+                let result = appDelegate.executeTerminalSplit(
+                    direction: direction,
+                    source: .explicitWorkspacePane(workspaceId: id, panelId: panelId)
+                )
+                result.presentUserFeedback()
             }
             return
         }

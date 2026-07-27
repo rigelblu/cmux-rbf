@@ -57,7 +57,9 @@ Values for `shortcuts.bindings.<action>`:
 - `shortcuts.bindings.focusRight`
 - `shortcuts.bindings.focusUp`
 - `shortcuts.bindings.focusDown`
+- `shortcuts.bindings.splitLeft`
 - `shortcuts.bindings.splitRight`
+- `shortcuts.bindings.splitUp`
 - `shortcuts.bindings.splitDown`
 - `shortcuts.bindings.toggleSplitZoom`
 - `shortcuts.bindings.equalizeSplits`

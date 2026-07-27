@@ -210,7 +210,9 @@ cmux current-workspace --json`}
       <Cmd
         name="new-split"
         desc={t("newSplitDesc")}
-        cli={`cmux new-split right
+        cli={`cmux new-split left
+cmux new-split right
+cmux new-split up
 cmux new-split down`}
         socket={`{"id":"split-new","method":"surface.split","params":{"direction":"right"}}`}
       />

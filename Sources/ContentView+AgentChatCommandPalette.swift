@@ -14,6 +14,10 @@ extension ContentView {
             return CmuxSurfaceTabBarBuiltInAction.splitRight.configID
         case "palette.terminalSplitDown":
             return CmuxSurfaceTabBarBuiltInAction.splitDown.configID
+        case "palette.terminalSplitLeft":
+            return CmuxSurfaceTabBarBuiltInAction.splitLeft.configID
+        case "palette.terminalSplitUp":
+            return CmuxSurfaceTabBarBuiltInAction.splitUp.configID
         default:
             return nil
         }

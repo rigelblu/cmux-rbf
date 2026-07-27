@@ -2673,10 +2673,15 @@ class GhosttyApp {
             }
             return performOnMain {
                 guard let app = AppDelegate.shared,
-                      let tabManager = app.tabManagerFor(tabId: tabId) ?? app.tabManager else {
+                      app.tabManagerFor(tabId: tabId) != nil else {
                     return false
                 }
-                return tabManager.createSplit(tabId: tabId, surfaceId: surfaceId, direction: direction) != nil
+                let result = app.executeTerminalSplit(
+                    direction: direction,
+                    source: .explicitWorkspacePane(workspaceId: tabId, panelId: surfaceId)
+                )
+                result.presentUserFeedback()
+                return result.isHandled
             }
         case GHOSTTY_ACTION_RING_BELL:
             performOnMain { self.ringBell() }
@@ -4939,8 +4944,14 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             return GhosttyApp.terminalPasteboard.hasString(for: GHOSTTY_CLIPBOARD_STANDARD)
         case #selector(pasteAsPlainText(_:)):
             return GhosttyApp.terminalPasteboard.hasString(for: GHOSTTY_CLIPBOARD_STANDARD)
-        case #selector(splitHorizontally(_:)), #selector(splitVertically(_:)):
-            return canSplitCurrentSurface()
+        case #selector(splitLeft(_:)):
+            return canSplitCurrentSurface(direction: .left)
+        case #selector(splitRight(_:)):
+            return canSplitCurrentSurface(direction: .right)
+        case #selector(splitUp(_:)):
+            return canSplitCurrentSurface(direction: .up)
+        case #selector(splitDown(_:)):
+            return canSplitCurrentSurface(direction: .down)
         case #selector(copyWorkspaceAndSurfaceIdentifiers(_:)):
             return terminalSurface != nil
         default:
@@ -7007,28 +7018,37 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         )
         pasteItem.target = self
         menu.addItem(.separator())
-        let splitHorizontallyItem = menu.addItem(
-            withTitle: String(localized: "terminalContextMenu.splitHorizontally", defaultValue: "Split Horizontally"),
-            action: #selector(splitHorizontally(_:)),
-            keyEquivalent: ""
+        addDirectionalSplitMenuItem(
+            to: menu,
+            title: String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left"),
+            selector: #selector(splitLeft(_:)),
+            shortcut: .splitLeft,
+            direction: .left,
+            symbolName: "rectangle.lefthalf.inset.filled"
         )
-        splitHorizontallyItem.target = self
-        applyConfiguredMenuShortcut(KeyboardShortcutSettings.menuShortcut(for: .splitDown), to: splitHorizontallyItem)
-        splitHorizontallyItem.image = NSImage(
-            systemSymbolName: "rectangle.bottomhalf.inset.filled",
-            accessibilityDescription: nil
+        addDirectionalSplitMenuItem(
+            to: menu,
+            title: String(localized: "menu.view.splitRight", defaultValue: "Split Right"),
+            selector: #selector(splitRight(_:)),
+            shortcut: .splitRight,
+            direction: .right,
+            symbolName: "rectangle.righthalf.inset.filled"
         )
-
-        let splitVerticallyItem = menu.addItem(
-            withTitle: String(localized: "terminalContextMenu.splitVertically", defaultValue: "Split Vertically"),
-            action: #selector(splitVertically(_:)),
-            keyEquivalent: ""
+        addDirectionalSplitMenuItem(
+            to: menu,
+            title: String(localized: "shortcut.splitUp.label", defaultValue: "Split Up"),
+            selector: #selector(splitUp(_:)),
+            shortcut: .splitUp,
+            direction: .up,
+            symbolName: "rectangle.tophalf.inset.filled"
         )
-        splitVerticallyItem.target = self
-        applyConfiguredMenuShortcut(KeyboardShortcutSettings.menuShortcut(for: .splitRight), to: splitVerticallyItem)
-        splitVerticallyItem.image = NSImage(
-            systemSymbolName: "rectangle.righthalf.inset.filled",
-            accessibilityDescription: nil
+        addDirectionalSplitMenuItem(
+            to: menu,
+            title: String(localized: "menu.view.splitDown", defaultValue: "Split Down"),
+            selector: #selector(splitDown(_:)),
+            shortcut: .splitDown,
+            direction: .down,
+            symbolName: "rectangle.bottomhalf.inset.filled"
         )
         appendCurrentSurfaceContextMenuItems(to: menu)
         let resetTerminalItem = menu.addItem(
@@ -7060,45 +7080,87 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         return menu
     }
 
-    private func canSplitCurrentSurface() -> Bool {
-        guard let surfaceId = terminalSurface?.id else { return false }
-        // Mirror panes are not workspace panels, but their split command routes
-        // to tmux and the resulting layout change rebuilds the mirrored panes.
-        if AppDelegate.shared?.remoteTmuxController.isMirrorPaneSurface(surfaceId) == true {
-            return true
+    private func addDirectionalSplitMenuItem(
+        to menu: NSMenu,
+        title: String,
+        selector: Selector,
+        shortcut: KeyboardShortcutSettings.Action,
+        direction: SplitDirection,
+        symbolName: String
+    ) {
+        let item = menu.addItem(withTitle: title, action: selector, keyEquivalent: "")
+        item.target = self
+        applyConfiguredMenuShortcut(KeyboardShortcutSettings.menuShortcut(for: shortcut), to: item)
+        item.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+        if let reason = currentSurfaceSplitUnsupportedReason(direction: direction) {
+            item.isEnabled = false
+            item.toolTip = reason.localizedHelp
         }
-        guard let tabId,
-              let app = AppDelegate.shared,
-              let manager = app.tabManagerFor(tabId: tabId) ?? app.tabManager,
-              let workspace = manager.tabs.first(where: { $0.id == tabId }) else {
+    }
+
+    private func currentSurfaceSplitUnsupportedReason(
+        direction: SplitDirection
+    ) -> TerminalSplitUnsupportedReason? {
+        guard direction.insertFirst,
+              let surfaceID = terminalSurface?.id else {
+            return nil
+        }
+        if AppDelegate.shared?.remoteTmuxController.isMirrorPaneSurface(surfaceID) == true {
+            return .remoteMirrorCannotInsertBefore
+        }
+        if let workspaceID = tabId,
+           let app = AppDelegate.shared,
+           let manager = app.tabManagerFor(tabId: workspaceID) ?? app.tabManager,
+           manager.tabs.first(where: { $0.id == workspaceID })?.isRemoteTmuxMirror == true {
+            return .remoteMirrorCannotInsertBefore
+        }
+        return nil
+    }
+
+    private func canSplitCurrentSurface(direction: SplitDirection) -> Bool {
+        guard currentSurfaceSplitUnsupportedReason(direction: direction) == nil,
+              let panelID = terminalSurface?.id else {
             return false
         }
-        return workspace.panels[surfaceId] != nil
+        if AppDelegate.shared?.remoteTmuxController.isMirrorPaneSurface(panelID) == true {
+            return true
+        }
+        guard let workspaceID = tabId,
+              let app = AppDelegate.shared,
+              let manager = app.tabManagerFor(tabId: workspaceID) ?? app.tabManager,
+              let workspace = manager.tabs.first(where: { $0.id == workspaceID }) else {
+            return false
+        }
+        return workspace.panels[panelID] != nil
     }
 
-    @objc private func splitHorizontally(_ sender: Any?) {
-        _ = splitCurrentSurface(direction: .down)
-    }
-
-    @objc private func splitVertically(_ sender: Any?) {
-        _ = splitCurrentSurface(direction: .right)
-    }
+    @objc private func splitLeft(_ sender: Any?) { _ = splitCurrentSurface(direction: .left) }
+    @objc private func splitRight(_ sender: Any?) { _ = splitCurrentSurface(direction: .right) }
+    @objc private func splitUp(_ sender: Any?) { _ = splitCurrentSurface(direction: .up) }
+    @objc private func splitDown(_ sender: Any?) { _ = splitCurrentSurface(direction: .down) }
 
     @discardableResult
     private func splitCurrentSurface(direction: SplitDirection) -> Bool {
-        guard let surfaceId = terminalSurface?.id else { return false }
-        // Remote tmux mirror pane: never fall through to a local split. The tmux
-        // command either reaches the live stream, or the action reports false.
-        if let controller = AppDelegate.shared?.remoteTmuxController,
-           controller.isMirrorPaneSurface(surfaceId) {
-            return controller.handleMirrorSplitRequested(surfaceId: surfaceId, vertical: !direction.isHorizontal, focusIntent: .focusCreatedPane)
-        }
-        guard let tabId,
-              let app = AppDelegate.shared,
-              let manager = app.tabManagerFor(tabId: tabId) ?? app.tabManager else {
+        guard let panelID = terminalSurface?.id,
+              let app = AppDelegate.shared else {
             return false
         }
-        return manager.createSplit(tabId: tabId, surfaceId: surfaceId, direction: direction) != nil
+        let source: TerminalSplitActionSource
+        if app.remoteTmuxController.isMirrorPaneSurface(panelID) {
+            source = .explicitRemoteMirrorPane(surfaceId: panelID)
+        } else {
+            guard let workspaceID = tabId,
+                  app.tabManagerFor(tabId: workspaceID) != nil else {
+                return false
+            }
+            source = .explicitWorkspacePane(workspaceId: workspaceID, panelId: panelID)
+        }
+        let result = app.executeTerminalSplit(
+            direction: direction,
+            source: source
+        )
+        result.presentUserFeedback()
+        return result.isHandled
     }
 
     @objc private func triggerFlash(_ sender: Any?) {

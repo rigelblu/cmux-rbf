@@ -830,6 +830,10 @@ struct DockSocketLifecycleTests {
         _ actions: [KeyboardShortcutSettings.Action],
         _ body: @MainActor () throws -> Void
     ) rethrows {
+        let originalSettingsFileStore = KeyboardShortcutSettings.installIsolatedTestFileStore(
+            prefix: "cmux-dock-shortcut-routing"
+        )
+        defer { KeyboardShortcutSettings.settingsFileStore = originalSettingsFileStore }
         let originals = actions.map {
             (action: $0,
              had: UserDefaults.standard.object(forKey: $0.defaultsKey) != nil,
@@ -854,7 +858,15 @@ struct DockSocketLifecycleTests {
 #if DEBUG
         try withDockEnabled {
             try withBrowserEnabled {
-                try withDefaultShortcuts([.newSurface, .openBrowser, .splitRight, .splitDown]) {
+                try withDefaultShortcuts([.newSurface, .openBrowser, .splitLeft, .splitRight, .splitUp, .splitDown]) {
+                    KeyboardShortcutSettings.setShortcut(
+                        StoredShortcut(key: "h", command: true, shift: false, option: true, control: false),
+                        for: .splitLeft
+                    )
+                    KeyboardShortcutSettings.setShortcut(
+                        StoredShortcut(key: "k", command: true, shift: false, option: true, control: false),
+                        for: .splitUp
+                    )
                     try withDockShortcutHarness { appDelegate, _, mainWorkspace, windowDock, fileExplorerState, window in
                         // Seed one Dock terminal so there is a focused Dock pane/panel.
                         let rootPane = try #require(windowDock.resolvePane(requestedPaneID: nil))
@@ -871,6 +883,11 @@ struct DockSocketLifecycleTests {
                         let tabsBeforeT = windowDock.bonsplitController.allTabIds.count
                         #expect(dispatchShortcut(appDelegate, window: window, characters: "t", keyCode: 17, flags: [.command]))
                         #expect(windowDock.bonsplitController.allTabIds.count == tabsBeforeT + 1)
+                        #expect(appDelegate.focusedDockStoreForShortcut(preferredWindow: window) === windowDock)
+                        #expect(
+                            KeyboardShortcutSettings.shortcut(for: .splitRight)
+                                == StoredShortcut(key: "d", command: true, shift: false, option: false, control: false)
+                        )
 
                         // New Browser (Cmd+Shift+L) -> a Dock browser is added.
                         let tabsBeforeL = windowDock.bonsplitController.allTabIds.count
@@ -888,6 +905,16 @@ struct DockSocketLifecycleTests {
                         let panesBeforeShiftD = windowDock.bonsplitController.allPaneIds.count
                         #expect(dispatchShortcut(appDelegate, window: window, characters: "d", keyCode: 2, flags: [.command, .shift]))
                         #expect(windowDock.bonsplitController.allPaneIds.count == panesBeforeShiftD + 1)
+
+                        // Split Left (custom Cmd+Option+H) -> a Dock pane is added.
+                        let panesBeforeLeft = windowDock.bonsplitController.allPaneIds.count
+                        #expect(dispatchShortcut(appDelegate, window: window, characters: "h", keyCode: 4, flags: [.command, .option]))
+                        #expect(windowDock.bonsplitController.allPaneIds.count == panesBeforeLeft + 1)
+
+                        // Split Up (custom Cmd+Option+K) -> a Dock pane is added.
+                        let panesBeforeUp = windowDock.bonsplitController.allPaneIds.count
+                        #expect(dispatchShortcut(appDelegate, window: window, characters: "k", keyCode: 40, flags: [.command, .option]))
+                        #expect(windowDock.bonsplitController.allPaneIds.count == panesBeforeUp + 1)
 
                         // The main content area never received any of the new surfaces.
                         #expect(Set(mainWorkspace.panels.keys) == mainPanelsBefore)

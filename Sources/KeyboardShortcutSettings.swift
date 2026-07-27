@@ -131,7 +131,9 @@ enum KeyboardShortcutSettings {
         case focusRight
         case focusUp
         case focusDown
+        case splitLeft
         case splitRight
+        case splitUp
         case splitDown, toggleSplitZoom
         case equalizeSplits
         case splitBrowserRight
@@ -265,7 +267,9 @@ enum KeyboardShortcutSettings {
             case .focusRight: return String(localized: "shortcut.focusPaneRight.label", defaultValue: "Focus Pane Right")
             case .focusUp: return String(localized: "shortcut.focusPaneUp.label", defaultValue: "Focus Pane Up")
             case .focusDown: return String(localized: "shortcut.focusPaneDown.label", defaultValue: "Focus Pane Down")
+            case .splitLeft: return String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left")
             case .splitRight: return String(localized: "shortcut.splitRight.label", defaultValue: "Split Right")
+            case .splitUp: return String(localized: "shortcut.splitUp.label", defaultValue: "Split Up")
             case .splitDown: return String(localized: "shortcut.splitDown.label", defaultValue: "Split Down")
             case .toggleSplitZoom: return String(localized: "shortcut.togglePaneZoom.label", defaultValue: "Toggle Pane Zoom")
             case .equalizeSplits: return String(localized: "shortcut.equalizeSplits.label", defaultValue: "Equalize Splits")
@@ -449,6 +453,14 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "↑", command: true, shift: false, option: true, control: false)
             case .focusDown:
                 return StoredShortcut(key: "↓", command: true, shift: false, option: true, control: false)
+            case .splitLeft, .splitUp:
+                // Unbound by default. The spatially obvious chords are already taken —
+                // Shift+Cmd+L opens a browser and Shift+Cmd+K clears the screen keeping
+                // scrollback — and displacing a shipped binding to add a direction is a
+                // worse trade than shipping these discoverable-but-unbound. Both stay
+                // visible and assignable in Settings → Keyboard Shortcuts and cmux.json,
+                // and are reachable meanwhile via the View menu and command palette.
+                return .unbound
             case .splitRight:
                 return StoredShortcut(key: "d", command: true, shift: false, option: false, control: false)
             case .splitDown: return StoredShortcut(key: "d", command: true, shift: true, option: false, control: false)
