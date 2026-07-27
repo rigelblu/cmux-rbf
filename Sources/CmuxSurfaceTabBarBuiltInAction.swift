@@ -9,6 +9,8 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
     case newTerminal = "cmux.newTerminal"
     case newBrowser = "cmux.newBrowser"
     case newSimulator = "cmux.newSimulator"
+    case splitLeft = "cmux.splitLeft"
+    case splitUp = "cmux.splitUp"
     case splitRight = "cmux.splitRight"
     case splitDown = "cmux.splitDown"
 
@@ -31,6 +33,10 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             self = .newBrowser
         case "cmux.newSimulator", "newSimulator", "new-simulator", "simulator":
             self = .newSimulator
+        case "cmux.splitLeft", "splitLeft":
+            self = .splitLeft
+        case "cmux.splitUp", "splitUp":
+            self = .splitUp
         case "cmux.splitRight", "splitRight":
             self = .splitRight
         case "cmux.splitDown", "splitDown":
@@ -63,6 +69,10 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             return (String(localized: "command.newBrowserTab.title", defaultValue: "New Browser Tab"), ["new", "browser", "tab", "surface"])
         case .newSimulator:
             return (String(localized: "command.newSimulatorPane.title", defaultValue: "New Simulator Pane"), ["new", "simulator", "iphone", "ipad", "ios", "surface"])
+        case .splitLeft:
+            return (String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left"), ["terminal", "split", "left"])
+        case .splitUp:
+            return (String(localized: "shortcut.splitUp.label", defaultValue: "Split Up"), ["terminal", "split", "up", "above"])
         case .splitRight:
             return (String(localized: "command.terminalSplitRight.title", defaultValue: "Split Right"), ["terminal", "split", "right"])
         case .splitDown:
@@ -86,25 +96,32 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             return "globe"
         case .newSimulator:
             return "iphone.gen3"
+        case .splitLeft:
+            return "rectangle.lefthalf.inset.filled"
+        case .splitUp:
+            return "rectangle.tophalf.inset.filled"
         case .splitRight:
-            return "square.split.2x1"
+            return "rectangle.righthalf.inset.filled"
         case .splitDown:
-            return "square.split.1x2"
+            return "rectangle.bottomhalf.inset.filled"
         }
     }
 
     var bonsplitAction: BonsplitConfiguration.SplitActionButton.Action? {
         switch self {
-        case .newWorkspace, .newAgentChat, .cloudVM, .mobileConnect, .newSimulator:
+        case .newWorkspace, .newAgentChat, .cloudVM, .mobileConnect, .newSimulator,
+             .splitLeft, .splitUp:
+            // Bonsplit cannot express insert-before. Keep Left/Up custom so
+            // Workspace can preserve the clicked pane and full direction.
             return nil
-        case .newTerminal:
-            return .newTerminal
-        case .newBrowser:
-            return .newBrowser
         case .splitRight:
             return .splitRight
         case .splitDown:
             return .splitDown
+        case .newTerminal:
+            return .newTerminal
+        case .newBrowser:
+            return .newBrowser
         }
     }
 }

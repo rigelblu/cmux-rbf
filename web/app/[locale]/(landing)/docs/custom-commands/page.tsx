@@ -152,7 +152,9 @@ export default function CustomCommandsPage() {
           actions: (chunks) => <code>{chunks}</code>,
           newTerminal: (chunks) => <code>{chunks}</code>,
           newBrowser: (chunks) => <code>{chunks}</code>,
+          splitLeft: (chunks) => <code>{chunks}</code>,
           splitRight: (chunks) => <code>{chunks}</code>,
+          splitUp: (chunks) => <code>{chunks}</code>,
           splitDown: (chunks) => <code>{chunks}</code>,
         })}
       </p>

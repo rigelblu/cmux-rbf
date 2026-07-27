@@ -30,7 +30,7 @@ extension KeyboardShortcutSettings.Action {
              .clearScreenKeepScrollback,
              .focusLeft, .focusRight, .focusUp, .focusDown,
              .focusPreviousPane, .focusNextPane,
-             .splitRight, .splitDown, .toggleSplitZoom,
+             .splitLeft, .splitRight, .splitUp, .splitDown, .toggleSplitZoom,
              .equalizeSplits,
              .splitBrowserRight, .splitBrowserDown,
              .openBrowser, .focusBrowserAddressBar,

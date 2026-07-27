@@ -108,7 +108,9 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case focusDown
     case focusPreviousPane
     case focusNextPane
+    case splitLeft
     case splitRight
+    case splitUp
     case splitDown
     case toggleSplitZoom
     /// Increases every terminal font size in the selected workspace.

@@ -10,7 +10,7 @@ Each terminal command starts inside the terminal's non-interactive login shell. 
 
 ## In-app panes (no config required)
 
-You do not need to edit JSON to use Dock. The Dock tab bar carries the same split affordances as the main area:
+You do not need to edit JSON to use Dock. Its tab bar keeps the established append-direction controls:
 
 - **New Terminal** / **New Browser** add a surface to the focused Dock pane.
 - **Split Right** / **Split Down** tile the Dock into a Bonsplit tree; each new pane offers New Terminal / New Browser.
@@ -20,7 +20,9 @@ The Dock toolbar `+` menu and an empty Dock pane offer the same New Terminal / N
 
 After a Dock has been saved in a session, cmux restores that snapshot instead of seeding it again. Restore includes the split and tab layout, divider positions, tab order and selection, terminal session metadata and agent resume state, and browser navigation, zoom, profile, developer tools, and mute state. An intentionally empty saved Dock also stays empty after relaunch.
 
-When a Dock pane has keyboard focus, the standard creation/split shortcuts act on the Dock instead of the main content area: New Browser (Cmd+Shift+L), New Surface (Cmd+T), and Split Right / Split Down (Cmd+D / Cmd+Shift+D) create or split inside the focused Dock pane. When the main area is focused, the same shortcuts behave as usual.
+When a Dock pane has keyboard focus, the standard creation/split shortcuts act on the Dock instead of the main content area: New Browser (Cmd+Shift+L), New Surface (Cmd+T), and all four split directions create or split inside the focused Dock pane. When the main area is focused, the same shortcuts behave as usual.
+
+Split Right and Split Down keep their defaults (Cmd+D / Cmd+Shift+D). Split Left and Split Up ship **unbound** — assign them in Settings → Keyboard Shortcuts or via `shortcuts.bindings.splitLeft` / `shortcuts.bindings.splitUp` in `cmux.json`. Until then they remain reachable from the View menu and the command palette while a Dock pane is focused.
 
 ## CLI / socket
 

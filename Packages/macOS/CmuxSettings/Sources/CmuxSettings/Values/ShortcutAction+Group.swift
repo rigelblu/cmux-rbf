@@ -29,7 +29,8 @@ extension ShortcutAction {
              .clearScreenKeepScrollback:
             return .navigation
         case .focusLeft, .focusRight, .focusUp, .focusDown,
-             .focusPreviousPane, .focusNextPane, .splitRight, .splitDown,
+             .focusPreviousPane, .focusNextPane,
+             .splitLeft, .splitRight, .splitUp, .splitDown,
              .toggleSplitZoom, .increaseWorkspaceTerminalFontSize,
              .decreaseWorkspaceTerminalFontSize, .resetWorkspaceTerminalFontSize,
              .equalizeSplits, .splitBrowserRight, .splitBrowserDown,
