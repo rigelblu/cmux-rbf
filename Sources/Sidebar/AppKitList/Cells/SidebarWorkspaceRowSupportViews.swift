@@ -9,26 +9,39 @@ import SwiftUI
 @MainActor
 struct SidebarRowPalette {
     let model: SidebarWorkspaceRowModel
+    let visual: SidebarWorkspaceRowVisualPalette
 
-    var colorScheme: ColorScheme { model.colorSchemeIsDark ? .dark : .light }
-
-    var selectedBackground: NSColor {
-        sidebarSelectedWorkspaceBackgroundNSColor(
-            for: colorScheme,
-            sidebarSelectionColorHex: model.settings.selectionColorHex
+    init(
+        model: SidebarWorkspaceRowModel,
+        isHovered: Bool = false,
+        isEditing: Bool = false
+    ) {
+        self.model = model
+        let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
+        visual = SidebarWorkspaceRowVisualPalette(
+            isActive: model.isActive,
+            isMultiSelected: model.isMultiSelected,
+            isHovered: isHovered,
+            isEditing: isEditing,
+            customColorHex: model.snapshot.customColorHex,
+            colorScheme: colorScheme,
+            selectionColorHex: model.settings.selectionColorHex,
+            notificationBadgeColorHex: model.settings.notificationBadgeColorHex
         )
     }
 
+    var colorScheme: ColorScheme { visual.colorScheme }
+
     func selectedForeground(_ opacity: CGFloat) -> NSColor {
-        sidebarSelectedWorkspaceForegroundNSColor(on: selectedBackground, opacity: opacity)
+        visual.primaryTextColor.withAlphaComponent(opacity)
     }
 
     var primaryText: NSColor {
-        model.isActive ? selectedForeground(1.0) : .labelColor
+        visual.primaryTextColor
     }
 
     func secondary(_ opacity: CGFloat = 0.75) -> NSColor {
-        model.isActive ? selectedForeground(opacity) : .secondaryLabelColor
+        visual.secondaryTextColor(opacity: opacity)
     }
 
     static func attributed(_ source: AttributedString, font: NSFont, color: NSColor) -> NSAttributedString {
@@ -417,4 +430,3 @@ final class SidebarRowLinkButton: NSButton {
         onClick?()
     }
 }
-

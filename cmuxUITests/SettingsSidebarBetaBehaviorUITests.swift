@@ -37,12 +37,10 @@ final class SettingsSidebarBetaBehaviorUITests: SettingsUITestCase {
     // userDefaultsKeys for the in-scope settings, reset before/after each
     // test so the run starts from the shipped default.
     //  - sidebarBranchVerticalLayout: SidebarCatalogSection.branchVerticalLayout (default true / "Vertical")
-    //  - sidebarActiveTabIndicatorStyle: indicator style key (default "leftRail")
     //  - rightSidebar.beta.feed.enabled: BetaFeaturesCatalogSection.rightSidebarFeed (default false)
     //  - rightSidebar.beta.dock.enabled: BetaFeaturesCatalogSection.rightSidebarDock (default false)
     private let inScopeDefaultsKeys = [
         "sidebarBranchVerticalLayout",
-        "sidebarActiveTabIndicatorStyle",
         "rightSidebar.beta.feed.enabled",
         "rightSidebar.beta.dock.enabled",
     ]
@@ -230,11 +228,10 @@ final class SettingsSidebarBetaBehaviorUITests: SettingsUITestCase {
     //   would require the bonsplit/workspace setup launch env the fixed
     //   harness does not provide. The picker binding itself is covered above.
     //
-    // TIER 2 (needs runtime seam): Active-tab indicator style — the control
-    //   that edits `sidebarActiveTabIndicatorStyle` lives in the *Workspace
-    //   Colors* section, not in Sidebar/Beta, so it is out of this section's
-    //   UI. Its runtime effect is purely visual chrome on the active
-    //   workspace row in the sidebar (left rail / dot / stripe drawn in
+    // (The Active-tab indicator style control was removed in #cm-10 along with
+    //   the setting itself; cmux now has one workspace colour treatment. The
+    //   note that used to sit here described a picker that no longer exists.)
+    // TIER 2 (needs runtime seam): remaining sidebar chrome is drawn in
     //   SidebarAppearanceSupport + ContentView). With no workspace rows at
     //   harness launch there is nothing to render the indicator on, and the
     //   distinction is pixel-level appearance with no accessibility element.

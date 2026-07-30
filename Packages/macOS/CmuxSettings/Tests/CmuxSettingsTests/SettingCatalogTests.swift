@@ -47,10 +47,6 @@ struct SettingCatalogTests {
                 "automation.suppressSubagentNotifications",
                 "integrations.suppressSubagentNotifications",
             ],
-            "sidebarActiveTabIndicatorStyle": [
-                "sidebar.activeTabIndicatorStyle",
-                "workspaceColors.indicatorStyle",
-            ],
             "sidebarNotificationBadgeColorHex": [
                 "sidebar.notificationBadgeColor",
                 "workspaceColors.notificationBadgeColor",
