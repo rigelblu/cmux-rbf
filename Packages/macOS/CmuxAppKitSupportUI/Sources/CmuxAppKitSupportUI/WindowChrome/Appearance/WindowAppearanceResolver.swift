@@ -20,6 +20,7 @@ public struct WindowAppearanceResolver {
             terminalRenderingMode: WindowAppearanceSnapshot.terminalRenderingMode(
                 usesHostLayerBackground: terminalAppearance.usesHostLayerBackground
             ),
+            terminalBackgroundImage: terminalAppearance.backgroundImage,
             unifySurfaceBackdrops: settings.unifySurfaceBackdrops,
             sidebarSettings: SidebarBackdropSettingsSnapshot(
                 materialRawValue: settings.sidebarMaterial,

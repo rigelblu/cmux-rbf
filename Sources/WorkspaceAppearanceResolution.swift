@@ -1,4 +1,5 @@
 import AppKit
+import CmuxAppKitSupportUI
 import CmuxFoundation
 import Foundation
 
@@ -39,7 +40,11 @@ extension WorkspaceContentView {
         return next
     }
 
-    static func ghosttyAppearanceSignature(_ config: GhosttyConfig, usesHostLayerBackground: Bool) -> String {
+    static func ghosttyAppearanceSignature(
+        _ config: GhosttyConfig,
+        usesHostLayerBackground: Bool,
+        terminalBackdropImage: TerminalBackdropImage? = nil
+    ) -> String {
         [
             config.backgroundColor.hexString(includeAlpha: true),
             config.foregroundColor.hexString(includeAlpha: true),
@@ -54,6 +59,10 @@ extension WorkspaceContentView {
             config.unfocusedSplitFill?.hexString(includeAlpha: true) ?? "nil",
             config.splitDividerColor?.hexString(includeAlpha: true) ?? "nil",
             String(usesHostLayerBackground),
+            // The window-root backdrop draws this image, so a changed or
+            // removed one has to invalidate the chrome even when every color
+            // above is identical.
+            terminalBackdropImage?.identityComponent ?? "noBackdropImage",
         ].joined(separator: "|")
     }
 }

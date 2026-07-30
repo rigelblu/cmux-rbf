@@ -20,11 +20,27 @@ public struct WindowBackdropLayer: View {
     @ViewBuilder
     private func backdrop(for policy: WindowBackdropPolicy) -> some View {
         switch policy {
-        case let .ghosttyTerminalBackdrop(color, opacity, _):
+        case let .ghosttyTerminalBackdrop(color, opacity, _, backgroundImage):
             let backdropColor = color.withAlphaComponent(opacity)
             switch role {
             case .windowRoot:
-                Color(nsColor: backdropColor)
+                // The image goes only at the window root. Every other role is
+                // a slice of this same backdrop, so drawing it again there
+                // would tile a second copy at the wrong geometry.
+                if let backgroundImage {
+                    ZStack {
+                        Color(nsColor: backdropColor)
+                        // An NSViewRepresentable has no intrinsic size, so it
+                        // must be told to fill. Without this it collapses to
+                        // its ideal height and paints only a band across the
+                        // top of the window, leaving every pane below it on
+                        // the flat backdrop color.
+                        TerminalBackdropImageView(image: backgroundImage)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else {
+                    Color(nsColor: backdropColor)
+                }
             case .terminalCanvas, .bonsplitChrome, .titlebar, .leftSidebar, .rightSidebar, .browserSurface:
                 LayerBackedBackdropColor(color: backdropColor)
             }

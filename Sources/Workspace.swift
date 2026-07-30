@@ -3077,7 +3077,6 @@ final class Workspace: Identifiable, ObservableObject {
             chromeColors: chromeColors,
             usesSharedBackdrop: sharesWindowBackdrop,
             surfaceCaptionBackgroundStyle: .transparentOverChrome,
-            surfaceCaptionBackgroundStyleOverrides: ["terminal": .chrome],
             showsCaptionPaneFocusIndicator: true
         )
     }
