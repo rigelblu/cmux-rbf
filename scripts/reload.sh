@@ -1057,7 +1057,22 @@ fi
 if command -v xattr >/dev/null 2>&1; then
   xattr -cr "$APP_PATH" || true
 fi
-if ! /usr/bin/codesign --force --sign - --timestamp=none --generate-entitlement-der "$APP_PATH" >/dev/null 2>&1; then
+# TCC (Privacy & Security) keys its grants off the code signature, not the bundle
+# id. An ad-hoc signature ("--sign -") yields a cdhash-pinned designated
+# requirement, so every rebuild looks like a brand-new app and macOS re-prompts
+# for things like removable-volume access — and leaves a dead Settings row behind.
+# Signing with a stable identity yields an identifier-based requirement instead,
+# so a single grant survives rebuilds. Opt in by exporting a codesigning identity
+# (see `security find-identity -v -p codesigning`):
+#   export CMUX_DEV_CODESIGN_IDENTITY="cmux Dev Signing"
+CODESIGN_IDENTITY="${CMUX_DEV_CODESIGN_IDENTITY:--}"
+if [[ "$CODESIGN_IDENTITY" != "-" ]] \
+  && ! /usr/bin/codesign --force --sign "$CODESIGN_IDENTITY" --timestamp=none --generate-entitlement-der "$APP_PATH" >/dev/null 2>&1; then
+  echo "warning: codesign with CMUX_DEV_CODESIGN_IDENTITY='$CODESIGN_IDENTITY' failed; falling back to ad-hoc (macOS will re-prompt for permissions)" >&2
+  CODESIGN_IDENTITY="-"
+fi
+if [[ "$CODESIGN_IDENTITY" == "-" ]] \
+  && ! /usr/bin/codesign --force --sign - --timestamp=none --generate-entitlement-der "$APP_PATH" >/dev/null 2>&1; then
   if [[ "${CMUX_ALLOW_UNSIGNED_DEV_APP:-}" == "1" ]]; then
     echo "warning: codesign failed for $APP_PATH; continuing because CMUX_ALLOW_UNSIGNED_DEV_APP=1" >&2
   else
