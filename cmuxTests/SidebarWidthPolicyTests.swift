@@ -278,67 +278,58 @@ final class SidebarWidthPolicyTests: XCTestCase {
 }
 
 final class SidebarWorkspaceSelectionColorTests: XCTestCase {
-    func testSelectedColoredWorkspaceUsesStandardSelectionBackgroundInLightAndDark() {
+    /// `cm-10` inverted this policy. These two tests previously asserted that a
+    /// selected coloured row collapsed into the global selection background;
+    /// it now keeps its own contrast-corrected colour, in both appearances.
+    func testSelectedColoredWorkspaceKeepsItsOwnColorInLightAndDark() {
         for colorScheme in [ColorScheme.light, .dark] {
-            let coloredSelected = sidebarWorkspaceRowBackgroundStyle(
-                activeTabIndicatorStyle: .solidFill,
-                isActive: true,
-                isMultiSelected: false,
-                customColorHex: "#E85D75",
-                colorScheme: colorScheme,
-                sidebarSelectionColorHex: nil
-            )
-            let standardSelected = sidebarWorkspaceRowBackgroundStyle(
-                activeTabIndicatorStyle: .solidFill,
-                isActive: true,
-                isMultiSelected: false,
-                customColorHex: nil,
-                colorScheme: colorScheme,
-                sidebarSelectionColorHex: nil
-            )
+            func fill(customColorHex: String?) -> NSColor? {
+                SidebarWorkspaceRowVisualPalette(
+                    isActive: true,
+                    isMultiSelected: false,
+                    isHovered: false,
+                    isEditing: false,
+                    customColorHex: customColorHex,
+                    colorScheme: colorScheme,
+                    selectionColorHex: nil,
+                    notificationBadgeColorHex: nil
+                ).backgroundStyle.color
+            }
 
-            XCTAssertEqual(coloredSelected.opacity, standardSelected.opacity, accuracy: 0.001)
-            XCTAssertEqual(coloredSelected.opacity, 1, accuracy: 0.001)
-            assertColor(coloredSelected.color, equals: standardSelected.color)
-
-            let unselectedColored = sidebarWorkspaceRowBackgroundStyle(
-                activeTabIndicatorStyle: .solidFill,
-                isActive: false,
-                isMultiSelected: false,
-                customColorHex: "#E85D75",
-                colorScheme: colorScheme,
-                sidebarSelectionColorHex: nil
-            )
-            XCTAssertEqual(unselectedColored.opacity, 0.7, accuracy: 0.001)
+            let colored = fill(customColorHex: "#E85D75")
+            let uncolored = fill(customColorHex: nil)
+            XCTAssertNotNil(colored)
             XCTAssertFalse(
-                colorsAreEqual(coloredSelected.color, unselectedColored.color),
-                "Selected row should use the standard selection background, not the workspace tab color"
+                colorsAreEqual(colored, uncolored),
+                "A selected coloured row must keep its own colour, not the global selection background"
+            )
+            XCTAssertGreaterThanOrEqual(
+                cmuxContrastRatio(foreground: .white, background: colored ?? .clear),
+                4.5,
+                "The active fill must stay readable with white content"
             )
         }
     }
 
-    func testSelectedColoredWorkspaceUsesConfiguredSelectionBackground() {
-        let selectionHex = "#123456"
-        let coloredSelected = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: .solidFill,
-            isActive: true,
-            isMultiSelected: false,
-            customColorHex: "#E85D75",
-            colorScheme: .light,
-            sidebarSelectionColorHex: selectionHex
-        )
-        let standardSelected = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: .solidFill,
-            isActive: true,
-            isMultiSelected: false,
-            customColorHex: nil,
-            colorScheme: .light,
-            sidebarSelectionColorHex: selectionHex
-        )
+    func testConfiguredSelectionColorStillStylesUncoloredRowsOnly() {
+        func fill(customColorHex: String?) -> NSColor? {
+            SidebarWorkspaceRowVisualPalette(
+                isActive: true,
+                isMultiSelected: false,
+                isHovered: false,
+                isEditing: false,
+                customColorHex: customColorHex,
+                colorScheme: .light,
+                selectionColorHex: "#123456",
+                notificationBadgeColorHex: nil
+            ).backgroundStyle.color
+        }
 
-        XCTAssertEqual(coloredSelected.opacity, 1, accuracy: 0.001)
-        assertColor(coloredSelected.color, equals: standardSelected.color)
-        assertColor(coloredSelected.color, equals: NSColor(hex: selectionHex))
+        assertColor(fill(customColorHex: nil), equals: NSColor(hex: "#123456"))
+        XCTAssertFalse(
+            colorsAreEqual(fill(customColorHex: "#E85D75"), NSColor(hex: "#123456")),
+            "A configured selection colour must not reclaim a coloured row's fill"
+        )
     }
 
     func testDefaultSelectedForegroundFallsBackForPaleSelectionBackground() throws {

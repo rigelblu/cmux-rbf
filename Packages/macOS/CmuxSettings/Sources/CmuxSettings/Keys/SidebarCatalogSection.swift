@@ -176,12 +176,6 @@ public struct SidebarCatalogSection: SettingCatalogSection {
         userDefaultsKey: RightSidebarWidthSettings.rememberedMaxWidthKey
     )
 
-    public let activeTabIndicatorStyle = DefaultsKey<String>(
-        id: "sidebar.activeTabIndicatorStyle",
-        defaultValue: "leftRail",
-        userDefaultsKey: "sidebarActiveTabIndicatorStyle"
-    )
-
     public let selectionColorHex = DefaultsKey<String>(
         id: "sidebar.selectionColor",
         defaultValue: "",

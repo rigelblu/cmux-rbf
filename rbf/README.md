@@ -11,6 +11,15 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Recognize a workspace by its colour, selected or not
+A workspace's colour stays visible as an identity strip down the leading edge of its row, over a quiet wash of the same colour. Selecting a workspace fills the row with a contrast-corrected version of that colour instead of a generic highlight, so the active one is obvious without rereading titles.
+
+- The active row's strip wears a pale tint of the workspace's own colour, so two similar colours stay distinguishable even while one is selected.
+- The strip's trailing edge curves *into* the row rather than tapering, and follows the row's own corner — so it reads as part of the row's edge, not a bar sitting on top of it.
+- Active row content is white over a fill darkened until it clears 4.5:1; the strip keeps at least 3:1 against that fill.
+- There is no indicator-style setting. This is the only workspace colour treatment — Left Rail and Solid Fill are gone, and a leftover `workspaceColors.indicatorStyle` in `cmux.json` is ignored rather than reported.
+- Increase Contrast, Reduce Transparency, and VoiceOver are unverified for this treatment.
+
 ## 🟠⋯ Read a pane at a glance, not as a one-item tab strip
 A pane holding a single surface shows a centered caption instead of a lone tab, because one tab implies somewhere to switch to. Add a second surface and the familiar tab strip returns.
 

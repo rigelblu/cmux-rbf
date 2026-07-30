@@ -16,6 +16,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     // Chrome
     private let backgroundView = NSView()
     private let railView = NSView()
+    /// Explicit trailing-corner mask for the Accent Strip. `cornerRadius` +
+    /// `maskedCorners` did not round the trailing corners here (the strip
+    /// rendered fully square on its trailing edge), so the shape is stated as
+    /// a path instead of relying on partial corner masking. Reused across
+    /// layout passes rather than reallocated per row.
+    private let railMaskLayer = CAShapeLayer()
     private let topDropIndicator = NSView()
     private let bottomDropIndicator = NSView()
     private let hintPill = SidebarShortcutHintPillView()
@@ -185,9 +191,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         backgroundView.layer?.cornerRadius = 6
         backgroundView.layer?.cornerCurve = .continuous
         backgroundView.layer?.borderWidth = 0
+        // The strip runs flush and full-height on the row's leading edge, so it
+        // must be clipped by the row's rounded corners rather than overhanging
+        // them. Hosting the rail inside the background makes that clip come from
+        // the same corner geometry the fill uses.
+        backgroundView.layer?.masksToBounds = true
         addSubview(backgroundView)
         railView.wantsLayer = true
-        addSubview(railView)
+        backgroundView.addSubview(railView)
         addSubview(contentContainer)
 
         pinImageView.imageScaling = .scaleProportionallyDown
@@ -295,7 +306,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     }
 
     private func palette(_ model: SidebarWorkspaceRowModel) -> SidebarRowPalette {
-        SidebarRowPalette(model: model)
+        SidebarRowPalette(
+            model: model,
+            isHovered: isPointerHovering,
+            isEditing: isEditing
+        )
     }
 
     private func applyModel(_ model: SidebarWorkspaceRowModel) {
@@ -314,26 +329,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let settings = model.settings
 
         // Chrome
-        let style = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: settings.activeTabIndicatorStyle,
-            isActive: model.isActive,
-            isMultiSelected: model.isMultiSelected,
-            customColorHex: snapshot.customColorHex,
-            colorScheme: palette.colorScheme,
-            sidebarSelectionColorHex: settings.selectionColorHex
-        )
-        applyBackgroundStyle(style)
-        if settings.activeTabIndicatorStyle == .solidFill, model.isActive {
-            backgroundView.layer?.borderWidth = 1.5
-            backgroundView.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.5).cgColor
-        } else {
-            backgroundView.layer?.borderWidth = 0
-        }
-        let railColor = sidebarWorkspaceRowExplicitRailNSColor(
-            activeTabIndicatorStyle: settings.activeTabIndicatorStyle,
-            customColorHex: snapshot.customColorHex,
-            colorScheme: palette.colorScheme
-        )
+        applyBackgroundStyle(palette.visual.backgroundStyle)
+        backgroundView.layer?.borderWidth = 0
+        let railColor = palette.visual.stripColor
         railView.isHidden = railColor == nil
         if let railColor {
             railView.layer?.backgroundColor = railColor.withAlphaComponent(0.95).cgColor
@@ -540,13 +538,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         badgeVisible: Bool,
         spinnerVisible: Bool
     ) {
-        let badgeFill: NSColor = {
-            if let hex = model.settings.notificationBadgeColorHex, let color = NSColor(hex: hex) {
-                return color
-            }
-            return model.isActive ? palette.primaryText.withAlphaComponent(0.25) : cmuxAccentNSColor()
-        }()
-        let badgeText: NSColor = model.isActive ? palette.primaryText : .white
+        let badgeFill = palette.visual.badgeFillColor
+        let badgeText = palette.visual.badgeTextColor
         let badgeFont = NSFont.systemFont(ofSize: model.scaled(9), weight: .semibold)
 
         let leadingBadgeVisible = badgeVisible && model.settings.notificationBadgePosition == .leading
@@ -724,8 +717,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             progressView.configure(
                 fraction: CGFloat(progress.value),
                 barHeight: max(3, 3 * model.fontScale),
-                trackColor: model.isActive ? palette.selectedForeground(0.15) : NSColor.secondaryLabelColor.withAlphaComponent(0.2),
-                fillColor: model.isActive ? palette.selectedForeground(0.8) : cmuxAccentNSColor(),
+                trackColor: palette.visual.progressTrackColor,
+                fillColor: palette.visual.progressFillColor,
                 labelText: progress.label,
                 labelFont: labelFont,
                 labelColor: palette.secondary(0.6)
@@ -933,6 +926,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     func beginInlineRename() {
         guard let model else { return }
         isEditing = true
+        applyModel(model)
         renameField.stringValue = model.snapshot.title
         renameField.font = .systemFont(ofSize: model.scaled(12.5), weight: .semibold)
         renameField.textColor = palette(model).selectedForeground(1.0)
@@ -956,6 +950,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private func endInlineRename(commit: Bool) {
         guard isEditing else { return }
         isEditing = false
+        if let model {
+            applyModel(model)
+        }
         renameField.isHidden = true
         titleView.isHidden = false
         needsLayout = true
@@ -997,7 +994,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     func layoutContent(model: SidebarWorkspaceRowModel, width: CGFloat, apply: Bool) -> CGFloat {
         let outerPad = SidebarWorkspaceListMetrics.rowOuterHorizontalPadding
         let contentPad = SidebarWorkspaceListMetrics.rowContentHorizontalPadding
-        let leading = outerPad + contentPad + (model.isGrouped ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
+        // Clears the strip when it is wider than the row's content padding;
+        // resolves to 0 at the current width.
+        let stripInset = SidebarWorkspaceRowVisualPalette
+            .accentStripContentInset(contentPadding: contentPad)
+        let leading = outerPad + contentPad + stripInset
+            + (model.isGrouped ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
         let trailing = width - outerPad - contentPad
         let contentWidth = max(10, trailing - leading)
         var y: CGFloat = 8
@@ -1256,8 +1258,29 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             // nesting ("can't tell when a workspace is in a group").
             let bgX = outerPad + (model.isGrouped ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
             backgroundView.frame = NSRect(x: bgX, y: 0, width: max(0, width - outerPad - bgX), height: y)
-            railView.frame = NSRect(x: bgX + 4 - 1, y: 5, width: 3, height: max(0, y - 10))
-            railView.layer?.cornerRadius = 1.5
+            // railView is a child of backgroundView, so this frame is in
+            // background-local coordinates. The strip runs flush to the
+            // leading, top, and bottom edges; the parent's corner mask rounds
+            // it. The layer is wider than the visible strip so it can hold the
+            // inverse flare, and the mask carves the silhouette out of it.
+            railView.frame = NSRect(
+                x: 0,
+                y: 0,
+                width: SidebarWorkspaceRowVisualPalette.accentStripLayerWidth,
+                height: y
+            )
+            // A bare CAShapeLayer defaults to contentsScale 1.0, which would
+            // rasterize the concave arc at 1x and upscale it on a Retina display.
+            railMaskLayer.contentsScale = window?.backingScaleFactor
+                ?? railView.layer?.contentsScale
+                ?? 2
+            railMaskLayer.frame = railView.bounds
+            railMaskLayer.path = SidebarWorkspaceRowVisualPalette.accentStripPath(
+                in: railView.bounds,
+                bodyWidth: SidebarWorkspaceRowVisualPalette.accentStripWidth,
+                flare: SidebarWorkspaceRowVisualPalette.accentStripFlareRadius
+            )
+            railView.layer?.mask = railMaskLayer
             let indicatorLeading: CGFloat = 8 + (model.isGrouped ? 0 : 0)
             topDropIndicator.frame = NSRect(
                 x: indicatorLeading,

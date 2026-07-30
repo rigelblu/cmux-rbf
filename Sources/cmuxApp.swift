@@ -1512,7 +1512,6 @@ private enum DebugWindowConfigSnapshot {
         sidebarBranchVerticalLayout=\(boolValue(defaults, key: SidebarCatalogSection().branchVerticalLayout.userDefaultsKey, fallback: SidebarCatalogSection().branchVerticalLayout.defaultValue))
         sidebarBranchDirectoryStacked=\(boolValue(defaults, key: SidebarCatalogSection().stackBranchDirectory.userDefaultsKey, fallback: SidebarCatalogSection().stackBranchDirectory.defaultValue))
         sidebarPathLastSegmentOnly=\(boolValue(defaults, key: SidebarCatalogSection().pathLastSegmentOnly.userDefaultsKey, fallback: SidebarCatalogSection().pathLastSegmentOnly.defaultValue))
-        sidebarActiveTabIndicatorStyle=\(stringValue(defaults, key: WorkspaceColorsCatalogSection().indicatorStyle.userDefaultsKey, fallback: WorkspaceColorsCatalogSection().indicatorStyle.defaultValue.rawValue))
         sidebarDevBuildBannerVisible=\(boolValue(defaults, key: DevBuildBannerDebugSettings.sidebarBannerVisibleKey, fallback: DevBuildBannerDebugSettings.defaultShowSidebarBanner))
         sidebarMinimumWidth=\(String(format: "%.1f", SessionPersistencePolicy.resolvedMinimumSidebarWidth(defaults: defaults)))
         """
@@ -1594,8 +1593,6 @@ private final class DebugWindowControlsWindowController: ReleasingWindowControll
 }
 
 private struct DebugWindowControlsView: View {
-    @AppStorage(WorkspaceColorsCatalogSection().indicatorStyle.userDefaultsKey)
-    private var sidebarActiveTabIndicatorStyle = WorkspaceColorsCatalogSection().indicatorStyle.defaultValue.rawValue
     @AppStorage(BrowserDevToolsButtonDebugSettings.iconNameKey) private var browserDevToolsIconNameRaw = BrowserDevToolsButtonDebugSettings.defaultIcon.rawValue
     @AppStorage(BrowserDevToolsButtonDebugSettings.iconColorKey) private var browserDevToolsIconColorRaw = BrowserDevToolsButtonDebugSettings.defaultColor.rawValue
 
@@ -1605,18 +1602,6 @@ private struct DebugWindowControlsView: View {
 
     private var selectedDevToolsColorOption: BrowserDevToolsIconColorOption {
         BrowserDevToolsIconColorOption(rawValue: browserDevToolsIconColorRaw) ?? BrowserDevToolsButtonDebugSettings.defaultColor
-    }
-
-    private var selectedSidebarActiveTabIndicatorStyle: WorkspaceIndicatorStyle {
-        WorkspaceIndicatorStyle.decodeFromUserDefaults(sidebarActiveTabIndicatorStyle)
-            ?? WorkspaceColorsCatalogSection().indicatorStyle.defaultValue
-    }
-
-    private var sidebarIndicatorStyleSelection: Binding<String> {
-        Binding(
-            get: { selectedSidebarActiveTabIndicatorStyle.rawValue },
-            set: { sidebarActiveTabIndicatorStyle = $0 }
-        )
     }
 
     var body: some View {
@@ -1729,22 +1714,6 @@ private struct DebugWindowControlsView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 2)
-                }
-
-                GroupBox("Active Workspace Indicator") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Picker("Style", selection: sidebarIndicatorStyleSelection) {
-                            ForEach(WorkspaceIndicatorStyle.allCases, id: \.self) { style in
-                                Text(style.displayName).tag(style.rawValue)
-                            }
-                        }
-                        .pickerStyle(.menu)
-
-                        Button("Reset Indicator Style") {
-                            sidebarActiveTabIndicatorStyle = WorkspaceColorsCatalogSection().indicatorStyle.defaultValue.rawValue
-                        }
-                    }
                     .padding(.top, 2)
                 }
 
@@ -2544,21 +2513,7 @@ private struct SidebarDebugView: View {
     private var sidebarPathLastSegmentOnly = SidebarCatalogSection().pathLastSegmentOnly.defaultValue
     @AppStorage(DevBuildBannerDebugSettings.sidebarBannerVisibleKey)
     private var showSidebarDevBuildBanner = DevBuildBannerDebugSettings.defaultShowSidebarBanner
-    @AppStorage(WorkspaceColorsCatalogSection().indicatorStyle.userDefaultsKey)
-    private var sidebarActiveTabIndicatorStyle = WorkspaceColorsCatalogSection().indicatorStyle.defaultValue.rawValue
     @AppStorage("sidebarSelectionColorHex") private var sidebarSelectionColorHex: String?
-
-    private var selectedSidebarIndicatorStyle: WorkspaceIndicatorStyle {
-        WorkspaceIndicatorStyle.decodeFromUserDefaults(sidebarActiveTabIndicatorStyle)
-            ?? WorkspaceColorsCatalogSection().indicatorStyle.defaultValue
-    }
-
-    private var sidebarIndicatorStyleSelection: Binding<String> {
-        Binding(
-            get: { selectedSidebarIndicatorStyle.rawValue },
-            set: { sidebarActiveTabIndicatorStyle = $0 }
-        )
-    }
 
     private var selectionColorBinding: Binding<Color> {
         Binding(
@@ -2654,12 +2609,6 @@ private struct SidebarDebugView: View {
 
                 GroupBox("Active Workspace Indicator") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Picker("Style", selection: sidebarIndicatorStyleSelection) {
-                            ForEach(WorkspaceIndicatorStyle.allCases, id: \.self) { style in
-                                Text(style.displayName).tag(style.rawValue)
-                            }
-                        }
-
                         ColorPicker(String(localized: "sidebar.debug.selectionColor", defaultValue: "Selection Color"), selection: selectionColorBinding, supportsOpacity: false)
 
                         if sidebarSelectionColorHex != nil {
@@ -2699,7 +2648,6 @@ private struct SidebarDebugView: View {
                         sidebarCornerRadius = 0.0
                     }
                     Button("Reset Active Indicator") {
-                        sidebarActiveTabIndicatorStyle = WorkspaceColorsCatalogSection().indicatorStyle.defaultValue.rawValue
                         sidebarSelectionColorHex = nil
                     }
                 }
@@ -2742,7 +2690,6 @@ private struct SidebarDebugView: View {
         sidebarBranchVerticalLayout=\(sidebarBranchVerticalLayout)
         sidebarBranchDirectoryStacked=\(sidebarBranchDirectoryStacked)
         sidebarPathLastSegmentOnly=\(sidebarPathLastSegmentOnly)
-        sidebarActiveTabIndicatorStyle=\(sidebarActiveTabIndicatorStyle)
         sidebarDevBuildBannerVisible=\(showSidebarDevBuildBanner)
         """
         let pasteboard = NSPasteboard.general

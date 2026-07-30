@@ -736,18 +736,11 @@ final class CmuxSettingsFileStore {
         sourcePath: String,
         snapshot: inout ResolvedSettingsSnapshot
     ) {
-        if let raw = jsonString(section["indicatorStyle"]) {
-            let indicatorKey = SettingCatalog().workspaceColors.indicatorStyle
-            let normalized = (WorkspaceIndicatorStyle.decodeFromJSON(raw) ?? indicatorKey.defaultValue).rawValue
-            let accepted = Set(WorkspaceIndicatorStyle.allCases.map(\.rawValue)).union([
-                "rail", "border", "wash", "lift", "typography", "washRail", "blueWashColorRail",
-            ])
-            guard accepted.contains(raw) else {
-                logInvalid("workspaceColors.indicatorStyle", sourcePath: sourcePath)
-                return
-            }
-            snapshot.managedUserDefaults[indicatorKey.userDefaultsKey] = .string(normalized)
-        }
+        // `workspaceColors.indicatorStyle` was removed 2026-07-31 — there is
+        // only one workspace colour treatment now. Existing configs keep the
+        // key, so read past it silently rather than reporting it invalid: it
+        // selects nothing, and warning about it would punish users for a
+        // setting cmux itself retired.
         if section.keys.contains("selectionColor") {
             guard let value = parseNullableHex(
                 section["selectionColor"],

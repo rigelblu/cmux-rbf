@@ -14697,16 +14697,25 @@ struct TabItemView: View, Equatable {
         settings.showsSSH
     }
 
-    private var activeTabIndicatorStyle: WorkspaceIndicatorStyle {
-        settings.activeTabIndicatorStyle
-    }
-
     private var sidebarSelectionColorHex: String? {
         settings.selectionColorHex
     }
 
     private var sidebarNotificationBadgeColorHex: String? {
         settings.notificationBadgeColorHex
+    }
+
+    private var rowVisualPalette: SidebarWorkspaceRowVisualPalette {
+        SidebarWorkspaceRowVisualPalette(
+            isActive: isActive,
+            isMultiSelected: isMultiSelected,
+            isHovered: isPointerHovering,
+            isEditing: isEditing,
+            customColorHex: workspaceSnapshot.customColorHex,
+            colorScheme: colorScheme,
+            selectionColorHex: sidebarSelectionColorHex,
+            notificationBadgeColorHex: sidebarNotificationBadgeColorHex
+        )
     }
 
     private var selectedWorkspaceBackgroundNSColor: NSColor {
@@ -14765,58 +14774,32 @@ struct TabItemView: View, Equatable {
         explicitRailColor(for: workspaceSnapshot) != nil
     }
 
-    private var activeBorderLineWidth: CGFloat {
-        switch activeTabIndicatorStyle {
-        case .leftRail:
-            return 0
-        case .solidFill:
-            return isActive ? 1.5 : 0
-        }
-    }
-
-    private var activeBorderColor: Color {
-        guard isActive else { return .clear }
-        switch activeTabIndicatorStyle {
-        case .leftRail:
-            return .clear
-        case .solidFill:
-            return Color.primary.opacity(0.5)
-        }
-    }
-
     private var usesInvertedActiveForeground: Bool {
         isActive
     }
 
     private var activePrimaryTextColor: Color {
-        usesInvertedActiveForeground
-            ? Color(nsColor: selectedWorkspaceForegroundNSColor(opacity: 1.0))
-            : .primary
+        Color(nsColor: rowVisualPalette.primaryTextColor)
     }
 
     private func activeSecondaryColor(_ opacity: Double = 0.75) -> Color {
-        usesInvertedActiveForeground
-            ? Color(nsColor: selectedWorkspaceForegroundNSColor(opacity: CGFloat(opacity)))
-            : .secondary
+        Color(nsColor: rowVisualPalette.secondaryTextColor(opacity: CGFloat(opacity)))
     }
 
     private var activeUnreadBadgeFillColor: Color {
-        if let hex = sidebarNotificationBadgeColorHex, let nsColor = NSColor(hex: hex) {
-            return Color(nsColor: nsColor)
-        }
-        return usesInvertedActiveForeground ? activePrimaryTextColor.opacity(0.25) : cmuxAccentColor()
+        Color(nsColor: rowVisualPalette.badgeFillColor)
     }
 
     private var activeUnreadBadgeTextColor: Color {
-        usesInvertedActiveForeground ? activePrimaryTextColor : .white
+        Color(nsColor: rowVisualPalette.badgeTextColor)
     }
 
     private var activeProgressTrackColor: Color {
-        usesInvertedActiveForeground ? activeSecondaryColor(0.15) : Color.secondary.opacity(0.2)
+        Color(nsColor: rowVisualPalette.progressTrackColor)
     }
 
     private var activeProgressFillColor: Color {
-        usesInvertedActiveForeground ? activeSecondaryColor(0.8) : cmuxAccentColor()
+        Color(nsColor: rowVisualPalette.progressFillColor)
     }
 
     private var shortcutHintEmphasis: Double {
@@ -15006,7 +14989,11 @@ struct TabItemView: View, Equatable {
         let titleRowSpacing: CGFloat = spinnerOnLeading ? 6 : 8
         let badgeFont = magnifiedFont(scaledFontSize(9), weight: .semibold)
         let spinnerTooltip = SidebarWorkspaceLoadingTooltip.text(count: workspaceSnapshot.activeCodingAgentCount)
-        let spinnerColor = usesInvertedActiveForeground ? selectedWorkspaceForegroundNSColor(opacity: 0.55) : .secondaryLabelColor
+        // Must match the AppKit cell, which derives this from the palette's
+        // primary (white over the corrected fill). Deriving it from the global
+        // selection colour instead made the two renderers disagree whenever a
+        // custom selectionColor was configured.
+        let spinnerColor = usesInvertedActiveForeground ? rowVisualPalette.primaryTextColor.withAlphaComponent(0.55) : .secondaryLabelColor
         let rowView = VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .sidebarTitleFirstLineCenter, spacing: titleRowSpacing) {
 
@@ -15384,24 +15371,32 @@ struct TabItemView: View, Equatable {
         // refresh rate (#5764 / #5845). Lazy rows must be height-stable after
         // they appear; content changes now apply in one discrete layout pass.
         .padding(.horizontal, SidebarWorkspaceListMetrics.rowContentHorizontalPadding)
+        // Clears the strip when it is wider than the row's content padding;
+        // resolves to 0 at the current width.
+        .padding(
+            .leading,
+            SidebarWorkspaceRowVisualPalette.accentStripContentInset(
+                contentPadding: SidebarWorkspaceListMetrics.rowContentHorizontalPadding
+            )
+        )
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(rowBackgroundColor)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(activeBorderColor, lineWidth: activeBorderLineWidth)
-                }
                 .overlay(alignment: .leading) {
                     if showsLeadingRail(for: workspaceSnapshot) {
-                        Capsule(style: .continuous)
-                        .fill(rowRailColor)
-                            .frame(width: 3)
-                            .padding(.leading, 4)
-                            .padding(.vertical, 5)
-                            .offset(x: -1)
+                        // Flush strip: leading, top, and bottom edges. The
+                        // enclosing clipShape rounds it to the row's corners so
+                        // it never overhangs them.
+                        SidebarAccentStripShape()
+                            .fill(rowRailColor)
+                            .frame(
+                                width: SidebarWorkspaceRowVisualPalette
+                                    .accentStripLayerWidth
+                            )
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         )
         .sidebarShortcutHintOverlay(
             text: showsWorkspaceShortcutHint ? workspaceShortcutLabel : nil,
@@ -15491,14 +15486,7 @@ struct TabItemView: View, Equatable {
     private func backgroundColor(
         for workspaceSnapshot: SidebarWorkspaceSnapshotBuilder.Snapshot
     ) -> Color {
-        let style = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: activeTabIndicatorStyle,
-            isActive: isActive,
-            isMultiSelected: isMultiSelected,
-            customColorHex: workspaceSnapshot.customColorHex,
-            colorScheme: colorScheme,
-            sidebarSelectionColorHex: sidebarSelectionColorHex
-        )
+        let style = rowVisualPalette.backgroundStyle
         guard let color = style.color else { return .clear }
         return Color(nsColor: color).opacity(style.opacity)
     }
@@ -15512,11 +15500,7 @@ struct TabItemView: View, Equatable {
     private func explicitRailColor(
         for workspaceSnapshot: SidebarWorkspaceSnapshotBuilder.Snapshot
     ) -> Color? {
-        guard let railColor = sidebarWorkspaceRowExplicitRailNSColor(
-            activeTabIndicatorStyle: activeTabIndicatorStyle,
-            customColorHex: workspaceSnapshot.customColorHex,
-            colorScheme: colorScheme
-        ) else {
+        guard let railColor = rowVisualPalette.stripColor else {
             return nil
         }
         return Color(nsColor: railColor).opacity(0.95)
@@ -15526,7 +15510,7 @@ struct TabItemView: View, Equatable {
         WorkspaceTabColorSettings.displayNSColor(
             hex: hex,
             colorScheme: colorScheme,
-            forceBright: activeTabIndicatorStyle == .leftRail
+            forceBright: false
         ) ?? NSColor(hex: hex) ?? .gray
     }
 

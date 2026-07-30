@@ -83,44 +83,6 @@ final class SidebarBranchLayoutSettingsTests: XCTestCase {
 }
 
 
-final class SidebarActiveTabIndicatorSettingsTests: XCTestCase {
-    func testDefaultStyleWhenUnset() {
-        let suiteName = "SidebarActiveTabIndicatorSettingsTests.Default.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            XCTFail("Failed to create isolated UserDefaults suite")
-            return
-        }
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        defaults.removeObject(forKey: SettingCatalog().workspaceColors.indicatorStyle.userDefaultsKey)
-        XCTAssertEqual(
-            UserDefaultsSettingsClient(defaults: defaults).value(for: SettingCatalog().workspaceColors.indicatorStyle),
-            SettingCatalog().workspaceColors.indicatorStyle.defaultValue
-        )
-    }
-
-    func testStoredStyleParsesAndInvalidFallsBack() {
-        let suiteName = "SidebarActiveTabIndicatorSettingsTests.Stored.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            XCTFail("Failed to create isolated UserDefaults suite")
-            return
-        }
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        defaults.set(WorkspaceIndicatorStyle.leftRail.rawValue, forKey: SettingCatalog().workspaceColors.indicatorStyle.userDefaultsKey)
-        XCTAssertEqual(UserDefaultsSettingsClient(defaults: defaults).value(for: SettingCatalog().workspaceColors.indicatorStyle), .leftRail)
-
-        defaults.set("rail", forKey: SettingCatalog().workspaceColors.indicatorStyle.userDefaultsKey)
-        XCTAssertEqual(UserDefaultsSettingsClient(defaults: defaults).value(for: SettingCatalog().workspaceColors.indicatorStyle), .leftRail)
-
-        defaults.set("not-a-style", forKey: SettingCatalog().workspaceColors.indicatorStyle.userDefaultsKey)
-        XCTAssertEqual(
-            UserDefaultsSettingsClient(defaults: defaults).value(for: SettingCatalog().workspaceColors.indicatorStyle),
-            SettingCatalog().workspaceColors.indicatorStyle.defaultValue
-        )
-    }
-}
-
 @Suite
 struct SidebarTabItemFontScaleTests {
     @Test func defaultSidebarFontScaleIsUnitScale() {

@@ -1129,20 +1129,8 @@
       "additionalProperties": false,
       "properties": {
         "indicatorStyle": {
-          "type": "string",
-          "enum": [
-            "leftRail",
-            "solidFill",
-            "rail",
-            "border",
-            "wash",
-            "lift",
-            "typography",
-            "washRail",
-            "blueWashColorRail"
-          ],
-          "default": "leftRail",
-          "description": "Active workspace indicator style. Legacy aliases are accepted and normalized."
+          "deprecated": true,
+          "description": "Retired. cmux has one workspace color treatment, so this no longer selects anything. It is accepted and ignored so existing config files stay valid; you can delete it."
         },
         "selectionColor": {
           "$ref": "#/$defs/colorHexOrNull",

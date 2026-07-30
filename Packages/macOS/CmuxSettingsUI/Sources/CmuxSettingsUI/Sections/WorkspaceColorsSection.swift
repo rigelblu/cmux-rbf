@@ -13,7 +13,6 @@ public struct WorkspaceColorsSection: View {
     private let catalog: SettingCatalog
     private let errorLog: SettingsErrorLog
 
-    @State private var indicator: DefaultsValueModel<WorkspaceIndicatorStyle>
     @State private var selectionHex: DefaultsValueModel<String>
     @State private var badgeHex: DefaultsValueModel<String>
     @State private var paletteModel: DefaultsValueModel<[String: String]>
@@ -52,7 +51,6 @@ public struct WorkspaceColorsSection: View {
         self.jsonStore = jsonStore
         self.catalog = catalog
         self.errorLog = errorLog
-        _indicator = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.indicatorStyle))
         _selectionHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.selectionColorHex))
         _badgeHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.notificationBadgeColorHex))
         _paletteModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.palette))
@@ -74,7 +72,6 @@ public struct WorkspaceColorsSection: View {
 
     private func startObservingSettings() {
         let models: [any SettingObservationStarting] = [
-            indicator,
             selectionHex,
             badgeHex,
             paletteModel,
@@ -85,21 +82,6 @@ public struct WorkspaceColorsSection: View {
     @ViewBuilder
     private var mainCard: some View {
         SettingsCard {
-            SettingsCardRow(
-                configurationReview: .json("workspaceColors.indicatorStyle"),
-                String(localized: "settings.workspaceColors.indicator", defaultValue: "Workspace Color Indicator"),
-                controlWidth: 196
-            ) {
-                Picker("", selection: Binding(get: { indicator.current }, set: { indicator.set($0) })) {
-                    ForEach(WorkspaceIndicatorStyle.allCases, id: \.self) { style in
-                        Text(indicatorStyleLabel(style)).tag(style)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-            }
-            SettingsCardDivider()
-
             colorRow(
                 title: String(localized: "settings.workspaceColors.selectionColor", defaultValue: "Selection Highlight"),
                 subtitle: String(localized: "settings.workspaceColors.selectionColor.subtitle", defaultValue: "Background color of the selected workspace in the sidebar."),
@@ -262,19 +244,6 @@ public struct WorkspaceColorsSection: View {
     private func baseHex(for name: String) -> String? {
         Self.builtInPalette.first(where: { $0.name == name })?.hex
     }
-
-    /// Localized label for an indicator style.
-    ///
-    /// Uses the legacy `sidebar.activeTabIndicator.*` localization keys
-    /// (mirrors `SidebarActiveTabIndicatorStyle.displayName` in the app
-    /// target) so existing translations apply.
-    private func indicatorStyleLabel(_ style: WorkspaceIndicatorStyle) -> String {
-        switch style {
-        case .leftRail: return String(localized: "sidebar.activeTabIndicator.leftRail", defaultValue: "Left Rail")
-        case .solidFill: return String(localized: "sidebar.activeTabIndicator.solidFill", defaultValue: "Solid Fill")
-        }
-    }
-
 
     /// cmux-themed accent color used as the live ColorPicker fallback
     /// when the selection or notification badge has no custom hex.
