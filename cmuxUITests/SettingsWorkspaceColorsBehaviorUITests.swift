@@ -6,9 +6,6 @@ import XCTest
 /// `Packages/macOS/CmuxSettingsUI/.../Sections/WorkspaceColorsSection.swift`
 /// and `Packages/macOS/CmuxSettings/.../Keys/WorkspaceColorsCatalogSection.swift`):
 ///
-/// - **Workspace Color Indicator** (`workspaceColors.indicatorStyle`,
-///   UserDefaults `sidebarActiveTabIndicatorStyle`): menu Picker, Left
-///   Rail / Solid Fill.
 /// - **Selection Highlight** (`workspaceColors.selectionColor`,
 ///   UserDefaults `sidebarSelectionColorHex`): `ColorPicker` + a "Reset"
 ///   button shown only when a custom hex is stored.
@@ -26,9 +23,6 @@ import XCTest
 /// The *visible* runtime effect of every color/style setting lives in
 /// the sidebar workspace-tab rendering and is pixel-only:
 ///
-/// - `WorkspaceTabTitleView.activeBorderLineWidth` / `activeBorderColor`
-///   switch on `activeTabIndicatorStyle` (left rail vs solid fill) — a
-///   `CGFloat` border width and a `Color`, no accessibility surface.
 /// - `selectedWorkspaceBackgroundNSColor` is derived from
 ///   `sidebarSelectionColorHex` and used only as a fill.
 /// - `activeUnreadBadgeFillColor` is derived from
@@ -59,9 +53,6 @@ import XCTest
 /// flaky under XCUITest), and the per-row Reset buttons only appear once
 /// a custom hex is stored, which there is no seam-free way to set up.
 ///
-// TIER 2 (needs runtime seam): Workspace Color Indicator (left rail vs
-//   solid fill) — only changes `activeBorderLineWidth`/`activeBorderColor`
-//   on the active workspace tab; pixel-only, no accessibility value.
 // TIER 2 (needs runtime seam): Selection Highlight color — only changes
 //   the selected workspace tab background fill; pixel-only, and the
 //   ColorPicker drives NSColorPanel which XCUITest cannot reliably set.
@@ -82,7 +73,6 @@ final class SettingsWorkspaceColorsBehaviorUITests: SettingsUITestCase {
 
     /// UserDefaults keys (raw `userDefaultsKey`s) backing this section.
     private static let workspaceColorKeys = [
-        "sidebarActiveTabIndicatorStyle",
         "sidebarSelectionColorHex",
         "sidebarNotificationBadgeColorHex",
         "workspaceTabColor.colors",
@@ -121,18 +111,13 @@ final class SettingsWorkspaceColorsBehaviorUITests: SettingsUITestCase {
 
         navigate(window, to: "Workspace Colors")
 
-        // Section anchor: the indicator row title must render so we know
-        // the Workspace Colors detail is on screen.
-        let indicatorTitle = window.staticTexts["Workspace Color Indicator"]
+        // Section anchor: the Workspace Color Indicator row was removed on
+        // 2026-07-31 along with the setting, so anchor on the first row that
+        // remains.
+        let selectionTitle = window.staticTexts["Selection Highlight"]
         XCTAssertTrue(
-            poll(timeout: 6.0) { indicatorTitle.exists },
-            "Workspace Colors section did not render its indicator row"
-        )
-
-        // The selection / badge color rows render their titles too.
-        XCTAssertTrue(
-            window.staticTexts["Selection Highlight"].exists,
-            "Selection Highlight row missing"
+            poll(timeout: 6.0) { selectionTitle.exists },
+            "Workspace Colors section did not render its Selection Highlight row"
         )
         XCTAssertTrue(
             window.staticTexts["Notification Badge"].exists,

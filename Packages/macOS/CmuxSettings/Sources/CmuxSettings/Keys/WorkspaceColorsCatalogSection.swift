@@ -2,11 +2,12 @@ import Foundation
 
 /// Settings under the dotted-id prefix `workspaceColors.*`.
 public struct WorkspaceColorsCatalogSection: SettingCatalogSection {
-    public let indicatorStyle = DefaultsKey<WorkspaceIndicatorStyle>(
-        id: "workspaceColors.indicatorStyle",
-        defaultValue: .leftRail,
-        userDefaultsKey: "sidebarActiveTabIndicatorStyle"
-    )
+    // `workspaceColors.indicatorStyle` was removed 2026-07-31. Accent Strip is
+    // no longer one style among three — it is how a coloured workspace row
+    // renders, so there is nothing left to choose between. Stored
+    // `sidebarActiveTabIndicatorStyle` values in UserDefaults and
+    // `indicatorStyle` keys in cmux.json are simply ignored; they select
+    // nothing rather than failing.
 
     public let selectionColorHex = DefaultsKey<String>(
         id: "workspaceColors.selectionColor",

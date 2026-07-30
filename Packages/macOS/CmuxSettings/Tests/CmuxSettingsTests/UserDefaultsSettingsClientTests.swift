@@ -31,7 +31,6 @@ struct UserDefaultsSettingsClientTests {
         #expect(client.value(for: catalog.app.keepWorkspaceOpenWhenClosingLastSurface) == true)
         #expect(client.value(for: catalog.app.workspaceInheritWorkingDirectory) == true)
         #expect(client.value(for: catalog.app.newWorkspacePlacement) == .afterCurrent)
-        #expect(client.value(for: catalog.workspaceColors.indicatorStyle) == .leftRail)
         #expect(client.value(for: catalog.workspaceGroups.anchorCloseSuppressed) == false)
         #expect(client.value(for: catalog.workspaceGroups.newWorkspacePlacement) == .afterCurrent)
         #expect(client.value(for: catalog.terminal.titleUpdateCoalescingEnabled) == false)
@@ -55,9 +54,6 @@ struct UserDefaultsSettingsClientTests {
         client.set(.top, for: catalog.app.newWorkspacePlacement)
         #expect(defaults.string(forKey: "newWorkspacePlacement") == "top")
         #expect(client.value(for: catalog.app.newWorkspacePlacement) == .top)
-
-        client.set(.solidFill, for: catalog.workspaceColors.indicatorStyle)
-        #expect(defaults.string(forKey: "sidebarActiveTabIndicatorStyle") == "solidFill")
 
         client.set(.end, for: catalog.workspaceGroups.newWorkspacePlacement)
         #expect(defaults.string(forKey: "workspaceGroup.newWorkspacePlacement") == "end")
@@ -115,37 +111,6 @@ struct UserDefaultsSettingsClientTests {
         #expect(client.value(for: catalog.app.newWorkspacePlacement) == .top)
     }
 }
-
-@Suite("WorkspaceIndicatorStyle legacy decode")
-struct WorkspaceIndicatorStyleLegacyDecodeTests {
-    @Test(arguments: [
-        ("leftRail", WorkspaceIndicatorStyle.leftRail),
-        ("solidFill", .solidFill),
-        ("rail", .leftRail),
-        ("border", .solidFill),
-        ("wash", .solidFill),
-        ("lift", .solidFill),
-        ("typography", .solidFill),
-        ("washRail", .solidFill),
-        ("blueWashColorRail", .solidFill),
-    ])
-    func mapsLegacyRawValues(raw: String, expected: WorkspaceIndicatorStyle) {
-        #expect(WorkspaceIndicatorStyle.decodeFromUserDefaults(raw) == expected)
-        #expect(WorkspaceIndicatorStyle.decodeFromJSON(raw) == expected)
-    }
-
-    @Test func unknownAndNonStringValuesDecodeAsNil() {
-        #expect(WorkspaceIndicatorStyle.decodeFromUserDefaults("sparkles") == nil)
-        #expect(WorkspaceIndicatorStyle.decodeFromUserDefaults(nil) == nil)
-        #expect(WorkspaceIndicatorStyle.decodeFromUserDefaults(7) == nil)
-    }
-
-    @Test func encodesModernRawValue() {
-        #expect(WorkspaceIndicatorStyle.leftRail.encodeForUserDefaults() as? String == "leftRail")
-        #expect(WorkspaceIndicatorStyle.solidFill.encodeForJSON() as? String == "solidFill")
-    }
-}
-
 @Suite("WorkspaceGroupNewPlacement decode")
 struct WorkspaceGroupNewPlacementDecodeTests {
     @Test(arguments: [

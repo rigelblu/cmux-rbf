@@ -22,7 +22,6 @@ struct SidebarTabItemSettingsSnapshot: Equatable {
     let openPortLinksInCmuxBrowser: Bool
     let showsNotificationMessage: Bool
     let notificationMessageLineLimit: Int
-    let activeTabIndicatorStyle: WorkspaceIndicatorStyle
     let loadingSpinnerPosition: SidebarIndicatorPosition
     let notificationBadgePosition: SidebarIndicatorPosition
     let selectionColorHex: String?
@@ -84,7 +83,6 @@ struct SidebarTabItemSettingsSnapshot: Equatable {
             hideAllDetails: hidesAllDetails
         )
 
-        activeTabIndicatorStyle = settings.value(for: workspaceColors.indicatorStyle)
         loadingSpinnerPosition = settings.value(for: sidebar.loadingSpinnerPosition)
         notificationBadgePosition = settings.value(for: sidebar.notificationBadgePosition)
         selectionColorHex = settings.value(for: workspaceColors.selectionColorHex).nilIfEmpty

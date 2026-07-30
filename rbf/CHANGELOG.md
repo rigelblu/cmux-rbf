@@ -9,6 +9,21 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.4.0 (2026-07-31) — #cm-10
+## 🟠⋯ Added for End Users
+- 2026-07-31 - feat (ux) | recognize a workspace by its colour and see which one is active at a glance — the colour stays as an identity strip down the row's leading edge over a quiet wash, and selecting a workspace fills the row with a contrast-corrected version of its own colour instead of a generic highlight (#cm-10)
+- 2026-07-31 - feat (ux) | tell two similar workspace colours apart while one is selected — the active row's strip wears a pale tint of that workspace's own colour, where before every selected row drew the same black or white edge and only the fill carried identity (#cm-10)
+- 2026-07-31 - feat (ux) | the colour strip curves into the row along the row's own corner instead of ending in a blunt or rounded tip (#cm-10)
+
+## 🟠⋯ Removed for End Users
+- 2026-07-31 - feat (ux) | the **Workspace Color Indicator** setting is gone, along with the Left Rail and Solid Fill styles — workspace colours now render one way, so there is nothing to choose between (#cm-10)
+
+## 🟠⋯ Known Limitations
+- A `workspaceColors.indicatorStyle` value left in `~/.config/cmux/cmux.json` is ignored rather than reported. It selects nothing and can be deleted; cmux stays silent rather than warning about a key it retired itself.
+- Increase Contrast, Reduce Transparency, and VoiceOver were not exercised for this release. The treatment is designed so the full-strength strip and opaque active fill survive them with the colour wash only supplemental, but that is unverified — and the wash is the part that composites against the translucent sidebar material those settings remove.
+
+---
+
 # 🔵⋯ v0.3.0 (2026-07-31) — #cm-13
 ## 🟠⋯ Added for End Users
 - 2026-07-31 - feat (ux) | see one terminal `background-image` spanning the whole window instead of a separately cropped copy in every pane, so a split no longer breaks the picture at each divider (#cm-13)

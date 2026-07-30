@@ -567,7 +567,6 @@ enum SettingsSearchIndex {
         "terminal.rendererRealization.enabled": settingID(for: .terminal, idSuffix: "renderer-realization"),
         "terminal.rendererRealization.idleSeconds": settingID(for: .terminal, idSuffix: "renderer-realization"),
         "terminal.rendererRealization.maxWarmRenderers": settingID(for: .terminal, idSuffix: "renderer-realization"),
-        "workspaceColors.indicatorStyle": settingID(for: .workspaceColors, idSuffix: "indicator"),
         "workspaceColors.selectionColor": settingID(for: .workspaceColors, idSuffix: "selection"),
         "workspaceColors.notificationBadgeColor": settingID(for: .workspaceColors, idSuffix: "badge"),
         "sidebarAppearance.matchTerminalBackground": settingID(for: .sidebarAppearance, idSuffix: "match-terminal"),

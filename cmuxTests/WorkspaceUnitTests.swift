@@ -113,142 +113,81 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
         XCTAssertEqual(color.alphaComponent, 0.65, accuracy: 0.001)
     }
 
+    /// The inversion this feature exists for: a selected workspace keeps its own
+    /// colour instead of collapsing into the global selection highlight. These
+    /// replace five tests that asserted the opposite policy, which shipped
+    /// before `cm-10` and which the removal of Left Rail / Solid Fill retired.
     @MainActor
-    func testSolidFillKeepsSelectedBackgroundForActiveCustomColoredWorkspaceRow() {
-        let manager = TabManager()
-        guard let workspace = manager.tabs.first else {
-            XCTFail("Expected TabManager to initialise with a workspace")
-            return
-        }
-
-        var observedSidebarInvalidation = false
-        let cancellable = workspace.sidebarImmediateObservationPublisher.sink {
-            observedSidebarInvalidation = true
-        }
-        observedSidebarInvalidation = false
-
-        manager.setTabColor(tabId: workspace.id, color: "#C0392B")
-
-        XCTAssertEqual(workspace.customColor, "#C0392B")
-        XCTAssertTrue(observedSidebarInvalidation)
-
-        let background = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: .solidFill,
+    func testActiveColoredWorkspaceRowUsesItsOwnContrastCorrectedColor() {
+        let palette = SidebarWorkspaceRowVisualPalette(
             isActive: true,
             isMultiSelected: false,
-            customColorHex: workspace.customColor,
+            isHovered: false,
+            isEditing: false,
+            customColorHex: "#C0392B",
             colorScheme: .light,
-            sidebarSelectionColorHex: nil
+            selectionColorHex: nil,
+            notificationBadgeColorHex: nil
         )
 
-        XCTAssertEqual(
-            background.color?.hexString(),
+        let fill = palette.backgroundStyle.color
+        XCTAssertNotNil(fill)
+        XCTAssertEqual(palette.backgroundStyle.opacity, 1.0, accuracy: 0.001)
+        // The whole point: NOT the global selection background.
+        XCTAssertNotEqual(
+            fill?.hexString(),
             sidebarSelectedWorkspaceBackgroundNSColor(for: .light).hexString()
         )
-        XCTAssertEqual(background.opacity, 1.0, accuracy: 0.001)
-        withExtendedLifetime(cancellable) {}
+        // And still readable with the white content the design pairs it with.
+        XCTAssertGreaterThanOrEqual(
+            cmuxContrastRatio(foreground: .white, background: fill ?? .clear),
+            4.5
+        )
     }
 
+    /// A configured `selectionColor` styles uncoloured rows only — it must not
+    /// reclaim a coloured row's fill, which is how the pre-`cm-10` policy worked.
     @MainActor
-    func testLeftRailKeepsSelectedBackgroundForActiveCustomColoredWorkspaceRow() {
-        let manager = TabManager()
-        guard let workspace = manager.tabs.first else {
-            XCTFail("Expected TabManager to initialise with a workspace")
-            return
+    func testConfiguredSelectionColorDoesNotOverrideAColoredRowsOwnFill() {
+        func fill(customColorHex: String?) -> NSColor? {
+            SidebarWorkspaceRowVisualPalette(
+                isActive: true,
+                isMultiSelected: false,
+                isHovered: false,
+                isEditing: false,
+                customColorHex: customColorHex,
+                colorScheme: .light,
+                selectionColorHex: "#123456",
+                notificationBadgeColorHex: nil
+            ).backgroundStyle.color
         }
 
-        var observedSidebarInvalidation = false
-        let cancellable = workspace.sidebarImmediateObservationPublisher.sink {
-            observedSidebarInvalidation = true
-        }
-        observedSidebarInvalidation = false
+        XCTAssertEqual(fill(customColorHex: nil)?.hexString(), "#123456")
+        XCTAssertNotEqual(fill(customColorHex: "#C0392B")?.hexString(), "#123456")
+    }
 
-        manager.setTabColor(tabId: workspace.id, color: "#C0392B")
-
-        XCTAssertEqual(workspace.customColor, "#C0392B")
-        XCTAssertTrue(observedSidebarInvalidation)
-
-        let background = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: .leftRail,
-            isActive: true,
+    /// Resting rows wear a quiet wash of their own colour rather than being
+    /// transparent (Left Rail) or strongly filled at 70% (Solid Fill).
+    @MainActor
+    func testInactiveColoredWorkspaceRowWearsAQuietWashOfItsOwnColor() {
+        let palette = SidebarWorkspaceRowVisualPalette(
+            isActive: false,
             isMultiSelected: false,
-            customColorHex: workspace.customColor,
+            isHovered: false,
+            isEditing: false,
+            customColorHex: "#C0392B",
             colorScheme: .light,
-            sidebarSelectionColorHex: nil
+            selectionColorHex: nil,
+            notificationBadgeColorHex: nil
         )
 
+        XCTAssertEqual(palette.backgroundStyle.color?.hexString(), "#C0392B")
         XCTAssertEqual(
-            background.color?.hexString(),
-            sidebarSelectedWorkspaceBackgroundNSColor(for: .light).hexString()
+            palette.backgroundStyle.opacity,
+            SidebarWorkspaceRowVisualPalette.restingWashOpacity,
+            accuracy: 0.001
         )
-        XCTAssertEqual(background.opacity, 1.0, accuracy: 0.001)
-        withExtendedLifetime(cancellable) {}
-    }
-
-    @MainActor
-    func testLeftRailLeavesInactiveCustomColoredWorkspaceRowTransparent() {
-        let manager = TabManager()
-        guard let workspace = manager.tabs.first else {
-            XCTFail("Expected TabManager to initialise with a workspace")
-            return
-        }
-
-        manager.setTabColor(tabId: workspace.id, color: "#C0392B")
-
-        let background = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: .leftRail,
-            isActive: false,
-            isMultiSelected: false,
-            customColorHex: workspace.customColor,
-            colorScheme: .light,
-            sidebarSelectionColorHex: nil
-        )
-
-        XCTAssertNil(background.color)
-        XCTAssertEqual(background.opacity, 0, accuracy: 0.001)
-    }
-
-    @MainActor
-    func testLeftRailResolvesExplicitRailColorForCustomColoredWorkspaceRow() {
-        let manager = TabManager()
-        guard let workspace = manager.tabs.first else {
-            XCTFail("Expected TabManager to initialise with a workspace")
-            return
-        }
-
-        manager.setTabColor(tabId: workspace.id, color: "#C0392B")
-
-        let railColor = sidebarWorkspaceRowExplicitRailNSColor(
-            activeTabIndicatorStyle: .leftRail,
-            customColorHex: workspace.customColor,
-            colorScheme: .light
-        )
-
-        XCTAssertNotNil(railColor)
-        XCTAssertEqual(railColor?.hexString(), "#D13929")
-    }
-
-    @MainActor
-    func testSolidFillUsesInactiveCustomWorkspaceColorAsBackground() {
-        let manager = TabManager()
-        guard let workspace = manager.tabs.first else {
-            XCTFail("Expected TabManager to initialise with a workspace")
-            return
-        }
-
-        manager.setTabColor(tabId: workspace.id, color: "#C0392B")
-
-        let background = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: .solidFill,
-            isActive: false,
-            isMultiSelected: false,
-            customColorHex: workspace.customColor,
-            colorScheme: .light,
-            sidebarSelectionColorHex: nil
-        )
-
-        XCTAssertEqual(background.color?.hexString(), "#C0392B")
-        XCTAssertEqual(background.opacity, 0.7, accuracy: 0.001)
+        XCTAssertEqual(palette.stripColor?.hexString(), "#C0392B")
     }
 
     @MainActor
