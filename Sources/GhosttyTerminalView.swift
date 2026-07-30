@@ -448,6 +448,9 @@ class GhosttyApp {
     private var runtimeColorSchemeSynchronizationDepth = 0
     private var reloadConfigurationDepth = 0
     private(set) var usesHostLayerBackground = false
+    /// The terminal `background-image` cmux draws at the window root, since
+    /// `macos-background-image-from-layer` stops Ghostty drawing it per-surface.
+    private(set) var terminalBackdropImage: TerminalBackdropImage?
     private(set) var userGhosttyShellIntegrationMode: String = "detect"
     private(set) var hasUserGhosttyCommand = false
     private(set) var resolvedUserShell: String?
@@ -1229,10 +1232,29 @@ class GhosttyApp {
             source: "loadDefaultConfigFilesWithLegacyFallback"
         )
         // Let cmux own the window-level backdrop once, while Ghostty keeps
-        // rendering text, cell backgrounds, and background images. This avoids
-        // separate translucent fills for terminal and chrome surfaces.
+        // rendering text and cell backgrounds. This avoids separate
+        // translucent fills for terminal and chrome surfaces.
+        //
+        // The image opt-in extends that ownership to `background-image`.
+        // Without it Ghostty reclaims the whole backdrop the moment an image
+        // is configured and fits it to each surface separately, so a split
+        // shows two independently-cropped copies and pane chrome between
+        // surfaces has no image beneath it at all. cmux draws it once at the
+        // window root instead — see `TerminalBackdropImage`.
+        // Escape hatch for bisecting backdrop-composition problems: with
+        // CMUX_BG_IMAGE_FROM_LAYER=0 the renderer keeps drawing the image
+        // per-surface exactly as it did before this delegation existed, so a
+        // missing image can be attributed to the delegation or exonerated
+        // from it without rebuilding GhosttyKit.
+        let delegatesBackgroundImage =
+            ProcessInfo.processInfo.environment["CMUX_BG_IMAGE_FROM_LAYER"] != "0"
         loadInlineGhosttyConfig(
-            "macos-background-from-layer = true",
+            delegatesBackgroundImage
+                ? """
+                macos-background-from-layer = true
+                macos-background-image-from-layer = true
+                """
+                : "macos-background-from-layer = true",
             into: config,
             prefix: "cmux-renderer-bg",
             logLabel: "renderer background"
@@ -1270,7 +1292,13 @@ class GhosttyApp {
         loadNoActiveDisplayVsyncFallbackIfNeeded(config)
 
         ghostty_config_finalize(config)
-        return renderingModeChanged
+
+        // Read the image cmux now draws itself, after finalize so relative
+        // paths are already expanded. A changed or removed image has to force
+        // an appearance notify the same way a rendering-mode flip does, or the
+        // window root keeps painting the previous backdrop.
+        let backdropImageChanged = refreshTerminalBackdropImage(from: config)
+        return renderingModeChanged || backdropImageChanged
     }
     func loadGlobalFontMagnificationConfig(_ config: ghostty_config_t) {
         guard !GlobalFontMagnification.isDefault else { return }
@@ -2205,6 +2233,95 @@ class GhosttyApp {
             scope: scope,
             forceNotify: forceNotify
         )
+    }
+
+    /// Reads the terminal `background-image` family out of a loaded config.
+    ///
+    /// Returns nil when no image is configured. The defaults below mirror
+    /// Ghostty's own (`background-image-fit = cover`, `-position = center`,
+    /// `-opacity = 1`, `-repeat = false`) so a config that sets only
+    /// `background-image` renders the same way it would inside the renderer.
+    @discardableResult
+    private func refreshTerminalBackdropImage(from config: ghostty_config_t) -> Bool {
+        let previous = terminalBackdropImage
+        terminalBackdropImage = Self.terminalBackdropImage(from: config)
+        if backgroundLogEnabled {
+            let describe = { (image: TerminalBackdropImage?) -> String in
+                guard let image else { return "nil" }
+                return "\(image.url.path) fit=\(image.fit.rawValue) pos=\(image.position.rawValue) opacity=\(String(format: "%.3f", Double(image.opacity))) repeat=\(image.repeats)"
+            }
+            // Read the delegation flags back out of the finalized config. The
+            // image is only ours to draw if Ghostty actually agreed to stop
+            // drawing it, and "we injected it" is not the same claim as
+            // "the renderer received it".
+            let fromLayer = Self.ghosttyBoolValue(from: config, key: "macos-background-from-layer")
+            let imageFromLayer = Self.ghosttyBoolValue(
+                from: config,
+                key: "macos-background-image-from-layer"
+            )
+            logBackground(
+                "terminal backdrop image resolved previous=[\(describe(previous))] next=[\(describe(terminalBackdropImage))] fromLayer=\(fromLayer.map(String.init) ?? "absent") imageFromLayer=\(imageFromLayer.map(String.init) ?? "absent")"
+            )
+        }
+        return previous != terminalBackdropImage
+    }
+
+    static func terminalBackdropImage(from config: ghostty_config_t) -> TerminalBackdropImage? {
+        var pathValue = ghostty_config_path_s()
+        let pathKey = "background-image"
+        guard ghostty_config_get(
+            config,
+            &pathValue,
+            pathKey,
+            UInt(pathKey.lengthOfBytes(using: .utf8))
+        ), let rawPath = pathValue.path else {
+            return nil
+        }
+        let path = String(cString: rawPath)
+        guard !path.isEmpty else { return nil }
+
+        return TerminalBackdropImage(
+            url: URL(fileURLWithPath: path),
+            fit: ghosttyEnumValue(from: config, key: "background-image-fit")
+                .flatMap(TerminalBackdropImage.Fit.init(rawValue:)) ?? .cover,
+            position: ghosttyEnumValue(from: config, key: "background-image-position")
+                .flatMap(TerminalBackdropImage.Position.init(configValue:)) ?? .centerCenter,
+            opacity: ghosttyFloatValue(from: config, key: "background-image-opacity")
+                .map(CGFloat.init) ?? 1.0,
+            repeats: ghosttyBoolValue(from: config, key: "background-image-repeat") ?? false
+        )
+    }
+
+    private static func ghosttyEnumValue(from config: ghostty_config_t, key: String) -> String? {
+        var value: UnsafePointer<Int8>?
+        guard ghostty_config_get(config, &value, key, UInt(key.lengthOfBytes(using: .utf8))),
+              let value else {
+            return nil
+        }
+        return String(cString: value)
+    }
+
+    /// Reads an `f32` config value.
+    ///
+    /// The width matters: `c_get.getValue` writes through the pointer using
+    /// the *config field's* type, so reading an `f32` field into a `Double`
+    /// fills only four of its eight bytes and leaves the rest uninitialized.
+    /// `background-image-opacity` is `f32` while the sibling
+    /// `background-opacity` is `f64` — they cannot share a reader.
+    private static func ghosttyFloatValue(from config: ghostty_config_t, key: String) -> Float? {
+        var value: Float = 0
+        guard ghostty_config_get(config, &value, key, UInt(key.lengthOfBytes(using: .utf8))) else {
+            return nil
+        }
+        return value
+    }
+
+    private static func ghosttyBoolValue(from config: ghostty_config_t, key: String) -> Bool? {
+        var value = false
+        guard ghostty_config_get(config, &value, key, UInt(key.lengthOfBytes(using: .utf8))) else {
+            return nil
+        }
+        return value
     }
 
     private func defaultBackgroundBlurValue(from config: ghostty_config_t) -> GhosttyBackgroundBlur {

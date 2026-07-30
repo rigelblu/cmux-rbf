@@ -177,6 +177,7 @@ struct WorkspaceContentView: View {
     ) -> Void)?
     @State private var config = WorkspaceContentView.resolveGhosttyAppearanceConfig(reason: "stateInit")
     @State private var lastAppliedUsesHostLayerBackground = GhosttyApp.shared.usesHostLayerBackground
+    @State private var lastAppliedTerminalBackdropImage = GhosttyApp.shared.terminalBackdropImage
     @State private var deferredThemeRefresh: DeferredThemeRefresh?
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var notificationStore: TerminalNotificationStore
@@ -611,7 +612,8 @@ struct WorkspaceContentView: View {
 
         let previousSignature = Self.ghosttyAppearanceSignature(
             config,
-            usesHostLayerBackground: lastAppliedUsesHostLayerBackground
+            usesHostLayerBackground: lastAppliedUsesHostLayerBackground,
+            terminalBackdropImage: lastAppliedTerminalBackdropImage
         )
         let previousBackgroundHex = config.backgroundColor.hexString()
         let next = Self.resolveGhosttyAppearanceConfig(
@@ -619,9 +621,11 @@ struct WorkspaceContentView: View {
             backgroundOverride: backgroundOverride
         )
         let nextUsesHostLayerBackground = GhosttyApp.shared.usesHostLayerBackground
+        let nextTerminalBackdropImage = GhosttyApp.shared.terminalBackdropImage
         let nextSignature = Self.ghosttyAppearanceSignature(
             next,
-            usesHostLayerBackground: nextUsesHostLayerBackground
+            usesHostLayerBackground: nextUsesHostLayerBackground,
+            terminalBackdropImage: nextTerminalBackdropImage
         )
         let eventLabel = backgroundEventId.map(String.init) ?? "nil"
         let sourceLabel = backgroundSource ?? "nil"
@@ -649,6 +653,7 @@ struct WorkspaceContentView: View {
             }
             if shouldApplyChrome {
                 lastAppliedUsesHostLayerBackground = nextUsesHostLayerBackground
+                lastAppliedTerminalBackdropImage = nextTerminalBackdropImage
             }
             if shouldRequestTitlebarRefresh {
                 onThemeRefreshRequest?(

@@ -52,7 +52,8 @@ struct AppWindowChromeComposition {
             backgroundColor: app.defaultBackgroundColor,
             backgroundOpacity: app.defaultBackgroundOpacity,
             backgroundBlur: app.defaultBackgroundBlur,
-            usesHostLayerBackground: app.usesHostLayerBackground
+            usesHostLayerBackground: app.usesHostLayerBackground,
+            backgroundImage: app.terminalBackdropImage
         )
     }
 

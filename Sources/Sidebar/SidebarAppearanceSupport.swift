@@ -59,7 +59,8 @@ func titlebarControlForegroundNSColor(opacity: CGFloat) -> NSColor {
             backgroundColor: app.defaultBackgroundColor,
             backgroundOpacity: app.defaultBackgroundOpacity,
             backgroundBlur: app.defaultBackgroundBlur,
-            usesHostLayerBackground: app.usesHostLayerBackground
+            usesHostLayerBackground: app.usesHostLayerBackground,
+            backgroundImage: app.terminalBackdropImage
         )
     ).currentFromUserDefaults(defaults: .standard, colorScheme: colorScheme)
     return titlebarControlForegroundNSColor(

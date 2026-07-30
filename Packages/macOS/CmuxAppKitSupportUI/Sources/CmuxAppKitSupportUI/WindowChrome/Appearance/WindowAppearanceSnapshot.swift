@@ -17,6 +17,13 @@ public struct WindowAppearanceSnapshot {
     /// Current terminal backdrop rendering owner.
     public let terminalRenderingMode: GhosttyTerminalBackdropRenderingMode
 
+    /// Terminal `background-image` the host draws, when the host owns it.
+    ///
+    /// Nil when no image is configured, or when Ghostty's renderer still owns
+    /// it — in which case the image is painted per-surface and must not also
+    /// be painted at the window root.
+    public let terminalBackgroundImage: TerminalBackdropImage?
+
     /// Whether sidebars share the terminal root backdrop.
     public let unifySurfaceBackdrops: Bool
 
@@ -32,6 +39,7 @@ public struct WindowAppearanceSnapshot {
         terminalBackgroundOpacity: CGFloat,
         terminalBackgroundBlur: GhosttyBackgroundBlur,
         terminalRenderingMode: GhosttyTerminalBackdropRenderingMode,
+        terminalBackgroundImage: TerminalBackdropImage? = nil,
         unifySurfaceBackdrops: Bool,
         sidebarSettings: SidebarBackdropSettingsSnapshot,
         windowGlassSettings: WindowGlassSettingsSnapshot
@@ -40,6 +48,7 @@ public struct WindowAppearanceSnapshot {
         self.terminalBackgroundOpacity = terminalBackgroundOpacity
         self.terminalBackgroundBlur = terminalBackgroundBlur
         self.terminalRenderingMode = terminalRenderingMode
+        self.terminalBackgroundImage = terminalBackgroundImage
         self.unifySurfaceBackdrops = unifySurfaceBackdrops
         self.sidebarSettings = sidebarSettings
         self.windowGlassSettings = windowGlassSettings
@@ -110,8 +119,20 @@ public struct WindowAppearanceSnapshot {
         return .ghosttyTerminalBackdrop(
             color: terminalBackgroundColor,
             opacity: terminalBackgroundOpacity,
-            renderingMode: terminalRenderingMode
+            renderingMode: terminalRenderingMode,
+            backgroundImage: hostDrawnTerminalBackgroundImage
         )
+    }
+
+    /// The background image this host is responsible for drawing.
+    ///
+    /// Gated on the rendering mode so the image can never be painted twice:
+    /// while Ghostty's renderer owns the backdrop it draws the image inside
+    /// each surface, and a window-root copy would show through as a second,
+    /// differently-fitted layer wherever a surface is translucent.
+    public var hostDrawnTerminalBackgroundImage: TerminalBackdropImage? {
+        guard terminalRenderingMode.usesWindowHostBackdrop else { return nil }
+        return terminalBackgroundImage
     }
 
     /// Whether AppKit hosting must be transparent for this snapshot.
