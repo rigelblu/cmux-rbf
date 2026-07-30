@@ -2914,7 +2914,7 @@ final class Workspace: Identifiable, ObservableObject {
             "border=\(colors.borderHex ?? "nil")"
     }
 
-    private static func bonsplitAppearance(
+    static func bonsplitAppearance(
         from backgroundColor: NSColor,
         backgroundOpacity: Double,
         tabTitleFontSize: CGFloat = 11
@@ -2938,7 +2938,10 @@ final class Workspace: Identifiable, ObservableObject {
             splitButtonTooltips: Self.currentSplitButtonTooltips(),
             enableAnimations: false,
             chromeColors: chromeColors,
-            usesSharedBackdrop: sharesWindowBackdrop
+            usesSharedBackdrop: sharesWindowBackdrop,
+            surfaceCaptionBackgroundStyle: .transparentOverChrome,
+            surfaceCaptionBackgroundStyleOverrides: ["terminal": .chrome],
+            showsCaptionPaneFocusIndicator: true
         )
     }
 
@@ -3111,6 +3114,7 @@ final class Workspace: Identifiable, ObservableObject {
             autoCloseEmptyPanes: true,
             contentViewLifecycle: .keepAllAlive,
             newTabPosition: .current,
+            tabBarVisibility: .adaptive,
             appearance: appearance
         )
         self.bonsplitController = BonsplitController(configuration: config)
