@@ -2,6 +2,3 @@
 	path = ghostty
 	url = git@github.com:rigelblu/ghostty-rbf.git
 	branch = main
-[submodule "vendor/bonsplit"]
-	path = vendor/bonsplit
-	url = https://github.com/manaflow-ai/bonsplit.git
