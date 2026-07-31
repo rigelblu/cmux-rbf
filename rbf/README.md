@@ -11,6 +11,19 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Read a pane at a glance, not as a one-item tab strip
+A pane holding a single surface shows a centered caption instead of a lone tab, because one tab implies somewhere to switch to. Add a second surface and the familiar tab strip returns.
+
+- The header keeps its icon, status marks, actions, and context menu — only the tab treatment goes.
+- Drag and middle-click close stay on the caption itself; clicking the empty header focuses the pane.
+- A focused pane draws a contrast-safe rule along its header, but only when more than one pane is on screen and only while the window is active.
+
+## 🟠⋯ One background image across the whole window
+A terminal `background-image` spans the window instead of being cropped separately into every pane, so splitting no longer breaks the picture at each divider.
+
+- Requires `background-opacity` below `1`. At full opacity each pane still paints an opaque fill that hides the shared backdrop; removing that fill is tracked separately.
+- Honors Ghostty's own `background-image-fit`, `-position`, `-opacity`, and `-repeat` settings.
+
 ## 🟠⋯ Put a new pane exactly where it belongs
 Create a terminal pane to the left, right, above, or below the pane you are working in.
 
