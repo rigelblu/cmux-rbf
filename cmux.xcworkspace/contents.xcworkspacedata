@@ -97,6 +97,9 @@
       location = "container:Packages/macOS"
       name = "Packages (macOS)">
       <FileRef
+         location = "group:Bonsplit">
+      </FileRef>
+      <FileRef
          location = "group:CMUXAgentLaunch">
       </FileRef>
       <FileRef

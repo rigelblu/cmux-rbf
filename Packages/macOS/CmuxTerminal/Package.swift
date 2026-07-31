@@ -18,7 +18,7 @@ let package = Package(
         .package(path: "../CMUXDebugLog"),
         .package(path: "../CMUXAgentLaunch"),
         .package(path: "../../Shared/CMUXMobileCore"),
-        .package(path: "../../../vendor/bonsplit"),
+        .package(path: "../Bonsplit"),
     ],
     targets: [
         .target(

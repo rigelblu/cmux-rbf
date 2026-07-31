@@ -18,7 +18,7 @@ let package = Package(
         // in-group workspace placement) is owned by CmuxSettings.
         .package(path: "../CmuxSettings"),
         // Bonsplit drives the Window/ tmux pane-overlay geometry.
-        .package(path: "../../../vendor/bonsplit"),
+        .package(path: "../Bonsplit"),
         // CMUXDebugLog backs the Session/ snapshot-restore logging.
         .package(path: "../CMUXDebugLog"),
         // CmuxTestSupport backs FileOpen/ PreferredEditorService UI-test capture.

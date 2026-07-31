@@ -29,6 +29,27 @@ public struct TerminalBackdropImageView: NSViewRepresentable {
     }
 }
 
+extension NSImage {
+    /// Draws into the current context, upright even when that context is
+    /// flipped.
+    ///
+    /// `draw(in:from:operation:fraction:)` positions correctly in a flipped
+    /// view but renders the image content vertically mirrored. The backdrop
+    /// view is flipped so the renderer's top-down offset math carries over
+    /// unchanged, which put every backdrop image upside down. The longer
+    /// overload with `respectFlipped: true` is AppKit's answer.
+    func drawRespectingFlip(in rect: CGRect, opacity: CGFloat) {
+        draw(
+            in: rect,
+            from: .zero,
+            operation: .sourceOver,
+            fraction: opacity,
+            respectFlipped: true,
+            hints: nil
+        )
+    }
+}
+
 /// AppKit view that renders one terminal backdrop image.
 public final class TerminalBackdropImageLayerView: NSView {
     /// Decoded images keyed by path, so a resize or appearance change does not
@@ -96,11 +117,9 @@ public final class TerminalBackdropImageLayerView: NSView {
         if backdropImage.repeats {
             drawTiled(loadedImage, tile: destination, opacity: backdropImage.opacity)
         } else {
-            loadedImage.draw(
+            loadedImage.drawRespectingFlip(
                 in: destination,
-                from: .zero,
-                operation: .sourceOver,
-                fraction: backdropImage.opacity
+                opacity: backdropImage.opacity
             )
         }
     }
@@ -121,11 +140,9 @@ public final class TerminalBackdropImageLayerView: NSView {
         while y < bounds.maxY {
             var x = firstX
             while x < bounds.maxX {
-                image.draw(
+                image.drawRespectingFlip(
                     in: CGRect(x: x, y: y, width: tile.width, height: tile.height),
-                    from: .zero,
-                    operation: .sourceOver,
-                    fraction: opacity
+                    opacity: opacity
                 )
                 x += tile.width
             }
