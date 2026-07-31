@@ -14,7 +14,7 @@
     "@types/prismjs": "^1.26.5",
     "animejs": "^4.3.5",
     "framer-motion": "^12.26.2",
-    "next": "16.1.2",
+    "next": "16.2.11",
     "prism-react-renderer": "^2.4.1",
     "prismjs": "^1.30.0",
     "react": "19.2.3",
