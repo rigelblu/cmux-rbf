@@ -14,7 +14,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../../../vendor/bonsplit"),
+        .package(path: "../Bonsplit"),
     ],
     targets: [
         .target(
