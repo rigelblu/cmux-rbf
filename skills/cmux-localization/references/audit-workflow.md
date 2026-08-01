@@ -29,7 +29,7 @@ Use:
 String(localized: "key.name", defaultValue: "English text")
 ```
 
-Update `Resources/Localizable.xcstrings` for all supported languages. Currently that means English and Japanese.
+Update `Resources/Localizable.xcstrings` for all supported locales — **20 of them**, not two. <!-- cmux-rbf: pruned upstream text — upstream said 'English and Japanese'; this repo has 20 locales (verified by counting web/messages/*.json and the localizations in Resources/Localizable.xcstrings), and the two-locale claim would badly under-scope a localization audit. Reject this hunk on upstream sync. -->
 
 Do not rely on `defaultValue` as the English localization. It is a fallback and development convenience, not a completed localization entry.
 

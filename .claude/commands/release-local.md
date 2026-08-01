@@ -2,6 +2,22 @@
 
 Full end-to-end release built locally. Bumps version, updates changelog, tags, then builds/signs/notarizes/uploads via `scripts/build-sign-upload.sh`.
 
+> ⚠️ **cmux-rbf: this command is upstream's and does not work here.** It queries
+> `manaflow-ai/cmux` for PR/issue authors, waits on CI checks that never start
+> (`.github/workflows/ci.yml` is `workflow_dispatch`-only), edits
+> `docs-site/content/docs/changelog.mdx` which does not exist in this repo, and
+> publishes a notarized DMG and homebrew cask this fork does not ship.
+> `scripts/release-pretag-guard.sh` also cannot complete: its first check compares
+> our `CURRENT_PROJECT_VERSION` against upstream's appcast and both are build 100,
+> and `set -euo pipefail` means its later checks — including the `cmux-unit`
+> compile, the only real gate — never run.
+>
+> **Release in cmux-rbf instead:** `deliver-feat local`, which bumps `rbf/VERSION`,
+> cuts `rbf/CHANGELOG.md`, and commits in jj. See `rbf/AGENTS.md`.
+>
+> Kept unmodified below for reference. Reject this hunk on upstream sync.
+
+
 ## Steps
 
 ### 1. Determine the new version number

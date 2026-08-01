@@ -20,9 +20,11 @@ scripts/normalize-pbxproj.py
 
 on staged `cmux.xcodeproj/project.pbxproj` changes. This sorts high-churn sections so Xcode's nondeterministic reordering does not reach commits.
 
-## CI guard
+## Guard (run it yourself)
 
-CI runs:
+<!-- cmux-rbf: pruned upstream text — was 'CI guard / CI runs:' — no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
+
+Nothing runs this for you. After touching the pbxproj:
 
 ```bash
 scripts/check-pbxproj.sh

@@ -21,7 +21,7 @@ The existing packages under `Packages/` predate this policy and should not be us
 
 ## Refactor architecture: layers, Coordinator/Service/Repository, dependency inversion
 
-These higher-level patterns are binding on every new or moved/meaningfully-rewritten file. (The full blueprint, with worked examples and the per-god decomposition, lives in the cmuxterm-hq control repo under `docs/cmux-refactor-audit/blueprint/`; the enforceable core is below.)
+These higher-level patterns are binding on every new or moved/meaningfully-rewritten file. (The enforceable core is below.) <!-- cmux-rbf: pruned upstream text — removed the pointer to the full blueprint in the cmuxterm-hq control repo — not reachable from this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 **Layered, downward-only DAG.** Packages form a strict acyclic graph in five layers; dependencies point only downward:
 

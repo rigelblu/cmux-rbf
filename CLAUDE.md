@@ -140,13 +140,13 @@ This makes it visible in the GitHub PR UI (Commits tab, check statuses) that the
 
 ## First pass, then dogfood
 
-A task's first pass ends when the change is implemented, the tagged build succeeded on the pushed HEAD, focused tests ran, and the PR is open (for `web/` PRs, also the live Vercel preview URL given to the user). Then hand off to the user for dogfood. Do not fix CI failures, merge conflicts, or review findings inline in the main conversation after that point.
+A task's first pass ends when the change is implemented, the tagged build succeeded on the pushed HEAD, focused tests ran, and the PR is open. Then hand off to the user for dogfood. Do not fix merge conflicts or review findings inline in the main conversation after that point. <!-- cmux-rbf: pruned upstream text — removed the Vercel preview URL requirement and 'CI failures' — no Vercel deploys and no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
-At handoff, launch one background `$autoreview` subagent with a bounded prompt (PR URL, worktree, base ref, allowed write scope, required verification), never a vague "make it green". That loop owns CI: it runs structured review plus PR feedback, and only when a check actually fails does it spawn a bounded repair subagent with that check's name and log context. Do not launch a separate parallel CI repair agent; two agents mutating one worktree race each other. One writer per worktree: if dogfood feedback needs main-agent edits while the loop runs, stop the loop first or give it its own sibling worktree. In Claude Code spawn the loop with the agent/task tool; in Codex use a background sub-task or bounded background `codex exec`.
+At handoff, launch one background `$autoreview` subagent with a bounded prompt (PR URL, worktree, base ref, allowed write scope, required verification), never a vague "make it green". That loop runs structured review plus PR feedback. <!-- cmux-rbf: pruned upstream text — removed 'owns CI ... only when a check actually fails' — no checks ever run here, so that loop would idle forever waiting on one, see rbf/AGENTS.md. Reject this hunk on upstream sync. --> Do not launch a separate parallel repair agent; two agents mutating one worktree race each other. One writer per worktree: if dogfood feedback needs main-agent edits while the loop runs, stop the loop first or give it its own sibling worktree. In Claude Code spawn the loop with the agent/task tool; in Codex use a background sub-task or bounded background `codex exec`.
 
 The loop may commit and push scoped fixes but never merges and never rebuilds the user's tagged build. The main agent inspects every pushed commit, rejects out-of-scope edits, and owns dogfood, approval, and merge. Merging app/runtime/UI changes still requires the user's explicit approval after dogfood; if a pushed fix changes runtime behavior mid-dogfood, rebuild the tag and re-notify, since the earlier verdict covers only the build the user tested.
 
-Notify through `cmux notify` so the user can leave and return. At handoff the main agent sends `cmux notify --title "Dogfood ready: <short task>" --subtitle "<branch> · <tag>" --body "Was: <prior bad behavior>. Now: <expected behavior>. <concrete check>. CI + review in background. PR: <pr-url>"`. The loop sends its outcome when done or blocked, e.g. `--title "CI green: <branch>"`, `--title "Review clean: <branch>" --body "fixed <n> findings, pushed"`, or `--title "CI blocked: <branch>" --body "<check>: <one-line cause>, needs your decision"`. Titles carry the outcome and branch; bodies say what happened and the single next action. If there is no cmux socket, skip notify and rely on the chat handoff.
+Notify through `cmux notify` so the user can leave and return. At handoff the main agent sends `cmux notify --title "Dogfood ready: <short task>" --subtitle "<branch> · <tag>" --body "Was: <prior bad behavior>. Now: <expected behavior>. <concrete check>. Review in background. PR: <pr-url>"`. The loop sends its outcome when done or blocked, e.g. `--title "Review clean: <branch>" --body "fixed <n> findings, pushed"` or `--title "Review blocked: <branch>" --body "<one-line cause>, needs your decision"`. <!-- cmux-rbf: pruned upstream text — removed the "CI green" / "CI blocked" notify titles — no CI verdict exists here, see rbf/AGENTS.md. Reject this hunk on upstream sync. --> Titles carry the outcome and branch; bodies say what happened and the single next action. If there is no cmux socket, skip notify and rely on the chat handoff.
 
 ## Shared behavior policy
 
@@ -164,54 +164,52 @@ Notify through `cmux notify` so the user can leave and return. At handoff the ma
   - `TerminalSurface.forceRefresh()` in `GhosttyTerminalView.swift`: called on every keystroke. Do not add allocations, file I/O, or formatting here.
 - **Terminal find layering contract:** `SurfaceSearchOverlay` must be mounted from `GhosttySurfaceScrollView` in `Sources/GhosttyTerminalView.swift` (AppKit portal layer), not from SwiftUI panel containers such as `Sources/Panels/TerminalPanelView.swift`. Portal-hosted terminal views can sit above SwiftUI during split/workspace churn.
 - **Submodule safety:** When modifying a submodule (ghostty, vendor/bonsplit, etc.), always push the submodule commit to its remote `main` branch BEFORE committing the updated pointer in the parent repo. Never commit on a detached HEAD or temporary branch — the commit will be orphaned and lost. Verify with: `cd <submodule> && git merge-base --is-ancestor HEAD origin/main`.
-- **All user-facing strings must be localized.** Use `String(localized: "key.name", defaultValue: "English text")` for every string shown in the UI (labels, buttons, menus, dialogs, tooltips, error messages). Keys go in `Resources/Localizable.xcstrings` with translations for all supported languages (currently English and Japanese). Never use bare string literals in SwiftUI `Text()`, `Button()`, alert titles, etc.
-- **Localization audit is required for every user-facing change.** Before finishing a task that changes UI, Settings rows, menus, shortcut metadata, schema/config text, docs, command/help text, alerts, or tooltips, enumerate the changed user-facing surfaces and verify each one has entries for every supported locale. `defaultValue`, English fallback text, schema descriptions, or copied English strings do not count as localization. For Swift/AppKit strings, update `Resources/Localizable.xcstrings`; for localized web/docs content, update every supported message catalog (currently `web/messages/en.json` and `web/messages/ja.json`) and any localized data structures that carry inline translations. Parse touched localization files, compare changed message keys across locales, and use `rg` over changed Swift/TS/TSX/docs files for newly introduced bare English. The final handoff must state what localization audit was performed or explicitly say what could not be verified.
+- **All user-facing strings must be localized.** Use `String(localized: "key.name", defaultValue: "English text")` for every string shown in the UI (labels, buttons, menus, dialogs, tooltips, error messages). Keys go in `Resources/Localizable.xcstrings` with translations for all supported languages — **20 locales, verified by counting `web/messages/*.json` and the localizations in `Resources/Localizable.xcstrings`.** <!-- cmux-rbf: pruned upstream text — upstream said 'currently English and Japanese'; that is two of twenty here and would badly under-scope a localization audit. Reject this hunk on upstream sync. --> Never use bare string literals in SwiftUI `Text()`, `Button()`, alert titles, etc.
+- **Localization audit is required for every user-facing change.** Before finishing a task that changes UI, Settings rows, menus, shortcut metadata, schema/config text, docs, command/help text, alerts, or tooltips, enumerate the changed user-facing surfaces and verify each one has entries for every supported locale. `defaultValue`, English fallback text, schema descriptions, or copied English strings do not count as localization. For Swift/AppKit strings, update `Resources/Localizable.xcstrings`; for localized web/docs content, update every supported message catalog (all 20 under `web/messages/`, not just `en.json`/`ja.json`) and any localized data structures that carry inline translations. Parse touched localization files, compare changed message keys across locales, and use `rg` over changed Swift/TS/TSX/docs files for newly introduced bare English. The final handoff must state what localization audit was performed or explicitly say what could not be verified.
 - **Shortcut policy:** Every new cmux-owned keyboard shortcut must be added to `KeyboardShortcutSettings`, visible/editable in Settings, supported in `~/.config/cmux/cmux.json`, and documented in the keyboard shortcut and configuration docs.
 - **Snapshot boundary for list subtrees.** In any SwiftUI panel whose `body` contains a `LazyVStack` / `LazyHStack` / `List` / `ForEach` of rows, no view below that boundary may hold a reference to an `ObservableObject` / `@Observable` store (no `@ObservedObject`, `@EnvironmentObject`, `@StateObject`, `@Bindable`, or even a plain `let store: SomeStore` property). Rows and drop-gaps receive immutable value snapshots plus closure action bundles only. Violating this reintroduces the "orthogonal @Published change invalidates every row and thrashes `LazyLayoutViewCache`" class of 100% CPU spin loop that hit the Sessions panel and the workspace sidebar (https://github.com/manaflow-ai/cmux/issues/2586). Reference pattern: `IndexSectionActions` / `SectionGapActions` / `SessionSearchFn` in `Sources/SessionIndexView.swift`.
 - **No state mutation inside view-body computations.** A function called from `body` (directly or through a helper) must not write `@Published` state, schedule a `Task { @MainActor in store.x = … }`, or `DispatchQueue.main.async` a store write. That creates a re-render feedback loop and pegs the main thread (same root-cause family as the snapshot-boundary rule). State-changing work triggered by "new data appeared" belongs in a `reload()` completion, a `didSet`, or a property-observer — never in the projection that feeds `ForEach`.
-- **Foundation, SwiftUI, AttributeGraph, and WebKit semantics change silently between macOS major versions.** A function that "obviously" returns the same value on every macOS is not a reliable assumption. Concrete case from https://github.com/manaflow-ai/cmux/issues/4529: `URL(fileURLWithPath: "/").deletingLastPathComponent().path` returns `"/.."` on macOS 14 and 15 but `"/"` on macOS 26 — Apple silently fixed the underlying CFURL normalization. The repo's `macos-26` CI and every maintainer's dev machine were on the fixed-behavior side; every reporter on the issue was on the broken side. Always test on the reporter's macOS before declaring a user-reported repro disproven. AWS M4 Pro builders (`cmux-aws-mac`, `cmux-aws-m4pro`, `aws-m4pro-1..6`) are pre-provisioned on macOS 15.7.4 and the preferred empirical-repro path; see the `regression-hunt` skill in the cmuxterm-hq sibling repo for the full playbook.
-- **Test files in `cmuxTests/` must be wired into `cmux.xcodeproj/project.pbxproj`.** A `.swift` file added to the worktree without a matching `PBXFileReference` + `PBXSourcesBuildPhase` entry is silently ignored by Xcode and never compiles or runs on CI. Both `xcodebuild test -only-testing:cmuxTests/<TestClass>` and bot reviews pass with "Executed 0 tests" — so the missing wiring is indistinguishable from a clean two-commit red/green regression test until a real user hits the bug. The `workflow-guard-tests` job runs `./scripts/lint-pbxproj-test-wiring.sh` to catch this at PR time; surfaced during the https://github.com/manaflow-ai/cmux/issues/4529 investigation against https://github.com/manaflow-ai/cmux/pull/4536. Add via Xcode (drag the file into the cmuxTests target) or hand-edit the four pbxproj entries; reference any wired sibling like `TabManagerUnitTests.swift` as a template.
-- **SPM packages live in group folders, and the root workspace mirrors that folder shape exactly.** Every Swift package lives physically under exactly one group directory — `Packages/Shared/<pkg>` (used by both apps), `Packages/iOS/<pkg>` (iOS app only), or `Packages/macOS/<pkg>` (macOS app only) — and `cmux.xcworkspace/contents.xcworkspacedata` has three groups whose container locations are those folders, with every package directory appearing as a FileRef under its folder's group. So opening the workspace shows all packages grouped exactly like the directory tree. The folder is the source of truth: to move a package between groups, `git mv` its directory, then run `python3 scripts/check-workspace-package-groups.py --write` to regenerate the workspace. A new package goes in the group folder matching its consumers (both apps → Shared, iOS only → iOS, macOS only → macOS). Cross-group `.package(path:)` deps use `../../<Group>/<Name>`; never hand-edit the workspace group membership. CI's `python3 scripts/check-workspace-package-groups.py --check` fails on drift.
-- **Do not ignore cmux-owned `Package.resolved` files.** SwiftPM resolution changes must be visible in PR diffs. Track the root Xcode lockfile and every cmux-owned package-local `Package.resolved` generated by standalone `swift package resolve`, `swift build`, or `swift test`; a package-local lockfile is the source of truth for that package's standalone resolution and is not replaced by `cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`. Vendored third-party directories may preserve their upstream ignore policy, but cmux-owned package `.gitignore` files must not ignore `Package.resolved`. CI's `python3 scripts/check-package-resolved-policy.py` fails if this drifts.
+- **Foundation, SwiftUI, AttributeGraph, and WebKit semantics change silently between macOS major versions.** A function that "obviously" returns the same value on every macOS is not a reliable assumption. Concrete case from https://github.com/manaflow-ai/cmux/issues/4529: `URL(fileURLWithPath: "/").deletingLastPathComponent().path` returns `"/.."` on macOS 14 and 15 but `"/"` on macOS 26 — Apple silently fixed the underlying CFURL normalization. Every maintainer's dev machine was on the fixed-behavior side; every reporter was on the broken side. Always test on the reporter's macOS before declaring a user-reported repro disproven. <!-- cmux-rbf: pruned upstream text — removed the `macos-26` CI reference, the pre-provisioned AWS M4 Pro builder fleet, and the `regression-hunt` skill in the cmuxterm-hq sibling repo — none of that is reachable from this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
+- **Test files in `cmuxTests/` must be wired into `cmux.xcodeproj/project.pbxproj`.** A `.swift` file added to the worktree without a matching `PBXFileReference` + `PBXSourcesBuildPhase` entry is silently ignored by Xcode and never compiles or runs on CI. `xcodebuild test -only-testing:cmuxTests/<TestClass>` passes with "Executed 0 tests" — indistinguishable from a real green run until a user hits the bug. **Run `./scripts/lint-pbxproj-test-wiring.sh` yourself; nothing runs it for you.** <!-- cmux-rbf: pruned upstream text — removed 'bot reviews' and the `workflow-guard-tests` PR job — no CI and no review bots here, see rbf/AGENTS.md. Reject this hunk on upstream sync. --> Surfaced during the https://github.com/manaflow-ai/cmux/issues/4529 investigation against https://github.com/manaflow-ai/cmux/pull/4536. Add via Xcode (drag the file into the cmuxTests target) or hand-edit the four pbxproj entries; reference any wired sibling like `TabManagerUnitTests.swift` as a template.
+- **SPM packages live in group folders, and the root workspace mirrors that folder shape exactly.** Every Swift package lives physically under exactly one group directory — `Packages/Shared/<pkg>` (used by both apps), `Packages/iOS/<pkg>` (iOS app only), or `Packages/macOS/<pkg>` (macOS app only) — and `cmux.xcworkspace/contents.xcworkspacedata` has three groups whose container locations are those folders, with every package directory appearing as a FileRef under its folder's group. So opening the workspace shows all packages grouped exactly like the directory tree. The folder is the source of truth: to move a package between groups, `git mv` its directory, then run `python3 scripts/check-workspace-package-groups.py --write` to regenerate the workspace. A new package goes in the group folder matching its consumers (both apps → Shared, iOS only → iOS, macOS only → macOS). Cross-group `.package(path:)` deps use `../../<Group>/<Name>`; never hand-edit the workspace group membership. **Run `python3 scripts/check-workspace-package-groups.py --check` yourself after any package move — nothing runs it for you.** <!-- cmux-rbf: pruned upstream text — was "CI's ... fails on drift" — no CI here, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
+- **Do not ignore cmux-owned `Package.resolved` files.** SwiftPM resolution changes must be visible in PR diffs. Track the root Xcode lockfile and every cmux-owned package-local `Package.resolved` generated by standalone `swift package resolve`, `swift build`, or `swift test`; a package-local lockfile is the source of truth for that package's standalone resolution and is not replaced by `cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`. Vendored third-party directories may preserve their upstream ignore policy, but cmux-owned package `.gitignore` files must not ignore `Package.resolved`. **Run `python3 scripts/check-package-resolved-policy.py` yourself after any SwiftPM change — nothing runs it for you.** <!-- cmux-rbf: pruned upstream text — was "CI's ... fails if this drifts" — no CI here, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 ## Ghostty submodule workflow
 
-Ghostty changes must be committed in the `ghostty` submodule and pushed to the `manaflow-ai/ghostty` fork.
-Keep `docs/ghostty-fork.md` up to date with any fork changes and conflict notes.
+<!-- cmux-rbf: pruned upstream text — upstream's remote mapping is INVERTED here — it says origin=upstream/manaflow=fork, but in cmux-rbf `origin` is rigelblu/ghostty-rbf (OURS) and `manaflow` is upstream, so `git push manaflow` would push our commits at upstream. Also parent-repo git -> jj per rbf/AGENTS.md. Reject this hunk on upstream sync. -->
+
+Ghostty changes are committed **in the `ghostty` submodule** and pushed to **`origin`** — in this fork that is `rigelblu/ghostty-rbf` (ours). `manaflow` is upstream; never push there. Keep `docs/ghostty-fork.md` up to date with fork changes and conflict notes.
+
+The submodule is a plain git checkout, so its commands stay git. The **parent** repo is jj.
 
 ```bash
 cd ghostty
-git remote -v  # origin = upstream, manaflow = fork
+git remote -v            # origin = rigelblu/ghostty-rbf (OURS) · manaflow = upstream
 git checkout -b <branch>
-git add <files>
-git commit -m "..."
-git push manaflow <branch>
+git commit -am "..."
+git push origin <branch>
+git merge-base --is-ancestor HEAD origin/<branch> && echo PUBLISHED   # verify, don't assume
 ```
 
-To keep the fork up to date with upstream:
+To take upstream ghostty changes, merge `manaflow/main` (dry-run with `--no-commit --no-ff` first and read the conflict count).
 
-```bash
-cd ghostty
-git fetch origin
-git checkout main
-git merge origin/main
-git push manaflow main
-```
-
-Then update the parent repo with the new submodule SHA:
+Then move the parent pointer, in jj:
 
 ```bash
 cd ..
-git add ghostty
-git commit -m "Update ghostty submodule"
+jj describe -m "fix (ghostty) | <user need> (#cm-N)"
+jj bookmark set <bookmark> -r @      # push moves an existing bookmark; it does not create one
+jj git push --bookmark <bookmark>
 ```
+
+Push with **jj**, not `git push`: a branch pushed by git arrives untracked, and jj treats untracked remote bookmarks as immutable — it will hide your own branch from `jj log` and refuse to rewrite it.
 
 ## Release
 
 Use the `/release` command to prepare a new release. This will:
 1. Determine the new version (bumps minor by default)
 2. Gather commits since the last tag and update the changelog
-3. Update `CHANGELOG.md` (the docs changelog page at `web/app/docs/changelog/page.tsx` reads from it)
+3. Update `rbf/CHANGELOG.md` and `rbf/VERSION` <!-- cmux-rbf: pruned upstream text — upstream pointed at `web/app/docs/changelog/page.tsx`, which does not exist in this repo; fork releases carry `rbf/CHANGELOG.md` + `rbf/VERSION`. Reject this hunk on upstream sync. -->
 4. Run `./scripts/bump-version.sh` to update both versions
 5. Commit, run `./scripts/release-pretag-guard.sh`, tag, and push
 
@@ -237,17 +235,13 @@ If it fails, run `./scripts/bump-version.sh`, commit the build-number bump, then
 Manual release steps (if not using the command):
 
 ```bash
-./scripts/release-pretag-guard.sh
-git tag vX.Y.Z
-git push origin vX.Y.Z
-gh run watch --repo manaflow-ai/cmux
+jj bookmark set <name> -r @      # then tag/push per rbf/AGENTS.md
+jj git push --bookmark <name>
 ```
 
+<!-- cmux-rbf: pruned upstream text — removed `git tag`/`git push origin`/`gh run watch --repo manaflow-ai/cmux`, the Apple GitHub secrets, the notarized `cmux-macos.dmg` asset, and the README download button — this fork has no signing secrets, no release workflow, and does not publish a DMG; `release-pretag-guard.sh` also cannot pass here (it compares our build number against upstream's appcast, both 100). Also git -> jj per rbf/AGENTS.md. Reject this hunk on upstream sync. -->
+
 Notes:
-- Requires GitHub secrets: `APPLE_CERTIFICATE_BASE64`, `APPLE_CERTIFICATE_PASSWORD`,
-  `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
-- The release asset is `cmux-macos.dmg` attached to the tag.
-- README download button points to `releases/latest/download/cmux-macos.dmg`.
 - Versioning: bump the minor version for updates unless explicitly asked otherwise.
 - Changelog: update `CHANGELOG.md`; docs changelog is rendered from it.
 

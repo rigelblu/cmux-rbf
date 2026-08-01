@@ -81,4 +81,4 @@ Foundation, SwiftUI, AttributeGraph, and WebKit behavior can change silently bet
 
 Concrete example: `URL(fileURLWithPath: "/").deletingLastPathComponent().path` returned `"/.."` on macOS 14 and 15 but `"/"` on macOS 26.
 
-When a user reports a repro on an older macOS, test on that macOS before declaring the repro disproven. AWS M4 Pro builders such as `cmux-aws-mac`, `cmux-aws-m4pro`, and `aws-m4pro-1..6` are pre-provisioned on macOS 15.7.4 and are the preferred empirical repro path.
+When a user reports a repro on an older macOS, test on that macOS before declaring the repro disproven. <!-- cmux-rbf: pruned upstream text — removed the pre-provisioned AWS M4 Pro builder fleet (`cmux-aws-mac`, `cmux-aws-m4pro`, `aws-m4pro-1..6`) as the preferred empirical-repro path — not reachable from this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
