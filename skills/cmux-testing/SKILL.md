@@ -20,7 +20,7 @@ The GitHub PR Commits tab then shows the test genuinely fails without the fix.
 
 Test files in `cmuxTests/` must be wired into `cmux.xcodeproj/project.pbxproj` with a matching `PBXFileReference` and `PBXSourcesBuildPhase` entry. A `.swift` file added without them is silently ignored by Xcode: `xcodebuild test -only-testing:cmuxTests/<TestClass>` and bot reviews both pass with "Executed 0 tests", so the missing wiring is indistinguishable from a clean red/green regression test until a real user hits the bug. Surfaced during https://github.com/manaflow-ai/cmux/issues/4529 against https://github.com/manaflow-ai/cmux/pull/4536.
 
-The `workflow-guard-tests` CI job runs `./scripts/lint-pbxproj-test-wiring.sh`. Add the file through Xcode (drag into the cmuxTests target) or hand-edit the pbxproj entries using a wired sibling such as `cmuxTests/TabManagerUnitTests.swift` as the template.
+**Run `./scripts/lint-pbxproj-test-wiring.sh` yourself — nothing runs it for you.** <!-- cmux-rbf: pruned upstream text — removed 'the workflow-guard-tests CI job runs' — no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. --> Add the file through Xcode (drag into the cmuxTests target) or hand-edit the pbxproj entries using a wired sibling such as `cmuxTests/TabManagerUnitTests.swift` as the template.
 
 ## Test quality policy
 
@@ -44,7 +44,7 @@ Swift Testing (Swift 6 / Xcode 16) is the default for every unit and integration
 
 ## Test target validation
 
-`reload.sh` builds only the `cmux` scheme, so a green reload says nothing about whether `cmuxTests`/`cmuxUITests` still compile. A moved or renamed symbol can keep the app building while breaking the test target (real case: a `write(to:atomically:)` typo and a removed `TabManager.CommandResult` surfaced only in the `tests` job). Before pushing package/refactor changes, build the `cmux-unit` scheme with `-derivedDataPath /tmp/cmux-<tag>` (plus the GlobalISel workaround flag for `cmuxApp`/`AppDelegate` churn), or let the `tests` CI job gate it.
+`reload.sh` builds only the `cmux` scheme, so a green reload says nothing about whether `cmuxTests`/`cmuxUITests` still compile. A moved or renamed symbol can keep the app building while breaking the test target (real case: a `write(to:atomically:)` typo and a removed `TabManager.CommandResult`). Before pushing package/refactor changes, **build the `cmux-unit` scheme yourself** with `-derivedDataPath /tmp/cmux-<tag>` (plus the GlobalISel workaround flag for `cmuxApp`/`AppDelegate` churn) — it is the only gate, and `reload.sh` alone is never proof the tests build. <!-- cmux-rbf: pruned upstream text — removed 'surfaced only in the tests job' and 'or let the tests CI job gate it' — no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 ## Detailed references
 

@@ -10,7 +10,7 @@ Use this skill for any user-facing string change.
 ## Hard rules
 
 - Every user-facing string is localized. Never a bare string literal in SwiftUI `Text()`, `Button()`, alert titles, tooltips, menus, or dialogs.
-- Swift/AppKit/SwiftUI: `String(localized: "key.name", defaultValue: "English text")`, with keys in `Resources/Localizable.xcstrings` translated for every supported language (currently English and Japanese).
+- Swift/AppKit/SwiftUI: `String(localized: "key.name", defaultValue: "English text")`, with keys in `Resources/Localizable.xcstrings` translated for **all 20 supported locales**. <!-- cmux-rbf: pruned upstream text — upstream said 'currently English and Japanese'; this repo has 20 locales (verified by counting web/messages/*.json and the localizations in Resources/Localizable.xcstrings), and the two-locale claim would badly under-scope a localization audit. Reject this hunk on upstream sync. -->
 - `defaultValue`, English fallback text, schema descriptions, and copied English strings do not count as localization.
 - Localized web/docs content updates every supported message catalog (currently `web/messages/en.json` and `web/messages/ja.json`) plus any localized data structures carrying inline translations.
 - A localization audit is required for every user-facing change.

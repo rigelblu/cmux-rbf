@@ -15,41 +15,42 @@ cd ghostty && zig build -Demit-xcframework=true -Dxcframework-target=universal -
 
 ## Submodule workflow
 
-Ghostty changes are committed in the `ghostty` submodule and pushed to the `manaflow-ai/ghostty` fork. Keep `docs/ghostty-fork.md` current with fork changes and conflict notes.
+<!-- cmux-rbf: pruned upstream text — upstream's remote guidance points at manaflow-ai/ghostty as the fork to push to; in cmux-rbf `origin` is rigelblu/ghostty-rbf (OURS) and `manaflow` is upstream, so pushing at a manaflow remote would push our commits at upstream. Upstream-of-upstream (ghostty-org) is not our merge source either — we take upstream ghostty via `manaflow/main`. Also parent-repo git -> jj per rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
-Always run `git remote -v` first and push to whichever remote is `manaflow-ai/ghostty`. `.gitmodules` sets the submodule URL to that fork, so in a normal checkout it is `origin`; older setups tracked upstream as `origin` and added the fork as `manaflow`. Substitute the right name below.
+Ghostty changes are committed **in the `ghostty` submodule** and pushed to **`origin`**, which in this fork is `rigelblu/ghostty-rbf` (ours). `manaflow` is upstream — never push there. Keep `docs/ghostty-fork.md` current with fork changes and conflict notes.
+
+The submodule is a plain git checkout, not a jj repo, so submodule commands stay git. Everything in the **parent** repo is jj.
 
 ```bash
 cd ghostty
-git remote -v                  # find the manaflow-ai/ghostty remote (usually origin)
+git remote -v            # origin = rigelblu/ghostty-rbf (OURS) · manaflow = upstream
 git checkout -b <branch>
-git add <files>
-git commit -m "..."
+git commit -am "..."
 git push origin <branch>
 ```
 
-To pull in changes from upstream `ghostty-org/ghostty`, add it as an explicit remote first, since no checkout has it by default:
+**Publish the submodule commit before the parent pointer references it**, and verify rather than trust:
 
 ```bash
-cd ghostty
-git remote add upstream https://github.com/ghostty-org/ghostty.git   # once
-git fetch upstream
-git checkout main
-git merge upstream/main
-git push origin main
+git fetch origin <branch> && git merge-base --is-ancestor HEAD origin/<branch> && echo PUBLISHED
 ```
 
-Then record the new SHA in the parent repo:
+To take upstream ghostty changes, merge `manaflow/main` into your branch (dry-run first — `--no-commit --no-ff` — and read the conflict count before committing).
+
+Then move the parent pointer, in jj:
 
 ```bash
 cd ..
-git add ghostty
-git commit -m "Update ghostty submodule"
+jj describe -m "fix (ghostty) | <user need> (#cm-N)"   # parent repo is jj
+jj bookmark set <bookmark> -r @      # push moves an existing bookmark; it does not create one
+jj git push --bookmark <bookmark>
 ```
+
+Push with **jj**, not `git push`: a branch pushed by git arrives untracked, and jj treats untracked remote bookmarks as immutable — it will hide your own branch from `jj log` and refuse to rewrite it.
 
 ## Submodule safety
 
-For any submodule (ghostty, `vendor/bonsplit`, `homebrew-cmux`), push the submodule commit to its remote branch **before** committing the updated pointer in the parent repo. Never commit on a detached HEAD or a temporary branch: the parent then points at a SHA unreachable from any remote branch, and a future checkout or CI job fails to fetch it.
+For any submodule (ghostty, `vendor/bonsplit`, `homebrew-cmux`), push the submodule commit to its remote branch **before** committing the updated pointer in the parent repo. Never commit on a detached HEAD or a temporary branch: the parent then points at a SHA unreachable from any remote branch, and a future checkout fails to fetch it. <!-- cmux-rbf: pruned upstream text — removed 'or CI job' — no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 Verify the commit is reachable from the branch the pointer should track, using the remote you just pushed to:
 

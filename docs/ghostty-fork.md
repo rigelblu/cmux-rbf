@@ -1,14 +1,18 @@
-# Ghostty Fork Changes (manaflow-ai/ghostty)
+# Ghostty Fork Changes (rigelblu/ghostty-rbf)
 
-This repo uses a fork of Ghostty for local patches that aren't upstream yet.
-When we change the fork, update this document and the parent submodule SHA.
+<!-- cmux-rbf: pruned upstream text — retitled from 'manaflow-ai/ghostty' and rewrote the checklist. Upstream's step 2 said "Commit and push to `manaflow-ai/ghostty`" — in cmux-rbf that is UPSTREAM'S PUBLIC REPO, not ours. `origin` is rigelblu/ghostty-rbf (ours); `manaflow` is upstream, and pushing there publishes unreviewed work to someone else's repo. Step 4's `git add ghostty` also predates the parent repo being jj. The rest of this file below is upstream's changelog and is NOT annotated — treat every `manaflow` push instruction in it as wrong, and every parent-repo git command as jj. Reject this hunk on upstream sync. -->
+
+This repo uses a fork of Ghostty for local patches that aren't upstream yet: **`rigelblu/ghostty-rbf`**, which is the `origin` remote inside `ghostty/`. The `manaflow` remote is **upstream — never push there.**
 
 ## Fork update checklist
 
 1) Make changes in `ghostty/`.
-2) Commit and push to `manaflow-ai/ghostty`.
-3) Update this file with the new change summary + conflict notes.
-4) In the parent repo: `git add ghostty` and commit the submodule SHA.
+2) Commit and push to **`origin`** (`rigelblu/ghostty-rbf`): `git push origin <branch>`.
+3) **Verify it is published before the parent points at it** — `git fetch origin <branch> && git merge-base --is-ancestor HEAD origin/<branch>`. An unpublished SHA in a parent commit is unfetchable for everyone else.
+4) Update this file with the change summary + conflict notes.
+5) In the **parent** repo (which is jj, not git): `jj describe -m "fix (ghostty) | <user need> (#cm-N)"`, then `jj bookmark set <name> -r @` and `jj git push --bookmark <name>`.
+
+> **Warning — the sections below are upstream's changelog, carried unmodified.** They contain `git push manaflow`, `git add ghostty` and similar upstream-shaped instructions. They are kept for their conflict notes and patch history, not as procedure. The checklist above is the procedure.
 
 ## Current fork changes
 

@@ -22,19 +22,12 @@ This updates `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`. The build number
 
 ## Tagging
 
+<!-- cmux-rbf: pruned upstream text — removed the manual tag-and-publish steps (`git tag`/`git push origin`/`gh run watch --repo manaflow-ai/cmux`), the Apple GitHub secrets, the `cmux-macos.dmg` asset and README download button — this fork has no signing secrets, no release workflow and publishes no DMG. `release-pretag-guard.sh` also cannot pass here: its first check compares our `CURRENT_PROJECT_VERSION` against upstream's appcast and both are build 100, and `set -euo pipefail` means its later checks — including the `cmux-unit` compile, the only real gate — never run; run `make test` yourself instead. Release in this fork is `deliver-feat local` plus `rbf/VERSION` and `rbf/CHANGELOG.md`, in jj (see rbf/AGENTS.md). Reject this hunk on upstream sync. -->
+
 ```bash
-./scripts/release-pretag-guard.sh
-git tag vX.Y.Z
-git push origin vX.Y.Z
-gh run watch --repo manaflow-ai/cmux
+jj bookmark set <name> -r @      # then tag/push per rbf/AGENTS.md
+jj git push --bookmark <name>
 ```
-
-If the pretag guard fails, run `./scripts/bump-version.sh`, commit the build-number bump, then retry.
-
-## Release artifacts and secrets
-
-- The release asset is `cmux-macos.dmg`, attached to the tag. The README download button points to `releases/latest/download/cmux-macos.dmg`.
-- Signing and notarization require the GitHub secrets `APPLE_CERTIFICATE_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
 
 ## Detailed reference
 

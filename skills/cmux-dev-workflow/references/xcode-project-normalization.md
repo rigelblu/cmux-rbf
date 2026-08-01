@@ -1,6 +1,6 @@
 # Xcode Project Normalization
 
-The pin (`.xcode-version`, `objectVersion = 60`), the pre-commit hook, and the CI guard are described in [../SKILL.md](../SKILL.md).
+The pin (`.xcode-version`, `objectVersion = 60`), the pre-commit hook, and the guard are described in [../SKILL.md](../SKILL.md) — run `scripts/check-pbxproj.sh` yourself after touching the pbxproj; nothing runs it for you. <!-- cmux-rbf: pruned upstream text — was 'the CI guard' — no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 ## Bumping the Xcode pin
 

@@ -4,6 +4,20 @@ Ship a stable cmux release built by CI: bump version, update changelog, open a P
 
 `skills/cmux-release/SKILL.md` owns the version-bump, pretag-guard, and tag mechanics plus the Apple signing secrets. This file owns the shared changelog and contributor procedure that `/release-nightly` and `/release-local` also use, and the PR-and-CI build path.
 
+> ⚠️ **cmux-rbf: this command is upstream's and does not work here.** It queries
+> `manaflow-ai/cmux` for PR/issue authors, waits on CI checks that never start
+> (`.github/workflows/ci.yml` is `workflow_dispatch`-only), and publishes a
+> notarized DMG this fork does not ship.
+> `scripts/release-pretag-guard.sh` also cannot complete: its first check compares
+> our `CURRENT_PROJECT_VERSION` against upstream's appcast and both are build 100,
+> and `set -euo pipefail` means its later checks — including the `cmux-unit`
+> compile, the only real gate — never run.
+>
+> **Release in cmux-rbf instead:** `deliver-feat local`, which bumps `rbf/VERSION`,
+> cuts `rbf/CHANGELOG.md`, and commits in jj. See `rbf/AGENTS.md`.
+>
+> Kept unmodified below for reference. Reject this hunk on upstream sync.
+
 ## Shared prep (all three release commands)
 
 1. **Pick the version.** Read `MARKETING_VERSION` from `cmux.xcodeproj/project.pbxproj`. Bump minor unless the user says otherwise (0.12.0 to 0.13.0).
