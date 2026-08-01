@@ -404,7 +404,12 @@ final class WindowAppearanceSnapshotTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        guard case let .ghosttyTerminalBackdrop(color, opacity, renderingMode) = policy else {
+        // `ghosttyTerminalBackdrop` carries a fourth associated value
+        // (backgroundImage) on main; this helper still destructured three,
+        // which left the whole cmuxTests target uncompilable — so none of
+        // these tests ran, on any branch. Ignoring the new value keeps this
+        // assertion's scope unchanged.
+        guard case let .ghosttyTerminalBackdrop(color, opacity, renderingMode, _) = policy else {
             XCTFail("expected terminal backdrop", file: file, line: line)
             return
         }
