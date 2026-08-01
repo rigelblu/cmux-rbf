@@ -5025,6 +5025,72 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         )
     }
 
+    /// Folds one key event into the typed-input line and, when that event
+    /// submits a proven `/rename <name>`, records the pending submission.
+    ///
+    /// Runs on the typing hot path, so it touches nothing but a small in-memory
+    /// buffer: no Ghostty FFI, no renderer locks, no allocation beyond the line.
+    ///
+    /// An earlier revision read the name back off the screen with
+    /// `mobileRenderGridFrame` — a locked FFI grid export plus a whole-screen
+    /// JSON decode inside `keyDown`, against CLAUDE.md's prohibition on work in
+    /// this path, and whose surface-access failure branch can tear down the
+    /// runtime surface `keyDown` is still holding. It also could not tell text
+    /// the user typed from text Codex rendered, so scrollback containing an
+    /// earlier `/rename foo` claimed a rename nobody asked for.
+    private func recordCodexRenameSubmissionIfNeeded(
+        for event: NSEvent,
+        committedText: [String]
+    ) {
+        guard !hasMarkedText() else {
+            // Mid-composition the input system owns the line, not the user.
+            codexInputLine.invalidate()
+            return
+        }
+        guard let submitted = codexInputLine.consume(
+            event: event,
+            committedText: committedText
+        ) else {
+            return
+        }
+        guard let name = CodexExplicitRenameSubmissionStore.explicitRenameName(
+            in: submitted
+        ) else {
+#if DEBUG
+            // Logs every submitted line, so "the keystrokes were never seen"
+            // and "they were seen but did not parse as a rename" are separable.
+            // Only fires on Return, so it is one line per submission.
+            if !submitted.isEmpty {
+                cmuxDebugLog(
+                    "codexRename.submissionIgnored line=\"\(submitted.prefix(60))\""
+                )
+            }
+#endif
+            return
+        }
+        guard let terminalSurface else { return }
+#if DEBUG
+        cmuxDebugLog(
+            "codexRename.armed surface=\(terminalSurface.id.uuidString.prefix(8)) "
+            + "name=\"\(name)\""
+        )
+#endif
+        // Deliberately no `agentKind == .codex` check here. Recording a pending
+        // submission for a non-Codex surface is inert: it is only ever consumed
+        // by a matching Codex rename confirmation arriving on this same surface,
+        // and it expires after 30s. The authoritative agent-kind gate lives on
+        // the apply side, which owns that decision anyway.
+        //
+        // Keeping it there costs nothing and buys two things: no registry lookup
+        // on the keyDown path, which CLAUDE.md protects; and a recording path
+        // free of app singletons, so it is testable against a real surface
+        // without injecting a transcript service.
+        CodexExplicitRenameSubmissionStore.shared.record(
+            surfaceID: terminalSurface.id,
+            name: name
+        )
+    }
+
     // MARK: - Clipboard paste
 
     @IBAction func paste(_ sender: Any?) {
@@ -5308,6 +5374,9 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
 
     // For NSTextInputClient - accumulates text during key events
     private(set) var keyTextAccumulator: [String]? = nil
+    /// The user's current input line, used to prove an explicit Codex
+    /// `/rename <name>` came from this person rather than from rendered output.
+    var codexInputLine = TerminalInputLineBuffer()
     private var markedText = NSMutableAttributedString()
     private var markedSelectedRange = NSRange(location: NSNotFound, length: 0)
     private var lastPerformKeyEvent: TimeInterval?
@@ -5786,6 +5855,13 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         // A forwarded keyDown owns its keyUp. Clear any stale IME suppression
         // entry left by an earlier suppressed repeat for the same physical key.
         imeConsumedKeyUps.remove(event.keyCode)
+
+        // Only keys that reach the terminal change the user's input line, so
+        // this sits after the IME-suppression return rather than before it.
+        recordCodexRenameSubmissionIfNeeded(
+            for: event,
+            committedText: accumulatedText
+        )
 
         // Build the key event
         var keyEvent = ghostty_input_key_s()

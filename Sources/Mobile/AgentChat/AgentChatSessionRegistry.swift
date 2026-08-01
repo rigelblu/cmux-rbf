@@ -76,6 +76,36 @@ final class AgentChatSessionRegistry {
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
+    /// Session ids of the live agent sessions bound to `workspaceID`.
+    ///
+    /// Feeds `WorkspaceAgentOccupancy`, which decides whether an explicit agent
+    /// rename may claim the workspace title. Terminal and embedded adapters both
+    /// read occupancy from here, so neither needs to know how the other launched.
+    ///
+    /// - Parameter workspaceID: Owning workspace UUID string.
+    /// - Returns: Raw (unprefixed) session ids, unordered.
+    func liveSessionIDs(workspaceID: String) -> [String] {
+        var live: [String] = []
+        for record in records.values where record.state != .ended {
+            guard record.workspaceID?.caseInsensitiveCompare(workspaceID) == .orderedSame else {
+                continue
+            }
+            if let pid = record.pid, processIsDead(pid) {
+                // Same reconciliation `liveSession` performs. `liveSession`
+                // keeps showing the session meanwhile so a live agent is never
+                // hidden; occupancy makes the opposite call and stops counting
+                // it, because a crashed session that is never reconciled blocks
+                // every later rename in its workspace, silently and forever.
+                // The recorded pid may be a launcher while the real agent still
+                // runs, so the tree-aware verdict is deferred off-main as usual.
+                handleProcessExit(sessionID: record.sessionID, pid: pid)
+                continue
+            }
+            live.append(record.sessionID)
+        }
+        return live
+    }
+
     /// Reconciles the session's exit watcher with its current pid. Called from
     /// every record-store path, so a watcher exists exactly while a session has
     /// a live pid and is cancelled when the pid changes, clears, or the session

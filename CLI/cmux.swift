@@ -20975,14 +20975,18 @@ struct CMUXCLI {
             lastAgentSurfaceId = surfaceId
 
             do {
-                _ = try socketClient.sendV2(method: "tab.action", params: [
+                _ = try socketClient.sendV2(method: "agent.session_title.seed", params: [
                     "workspace_id": workspaceId,
                     "surface_id": surfaceId,
-                    "action": "rename",
                     "title": CMUXCLI.codexTeamsTitle(thread: thread, spawn: spawn, depth: depth)
                 ])
             } catch {
-                // The subagent pane already exists, so a rename failure should not stop watching.
+                // The subagent pane already exists, so a rename failure should not stop
+                // watching — but it must not vanish either. A silent swallow here is what
+                // hid a resolution defect that made this call fail for every pane.
+                FileHandle.standardError.write(
+                    Data("cmux: agent.session_title.seed failed for surface \(surfaceId): \(error)\n".utf8)
+                )
             }
             do {
                 _ = try socketClient.sendV2(method: "workspace.equalize_splits", params: [
