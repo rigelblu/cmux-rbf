@@ -1491,6 +1491,12 @@
           "default": 980,
           "description": "Default maximum reading column width, in CSS pixels, for newly opened markdown viewers.",
           "descriptionKey": "schemaDescriptions.markdown.maxWidth"
+        },
+        "background": {
+          "type": "string",
+          "enum": ["terminal", "solid"],
+          "default": "terminal",
+          "description": "What the markdown viewer paints its page on. \"terminal\" leaves the canvas transparent so the terminal background shows through; \"solid\" paints the canvas github-markdown.css was designed against (#ffffff light, #0d1117 dark), which makes the page's contrast fixed and checkable instead of dependent on the terminal theme."
         }
       }
     },

@@ -143,7 +143,23 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         var workspaceId: UUID = UUID()
         var filePath: String = ""
         private var pendingMarkdown: String = ""
-        private var pendingTheme: MarkdownWebTheme = .resolve(backgroundColor: GhosttyBackgroundTheme.currentColor())
+        // Seeded from the persisted default so this is correct if it is ever
+        // read — but it is believed unreachable, and an earlier version of this
+        // comment claimed it as a second cause of the resize flash. That claim
+        // was wrong and is retracted: every read is `lastTheme ?? pendingTheme`,
+        // and `lastTheme` is assigned unconditionally in `loadShell`, the only
+        // caller of `loadHTMLString`. So no navigation can finish, terminate, or
+        // reattach with `lastTheme` still nil, and `close()` does not clear it.
+        // The flash had exactly one cause — the panel container in
+        // MarkdownPanelView — and was fixed there.
+        //
+        // Kept rather than deleted because a wrong-looking fallback is a trap
+        // for the next reader; note it would still be wrong if reached, since it
+        // reads the *global* default and not this panel's `backgroundStyle`.
+        private var pendingTheme: MarkdownWebTheme = .resolve(
+            backgroundColor: GhosttyBackgroundTheme.currentColor(),
+            style: MarkdownBackgroundSettings.resolvedDefault()
+        )
         private var lastMarkdown: String? = nil
         private var lastTheme: MarkdownWebTheme? = nil
         private var lastFontFamily: String = ""

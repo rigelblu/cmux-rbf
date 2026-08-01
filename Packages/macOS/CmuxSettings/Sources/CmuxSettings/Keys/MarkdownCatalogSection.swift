@@ -38,6 +38,27 @@ public struct MarkdownCatalogSection: SettingCatalogSection {
         userDefaultsKey: "markdown.maxWidth"
     )
 
+    /// What the viewer paints its page on: `terminal` or `solid`.
+    ///
+    /// `terminal` — the default, and the only behaviour before this key existed
+    /// — leaves the page canvas transparent so the terminal's own background
+    /// shows through and the panel matches whatever theme is set. `solid` paints
+    /// the canvas github-markdown.css was designed against: `#ffffff` in light
+    /// and `#0d1117` in dark.
+    ///
+    /// This is a legibility control, not decoration. Under `terminal` the page's
+    /// contrast is a function of the terminal theme, so nothing the viewer draws
+    /// has a knowable contrast ratio — a colour that reads well on one theme can
+    /// be unreadable on another, and the only oracle is a human looking at it.
+    /// Under `solid` every ratio is fixed and checkable.
+    ///
+    /// Defaults to `terminal` so an upgrade changes nothing for anyone.
+    public let background = DefaultsKey<String>(
+        id: "markdown.background",
+        defaultValue: "terminal",
+        userDefaultsKey: "markdown.background"
+    )
+
     /// Creates the markdown settings section with its default keys.
     public init() {}
 }

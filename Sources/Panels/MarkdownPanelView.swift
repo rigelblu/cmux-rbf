@@ -30,6 +30,16 @@ struct MarkdownPanelView: View {
     @State private var copyConfirmation: CopyConfirmation? = nil
     @State private var copyConfirmationGeneration: Int = 0
     @AppStorage(FilePreviewWordWrapSettings.key) private var fileEditorWordWrap = FilePreviewWordWrapSettings.defaultEnabled
+    /// The theme this viewer renders with. Derived from the panel's own
+    /// `backgroundStyle`, not from a global setting, so one viewer can be solid
+    /// while another stays on the terminal — and so the typography popover's
+    /// per-viewer edits take effect here.
+    private var markdownTheme: MarkdownWebTheme {
+        MarkdownWebTheme.resolve(
+            backgroundColor: themeBackgroundColor,
+            style: panel.backgroundStyle
+        )
+    }
 
     private enum CopyConfirmation: Equatable {
         case markdown
@@ -78,11 +88,23 @@ struct MarkdownPanelView: View {
 
     @ViewBuilder
     private var markdownBody: some View {
+        // Resolved once per body evaluation, not per read. `markdownTheme` is a
+        // computed property and was read twice here plus once through
+        // `rendererBackgroundColor`, and each resolve runs three
+        // `markdownThemeOverlay` binary searches — 18 blend+luminance iterations
+        // apiece. That is ~162 colour operations per pass on a view that
+        // re-evaluates on every MarkdownPanel publish: content live-reload,
+        // isDirty, displayMode, focus flash.
+        let theme = markdownTheme
+        let canvas = MarkdownBackgroundStyle.colourBehindPage(
+            theme: theme,
+            panelContent: appearance.contentBackgroundColor
+        )
         ZStack {
             MarkdownWebRenderer(
                 markdown: panel.content,
-                theme: MarkdownWebTheme.resolve(backgroundColor: themeBackgroundColor),
-                backgroundColor: appearance.contentBackgroundColor,
+                theme: theme,
+                backgroundColor: canvas,
                 panelId: panel.id,
                 workspaceId: panel.workspaceId,
                 filePath: panel.filePath,
@@ -93,6 +115,22 @@ struct MarkdownPanelView: View {
                 onRequestPanelFocus: onRequestPanelFocus
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The canvas sits directly behind the web view, and only here.
+            //
+            // This is what closes the resize flash: a relayout moves the
+            // container before the web view repaints, so whatever is behind the
+            // page shows through for that moment — and it must not be a
+            // different colour from the page. Scoped to this branch rather than
+            // the whole panel because `markdown.background` is about the
+            // *rendered page*: painting it panel-wide also repainted the file
+            // header and the raw-text editor container, which still take
+            // terminal colours, giving a two-tone panel in text mode — and on a
+            // transparent/blurred window it replaced a `.clear` header with an
+            // opaque one, so the blur stopped showing through.
+            //
+            // Inside `.opacity` on purpose: in text mode it fades out with the
+            // web view instead of sitting behind the editor.
+            .background(Color(nsColor: canvas))
             .opacity(panel.displayMode == .preview ? 1 : 0)
             .allowsHitTesting(panel.displayMode == .preview)
             .accessibilityHidden(panel.displayMode != .preview)
@@ -189,6 +227,16 @@ struct MarkdownPanelView: View {
 
     // MARK: - Theme
 
+    /// The panel's own container colour — header, chrome, and the raw-text
+    /// editor behind it.
+    ///
+    /// Deliberately the *terminal's* colour, not the chosen canvas. It briefly
+    /// followed the canvas to close the resize flash, which also repainted the
+    /// file header and the text-edit container: a `solid` viewer switched to
+    /// text mode showed a white header above a terminal-coloured editor, and on
+    /// a transparent window an opaque header replaced one that had let the
+    /// blur through. The canvas now sits directly behind the web view in
+    /// `markdownBody` instead, which closes the flash without owning the panel.
     private var contentBackgroundColor: Color {
         Color(nsColor: appearance.contentBackgroundColor)
     }

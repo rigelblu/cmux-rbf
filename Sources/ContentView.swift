@@ -7652,6 +7652,27 @@ struct ContentView: View {
         )
         contributions.append(
             CommandPaletteCommandContribution(
+                // "Markdown" is in the title, not just the subtitle, unlike its
+                // zoom siblings. The sidebar already ships
+                // "Enable/Disable Match Terminal Background" under the "Sidebar"
+                // subtitle, so a title of "Toggle Background" would put two
+                // near-identical rows in front of anyone typing "background" —
+                // one of which quietly does something else entirely.
+                commandId: "palette.markdownToggleBackground",
+                title: constant(String(
+                    localized: "command.markdownToggleBackground.title",
+                    defaultValue: "Toggle Markdown Background"
+                )),
+                subtitle: markdownPanelSubtitle,
+                keywords: [
+                    "markdown", "background", "canvas", "solid", "terminal",
+                    "transparent", "theme", "contrast", "page", "paper",
+                ],
+                when: { $0.bool(CommandPaletteContextKeys.panelIsMarkdown) }
+            )
+        )
+        contributions.append(
+            CommandPaletteCommandContribution(
                 commandId: "palette.browserClearHistory",
                 title: constant(String(localized: "command.browserClearHistory.title", defaultValue: "Clear Browser History")),
                 subtitle: constant(String(localized: "command.browserClearHistory.subtitle", defaultValue: "Browser")),
@@ -8570,6 +8591,11 @@ struct ContentView: View {
         }
         registry.register(commandId: "palette.markdownZoomReset") {
             if !tabManager.resetZoomFocusedMarkdown() {
+                NSSound.beep()
+            }
+        }
+        registry.register(commandId: "palette.markdownToggleBackground") {
+            if !tabManager.toggleBackgroundFocusedMarkdown() {
                 NSSound.beep()
             }
         }
