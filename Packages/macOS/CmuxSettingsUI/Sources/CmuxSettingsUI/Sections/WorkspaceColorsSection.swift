@@ -145,6 +145,7 @@ public struct WorkspaceColorsSection: View {
             ) {
                 Button(String(localized: "settings.workspaceColors.resetPalette.button", defaultValue: "Reset")) {
                     paletteModel.reset()
+                    pruneOrphanedLabels(against: effectivePaletteMap(stored: [:]))
                     paletteReconcileTracker.recordPaletteReset(resultingHexes: effectivePaletteMap(stored: [:]))
                 }
                 .buttonStyle(.bordered)
@@ -177,7 +178,15 @@ public struct WorkspaceColorsSection: View {
     }
 
     /// Stores a label, or removes it when cleared. Clearing restores the raw palette name.
+    ///
+    /// A commit for a palette name that no longer exists is dropped rather than written.
+    /// A row can be torn down *because* its entry disappeared — **Reset Palette** or
+    /// **Remove** while its field is focused — and the teardown commit would otherwise
+    /// persist a label keyed to a colour nothing renders, where no `.unknownPaletteName`
+    /// message can ever surface it. It would then silently reattach if a name with the
+    /// same spelling ever returned.
     private func commitLabel(_ text: String, for paletteName: String) {
+        guard effectivePaletteMap(stored: paletteModel.current)[paletteName] != nil else { return }
         var labels = labelsModel.current
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
@@ -186,6 +195,20 @@ public struct WorkspaceColorsSection: View {
             labels[paletteName] = trimmed
         }
         labelsModel.set(labels)
+    }
+
+    /// Drops label keys whose palette entry is gone.
+    ///
+    /// **Remove** and **Reset Palette** mutate `workspaceColors.colors` only, so a
+    /// removed entry's label lingered in defaults indefinitely — invisible, because with
+    /// no row there is nothing to render its rejection on — and silently reattached if
+    /// that name ever came back. Monotonic minting covers `Custom N`, but a `cmux.json`
+    /// entry removed and re-added by hand keeps its old meaning.
+    private func pruneOrphanedLabels(against palette: [String: String]) {
+        let labels = labelsModel.current
+        let survivors = labels.filter { palette[$0.key] != nil }
+        guard survivors.count != labels.count else { return }
+        labelsModel.set(survivors)
     }
 
     /// Why a label cannot be used, in the user's words.
@@ -302,6 +325,7 @@ public struct WorkspaceColorsSection: View {
                         var snapshot = effectivePaletteMap(stored: paletteModel.current)
                         snapshot.removeValue(forKey: entry.name)
                         paletteModel.set(snapshot)
+                        pruneOrphanedLabels(against: snapshot)
                         paletteReconcileTracker.reconcileExternalHexes(snapshot)
                     }
                     .buttonStyle(.bordered)
@@ -375,6 +399,13 @@ private struct WorkspaceColorLabelField: View {
     let commit: (String) -> Void
 
     @State private var draft: String
+    /// The value `draft` was last set *from* — an external label, or our own commit.
+    ///
+    /// `draft != storedLabel` cannot mean "the user typed", because `draft` is
+    /// deliberately not synced while the field holds focus, so an external write moves
+    /// `storedLabel` underneath an untouched draft. Comparing against what we last
+    /// synced separates the two: only the user can make `draft` diverge from this.
+    @State private var syncedValue: String
     @FocusState private var isFocused: Bool
 
     init(
@@ -388,6 +419,19 @@ private struct WorkspaceColorLabelField: View {
         self.errorMessage = errorMessage
         self.commit = commit
         _draft = State(initialValue: storedLabel)
+        _syncedValue = State(initialValue: storedLabel)
+    }
+
+    /// Commits `draft` and records what was written, so the same edit cannot commit twice.
+    ///
+    /// `commitLabel` trims; `draft` does not. Without folding the trimmed result back in,
+    /// a submitted `"  GOAL: X  "` stayed untrimmed forever — `onChange(of: storedLabel)`
+    /// is suppressed while focused — and that row re-committed on every later close.
+    private func commitDraft() {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        commit(trimmed)
+        draft = trimmed
+        syncedValue = trimmed
     }
 
     var body: some View {
@@ -400,14 +444,36 @@ private struct WorkspaceColorLabelField: View {
             .cmuxFont(size: 12, weight: .regular)
             .frame(width: 190)
             .focused($isFocused)
-            .onSubmit { commit(draft) }
+            .onSubmit { commitDraft() }
             .onChange(of: isFocused) { _, focused in
-                if !focused { commit(draft) }
+                if !focused { commitDraft() }
             }
             // An external edit (cmux.json reload, Reset Palette) wins over a stale draft
             // the user is not currently typing into.
             .onChange(of: storedLabel) { _, newValue in
-                if !isFocused { draft = newValue }
+                if !isFocused {
+                    draft = newValue
+                    syncedValue = newValue
+                }
+            }
+            // Teardown backstop. @FocusState reports focus *transitions*, and a view
+            // that is destroyed never transitions — it just stops existing. Closing
+            // Settings with the caret still in this field therefore never runs the
+            // commit above, and the draft dies with the @State holding it.
+            //
+            // Measured on the performClose path Cmd-W drives: onChange(of: isFocused)
+            // does not fire, onDisappear does. Reported from dogfood 2026-08-01, where
+            // the only way to save a label was an undocumented blur-first gesture.
+            //
+            // The guard is `syncedValue`, not `storedLabel`. Comparing against
+            // `storedLabel` looked equivalent and was the opposite of correct: because
+            // `draft` is deliberately not synced while focused, an external write moves
+            // `storedLabel` underneath an untouched draft, so the comparison read as a
+            // user edit and the teardown committed a stale value *over* that write — or
+            // resurrected a label the external edit had just deleted. `syncedValue` only
+            // diverges when the user actually types.
+            .onDisappear {
+                if draft != syncedValue { commitDraft() }
             }
             .accessibilityLabel(
                 String(
@@ -418,6 +484,7 @@ private struct WorkspaceColorLabelField: View {
                     paletteName
                 )
             )
+            .accessibilityIdentifier("SettingsWorkspaceColorLabelField.\(paletteName)")
 
             if let errorMessage {
                 Text(errorMessage)

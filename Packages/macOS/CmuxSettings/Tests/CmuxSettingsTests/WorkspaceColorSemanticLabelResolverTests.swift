@@ -240,4 +240,52 @@ struct WorkspaceColorSemanticLabelResolverTests {
                 == "palette.workspaceColor.\(String(hash, radix: 16))"
         )
     }
+
+    // MARK: - A name that looks like hex is still a name (cm-11-F2)
+
+    /// `WorkspaceColorHex.normalized` treats the leading `#` as optional, so any
+    /// six-character string of hex digits parses as a colour. Running that pass
+    /// before the palette lookup meant a legitimately named entry — `Decade`,
+    /// `Facade`, `Deface`, `Efface`, `Accede`, `Beaded` — resolved to its own
+    /// letters as a hex value instead of to the colour the user defined.
+    ///
+    /// This is reachable without the CLI: the command palette hands the palette's
+    /// own key back to `applyWorkspacePaletteColor`, so cmux fed itself the bad
+    /// input and silently applied a colour present in no palette.
+    @Test("A palette name made only of hex letters resolves to its own colour, not to itself as hex")
+    func hexLookingPaletteNameResolvesToItsColour() {
+        let palette = ["Decade": "#123456", "Teal": "#006B6B"]
+        #expect(
+            WorkspaceColorSemanticLabelResolver.resolve("Decade", palette: palette, labels: [:])
+                == "#123456"
+        )
+    }
+
+    @Test("A label made only of hex letters resolves to its entry's colour")
+    func hexLookingLabelResolvesToItsEntryColour() {
+        #expect(
+            WorkspaceColorSemanticLabelResolver.resolve(
+                "Facade",
+                palette: Self.palette,
+                labels: ["Teal": "Facade"]
+            ) == "#006B6B"
+        )
+    }
+
+    @Test("An explicit #-prefixed hex still outranks a palette name spelled the same way")
+    func hashPrefixedHexStillWinsOverAName() {
+        let palette = ["Decade": "#123456"]
+        #expect(
+            WorkspaceColorSemanticLabelResolver.resolve("#DECADE", palette: palette, labels: [:])
+                == "#DECADE"
+        )
+    }
+
+    @Test("A bare hex that matches no name still resolves as hex")
+    func bareHexWithNoNameCollisionStillResolves() {
+        #expect(
+            WorkspaceColorSemanticLabelResolver.resolve("C0FFEE", palette: Self.palette, labels: [:])
+                == "#C0FFEE"
+        )
+    }
 }

@@ -6855,34 +6855,6 @@ struct ContentView: View {
             return String(localized: "commandPalette.subtitle.markdownWithName", defaultValue: "Markdown • \(name)")
         }
 
-        func workspaceColorCommandTitle(_ paletteName: String) -> String {
-            switch paletteName {
-            case "Red":
-                return String(localized: "shortcut.setWorkspaceColorRed.label", defaultValue: "Workspace Color: Red")
-            case "Crimson":
-                return String(localized: "shortcut.setWorkspaceColorCrimson.label", defaultValue: "Workspace Color: Crimson")
-            case "Orange":
-                return String(localized: "shortcut.setWorkspaceColorOrange.label", defaultValue: "Workspace Color: Orange")
-            case "Amber":
-                return String(localized: "shortcut.setWorkspaceColorAmber.label", defaultValue: "Workspace Color: Amber")
-            case "Olive":
-                return String(localized: "shortcut.setWorkspaceColorOlive.label", defaultValue: "Workspace Color: Olive")
-            case "Green":
-                return String(localized: "shortcut.setWorkspaceColorGreen.label", defaultValue: "Workspace Color: Green")
-            case "Teal":
-                return String(localized: "shortcut.setWorkspaceColorTeal.label", defaultValue: "Workspace Color: Teal")
-            case "Aqua":
-                return String(localized: "shortcut.setWorkspaceColorAqua.label", defaultValue: "Workspace Color: Aqua")
-            case "Blue":
-                return String(localized: "shortcut.setWorkspaceColorBlue.label", defaultValue: "Workspace Color: Blue")
-            default:
-                return String(
-                    localized: "command.workspaceColor.named",
-                    defaultValue: "Workspace Color: \(paletteName)"
-                )
-            }
-        }
-
         var contributions: [CommandPaletteCommandContribution] = []
         contributions.append(contentsOf: Self.commandPaletteCloudCommandContributions())
 
@@ -7310,13 +7282,34 @@ struct ContentView: View {
             )
         )
         contributions.append(contentsOf: WorkspaceTodoPaletteCommands.contributions(workspaceSubtitle: workspaceSubtitle))
-        for entry in WorkspaceTabColorSettings.palette() {
+        // `labeledPaletteEntries()`, not `palette()` — the same accessor both menus and
+        // `workspace.color.list` use, so a label reaches every surface that picks a
+        // colour rather than only the two that were patched (`#cm-11`). The old path
+        // built titles from a hardcoded switch over the sixteen built-in raw names,
+        // which showed `Workspace Color: Teal` here while the menus showed
+        // `GOAL: Primary (Teal)`, left custom colours untranslated, and — because
+        // `keywords` carried only the raw name — made a label unsearchable in the
+        // fastest picker cmux has.
+        for entry in WorkspaceTabColorSettings.labeledPaletteEntries() {
+            let displayName = entry.displayName
+            var keywords = ["workspace", "color", "palette", entry.name.lowercased()]
+            if let label = entry.label {
+                keywords.append(label.lowercased())
+            }
             contributions.append(
                 CommandPaletteCommandContribution(
-                    commandId: commandPaletteWorkspaceColorCommandID(entry.name),
-                    title: constant(workspaceColorCommandTitle(entry.name)),
+                    commandId: WorkspaceColorCommandIdentity.commandID(forPaletteName: entry.name),
+                    title: constant(
+                        String(
+                            format: String(
+                                localized: "command.workspaceColor.named",
+                                defaultValue: "Workspace Color: %@"
+                            ),
+                            displayName
+                        )
+                    ),
                     subtitle: workspaceSubtitle,
-                    keywords: ["workspace", "color", "palette", entry.name.lowercased()],
+                    keywords: keywords,
                     when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) }
                 )
             )
@@ -8064,15 +8057,6 @@ struct ContentView: View {
         return "palette.cmuxConfig.issue.\(String(hash, radix: 16))"
     }
 
-    private func commandPaletteWorkspaceColorCommandID(_ colorName: String) -> String {
-        var hash: UInt64 = 1_469_598_103_934_665_603
-        for byte in colorName.utf8 {
-            hash ^= UInt64(byte)
-            hash &*= 1_099_511_628_211
-        }
-        return "palette.workspaceColor.\(String(hash, radix: 16))"
-    }
-
     private func commandPaletteExtensionSidebarCommandID(_ providerId: String) -> String {
         var hash: UInt64 = 1_469_598_103_934_665_603
         for byte in providerId.utf8 {
@@ -8391,7 +8375,7 @@ struct ContentView: View {
             tabManager.applyWorkspaceColor(nil, toWorkspaceIds: [workspace.id])
         }
         for entry in WorkspaceTabColorSettings.palette() {
-            registry.register(commandId: commandPaletteWorkspaceColorCommandID(entry.name)) {
+            registry.register(commandId: WorkspaceColorCommandIdentity.commandID(forPaletteName: entry.name)) {
                 guard let workspace = tabManager.selectedWorkspace else {
                     NSSound.beep()
                     return

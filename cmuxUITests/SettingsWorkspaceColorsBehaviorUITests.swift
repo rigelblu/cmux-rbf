@@ -76,6 +76,7 @@ final class SettingsWorkspaceColorsBehaviorUITests: SettingsUITestCase {
         "sidebarSelectionColorHex",
         "sidebarNotificationBadgeColorHex",
         "workspaceTabColor.colors",
+        "workspaceTabColor.labels",
     ]
 
     /// Built-in palette default hexes (mirrors
@@ -145,5 +146,100 @@ final class SettingsWorkspaceColorsBehaviorUITests: SettingsUITestCase {
             window.staticTexts["Reset Palette"].exists,
             "Reset Palette row missing"
         )
+    }
+
+    /// TIER 1 regression: a semantic label typed into a palette row must
+    /// survive closing Settings while that field still holds focus.
+    ///
+    /// `WorkspaceColorLabelField` keeps the in-progress text in `@State`
+    /// and flushes it on `.onSubmit` and on `@FocusState` loss. Neither
+    /// fires when the window is closed with the caret still in the field:
+    /// a standalone AppKit+SwiftUI probe measured `onChange(of: isFocused)`
+    /// **not** firing on the `performClose` path that ⌘W drives, while
+    /// `onDisappear` did. Without a teardown commit the draft dies with the
+    /// view and the typed label is discarded silently — the user sees an
+    /// empty field on return, indistinguishable from never having typed.
+    ///
+    /// Found in dogfood 2026-08-01 (brief finding `cm-11-F1`), where the
+    /// only way to save a label was an undocumented blur-first gesture.
+    ///
+    /// This asserts the *effect* — the label is readable after a reopen —
+    /// rather than that a commit function was called, because the defect is
+    /// precisely that the commit is never reached.
+    func testTypedLabelSurvivesClosingSettingsWhileFieldStillHasFocus() {
+        let app = makeLaunchedApp()
+        var window = openSettings(app)
+        navigate(window, to: "Workspace Colors")
+
+        let field = reachableLabelField(window, "Red")
+        XCTAssertEqual(
+            field.value as? String, "",
+            "Test must start from an unlabelled Red row"
+        )
+
+        field.click()
+        field.typeText("GOAL: Primary")
+
+        // Close with the caret still in the field: no click away, no Return,
+        // no Tab. This is the exact gesture that loses the input today.
+        closeSettings(app, window)
+
+        window = openSettings(app)
+        navigate(window, to: "Workspace Colors")
+
+        let reopened = reachableLabelField(window, "Red")
+        defer { closeSettings(app, window) }
+
+        XCTAssertEqual(
+            reopened.value as? String,
+            "GOAL: Primary",
+            "A label typed into the Red row was discarded when Settings closed while the field held focus"
+        )
+    }
+
+    /// Resolves a palette row's label field and waits until it can actually
+    /// be clicked.
+    ///
+    /// Two reasons this needs more than a subscript. Settings is one tall
+    /// `ScrollView` positioned by `proxy.scrollTo(anchorID:)`, and
+    /// `navigate(_:to:)` returns without waiting for that jump — SwiftUI
+    /// reports unsettled geometry mid-animation (a first run logged
+    /// `Invalid view geometry: x is infinity` alongside a row at y=-283.5).
+    /// And the anchor can leave a row outside the viewport entirely, where
+    /// `.exists` is still true but `.click()` throws "Not hittable".
+    ///
+    /// Asserting on an unreachable element would produce a failure that
+    /// looks like the regression but is really the harness, so this fails
+    /// with the frame in the message instead.
+    private func reachableLabelField(
+        _ window: XCUIElement,
+        _ paletteName: String,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let field = window.textFields["SettingsWorkspaceColorLabelField.\(paletteName)"]
+        XCTAssertTrue(
+            poll(timeout: 8.0) { field.exists },
+            "\(paletteName) palette row did not render its label field",
+            line: line
+        )
+        if poll(timeout: 4.0, { field.isHittable }) { return field }
+
+        // Nudge the detail scroll view both ways — the row may be above or
+        // below the viewport depending on where the anchor landed.
+        let scroller = window.scrollViews.firstMatch
+        for delta in [60.0, 60.0, 60.0, 60.0, 60.0, -120.0, -60.0, -60.0, -60.0, -60.0] {
+            if field.isHittable { break }
+            guard scroller.exists else { break }
+            scroller.scroll(byDeltaX: 0, deltaY: CGFloat(delta))
+            _ = poll(timeout: 0.5) { field.isHittable }
+        }
+
+        XCTAssertTrue(
+            field.isHittable,
+            "\(paletteName) label field never became clickable (frame \(field.frame)) — "
+                + "harness could not reach the control, so this run says nothing about the regression",
+            line: line
+        )
+        return field
     }
 }

@@ -2,8 +2,14 @@ import Foundation
 
 /// Command-palette identity derived from a raw workspace palette name.
 ///
-/// Moved verbatim from `ContentView.commandPaletteWorkspaceColorCommandID`, where it
-/// was `private` on an 8000-line SwiftUI view and therefore untestable.
+/// Lifted from `ContentView.commandPaletteWorkspaceColorCommandID`, where it was
+/// `private` on an 8000-line SwiftUI view and therefore untestable.
+///
+/// It was first landed as a *copy*, leaving the private original still shipping — so
+/// the suites asserting ID stability guarded a function nothing called, and would have
+/// stayed green through any change to the real one. Both call sites now use this type
+/// and the private copy is gone; keep it that way, or the tests below stop meaning
+/// anything.
 ///
 /// This is why custom palette names must be minted monotonically: the ID is a pure
 /// function of the raw name, so recycling `Custom N` recycles the command ID, and any

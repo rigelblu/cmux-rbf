@@ -9,6 +9,30 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.6.0 (2026-08-01) — #cm-11
+## 🟠⋯ Added for End Users
+- 2026-08-01 - feat (ux) | give a workspace colour the meaning it already has in your head — label Teal `GOAL: Primary` and cmux shows it as **GOAL: Primary (Teal)** everywhere you pick a colour, while the colour's own name, its hex, your saved workspaces, and your scripts keep working exactly as before (#cm-11)
+- 2026-08-01 - feat (ux) | see which colour a workspace already has before you change it — the colour menu checks the entry that is assigned, and shows a mixed marker when several selected workspaces disagree, instead of making you assign one and look (#cm-11)
+- 2026-08-01 - feat (ux) | clear a colour by one name everywhere — the command palette entry that read *Reset Workspace Color* now reads **No Color**, matching the menu row, and that row is always offered with its own checked or mixed state (#cm-11)
+- 2026-08-01 - feat (ux) | go straight from the colour menu to where labels are edited — **Edit Color Labels…** opens Settings on the Workspace Colors rows rather than leaving you to find them (#cm-11)
+- 2026-08-01 - feat (ux) | keep seeing a colour a workspace is still wearing after you removed it from your palette — it appears as a temporary **Custom (#RRGGBB)** row rather than vanishing from the menu (#cm-11)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-01 - feat (dx) | ask cmux which colours exist instead of guessing their names — `cmux workspace-color list [--json]` returns the raw name, label, display name, and hex of every effective palette entry. `workspace-action --help` now points at it instead of hardcoding sixteen English names that could show neither your custom entries nor your labels (#cm-11)
+- 2026-08-01 - feat (dx) | assign a colour by what it means — `cmux workspace-action set-color "GOAL: Primary"` resolves an exact unique label, while raw names and hex values keep working unchanged (#cm-11)
+- 2026-08-01 - feat (dx) | define labels in `~/.config/cmux/cmux.json` under `workspaceColors.labels`, keyed by raw palette name; clearing or omitting one restores the raw name (#cm-11)
+- 2026-08-01 - feat (dx) | custom palette names are no longer recycled — removing `Custom 3` and adding another gives a new name, so a label, or a `cmux.json` `actions` override keyed by the old command ID, can no longer silently retarget onto a different colour (#cm-11)
+
+## 🟠⋯ Known Limitations
+- **No Color** cannot carry a label. It is an assignment state rather than a palette colour, though it still shows its own checked or mixed marker.
+- `workspace-group set-color` and **Choose Custom Color…** stay hex-only. Neither accepts a raw name or a label.
+- If two palette entries resolve to the same hex, both show as assigned. cmux stores a colour, not which entry you picked, so naming one winner would invent information it does not have.
+- A label in `cmux.json` that is empty, over-long, duplicated, or colliding with a raw palette name is ignored and logged rather than surfaced in config review — that section has no review channel. Settings shows the same errors inline as you type.
+- Labels are your own text and are never translated. The CLI and configuration documentation for this feature is English-only.
+- `clear-color` remains the CLI verb for **No Color**. Renaming a shipped verb would break existing scripts, so the two spellings coexist.
+
+---
+
 # 🔵⋯ v0.5.0 (2026-08-01) — #cm-14
 ## 🟠⋯ Added for End Users
 - 2026-08-01 - feat (ux) | zoom once and watch all of cmux scale together — terminals, the sidebar, tab bars, the command palette, Settings, browser panes, the markdown viewer, and text previews — instead of only the pane you happen to be in. `⇧⌘=` grows it, `⇧⌘-` shrinks it, `⇧⌘0` returns to normal (#cm-14)
