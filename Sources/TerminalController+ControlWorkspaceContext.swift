@@ -23,6 +23,22 @@ extension TerminalController: ControlWorkspaceContext {
         resolveTabManager(routing: routing) != nil
     }
 
+    /// `workspace.color.list` (`#cm-11`) — the effective palette, labels attached.
+    ///
+    /// Reads no workspace state: this is the palette, not an assignment. It goes through
+    /// `labeledPaletteEntries`, the same accessor both menus use, so the CLI can never
+    /// report a vocabulary the chooser would not accept.
+    func controlWorkspaceColorList() -> [ControlWorkspaceColorEntry] {
+        WorkspaceTabColorSettings.labeledPaletteEntries().map { entry in
+            ControlWorkspaceColorEntry(
+                name: entry.name,
+                label: entry.label,
+                displayName: entry.displayName,
+                hex: entry.hex
+            )
+        }
+    }
+
     // MARK: - Snapshots
 
     /// Builds the Sendable summary of one workspace (the legacy

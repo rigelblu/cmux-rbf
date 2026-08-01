@@ -23,6 +23,8 @@ extension ControlCommandCoordinator {
             // shared with the socket dispatcher's worker lane; from this
             // main-actor dispatch its hop collapses inline.
             return workspaceList(request.params, context: context)
+        case "workspace.color.list":
+            return workspaceColorList()
         case "workspace.create":
             return workspaceCreate(request.params)
         case "workspace.select":
@@ -230,6 +232,33 @@ extension ControlCommandCoordinator {
     }
 
     // MARK: - Create
+
+    /// `workspace.color.list` — the effective palette, read-only (`#cm-11`).
+    ///
+    /// Automation can assign a color by label (`workspace-action set-color "GOAL:
+    /// Primary"`) but had no way to discover what labels exist; the only listing of the
+    /// vocabulary was hardcoded English in `workspace-action --help`. This reports the
+    /// live palette instead.
+    ///
+    /// No mutating verbs, by decision: Settings and `cmux.json` stay the only label
+    /// editors, so there is exactly one durable owner of what a color means.
+    func workspaceColorList() -> ControlCallResult {
+        guard let context else {
+            return .err(code: "unavailable", message: "Workspace color palette not available", data: nil)
+        }
+        return .ok(.object([
+            "colors": .array(context.controlWorkspaceColorList().map { entry in
+                .object([
+                    "name": .string(entry.name),
+                    // Null rather than omitted or name-echoing, so a consumer can tell
+                    // "unlabelled" from "labelled with its own name".
+                    "label": orNull(entry.label),
+                    "display_name": .string(entry.displayName),
+                    "hex": .string(entry.hex),
+                ])
+            }),
+        ]))
+    }
 
     /// `workspace.create` — create a workspace.
     ///
