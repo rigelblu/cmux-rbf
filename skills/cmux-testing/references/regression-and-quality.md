@@ -35,13 +35,14 @@ For metadata changes, prefer testing the built app bundle or the runtime behavio
 
 Test files in `cmuxTests/` must be wired into `cmux.xcodeproj/project.pbxproj`.
 
-A `.swift` file added to `cmuxTests/` without matching project entries can be silently ignored by Xcode. Both targeted `xcodebuild test -only-testing:cmuxTests/<TestClass>` and bot reviews can pass with "Executed 0 tests".
+A `.swift` file added to `cmuxTests/` without matching project entries can be silently ignored by Xcode. Targeted `xcodebuild test -only-testing:cmuxTests/<TestClass>` passes with "Executed 0 tests", which is indistinguishable from success.
 
-The `workflow-guard-tests` job runs:
+**Run the wiring lint yourself — nothing runs it for you:**
 
 ```bash
 ./scripts/lint-pbxproj-test-wiring.sh
 ```
+<!-- cmux-rbf: pruned upstream text — removed 'bot reviews' and 'the workflow-guard-tests job runs' — no CI and no review bots in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 When hand-editing wiring, use a wired sibling like `TabManagerUnitTests.swift` as the template.
 

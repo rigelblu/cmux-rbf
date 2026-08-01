@@ -32,20 +32,10 @@ Before creating a release tag, run:
 
 If it fails, run `./scripts/bump-version.sh`, commit the build-number bump, then retry tagging.
 
-Manual release steps if not using the command:
-
-```bash
-./scripts/release-pretag-guard.sh
-git tag vX.Y.Z
-git push origin vX.Y.Z
-gh run watch --repo manaflow-ai/cmux
-```
+<!-- cmux-rbf: pruned upstream text — removed the manual tag-and-publish steps (`git tag`/`git push origin`/`gh run watch --repo manaflow-ai/cmux`), the Apple GitHub secrets, the `cmux-macos.dmg` asset and README download button — this fork has no signing secrets, no release workflow and publishes no DMG. `release-pretag-guard.sh` also cannot pass here: its first check compares our `CURRENT_PROJECT_VERSION` against upstream's appcast and both are build 100. Release in this fork is `deliver-feat local` plus `rbf/VERSION` and `rbf/CHANGELOG.md`, in jj (see rbf/AGENTS.md). Reject this hunk on upstream sync. -->
 
 ## Notes
 
-- Requires GitHub secrets: `APPLE_CERTIFICATE_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
-- The release asset is `cmux-macos.dmg` attached to the tag.
-- README download button points to `releases/latest/download/cmux-macos.dmg`.
 - Bump the minor version for updates unless explicitly asked otherwise.
 - Update `CHANGELOG.md`; docs changelog is rendered from it.
 

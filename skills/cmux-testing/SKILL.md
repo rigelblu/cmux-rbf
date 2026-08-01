@@ -39,7 +39,7 @@ Swift Testing is the current Apple-supported primitive for tests on this codebas
 
 ## Test target validation
 
-`reload.sh` does not compile the test target. It builds only the `cmux` scheme, so a green `reload.sh` says nothing about whether `cmuxTests`/`cmuxUITests` still compile. A symbol that is moved or renamed can keep the `cmux` app building while breaking the test target (real case: a `write(to:atomically:)` typo and a removed `TabManager.CommandResult` only surfaced in the `tests` job). Before pushing package/refactor changes, build the `cmux-unit` scheme (with `-derivedDataPath /tmp/cmux-<tag>` and, for `cmuxApp`/`AppDelegate` churn, the GlobalISel workaround flag) or let the `tests` CI job gate it — never treat `reload.sh` alone as proof the tests build.
+`reload.sh` does not compile the test target. It builds only the `cmux` scheme, so a green `reload.sh` says nothing about whether `cmuxTests`/`cmuxUITests` still compile. A symbol that is moved or renamed can keep the `cmux` app building while breaking the test target (real case: a `write(to:atomically:)` typo and a removed `TabManager.CommandResult`). Before pushing package/refactor changes, **build the `cmux-unit` scheme yourself** (with `-derivedDataPath /tmp/cmux-<tag>` and, for `cmuxApp`/`AppDelegate` churn, the GlobalISel workaround flag) — it is the only gate, and `reload.sh` alone is never proof the tests build. <!-- cmux-rbf: pruned upstream text — removed 'or let the `tests` CI job gate it' and 'only surfaced in the tests job' — no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 ## Remote-tmux live layout fuzz
 
