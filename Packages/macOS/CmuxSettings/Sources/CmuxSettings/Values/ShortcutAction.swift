@@ -161,6 +161,10 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case markdownZoomIn
     case markdownZoomOut
     case markdownZoomReset
+    /// Scales all of cmux at once — chrome, terminals, and text panels.
+    case globalZoomIn
+    case globalZoomOut
+    case globalZoomReset
     case find
     case findInDirectory
     case findNext

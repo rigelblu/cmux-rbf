@@ -57,6 +57,31 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
     /// transient; the persistent default lives in `MarkdownFontSizeSettings`.
     @Published private(set) var fontSize: Double
 
+    /// The app-wide magnification this panel currently renders against.
+    ///
+    /// Mirrored into `@Published` state rather than read from
+    /// ``GlobalFontMagnification`` at render time so SwiftUI actually
+    /// invalidates the view when the global scale changes — a computed property
+    /// reading global state gives the graph nothing to depend on.
+    @Published private(set) var globalFontScale: Double = Double(GlobalFontMagnification.scale)
+
+    /// The size the preview renders at: this panel's own ``fontSize`` combined
+    /// with the app-wide scale.
+    ///
+    /// ``fontSize`` stays the size the user picked, so the typography popover
+    /// keeps showing their choice instead of a number that moves whenever the
+    /// global scale does.
+    var effectiveFontSize: Double {
+        MarkdownFontSizeSettings.clamp(fontSize * globalFontScale)
+    }
+
+    /// Re-reads the app-wide scale after it changes.
+    func refreshGlobalFontScale() {
+        let scale = Double(GlobalFontMagnification.scale)
+        guard abs(scale - globalFontScale) > 0.0001 else { return }
+        globalFontScale = scale
+    }
+
     /// Body prose font family for the preview renderer, as an installed
     /// font-family name. Empty string means the System default (the GitHub
     /// stack). Applied as an inline `font-family` on the rendered content; code
@@ -87,6 +112,7 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
     private var isClosed: Bool = false
     // NotificationCenter token; removal is thread-safe so deinit can drop it.
     private nonisolated(unsafe) var typographyDefaultsObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var globalFontMagnificationObserver: GlobalFontMagnificationChangeObserver?
     // The typography default this viewer is currently tracking. While the panel
     // still matches it, a default change (Set as Default / cmux.json reload) is
     // adopted; once the user customizes the panel it diverges and is left alone.
@@ -117,6 +143,23 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
         loadFileContent()
         startWatching()
         observeTypographyDefaults()
+        observeGlobalFontMagnification()
+    }
+
+    /// Tracks the app-wide magnification on the PANEL, not on its SwiftUI view.
+    ///
+    /// cmux mounts one workspace at a time, so a view-level `.onReceive` never
+    /// fires for panels in unselected workspaces and never replays on re-mount —
+    /// those documents would render at whatever scale was current when they were
+    /// created and stay there. The panel outlives mounting, so it observes here.
+    /// Mirrors `FilePreviewTextEditor`, which owns its observer for this reason.
+    private func observeGlobalFontMagnification() {
+        // Called directly, not hopped through a `Task`: the observer already
+        // delivers on the main actor, and deferring meant the panel still
+        // rendered the old scale for a runloop turn after the change.
+        globalFontMagnificationObserver = GlobalFontMagnificationChangeObserver { [weak self] in
+            self?.refreshGlobalFontScale()
+        }
     }
 
     /// Adopt a changed typography default (from another viewer's "Set as Default"

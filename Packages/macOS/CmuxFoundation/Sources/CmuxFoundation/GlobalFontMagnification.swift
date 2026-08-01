@@ -144,6 +144,33 @@ public struct GlobalFontMagnification {
         notificationCenter.post(name: Self.didChangeNotification, object: nil)
     }
 
+    /// Steps the magnification by whole ``stepPercent`` increments.
+    ///
+    /// Stepping past a bound clamps to it. A step that lands on the percent
+    /// already stored writes nothing and posts no notification, so holding the
+    /// zoom chord at 50% or 200% does not spend a full Ghostty config reload
+    /// per repeat.
+    ///
+    /// - Parameter increments: Signed count of increments; negative steps down.
+    /// - Returns: The percent in effect after the step.
+    @discardableResult
+    public func step(by increments: Int) -> Int {
+        let current = storedPercent
+        let stepped = Self.clamp(current + increments * Self.stepPercent)
+        guard stepped != current else { return current }
+        setPercent(stepped)
+        return stepped
+    }
+
+    /// Steps the percent stored in `UserDefaults.standard`.
+    ///
+    /// - Parameter increments: Signed count of increments; negative steps down.
+    /// - Returns: The percent in effect after the step.
+    @discardableResult
+    public static func step(by increments: Int) -> Int {
+        Self().step(by: increments)
+    }
+
     /// Raw percent stored in `UserDefaults.standard`.
     public static var storedPercent: Int {
         Self().storedPercent

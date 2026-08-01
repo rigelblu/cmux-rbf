@@ -9,6 +9,21 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.5.0 (2026-08-01) — #cm-14
+## 🟠⋯ Added for End Users
+- 2026-08-01 - feat (ux) | zoom once and watch all of cmux scale together — terminals, the sidebar, tab bars, the command palette, Settings, browser panes, the markdown viewer, and text previews — instead of only the pane you happen to be in. `⇧⌘=` grows it, `⇧⌘-` shrinks it, `⇧⌘0` returns to normal (#cm-14)
+- 2026-08-01 - feat (ux) | keep sizing a single pane the way you always have — `⌘=` still belongs to the pane you're in, and the two zooms compose: a pane you enlarged by hand stays proportionally larger when everything scales around it (#cm-14)
+- 2026-08-01 - feat (ux) | reach the app-wide zoom from wherever you already are — the View menu, the command palette, or a keyboard shortcut you can rebind in Settings or `~/.config/cmux/cmux.json` (#cm-14)
+
+## 🟠⋯ Known Limitations
+- **Everything: Actual Size** resets the app-wide scale only. A pane you sized by hand with `⌘=` keeps its own zoom — the two axes are independent by design, so the name promises more than it does. Reset that pane with `⌘0` while it is focused.
+- There is no on-screen indicator of the current zoom level. The scale stops at 200% and 50%, and at either limit the shortcut simply stops responding rather than telling you why. The percentage is visible in **Settings › App › Global Font Magnification**.
+- PDF previews, image previews, and the canvas layout keep their own view zoom and do not follow the app-wide scale. Fit-to-window is a different operation from scaling text, so folding them in would fight the fit.
+- The scale is stored in one shared preference. A second cmux running from another build on the same machine picks it up on its next configuration reload.
+- A terminal mirrored to the phone is left at its fitted size while the app-wide scale moves, so it can briefly sit out of proportion with its neighbours. It returns to the current scale when mirroring stops.
+
+---
+
 # 🔵⋯ v0.4.0 (2026-07-31) — #cm-10
 ## 🟠⋯ Added for End Users
 - 2026-07-31 - feat (ux) | recognize a workspace by its colour and see which one is active at a glance — the colour stays as an identity strip down the row's leading edge over a quiet wash, and selecting a workspace fills the row with a contrast-corrected version of its own colour instead of a generic highlight (#cm-10)

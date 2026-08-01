@@ -6766,6 +6766,12 @@ struct ContentView: View {
             return "⌘-"
         case "palette.markdownZoomReset":
             return "⌘0"
+        case "palette.globalZoomIn":
+            return "⇧⌘="
+        case "palette.globalZoomOut":
+            return "⇧⌘-"
+        case "palette.globalZoomReset":
+            return "⇧⌘0"
         case "palette.terminalFind":
             return "⌘F"
         case "palette.terminalFindNext":
@@ -8660,6 +8666,15 @@ struct ContentView: View {
             if !tabManager.resetZoomFocusedBrowserOrTextFilePreview() {
                 NSSound.beep()
             }
+        }
+        registry.register(commandId: "palette.globalZoomIn") {
+            GlobalZoomAction.zoomIn.perform()
+        }
+        registry.register(commandId: "palette.globalZoomOut") {
+            GlobalZoomAction.zoomOut.perform()
+        }
+        registry.register(commandId: "palette.globalZoomReset") {
+            GlobalZoomAction.reset.perform()
         }
         registry.register(commandId: "palette.markdownZoomIn") {
             if !tabManager.zoomInFocusedMarkdown() {
