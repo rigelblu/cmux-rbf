@@ -72,6 +72,7 @@ Environment:
 | `feedback` | Open feedback UI or submit feedback with `--email`, `--body`, and repeated `--image`. |
 | `feed` | Open the keyboard-first Feed TUI or manage persisted Feed workstream history. |
 | `themes` | List, set, clear, or interactively pick Ghostty themes. |
+| `workspace-color` | List the effective workspace color palette with the labels layered over it. Read-only. |
 | `claude-teams` | Launch Claude Code with cmux/tmux-style agent team integration. |
 | `codex-teams` | Launch Codex with cmux-managed subagent panes. |
 | `omo` | Launch OpenCode with oh-my-openagent integration. |
@@ -224,7 +225,35 @@ Workspace and tab action names:
 | Command | Actions |
 | --- | --- |
 | `workspace-action` | `pin`, `unpin`, `rename`, `clear-name`, `set-description`, `clear-description`, `move-up`, `move-down`, `move-top`, `close-others`, `close-above`, `close-below`, `mark-read`, `mark-unread`, `set-color`, `clear-color` |
+| `workspace-color` | `list` |
 | `tab-action` | `rename`, `clear-name`, `close-left`, `close-right`, `close-others`, `new-terminal-right`, `new-browser-right`, `reload`, `duplicate`, `pin`, `unpin`, `mark-unread` |
+
+### Workspace colors
+
+`workspace-action set-color` accepts any of three spellings of the same colour,
+resolved in this order: a normalized `#RRGGBB` hex, a palette name (`Teal`), or a
+semantic label (`GOAL: Primary`). Labels are matched exactly after trimming and
+case-folding, and an ambiguous label fails closed rather than guessing.
+
+Run `cmux workspace-color list` to see what a given machine accepts:
+
+```console
+$ cmux workspace-color list
+NAME	LABEL	DISPLAY NAME	HEX
+Teal	GOAL: Primary	GOAL: Primary (Teal)	#006B6B
+Red		Red	#C0392B
+```
+
+`--json` emits the same rows as objects with `name`, `label`, `display_name` and
+`hex`; `label` is `null` when unset, so a consumer can tell an unlabelled entry
+from one labelled with its own name.
+
+The command is read-only and has no mutating verbs. Labels are edited in
+Settings → Workspace Colors or in `cmux.json` under `workspaceColors.labels`, so
+cmux keeps exactly one durable owner of what a colour means.
+
+`workspace-action clear-color` is the automation spelling of the **No Color**
+menu row; the verb is unchanged for compatibility.
 
 ### Workspace environment variables
 

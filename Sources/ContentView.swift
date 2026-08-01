@@ -7296,8 +7296,15 @@ struct ContentView: View {
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.resetWorkspaceColor",
-                title: constant(String(localized: "shortcut.resetWorkspaceColor.label", defaultValue: "Reset Workspace Color")),
+                // Deliberately the *menu's* key, not a palette-local twin (`#cm-11`).
+                // One mutation should carry one name, and sharing the key makes that
+                // structural rather than two strings that happen to agree today. It also
+                // inherits all 20 locales; `shortcut.resetWorkspaceColor.label` had 2.
+                // The command id stays `resetWorkspaceColor` — renaming it would recycle
+                // a `cmux.json` `actions` override key onto different behaviour.
+                title: constant(String(localized: "contextMenu.noColor", defaultValue: "No Color")),
                 subtitle: workspaceSubtitle,
+                // "reset" and "clear" stay so the old vocabulary still finds it.
                 keywords: ["workspace", "color", "reset", "clear", "palette"],
                 when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) }
             )
