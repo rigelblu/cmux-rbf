@@ -415,6 +415,29 @@ working-directory = ~/code`}</CodeBlock>
     }
   }
 }`}</CodeBlock>
+                <p>
+                  <code>workspaceColors.labels</code> layers optional meaning over those
+                  names, keyed by the raw name. The picker then reads{" "}
+                  <code>GOAL: Primary (Teal)</code> — meaning first, stable identity in
+                  parentheses. A label never changes a color: raw names and hex values keep
+                  working in <code>cmux.json</code>, in commands, and in the CLI, and
+                  clearing a label restores the raw name alone.
+                </p>
+                <CodeBlock lang="json">{`{
+  "workspaceColors": {
+    "labels": {
+      "Teal": "GOAL: Primary",
+      "Red": "BLOCKED"
+    }
+  }
+}`}</CodeBlock>
+                <p>
+                  Labels must be unique after trimming and case-folding, and may not collide
+                  with a raw palette name — an ambiguous label is ignored rather than
+                  resolved to a guess. Run <code>cmux workspace-color list</code> to see
+                  which labels are in effect on a machine. Settings → Workspace Colors edits
+                  the same values, with the reason shown inline when one is rejected.
+                </p>
               </>
             )}
           </section>
