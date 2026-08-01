@@ -5,6 +5,11 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
+(empty)
+
+---
+
+# 🔵⋯ v0.8.0 (2026-08-01) — #cm-15
 ## 🟠⋯ Added for End Users
 - 2026-08-01 - feat (ux) | read your color-coded plans in the markdown panel instead of raw marker emoji — the first 🔴🟠🟡🟢🔵🟣⚫ in a block disappears, and outside headings it tints the code span beside it, so `**🟢`PASS`**` reads as a green `PASS` highlight and a verification table scans by colour (#cm-15)
 - 2026-08-01 - feat (ux) | tell your plan's sections apart by colour, not just by size — a heading keeps its marker's colour as text tint. Colour is pre-attentive where a 4px size step is not, so headings separate at scroll distance (#cm-15)
