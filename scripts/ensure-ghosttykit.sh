@@ -76,6 +76,19 @@ if ! validate_bridge_header "$PROJECT_DIR/ghostty.h"; then
 fi
 
 GHOSTTY_SHA="$(git -C ghostty rev-parse HEAD)"
+
+# Warn when the checked-out ghostty differs from the pointer the parent records.
+# Everything downstream keys off the CHECKOUT, so a mismatch builds and links
+# happily while the source you read is not the source you run. cmux linked a
+# framework 65 commits away from its recorded pointer without a single signal.
+# A warning, not a failure: building a modified submodule on purpose is normal.
+GHOSTTY_RECORDED_SHA="$(git ls-tree HEAD ghostty 2>/dev/null | awk '{print $3}')"
+if [[ -n "$GHOSTTY_RECORDED_SHA" && "$GHOSTTY_RECORDED_SHA" != "$GHOSTTY_SHA" ]]; then
+  echo "==> WARNING: ghostty checkout does not match the recorded pointer." >&2
+  echo "    recorded: ${GHOSTTY_RECORDED_SHA:0:12}   checked out: ${GHOSTTY_SHA:0:12}" >&2
+  echo "    GhosttyKit will be built from the CHECKOUT. Run 'git submodule update --init' to match." >&2
+fi
+
 GHOSTTYKIT_CRASH_REPORT_SUBDIR="${CMUX_GHOSTTYKIT_CRASH_REPORT_SUBDIR:-cmux/crash}"
 # cmux owns process-wide crash capture through Sentry Cocoa. Linking Ghostty's
 # native Sentry as well creates a second global crash handler and starts its
