@@ -11,6 +11,27 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Read a colour-coded plan as colour, not as raw emoji
+
+If your notes mark status with 🔴🟠🟡🟢🔵🟣⚫, the markdown panel reads them as formatting instead of showing them as glyphs. The first marker in a block disappears; outside a heading it tints the code span beside it, so `**🟢`PASS`**` becomes a green `PASS` highlight and a verification table scans by colour. A heading keeps its marker's colour as text tint — colour is pre-attentive where a 4px size step is not, so sections separate at scroll distance.
+
+- Markers inside fenced blocks and inline code stay literal. A marker in backticks is content, not syntax.
+- `⚪` is not a YMD colour, so `**⚪`PENDING`**` keeps its glyph and takes no highlight while `**🟢`PASS`**` loses its and gains one. That asymmetry *is* the pass/pending signal.
+- One marker per block, not per line — including inside a table cell.
+- A marker before a code span that sits inside a link conceals but does not tint. A highlight there would be stripped by the link sanitizer, taking your `<code>` formatting with it.
+- Headings never take a highlight. Heading ids come from a plain-text projection that cannot see it, so a highlight there would break `#anchor` links and scroll-restore.
+- Documents over 250,000 bytes are skipped entirely, so a pathological file never spends a frame on markers.
+- Light-mode yellow and green are deliberate contrast exceptions. Yellow is the one hue whose identity *is* its luminance — anything dark enough to pass WCAG AA reads as gold rather than yellow — and both sit on headings, where the level is already carried by size and position.
+
+## 🟠⋯ Choose what the markdown viewer paints the page on
+
+**Terminal** leaves the page transparent so your terminal background shows through, matching whatever theme you run. **Solid** paints the canvas GitHub's markdown styling was designed against, so the page reads the same on every theme — and its contrast becomes a fixed number rather than a function of your terminal colours.
+
+- Per-viewer: one panel can be solid while another stays on the terminal.
+- Reachable from the `AA` popover, the command palette (**Toggle Markdown Background**), Settings, or `markdown.background` in `~/.config/cmux/cmux.json`.
+- Defaults to **Terminal**, so nothing changes until you ask it to.
+- Choosing the canvas never changes light-vs-dark. That still follows your terminal.
+
 ## 🟠⋯ Rename a Codex session once and see it in cmux
 
 Type `/rename` in a Codex session and the cmux tab hosting it takes the same name — and the workspace too, when that session is the only agent working there. One piece of work stops carrying two different names.

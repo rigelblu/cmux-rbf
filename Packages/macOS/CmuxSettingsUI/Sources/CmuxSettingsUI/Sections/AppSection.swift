@@ -40,6 +40,7 @@ public struct AppSection: View {
     @State private var markdownFontSize: DefaultsValueModel<Int>
     @State private var markdownFontFamily: DefaultsValueModel<String>
     @State private var markdownMaxWidth: DefaultsValueModel<Int>
+    @State private var markdownBackground: DefaultsValueModel<String>
     @State private var canvasPaneGap: DefaultsValueModel<Int>
     @State private var canvasSnapping: DefaultsValueModel<Bool>
     @State private var fileEditorWordWrap: DefaultsValueModel<Bool>
@@ -93,6 +94,7 @@ public struct AppSection: View {
         _markdownFontSize = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.markdown.fontSize))
         _markdownFontFamily = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.markdown.fontFamily))
         _markdownMaxWidth = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.markdown.maxWidth))
+        _markdownBackground = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.markdown.background))
         _canvasPaneGap = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.canvas.paneGap))
         _canvasSnapping = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.canvas.snappingEnabled))
         _fileEditorWordWrap = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.fileEditor.wordWrap))
@@ -138,7 +140,7 @@ public struct AppSection: View {
             mainCard
         }
         .task {
-            startSettingsObservation([language, appearance, appIcon, placement, inheritDir, minimalMode, keepWorkspaceOpen, firstClick, focusHistoryIncludesPanesAndTabs, fileDrop, preferredEditor, openSupported, openMarkdown, globalFontMagnification, markdownFontSize, markdownFontFamily, markdownMaxWidth, canvasPaneGap, canvasSnapping, fileEditorWordWrap, iMessage, reorder, dockBadge, menuBarOnly, showInMenuBar, paneRing, paneFlash, agentPermissionPrompt, agentTurnComplete, agentIdleReminder, soundName, soundCommand, customSoundFile, telemetry, confirmQuit, warnCloseTab, warnCloseX, hideCloseButton, renameSelects, paletteAllSurfaces])
+            startSettingsObservation([language, appearance, appIcon, placement, inheritDir, minimalMode, keepWorkspaceOpen, firstClick, focusHistoryIncludesPanesAndTabs, fileDrop, preferredEditor, openSupported, openMarkdown, globalFontMagnification, markdownFontSize, markdownFontFamily, markdownMaxWidth, markdownBackground, canvasPaneGap, canvasSnapping, fileEditorWordWrap, iMessage, reorder, dockBadge, menuBarOnly, showInMenuBar, paneRing, paneFlash, agentPermissionPrompt, agentTurnComplete, agentIdleReminder, soundName, soundCommand, customSoundFile, telemetry, confirmQuit, warnCloseTab, warnCloseX, hideCloseButton, renameSelects, paletteAllSurfaces])
             if languageAtAppear == nil { languageAtAppear = language.current }; if telemetryAtAppear == nil { telemetryAtAppear = telemetry.current }
         }
     }
@@ -442,6 +444,35 @@ public struct AppSection: View {
                 .accessibilityLabel(
                     String(localized: "settings.app.markdownMaxWidth", defaultValue: "Markdown Viewer Max Width")
                 )
+            }
+            SettingsCardDivider()
+
+            // Markdown Viewer Background
+            SettingsCardRow(
+                configurationReview: .json("markdown.background"),
+                String(localized: "settings.app.markdownBackground", defaultValue: "Markdown Viewer Background"),
+                subtitle: String(
+                    localized: "settings.app.markdownBackground.subtitle",
+                    defaultValue: "What newly opened markdown viewers paint the page on. Terminal leaves it transparent so your terminal background shows through; Solid paints the canvas GitHub's markdown styling was designed against, which keeps the page's contrast the same on every theme."
+                ),
+                controlWidth: Self.columnWidth
+            ) {
+                Picker(
+                    String(localized: "settings.app.markdownBackground", defaultValue: "Markdown Viewer Background"),
+                    selection: Binding(
+                        get: { markdownBackground.current },
+                        set: { markdownBackground.set($0) }
+                    )
+                ) {
+                    Text(String(localized: "markdown.background.terminal", defaultValue: "Terminal"))
+                        .tag("terminal")
+                    Text(String(localized: "markdown.background.solid", defaultValue: "Solid"))
+                        .tag("solid")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .accessibilityIdentifier("SettingsMarkdownBackgroundPicker")
             }
             SettingsCardDivider()
 

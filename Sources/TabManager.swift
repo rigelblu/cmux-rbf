@@ -3024,6 +3024,15 @@ class TabManager: ObservableObject {
         focusedMarkdownPanel?.resetZoom() ?? false
     }
 
+    /// Flips the focused markdown viewer between the terminal canvas and the
+    /// solid one. Routes through the panel's own `toggleBackgroundStyle` so the
+    /// palette and the typography popover share one mutation path rather than
+    /// each computing the opposite state independently.
+    @discardableResult
+    func toggleBackgroundFocusedMarkdown() -> Bool {
+        focusedMarkdownPanel?.toggleBackgroundStyle() ?? false
+    }
+
     @discardableResult
     func toggleDeveloperToolsFocusedBrowser() -> Bool {
         focusedBrowserPanel?.toggleDeveloperTools() ?? false

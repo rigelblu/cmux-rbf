@@ -148,6 +148,30 @@ body {
   max-width: 100%;
   height: auto;
 }
+/* Quieter inline code than upstream GitHub's.
+   Two reasons this panel wants less than github-markdown.css:828 gives it.
+   (1) Reading hierarchy: a YMD highlight is a *status* and a code span is merely
+   monospace, so the plain span should sit clearly below the highlight rather than
+   competing with it at a similar weight.
+   (2) The overlay is alpha, and cmux tints the panel canvas. A cool grey at 20%
+   over a warm canvas separates far more than the same 20% does over #ffffff,
+   so the stock value reads heavier here than it does on github.com. Lowering
+   the alpha lets more canvas through, which makes the pill harmonise with
+   whatever tint is set instead of fighting it.
+   Overriding the rule, not --bgColor-neutral-muted: that variable is also read
+   at shell.html:127 for an unrelated element. Kept here rather than in
+   github-markdown.css so an upstream refresh of that vendored file does not
+   conflict, and out of ymd.js because this is panel styling, not dialect. */
+.markdown-body code,
+.markdown-body tt {
+  background-color: #afb8c126;   /* was #afb8c133 — 20% -> 15% */
+}
+@media (prefers-color-scheme: dark) {
+  .markdown-body code,
+  .markdown-body tt {
+    background-color: #6e76814d;  /* was #6e768166 — 40% -> 30% */
+  }
+}
 .cmux-mermaid .cmux-source, .cmux-vega .cmux-source { display: none; }
 .markdown-body code[data-cmux-file] {
   cursor: default;
@@ -247,6 +271,9 @@ html { scroll-behavior: smooth; }
 </script>
 <script>
 {{viewerNavigationJS}}
+</script>
+<script>
+{{ymdJS}}
 </script>
 <script>
 (function() {
@@ -1048,7 +1075,21 @@ html { scroll-behavior: smooth; }
       },
       heading(text, level, raw) {
         var slug = uniqueHeadingSlug(raw);
-        return '<h' + level + ' id="' + slug + '">' + text + '</h' + level + '>\n';
+        // Ask the YMD module whether this heading is decorated. Deliberately
+        // generic: the hook carries no YMD vocabulary, so the dialect stays in
+        // ymd.js and this file — the subsystem's hottest — gains no reason to
+        // change when the palette or the marker set does. Resolved at call time,
+        // not at registration: ymd.js is substituted into the shell after this.
+        // `slug` is computed from `raw`, the plain-text projection of the
+        // untouched tokens, so decoration cannot move a heading's anchor id.
+        var deco = null;
+        if (typeof CmuxYMD !== 'undefined' && CmuxYMD
+            && typeof CmuxYMD.decorateHeading === 'function') {
+          deco = CmuxYMD.decorateHeading(text);
+        }
+        var cls = deco ? ' class="' + deco.className + '"' : '';
+        var body = deco ? deco.html : text;
+        return '<h' + level + ' id="' + slug + '"' + cls + '>' + body + '</h' + level + '>\n';
       },
       link(href, title, text) {
         var html = '<a href="' + escapeAttribute(href) + '"';

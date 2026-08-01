@@ -1039,6 +1039,8 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		730600000000000000000001 /* MainWindowVisibleFrameFitCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 730600010000000000000001 /* MainWindowVisibleFrameFitCoreTests.swift */; };
 		730600020000000000000002 /* MainWindowVisibleFrameFitRescue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 730600020000000000000001 /* MainWindowVisibleFrameFitRescue.swift */; };
 		A9D9000000000000000F0017 /* markdown-viewer in Resources */ = {isa = PBXBuildFile; fileRef = A9D9000000000000000F0016 /* markdown-viewer */; };
+		F5168A0B0000000000000010 /* MarkdownBackgroundSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A0B0000000000000011 /* MarkdownBackgroundSettings.swift */; };
+		F5168A0C0000000000000001 /* MarkdownBackgroundStyleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A0C0000000000000002 /* MarkdownBackgroundStyleTests.swift */; };
 		A28B087F0000000000000003 /* MarkdownEditableFocusMessageHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28B087F0000000000000004 /* MarkdownEditableFocusMessageHandler.swift */; };
 		F5168A040000000000000001 /* MarkdownFontFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A040000000000000002 /* MarkdownFontFamily.swift */; };
 		F5168A070000000000000001 /* MarkdownFontFamilyCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A070000000000000002 /* MarkdownFontFamilyCache.swift */; };
@@ -1057,6 +1059,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		A50014F3 /* MarkdownViewerAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50014F1 /* MarkdownViewerAssets.swift */; };
 		A50014F5 /* MarkdownWebRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50014F4 /* MarkdownWebRenderer.swift */; };
 		A50014F9 /* MarkdownWebSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50014F8 /* MarkdownWebSupport.swift */; };
+		D7470012D7470012D7470012 /* MarkdownYMDShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7470011D7470011D7470011 /* MarkdownYMDShellTests.swift */; };
 		7490C0027490C0027490C002 /* MemoryPressureFootprintSampling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7490D0027490D0027490D002 /* MemoryPressureFootprintSampling.swift */; };
 		7490C0037490C0037490C003 /* MemoryPressureFootprintThresholds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7490D0037490D0037490D003 /* MemoryPressureFootprintThresholds.swift */; };
 		7490C0047490C0047490C004 /* MemoryPressureMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7490D0047490D0047490D004 /* MemoryPressureMonitor.swift */; };
@@ -3231,6 +3234,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		730600010000000000000001 /* MainWindowVisibleFrameFitCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowVisibleFrameFitCoreTests.swift; sourceTree = "<group>"; };
 		730600020000000000000001 /* MainWindowVisibleFrameFitRescue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MainWindowVisibleFrameFitRescue.swift; sourceTree = "<group>"; };
 		A9D9000000000000000F0016 /* markdown-viewer */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder; path = "markdown-viewer"; sourceTree = "<group>"; };
+		F5168A0B0000000000000011 /* MarkdownBackgroundSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownBackgroundSettings.swift; sourceTree = "<group>"; };
+		F5168A0C0000000000000002 /* MarkdownBackgroundStyleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBackgroundStyleTests.swift; sourceTree = "<group>"; };
 		A28B087F0000000000000004 /* MarkdownEditableFocusMessageHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownEditableFocusMessageHandler.swift; sourceTree = "<group>"; };
 		F5168A040000000000000002 /* MarkdownFontFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownFontFamily.swift; sourceTree = "<group>"; };
 		F5168A070000000000000002 /* MarkdownFontFamilyCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownFontFamilyCache.swift; sourceTree = "<group>"; };
@@ -3248,6 +3253,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		A50014F1 /* MarkdownViewerAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownViewerAssets.swift; sourceTree = "<group>"; };
 		A50014F4 /* MarkdownWebRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownWebRenderer.swift; sourceTree = "<group>"; };
 		A50014F8 /* MarkdownWebSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownWebSupport.swift; sourceTree = "<group>"; };
+		D7470011D7470011D7470011 /* MarkdownYMDShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownYMDShellTests.swift; sourceTree = "<group>"; };
 		7490D0027490D0027490D002 /* MemoryPressureFootprintSampling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MemoryPressureFootprintSampling.swift; sourceTree = "<group>"; };
 		7490D0037490D0037490D003 /* MemoryPressureFootprintThresholds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MemoryPressureFootprintThresholds.swift; sourceTree = "<group>"; };
 		7490D0047490D0047490D004 /* MemoryPressureMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MemoryPressureMonitor.swift; sourceTree = "<group>"; };
@@ -5683,6 +5689,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				F5168A040000000000000002 /* MarkdownFontFamily.swift */,
 				F5168A070000000000000002 /* MarkdownFontFamilyCache.swift */,
 				F5168A050000000000000002 /* MarkdownMaxWidthSettings.swift */,
+				F5168A0B0000000000000011 /* MarkdownBackgroundSettings.swift */,
 				F11E52270000000000005228 /* FilePreviewWordWrapSettings.swift */,
 				F5168A060000000000000002 /* MarkdownTypographyDefaults.swift */,
 				F5168A020000000000000002 /* MarkdownTypographyControl.swift */,
@@ -6427,6 +6434,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				C0DEFB300000000000000002 /* FocusSurfaceBroadcasterTests.swift */,
 				A5001435A5001435A5001435 /* FilePreviewPDFThumbnailSidebarTests.swift */,
 				D7470001D7470001D7470001 /* MarkdownLinkBoundaryRegressionTests.swift */,
+				D7470011D7470011D7470011 /* MarkdownYMDShellTests.swift */,
+				F5168A0C0000000000000002 /* MarkdownBackgroundStyleTests.swift */,
 				D8072A01D8072A01D8072A01 /* BrowserViewportRuntimeLoadDelegate.swift */,
 				D8072A03D8072A03D8072A03 /* BrowserViewportRuntimeTests.swift */,
 				D6069001D6069001D6069001 /* MarkdownMermaidZoomTests.swift */,
@@ -7721,6 +7730,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				A6D1F0300000000000000002 /* MainWindowVisibilityController+Lifecycle.swift in Sources */,
 				2F0C06000000000000000002 /* MainWindowVisibilityController.swift in Sources */,
 				730600020000000000000002 /* MainWindowVisibleFrameFitRescue.swift in Sources */,
+				F5168A0B0000000000000010 /* MarkdownBackgroundSettings.swift in Sources */,
 				A28B087F0000000000000003 /* MarkdownEditableFocusMessageHandler.swift in Sources */,
 				F5168A040000000000000001 /* MarkdownFontFamily.swift in Sources */,
 				F5168A070000000000000001 /* MarkdownFontFamilyCache.swift in Sources */,
@@ -8973,9 +8983,11 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				17C9F5BA0DD14EDC8C3E5001 /* MainWindowVisibilityControllerTests.swift in Sources */,
 				A6D1F0100000000000000002 /* MainWindowVisibilityLifecycleTests.swift in Sources */,
 				730600000000000000000001 /* MainWindowVisibleFrameFitCoreTests.swift in Sources */,
+				F5168A0C0000000000000001 /* MarkdownBackgroundStyleTests.swift in Sources */,
 				D7470002D7470002D7470002 /* MarkdownLinkBoundaryRegressionTests.swift in Sources */,
 				D6069002D6069002D6069002 /* MarkdownMermaidZoomTests.swift in Sources */,
 				D3664002D3664002D3664002 /* MarkdownPanelTests.swift in Sources */,
+				D7470012D7470012D7470012 /* MarkdownYMDShellTests.swift in Sources */,
 					7490A0017490A0017490A001 /* MemoryPressureMonitorTests.swift in Sources */,
 				606500010000000000000001 /* MenuBarOnlyActivationPolicyTests.swift in Sources */,
 					C0DE70520000000000000002 /* MenuBarProfilingLauncherTests.swift in Sources */,
