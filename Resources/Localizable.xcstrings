@@ -61510,6 +61510,23 @@
         }
       }
     },
+    "command.markdownToggleBackground.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggle Markdown Background"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown の背景を切り替え"
+          }
+        }
+      }
+    },
     "command.markdownZoomIn.title": {
       "extractionState": "manual",
       "localizations": {
@@ -118765,6 +118782,57 @@
         }
       }
     },
+    "markdown.background.label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Background"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "背景"
+          }
+        }
+      }
+    },
+    "markdown.background.solid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solid"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "単色"
+          }
+        }
+      }
+    },
+    "markdown.background.terminal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminal"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ターミナル"
+          }
+        }
+      }
+    },
     "markdown.fileUnavailable.message": {
       "extractionState": "manual",
       "localizations": {
@@ -153192,6 +153260,40 @@
         }
       }
     },
+    "settings.app.markdownBackground" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown Viewer Background"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown ビューアの背景"
+          }
+        }
+      }
+    },
+    "settings.app.markdownBackground.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What newly opened markdown viewers paint the page on. Terminal leaves it transparent so your terminal background shows through; Solid paints the canvas GitHub's markdown styling was designed against, which keeps the page's contrast the same on every theme."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく開く Markdown ビューアがページを描画する背景です。「ターミナル」は背景を透過してターミナルの背景を表示し、「単色」は GitHub の Markdown スタイルが前提とする背景色で塗るため、どのテーマでもページのコントラストが一定になります。"
+          }
+        }
+      }
+    },
     "settings.app.markdownFontFamily": {
       "extractionState": "manual",
       "localizations": {
@@ -184268,6 +184370,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "markdown.fontSize Markdown マークダウン ビューア フォントサイズ 文字サイズ ズーム 拡大 縮小 大きく 小さく 既定 ポイント font size zoom"
+          }
+        }
+      }
+    },
+    "settings.search.alias.setting.app.markdown-background" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "markdown.background md markdown viewer background canvas page solid terminal transparent see-through theme contrast readable"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "markdown.background md markdown ビューア 背景 キャンバス ページ 単色 ターミナル 透過 テーマ コントラスト 可読性"
           }
         }
       }

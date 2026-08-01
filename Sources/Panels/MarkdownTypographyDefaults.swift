@@ -1,6 +1,6 @@
 import Foundation
 
-/// Writes the markdown viewer typography defaults (size, font, and width).
+/// Writes the markdown viewer defaults (size, font, width, and page canvas).
 ///
 /// Writing the keys triggers `UserDefaults.didChangeNotification`, which open
 /// viewers observe: those still on the previous default adopt the new one, while
@@ -13,16 +13,19 @@ enum MarkdownTypographyDefaults {
         fontSize: Double,
         fontFamily: String,
         maxContentWidth: Double,
+        background: MarkdownBackgroundStyle,
         defaults: UserDefaults = .standard
     ) {
         MarkdownFontSizeSettings.setDefault(fontSize, defaults: defaults)
         MarkdownFontFamily.setDefault(fontFamily, defaults: defaults)
         MarkdownMaxWidthSettings.setDefault(maxContentWidth, defaults: defaults)
+        MarkdownBackgroundSettings.setDefault(background, defaults: defaults)
     }
 
     static func resetToBuiltInDefaults(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: MarkdownFontSizeSettings.key)
         MarkdownFontFamily.setDefault(MarkdownFontFamily.systemDefault, defaults: defaults)
         MarkdownMaxWidthSettings.resetDefault(defaults: defaults)
+        MarkdownBackgroundSettings.resetDefault(defaults: defaults)
     }
 }

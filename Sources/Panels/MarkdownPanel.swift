@@ -94,6 +94,14 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
     /// `MarkdownMaxWidthSettings`.
     @Published private(set) var maxContentWidth: Double
 
+    /// What this viewer paints its page on. Per-panel and transient; the
+    /// persistent default lives in `MarkdownBackgroundSettings`.
+    ///
+    /// Per-panel rather than global so it behaves like its three siblings above:
+    /// changeable for one viewer from the typography popover, and promotable
+    /// with "Set as default for new viewers". A global setting could do neither.
+    @Published private(set) var backgroundStyle: MarkdownBackgroundStyle
+
     /// Stable markdown renderer state. Keep this panel-owned so split/tab
     /// layout churn does not recreate the WKWebView and flash existing content.
     let rendererSession = MarkdownRendererSession()
@@ -119,6 +127,7 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
     private var followedFontSize: Double
     private var followedFontFamily: String
     private var followedMaxContentWidth: Double
+    private var followedBackgroundStyle: MarkdownBackgroundStyle
 
     // MARK: - Init
 
@@ -129,15 +138,18 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
         let defaultSize = MarkdownFontSizeSettings.resolvedDefault()
         let defaultFamily = MarkdownFontFamily.resolvedDefault()
         let defaultMaxWidth = MarkdownMaxWidthSettings.resolvedDefault()
+        let defaultBackground = MarkdownBackgroundSettings.resolvedDefault()
         self.id = UUID()
         self.workspaceId = workspaceId
         self.filePath = filePath
         self.fontSize = MarkdownFontSizeSettings.clamp(fontSize ?? defaultSize)
         self.fontFamily = defaultFamily
         self.maxContentWidth = defaultMaxWidth
+        self.backgroundStyle = defaultBackground
         self.followedFontSize = defaultSize
         self.followedFontFamily = defaultFamily
         self.followedMaxContentWidth = defaultMaxWidth
+        self.followedBackgroundStyle = defaultBackground
         self.displayTitle = (filePath as NSString).lastPathComponent
 
         loadFileContent()
@@ -182,16 +194,20 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
         // Only viewers still tracking the default follow the change.
         guard abs(fontSize - followedFontSize) < 0.01,
               fontFamily == followedFontFamily,
-              abs(maxContentWidth - followedMaxContentWidth) < 0.01 else { return }
+              abs(maxContentWidth - followedMaxContentWidth) < 0.01,
+              backgroundStyle == followedBackgroundStyle else { return }
         let newSize = MarkdownFontSizeSettings.resolvedDefault()
         let newFamily = MarkdownFontFamily.resolvedDefault()
         let newMaxWidth = MarkdownMaxWidthSettings.resolvedDefault()
+        let newBackground = MarkdownBackgroundSettings.resolvedDefault()
         _ = setFontSize(newSize)
         _ = setFontFamily(newFamily)
         _ = setMaxContentWidth(newMaxWidth)
+        _ = setBackgroundStyle(newBackground)
         followedFontSize = newSize
         followedFontFamily = newFamily
         followedMaxContentWidth = newMaxWidth
+        followedBackgroundStyle = newBackground
     }
 
     // MARK: - Font size / zoom
@@ -247,18 +263,37 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
         return true
     }
 
+    /// Sets what this viewer paints its page on. Returns `true` if changed.
+    @discardableResult
+    func setBackgroundStyle(_ style: MarkdownBackgroundStyle) -> Bool {
+        guard style != backgroundStyle else { return false }
+        backgroundStyle = style
+        return true
+    }
+
+    /// Flips between `terminal` and `solid`. The command palette's toggle needs
+    /// a single action rather than two commands, and the popover reuses it, so
+    /// both entrypoints share one path rather than each computing the opposite.
+    @discardableResult
+    func toggleBackgroundStyle() -> Bool {
+        setBackgroundStyle(backgroundStyle == .solid ? .terminal : .solid)
+    }
+
     /// Resets typography to the configured defaults. Used by the popover's
     /// "Reset to default" action.
     func resetTypography() {
         let defaultSize = MarkdownFontSizeSettings.resolvedDefault()
         let defaultFamily = MarkdownFontFamily.resolvedDefault()
         let defaultMaxWidth = MarkdownMaxWidthSettings.resolvedDefault()
+        let defaultBackground = MarkdownBackgroundSettings.resolvedDefault()
         _ = setFontSize(defaultSize)
         _ = setFontFamily(defaultFamily)
         _ = setMaxContentWidth(defaultMaxWidth)
+        _ = setBackgroundStyle(defaultBackground)
         followedFontSize = defaultSize
         followedFontFamily = defaultFamily
         followedMaxContentWidth = defaultMaxWidth
+        followedBackgroundStyle = defaultBackground
     }
 
     /// Clears persisted markdown typography defaults and resets this viewer to
@@ -268,9 +303,11 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
         _ = setFontSize(MarkdownFontSizeSettings.defaultPointSize)
         _ = setFontFamily(MarkdownFontFamily.systemDefault)
         _ = setMaxContentWidth(MarkdownMaxWidthSettings.defaultCSSPixels)
+        _ = setBackgroundStyle(MarkdownBackgroundSettings.defaultStyle)
         followedFontSize = MarkdownFontSizeSettings.defaultPointSize
         followedFontFamily = MarkdownFontFamily.systemDefault
         followedMaxContentWidth = MarkdownMaxWidthSettings.defaultCSSPixels
+        followedBackgroundStyle = MarkdownBackgroundSettings.defaultStyle
     }
 
     // MARK: - Panel protocol

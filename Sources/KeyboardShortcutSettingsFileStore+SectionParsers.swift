@@ -99,6 +99,18 @@ extension CmuxSettingsFileStore {
         } else if section.keys.contains("maxWidth") {
             logInvalid("markdown.maxWidth", sourcePath: sourcePath)
         }
+
+        // An unrecognised value is logged and dropped rather than silently
+        // resolving to `terminal`. `MarkdownBackgroundStyle(rawValueOrTerminal:)`
+        // still protects the panel at read time, but a typo in cmux.json should
+        // tell its author instead of quietly doing nothing — which is exactly
+        // what `logInvalid` is for, and how the three siblings above behave.
+        if let value = jsonString(section["background"]),
+           let style = MarkdownBackgroundStyle(rawValue: value) {
+            snapshot.managedUserDefaults[MarkdownBackgroundSettings.key] = .string(style.rawValue)
+        } else if section.keys.contains("background") {
+            logInvalid("markdown.background", sourcePath: sourcePath)
+        }
     }
 
     func parseMobileSection(

@@ -5,7 +5,22 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(empty)
+## 🟠⋯ Added for End Users
+- 2026-08-01 - feat (ux) | read your color-coded plans in the markdown panel instead of raw marker emoji — the first 🔴🟠🟡🟢🔵🟣⚫ in a block disappears, and outside headings it tints the code span beside it, so `**🟢`PASS`**` reads as a green `PASS` highlight and a verification table scans by colour (#cm-15)
+- 2026-08-01 - feat (ux) | tell your plan's sections apart by colour, not just by size — a heading keeps its marker's colour as text tint. Colour is pre-attentive where a 4px size step is not, so headings separate at scroll distance (#cm-15)
+- 2026-08-01 - feat (ux) | choose what the markdown viewer paints its page on — **Terminal** leaves it transparent so your terminal background shows through, **Solid** paints the canvas GitHub's markdown styling was designed against. Per-viewer, from the `AA` popover, the command palette, Settings, or `markdown.background` in `~/.config/cmux/cmux.json` (#cm-15)
+- 2026-08-01 - feat (ux) | read inline code without it shouting over the status highlights — plain code spans stepped back from GitHub's 20% grey overlay to 15%, so a highlight reads as a status and a code span reads as monospace (#cm-15)
+
+## 🟠⋯ Known Limitations
+- Markers inside fenced blocks and inline code stay literal, by design — a marker in backticks is content, not syntax.
+- `⚪` is not a YMD colour: `**⚪`PENDING`**` keeps its glyph and takes no highlight, while `**🟢`PASS`**` loses its glyph and gains one. The asymmetry *is* the pass/pending signal, not an oversight.
+- A marker before a code span that sits inside a link label conceals but does not tint. A highlight there would be a `<span>` inside an `<a>`, which the link-label sanitizer strips — taking the `<code>` with it.
+- Light-mode yellow and green are deliberate WCAG AA exceptions (1.97:1 and 3.22:1 on `#ffffff`), accepted by dated decision. Yellow is the one hue whose identity *is* its luminance — anything dark enough to pass reads as gold, not yellow. Both sit on headings, where level is already carried by size, weight and position, so the colour is redundant signal rather than sole signal. Switching the viewer to **Solid** makes those ratios fixed and checkable.
+- Documents over 250,000 bytes are skipped entirely — the pass costs ~14ns/byte, so the ceiling keeps a pathological file from spending a frame on markers.
+- Heading colour never becomes a highlight. The shell derives heading ids from a plain-text projection that does not cover extension tokens, so a highlight in a heading corrupts its `#anchor` link and the scroll-restore that depends on it.
+
+---
+
 
 ---
 

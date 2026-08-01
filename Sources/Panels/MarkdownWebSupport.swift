@@ -182,6 +182,47 @@ final class MarkdownWebView: WKWebView {
     }
 }
 
+/// What the markdown viewer paints its page on.
+///
+/// The distinction is legibility, not decoration. Under ``terminal`` the page
+/// canvas is transparent and the terminal's own background shows through, so no
+/// colour the viewer draws has a knowable contrast ratio — it depends on a theme
+/// this code cannot see, and the only oracle is a human looking at it. Under
+/// ``solid`` the canvas is the one `github-markdown.css` was designed against,
+/// so every ratio is fixed and checkable.
+enum MarkdownBackgroundStyle: String, Equatable {
+    case terminal
+    case solid
+
+    /// Unknown values fall back to `terminal`, the pre-existing behaviour: a
+    /// typo in `cmux.json` must not repaint the panel.
+    init(rawValueOrTerminal raw: String?) {
+        self = MarkdownBackgroundStyle(rawValue: raw ?? "") ?? .terminal
+    }
+
+    /// The colour that must sit directly behind the rendered page.
+    ///
+    /// Extracted from `MarkdownPanelView` so the decision is testable. It is the
+    /// whole content of the resize-flash fix: a relayout moves the container
+    /// before the web view repaints, so whatever is behind the page shows for
+    /// that moment and must not be a different colour from the page. Under
+    /// `terminal` there is no canvas and the panel's own colour is correct.
+    ///
+    /// What this does NOT capture is *where* the view puts it — that is a
+    /// SwiftUI view-tree property with no unit-test seam. Placement is verified
+    /// by dogfood only; see the note in MarkdownBackgroundStyleTests.
+    static func colourBehindPage(theme: MarkdownWebTheme, panelContent: NSColor) -> NSColor {
+        theme.canvasColor ?? panelContent
+    }
+
+    /// The canvas `github-markdown.css` pairs with each appearance.
+    static func solidCanvas(isDark: Bool) -> NSColor {
+        isDark
+            ? NSColor(srgbRed: 0x0D / 255, green: 0x11 / 255, blue: 0x17 / 255, alpha: 1)
+            : NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
+    }
+}
+
 struct MarkdownWebTheme: Equatable {
     let isDark: Bool
     let background: String
@@ -189,10 +230,23 @@ struct MarkdownWebTheme: Equatable {
     let neutralMutedBackground: String
     let border: String
     let mutedBorder: String
+    /// The colour the web view itself should be backed by, or nil to stay
+    /// transparent. Without this the CSS canvas would be painted over a
+    /// transparent `WKWebView` and the terminal would still show through at the
+    /// edges — the page would look solid while the panel was not.
+    let canvasColor: NSColor?
 
-    static func resolve(backgroundColor: NSColor) -> MarkdownWebTheme {
-        let base = backgroundColor.markdownOpaqueSRGB
-        let isDark = !base.isLightColor
+    static func resolve(
+        backgroundColor: NSColor,
+        style: MarkdownBackgroundStyle = .terminal
+    ) -> MarkdownWebTheme {
+        let terminalBase = backgroundColor.markdownOpaqueSRGB
+        // Appearance still follows the terminal even in `solid`: the choice is
+        // which canvas to paint, not whether the user is in light or dark mode.
+        let isDark = !terminalBase.isLightColor
+        let base = style == .solid
+            ? MarkdownBackgroundStyle.solidCanvas(isDark: isDark)
+            : terminalBase
         let overlayColor: NSColor = isDark ? .white : .black
         let muted = base.markdownThemeOverlay(
             targetContrast: isDark ? 1.09 : 1.06,
@@ -208,11 +262,12 @@ struct MarkdownWebTheme: Equatable {
         )
         return MarkdownWebTheme(
             isDark: isDark,
-            background: "transparent",
+            background: style == .solid ? base.markdownCSSColor : "transparent",
             mutedBackground: muted.markdownCSSColor,
             neutralMutedBackground: neutralMuted.markdownCSSColor,
             border: border.markdownCSSColor,
-            mutedBorder: border.withAlphaComponent(border.alphaComponent * 0.70).markdownCSSColor
+            mutedBorder: border.withAlphaComponent(border.alphaComponent * 0.70).markdownCSSColor,
+            canvasColor: style == .solid ? base : nil
         )
     }
 }

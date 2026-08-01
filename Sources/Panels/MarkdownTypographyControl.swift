@@ -13,7 +13,15 @@ struct MarkdownTypographyControl: View {
     @State private var families: [String] = []
     @State private var sizeText = ""
     @State private var maxWidthText = ""
-    private let labelColumnWidth: CGFloat = 66
+    // Sized for the longest label, which is now "Background" — at 66 it wrapped
+    // to "Backgroun / d". Headroom past the English width on purpose: this is a
+    // fixed column and the app ships 20 locales, where the same word is longer
+    // (de "Hintergrund", fr "Arrière-plan"). A fixed number is still the wrong
+    // shape — a Grid with .gridColumnAlignment would size to the widest cell in
+    // whatever language is loaded — but that is a layout refactor of all four
+    // rows, so this is the bounded fix and the fragility is named rather than
+    // hidden. Revisit if a translation clips again.
+    private let labelColumnWidth: CGFloat = 96
 
     private var buttonLabel: String {
         String(localized: "markdown.toolbar.fontSize", defaultValue: "Font Size")
@@ -29,6 +37,10 @@ struct MarkdownTypographyControl: View {
 
     private var maxWidthBinding: Binding<Double> {
         Binding(get: { panel.maxContentWidth }, set: { _ = panel.setMaxContentWidth($0) })
+    }
+
+    private var backgroundBinding: Binding<MarkdownBackgroundStyle> {
+        Binding(get: { panel.backgroundStyle }, set: { _ = panel.setBackgroundStyle($0) })
     }
 
     /// The current selection is always tag-able, even before the full list loads.
@@ -116,6 +128,23 @@ struct MarkdownTypographyControl: View {
                         .labelsHidden()
                     }
                 }
+
+                // The page canvas. Lives with the typography controls because
+                // this is where a reader looks for "how this viewer renders",
+                // and because it has to participate in the three actions below
+                // — a background that "Reset to default" silently skipped is
+                // exactly the shared-behavior defect this repo has hit before.
+                HStack(alignment: .firstTextBaseline, spacing: 14) {
+                    fieldLabel(String(localized: "markdown.background.label", defaultValue: "Background"))
+                    Picker("", selection: backgroundBinding) {
+                        Text(String(localized: "markdown.background.terminal", defaultValue: "Terminal"))
+                            .tag(MarkdownBackgroundStyle.terminal)
+                        Text(String(localized: "markdown.background.solid", defaultValue: "Solid"))
+                            .tag(MarkdownBackgroundStyle.solid)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
             }
 
             Divider()
@@ -131,14 +160,15 @@ struct MarkdownTypographyControl: View {
                     MarkdownTypographyDefaults.setDefault(
                         fontSize: panel.fontSize,
                         fontFamily: panel.fontFamily,
-                        maxContentWidth: panel.maxContentWidth
+                        maxContentWidth: panel.maxContentWidth,
+                        background: panel.backgroundStyle
                     )
                 }
             }
             .buttonStyle(.link)
         }
         .padding(14)
-        .frame(width: 272)
+        .frame(width: 312)
         .onAppear {
             syncDraftFieldsFromPanel()
         }
