@@ -24,6 +24,14 @@ public protocol ControlWorkspaceContext: AnyObject {
     /// The localized workspace error messages, resolved against the app bundle.
     func controlWorkspaceStrings() -> ControlWorkspaceStrings
 
+    /// The effective workspace color palette for `workspace.color.list` (`#cm-11`).
+    ///
+    /// Answered by the app rather than read here, even though this package can see
+    /// `CmuxSettings`: the built-in palette's names and default hexes live in the app
+    /// target, and `CmuxSettingsUI` already had to mirror them once. A second mirror in
+    /// the socket layer would be a third definition of the same sixteen colors.
+    func controlWorkspaceColorList() -> [ControlWorkspaceColorEntry]
+
     /// Whether the routing selectors resolve a TabManager, used to reproduce the
     /// legacy `unavailable`-first ordering for `workspace.reorder` /
     /// `workspace.next` / `previous` / `last` before their param/state work.

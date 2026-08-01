@@ -256,6 +256,8 @@ extension ControlWorkspaceContext {
 
     func controlWorkspaceRoutingResolvesTabManager(routing: ControlRoutingSelectors) -> Bool { false }
 
+    func controlWorkspaceColorList() -> [ControlWorkspaceColorEntry] { [] }
+
     func controlWorkspaceList(routing: ControlRoutingSelectors) -> ControlWorkspaceListResolution {
         .tabManagerUnavailable
     }
