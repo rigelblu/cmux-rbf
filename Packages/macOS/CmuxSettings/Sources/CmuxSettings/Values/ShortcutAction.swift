@@ -140,6 +140,10 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case markdownZoomIn
     case markdownZoomOut
     case markdownZoomReset
+    /// Scales all of cmux at once — chrome, terminals, and text panels.
+    case globalZoomIn
+    case globalZoomOut
+    case globalZoomReset
     case find
     case findInDirectory
     case findNext
@@ -179,7 +183,8 @@ extension ShortcutAction {
     public var group: Group {
         switch self {
         case .openSettings, .reloadConfiguration, .showHideAllWindows, .globalSearch,
-             .newWindow, .closeWindow, .toggleFullScreen, .quit:
+             .newWindow, .closeWindow, .toggleFullScreen, .quit,
+             .globalZoomIn, .globalZoomOut, .globalZoomReset:
             return .app
         case .toggleSidebar, .newTab, .newBrowserWorkspace, .saveLayoutTemplate, .openFolder, .reopenPreviousSession, .goToWorkspace,
              .commandPalette, .commandPaletteNext, .commandPalettePrevious, .sendFeedback,
@@ -462,6 +467,9 @@ extension ShortcutAction {
         case .markdownZoomIn: return "Markdown Viewer: Zoom In"
         case .markdownZoomOut: return "Markdown Viewer: Zoom Out"
         case .markdownZoomReset: return "Markdown Viewer: Actual Size"
+        case .globalZoomIn: return "Everything: Zoom In"
+        case .globalZoomOut: return "Everything: Zoom Out"
+        case .globalZoomReset: return "Everything: Actual Size"
         case .find: return "Find…"
         case .findInDirectory: return "Find in Directory…"
         case .findNext: return "Find Next"

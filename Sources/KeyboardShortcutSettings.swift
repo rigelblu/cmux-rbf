@@ -175,6 +175,9 @@ enum KeyboardShortcutSettings {
         case markdownZoomIn
         case markdownZoomOut
         case markdownZoomReset
+        case globalZoomIn
+        case globalZoomOut
+        case globalZoomReset
         case find
         case findInDirectory
         case findNext
@@ -306,6 +309,11 @@ enum KeyboardShortcutSettings {
             case .markdownZoomIn: return String(localized: "shortcut.markdownZoomIn.label", defaultValue: "Markdown Viewer: Zoom In")
             case .markdownZoomOut: return String(localized: "shortcut.markdownZoomOut.label", defaultValue: "Markdown Viewer: Zoom Out")
             case .markdownZoomReset: return String(localized: "shortcut.markdownZoomReset.label", defaultValue: "Markdown Viewer: Actual Size")
+            // Same keys the View menu and command palette use, so the three
+            // entrypoints can never show three different names for one action.
+            case .globalZoomIn: return String(localized: "menu.view.globalZoomIn", defaultValue: "Everything: Zoom In")
+            case .globalZoomOut: return String(localized: "menu.view.globalZoomOut", defaultValue: "Everything: Zoom Out")
+            case .globalZoomReset: return String(localized: "menu.view.globalActualSize", defaultValue: "Everything: Actual Size")
             case .find: return String(localized: "menu.find.find", defaultValue: "Find…")
             case .findInDirectory: return String(localized: "menu.find.findInDirectory", defaultValue: "Find in Directory…")
             case .findNext: return String(localized: "menu.find.findNext", defaultValue: "Find Next")
@@ -558,6 +566,15 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "-", command: true, shift: false, option: false, control: false)
             case .markdownZoomReset:
                 return StoredShortcut(key: "0", command: true, shift: false, option: false, control: false)
+            case .globalZoomIn:
+                // Shift+Cmd+= scales all of cmux at once. The unshifted chord
+                // family stays with the focused surface, so Cmd+= still sizes
+                // one pane and the two axes compose instead of competing.
+                return StoredShortcut(key: "=", command: true, shift: true, option: false, control: false)
+            case .globalZoomOut:
+                return StoredShortcut(key: "-", command: true, shift: true, option: false, control: false)
+            case .globalZoomReset:
+                return StoredShortcut(key: "0", command: true, shift: true, option: false, control: false)
             case .find:
                 return StoredShortcut(key: "f", command: true, shift: false, option: false, control: false)
             case .findInDirectory:

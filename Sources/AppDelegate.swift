@@ -12581,6 +12581,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func installGlobalFontMagnificationObserver() {
         guard globalFontMagnificationObserver == nil else { return }
+        // Seed the baseline HERE, not lazily at the read site. The first change
+        // of a session must scale from the percent actually on screen; defaulting
+        // to 100% made a first ⇧⌘- at 200% compute ratio 1.9 and grow the pane it
+        // was asked to shrink, and made a first ⇧⌘0 from 150% a silent no-op.
+        // Reading `storedPercent` inside the handler instead would be worse — it
+        // reads after the write, yielding ratio 1 and swallowing the first zoom.
+        Self.magnificationRatioTracker = GlobalMagnificationRatioTracker(
+            startingAt: GlobalFontMagnification.storedPercent
+        )
         globalFontMagnificationObserver = NotificationCenter.default.addObserver(
             forName: GlobalFontMagnification.didChangeNotification,
             object: nil,
@@ -12592,8 +12601,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     source: "globalFontMagnificationDidChange",
                     reloadSettingsFromFile: false
                 )
+                Self.reapplyGlobalMagnificationToHandSizedTerminals()
             }
         }
+    }
+
+    /// Rescales terminals that opted out of config-driven font sizing.
+    ///
+    /// The config reload above already handles every surface that still follows
+    /// config. It cannot reach a surface the user sized by hand: Ghostty sets
+    /// `font_size_adjusted` on any manual change and then deliberately skips
+    /// that surface on config reload, "since we assume the user wants a
+    /// specific size" (`Surface.zig`). Without this pass, zooming the app left
+    /// every hand-sized pane frozen while its neighbours grew around it.
+    ///
+    /// Each such surface is scaled by the *ratio* between the previous and
+    /// current magnification, so per-pane zoom and the app-wide scale compose
+    /// instead of competing.
+
+    /// Tracks the percent terminals were last scaled to.
+    ///
+    /// Seeded in ``installGlobalFontMagnificationObserver()`` from the stored
+    /// percent — never lazily on first use, which would measure the first change
+    /// of a session against 100% instead of what is on screen.
+    @MainActor
+    private static var magnificationRatioTracker: GlobalMagnificationRatioTracker?
+
+    @MainActor
+    private static func reapplyGlobalMagnificationToHandSizedTerminals() {
+        let percent = GlobalFontMagnification.storedPercent
+        guard var tracker = magnificationRatioTracker else { return }
+        let previousPercent = tracker.baseline
+        let consumed = tracker.consume(percent: percent)
+        magnificationRatioTracker = tracker
+        guard let ratio = consumed else { return }
+
+        let all = GhosttyApp.terminalSurfaceRegistry.allSurfaces()
+        var casted = 0
+        var scaled = 0
+        for surface in all {
+            guard let terminalSurface = surface as? TerminalSurface else { continue }
+            casted += 1
+            if terminalSurface.reapplyFontSizeForGlobalMagnificationChange(ratio: ratio) {
+                scaled += 1
+            }
+        }
+#if DEBUG
+        cmuxDebugLog(
+            "globalZoom.reapply percent=\(previousPercent)->\(percent) ratio=\(ratio) " +
+            "registered=\(all.count) terminalSurfaces=\(casted) scaled=\(scaled)"
+        )
+#endif
     }
 
     @objc func reloadConfigurationMenuItem(_ sender: Any?) {
@@ -14038,6 +14096,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             if !didHandle { NSSound.beep() }
             return true
         }
+
+        // Checked ahead of the surface-scoped zoom chords. The global actions
+        // are unscoped and always consume the event, so testing them first
+        // keeps routing predictable even if a user rebinds one onto a chord a
+        // focused-surface handler would otherwise claim.
+        if matchConfiguredShortcut(event: event, action: .globalZoomIn) { return GlobalZoomAction.zoomIn.perform() }
+
+        if matchConfiguredShortcut(event: event, action: .globalZoomOut) { return GlobalZoomAction.zoomOut.perform() }
+
+        if matchConfiguredShortcut(event: event, action: .globalZoomReset) { return GlobalZoomAction.reset.perform() }
 
         if matchConfiguredShortcut(event: event, action: .browserZoomIn) { return performBrowserOrTextPreviewZoomShortcut(event: event, action: .browserZoomIn) }
 

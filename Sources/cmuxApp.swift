@@ -985,6 +985,22 @@ struct cmuxApp: App {
                 _ = activeTabManager.resetZoomFocusedBrowserOrTextFilePreview()
             }
 
+            Divider()
+
+            splitCommandButton(title: String(localized: "menu.view.globalZoomIn", defaultValue: "Everything: Zoom In"), shortcut: menuShortcut(for: .globalZoomIn)) {
+                GlobalZoomAction.zoomIn.perform()
+            }
+
+            splitCommandButton(title: String(localized: "menu.view.globalZoomOut", defaultValue: "Everything: Zoom Out"), shortcut: menuShortcut(for: .globalZoomOut)) {
+                GlobalZoomAction.zoomOut.perform()
+            }
+
+            splitCommandButton(title: String(localized: "menu.view.globalActualSize", defaultValue: "Everything: Actual Size"), shortcut: menuShortcut(for: .globalZoomReset)) {
+                GlobalZoomAction.reset.perform()
+            }
+
+            Divider()
+
             Button(String(localized: "menu.view.clearBrowserHistory", defaultValue: "Clear Browser History")) {
                 BrowserHistoryStore.shared.clearHistory()
             }

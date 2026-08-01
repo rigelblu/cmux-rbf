@@ -1,7 +1,44 @@
 import AppKit
 import CmuxCanvas
+import CmuxFoundation
 import CmuxPanes
 import CmuxSettings
+
+/// The single path every global-zoom entrypoint runs through.
+///
+/// The keyboard shortcut, the View menu, and the command palette all call
+/// ``perform()``, so the three can never drift apart. Lives here beside the
+/// surface-scoped zoom router rather than in its own file because this project
+/// has no file-system-synchronized groups — an unwired new file compiles to
+/// nothing, silently.
+enum GlobalZoomAction {
+    case zoomIn
+    case zoomOut
+    case reset
+
+    /// Applies the step and always reports the event consumed.
+    ///
+    /// Reporting handled even at a bound is deliberate: if a no-op step fell
+    /// through, the chord would reach the focused surface and zoom a single
+    /// pane instead — the exact confusion this feature exists to remove.
+    @discardableResult
+    func perform() -> Bool {
+        switch self {
+        case .zoomIn:
+            GlobalFontMagnification.step(by: 1)
+        case .zoomOut:
+            GlobalFontMagnification.step(by: -1)
+        case .reset:
+            // Guarded for the same reason ``GlobalFontMagnification/step(by:)``
+            // is: an unconditional reset would post a change notification and
+            // reload every terminal's config on each repeat while already at
+            // 100%.
+            guard !GlobalFontMagnification.isDefault else { return true }
+            GlobalFontMagnification.resetToDefault()
+        }
+        return true
+    }
+}
 
 extension AppDelegate {
     @discardableResult

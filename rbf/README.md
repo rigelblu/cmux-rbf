@@ -11,6 +11,15 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Zoom once and have all of cmux scale
+`⇧⌘=` and `⇧⌘-` resize everything together — terminals, the sidebar, tab bars, the command palette, Settings, browser panes, the markdown viewer, and text previews. `⇧⌘0` returns to normal.
+
+- `⌘=` still sizes only the pane you are in, and the two compose: a pane you enlarged by hand stays proportionally larger when everything scales around it.
+- Reachable from the View menu and the Command Palette, and rebindable in Settings or `~/.config/cmux/cmux.json`.
+- **Everything: Actual Size** resets the app-wide scale only; a hand-sized pane keeps its own zoom. Reset that pane with `⌘0` while it is focused.
+- The scale runs 50%–200% with no on-screen indicator; at either limit the shortcut simply stops responding. The current percentage is in **Settings › App › Global Font Magnification**.
+- PDF previews, image previews, and the canvas layout keep their own view zoom — fit-to-window is a different operation from scaling text.
+
 ## 🟠⋯ Recognize a workspace by its colour, selected or not
 A workspace's colour stays visible as an identity strip down the leading edge of its row, over a quiet wash of the same colour. Selecting a workspace fills the row with a contrast-corrected version of that colour instead of a generic highlight, so the active one is obvious without rereading titles.
 

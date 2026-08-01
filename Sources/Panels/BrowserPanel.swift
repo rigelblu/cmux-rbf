@@ -2997,6 +2997,27 @@ final class BrowserPanel: Panel, ObservableObject {
     private let minPageZoom: CGFloat = 0.25
     private let maxPageZoom: CGFloat = 5.0
     private let pageZoomStep: CGFloat = 0.1
+
+    /// This pane's own zoom, independent of the app-wide scale.
+    ///
+    /// The live `webView.pageZoom` is the *product* of this and the global
+    /// magnification, mirroring how a terminal's runtime font size is its base
+    /// points times the same percent. Keeping the base here — on the panel,
+    /// which outlives its web view — is what lets a reload, crash recovery, or
+    /// profile switch restore zoom without re-multiplying the global scale into
+    /// the base and compounding it on every replacement.
+    private var basePageZoom: CGFloat = 1.0
+    private nonisolated(unsafe) var globalFontMagnificationObserver: GlobalFontMagnificationChangeObserver?
+
+    /// The pane's base zoom combined with the current app-wide scale.
+    var effectivePageZoom: CGFloat {
+        GlobalZoomComposition.effective(
+            base: basePageZoom,
+            scale: GlobalFontMagnification.scale,
+            minimum: minPageZoom,
+            maximum: maxPageZoom
+        )
+    }
     private var insecureHTTPBypassHostOnce: String?
     var activeInteractiveBrowserPromptIDs: Set<UUID> = []
     var insecureHTTPAlertFactory: () -> NSAlert
@@ -3317,7 +3338,11 @@ final class BrowserPanel: Panel, ObservableObject {
         let restoreURL = restorableDisplayURLForCurrentErrorPage(liveURL: oldWebView.url)
         let history = sessionNavigationHistorySnapshot()
         let historyCurrentURL = preferredURLStringForOmnibar() ?? restoreURL?.absoluteString
-        let desiredZoom = max(minPageZoom, min(maxPageZoom, oldWebView.pageZoom))
+        // Derived from this pane's stored base, never copied from the outgoing
+        // web view: `oldWebView.pageZoom` already has the global scale folded
+        // in, so carrying it forward would multiply the scale in again on every
+        // replacement and creep the pane larger with each reload.
+        let desiredZoom = effectivePageZoom
 
         clearBrowserFocusMode(reason: "webViewDiscard")
         invalidateSearchFocusRequests(reason: "webViewDiscard")
@@ -4281,6 +4306,17 @@ final class BrowserPanel: Panel, ObservableObject {
             return browserFallbackInteractiveModalHostWindow()
         }
 
+        // Installed BEFORE the navigation branches below, which contain early
+        // returns: a panel built with `renderInitialNavigation: false` (browser
+        // disabled + session restoration) would otherwise carry no observer for
+        // the process lifetime and never follow the app-wide scale again.
+        observeGlobalFontMagnification()
+        // Adopt the app-wide scale at creation, not only on later changes. The
+        // observer delivers *changes*; without this a pane opened while the
+        // scale is 200% renders at 1.0 beside siblings at 2.0 until the user
+        // next moves the percent.
+        reapplyEffectivePageZoomForGlobalScaleChange()
+
         if let initialRequest {
             hiddenWebViewDiscardManager.updateRestoredSessionRenderIntent(nil)
             currentURL = initialRequest.url
@@ -4315,6 +4351,25 @@ final class BrowserPanel: Panel, ObservableObject {
             } else {
                 navigate(to: url)
             }
+        }
+
+    }
+
+    /// Tracks the app-wide magnification on the PANEL, not on its SwiftUI view.
+    ///
+    /// cmux mounts one workspace at a time, so a view-level `.onReceive` never
+    /// fires for panes in unselected workspaces and never replays on re-mount —
+    /// those pages would keep rendering at whatever scale was current when they
+    /// were created, and `currentPageZoomFactor()` would report a value
+    /// inconsistent with the app-wide scale. The panel outlives mounting, so it
+    /// observes here. Mirrors `FilePreviewTextEditor`, which owns its observer
+    /// for exactly this reason.
+    private func observeGlobalFontMagnification() {
+        // Called directly, not hopped through a `Task`: the observer already
+        // delivers on the main actor, and deferring meant the pane still
+        // rendered the old scale for a runloop turn after the change.
+        globalFontMagnificationObserver = GlobalFontMagnificationChangeObserver { [weak self] in
+            self?.reapplyEffectivePageZoomForGlobalScaleChange()
         }
     }
 
@@ -4701,7 +4756,9 @@ final class BrowserPanel: Panel, ObservableObject {
         let shouldRestoreURL = wasRenderable && restoreURLString != nil && restoreURLString != blankURLString
         let history = sessionNavigationHistorySnapshot()
         let historyCurrentURL = preferredURLStringForOmnibar()
-        let desiredZoom = max(minPageZoom, min(maxPageZoom, previousWebView.pageZoom))
+        // See the note at the sibling replacement sites: derive from the stored
+        // base so the global scale is applied exactly once.
+        let desiredZoom = effectivePageZoom
         let restoreDeveloperTools = preferredDeveloperToolsVisible || isDeveloperToolsVisible()
 
         invalidateSearchFocusRequests(reason: "profileSwitch")
@@ -5218,7 +5275,11 @@ final class BrowserPanel: Panel, ObservableObject {
         let shouldShowManualRecovery = waitForManualRecovery && wasRenderable && hasRecoveryTarget
         let history = sessionNavigationHistorySnapshot()
         let historyCurrentURL = preferredURLStringForOmnibar()
-        let desiredZoom = max(minPageZoom, min(maxPageZoom, oldWebView.pageZoom))
+        // Derived from this pane's stored base, never copied from the outgoing
+        // web view: `oldWebView.pageZoom` already has the global scale folded
+        // in, so carrying it forward would multiply the scale in again on every
+        // replacement and creep the pane larger with each reload.
+        let desiredZoom = effectivePageZoom
         let restoreDevTools = preferredDeveloperToolsVisible
 
         if oldWebView.configuration.websiteDataStore !== websiteDataStore {
@@ -7157,24 +7218,71 @@ extension BrowserPanel {
     }
 
     func zoomInResult() -> Result<Bool, BrowserAutomationViewportError> {
-        applyPageZoom(webView.pageZoom + pageZoomStep)
+        stepBasePageZoom(by: pageZoomStep)
     }
 
     func zoomOutResult() -> Result<Bool, BrowserAutomationViewportError> {
-        applyPageZoom(webView.pageZoom - pageZoomStep)
+        stepBasePageZoom(by: -pageZoomStep)
     }
 
+    /// Resets this pane's OWN zoom, leaving the app-wide scale applied.
+    ///
+    /// Deliberately renders `1.0 × scale`, not a literal 1.0. `Cmd+0` here must
+    /// compose the way every sibling does — `MarkdownPanel.resetZoom()` resets
+    /// its base and renders `fontSize × globalFontScale`, and a terminal's
+    /// `reset_font_size` lands on the *scaled* config size. Pinning the rendered
+    /// value to 1.0 instead sets `base = 1/scale`, so at 200% the pane rendered
+    /// half its neighbours and a following ⇧⌘0 drove it to 0.5 — one keystroke
+    /// opting a pane out of the app-wide scale permanently.
+    ///
+    /// The cost is that `currentPageZoomFactor()` reports `1 × scale` after a
+    /// reset while `setPageZoomFactor(1.0)` reports exactly 1.0. That read-back
+    /// difference is real but cosmetic, and the verbs genuinely differ: "reset
+    /// this pane's own zoom" is not "render at exactly this factor".
     func resetZoomResult() -> Result<Bool, BrowserAutomationViewportError> {
-        applyPageZoom(1.0)
+        basePageZoom = 1.0
+        return applyPageZoom(effectivePageZoom)
+    }
+
+    /// Steps this pane's own zoom, leaving the app-wide scale untouched.
+    ///
+    /// The base is clamped in BASE units — `[min, max] / scale` — not against
+    /// the rendered bounds. Clamping the base to the rendered range creates a
+    /// dead zone whenever the scale is not 1: at 200% global a base above 2.5
+    /// already renders at the 5.0 ceiling, so further presses changed nothing,
+    /// returned `false`, and let the chord fall through to the web page — and
+    /// stepping *down* from a sub-range base could clamp upward and enlarge the
+    /// page the user asked to shrink.
+    private func stepBasePageZoom(by delta: CGFloat) -> Result<Bool, BrowserAutomationViewportError> {
+        let scale = GlobalFontMagnification.scale
+        let baseLowerBound = scale > 0 ? minPageZoom / scale : minPageZoom
+        let baseUpperBound = scale > 0 ? maxPageZoom / scale : maxPageZoom
+        basePageZoom = max(baseLowerBound, min(baseUpperBound, basePageZoom + delta))
+        return applyPageZoom(effectivePageZoom)
+    }
+
+    /// Reapplies the derived zoom after the app-wide scale changes.
+    func reapplyEffectivePageZoomForGlobalScaleChange() {
+        _ = applyPageZoom(effectivePageZoom)
     }
 
     func currentPageZoomFactor() -> CGFloat {
         webView.pageZoom
     }
 
+    /// Sets the *rendered* zoom, preserving the automation contract.
+    ///
+    /// Callers (the CLI and socket viewport verbs) mean "make the page render
+    /// at this factor", and ``currentPageZoomFactor()`` reads that same rendered
+    /// value back. So the requested factor is divided by the app-wide scale to
+    /// recover a base, leaving `base × scale` equal to what was asked for.
     @discardableResult
     func setPageZoomFactor(_ pageZoom: CGFloat) -> Bool {
         let clamped = max(minPageZoom, min(maxPageZoom, pageZoom))
+        basePageZoom = GlobalZoomComposition.base(
+            forRendered: clamped,
+            scale: GlobalFontMagnification.scale
+        )
         return pageZoomMutationHandled(applyPageZoom(clamped))
     }
 

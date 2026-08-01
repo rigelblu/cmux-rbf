@@ -69,6 +69,32 @@ extension ContentView {
                 when: browserOrTextPreview
             )
         )
+        // No `when` clause: the global scale answers regardless of focus, so
+        // these three stay listed even with nothing zoomable selected.
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.globalZoomIn",
+                title: constant(String(localized: "menu.view.globalZoomIn", defaultValue: "Everything: Zoom In")),
+                subtitle: constant(String(localized: "command.triggerFlash.subtitle", defaultValue: "View")),
+                keywords: ["global", "app", "everything", "zoom", "font", "magnification", "bigger", "larger", "in"]
+            )
+        )
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.globalZoomOut",
+                title: constant(String(localized: "menu.view.globalZoomOut", defaultValue: "Everything: Zoom Out")),
+                subtitle: constant(String(localized: "command.triggerFlash.subtitle", defaultValue: "View")),
+                keywords: ["global", "app", "everything", "zoom", "font", "magnification", "smaller", "out"]
+            )
+        )
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.globalZoomReset",
+                title: constant(String(localized: "menu.view.globalActualSize", defaultValue: "Everything: Actual Size")),
+                subtitle: constant(String(localized: "command.triggerFlash.subtitle", defaultValue: "View")),
+                keywords: ["global", "app", "everything", "zoom", "font", "magnification", "reset", "actual size", "default"]
+            )
+        )
     }
 
     func registerViewCommandHandlers(_ registry: inout CommandPaletteHandlerRegistry) {
