@@ -87,6 +87,12 @@ enum WorkspaceTabColorSettings {
 
     static func persistPaletteMap(_ rawPalette: [String: String], defaults: UserDefaults = .standard) {
         let normalizedPalette = normalizedPaletteMap(rawPalette)
+        // Advance on persistence, not on minting: `Custom N` names also arrive through a
+        // hand-written cmux.json and the legacy migration, neither of which mints.
+        WorkspaceColorCustomNameMint.advanceHighWaterMark(
+            forPaletteNames: normalizedPalette.keys,
+            defaults: defaults
+        )
         if normalizedPalette == defaultPaletteMap {
             defaults.removeObject(forKey: paletteKey)
         } else {
@@ -114,7 +120,11 @@ enum WorkspaceTabColorSettings {
             return normalized
         }
 
-        palette[nextCustomColorName(existingNames: Set(palette.keys))] = normalized
+        let minted = WorkspaceColorCustomNameMint.nextCustomName(
+            existingNames: palette.keys,
+            defaults: defaults
+        )
+        palette[minted] = normalized
         persistPaletteMap(palette, defaults: defaults)
         return normalized
     }
@@ -123,6 +133,9 @@ enum WorkspaceTabColorSettings {
         defaults.removeObject(forKey: paletteKey)
         defaults.removeObject(forKey: legacyDefaultOverridesKey)
         defaults.removeObject(forKey: legacyCustomColorsKey)
+        // Deliberately does NOT clear WorkspaceColorCustomNameMint.highWaterMarkDefaultsKey.
+        // Resetting the palette restores default colors; it must not restore the ability to
+        // recycle a name that already carried a label and a command-palette identity.
     }
 
     static func normalizedHex(_ raw: String) -> String? {
@@ -239,6 +252,11 @@ enum WorkspaceTabColorSettings {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    /// Legacy-migration naming only. Deliberately *not* monotonic: it reproduces the
+    /// original sequential `Custom 1…N` numbering so migrating an old install yields the
+    /// same names it always did. It neither reads nor advances the high-water mark; the
+    /// mark is advanced when the migrated palette is first persisted.
+    /// New names come from `WorkspaceColorCustomNameMint.nextCustomName`.
     private static func nextCustomColorName(
         existingNames: Set<String>,
         startingAt initialIndex: Int = 1

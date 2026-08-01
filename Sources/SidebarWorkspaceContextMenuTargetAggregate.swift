@@ -18,6 +18,15 @@ struct SidebarWorkspaceContextMenuTargetAggregate: Equatable {
     let canMarkUnread: Bool
     let hasLatestNotification: Bool
     let notifications: [TerminalNotification]
+    /// Each target workspace's assigned color, `nil` where a workspace has none.
+    ///
+    /// The workspace color submenu derives on/off/mixed from this. Both menu builders
+    /// previously gated on the *clicked* workspace while acting on `targetWorkspaceIds`,
+    /// so no multi-target color snapshot existed and a checkmark could not be truthful
+    /// for a multi-selection.
+    ///
+    /// Aggregated here, above the `LazyVStack`, so rows never read a store to draw state.
+    let targetColorHexes: [String?]
 
     @MainActor
     init(
@@ -59,6 +68,13 @@ struct SidebarWorkspaceContextMenuTargetAggregate: Equatable {
         notifications = notificationIndex.contextMenuNotifications(
             workspaceIds: targetWorkspaceIds
         )
+        // `compactMap` on the row, then `map` the color: a target we cannot resolve
+        // contributes nothing, while a resolved-but-uncolored one contributes `nil`.
+        // Flattening those two cases together would make a fully-coloured selection
+        // report No Color as mixed.
+        targetColorHexes = targetWorkspaceIds.compactMap { id in
+            workspaceRowsById[id].map(\.workspace.customColorHex)
+        }
     }
 
     private static func commonGroupId(_ groupIds: [UUID?]) -> UUID? {

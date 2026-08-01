@@ -1,4 +1,5 @@
 import AppKit
+import CmuxSettings
 import SwiftUI
 
 /// Menu-open-deferred wrapper for a sidebar row's workspace context menu.
@@ -16,6 +17,39 @@ struct TabItemWorkspaceContextMenuContent: View {
 }
 
 extension TabItemView {
+    /// One workspace-color row: assignment state, color identity, then meaning.
+    ///
+    /// AppKit gets tri-state free via `NSMenuItem.state`. SwiftUI menus expose no
+    /// `.mixed`, so state is drawn as a leading glyph beside the swatch — a checkmark for
+    /// on, a dash for mixed, and a same-size clear placeholder for off so titles stay
+    /// aligned. State never depends on hue, and the swatch keeps its own slot.
+    @ViewBuilder
+    fileprivate func workspaceColorMenuLabel(
+        title: String,
+        swatchHex: String?,
+        state: WorkspaceColorAssignmentState
+    ) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            HStack(spacing: 3) {
+                switch state {
+                case .on:
+                    Image(systemName: "checkmark")
+                case .mixed:
+                    Image(systemName: "minus")
+                case .off:
+                    Image(systemName: "checkmark").hidden()
+                }
+                if let swatchHex {
+                    Image(nsImage: coloredCircleImage(color: tabColorSwatchColor(for: swatchHex)))
+                } else {
+                    Image(systemName: "xmark.circle")
+                }
+            }
+        }
+    }
+
     private func contextMenuLabel(multi: String, single: String, isMulti: Bool) -> String {
         isMulti ? multi : single
     }
@@ -140,34 +174,65 @@ extension TabItemView {
         }
 
         Menu(String(localized: "contextMenu.workspaceColor", defaultValue: "Workspace Color")) {
-            let tabColorPalette = WorkspaceTabColorSettings.palette()
+            // Same model the AppKit builder uses, fed from the pre-computed multi-target
+            // snapshot. Rows below the LazyVStack boundary must not read a store, so the
+            // colors arrive as an immutable value rather than a live workspace read.
+            let candidates = WorkspaceTabColorSettings.colorMenuCandidates(
+                targetHexes: context.targetColorHexes
+            )
 
-            if workspaceSnapshot.customColorHex != nil {
-                Button {
-                    applyTabColor(nil, targetIds: targetIds)
-                } label: {
-                    Label(String(localized: "contextMenu.clearColor", defaultValue: "Clear Color"), systemImage: "xmark.circle")
-                }
-            }
+            ForEach(Array(candidates.enumerated()), id: \.offset) { _, candidate in
+                switch candidate.kind {
+                case .noColor:
+                    // Unconditional, so it can carry state. A row that vanishes when
+                    // nothing is colored cannot say "none of these are colored".
+                    Button {
+                        applyTabColor(nil, targetIds: targetIds)
+                    } label: {
+                        workspaceColorMenuLabel(
+                            title: String(localized: "contextMenu.noColor", defaultValue: "No Color"),
+                            swatchHex: nil,
+                            state: candidate.state
+                        )
+                    }
 
-            Button {
-                promptCustomColor(targetIds: targetIds)
-            } label: {
-                Label(String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"), systemImage: "paintpalette")
-            }
+                    Button {
+                        promptCustomColor(targetIds: targetIds)
+                    } label: {
+                        Label(
+                            String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
+                            systemImage: "paintpalette"
+                        )
+                    }
 
-            if !tabColorPalette.isEmpty {
-                Divider()
-            }
+                    Divider()
 
-            ForEach(tabColorPalette, id: \.id) { entry in
-                Button {
-                    applyTabColor(entry.hex, targetIds: targetIds)
-                } label: {
-                    Label {
-                        Text(entry.name)
-                    } icon: {
-                        Image(nsImage: coloredCircleImage(color: tabColorSwatchColor(for: entry.hex)))
+                case let .paletteEntry(entry):
+                    Button {
+                        applyTabColor(entry.hex, targetIds: targetIds)
+                    } label: {
+                        workspaceColorMenuLabel(
+                            title: entry.displayName,
+                            swatchHex: entry.hex,
+                            state: candidate.state
+                        )
+                    }
+
+                case let .unlisted(hex):
+                    Button {
+                        applyTabColor(hex, targetIds: targetIds)
+                    } label: {
+                        workspaceColorMenuLabel(
+                            title: String(
+                                format: String(
+                                    localized: "contextMenu.unlistedColor",
+                                    defaultValue: "Custom (%@)"
+                                ),
+                                hex
+                            ),
+                            swatchHex: hex,
+                            state: candidate.state
+                        )
                     }
                 }
             }

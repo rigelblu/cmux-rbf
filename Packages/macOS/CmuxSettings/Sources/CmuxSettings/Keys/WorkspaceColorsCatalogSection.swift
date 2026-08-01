@@ -27,6 +27,28 @@ public struct WorkspaceColorsCatalogSection: SettingCatalogSection {
         userDefaultsKey: "workspaceTabColor.colors"
     )
 
+    /// Optional semantic labels keyed by raw palette name, e.g. `Teal` → `GOAL: Primary`.
+    ///
+    /// Additive metadata. A missing key, a missing raw color, or a cleared string simply
+    /// leaves that entry showing its raw palette name.
+    public let labels = DefaultsKey<[String: String]>(
+        id: "workspaceColors.labels",
+        defaultValue: [:],
+        userDefaultsKey: "workspaceTabColor.labels"
+    )
+
+    /// Highest `Custom N` index ever minted. Internal bookkeeping, not user configuration:
+    /// no `cmux.json` parsing writes it. It lives in the catalog so `CmuxSettingsUI` can
+    /// advance it through the typed store, which never hands out raw `UserDefaults`.
+    ///
+    /// Deliberately outside the palette dictionary so **Reset Palette** cannot revive
+    /// name recycling. See `WorkspaceColorCustomNameMint`.
+    public let customNameHighWaterMark = DefaultsKey<Int>(
+        id: "workspaceColors.customNameHighWaterMark",
+        defaultValue: 0,
+        userDefaultsKey: WorkspaceColorCustomNameMint.highWaterMarkDefaultsKey
+    )
+
     public let paletteOverrides = JSONKey<[String: String]>(
         id: "workspaceColors.paletteOverrides",
         defaultValue: [:]

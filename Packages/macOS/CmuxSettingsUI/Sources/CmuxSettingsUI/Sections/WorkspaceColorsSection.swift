@@ -16,6 +16,12 @@ public struct WorkspaceColorsSection: View {
     @State private var selectionHex: DefaultsValueModel<String>
     @State private var badgeHex: DefaultsValueModel<String>
     @State private var paletteModel: DefaultsValueModel<[String: String]>
+    /// Optional semantic labels keyed by raw palette name.
+    @State private var labelsModel: DefaultsValueModel<[String: String]>
+    /// Highest `Custom N` ever minted. This section writes the palette straight to
+    /// defaults, bypassing the app target, so it must advance the mark itself or a
+    /// removed custom name becomes reusable — taking its label and command ID with it.
+    @State private var customNameHighWaterMark: DefaultsValueModel<Int>
     @State private var paletteReconcileTracker = WorkspacePaletteColorReconcileTracker()
 
     /// Built-in palette order and default hexes. Mirrors
@@ -54,6 +60,10 @@ public struct WorkspaceColorsSection: View {
         _selectionHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.selectionColorHex))
         _badgeHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.notificationBadgeColorHex))
         _paletteModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.palette))
+        _labelsModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.labels))
+        _customNameHighWaterMark = State(
+            initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.customNameHighWaterMark)
+        )
     }
 
     public var body: some View {
@@ -67,6 +77,12 @@ public struct WorkspaceColorsSection: View {
         }
         .onChange(of: paletteModel.current) { _, newPalette in
             paletteReconcileTracker.reconcileExternalHexes(effectivePaletteMap(stored: newPalette))
+            advanceCustomNameHighWaterMark(for: newPalette)
+        }
+        .task {
+            // Cover a palette that already contained Custom N entries before this section
+            // was ever opened — Remove could otherwise free the highest name on first use.
+            advanceCustomNameHighWaterMark(for: paletteModel.current)
         }
     }
 
@@ -75,6 +91,10 @@ public struct WorkspaceColorsSection: View {
             selectionHex,
             badgeHex,
             paletteModel,
+            // Without these, a cmux.json reload would not refresh the label fields and the
+            // mint mark could be read stale after an external palette write.
+            labelsModel,
+            customNameHighWaterMark,
         ]
         models.forEach { $0.startObserving() }
     }
@@ -133,6 +153,77 @@ public struct WorkspaceColorsSection: View {
         }
     }
 
+    /// Raises the mint high-water mark to cover every `Custom N` in `palette`.
+    ///
+    /// Called from `onChange`/`task`, never from a body computation, so this cannot
+    /// become a re-render feedback loop.
+    private func advanceCustomNameHighWaterMark(for palette: [String: String]) {
+        let highest = WorkspaceColorCustomNameMint.highestIndex(in: palette.keys)
+        guard highest > customNameHighWaterMark.current else { return }
+        customNameHighWaterMark.set(highest)
+    }
+
+    /// Labels that currently resolve, and why any others were rejected.
+    private func labelValidation() -> (
+        valid: [String: String],
+        rejections: [String: WorkspaceColorSemanticLabelResolver.LabelRejection]
+    ) {
+        let palette = effectivePaletteMap(stored: paletteModel.current)
+        let raw = labelsModel.current
+        return (
+            WorkspaceColorSemanticLabelResolver.validLabels(rawLabels: raw, palette: palette),
+            WorkspaceColorSemanticLabelResolver.rejections(rawLabels: raw, palette: palette)
+        )
+    }
+
+    /// Stores a label, or removes it when cleared. Clearing restores the raw palette name.
+    private func commitLabel(_ text: String, for paletteName: String) {
+        var labels = labelsModel.current
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            labels.removeValue(forKey: paletteName)
+        } else {
+            labels[paletteName] = trimmed
+        }
+        labelsModel.set(labels)
+    }
+
+    /// Why a label cannot be used, in the user's words.
+    private static func rejectionMessage(
+        _ rejection: WorkspaceColorSemanticLabelResolver.LabelRejection
+    ) -> String {
+        switch rejection {
+        case .empty:
+            String(localized: "settings.workspaceColors.label.error.empty", defaultValue: "Enter a label or leave the field blank to use the color name.")
+        case .tooLong:
+            String(
+                format: String(
+                    localized: "settings.workspaceColors.label.error.tooLong",
+                    defaultValue: "Labels are limited to %lld characters."
+                ),
+                WorkspaceColorSemanticLabelResolver.maximumLabelLength
+            )
+        case let .duplicateLabel(otherName):
+            String(
+                format: String(
+                    localized: "settings.workspaceColors.label.error.duplicate",
+                    defaultValue: "Already used by %@. Labels must be unique."
+                ),
+                otherName
+            )
+        case let .collidesWithPaletteName(name):
+            String(
+                format: String(
+                    localized: "settings.workspaceColors.label.error.collides",
+                    defaultValue: "“%@” is already a color name. Choose different wording."
+                ),
+                name
+            )
+        case .unknownPaletteName:
+            String(localized: "settings.workspaceColors.label.error.unknown", defaultValue: "No color with this name exists.")
+        }
+    }
+
     @ViewBuilder
     private func colorRow(title: String, subtitle: String, json: String, resetLabel: String, model: DefaultsValueModel<String>) -> some View {
         let isCustom = !model.current.isEmpty
@@ -174,12 +265,20 @@ public struct WorkspaceColorsSection: View {
             }
             return String(localized: "settings.workspaceColors.customEntry", defaultValue: "Named palette entry.")
         }()
+        let validation = labelValidation()
+        let rejection = validation.rejections[entry.name]
         SettingsCardRow(
             configurationReview: .json("workspaceColors.colors"),
             entry.name,
             subtitle: subtitle
         ) {
             HStack(spacing: 8) {
+                WorkspaceColorLabelField(
+                    paletteName: entry.name,
+                    storedLabel: labelsModel.current[entry.name] ?? "",
+                    errorMessage: rejection.map(Self.rejectionMessage),
+                    commit: { commitLabel($0, for: entry.name) }
+                )
                 HexColorPicker(
                     storedHex: entry.hex,
                     fallback: Color(nsColor: .systemBlue),
@@ -259,5 +358,74 @@ public struct WorkspaceColorsSection: View {
             return NSColor(srgbRed: 0, green: 136.0 / 255.0, blue: 1.0, alpha: 1.0)
         }
         return Color(nsColor: nsColor)
+    }
+}
+
+/// Editable semantic label for one palette entry.
+///
+/// Keeps a local draft and commits on submit or when focus leaves, so a settings write
+/// happens once per edit rather than once per keystroke. Invalid text stays visible and
+/// editable — it simply never enters the effective resolver — because silently discarding
+/// what someone typed is worse than showing why it cannot be used.
+@MainActor
+private struct WorkspaceColorLabelField: View {
+    let paletteName: String
+    let storedLabel: String
+    let errorMessage: String?
+    let commit: (String) -> Void
+
+    @State private var draft: String
+    @FocusState private var isFocused: Bool
+
+    init(
+        paletteName: String,
+        storedLabel: String,
+        errorMessage: String?,
+        commit: @escaping (String) -> Void
+    ) {
+        self.paletteName = paletteName
+        self.storedLabel = storedLabel
+        self.errorMessage = errorMessage
+        self.commit = commit
+        _draft = State(initialValue: storedLabel)
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            TextField(
+                String(localized: "settings.workspaceColors.label.placeholder", defaultValue: "Label"),
+                text: $draft
+            )
+            .textFieldStyle(.roundedBorder)
+            .cmuxFont(size: 12, weight: .regular)
+            .frame(width: 190)
+            .focused($isFocused)
+            .onSubmit { commit(draft) }
+            .onChange(of: isFocused) { _, focused in
+                if !focused { commit(draft) }
+            }
+            // An external edit (cmux.json reload, Reset Palette) wins over a stale draft
+            // the user is not currently typing into.
+            .onChange(of: storedLabel) { _, newValue in
+                if !isFocused { draft = newValue }
+            }
+            .accessibilityLabel(
+                String(
+                    format: String(
+                        localized: "settings.workspaceColors.label.accessibility",
+                        defaultValue: "Label for %@"
+                    ),
+                    paletteName
+                )
+            )
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .cmuxFont(size: 10, weight: .regular)
+                    .foregroundStyle(.red)
+                    .frame(width: 190, alignment: .trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
