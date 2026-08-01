@@ -11,6 +11,17 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Use the cmux you build as your everyday app
+
+The flavour installs as **cmux RBF** in `/Applications`, with its own green `RBF` banner icon, its own bundle id and its own socket — so it is something you open from the Dock rather than something you launch out of a build directory. Upstream's `cmux.app` is never read, written or replaced; it stays as the fallback, and both can run at once. `make install-rbf-plan` prints the whole plan and writes nothing; `make install-rbf` does it.
+
+- The first install copies your workspaces, window layout, session order and reopen history across, so it opens into the setup you already have. Re-installing never touches them again, including workspaces created since.
+- `~/.config/cmux/cmux.json` resolves from `$HOME`, not the bundle id, so shortcuts and sidebar config are shared with upstream automatically and permanently — no migration, and no drift.
+- **You will sign in once, by hand.** Auth lives in the keychain under a service name derived from the bundle id, so a separate app cannot see it by construction. No file copy reaches it.
+- macOS permissions survive every reinstall, because the install signs with a stable identity rather than ad-hoc. An ad-hoc signature changes the designated requirement each time, which silently drops every grant.
+- **About still reports upstream's version** (`0.64.20 / 100`) — both version keys were inherited at the fork point. A fork-owned version key (`RBFVersion`) is already written into the installed bundle, but nothing reads it yet; until `#cm-17.3` lands that reader, `env | grep CMUX_BUNDLE_ID` answers "which cmux am I in?"; `com.cmuxterm.app.rbf` is the flavour.
+- If a state clone half-completes, `rbf/scripts/migrate-rbf-state.sh` is the way back — it reports and guards each store separately, and re-clones only what is missing.
+
 ## 🟠⋯ Read a colour-coded plan as colour, not as raw emoji
 
 If your notes mark status with 🔴🟠🟡🟢🔵🟣⚫, the markdown panel reads them as formatting instead of showing them as glyphs. The first marker in a block disappears; outside a heading it tints the code span beside it, so `**🟢`PASS`**` becomes a green `PASS` highlight and a verification table scans by colour. A heading keeps its marker's colour as text tint — colour is pre-attentive where a 4px size step is not, so sections separate at scroll distance.

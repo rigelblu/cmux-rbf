@@ -5229,7 +5229,11 @@ enum AppIconSettings {
                 },
                 imageForMode: { mode in
                     guard let imageName = mode.imageName else { return nil }
-                    return NSImage(named: imageName)
+                    return NSImage(named: ChannelAppIconName.resolved(
+                        base: imageName,
+                        bundle: .main,
+                        assetExists: { NSImage(named: $0) != nil }
+                    ))
                 },
                 setApplicationIconImage: { icon in
                     NSApplication.shared.applicationIconImage = icon
@@ -5333,7 +5337,14 @@ final class AppIconAppearanceObserver: NSObject {
                     return app.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
                 },
                 imageForName: { imageName in
-                    NSImage(named: imageName)
+                    // Channel-resolved: the Dock icon is set here at runtime, so
+                    // ASSETCATALOG_COMPILER_APPICON_NAME never reaches it. See
+                    // ChannelAppIconName.
+                    NSImage(named: ChannelAppIconName.resolved(
+                        base: imageName,
+                        bundle: .main,
+                        assetExists: { NSImage(named: $0) != nil }
+                    ))
                 },
                 setApplicationIconImage: { icon in
                     NSApplication.shared.applicationIconImage = icon

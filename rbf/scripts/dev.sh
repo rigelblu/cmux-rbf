@@ -29,8 +29,8 @@ cd "$REPO_ROOT"
 # detached permanently — so `git branch --show-current` is empty there and a
 # git-only version silently falls back to the commit sha. That is not a cosmetic
 # fallback: the sha changes on every commit, so every commit would mint a fresh
-# ~6GB DerivedData directory. `closest_bookmark()` walks back to the nearest
-# bookmark, which is the branch you think you are on.
+# ~6GB DerivedData directory. So walk back to the nearest bookmark instead —
+# see the revset below, and why it is written out rather than aliased.
 #
 # git worktrees (used for isolated builds, since jj workspaces cannot build this
 # repo) do have a real branch, so the git path still matters. Detached-and-no-jj
@@ -97,34 +97,14 @@ BUILD_ID_VALUE="$(derive_build_id)"
 export CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION="${CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION:-1}"
 
 # --- Landmine 2: ghostty needs Zig 0.15.2 exactly -----------------------------
-# A stock PATH usually has 0.16.0, which ghostty rejects outright. If a matching
-# toolchain is already discoverable, leave PATH alone; otherwise adopt a known
-# 0.15.2 if one is on this machine. Fail loudly rather than 200 lines deep in a
-# build log — it warns and continues, since a cached GhosttyKit may still
-# carry the build. (`#cm-4` is the slice that removes this whole problem.)
-ensure_zig() {
-  if command -v zig >/dev/null 2>&1 && [[ "$(zig version 2>/dev/null)" == 0.15.2* ]]; then
-    return
-  fi
-  local candidate
-  for candidate in \
-    "${CMUX_ZIG:-}" \
-    "$REPO_ROOT/.cmux-tools/zig/zig" \
-    /Volumes/Tom\'s\ HDD/tmp/cmux-rbf-terminal-units/toolchains/zig-aarch64-macos-0.15.2/zig
-  do
-    [[ -n "$candidate" && -x "$candidate" ]] || continue
-    if [[ "$("$candidate" version 2>/dev/null)" == 0.15.2* ]]; then
-      PATH="$(dirname "$candidate"):$PATH"
-      export PATH
-      echo "==> zig 0.15.2 from $(dirname "$candidate")"
-      return
-    fi
-  done
-  echo "dev.sh: no Zig 0.15.2 found (PATH zig is '$(zig version 2>/dev/null || echo none)')." >&2
-  echo "        ghostty rejects anything else. Set CMUX_ZIG=/path/to/zig." >&2
-  echo "        (Not ./scripts/setup.sh — it only suggests 'brew install zig', which gives 0.16.0.)" >&2
-  echo "        A cached GhosttyKit may still let this build succeed — continuing." >&2
-}
+# Lives in rbf/scripts/lib/rbf-zig.sh, not here, because `make install-rbf` reaches
+# install-rbf.sh without passing through this file — and when this was a private
+# function, that path silently had no Zig guard and died inside an xcodebuild
+# script phase. See the lib header.
+RBF_REPO_ROOT="$REPO_ROOT"
+# shellcheck source=rbf/scripts/lib/rbf-zig.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-zig.sh"
+ensure_zig() { rbf_ensure_zig; }
 
 # --- Guard: submodule parked behind the pointer the commit records ------------
 # The pointer moves with a merge or rebase; the submodule working directory does
@@ -182,6 +162,29 @@ case "$cmd" in
     # (`Fix_Thing` -> reload.sh `cmux-fix-thing`, naive `cmux-Fix_Thing`), which
     # means two multi-GB dirs, a full rebuild on every `make test`, and a name
     # cleanup-dev-builds.sh cannot map back to a build-id.
+    # Both guards, same as `build` and `run` — omitting them here was a real bug.
+    # `cmux-unit.xcscheme` sets buildForTesting="YES" on the app target, so
+    # `make test` runs the ghostty script phase and needs Zig 0.15.2 exactly like
+    # a build does; without this it dies ~200 lines into an xcodebuild phase
+    # while `make build` succeeds. And a stale submodule would link a ghostty the
+    # commit does not record — a green test run against code nobody wrote, in the
+    # one command this fork calls its gate.
+    check_submodule_sync
+    ensure_zig
+
+    # A running tagged app makes the test runner die with "Test runner never
+    # began executing tests", exit 65, ZERO tests run — and nothing in that
+    # message says why. Documented in rbf/AGENTS.md, which is no help to someone
+    # who has not read it. Detect it and say the fix.
+    if pgrep -f "cmux DEV $BUILD_ID_VALUE.app/Contents/MacOS/" >/dev/null 2>&1; then
+      echo "dev.sh: REFUSING — 'cmux DEV $BUILD_ID_VALUE' is running." >&2
+      echo "        The test runner would die with 'Test runner never began" >&2
+      echo "        executing tests', exit 65, and zero tests run — a failure" >&2
+      echo "        that looks like broken tests and is not." >&2
+      echo "        Quit that app, then re-run." >&2
+      exit 1
+    fi
+
     dd_slug="$BUILD_ID_VALUE"
     # shellcheck source=/dev/null
     if . scripts/lib/mobile-attach.sh 2>/dev/null && declare -f cmux_attach__slug_raw >/dev/null; then

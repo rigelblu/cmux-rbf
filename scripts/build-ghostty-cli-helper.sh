@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Xcode Run Script phases export TOOLCHAINS=com.apple.dt.toolchain.XcodeDefault,
+# which pins every `xcrun` lookup in this script to that one toolchain. The Metal
+# compiler ships as a SEPARATE toolchain (com.apple.dt.toolchain.Metal.<ver>), so
+# ghostty's shader build fails with
+#
+#   error: cannot execute tool 'metal' due to missing Metal Toolchain
+#
+# even when the Metal toolchain is installed and `xcrun -sdk macosx metal` works
+# in an ordinary shell. Unsetting it here is the only place that helps: xcodebuild
+# re-sets it per phase, so neither the calling shell's `unset` nor a `TOOLCHAINS=`
+# build-setting override survives into this script — both verified 2026-08-01.
+# Only surfaces on a local Release build, which is why CI (real Apple creds) and
+# every Debug `reload.sh` have never hit it.
+unset TOOLCHAINS
+
 usage() {
   cat <<'EOF'
 Usage: ./scripts/build-ghostty-cli-helper.sh [--universal | --target <zig-target>] --output <path>
