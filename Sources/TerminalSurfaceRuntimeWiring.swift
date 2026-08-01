@@ -1,4 +1,5 @@
 import AppKit
+import Bonsplit
 import Foundation
 import CmuxTerminal
 import CmuxTerminalCore
@@ -99,8 +100,123 @@ final class TerminalOutputByteTeeBridge: TerminalByteTeeBinding {
         let teeContext = Unmanaged.passRetained(TerminalOutputTeeContext(
             workspaceID: workspaceID,
             surfaceID: surfaceID,
-            agentDefinitions: CmuxTaskManagerCodingAgentDefinition.builtIns
+            agentDefinitions: CmuxTaskManagerCodingAgentDefinition.builtIns,
+            codexRenameHandler: { confirmation in
+                // Runs on Ghostty's PTY read path. Codex redraws the same
+                // confirmation cell repeatedly, and only a pending submission
+                // makes any of them a real rename, so the discriminating check
+                // runs first and here — the submission store is lock-guarded and
+                // Sendable, so a redraw never reaches the main actor at all. That
+                // actor also services keystrokes; a rejected confirmation must
+                // not queue work on it.
+                let consumed = CodexExplicitRenameSubmissionStore.shared.consumeMatching(
+                    surfaceID: surfaceID,
+                    name: confirmation.name
+                )
+#if DEBUG
+                if !consumed {
+                    // Logged after all: this fires only when the detector emits a
+                    // confirmation, which happens on rename output — not per
+                    // keystroke — so it is rare and bounded. Silencing it made
+                    // "the detector never saw the rename" indistinguishable from
+                    // "nothing was armed", which is the first fork any diagnosis
+                    // needs to take.
+                    Task { @MainActor in
+                        cmuxDebugLog(
+                            "codexRename.detectedButUnarmed "
+                            + "surface=\(surfaceID.uuidString.prefix(8)) "
+                            + "thread=\(confirmation.threadID.prefix(8)) "
+                            + "name=\"\(confirmation.name)\""
+                        )
+                    }
+                }
+#endif
+                guard consumed else { return }
+                Task { @MainActor in
+                    // Every rejection below is logged. A feature whose whole job
+                    // is conditional application must say why it declined:
+                    // silent `false` returns cost a full debugging session when a
+                    // proven rename reached here and no session was registered.
+                    func reject(_ reason: String) {
+#if DEBUG
+                        cmuxDebugLog(
+                            "codexRename.rejected reason=\(reason) "
+                            + "surface=\(surfaceID.uuidString.prefix(8)) "
+                            + "thread=\(confirmation.threadID.prefix(8)) "
+                            + "name=\"\(confirmation.name)\""
+                        )
+#endif
+                    }
+                    let controller = TerminalController.shared
+                    guard let registry = controller.agentChatTranscriptService?.registry else {
+                        reject("no_transcript_service")
+                        return
+                    }
+                    guard let record = registry.liveSession(surfaceID: surfaceID.uuidString) else {
+                        // Reached here on a machine where Codex launched outside
+                        // cmux's wrapper, so no hook ever registered the session.
+                        reject("no_live_session")
+                        return
+                    }
+                    guard record.agentKind == .codex else {
+                        reject("agent_kind_\(record.agentKind.sourceName)")
+                        return
+                    }
+                    guard record.sessionID.caseInsensitiveCompare(confirmation.threadID)
+                        == .orderedSame else {
+                        reject("thread_mismatch_record=\(record.sessionID.prefix(8))")
+                        return
+                    }
+                    guard record.workspaceID == nil ||
+                        record.workspaceID?.caseInsensitiveCompare(workspaceID.uuidString)
+                            == .orderedSame else {
+                        reject("workspace_mismatch")
+                        return
+                    }
+                    guard let tabManager = AppDelegate.shared?.tabManagerFor(tabId: workspaceID),
+                        let workspace = tabManager.tabs.first(where: { $0.id == workspaceID }) else {
+                        reject("workspace_not_found")
+                        return
+                    }
+                    guard let panelId = workspace.panelIdHostingTerminalSurface(surfaceID) else {
+                        reject("no_panel_for_surface")
+                        return
+                    }
+                    // A sibling Codex session or a Teams subagent sharing this
+                    // workspace keeps the rename on its own tab.
+                    let workspaceEligible = WorkspaceAgentOccupancy.isSoleAgentSurface(
+                        .terminalSession(sessionID: record.sessionID),
+                        in: workspace,
+                        registry: registry
+                    )
+                    let applied = workspace.applyCodexSessionName(
+                        confirmation.name,
+                        panelId: panelId,
+                        workspaceEligible: workspaceEligible
+                    )
+#if DEBUG
+                    // Logged on success too: "the rename was proven but the
+                    // workspace declined it" and "nothing reached here at all"
+                    // look identical from the outside otherwise.
+                    cmuxDebugLog(
+                        "codexRename.applied surface=\(surfaceID.uuidString.prefix(8)) "
+                        + "name=\"\(confirmation.name)\" eligible=\(workspaceEligible) "
+                        + "workspaceApplied=\(applied.workspaceApplied) "
+                        + "panelApplied=\(applied.panelApplied.map(String.init(describing:)) ?? "nil")"
+                    )
+#endif
+                }
+            }
         ))
+#if DEBUG
+        // Absence of this line is the proof that a silent rename never had a
+        // detector at all — the fork that separates "tee not installed on the
+        // renaming surface" from every downstream explanation.
+        cmuxDebugLog(
+            "codexRename.teeInstalled surface=\(surfaceID.uuidString.prefix(8)) "
+            + "workspace=\(workspaceID.uuidString.prefix(8))"
+        )
+#endif
         ghostty_surface_set_pty_tee_cb(
             surface,
             cmuxTerminalOutputTeeCallback,

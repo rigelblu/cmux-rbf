@@ -5,7 +5,14 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(empty)
+## 🟠⋯ Added for End Users
+- 2026-08-01 - fix (ux) | rename a Codex session once and see it in cmux — typing `/rename` in Codex now renames the cmux tab hosting it, and the workspace too when that session is the only agent working there, so one piece of work stops carrying two different names (#cm-9)
+- 2026-08-01 - fix (ux) | keep the name you chose yourself — a name you set in cmux still wins over anything Codex sends, and only a rename you explicitly typed syncs; the names Codex generates on its own are ignored, and neither a redraw of the confirmation nor a scripted keystroke can trigger one (#cm-9)
+
+## 🟠⋯ Known Limitations
+- Codex 0.146.0 registers a session with cmux only when that session submits its first real prompt — it never runs a session-start hook. A `/rename` typed before you have sent Codex anything is therefore declined and nothing changes. Send one message first, and renames land from then on (#cm-9)
+- Dragging a Codex tab into a different workspace stops its renames. The tab keeps working; only the rename sync goes quiet, and it comes back when the surface is recreated. Rename before you move the tab, or move it back (#cm-9)
+- With two Codex sessions in one workspace whose hook payloads carry no workspace binding, each can believe it is the only agent there, so the second `/rename` can retitle the whole workspace rather than just its own tab. Tab titles are always correct; only the workspace title is affected (#cm-9)
 
 ---
 

@@ -7,13 +7,44 @@ import Foundation
 extension Workspace {
     // MARK: - Title Management
 
-    /// Who set a custom title. Auto-naming (AI-generated titles) must never
-    /// overwrite a user-set title; this enum carries that distinction for
-    /// workspace and panel custom titles, and round-trips through session
-    /// persistence.
+    /// Who set a custom title. Direct cmux names outrank explicit agent-session
+    /// names, which outrank automatic names. The provenance round-trips through
+    /// session persistence for both workspace and panel custom titles.
     enum CustomTitleSource: String, Codable, Sendable {
         case user
+        case agentSession
         case auto
+
+        func canReplace(_ existing: CustomTitleSource?) -> Bool {
+            switch self {
+            case .user:
+                return true
+            case .agentSession:
+                return existing != .user
+            case .auto:
+                return existing == nil || existing == .auto
+            }
+        }
+
+        /// Whether this source may clear a title it owns.
+        ///
+        /// Only the user clears a title. An automatic namer producing an empty
+        /// string must not wipe the label the user is reading, and Codex offers
+        /// no way to clear a thread name — a bare `/rename` opens a prompt
+        /// pre-filled with the current name (verified against Codex 0.146.0 on
+        /// 2026-07-31), so an explicit agent clear has no gesture to mirror.
+        ///
+        /// If Codex ever gains one — a bare `/rename` that empties the name, or
+        /// a `/rename --clear` — add `.agentSession` here. The typed-input line
+        /// already sees the exact submitted text, so detecting it is small.
+        var canClearOwnTitle: Bool {
+            switch self {
+            case .user:
+                return true
+            case .auto, .agentSession:
+                return false
+            }
+        }
     }
 
     var hasCustomTitle: Bool {
@@ -126,14 +157,20 @@ extension Workspace {
 
     /// Sets, replaces, or clears (empty/nil `title`) the workspace custom title.
     ///
-    /// `.auto` writes are rejected when a user-set title exists, and `.auto`
-    /// never clears. Returns whether the write landed.
+    /// Lower-priority writes are rejected, and non-user sources never clear —
+    /// an empty write from an agent or an automatic namer leaves the existing
+    /// title alone rather than wiping the label the user is reading.
+    /// Returns whether the write landed.
     @discardableResult
     func setCustomTitle(_ title: String?, source: CustomTitleSource = .user) -> Bool {
         let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if source == .auto {
-            guard !trimmed.isEmpty else { return false }
-            if hasCustomTitle, (customTitleSource ?? .user) == .user { return false }
+        if source != .user {
+            if trimmed.isEmpty {
+                guard source.canClearOwnTitle,
+                      effectiveCustomTitleSource == source else { return false }
+            } else {
+                guard source.canReplace(effectiveCustomTitleSource) else { return false }
+            }
         }
         if trimmed.isEmpty {
             if customTitle != nil {
@@ -155,6 +192,34 @@ extension Workspace {
         )
 #endif
         return true
+    }
+
+    /// Shared title mutation for an explicit Codex `/rename`, used by normal
+    /// terminal Codex, embedded Codex, and Codex Teams alike so rename
+    /// behavior never depends on how the session was launched.
+    ///
+    /// Workspace and panel ownership are independent: a direct cmux name
+    /// blocks only the title it owns, and clearing it lets the next explicit
+    /// Codex name land. A `nil` or blank `title` clears nothing: `canClearOwnTitle`
+    /// is `true` only for `.user`, so an agent cannot clear its own title. The
+    /// optional stays in the signature for the day Codex grows a real clear.
+    ///
+    /// - Parameter workspaceEligible: Whether this session may claim the
+    ///   workspace title. Adapters pass `false` when the session is not the
+    ///   workspace's sole live agent session, which keeps a sibling terminal
+    ///   session or a Teams subagent to its own tab.
+    @discardableResult
+    func applyCodexSessionName(
+        _ title: String?,
+        panelId: UUID?,
+        workspaceEligible: Bool
+    ) -> (workspaceApplied: Bool, panelApplied: Bool?) {
+        let workspaceApplied = workspaceEligible
+            && setCustomTitle(title, source: .agentSession)
+        let panelApplied = panelId.map {
+            setPanelCustomTitle(panelId: $0, title: title, source: .agentSession)
+        }
+        return (workspaceApplied, panelApplied)
     }
 
     func setCustomDescription(_ description: String?) {

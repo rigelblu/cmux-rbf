@@ -984,6 +984,7 @@ class TerminalController {
         "notification.create_for_target",
         "notification.create_for_caller",
         "workspace.set_auto_title",
+        "agent.session_title.seed",
     ]
 
     private nonisolated func socketWorkerV2Response(handling parsedRequest: ControlRequest) -> String? {
@@ -2184,6 +2185,8 @@ class TerminalController {
             return v2Result(id: id, self.v2WorkspaceCloudVMTerminalReady(params: params))
         case "workspace.set_auto_title":
             return v2Result(id: id, self.v2WorkspaceSetAutoTitle(params: params))
+        case "agent.session_title.seed":
+            return v2Result(id: id, self.v2AgentSessionTitleSeed(params: params))
 
         // Settings/session/feedback: session.restore_previous, settings.open, and
         // feedback.open handled by ControlCommandCoordinator.
@@ -3653,7 +3656,13 @@ class TerminalController {
                 var userOwned: Bool?
                 v2MainSync {
                     guard let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }) else { return }
-                    userOwned = workspace.effectiveCustomTitleSource == .user
+                    // Anything but `.auto` is a name a person chose, directly or
+                    // through an agent they instructed. Comparing against `.user`
+                    // alone predates `.agentSession` and told the naming engine a
+                    // Codex-renamed workspace was still up for grabs — so it ran a
+                    // full summarization every turn and had the result rejected.
+                    let source = workspace.effectiveCustomTitleSource
+                    userOwned = source != nil && source != .auto
                 }
                 result["workspace_user_owned"] = v2OrNull(userOwned)
             }
@@ -3727,6 +3736,60 @@ class TerminalController {
             "workspace_applied": workspaceApplied,
             "panel_applied": v2OrNull(panelApplied),
             "enabled": true
+        ])
+    }
+
+    /// Internal Codex Teams bridge for its initial descriptive pane label.
+    /// The seed is automatic provenance, so a later explicit `/rename`
+    /// confirmation can replace it while a direct cmux name remains protected.
+    private func v2AgentSessionTitleSeed(params: [String: Any]) -> V2CallResult {
+        guard let tabManager = v2ResolveTabManager(params: params) else {
+            return .err(code: "unavailable", message: "TabManager not available", data: nil)
+        }
+        guard let workspaceId = v2UUID(params, "workspace_id") else {
+            return .err(code: "invalid_params", message: "Missing or invalid workspace_id", data: nil)
+        }
+        guard let surfaceId = v2UUID(params, "surface_id") else {
+            return .err(code: "invalid_params", message: "Missing or invalid surface_id", data: nil)
+        }
+        guard let titleRaw = v2String(params, "title") else {
+            return .err(code: "invalid_params", message: "Missing or invalid title", data: nil)
+        }
+        let title = titleRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            return .err(code: "invalid_params", message: "Missing or invalid title", data: nil)
+        }
+
+        var foundWorkspace = false
+        var foundPanel = false
+        var panelApplied: Bool?
+        v2MainSync {
+            guard let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }) else {
+                return
+            }
+            foundWorkspace = true
+            // `surface.split` returns the terminal-surface UUID (the panel
+            // id), while hook payloads carry bonsplit tab ids. One shared
+            // resolver owns that ambiguity for every caller.
+            guard let panelId = tabManager.panelId(forSurfaceOrPanelId: surfaceId, in: workspace) else {
+                return
+            }
+            foundPanel = true
+            panelApplied = workspace.setPanelCustomTitle(
+                panelId: panelId,
+                title: title,
+                source: .auto
+            )
+        }
+
+        guard foundWorkspace else {
+            return .err(code: "not_found", message: "Workspace not found", data: nil)
+        }
+        guard foundPanel else {
+            return .err(code: "not_found", message: "Surface not found", data: nil)
+        }
+        return .ok([
+            "panel_applied": v2OrNull(panelApplied)
         ])
     }
 
