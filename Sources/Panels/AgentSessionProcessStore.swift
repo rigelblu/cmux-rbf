@@ -81,6 +81,14 @@ final class AgentSessionProcessStore {
                 },
                 failureSink: { [weak self] _ in
                     self?.failSession(sessionId: sessionId, status: 1)
+                },
+                nameUpdateSink: { [weak self] threadID, name in
+                    self?.emitSessionNameUpdated(
+                        sessionId: sessionId,
+                        providerID: plan.provider,
+                        threadID: threadID,
+                        name: name
+                    )
                 }
             )
         }
@@ -656,6 +664,21 @@ final class AgentSessionProcessStore {
             "type": "provider.turnComplete",
             "sessionId": sessionId,
             "providerId": providerID.rawValue
+        ])
+    }
+
+    private func emitSessionNameUpdated(
+        sessionId: String,
+        providerID: AgentSessionProviderID,
+        threadID: String,
+        name: String
+    ) {
+        eventSink?([
+            "type": "provider.sessionNameUpdated",
+            "sessionId": sessionId,
+            "providerId": providerID.rawValue,
+            "threadId": threadID,
+            "name": name
         ])
     }
 

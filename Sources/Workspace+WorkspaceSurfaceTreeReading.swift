@@ -14,6 +14,18 @@ extension Workspace: WorkspaceSurfaceTreeReading {
         paneTree.panelId(forSurfaceId: surfaceId)
     }
 
+    /// Resolves the panel hosting a *terminal surface* UUID — the id the PTY
+    /// tee context carries. `TerminalPanel` adopts its surface's id at init,
+    /// so the resolution is identity whenever a terminal panel with that id is
+    /// still registered. This is a different id space from the bonsplit tab
+    /// ids `panelIdFromSurfaceId` maps: a terminal surface UUID never appears
+    /// in that map, so routing this lookup through it answers `nil` for every
+    /// live panel.
+    func panelIdHostingTerminalSurface(_ surfaceID: UUID) -> UUID? {
+        guard panels[surfaceID]?.panelType == .terminal else { return nil }
+        return surfaceID
+    }
+
     func surfaceIdFromPanelId(_ panelId: UUID) -> TabID? {
         paneTree.surfaceId(forPanelId: panelId)
     }

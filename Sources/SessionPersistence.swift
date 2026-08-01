@@ -1673,6 +1673,8 @@ struct SessionPanelSnapshot: Codable, Sendable {
     var customTitle: String?
     /// Provenance of `customTitle`; absent provenance restores as user-set for compatibility.
     var customTitleSource: Workspace.CustomTitleSource? = nil
+    /// Current-build authority when `customTitleSource` uses a downgrade-safe value.
+    var customTitleAuthority: Workspace.CustomTitleSource? = nil
     var directory: String?
     var directoryIsTrustedRemoteReport: Bool? = nil
     var directoryRequiresRemoteTrust: Bool? = nil
@@ -1796,6 +1798,8 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
     var customTitle: String?
     /// Provenance of `customTitle`; absent provenance restores as user-set for compatibility.
     var customTitleSource: Workspace.CustomTitleSource? = nil
+    /// Current-build authority when `customTitleSource` uses a downgrade-safe value.
+    var customTitleAuthority: Workspace.CustomTitleSource? = nil
     var customDescription: String?
     var customColor: String?
     var customizationDirectory: String? = nil

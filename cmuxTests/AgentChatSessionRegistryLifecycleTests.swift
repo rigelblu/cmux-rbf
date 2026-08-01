@@ -497,6 +497,92 @@ struct AgentChatSessionRegistryLifecycleTests {
         #expect(resolved.sessionID == newer.sessionID)
     }
 
+    /// An explicit agent rename may claim the workspace title only when nothing
+    /// else in that workspace could claim it too. A sibling terminal session or
+    /// a Teams subagent therefore renames its own tab and leaves the workspace
+    /// name alone; an ended sibling stops competing for it, and a session in
+    /// another workspace never competed.
+    @MainActor
+    @Test func liveSessionIDsReportsWorkspaceOccupants() throws {
+        let workspaceID = UUID().uuidString
+        let otherWorkspaceID = UUID().uuidString
+        let lead = Self.liveCodexRecord(sessionID: "lead", workspaceID: workspaceID)
+        let sibling = Self.liveCodexRecord(sessionID: "sibling", workspaceID: workspaceID)
+        let elsewhere = Self.liveCodexRecord(sessionID: "elsewhere", workspaceID: otherWorkspaceID)
+
+        let alone = AgentChatSessionRegistry(restoredRecords: [lead, elsewhere])
+        #expect(alone.liveSessionIDs(workspaceID: workspaceID) == ["lead"])
+
+        let shared = AgentChatSessionRegistry(restoredRecords: [lead, sibling, elsewhere])
+        #expect(Set(shared.liveSessionIDs(workspaceID: workspaceID)) == ["lead", "sibling"])
+
+        var endedSibling = sibling
+        endedSibling.state = .ended
+        let survivor = AgentChatSessionRegistry(restoredRecords: [lead, endedSibling])
+        #expect(survivor.liveSessionIDs(workspaceID: workspaceID) == ["lead"])
+    }
+
+    /// Hook-store workspace ids arrive as raw JSON strings and are never
+    /// normalized, so occupancy must fold case the way every other workspace
+    /// comparison on the rename path already does. A case-sensitive match hides
+    /// a real sibling and lets a second agent claim the workspace title.
+    @MainActor
+    @Test func liveSessionIDsFoldsWorkspaceIDCase() throws {
+        let workspaceID = UUID().uuidString
+        let sibling = Self.liveCodexRecord(
+            sessionID: "sibling",
+            workspaceID: workspaceID.lowercased()
+        )
+
+        let registry = AgentChatSessionRegistry(restoredRecords: [sibling])
+
+        #expect(registry.liveSessionIDs(workspaceID: workspaceID.uppercased()) == ["sibling"])
+    }
+
+    /// A session whose recorded process is gone must stop occupying its
+    /// workspace. `liveSession` already reconciles a dead pid; occupancy that
+    /// trusts `state` alone lets a crashed session with no `SessionEnd` hook
+    /// block every later rename in that workspace, permanently and silently.
+    @MainActor
+    @Test func liveSessionIDsExcludesSessionWithDeadPID() throws {
+        let workspaceID = UUID().uuidString
+        var crashed = Self.liveCodexRecord(sessionID: "crashed", workspaceID: workspaceID)
+        crashed.pid = Self.reapedPID()
+
+        let registry = AgentChatSessionRegistry(restoredRecords: [crashed])
+
+        #expect(registry.liveSessionIDs(workspaceID: workspaceID).isEmpty)
+    }
+
+    /// A pid that has been spawned and reaped, so `kill(pid, 0)` reports ESRCH.
+    private static func reapedPID() -> Int {
+        var pid: pid_t = 0
+        let argv: [UnsafeMutablePointer<CChar>?] = [strdup("/usr/bin/true"), nil]
+        defer { free(argv[0]) }
+        guard posix_spawn(&pid, "/usr/bin/true", nil, nil, argv, environ) == 0 else { return 0 }
+        var status: Int32 = 0
+        waitpid(pid, &status, 0)
+        return Int(pid)
+    }
+
+    private static func liveCodexRecord(
+        sessionID: String,
+        workspaceID: String
+    ) -> AgentChatSessionRecord {
+        AgentChatSessionRecord(
+            sessionID: sessionID,
+            agentKind: .codex,
+            workspaceID: workspaceID,
+            surfaceID: UUID().uuidString,
+            workingDirectory: "/Users/example/project",
+            transcriptPath: "/tmp/\(sessionID).jsonl",
+            state: .idle,
+            lastActivityAt: Date(timeIntervalSince1970: 100),
+            title: nil,
+            pid: nil
+        )
+    }
+
     private func temporaryHomeDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-agent-chat-\(UUID().uuidString)", isDirectory: true)

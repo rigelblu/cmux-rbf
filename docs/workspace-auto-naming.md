@@ -15,9 +15,22 @@ Off by default. Enable it in **Settings > Automation > Workspace Auto-Naming** o
 Custom titles carry a provenance marker (user vs auto):
 
 - A name you set yourself - sidebar rename, command palette, `cmux rename-workspace`/`rename-tab`, or Claude's `/rename` - is never overwritten by auto-naming, and auto-naming for that workspace or tab stops.
+- A name you set with Codex's `/rename` is treated as the agent's own name, not as one you set in cmux: it replaces an auto name, but it never overrides a name you set in cmux yourself. See [Codex `/rename` sync](#codex-rename-sync).
 - Custom titles that predate this feature (snapshots persisted before provenance existed) restore as user-set: existing named workspaces are never auto-renamed. Workspaces without a custom title (the common "Claude Code"-row case) auto-name normally.
 - Clearing your custom name re-opens the workspace or tab to auto-naming (sidebar, command palette, or `cmux workspace-action --action clear-name`).
 - Auto names lose to the user everywhere else too: OSC terminal titles never override any custom title (unchanged behavior), and provenance survives session restore and moving tabs between workspaces.
+
+## Codex `/rename` sync
+
+Renaming a Codex session with `/rename` also renames the cmux tab hosting it, and the workspace when that session is the only agent working in it. Rename once, in the tool where the session lives.
+
+Only a rename you explicitly type syncs. The names Codex generates for a session on its own are ignored, because they arrive by the same channel as an explicit one and carry nothing that distinguishes them - so cmux proves the rename at its own input boundary instead, from the keystrokes you actually committed. A redraw of the same confirmation on screen, or a keystroke sent over the cmux socket rather than typed, will not trigger a rename.
+
+Precedence is unchanged: a name you set in cmux yourself still wins, and stays until you clear it.
+
+**Two cases where a rename does not reach the workspace.** Dragging a Codex tab into a different workspace stops its rename sync until the surface is recreated — the tab itself is unaffected. And when two Codex sessions share one workspace but their hook payloads carry no workspace binding, each can read as the only agent present, so the second rename can claim the workspace title instead of only its own tab. In both cases the tab title stays correct; only the workspace title is at risk.
+
+**A `/rename` only lands once the session has said something.** Codex 0.146.0 registers a session with cmux at that session's first real prompt submission - it never runs a session-start hook - so a `/rename` typed before you have sent Codex any message is declined and nothing changes. Send one message first, and renames land from then on. This is Codex behavior, not a cmux setting, and there is nothing to configure.
 
 ## Guarantees
 

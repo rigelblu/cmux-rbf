@@ -57,11 +57,46 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
             applyThemeToLoadedPage()
         }
         processStore.eventSink = { [weak self] event in
+            self?.applyCodexSessionNameIfNeeded(event)
             self?.sendEvent(event)
         }
         processStore.activeProviderSink = { [weak self] hasActiveProvider in
             self?.onHasActiveProviderChanged?(hasActiveProvider)
         }
+    }
+
+    private func applyCodexSessionNameIfNeeded(_ event: [String: Any]) {
+        guard event["type"] as? String == "provider.sessionNameUpdated",
+              event["providerId"] as? String == AgentSessionProviderID.codex.rawValue,
+              let name = event["name"] as? String,
+              let tabManager = AppDelegate.shared?.tabManagerFor(tabId: workspaceId),
+              let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }),
+              let panel = workspace.panels[panelId] as? AgentSessionPanel,
+              panel.currentProviderID == .codex else {
+            return
+        }
+        // Embedded panels are not tracked in `AgentChatSessionRegistry`, so this
+        // passes its panel identity and lets the shared rule read occupancy from
+        // both sides. The terminal adapter calls the same rule with its own
+        // identity, so the two can never disagree about one workspace.
+        let workspaceEligible = WorkspaceAgentOccupancy.isSoleAgentSurface(
+            .embeddedPanel(panelId: panelId),
+            in: workspace,
+            registry: TerminalController.shared.agentChatTranscriptService?.registry
+        )
+        let applied = workspace.applyCodexSessionName(
+            name,
+            panelId: panelId,
+            workspaceEligible: workspaceEligible
+        )
+#if DEBUG
+        cmuxDebugLog(
+            "codexRename.embedded.applied panel=\(panelId.uuidString.prefix(8)) "
+            + "name=\"\(name)\" eligible=\(workspaceEligible) "
+            + "workspaceApplied=\(applied.workspaceApplied) "
+            + "panelApplied=\(applied.panelApplied.map(String.init(describing:)) ?? "nil")"
+        )
+#endif
     }
 
     func ensureWebView(onPointerDown: @escaping () -> Void) -> AgentSessionWebView {
