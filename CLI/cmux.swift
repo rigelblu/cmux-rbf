@@ -20975,10 +20975,9 @@ struct CMUXCLI {
             lastAgentSurfaceId = surfaceId
 
             do {
-                _ = try socketClient.sendV2(method: "tab.action", params: [
+                _ = try socketClient.sendV2(method: "agent.session_title.seed", params: [
                     "workspace_id": workspaceId,
                     "surface_id": surfaceId,
-                    "action": "rename",
                     "title": CMUXCLI.codexTeamsTitle(thread: thread, spawn: spawn, depth: depth)
                 ])
             } catch {

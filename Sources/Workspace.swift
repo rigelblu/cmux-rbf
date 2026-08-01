@@ -133,13 +133,17 @@ extension Workspace {
             (notificationStore?.hasUnreadNotification(forTabId: id, surfaceId: nil) ?? false) ||
             (notificationStore?.hasRestoredUnreadIndicator(forTabId: id) ?? false)
         let workspaceNotificationSnapshots = notificationSnapshots(surfaceId: nil)
+        let persistedTitleSource = effectiveCustomTitleSource == .agentSession
+            ? CustomTitleSource.auto
+            : effectiveCustomTitleSource
         var snapshot = SessionWorkspaceSnapshot(
             workspaceId: id,
             stableId: stableId,
             taskCreateOperationID: taskCreateOperationID,
             processTitle: processTitle,
             customTitle: customTitle,
-            customTitleSource: effectiveCustomTitleSource,
+            customTitleSource: persistedTitleSource,
+            customTitleAuthority: effectiveCustomTitleSource == .agentSession ? .agentSession : nil,
             customDescription: customDescription,
             customColor: customColor,
             isPinned: isPinned,
@@ -244,7 +248,10 @@ extension Workspace {
         applySessionDividerPositions(snapshotNode: snapshot.layout, liveNode: bonsplitController.treeSnapshot())
 
         applyProcessTitle(snapshot.processTitle)
-        setCustomTitle(snapshot.customTitle, source: snapshot.customTitleSource ?? .user)
+        setCustomTitle(
+            snapshot.customTitle,
+            source: snapshot.customTitleAuthority ?? snapshot.customTitleSource ?? .user
+        )
         setCustomDescription(snapshot.customDescription)
         setCustomColor(snapshot.customColor)
         isPinned = snapshot.isPinned
@@ -475,6 +482,9 @@ extension Workspace {
         let customTitleSource: CustomTitleSource? = customTitle != nil
             ? (panelCustomTitleSources[panelId] ?? .user)
             : nil
+        let persistedCustomTitleSource = customTitleSource == .agentSession
+            ? CustomTitleSource.auto
+            : customTitleSource
         let directory: String? = {
             if let directory = panelDirectories[panelId]?.trimmingCharacters(in: .whitespacesAndNewlines),
                !directory.isEmpty {
@@ -747,7 +757,8 @@ extension Workspace {
             type: panel.panelType,
             title: panelTitle,
             customTitle: customTitle,
-            customTitleSource: customTitleSource,
+            customTitleSource: persistedCustomTitleSource,
+            customTitleAuthority: customTitleSource == .agentSession ? .agentSession : nil,
             directory: directory,
             directoryIsTrustedRemoteReport: directoryIsTrustedRemoteReport,
             directoryRequiresRemoteTrust: directoryRequiresRemoteTrust ? true : nil,
@@ -1838,7 +1849,11 @@ extension Workspace {
             panelTitles[panelId] = title
         }
 
-        setPanelCustomTitle(panelId: panelId, title: snapshot.customTitle, source: snapshot.customTitleSource ?? .user)
+        setPanelCustomTitle(
+            panelId: panelId,
+            title: snapshot.customTitle,
+            source: snapshot.customTitleAuthority ?? snapshot.customTitleSource ?? .user
+        )
         setPanelPinned(panelId: panelId, pinned: snapshot.isPinned)
 
         // The bonsplit tab header only refreshes when `updateTab` is called; the writes
@@ -4233,16 +4248,22 @@ final class Workspace: Identifiable, ObservableObject {
 
     /// Sets, replaces, or clears (empty/nil `title`) a panel custom title.
     ///
-    /// `.auto` writes are rejected when a user-set title exists, and `.auto`
-    /// never clears. Returns whether the write landed.
+    /// Lower-priority writes are rejected. A non-user source may clear only a
+    /// title it owns, so an explicit agent clear falls back to the panel's
+    /// remaining title while a direct cmux name survives.
+    /// Returns whether the write landed.
     @discardableResult
     func setPanelCustomTitle(panelId: UUID, title: String?, source: CustomTitleSource = .user) -> Bool {
         guard panels[panelId] != nil else { return false }
         let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let previous = panelCustomTitles[panelId]
-        if source == .auto {
-            guard !trimmed.isEmpty else { return false }
-            if previous != nil, (panelCustomTitleSources[panelId] ?? .user) == .user { return false }
+        if source != .user {
+            let existingSource = previous == nil ? nil : (panelCustomTitleSources[panelId] ?? .user)
+            if trimmed.isEmpty {
+                guard source.canClearOwnTitle, existingSource == source else { return false }
+            } else {
+                guard source.canReplace(existingSource) else { return false }
+            }
         }
         if trimmed.isEmpty {
             guard previous != nil else { return false }
@@ -4250,9 +4271,9 @@ final class Workspace: Identifiable, ObservableObject {
             panelCustomTitleSources.removeValue(forKey: panelId)
         } else {
             guard previous != trimmed else {
-                // Same text: a user write still claims ownership so a later
-                // auto write cannot replace a title the user re-confirmed.
-                if source == .user { panelCustomTitleSources[panelId] = .user }
+                // Same text can still be a higher-authority action. Preserve
+                // that claim so a later lower-authority write cannot replace it.
+                panelCustomTitleSources[panelId] = source
                 return true
             }
             panelCustomTitles[panelId] = trimmed

@@ -1184,6 +1184,46 @@ struct CodexAppServerSessionTests {
         }
     }
 
+    @Test
+    func testExplicitRenameRequestOwnsDedicatedNameSink() async throws {
+        var sentLines: [String] = []
+        var updates: [(threadID: String, name: String)] = []
+        let session = CodexAppServerSession(
+            workingDirectory: nil,
+            writeData: { data in
+                sentLines.append(
+                    String(decoding: data, as: UTF8.self)
+                        .trimmingCharacters(in: .newlines)
+                )
+            },
+            outputSink: { _, _ in },
+            nameUpdateSink: { threadID, name in
+                updates.append((threadID, name))
+            }
+        )
+
+        session.consumeStdout(
+            #"{"method":"thread/started","params":{"thread":{"id":"thread-1"}}}"# + "\n"
+        )
+        session.consumeStdout(
+            #"{"method":"thread/name/updated","params":{"threadId":"thread-1","threadName":"Automatic"}}"# + "\n"
+        )
+        expectEqual(updates.count, 0)
+
+        try await session.submit("/rename   Fix auth bug  ")
+        let request = jsonLine(try #require(sentLines.last))
+        expectEqual(request["method"] as? String, "thread/name/set")
+        expectEqual((request["params"] as? [String: Any])?["name"] as? String, "Fix auth bug")
+
+        session.consumeStdout(
+            #"{"method":"thread/name/updated","params":{"threadId":"thread-1","threadName":"Fix auth bug"}}"# + "\n"
+        )
+
+        expectEqual(updates.count, 1)
+        expectEqual(updates.first?.threadID, "thread-1")
+        expectEqual(updates.first?.name, "Fix auth bug")
+    }
+
     private func jsonLine(_ rawLine: String) -> [String: Any] {
         guard let data = rawLine.data(using: .utf8),
             let decoded = try? JSONSerialization.jsonObject(with: data),

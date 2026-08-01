@@ -7,6 +7,7 @@ final class CodexAppServerSession {
     typealias ActivitySink = (_ activity: [String: Any]) -> Void
     typealias TurnCompleteSink = () -> Void
     typealias FailureSink = (_ details: String?) -> Void
+    typealias NameUpdateSink = (_ threadID: String, _ name: String) -> Void
 
     private static let maxQueuedInputCount = 1
     private static let maxQueuedInputBytes = 64 * 1024
@@ -17,6 +18,7 @@ final class CodexAppServerSession {
     private let activitySink: ActivitySink
     private let turnCompleteSink: TurnCompleteSink
     private let failureSink: FailureSink
+    private let nameUpdateSink: NameUpdateSink
     private var nextRequestID = 1
     private var initializeRequestID: Int?
     private var didInitialize = false
@@ -28,6 +30,7 @@ final class CodexAppServerSession {
     private var activePermissionMode: AgentSessionPermissionMode = .standard
     private var isTurnInFlight = false
     private var turnStartRequestIDs: Set<Int> = []
+    private var explicitNameRequests: [Int: (threadID: String, name: String)] = [:]
 
     init(
         workingDirectory: String?,
@@ -35,7 +38,8 @@ final class CodexAppServerSession {
         outputSink: @escaping OutputSink,
         activitySink: @escaping ActivitySink = { _ in },
         turnCompleteSink: @escaping TurnCompleteSink = {},
-        failureSink: @escaping FailureSink = { _ in }
+        failureSink: @escaping FailureSink = { _ in },
+        nameUpdateSink: @escaping NameUpdateSink = { _, _ in }
     ) {
         self.workingDirectory = workingDirectory
         self.writeData = writeData
@@ -43,6 +47,7 @@ final class CodexAppServerSession {
         self.activitySink = activitySink
         self.turnCompleteSink = turnCompleteSink
         self.failureSink = failureSink
+        self.nameUpdateSink = nameUpdateSink
     }
 
     func start() async throws {
@@ -66,6 +71,32 @@ final class CodexAppServerSession {
         guard !text.isEmpty else { return }
         guard !didFailStartup else {
             throw AgentSessionBridgeError.providerNotReady(AgentSessionProviderID.codex.displayName)
+        }
+        if let name = Self.explicitRenameName(in: text) {
+            guard let threadID else {
+                throw AgentSessionBridgeError.providerNotReady(AgentSessionProviderID.codex.displayName)
+            }
+            let requestID = nextRequestID
+            nextRequestID += 1
+            if explicitNameRequests.count >= 8,
+               let oldestRequestID = explicitNameRequests.keys.min() {
+                explicitNameRequests.removeValue(forKey: oldestRequestID)
+            }
+            explicitNameRequests[requestID] = (threadID, name)
+            do {
+                try await sendJSONObject([
+                    "id": requestID,
+                    "method": "thread/name/set",
+                    "params": [
+                    "threadId": threadID,
+                    "name": name
+                    ]
+                ])
+            } catch {
+                explicitNameRequests.removeValue(forKey: requestID)
+                throw error
+            }
+            return
         }
         guard !isTurnInFlight else {
             throw AgentSessionBridgeError.providerNotReady(AgentSessionProviderID.codex.displayName)
@@ -101,6 +132,19 @@ final class CodexAppServerSession {
             total + input.text.utf8.count
         }
         return queuedBytes + text.utf8.count <= Self.maxQueuedInputBytes
+    }
+
+    private static func explicitRenameName(in text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("/rename"),
+              trimmed.count > "/rename".count else {
+            return nil
+        }
+        let argumentStart = trimmed.index(trimmed.startIndex, offsetBy: "/rename".count)
+        guard trimmed[argumentStart].isWhitespace else { return nil }
+        let name = trimmed[argumentStart...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
     }
 
     func consumeStdout(_ text: String) {
@@ -143,6 +187,9 @@ final class CodexAppServerSession {
     }
 
     private func handleResponse(id: Int, result: [String: Any]?) {
+        if explicitNameRequests[id] != nil {
+            return
+        }
         if id == initializeRequestID {
             initializeRequestID = nil
             didInitialize = true
@@ -176,6 +223,10 @@ final class CodexAppServerSession {
 
     private func handleRPCError(id: Int, error: [String: Any]) {
         let details = error["message"] as? String
+        if explicitNameRequests.removeValue(forKey: id) != nil {
+            emitCodexRPCFailure(details: details)
+            return
+        }
         if id == initializeRequestID || id == threadStartRequestID {
             failStartup(details: details)
             return
@@ -199,6 +250,21 @@ final class CodexAppServerSession {
                 threadStartRequestID = nil
                 drainCodexAppServerQueuedInputs()
             }
+        case "thread/name/updated":
+            guard let updatedThreadID = params?["threadId"] as? String,
+                  updatedThreadID == threadID,
+                  let name = params?["threadName"] as? String else {
+                break
+            }
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let requestID = explicitNameRequests.first(where: {
+                      $0.value.threadID == updatedThreadID && $0.value.name == trimmed
+                  })?.key else {
+                break
+            }
+            explicitNameRequests.removeValue(forKey: requestID)
+            nameUpdateSink(updatedThreadID, trimmed)
         case "item/agentMessage/delta":
             if let delta = params?["delta"] as? String {
                 outputSink("stdout", delta)

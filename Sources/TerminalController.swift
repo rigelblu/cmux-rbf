@@ -2184,6 +2184,8 @@ class TerminalController {
             return v2Result(id: id, self.v2WorkspaceCloudVMTerminalReady(params: params))
         case "workspace.set_auto_title":
             return v2Result(id: id, self.v2WorkspaceSetAutoTitle(params: params))
+        case "agent.session_title.seed":
+            return v2Result(id: id, self.v2AgentSessionTitleSeed(params: params))
 
         // Settings/session/feedback: session.restore_previous, settings.open, and
         // feedback.open handled by ControlCommandCoordinator.
@@ -3727,6 +3729,57 @@ class TerminalController {
             "workspace_applied": workspaceApplied,
             "panel_applied": v2OrNull(panelApplied),
             "enabled": true
+        ])
+    }
+
+    /// Internal Codex Teams bridge for its initial descriptive pane label.
+    /// The seed is automatic provenance, so a later explicit `/rename`
+    /// confirmation can replace it while a direct cmux name remains protected.
+    private func v2AgentSessionTitleSeed(params: [String: Any]) -> V2CallResult {
+        guard let tabManager = v2ResolveTabManager(params: params) else {
+            return .err(code: "unavailable", message: "TabManager not available", data: nil)
+        }
+        guard let workspaceId = v2UUID(params, "workspace_id") else {
+            return .err(code: "invalid_params", message: "Missing or invalid workspace_id", data: nil)
+        }
+        guard let surfaceId = v2UUID(params, "surface_id") else {
+            return .err(code: "invalid_params", message: "Missing or invalid surface_id", data: nil)
+        }
+        guard let titleRaw = v2String(params, "title") else {
+            return .err(code: "invalid_params", message: "Missing or invalid title", data: nil)
+        }
+        let title = titleRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            return .err(code: "invalid_params", message: "Missing or invalid title", data: nil)
+        }
+
+        var foundWorkspace = false
+        var foundPanel = false
+        var panelApplied: Bool?
+        v2MainSync {
+            guard let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }) else {
+                return
+            }
+            foundWorkspace = true
+            guard let panelId = workspace.panelIdFromSurfaceId(TabID(uuid: surfaceId)) else {
+                return
+            }
+            foundPanel = true
+            panelApplied = workspace.setPanelCustomTitle(
+                panelId: panelId,
+                title: title,
+                source: .auto
+            )
+        }
+
+        guard foundWorkspace else {
+            return .err(code: "not_found", message: "Workspace not found", data: nil)
+        }
+        guard foundPanel else {
+            return .err(code: "not_found", message: "Surface not found", data: nil)
+        }
+        return .ok([
+            "panel_applied": v2OrNull(panelApplied)
         ])
     }
 
