@@ -215,6 +215,10 @@ extension KeyboardShortcutSettings.Action {
             return .browserOrFilePreviewTextEditor
         case .markdownZoomIn, .markdownZoomOut, .markdownZoomReset:
             return .markdownPanel
+        case .globalZoomIn, .globalZoomOut, .globalZoomReset:
+            // Deliberately unscoped: the global scale answers the chord no
+            // matter what holds focus, which is the whole point of it.
+            return .application
         case .canvasZoomReset:
             return .canvasLayoutOutsideFocusedContent
         case .canvasRevealFocusedPane, .canvasOverview, .canvasZoomIn, .canvasZoomOut,

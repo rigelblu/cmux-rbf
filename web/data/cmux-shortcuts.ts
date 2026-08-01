@@ -413,6 +413,24 @@ export const shortcutCategories: ShortcutCategory[] = [
         description: { en: "Markdown viewer: actual size", ja: "Markdownビューア: 実寸表示" },
         note: { en: "focused markdown viewer", ja: "フォーカス中のMarkdownビューア" },
       },
+      {
+        id: "globalZoomIn",
+        combos: [["⇧", "⌘", "="]],
+        description: { en: "Everything: zoom in", ja: "全体: 拡大" },
+        note: { en: "scales the whole app, not just the focused pane", ja: "フォーカス中のペインだけでなくアプリ全体を拡大" },
+      },
+      {
+        id: "globalZoomOut",
+        combos: [["⇧", "⌘", "-"]],
+        description: { en: "Everything: zoom out", ja: "全体: 縮小" },
+        note: { en: "scales the whole app, not just the focused pane", ja: "フォーカス中のペインだけでなくアプリ全体を縮小" },
+      },
+      {
+        id: "globalZoomReset",
+        combos: [["⇧", "⌘", "0"]],
+        description: { en: "Everything: actual size", ja: "全体: 実寸表示" },
+        note: { en: "resets the app-wide scale only; per-pane zoom is unchanged", ja: "アプリ全体の倍率のみリセット。ペインごとの拡大率は変更されません" },
+      },
       { id: "toggleBrowserDeveloperTools", combos: [["⌥", "⌘", "I"]], description: { en: "Toggle browser developer tools", ja: "ブラウザ開発者ツールを切り替え" } },
       { id: "showBrowserJavaScriptConsole", combos: [["⌥", "⌘", "C"]], description: { en: "Show browser JavaScript console", ja: "ブラウザJavaScriptコンソールを表示" } },
       {
