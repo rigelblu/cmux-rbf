@@ -152,12 +152,44 @@ struct WorkspaceColorMenuModelTests {
         #expect(unlisted?.state == .mixed)
     }
 
+    // MARK: - Label management
+
+    @Test("The chooser ends with a label-management row")
+    func chooserEndsWithLabelManagementRow() {
+        let rows = candidates(targets: [nil])
+        #expect(rows.count == 5, "No Color, three palette entries, then the label-management row")
+        #expect(rows.last?.kind == .editLabels)
+        #expect(rows.last?.hex == nil, "a navigation row carries no color")
+        #expect(rows.last?.state == .off, "a navigation row is never checked")
+    }
+
+    @Test("Exactly one label-management row, whatever the selection")
+    func exactlyOneLabelManagementRow() {
+        // Including the unlisted-row path, which appends after the palette — the row must
+        // stay last there too, or it would land in the middle of the assignment choices.
+        for targets in [[nil], [String?.some("#006B6B")], [nil, "#ABCDEF"], []] {
+            let rows = candidates(targets: targets)
+            #expect(rows.count { $0.kind == .editLabels } == 1)
+            #expect(rows.last?.kind == .editLabels)
+        }
+    }
+
+    @Test("The label-management row is not an assignment candidate")
+    func labelManagementRowIsNotAssignable() {
+        // Guards the seam where a builder maps rows to `applyTabColor(row.hex)`: an
+        // editLabels row must never look like "assign no color".
+        let rows = candidates(targets: ["#006B6B"])
+        let assignable = rows.filter { $0.kind != .editLabels }
+        #expect(assignable.count { $0.kind == .noColor } == 1)
+        #expect(!assignable.contains { $0.kind == .editLabels })
+    }
+
     // MARK: - Degenerate input
 
     @Test("An empty selection still renders the palette, all off")
     func emptySelectionRendersPaletteOff() {
         let rows = candidates(targets: [])
-        #expect(rows.count == 4, "No Color plus three entries")
+        #expect(rows.count == 5, "No Color, three entries, and the label-management row")
         #expect(rows.allSatisfy { $0.state == .off })
     }
 

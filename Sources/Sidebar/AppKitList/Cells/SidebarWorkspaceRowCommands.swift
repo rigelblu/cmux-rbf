@@ -622,6 +622,20 @@ struct SidebarWorkspaceRowMenuBuilder {
                     hex: hex,
                     state: candidate.state
                 ))
+
+            case .editLabels:
+                // Assignment above, label management below. A transient menu is the wrong
+                // place for a text field, so this navigates to Settings instead.
+                submenu.addItem(.separator())
+                let editItem = item(
+                    String(localized: "contextMenu.editColorLabels", defaultValue: "Edit Color Labels…")
+                ) {
+                    AppDelegate.presentWorkspaceColorLabelEditor()
+                }
+                editItem.image = RenderableSystemSymbol.configuredAppKitImage(
+                    systemName: "tag", pointSize: 13, weight: nil
+                )
+                submenu.addItem(editItem)
             }
         }
 
