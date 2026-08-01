@@ -1760,7 +1760,10 @@ class TabManager: ObservableObject {
     }
 
     func applyWorkspacePaletteColor(named name: String, toWorkspaceIds workspaceIds: [UUID]) {
-        guard let color = WorkspaceTabColorSettings.currentColorHex(named: name) else { return }
+        // Was `currentColorHex(named:)` — an exact case-sensitive dictionary lookup with
+        // no hex and no label support. The shared resolver is strictly more permissive,
+        // so every input that resolved before still resolves.
+        guard let color = WorkspaceTabColorSettings.resolvedColorHex(name) else { return }
         applyWorkspaceColor(color, toWorkspaceIds: workspaceIds)
     }
 

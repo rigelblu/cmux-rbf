@@ -96,7 +96,8 @@ struct SidebarWorkspaceRowInput {
                 canMarkRead: targetAggregate.canMarkRead,
                 canMarkUnread: targetAggregate.canMarkUnread,
                 hasLatestNotification: targetAggregate.hasLatestNotification,
-                notifications: targetAggregate.notifications
+                notifications: targetAggregate.notifications,
+                targetColorHexes: targetAggregate.targetColorHexes
             )
         )
     }

@@ -199,6 +199,119 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         #expect(single.notifications.map(\.id) == [singleNotification.id])
     }
 
+    // MARK: - `cm-11.1` multi-target color snapshot
+
+    /// The workspace color submenu can only draw a truthful checkmark if it knows every
+    /// target's current color. Both builders previously gated on the clicked workspace
+    /// while acting on the whole selection, so this aggregate is where that gap closes.
+    @Test
+    func aggregateCollectsEveryTargetColorInTargetOrder() throws {
+        let teal = UUID()
+        let red = UUID()
+        let uncolored = UUID()
+        let suiteName = "TargetColorAggregate.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+
+        let rows = [
+            teal: Self.rowInput(
+                workspaceId: teal, groupId: nil, unreadCount: 0, isMultiSelected: true,
+                isRemote: false, remoteState: .disconnected, settings: settings,
+                customColorHex: "#006B6B"
+            ),
+            red: Self.rowInput(
+                workspaceId: red, groupId: nil, unreadCount: 0, isMultiSelected: true,
+                isRemote: false, remoteState: .disconnected, settings: settings,
+                customColorHex: "#C0392B"
+            ),
+            uncolored: Self.rowInput(
+                workspaceId: uncolored, groupId: nil, unreadCount: 0, isMultiSelected: true,
+                isRemote: false, remoteState: .disconnected, settings: settings,
+                customColorHex: nil
+            ),
+        ]
+
+        let aggregate = SidebarWorkspaceContextMenuTargetAggregate(
+            targetWorkspaceIds: [teal, red, uncolored],
+            workspaceRowsById: rows,
+            anchorWorkspaceIds: [],
+            notificationIndex: SidebarWorkspaceNotificationIndex(notifications: [])
+        )
+
+        #expect(
+            aggregate.targetColorHexes == ["#006B6B", "#C0392B", nil],
+            "colors must line up with targetWorkspaceIds, with nil for an uncolored workspace"
+        )
+    }
+
+    @Test
+    func aggregateScopesColorsToItsOwnTargets() throws {
+        let selected = UUID()
+        let other = UUID()
+        let suiteName = "TargetColorScope.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+
+        let rows = [
+            selected: Self.rowInput(
+                workspaceId: selected, groupId: nil, unreadCount: 0, isMultiSelected: false,
+                isRemote: false, remoteState: .disconnected, settings: settings,
+                customColorHex: "#006B6B"
+            ),
+            other: Self.rowInput(
+                workspaceId: other, groupId: nil, unreadCount: 0, isMultiSelected: false,
+                isRemote: false, remoteState: .disconnected, settings: settings,
+                customColorHex: "#C0392B"
+            ),
+        ]
+
+        let aggregate = SidebarWorkspaceContextMenuTargetAggregate(
+            targetWorkspaceIds: [selected],
+            workspaceRowsById: rows,
+            anchorWorkspaceIds: [],
+            notificationIndex: SidebarWorkspaceNotificationIndex(notifications: [])
+        )
+
+        #expect(
+            aggregate.targetColorHexes == ["#006B6B"],
+            "a single-row menu must not inherit another workspace's color"
+        )
+    }
+
+    @Test
+    func aggregateOmitsTargetsWithNoKnownRow() throws {
+        let known = UUID()
+        let missing = UUID()
+        let suiteName = "TargetColorMissing.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+
+        let rows = [
+            known: Self.rowInput(
+                workspaceId: known, groupId: nil, unreadCount: 0, isMultiSelected: true,
+                isRemote: false, remoteState: .disconnected, settings: settings,
+                customColorHex: "#006B6B"
+            ),
+        ]
+
+        let aggregate = SidebarWorkspaceContextMenuTargetAggregate(
+            targetWorkspaceIds: [known, missing],
+            workspaceRowsById: rows,
+            anchorWorkspaceIds: [],
+            notificationIndex: SidebarWorkspaceNotificationIndex(notifications: [])
+        )
+
+        // A workspace we cannot resolve is unknown, not uncolored. Emitting nil for it
+        // would make No Color read as "mixed" for a selection that is fully colored.
+        #expect(
+            aggregate.targetColorHexes == ["#006B6B"],
+            "an unresolvable target contributes nothing rather than a false nil"
+        )
+    }
+
     private static func rowInput(
         workspaceId: UUID,
         groupId: UUID?,
@@ -206,14 +319,15 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         isMultiSelected: Bool,
         isRemote: Bool,
         remoteState: WorkspaceRemoteConnectionState,
-        settings: SidebarTabItemSettingsSnapshot
+        settings: SidebarTabItemSettingsSnapshot,
+        customColorHex: String? = nil
     ) -> SidebarWorkspaceRowInput {
         SidebarWorkspaceRowInput(
             workspaceId: workspaceId,
             groupId: groupId,
             index: 0,
             workspaceCount: 3,
-            workspace: SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(),
+            workspace: SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: customColorHex),
             isActive: false,
             isMultiSelected: isMultiSelected,
             hasUserCustomTitle: false,

@@ -140,7 +140,8 @@ struct SidebarAppKitRowCellTests {
                 canMarkRead: false,
                 canMarkUnread: false,
                 hasLatestNotification: false,
-                notifications: []
+                notifications: [],
+                targetColorHexes: []
             )
         )
     }
