@@ -99,17 +99,28 @@ public enum WorkspaceColorSemanticLabelResolver {
 
     /// Turns a user-supplied color value into a normalized hex.
     ///
-    /// Ordered: normalized hex → exact case-sensitive raw name → case-folded raw name →
-    /// exact unique valid label. The exact-case pass must come first and can never be
-    /// ambiguous, because palette keys are trimmed but never case-folded — `cmux.json`
-    /// may legitimately define both `Teal` and `teal`. Ambiguity below that pass fails
-    /// closed rather than picking a winner.
+    /// Ordered: explicit `#RRGGBB` hex → exact case-sensitive raw name → case-folded raw
+    /// name → exact unique valid label → bare six-digit hex. The exact-case name pass can
+    /// never be ambiguous, because palette keys are trimmed but never case-folded —
+    /// `cmux.json` may legitimately define both `Teal` and `teal`. Ambiguity below that
+    /// pass fails closed rather than picking a winner.
+    ///
+    /// **Bare hex runs last, and that ordering is load-bearing.**
+    /// `WorkspaceColorHex.normalized` treats the `#` as optional, so six-letter words
+    /// built from hex digits — `Decade`, `Facade`, `Deface`, `Efface`, `Accede`,
+    /// `Beaded` — parse as colours. Accepting those before the palette lookup meant a
+    /// user-defined entry named `Decade` resolved to `#DECADE`, a colour in no palette,
+    /// with no error. That was reachable without the CLI: the command palette hands an
+    /// entry's own key back to `applyWorkspacePaletteColor`, so cmux fed itself the bad
+    /// input. An explicit `#` still wins outright, because it can only mean a colour.
     public static func resolve(
         _ input: String,
         palette: [String: String],
         labels: [String: String]
     ) -> String? {
-        if let hex = WorkspaceColorHex.normalized(input) { return hex }
+        if WorkspaceColorHex.isExplicitHex(input), let hex = WorkspaceColorHex.normalized(input) {
+            return hex
+        }
 
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -124,11 +135,15 @@ public enum WorkspaceColorSemanticLabelResolver {
         // Two entries fold together and neither was an exact match — fail closed.
         if foldedNameMatches.count > 1 { return nil }
 
-        // A raw name always outranks a label, so this pass runs last.
+        // A raw name always outranks a label, so this pass runs before hex-without-#.
         let valid = validLabels(rawLabels: labels, palette: palette)
         let labelMatches = valid.filter { $0.value.lowercased() == folded }
-        guard labelMatches.count == 1, let name = labelMatches.first?.key else { return nil }
-        return palette[name]
+        if labelMatches.count == 1, let name = labelMatches.first?.key { return palette[name] }
+        if labelMatches.count > 1 { return nil }
+
+        // Nothing in the user's own vocabulary claimed it, so a bare six-digit hex is
+        // safe to read as a colour.
+        return WorkspaceColorHex.normalized(trimmed)
     }
 
     /// The effective entries a menu, the command palette, and `workspace.color.list`

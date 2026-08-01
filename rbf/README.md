@@ -11,6 +11,18 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Name a workspace colour by what it means to you
+Give workspace colours your own meaning — such as **GOAL: Primary (Teal)** — and see which one is assigned whenever you open the chooser. Labels are optional and change nothing underneath: colour names, hex values, saved workspaces, and scripts keep working exactly as before.
+
+- Meaning comes first and the colour's own name stays in parentheses, so a label never costs you the identity underneath it. With no label, you just see the colour name.
+- The colour menu marks what is already assigned — checked for one workspace, mixed when several selected workspaces disagree — instead of making you assign one and look.
+- **Edit Color Labels…** at the foot of the menu opens Settings on the Workspace Colors rows, rather than leaving you to find them.
+- **No Color** is always offered and carries its own state. The command palette calls it **No Color** too, so one action has one name; `clear-color` remains its CLI spelling.
+- A colour a workspace still wears after you removed it from the palette appears as a temporary **Custom (#RRGGBB)** row rather than vanishing.
+- Edit labels in Settings or in `~/.config/cmux/cmux.json` under `workspaceColors.labels`. Clearing one restores the raw colour name.
+- Automation reads the palette with `cmux workspace-color list [--json]` and can assign by label: `cmux workspace-action set-color "GOAL: Primary"`.
+- **No Color** itself cannot be labelled, `workspace-group set-color` stays hex-only, and if two entries share a hex both show as assigned — cmux stores a colour, not which entry you picked.
+
 ## 🟠⋯ Zoom once and have all of cmux scale
 `⇧⌘=` and `⇧⌘-` resize everything together — terminals, the sidebar, tab bars, the command palette, Settings, browser panes, the markdown viewer, and text previews. `⇧⌘0` returns to normal.
 
