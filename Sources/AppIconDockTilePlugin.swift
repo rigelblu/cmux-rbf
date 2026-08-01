@@ -25,6 +25,36 @@ private enum DockTileAppIconMode: String {
     }
 }
 
+/// Channel-aware lookup for the two runtime icon assets.
+///
+/// **This is a deliberate mirror of `CmuxFoundation.ChannelAppIconName`, and the
+/// duplication is stated rather than hidden.** This plugin is loaded into
+/// **Dock's** process, not cmux's, and links no Cmux package — see the note on
+/// `CmuxDockTilePlugin` about keeping it minimal and deriving everything from
+/// the enclosing app bundle. Importing CmuxFoundation here means adding a
+/// package product to the plugin target in `project.pbxproj`, a heavier and
+/// riskier change than the six lines it saves.
+///
+/// If that dependency is ever added, delete this and call the shared type. The
+/// two must not diverge: they answer the same question, and a channel whose Dock
+/// icon disagrees with its app switcher icon is worse than one with neither.
+enum ChannelDockTileIcon {
+    static func image(base: NSImage.Name, in bundle: Bundle) -> NSImage? {
+        let iconName = (bundle.object(forInfoDictionaryKey: "CFBundleIconName") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let suffix = iconName?.hasPrefix("AppIcon") == true
+            ? String(iconName!.dropFirst("AppIcon".count))
+            : ""
+        if !suffix.isEmpty,
+           let variant = bundle.image(forResource: NSImage.Name(base + suffix)) {
+            return variant
+        }
+        // No variant drawn for this channel — upstream's art is the right
+        // fallback, not a missing icon.
+        return bundle.image(forResource: base)
+    }
+}
+
 final class CmuxDockTilePlugin: NSObject, NSDockTilePlugIn {
     // The plugin can stay alive while the app remains in the Dock, even after quit.
     // Keep the state minimal and derive everything from the enclosing app bundle.
@@ -113,7 +143,8 @@ final class CmuxDockTilePlugin: NSObject, NSDockTilePlugIn {
         }
 
         guard let imageName = mode.imageName(isDarkAppearance: isDarkAppearance),
-              let icon = appBundle?.image(forResource: imageName) else {
+              let bundle = appBundle,
+              let icon = ChannelDockTileIcon.image(base: imageName, in: bundle) else {
             if shouldPersistBundleIcon {
                 NSWorkspace.shared.setIcon(nil, forFile: appBundleURL.path, options: [])
                 NSWorkspace.shared.noteFileSystemChanged(appBundleURL.path)

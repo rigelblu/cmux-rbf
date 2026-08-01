@@ -9,6 +9,32 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.9.0 (2026-08-02) — #cm-17, #cm-18, #cm-19
+## 🟠⋯ Added for End Users
+- 2026-08-02 - feat (ux) | use the cmux you build as your everyday app instead of launching it out of a build directory — the fork installs as **cmux RBF** in `/Applications`, with its own green `RBF` banner icon, its own bundle id and its own socket. Upstream's `cmux.app` is never read, written or replaced, so it stays as the fallback and both can run at once (#cm-17)
+- 2026-08-02 - feat (ux) | open the fork into the workspaces you already have, not an empty window — the first install copies your workspaces, window layout, session order and reopen history across. Re-installing never touches them again, including workspaces created since (#cm-17)
+- 2026-08-02 - feat (ux) | read the whole plan before anything is written — `make install-rbf-plan` prints the target path, both bundle ids, the signing identity and the state-migration decision, and writes nothing. `make install-rbf` acts. The plain name acts and a `-plan` suffix previews, except where a plain name cannot act safely and refuses instead: `make install` now points at `install-rbf` rather than doing something far larger than "install" promises (#cm-17)
+- 2026-08-02 - feat (ux) | keep your macOS permissions across every reinstall — the install signs with the stable `cmux Dev Signing` identity rather than ad-hoc, so Accessibility, Screen Recording and Full Disk Access survive instead of silently resetting each time (#cm-17)
+
+## 🟠⋯ Fixed for End Users
+- 2026-08-02 - fix (ghostty) | see each character the moment you press it — a single keypress into an idle focused pane could sit unrendered indefinitely; it now paints in the first frame. The cause was slot-zero reuse in the ghostty fork's frame rotation, so a queued frame was overwritten instead of drawn (#cm-18)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-02 - feat (dx) | build and run this checkout without inventing a build-id or hunting a DerivedData path — `make run`, `make build`, `make test`. The build-id comes from your branch (`tom-rigelblu/cm-19` → `cm-19`), so two builds never collide and nobody picks a name (#cm-19)
+- 2026-08-02 - feat (dx) | reclaim the disk that old builds hold — `make clean-builds-plan` lists every per-build-id DerivedData directory with its size, `make clean-builds` deletes them, keeping only the build whose app is running, the most recent reload, and your current build-id. **It does not check whether a branch still exists** — read the plan before running it. First real run reclaimed **85.8 GB across 14** build-ids (#cm-19)
+- 2026-08-02 - fix (dx) | stop a build silently linking a GhosttyKit your tree does not record — a merge or rebase moves the submodule pointer while the `ghostty` working directory stays put, and the artifact cache keys on the checked-out SHA, so the build succeeded and ran the wrong renderer. It now refuses, and names the fix (#cm-19)
+- 2026-08-02 - fix (dx) | stop builds breaking with "it worked yesterday" — XcodeProj was declared `from: "9.0.0"`, an open upper bound, so a freely-resolving build drifted the lockfile to a version where `XcodeProjectAdapter.swift` stops compiling. The build that *does* the drift succeeds and the next one fails. Now capped below 9.15.0 in the manifest, where every entrypoint inherits it (#cm-17)
+- 2026-08-02 - fix (dx) | make `make install-rbf` find the Zig that ghostty accepts — the 0.15.2 preflight lived inside `dev.sh`, which `install-rbf.sh` never passes through, so a Release build died ~200 lines into an Xcode script phase. It is now shared, and fatal before the build rather than during it (#cm-17)
+
+## 🟠⋯ Known Limitations
+- `~/.config/cmux/cmux.json` resolves from `$HOME`, not the bundle id, so both apps share it. A settings change in one appears in the other. This is the one place the "two separate apps" model does not hold — and it is also why your shortcuts and sidebar config need no migration at all (#cm-17)
+- **You will sign in to cmux RBF once, by hand.** Auth lives in the keychain under a service name derived from the bundle id, so a separate app cannot see it by construction and no file copy reaches it. An earlier draft promised sign-in carried across; it does not (#cm-17)
+- **About still reports upstream's version** — `0.64.20 / 100`, identical to what upstream shows, because the fork inherited both version keys at the fork point. The install already writes a fork-owned `RBFVersion` key into the bundle, but no reader consumes it yet; until `#cm-17.3` adds one, `env | grep CMUX_BUNDLE_ID` is the authoritative answer to "which cmux am I in?"; `com.cmuxterm.app.rbf` is the fork (#cm-17)
+- The `cmux` CLI on your `PATH` still resolves to upstream's app. Deliberate for now — `reload.sh` refuses to shadow the production CLI, and which app should own the name is unsettled (#cm-17)
+- macOS may ask *"cmux RBF would like to access data from other apps"* — **Allow is correct.** Both apps keep their state under `~/Library/Application Support/cmux/`, a directory macOS attributes to upstream, so it reads the fork as reaching into another app's data. It is not tied to installing: it can appear on an ordinary quit and relaunch. Giving the fork its own directory would end it, and was declined for now because `"cmux"` is hardcoded as that path component at 12+ upstream-owned sites — a permanent merge surface out of proportion to one click (#cm-17)
+
+---
+
 # 🔵⋯ v0.8.0 (2026-08-01) — #cm-15
 ## 🟠⋯ Added for End Users
 - 2026-08-01 - feat (ux) | read your color-coded plans in the markdown panel instead of raw marker emoji — the first 🔴🟠🟡🟢🔵🟣⚫ in a block disappears, and outside headings it tints the code span beside it, so `**🟢`PASS`**` reads as a green `PASS` highlight and a verification table scans by colour (#cm-15)
