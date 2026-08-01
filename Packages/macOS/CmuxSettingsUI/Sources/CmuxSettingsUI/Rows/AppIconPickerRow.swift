@@ -1,3 +1,4 @@
+import AppKit
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
@@ -41,13 +42,13 @@ struct AppIconPickerRow: View {
                             Group {
                                 if mode == .automatic {
                                     ZStack {
-                                        Image("AppIconLight", bundle: .main)
+                                        Image(Self.channelAsset("AppIconLight"), bundle: .main)
                                             .resizable()
                                             .interpolation(.high)
                                             .frame(width: autoIconSize, height: autoIconSize)
                                             .clipShape(RoundedRectangle(cornerRadius: autoIconSize * 0.22, style: .continuous))
                                             .offset(x: -10)
-                                        Image("AppIconDark", bundle: .main)
+                                        Image(Self.channelAsset("AppIconDark"), bundle: .main)
                                             .resizable()
                                             .interpolation(.high)
                                             .frame(width: autoIconSize, height: autoIconSize)
@@ -96,10 +97,22 @@ struct AppIconPickerRow: View {
 
     private func iconAssetName(for mode: AppIconMode) -> String {
         switch mode {
-        case .automatic: return "AppIconLight"
-        case .light: return "AppIconLight"
-        case .dark: return "AppIconDark"
+        case .automatic: return Self.channelAsset("AppIconLight")
+        case .light: return Self.channelAsset("AppIconLight")
+        case .dark: return Self.channelAsset("AppIconDark")
         }
+    }
+
+    /// The preview must show the icon this channel will actually apply, not
+    /// upstream's. Same resolution the Dock and the dock tile plugin use — see
+    /// `ChannelAppIconName`. Without it, `cmux RBF`'s Settings offered a choice
+    /// between two icons it would never display.
+    static func channelAsset(_ base: String) -> String {
+        ChannelAppIconName.resolved(
+            base: base,
+            bundle: .main,
+            assetExists: { NSImage(named: $0) != nil }
+        )
     }
 
     private func iconDisplayName(_ mode: AppIconMode) -> String {
