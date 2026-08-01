@@ -1167,6 +1167,15 @@
             "$ref": "#/$defs/colorHex"
           }
         },
+        "labels": {
+          "type": "object",
+          "description": "Optional semantic labels for palette colors, keyed by the raw color name. Shown as \"Label (Raw Name)\" wherever a workspace color is picked. A label never changes a color's value: raw names and hex values keep working in config, commands, and the CLI. Clear or omit a label to show the raw name alone.",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
         "paletteOverrides": {
           "type": "object",
           "description": "Legacy workspace color overrides for built-in palette names. Prefer workspaceColors.colors for new configs.",

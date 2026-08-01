@@ -741,6 +741,40 @@ final class CmuxSettingsFileStore {
         // key, so read past it silently rather than reporting it invalid: it
         // selects nothing, and warning about it would punish users for a
         // setting cmux itself retired.
+        //
+        // `labels` is parsed FIRST, deliberately. Three unconditional returns follow — bad
+        // `selectionColor`, bad `notificationBadgeColor`, and the `colors` block's own
+        // trailing return. A `labels` block placed below any of them would silently never
+        // run for a user who also sets `colors` — which is every user who has customised
+        // a palette.
+        if section.keys.contains("labels") {
+            if let rawLabels = section["labels"] as? [String: Any] {
+                var normalizedLabels: [String: String] = [:]
+                for (rawName, rawValue) in rawLabels {
+                    let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !name.isEmpty else {
+                        cmuxSettingsFileStoreLogger.warning("ignoring empty workspace color name in workspaceColors.labels in \(sourcePath, privacy: .private(mask: .hash))")
+                        continue
+                    }
+                    guard let rawLabel = jsonString(rawValue) else {
+                        cmuxSettingsFileStoreLogger.warning("ignoring non-string workspace color label for '\(name, privacy: .private(mask: .hash))' in \(sourcePath, privacy: .private(mask: .hash))")
+                        continue
+                    }
+                    // A cleared label restores the raw palette name, so an empty value is
+                    // an absence rather than something worth storing.
+                    let label = rawLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !label.isEmpty else { continue }
+                    normalizedLabels[name] = label
+                }
+                // Shape only. Semantic validation — collisions with raw palette names,
+                // duplicates after case-folding, orphaned keys — belongs to
+                // WorkspaceColorSemanticLabelResolver, which every consumer goes through.
+                snapshot.managedUserDefaults[SettingCatalog().workspaceColors.labels.userDefaultsKey] = .stringDictionary(normalizedLabels)
+            } else {
+                logInvalid("workspaceColors.labels", sourcePath: sourcePath)
+            }
+        }
+
         if section.keys.contains("selectionColor") {
             guard let value = parseNullableHex(
                 section["selectionColor"],

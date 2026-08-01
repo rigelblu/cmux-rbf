@@ -4515,19 +4515,14 @@ class TerminalController {
                     return
                 }
                 let colorInput = colorRaw.trimmingCharacters(in: .whitespacesAndNewlines)
-                // Resolve named colors from the effective palette, including file-defined additions.
-                let effectivePalette = WorkspaceTabColorSettings.palette()
-                let hex: String
-                if let entry = effectivePalette.first(where: {
-                    $0.name.caseInsensitiveCompare(colorInput) == .orderedSame
-                }) {
-                    hex = entry.hex
-                } else if let normalized = WorkspaceTabColorSettings.normalizedHex(colorInput) {
-                    hex = normalized
-                } else {
-                    let colorNames = effectivePalette.map(\.name)
-                    result = .err(code: "invalid_params", message: "Invalid color. Use a hex value (#RRGGBB) or a named color.", data: [
-                        "named_colors": colorNames
+                // One shared resolver: hex → exact-case raw name → folded raw name →
+                // exact unique label. Replaces an inline name-first match that accepted
+                // no labels and preferred a palette entry named like a hex over the hex.
+                guard let hex = WorkspaceTabColorSettings.resolvedColorHex(colorInput) else {
+                    let entries = WorkspaceTabColorSettings.labeledPaletteEntries()
+                    result = .err(code: "invalid_params", message: "Invalid color. Use a hex value (#RRGGBB), a named color, or a color label.", data: [
+                        "named_colors": entries.map(\.name),
+                        "color_labels": entries.compactMap(\.label),
                     ])
                     return
                 }

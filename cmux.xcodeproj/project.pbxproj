@@ -2110,6 +2110,9 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		B2929B53F4CC4C9D972771EC /* WorkspaceChecklistAttachmentQuickLookController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3981070E40BA4F53B8406CE4 /* WorkspaceChecklistAttachmentQuickLookController.swift */; };
 		D7AB3605C10DEF0000000003 /* WorkspaceCloseTabsBatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AB3605C10DEF0000000004 /* WorkspaceCloseTabsBatching.swift */; };
 		D7AB3605C10DEF0000000001 /* WorkspaceCloseTabsContextMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AB3605C10DEF0000000002 /* WorkspaceCloseTabsContextMenuTests.swift */; };
+		B6BF3DC98DB1495E57900212 /* WorkspaceColorLabelsConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */; };
+		B6BF3DC98DB1495E57900211 /* WorkspaceColorMonotonicMintingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */; };
+		B6BF3DC98DB1495E57900213 /* WorkspaceColorResolverParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */; };
 		A5FB1203 /* WorkspaceConfigActionCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FB1204 /* WorkspaceConfigActionCapture.swift */; };
 		5732A0045732A0045732A004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0045732B0045732B004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift */; };
 		A5001407 /* WorkspaceContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001417 /* WorkspaceContentView.swift */; };
@@ -4276,6 +4279,9 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		3981070E40BA4F53B8406CE4 /* WorkspaceChecklistAttachmentQuickLookController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChecklistAttachmentQuickLookController.swift; sourceTree = "<group>"; };
 		D7AB3605C10DEF0000000004 /* WorkspaceCloseTabsBatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCloseTabsBatching.swift; sourceTree = "<group>"; };
 		D7AB3605C10DEF0000000002 /* WorkspaceCloseTabsContextMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCloseTabsContextMenuTests.swift; sourceTree = "<group>"; };
+		42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorLabelsConfigTests.swift; sourceTree = "<group>"; };
+		42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorMonotonicMintingTests.swift; sourceTree = "<group>"; };
+		42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorResolverParityTests.swift; sourceTree = "<group>"; };
 		A5FB1204 /* WorkspaceConfigActionCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceConfigActionCapture.swift; sourceTree = "<group>"; };
 		5732B0045732B0045732B004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceContentMinimalModeSafeAreaModifier.swift; sourceTree = "<group>"; };
 		A5001417 /* WorkspaceContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceContentView.swift; sourceTree = "<group>"; };
@@ -6449,6 +6455,9 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				C06552020000000000000002 /* TabManagerTitleUpdateTests.swift */,
 				CM14A1B2C3D4E5F60718293A /* PanelGlobalMagnificationObserverTests.swift */,
 				42092CDB2109E250F7F2A76E /* TabManagerUnitTests.swift */,
+				42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */,
+				42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */,
+				42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */,
 				AB12CD340000000000000002 /* WorkspaceTodoNotificationRegressionTests.swift */,
 				DCE71A0F7E02A07A155241E4 /* SidebarWorkspaceRowStatusGlyphRemovalTests.swift */,
 				ACCE10000000000000000002 /* SidebarWorkspaceAccentStripPaletteTests.swift */,
@@ -9206,6 +9215,9 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D7AB00000000000000000011 /* WorkspaceAdjacentPaneMoveTests.swift in Sources */,
 				A11EAE000000000000000000 /* WorkspaceAppearanceConfigResolutionTests.swift in Sources */,
 				D7AB3605C10DEF0000000001 /* WorkspaceCloseTabsContextMenuTests.swift in Sources */,
+				B6BF3DC98DB1495E57900212 /* WorkspaceColorLabelsConfigTests.swift in Sources */,
+				B6BF3DC98DB1495E57900211 /* WorkspaceColorMonotonicMintingTests.swift in Sources */,
+				B6BF3DC98DB1495E57900213 /* WorkspaceColorResolverParityTests.swift in Sources */,
 				F7000000A1B2C3D4E5F60718 /* WorkspaceContentViewVisibilityTests.swift in Sources */,
 				D1A700000000000000000008 /* WorkspaceCreateIdempotencyRecoveryTests.swift in Sources */,
 				C0DE00000000000000000D38 /* WorkspaceCreateIdempotencyTombstoneTests.swift in Sources */,

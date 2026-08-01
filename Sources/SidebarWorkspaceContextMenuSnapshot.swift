@@ -22,4 +22,9 @@ struct SidebarWorkspaceContextMenuSnapshot: Equatable {
     let canMarkUnread: Bool
     let hasLatestNotification: Bool
     let notifications: [TerminalNotification]
+    /// Each target workspace's assigned color, `nil` where a workspace has none.
+    ///
+    /// Feeds `WorkspaceColorMenuModel`, so the color submenu can mark on/off/mixed for
+    /// the whole selection instead of guessing from the clicked row.
+    let targetColorHexes: [String?]
 }

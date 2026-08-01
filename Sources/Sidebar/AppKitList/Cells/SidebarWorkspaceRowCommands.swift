@@ -1,5 +1,6 @@
 import AppKit
 import CmuxFoundation
+import CmuxSettings
 import CmuxWorkspaces
 import Foundation
 
@@ -563,44 +564,109 @@ struct SidebarWorkspaceRowMenuBuilder {
     private func addColorMenu(to menu: NSMenu, tabManager: TabManager) {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        let palette = WorkspaceTabColorSettings.palette()
 
-        if tab.customColor != nil {
-            let clearItem = item(String(localized: "contextMenu.clearColor", defaultValue: "Clear Color")) { [commands] in
-                commands.applyTabColor(nil)
+        // Every workspace the action will apply to, not just the clicked one. This menu
+        // has always acted on `targetIds` while reading `tab.customColor`, so a checkmark
+        // could not be truthful for a multi-selection.
+        let targetHexes = colorMenuTargetHexes(tabManager)
+        let candidates = WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: targetHexes)
+
+        for candidate in candidates {
+            switch candidate.kind {
+            case .noColor:
+                // Unconditional: a row that disappears when nothing is coloured cannot
+                // carry state, and "Clear Color" with a checkmark reads as "clearing is on".
+                let noColorItem = item(
+                    String(localized: "contextMenu.noColor", defaultValue: "No Color")
+                ) { [commands] in
+                    commands.applyTabColor(nil)
+                }
+                noColorItem.image = RenderableSystemSymbol.configuredAppKitImage(
+                    systemName: "xmark.circle", pointSize: 13, weight: nil
+                )
+                noColorItem.state = Self.menuItemState(candidate.state)
+                submenu.addItem(noColorItem)
+
+                let customItem = item(
+                    String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…")
+                ) { [commands] in
+                    commands.promptCustomColor()
+                }
+                customItem.image = RenderableSystemSymbol.configuredAppKitImage(
+                    systemName: "paintpalette", pointSize: 13, weight: nil
+                )
+                submenu.addItem(customItem)
+                submenu.addItem(.separator())
+
+            case let .paletteEntry(entry):
+                // Meaning first, raw identity second: "GOAL: Primary (Teal)".
+                submenu.addItem(colorMenuItem(
+                    title: entry.displayName,
+                    hex: entry.hex,
+                    state: candidate.state
+                ))
+
+            case let .unlisted(hex):
+                // A colour a selected workspace still carries after its palette entry was
+                // removed. Truthful current state, never a palette write.
+                // One format string taking the hex, so the frame is translated and the
+                // colour value never is.
+                submenu.addItem(colorMenuItem(
+                    title: String(
+                        format: String(
+                            localized: "contextMenu.unlistedColor",
+                            defaultValue: "Custom (%@)"
+                        ),
+                        hex
+                    ),
+                    hex: hex,
+                    state: candidate.state
+                ))
             }
-            clearItem.image = RenderableSystemSymbol.configuredAppKitImage(
-                systemName: "xmark.circle", pointSize: 13, weight: nil
-            )
-            submenu.addItem(clearItem)
         }
 
-        let customItem = item(String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…")) { [commands] in
-            commands.promptCustomColor()
-        }
-        customItem.image = RenderableSystemSymbol.configuredAppKitImage(
-            systemName: "paintpalette", pointSize: 13, weight: nil
-        )
-        submenu.addItem(customItem)
-
-        if !palette.isEmpty {
-            submenu.addItem(.separator())
-        }
-        for entry in palette {
-            let colorItem = item(entry.name) { [commands] in
-                commands.applyTabColor(entry.hex)
-            }
-            let swatch = WorkspaceTabColorSettings.displayNSColor(
-                hex: entry.hex,
-                colorScheme: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light,
-                forceBright: false
-            ) ?? NSColor(hex: entry.hex) ?? .gray
-            colorItem.image = SidebarWorkspaceRowMenuBuilder.coloredCircleImage(color: swatch)
-            submenu.addItem(colorItem)
-        }
         let parent = item(String(localized: "contextMenu.workspaceColor", defaultValue: "Workspace Color")) {}
         parent.submenu = submenu
         menu.addItem(parent)
+    }
+
+    /// Current colour of every workspace this menu's actions will apply to.
+    private func colorMenuTargetHexes(_ tabManager: TabManager) -> [String?] {
+        let workspaceById = Dictionary(
+            tabManager.tabs.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        // A target we cannot resolve contributes nothing; a resolved uncoloured one
+        // contributes nil. Collapsing those would make No Color read as mixed.
+        return targetIds.compactMap { workspaceById[$0].map(\.customColor) }
+    }
+
+    private func colorMenuItem(
+        title: String,
+        hex: String,
+        state: WorkspaceColorAssignmentState
+    ) -> NSMenuItem {
+        let colorItem = item(title) { [commands] in
+            commands.applyTabColor(hex)
+        }
+        let swatch = WorkspaceTabColorSettings.displayNSColor(
+            hex: hex,
+            colorScheme: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light,
+            forceBright: false
+        ) ?? NSColor(hex: hex) ?? .gray
+        colorItem.image = SidebarWorkspaceRowMenuBuilder.coloredCircleImage(color: swatch)
+        colorItem.state = Self.menuItemState(state)
+        return colorItem
+    }
+
+    /// Native menu state, so assignment is communicated without a second icon competing
+    /// with the swatch and without relying on hue.
+    private static func menuItemState(_ state: WorkspaceColorAssignmentState) -> NSControl.StateValue {
+        switch state {
+        case .on: .on
+        case .mixed: .mixed
+        case .off: .off
+        }
     }
 
     private func addSSHErrorItem(to menu: NSMenu) {
