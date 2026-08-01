@@ -11,6 +11,15 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Rename a Codex session once and see it in cmux
+
+Type `/rename` in a Codex session and the cmux tab hosting it takes the same name — and the workspace too, when that session is the only agent working there. One piece of work stops carrying two different names.
+
+- Only a rename you type syncs. The names Codex generates for itself are ignored, a redraw of the confirmation will not retrigger one, and neither will a keystroke sent over the cmux socket rather than typed.
+- A name you set in cmux yourself still wins, and stays until you clear it.
+- **The session has to have said something first.** Codex registers a session with cmux at its first real prompt, so a `/rename` typed before you have sent it any message is declined and nothing happens. Send one message, then rename.
+- Two smaller gaps, both documented in `docs/workspace-auto-naming.md`: dragging a Codex tab into another workspace stops its rename sync until the surface is recreated, and two Codex sessions sharing a workspace can each read as the only one there, so the second rename may claim the workspace title. Tab titles stay correct in both cases.
+
 ## 🟠⋯ Name a workspace colour by what it means to you
 Give workspace colours your own meaning — such as **GOAL: Primary (Teal)** — and see which one is assigned whenever you open the chooser. Labels are optional and change nothing underneath: colour names, hex values, saved workspaces, and scripts keep working exactly as before.
 
