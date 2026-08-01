@@ -36,6 +36,28 @@ extension AppDelegate {
 #endif
     }
 
+    /// Opens Settings at Workspace Colors for the color submenu's **Edit Color Labels…**
+    /// row (`#cm-11`).
+    ///
+    /// Both color submenus route here instead of each naming the section, so the two
+    /// entrypoints cannot drift to different destinations — the failure this feature's
+    /// shared-resolver work exists to prevent, one layer up. Editing happens in Settings
+    /// rather than in the menu because a transient menu is the wrong place to hold a text
+    /// field.
+    @MainActor
+    static func presentWorkspaceColorLabelEditor(
+        presentSettingsWindow: (@MainActor (SettingsNavigationTarget?) -> SettingsWindowShowResult)? = nil,
+        activateApplication: @MainActor () -> Void = {
+            NSRunningApplication.current.activate(options: [.activateAllWindows])
+        }
+    ) {
+        presentPreferencesWindow(
+            navigationTarget: .workspaceColors,
+            presentSettingsWindow: presentSettingsWindow,
+            activateApplication: activateApplication
+        )
+    }
+
     @MainActor
     func openPreferencesWindow(debugSource: String, navigationTarget: SettingsNavigationTarget? = nil) {
 #if DEBUG

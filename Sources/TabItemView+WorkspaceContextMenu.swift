@@ -234,6 +234,20 @@ extension TabItemView {
                             state: candidate.state
                         )
                     }
+
+                case .editLabels:
+                    // Assignment above, label management below. A transient menu is the
+                    // wrong place for a text field, so this navigates to Settings instead.
+                    Divider()
+
+                    Button {
+                        AppDelegate.presentWorkspaceColorLabelEditor()
+                    } label: {
+                        Label(
+                            String(localized: "contextMenu.editColorLabels", defaultValue: "Edit Color Labels…"),
+                            systemImage: "tag"
+                        )
+                    }
                 }
             }
         }

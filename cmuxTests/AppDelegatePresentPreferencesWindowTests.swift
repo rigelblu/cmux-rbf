@@ -106,6 +106,43 @@ struct AppDelegatePresentPreferencesWindowTests {
         #expect(activateApplicationCallCount == 1)
     }
 
+    /// `#cm-11` — both color submenus' **Edit Color Labels…** row routes here, so the
+    /// section it lands on is asserted once rather than in each builder.
+    @Test func workspaceColorLabelEditorOpensWorkspaceColorsSection() {
+        var receivedNavigationTarget: SettingsNavigationTarget?
+        var activateApplicationCallCount = 0
+
+        AppDelegate.presentWorkspaceColorLabelEditor(
+            presentSettingsWindow: { navigationTarget in
+                receivedNavigationTarget = navigationTarget
+                return .presented
+            },
+            activateApplication: {
+                activateApplicationCallCount += 1
+            }
+        )
+
+        #expect(receivedNavigationTarget == .workspaceColors)
+        #expect(activateApplicationCallCount == 1)
+    }
+
+    /// A menu row that silently does nothing is worse than one that beeps: the label
+    /// editor inherits the same fail-loud contract as ⌘, rather than getting its own.
+    @Test func workspaceColorLabelEditorDoesNotActivateWhenPresentationFails() {
+        var activateApplicationCallCount = 0
+
+        AppDelegate.presentWorkspaceColorLabelEditor(
+            presentSettingsWindow: { _ in
+                .failed(reason: "test-injected presentation failure")
+            },
+            activateApplication: {
+                activateApplicationCallCount += 1
+            }
+        )
+
+        #expect(activateApplicationCallCount == 0)
+    }
+
     @Test func doesNotActivateWhenPresentationFails() {
         var activateApplicationCallCount = 0
 
