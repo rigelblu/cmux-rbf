@@ -33,8 +33,10 @@ extension WorkspaceTabColorSettings {
     ///
     /// The single resolver behind the config workspace definition, the socket/CLI
     /// `set_color` handler, and `TabManager.applyWorkspacePaletteColor`. Ordered
-    /// hex → exact-case raw name → folded raw name → exact unique label; ambiguity fails
-    /// closed. `workspace.group.set_color` and the Choose Custom Color… alert stay
+    /// explicit `#RRGGBB` → exact-case raw name → folded raw name → exact unique label →
+    /// bare six-digit hex; ambiguity fails closed. Bare hex is deliberately last, so a
+    /// palette entry or label spelled from hex letters (`Decade`, `Facade`) keeps its own
+    /// colour. `workspace.group.set_color` and the Choose Custom Color… alert stay
     /// hex-only by decision and do not call this.
     static func resolvedColorHex(_ raw: String, defaults: UserDefaults = .standard) -> String? {
         WorkspaceColorSemanticLabelResolver.resolve(
