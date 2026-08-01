@@ -76,6 +76,19 @@ if ! validate_bridge_header "$PROJECT_DIR/ghostty.h"; then
 fi
 
 GHOSTTY_SHA="$(git -C ghostty rev-parse HEAD)"
+
+# Warn when the checked-out ghostty differs from the pointer the parent records.
+# Everything downstream keys off the CHECKOUT, so a mismatch builds and links
+# happily while the source you read is not the source you run. cmux linked a
+# framework 65 commits away from its recorded pointer without a single signal.
+# A warning, not a failure: building a modified submodule on purpose is normal.
+GHOSTTY_RECORDED_SHA="$(git ls-tree HEAD ghostty 2>/dev/null | awk '{print $3}')"
+if [[ -n "$GHOSTTY_RECORDED_SHA" && "$GHOSTTY_RECORDED_SHA" != "$GHOSTTY_SHA" ]]; then
+  echo "==> WARNING: ghostty checkout does not match the recorded pointer." >&2
+  echo "    recorded: ${GHOSTTY_RECORDED_SHA:0:12}   checked out: ${GHOSTTY_SHA:0:12}" >&2
+  echo "    GhosttyKit will be built from the CHECKOUT. Run 'git submodule update --init' to match." >&2
+fi
+
 GHOSTTYKIT_CRASH_REPORT_SUBDIR="${CMUX_GHOSTTYKIT_CRASH_REPORT_SUBDIR:-cmux/crash}"
 GHOSTTYKIT_BUILD_FLAVOR="crashsubdir-$(printf '%s' "$GHOSTTYKIT_CRASH_REPORT_SUBDIR" | tr '/=' '--')-v1"
 GHOSTTY_CLEAN_KEY="${GHOSTTY_SHA}-${GHOSTTYKIT_BUILD_FLAVOR}"
@@ -222,7 +235,13 @@ else
     echo "==> Building GhosttyKit.xcframework (this may take a few minutes)..."
     (
       cd ghostty
-      zig build -Dcrash-report-subdir="$GHOSTTYKIT_CRASH_REPORT_SUBDIR" -Demit-xcframework=true -Dxcframework-target=universal -Doptimize=ReleaseFast
+      # -Demit-macos-app=false matters: `emit_macos_app` resolves to
+      # `emit_xcframework` (src/build/Config.zig), so asking for the xcframework
+      # also builds Ghostty's macOS app — whose Swift needs a newer macOS SDK
+      # than this repo pins. Without the flag the local build fails in Ghostty's
+      # app target, which reads as "the submodule pointer is broken" and is not.
+      # build-ghosttykit.yml has always passed it; this path had drifted.
+      zig build -Dcrash-report-subdir="$GHOSTTYKIT_CRASH_REPORT_SUBDIR" -Demit-xcframework=true -Demit-macos-app=false -Dxcframework-target=universal -Doptimize=ReleaseFast
     )
     echo "$GHOSTTY_KEY" > "$LOCAL_KEY_STAMP"
     echo "$GHOSTTY_SHA" > "$LEGACY_LOCAL_SHA_STAMP"
