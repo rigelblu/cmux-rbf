@@ -234,4 +234,53 @@ struct ControlCommandCoordinatorWorkspaceTests {
         #expect(code == "invalid_params")
         #expect(context.terminalSessionEndCall == nil)
     }
+
+    // MARK: - workspace.color.list (`#cm-11`)
+
+    /// Read-only discovery, so automation can learn the vocabulary
+    /// `workspace-action set-color` accepts without a human reading Settings.
+    @Test func workspaceColorListExposesTheEffectivePalette() throws {
+        let (coordinator, context) = coordinator()
+        context.colorPalette = [
+            ControlWorkspaceColorEntry(
+                name: "Teal", label: "GOAL: Primary", displayName: "GOAL: Primary (Teal)", hex: "#006B6B"
+            ),
+            ControlWorkspaceColorEntry(name: "Red", label: nil, displayName: "Red", hex: "#C0392B"),
+        ]
+
+        guard case .ok(.object(let payload)) = coordinator.handle(request("workspace.color.list")),
+              case .array(let rows) = payload["colors"],
+              case .object(let labelled) = rows.first,
+              case .object(let bare) = rows.last else {
+            Issue.record("unexpected workspace.color.list shape")
+            return
+        }
+
+        #expect(rows.count == 2)
+        #expect(labelled["name"] == .string("Teal"))
+        #expect(labelled["label"] == .string("GOAL: Primary"))
+        #expect(labelled["display_name"] == .string("GOAL: Primary (Teal)"))
+        #expect(labelled["hex"] == .string("#006B6B"))
+
+        // Null rather than an omitted key or an echoed name, so a consumer can tell
+        // "unlabelled" from "labelled with its own name".
+        #expect(bare["label"] == .null)
+        #expect(bare["display_name"] == .string("Red"))
+    }
+
+    @Test func workspaceColorListReportsAnEmptyPaletteAsAnEmptyList() throws {
+        // `context` is bound rather than discarded: the coordinator holds it weakly, so
+        // `let (coordinator, _)` deallocates it and every method answers `unavailable`.
+        let (coordinator, context) = coordinator()
+        context.colorPalette = []
+
+        guard case .ok(.object(let payload)) = coordinator.handle(request("workspace.color.list")),
+              case .array(let rows) = payload["colors"] else {
+            Issue.record("unexpected workspace.color.list shape")
+            return
+        }
+        // An empty array, never a missing key: scripts should be able to iterate
+        // unconditionally rather than branch on presence.
+        #expect(rows.isEmpty)
+    }
 }

@@ -4453,6 +4453,14 @@ struct CMUXCLI {
 
         case "layout": try runLayoutNamespace(commandArgs: commandArgs, client: client, jsonOutput: jsonOutput, idFormat: idFormat, windowOverride: windowId)
 
+        case "workspace-color":
+            try runWorkspaceColorNamespace(
+                commandArgs: commandArgs,
+                client: client,
+                jsonOutput: jsonOutput,
+                idFormat: idFormat
+            )
+
         case "list-workspaces":
             Self.warnLegacyVerbDeprecated("list-workspaces", replacement: "cmux workspace list")
             try runWorkspaceListCommand(
@@ -15563,12 +15571,14 @@ struct CMUXCLI {
               --workspace <id|ref|index>   Target workspace (default: current/$CMUX_WORKSPACE_ID)
               --window <id|ref|index>      Window context for workspace refs and indexes
               --title <text>               Title for rename
-              --color <name|#hex>          Color for set-color (name or #RRGGBB hex)
+              --color <label|name|#hex>    Color for set-color
               --description <text>         Description for set-description
 
-            Named colors:
-              Red, Crimson, Orange, Amber, Olive, Green, Teal, Aqua,
-              Blue, Navy, Indigo, Purple, Magenta, Rose, Brown, Charcoal
+            Colors:
+              set-color accepts a semantic label, a palette name, or a #RRGGBB hex.
+              Run `cmux workspace-color list` to see the effective palette — this help
+              cannot list it, because the palette is user-editable and labels are yours.
+              clear-color is the automation spelling of No Color.
 
             Example:
               cmux workspace-action --workspace workspace:2 --action pin
@@ -15576,6 +15586,7 @@ struct CMUXCLI {
               cmux workspace-action close-others
               cmux workspace-action --action set-color --color blue
               cmux workspace-action --action set-color --color "#C0392B"
+              cmux workspace-action --action set-color --color "GOAL: Primary"
               cmux workspace-action set-color Amber
               cmux workspace-action --action set-description --description "Ship checklist"
               cmux workspace-action --action set-description $'Ship checklist\n- verify build\n- post notes'
@@ -15683,6 +15694,8 @@ struct CMUXCLI {
             return Self.workspaceCommandUsage
         case "layout":
             return Self.layoutHelpText()
+        case "workspace-color":
+            return Self.workspaceColorHelpText()
         case "workspace-group":
             let createSafety = String(
                 localized: "cli.workspaceGroup.help.createSafety",

@@ -48,6 +48,10 @@ final class FakeWorkspaceControlCommandContext: ControlCommandContext {
         true
     }
 
+    var colorPalette: [ControlWorkspaceColorEntry] = []
+
+    func controlWorkspaceColorList() -> [ControlWorkspaceColorEntry] { colorPalette }
+
     func controlWorkspaceList(routing: ControlRoutingSelectors) -> ControlWorkspaceListResolution {
         listResolution
     }
