@@ -14,6 +14,13 @@ public struct WorkspaceColorMenuCandidate: Equatable, Sendable {
         /// names. Ephemeral: it is a truthful assignment candidate, never a palette write,
         /// and never appears in `workspace.color.list`.
         case unlisted(hex: String)
+        /// The trailing **Edit Color Labels…** row, which opens Settings rather than
+        /// assigning anything.
+        ///
+        /// It lives in this model, not in each menu builder, so the two choosers cannot
+        /// disagree about whether the row exists or where it sits. Each builder still
+        /// supplies the action, exactly as it does for `noColor`.
+        case editLabels
     }
 
     public let kind: Kind
@@ -91,6 +98,14 @@ public enum WorkspaceColorMenuModel {
                 )
             )
         }
+
+        // Last, after every assignment candidate: label management is a different kind of
+        // act from choosing a color, and it navigates away rather than mutating anything.
+        // `.off` is not a placeholder here — this row is never checked, which is exactly
+        // what `.off` means to both builders' state rendering.
+        rows.append(
+            WorkspaceColorMenuCandidate(kind: .editLabels, hex: nil, state: .off)
+        )
 
         return rows
     }
