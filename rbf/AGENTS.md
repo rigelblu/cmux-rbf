@@ -42,13 +42,19 @@ rg -n "cmux-rbf: pruned upstream text" CLAUDE.md skills/ docs/ .claude/commands/
 **Two places still carry upstream's version wholesale**, banner-warned rather than pruned, because they are mostly upstream changelog or upstream procedure: `docs/ghostty-fork.md` and `.claude/commands/release*.md`. Trust their banners over their bodies.
 
 ## 🟠⋯ Build, run and test: `make`
-The front door, so you never invent a tag or hunt a DerivedData path — the tag comes from your git branch (`tom-rigelblu/cm-18` → `cm-18`):
+The front door, so you never invent a **build-id** or hunt a DerivedData path.
+
+**Where the build-id comes from: your jj bookmark first, then a git branch.** `tom-rigelblu/cm-19` → `cm-19`. jj keeps git's HEAD detached permanently, so in this checkout `git branch --show-current` is *empty* — the jj lookup is the one that fires, and the git path only matters in the git worktrees used for isolated builds. If neither resolves you get `detached-<sha>` **and a warning on stderr**, because that mints a fresh ~6GB DerivedData dir per commit.
+
+The build-id is what `scripts/reload.sh --tag` takes. It decides the DerivedData dir, the debug socket, the app name, and the bundle id suffix — so two dev builds never collide. It is a *component* of the bundle id, not a peer: build-id `cm-18` gives `com.cmuxterm.app.debug.cm.18` (reload.sh maps non-alnum runs to dots, so the hyphen does not survive). That is why changing it resets TCC grants and keychain-backed sign-in — the same mechanism behind `#cm-17`'s "sign-in does not migrate".
 
 ```bash
-make run            # build this branch's tag and launch it
-make build          # build only; prints the App path
-make test           # cmux-unit scheme — nothing else compiles the unit tests
-make clean-builds   # dry run; --apply variant actually deletes (tags go stale fast, ~6GB each)
+make run                       # build this branch's build-id and launch it
+make build                     # build only; prints the App path
+make test                      # cmux-unit scheme — nothing else compiles the unit tests
+make clean-builds              # dry run; clean-builds-apply actually deletes (~6GB each)
+make run BUILD_ID=spike        # a second build alongside your branch's
+make build ARGS=--prod-auth    # extra flags → reload.sh (for `make test`, → xcodebuild)
 make help
 ```
 
