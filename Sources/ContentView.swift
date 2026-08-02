@@ -15535,7 +15535,8 @@ struct TabItemView: View, Equatable {
         guard let railColor = rowVisualPalette.stripColor else {
             return nil
         }
-        return Color(nsColor: railColor).opacity(0.95)
+        return Color(nsColor: railColor)
+            .opacity(SidebarWorkspaceRowVisualPalette.accentStripOpacity)
     }
 
     func tabColorSwatchColor(for hex: String) -> NSColor {
