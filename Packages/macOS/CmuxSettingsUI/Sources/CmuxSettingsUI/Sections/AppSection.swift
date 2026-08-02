@@ -69,6 +69,9 @@ public struct AppSection: View {
     // Sticky: a picker change can rewrite the OS AppleLanguages override even when the selection returns to its starting value (clearing a preserved foreign override via an explicit pick, then System), so the restart hint must not rely on the value comparison alone.
     @State private var languageOverrideTouched = false
     @State private var telemetryAtAppear: Bool?
+    /// Host-derived, not a catalog setting: whether the terminal theme is
+    /// pinned to one theme across both appearances, and which one.
+    @State private var terminalThemePin: TerminalThemePinModel
 
     public init(
         defaultsStore: UserDefaultsSettingsStore,
@@ -77,6 +80,7 @@ public struct AppSection: View {
     ) {
         self.catalog = catalog
         self.hostActions = hostActions
+        _terminalThemePin = State(initialValue: TerminalThemePinModel(hostActions: hostActions))
         _language = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.language))
         _appearance = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.appearance))
         _appIcon = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.appIcon))
@@ -140,7 +144,7 @@ public struct AppSection: View {
             mainCard
         }
         .task {
-            startSettingsObservation([language, appearance, appIcon, placement, inheritDir, minimalMode, keepWorkspaceOpen, firstClick, focusHistoryIncludesPanesAndTabs, fileDrop, preferredEditor, openSupported, openMarkdown, globalFontMagnification, markdownFontSize, markdownFontFamily, markdownMaxWidth, markdownBackground, canvasPaneGap, canvasSnapping, fileEditorWordWrap, iMessage, reorder, dockBadge, menuBarOnly, showInMenuBar, paneRing, paneFlash, agentPermissionPrompt, agentTurnComplete, agentIdleReminder, soundName, soundCommand, customSoundFile, telemetry, confirmQuit, warnCloseTab, warnCloseX, hideCloseButton, renameSelects, paletteAllSurfaces])
+            startSettingsObservation([language, appearance, appIcon, placement, inheritDir, minimalMode, keepWorkspaceOpen, firstClick, focusHistoryIncludesPanesAndTabs, fileDrop, preferredEditor, openSupported, openMarkdown, globalFontMagnification, markdownFontSize, markdownFontFamily, markdownMaxWidth, markdownBackground, canvasPaneGap, canvasSnapping, fileEditorWordWrap, iMessage, reorder, dockBadge, menuBarOnly, showInMenuBar, paneRing, paneFlash, agentPermissionPrompt, agentTurnComplete, agentIdleReminder, soundName, soundCommand, customSoundFile, telemetry, confirmQuit, warnCloseTab, warnCloseX, hideCloseButton, renameSelects, paletteAllSurfaces, terminalThemePin])
             if languageAtAppear == nil { languageAtAppear = language.current }; if telemetryAtAppear == nil { telemetryAtAppear = telemetry.current }
         }
     }
@@ -186,7 +190,11 @@ public struct AppSection: View {
             // Theme — three-up visual picker mirroring legacy
             ThemePickerRow(
                 selectedMode: appearance.current,
-                onSelect: { appearance.set($0) }
+                onSelect: { appearance.set($0) },
+                subtitle: ThemePickerCaveat.subtitle(
+                    selectedMode: appearance.current,
+                    pinnedThemeName: terminalThemePin.pinnedThemeName
+                )
             )
             .settingsSearchAnchors(["setting:app:appearance"])
             SettingsCardDivider()

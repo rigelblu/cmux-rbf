@@ -13,15 +13,33 @@ import SwiftUI
 struct ThemePickerRow: View {
     let selectedMode: AppearanceMode
     let onSelect: (AppearanceMode) -> Void
+    /// A caveat rendered under the "Theme" title, or `nil` for the normal case.
+    ///
+    /// The treatment here is *copied* from ``SettingsCardRow``, not inherited:
+    /// this row is a bespoke `HStack`, not a `SettingsCardRow`, so it has no
+    /// subtitle slot to fill. The Language row directly above it uses that
+    /// component's subtitle for its own conditional caveat ("Restart cmux to
+    /// apply"), and two caveats in one card that do not look alike read as two
+    /// different kinds of message — so keep `spacing: 3`, `.caption`,
+    /// `.secondary` and `lineLimit(2)` in step with `SettingsCardRow.body`.
+    var subtitle: String?
 
     private let thumbWidth: CGFloat = 76
     private let thumbHeight: CGFloat = 50
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Text(String(localized: "settings.app.theme", defaultValue: "Theme"))
-                .cmuxFont(size: 13, weight: .medium)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
+                Text(String(localized: "settings.app.theme", defaultValue: "Theme"))
+                    .cmuxFont(size: 13, weight: .medium)
+                if let subtitle {
+                    Text(subtitle)
+                        .cmuxFont(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 8) {
                 ForEach(AppearanceMode.allCases, id: \.self) { mode in

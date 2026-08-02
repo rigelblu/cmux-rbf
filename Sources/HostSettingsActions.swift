@@ -307,6 +307,65 @@ final class HostSettingsActions: SettingsHostActions {
         }
     }
 
+    func terminalThemePinnedAcrossAppearances() -> String? {
+        Self.pinnedTerminalThemeName()
+    }
+
+    func terminalThemePinnedAcrossAppearancesUpdates() -> AsyncStream<String?> {
+        AsyncStream { continuation in
+            // Same Sendable-signal bridge as `mobilePairingStatusUpdates()`: the
+            // non-Sendable `Notification` never crosses into the drain task.
+            let (signals, signalContinuation) = AsyncStream<Void>.makeStream(
+                bufferingPolicy: .bufferingNewest(1)
+            )
+            // Reusing the mobile token box rather than adding a second identical
+            // one — it is a plain Sendable wrapper around an observer token and
+            // nothing about it is mobile-specific but the name.
+            let observer = MobileHostStatusObserverToken(
+                NotificationCenter.default.addObserver(
+                    forName: .ghosttyConfigDidReload,
+                    object: nil,
+                    queue: nil
+                ) { _ in
+                    signalContinuation.yield(())
+                }
+            )
+            let drainTask = Task { @MainActor in
+                continuation.yield(Self.pinnedTerminalThemeName())
+                for await _ in signals {
+                    if Task.isCancelled { break }
+                    continuation.yield(Self.pinnedTerminalThemeName())
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                drainTask.cancel()
+                signalContinuation.finish()
+                observer.remove()
+            }
+        }
+    }
+
+    /// The theme name pinned across both appearances, read from the user's
+    /// *resolved* Ghostty config.
+    ///
+    /// Deliberately goes through ``GhosttyApp/userAppearanceConfigSummary(configPaths:)``
+    /// rather than the app-support-only reader that
+    /// `GhosttySurfaceConfigurationRefresh` uses for its runtime color-scheme
+    /// decision. That reader looks only at cmux's managed config directory, so
+    /// for a user whose `theme` lives in their own `~/.config/ghostty/config` —
+    /// which is the reported case this exists for — it returns `nil` and the
+    /// caveat would never appear. The summary scans every discovered path in
+    /// load order, so its `lastThemeDirective` is the value that actually
+    /// decided the pixels.
+    ///
+    /// Static so the update stream's forwarding task does not retain this bridge.
+    private static func pinnedTerminalThemeName() -> String? {
+        GhosttyConfig.themeNamePinnedAcrossAppearances(
+            GhosttyApp.userAppearanceConfigSummary().lastThemeDirective
+        )
+    }
+
     func irohSettingsController() -> (any CmxIrohSettingsControlling)? {
         MobileHostIrohRuntime.shared
     }

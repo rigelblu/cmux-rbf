@@ -138,6 +138,29 @@ public protocol SettingsHostActions: AnyObject {
     /// bound-port indicator and connection count stay live without polling.
     func mobilePairingStatusUpdates() -> AsyncStream<MobilePairingStatusSnapshot>
 
+    /// The name of the terminal theme that is pinned across both appearances —
+    /// i.e. the user's resolved Ghostty `theme` gives light and dark the *same*
+    /// theme — or `nil` when the theme follows the appearance.
+    ///
+    /// The App section's Theme picker shows this as a caveat, because the
+    /// picker's System tile is a split light/dark thumbnail: a picture of the
+    /// app switching. When the terminal cannot honor half of it, the picture is
+    /// a half-truth and the row says so.
+    ///
+    /// Lives here rather than in the catalog because it is not a setting — it is
+    /// derived host state, read from the user's resolved Ghostty config across
+    /// *every* discovered path (their own `~/.config/ghostty/config` as well as
+    /// any cmux-managed override), so the answer matches the pixels rather than
+    /// one file's opinion of them. See ``terminalThemePinnedAcrossAppearancesUpdates()``
+    /// for live refresh.
+    func terminalThemePinnedAcrossAppearances() -> String?
+
+    /// A stream that yields the pinned-theme name (or `nil`) whenever the
+    /// Ghostty config reloads. The Theme picker subscribes so the caveat cannot
+    /// go stale in a long-lived Settings window after the user edits their
+    /// config or runs `cmux themes set --light X --dark Y`.
+    func terminalThemePinnedAcrossAppearancesUpdates() -> AsyncStream<String?>
+
     /// Cross-platform Iroh and private-network settings controller supplied by
     /// the host app. `nil` in previews and hosts without the Iroh runtime.
     func irohSettingsController() -> (any CmxIrohSettingsControlling)?
@@ -219,6 +242,17 @@ public extension SettingsHostActions {
 
     /// Default: an immediately-finished stream, for hosts without a live mobile service.
     func mobilePairingStatusUpdates() -> AsyncStream<MobilePairingStatusSnapshot> {
+        AsyncStream { $0.finish() }
+    }
+
+    /// Default: not pinned, for hosts with no Ghostty config to read
+    /// (previews/tests). Silence is the safe default — a caveat shown where none
+    /// is warranted is worse than one that never appears, because it teaches the
+    /// reader to stop believing the row.
+    func terminalThemePinnedAcrossAppearances() -> String? { nil }
+
+    /// Default: an immediately-finished stream, for hosts with no config reloads.
+    func terminalThemePinnedAcrossAppearancesUpdates() -> AsyncStream<String?> {
         AsyncStream { $0.finish() }
     }
 
