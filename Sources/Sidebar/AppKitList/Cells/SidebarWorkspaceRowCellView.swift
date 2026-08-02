@@ -334,7 +334,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let railColor = palette.visual.stripColor
         railView.isHidden = railColor == nil
         if let railColor {
-            railView.layer?.backgroundColor = railColor.withAlphaComponent(0.95).cgColor
+            railView.layer?.backgroundColor = railColor
+                .withAlphaComponent(SidebarWorkspaceRowVisualPalette.accentStripOpacity)
+                .cgColor
         }
 
         // Title line
