@@ -1146,31 +1146,38 @@ public struct GhosttyConfig {
         return lightTheme.caseInsensitiveCompare(darkTheme) == .orderedSame
     }
 
-    /// The single theme name both appearances resolve to, or `nil` when the raw
-    /// `theme` value gives light and dark different themes.
+    /// The single theme name Ghostty applies in **both** appearances, or `nil`
+    /// when the raw `theme` value gives light and dark different themes — or
+    /// gives one side no theme at all.
     ///
-    /// This is ``themeValueUsesSameResolvedThemeInBothColorSchemes(_:)`` with the
-    /// name carried out instead of discarded, and it deliberately reuses that
-    /// predicate rather than re-deriving the comparison: a second parser beside
-    /// ``resolveThemeName(from:preferredColorScheme:)`` would be free to drift
-    /// from the one that actually decides the terminal's colors.
+    /// Built on ``appliedThemeName(from:preferredColorScheme:)``, asked once per
+    /// side and compared. **Not** on
+    /// ``resolveThemeName(from:preferredColorScheme:)``, and the distinction is
+    /// the whole correctness of this function: `resolveThemeName` falls back
+    /// *across* sides, so it answers `X` for the dark side of `light:X`, while
+    /// Ghostty applies no theme there and the terminal keeps its default. Those
+    /// are two different backgrounds — the terminal *is* following the
+    /// appearance — so treating that value as pinned states something false and
+    /// names a theme the dark side never loads.
     ///
-    /// A `nil` result means "the theme follows the appearance". A non-`nil`
-    /// result is the name to *show* a user — "your theme is pinned" is not
-    /// actionable, and the theme's own name is.
+    /// `cmux themes set --light X` writes exactly `theme = light:X`, so this is
+    /// a reachable path and not a parser curiosity. Found by cold review
+    /// 2026-08-02, after the first implementation shipped the wrong resolver and
+    /// a test that asserted the wrong behaviour as correct.
+    ///
+    /// A `nil` result means "the theme follows the appearance, or cannot be
+    /// judged". A non-`nil` result is the name to *show* a user — "your theme is
+    /// pinned" is not actionable, and the theme's own name is.
     public static func themeNamePinnedAcrossAppearances(_ rawThemeValue: String?) -> String? {
         guard let rawThemeValue,
-              themeValueUsesSameResolvedThemeInBothColorSchemes(rawThemeValue) else {
-            return nil
-        }
-        // Non-empty by construction: the guard above already rejects a value
-        // whose resolved names are empty on either side, so no emptiness check
-        // belongs here. (Established by mutation testing — deleting such a check
-        // failed nothing, because it could never fire. `neverDisagreesWithTheExistingPredicate`
-        // pins this function to that predicate, so loosening one without the
-        // other breaks a test rather than leaking an empty name.)
-        return resolveThemeName(from: rawThemeValue, preferredColorScheme: .light)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+              let light = appliedThemeName(from: rawThemeValue, preferredColorScheme: .light)
+                  .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }),
+              let dark = appliedThemeName(from: rawThemeValue, preferredColorScheme: .dark)
+                  .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }),
+              !light.isEmpty,
+              light.caseInsensitiveCompare(dark) == .orderedSame
+        else { return nil }
+        return light
     }
 
     /// The last non-empty `theme` directive value in the given config contents,
