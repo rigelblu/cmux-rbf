@@ -73,6 +73,16 @@ Give workspace colours your own meaning — such as **GOAL: Primary (Teal)** —
 - The scale runs 50%–200% with no on-screen indicator; at either limit the shortcut simply stops responding. The current percentage is in **Settings › App › Global Font Magnification**.
 - PDF previews, image previews, and the canvas layout keep their own view zoom — fit-to-window is a different operation from scaling text.
 
+## 🟠⋯ Know when your terminal theme cannot follow light and dark
+With Appearance set to System, the Theme picker's System tile shows a split light/dark thumbnail — a picture of the app switching. If your Ghostty `theme` resolves to the *same* theme on both sides, the terminal cannot honour half of that, so the picker now says so and names the theme that is pinned.
+
+- **The fix is a paired theme**, either `theme = light:<one>,dark:<other>` in your Ghostty config or `cmux themes set --light <one> --dark <other>`. Both have always worked; nothing told you they were needed.
+- The whole pane stack — terminal cells, the pane fill and the window backdrop — takes its colour from the resolved theme, which is why a pinned theme reads as "dark mode is broken" rather than as one setting that stayed put.
+- Shown only under Appearance = System. Under an explicit Light or Dark a pinned theme is exactly what you asked for, so the line stays out of the way.
+- **It reports; it does not choose for you.** Guessing a counterpart theme from a name (dawn→moon, Latte→Mocha) would be right for some pairs and silently wrong for the rest, and would override a value you wrote deliberately.
+- **It only speaks when *both* sides resolve to the same theme.** A one-sided `theme = light:X` leaves your dark appearance on ghostty's default, so the terminal does follow the appearance and no caveat is owed — even though the pair is probably unfinished. cmux cannot tell an unfinished pair from a chosen one, and v0.11.0 shipped the version that guessed: it reported `light:X` as pinned and named a theme the dark side never loads. Fixed in v0.11.1.
+- Two things it cannot warn about: a paired theme whose two halves carry different `background-image-opacity` will change the window image's weight with the appearance, and colour-valued settings like `unfocused-split-fill` have no conditional form in Ghostty at all, so one tuned for a light background stays put in dark.
+
 ## 🟠⋯ Recognize a workspace by its colour, selected or not
 A workspace's colour stays visible as an identity strip down the leading edge of its row, over a quiet wash of the same colour. Selecting a workspace fills the row with a contrast-corrected version of that colour instead of a generic highlight, so the active one is obvious without rereading titles.
 

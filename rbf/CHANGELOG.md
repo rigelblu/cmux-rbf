@@ -9,6 +9,33 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.11.1 (2026-08-02) — #cm-21
+## 🟠⋯ Fixed for End Users
+- 2026-08-02 - fix (ux) | stop being told your terminal is stuck on a theme it is not stuck on — v0.11.0's caveat fired on a **one-sided** conditional theme such as `theme = light:X`, where the terminal in fact follows the appearance: it renders `X` in light and ghostty's default in dark. The message claimed both appearances kept `X`, and named a theme the dark side never loads. **This was reachable through v0.11.0's own advice** — `cmux themes set --light X`, run without the matching `--dark`, writes exactly that value (#cm-21)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-02 - fix (perf) | the Theme caveat no longer does its config read on the main thread each time the config reloads — a signal that fires on appearance switches, font-size steppers and theme-preview scrubbing, not just theme edits. The read now happens off the main actor and is delivered back to the UI when it completes (#cm-21)
+- 2026-08-02 - fix (perf) | changing any ghostty setting no longer invalidates all ~45 rows of the App settings card to re-render an identical caveat (#cm-21)
+
+## 🟠⋯ Known Limitations
+- **A one-sided theme now stays silent rather than warning wrongly, and that is the deliberate stopping point.** `theme = light:X` leaves your dark appearance on ghostty's default theme, which you may not have intended — but cmux cannot tell an unfinished pair from a chosen one, and v0.11.0 shows what happens when it guesses (#cm-21)
+- Themes that are aliases of one another (`Solarized Light` and `iTerm2 Solarized Light`) resolve to different names, so a terminal effectively pinned through two aliases still gets no caveat. Missing message, never a wrong one (#cm-21)
+- The caveat reads the config paths cmux scans, which are the standard `~/.config/ghostty/` locations. A config located through `XDG_CONFIG_HOME` is not scanned, so a pinned theme there is never reported — a pre-existing scan-path limitation, not introduced here (#cm-21)
+
+---
+
+# 🔵⋯ v0.11.0 (2026-08-02) — #cm-21
+## 🟠⋯ Fixed for End Users
+- 2026-08-02 - fix (ux) | find out *why* your terminal keeps one background in both appearances, instead of concluding cmux is broken — when your Ghostty `theme` resolves to the same theme for light and dark, the Theme picker in Settings → App now says so and names the theme that is pinned. Set Appearance to System and the picker's System tile shows a split light/dark thumbnail — a picture of the app switching — which the terminal cannot honour while one theme is pinned to both sides. The fix is `theme = light:<one>,dark:<other>` in your Ghostty config, or `cmux themes set --light <one> --dark <other>` — **both sides, not one** (#cm-21). **Corrected in v0.11.1:** as shipped in v0.11.0 this caveat also fired on a one-sided `light:X`, where the terminal does follow the appearance
+
+## 🟠⋯ Known Limitations
+- **This does not make a pinned theme follow the appearance — it tells you that it cannot.** cmux has always supported `light:…,dark:…` and shipped `cmux themes set --light X --dark Y`; what was missing was any signal that a single unconditional `theme` silently defeats an Appearance setting of System. Choosing the pair is still yours (#cm-21)
+- The line appears only under Appearance = **System**. Under an explicit Light or Dark there is nothing for the terminal to follow, so a pinned theme is exactly what you asked for (#cm-21)
+- **A paired light/dark theme usually changes more than the background.** If the two themes carry different `background-image-opacity` values, the window background image `#cm-13` draws will change weight with the appearance — that is the themes' doing, not cmux's (#cm-21)
+- **Colour-valued settings cannot follow the appearance at all.** Ghostty's conditional `light:`/`dark:` form exists for `theme` only, so a value like `unfocused-split-fill = #000000` tuned against a light background stays black in dark, where unfocused splits can go nearly invisible. Nothing warns about this one (#cm-21)
+
+---
+
 # 🔵⋯ v0.10.0 (2026-08-02) — #cm-20
 ## 🟠⋯ Changed for End Users
 - 2026-08-02 - feat (ux) | read a coloured workspace row as a row that carries a colour, rather than as a filled swatch — the same-colour wash `#cm-10` puts behind every coloured sidebar row drops to a quiet tint. Resting `14% → 5%`, hovered `24% → 9%`, multi-selected `35% → 13%`, scaled together so the resting → hover → multi-select ladder keeps its shape instead of flattening at the bottom. The identity strip comes down with them, `95% → 85%`, and stays the strongest colour on a resting row (#cm-20)
