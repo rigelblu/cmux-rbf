@@ -1146,6 +1146,33 @@ public struct GhosttyConfig {
         return lightTheme.caseInsensitiveCompare(darkTheme) == .orderedSame
     }
 
+    /// The single theme name both appearances resolve to, or `nil` when the raw
+    /// `theme` value gives light and dark different themes.
+    ///
+    /// This is ``themeValueUsesSameResolvedThemeInBothColorSchemes(_:)`` with the
+    /// name carried out instead of discarded, and it deliberately reuses that
+    /// predicate rather than re-deriving the comparison: a second parser beside
+    /// ``resolveThemeName(from:preferredColorScheme:)`` would be free to drift
+    /// from the one that actually decides the terminal's colors.
+    ///
+    /// A `nil` result means "the theme follows the appearance". A non-`nil`
+    /// result is the name to *show* a user — "your theme is pinned" is not
+    /// actionable, and the theme's own name is.
+    public static func themeNamePinnedAcrossAppearances(_ rawThemeValue: String?) -> String? {
+        guard let rawThemeValue,
+              themeValueUsesSameResolvedThemeInBothColorSchemes(rawThemeValue) else {
+            return nil
+        }
+        // Non-empty by construction: the guard above already rejects a value
+        // whose resolved names are empty on either side, so no emptiness check
+        // belongs here. (Established by mutation testing — deleting such a check
+        // failed nothing, because it could never fire. `neverDisagreesWithTheExistingPredicate`
+        // pins this function to that predicate, so loosening one without the
+        // other breaks a test rather than leaking an empty name.)
+        return resolveThemeName(from: rawThemeValue, preferredColorScheme: .light)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// The last non-empty `theme` directive value in the given config contents,
     /// or `nil` when none is present.
     public static func lastThemeDirective(in contents: String) -> String? {
