@@ -59,7 +59,15 @@ final class TerminalThemePinModel {
         hasStarted = true
         pinnedThemeName = currentPinnedThemeName()
         driver.activate(makeStream) { [weak self] name in
-            self?.pinnedThemeName = name
+            guard let self, name != pinnedThemeName else { return }
+            // Equality-guarded, unlike the template this mirrors. Its stream has
+            // value-changed semantics; ours is `.ghosttyConfigDidReload`, which
+            // fires on *any* config reload — appearance switches, font-size
+            // steppers, theme-preview scrubbing. `@Observable`'s setter has no
+            // equality check, so an unconditional write would invalidate every
+            // row of the ~45-row App card on each of those, almost always to
+            // re-render the identical caveat. Found by cold review 2026-08-02.
+            pinnedThemeName = name
         }
     }
 }
