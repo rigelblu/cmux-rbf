@@ -25,36 +25,9 @@ By default, `reload.sh` builds but does **not** launch the app. The script print
 ./scripts/reload.sh --tag fix-zsh-autosuggestions --launch
 ```
 
-`reload.sh` prints an `App path:` line with the absolute path to the built `.app`. Use that path to build a cmd-clickable `file://` URL. Steps:
-
-1. Grab the path from the `App path:` line in `reload.sh` output.
-2. Prepend `file://` and URL-encode spaces as `%20`. Do not hardcode any part of the path.
-3. Format it as a markdown link using the template for your agent type.
-
-Example. If `reload.sh` output contains:
-
-```text
-App path:
-  /Users/someone/Library/Developer/Xcode/DerivedData/cmux-my-tag/Build/Products/Debug/cmux DEV my-tag.app
-```
-
-**Claude Code** outputs:
-
-```markdown
--------------------------------------------------------
-[cmux DEV my-tag.app](file:///Users/someone/Library/Developer/Xcode/DerivedData/cmux-my-tag/Build/Products/Debug/cmux%20DEV%20my-tag.app)
--------------------------------------------------------
-```
-
-**Codex** outputs:
-
-```markdown
--------------------------------------------------------
-[my-tag: file:///Users/someone/Library/Developer/Xcode/DerivedData/cmux-my-tag/Build/Products/Debug/cmux%20DEV%20my-tag.app](file:///Users/someone/Library/Developer/Xcode/DerivedData/cmux-my-tag/Build/Products/Debug/cmux%20DEV%20my-tag.app)
--------------------------------------------------------
-```
-
 Never use `/tmp/cmux-<tag>/...` app links in chat output.
+
+<!-- cmux-rbf: pruned upstream text — removed the `App path:` → cmd-clickable `file://` markdown-link recipe and its Claude Code / Codex output templates. In this fork agents hand back the `make` command instead; see "How to hand a build back" in rbf/AGENTS.md. A `file://` link addresses a bundle that was already built, so it silently launches the last build whenever the tree has moved on — observed 2026-08-02, when a link offered as the fix pointed at the previous value of the constant. `make run` cannot go stale because it rebuilds. Reject this hunk on upstream sync. -->
 
 For CLI or socket dogfood against a tagged Debug app, use the tag-bound helper and set `CMUX_TAG`.
 Do not use `/tmp/cmux-cli` for tagged dogfood, since that symlink points at the most recently reloaded build and can target the user's main app socket.

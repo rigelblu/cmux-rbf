@@ -104,6 +104,34 @@ Absolute path, always. `make -C` moves make's working directory before anything 
 
 Before handing back, confirm the tree you built is the tree you are naming: `make -C <path> help` prints `current build-id:` and costs nothing.
 
+### 🟣⋯ How to hand a build back
+**Give Tom the command, not the path.** When a change is ready to look at, end with the `make` line he should run:
+
+```
+Ready to look at:  make run
+```
+
+Name a non-default build-id only when the work genuinely needs one (`make run BUILD_ID=spike`), and say why in the same breath.
+
+**Never hand back a `file://` link to a `.app`** — that is upstream's convention and it is pruned from `CLAUDE.md`. A path addresses a bundle *that was already built*, so it keeps resolving after the tree moves on and launches the previous build without saying so. Observed 2026-08-02 on `#cm-20`: a link offered as the fix pointed at the prior value of the constant, because the intervening command was `make test`, which builds `cmux-unit` and never touches the app. `make run` rebuilds, so it cannot be stale; a link cannot know whether it is.
+
+The same holds for pasting a DerivedData path as prose, and `BUILD_ID` takes a **build-id**, never a filename — `BUILD_ID=cm-17.app` mints `cmux DEV cm-17.app.app` with its own ~6GB DerivedData dir and its own bundle id, which resets TCC grants and keychain sign-in.
+
+#### 🟡⋯ If you did not build in Tom's checkout, say where you built
+Bare `make run` means *"whatever your current directory's branch resolves to"*. Run in Tom's tree it builds **Tom's** branch, not yours — so an agent working in its own worktree that hands back bare `make run` is handing back someone else's build. Give the directory:
+
+```
+Ready to look at:  make -C /Volumes/Tom's HDD/tmp/<your-worktree> run
+```
+
+Absolute path, always. `make -C` moves make's working directory before anything runs, and the derivation is **cwd-relative** (`derive_build_id()` tests `.jj` and `git branch --show-current` in `$PWD`), so `-C` is what makes it read *your* branch.
+
+**Do not reach for `BUILD_ID` to do this.** The build-id names the *output slot*; the checkout names the *source*. `make run BUILD_ID=<yours>` in Tom's tree compiles **his** working copy into a slot wearing **your** name — wrong code, right-looking app, no error. That is strictly worse than a stale link, which at least shows an app someone really built.
+
+`BUILD_ID` has exactly one use in a multi-agent session: **two agents on the same branch name**. Distinct branches already isolate everything — build-id, DerivedData, debug socket, bundle id — with no flag at all. Same branch in two worktrees collides on all four, and one of the two must pass `BUILD_ID=<something>` and say so.
+
+Before handing back, confirm the tree you built is the tree you are naming: `make -C <path> help` prints `current build-id:` and costs nothing.
+
 **Two build landmines, both disarmed below every entrypoint rather than at one:**
 
 - **XcodeProj resolves forward.** Capped to `"9.0.0" ..< "9.15.0"` in `Packages/macOS/CMUXProjectModel/Package.swift`; 9.15.0 adds a case that makes `XcodeProjectAdapter.swift:706` non-exhaustive. The build that *does* the drift succeeds and the next one fails, so it presents as "it worked yesterday." `dev.sh` also defaults `CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION=1` as a second line.
@@ -116,10 +144,10 @@ Each was first patched at whichever entrypoint surfaced it, and each then failed
 ### 🟣⋯ `/Applications` holds **two** cmux apps — check which one you are in
 Since v0.9.0 (`#cm-17`) the flavour installs beside upstream rather than replacing it:
 
-| App | Bundle id | What it is |
-| --- | --- | --- |
+| App                          | Bundle id              | What it is                                           |
+| ---                          | ---                    | ---                                                  |
 | `/Applications/cmux RBF.app` | `com.cmuxterm.app.rbf` | **ours** — `make install-rbf` builds and installs it |
-| `/Applications/cmux.app` | `com.cmuxterm.app` | upstream's, never read or written by the installer |
+| `/Applications/cmux.app`     | `com.cmuxterm.app`     | upstream's, never read or written by the installer   |
 
 **`env \| grep CMUX_BUNDLE_ID` is how a session tells which one hosts it**, and this matters beyond documentation. `#cm-17`'s opening measurement was exactly this reading — it found that every fork feature shipped to date was running in *upstream's* app, which is the finding that motivated the whole slice. An agent that assumes `/Applications/cmux.app` is the fork will draw wrong conclusions from a running app, and they will look like product bugs.
 
