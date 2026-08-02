@@ -330,7 +330,15 @@ final class HostSettingsActions: SettingsHostActions {
                     signalContinuation.yield(())
                 }
             )
-            let drainTask = Task { @MainActor in
+            // Deliberately NOT `@MainActor`, unlike the mobile stream this mirrors:
+            // `pinnedTerminalThemeName()` reads several config files, and this
+            // fires on every `.ghosttyConfigDidReload` — a signal posted on
+            // appearance switches, font-size steppers and theme-preview scrubbing,
+            // not just theme edits. The mobile stream reads an in-memory snapshot
+            // and can afford the main actor; this cannot. `SettingReadDriver`
+            // delivers each value back on the main actor, so the consumer is
+            // unaffected.
+            let drainTask = Task {
                 continuation.yield(Self.pinnedTerminalThemeName())
                 for await _ in signals {
                     if Task.isCancelled { break }
@@ -347,20 +355,42 @@ final class HostSettingsActions: SettingsHostActions {
     }
 
     /// The theme name pinned across both appearances, read from the user's
-    /// *resolved* Ghostty config.
+    /// *resolved* Ghostty config via
+    /// ``GhosttyApp/userAppearanceConfigSummary(configPaths:)``.
     ///
-    /// Deliberately goes through ``GhosttyApp/userAppearanceConfigSummary(configPaths:)``
-    /// rather than the app-support-only reader that
-    /// `GhosttySurfaceConfigurationRefresh` uses for its runtime color-scheme
-    /// decision. That reader looks only at cmux's managed config directory, so
-    /// for a user whose `theme` lives in their own `~/.config/ghostty/config` —
-    /// which is the reported case this exists for — it returns `nil` and the
-    /// caveat would never appear. The summary scans every discovered path in
-    /// load order, so its `lastThemeDirective` is the value that actually
-    /// decided the pixels.
+    /// **This must be the last `theme` directive across the full discovered scan
+    /// set, and "the user's config" is not one file.** cmux reads
+    /// `~/.config/ghostty/config` first and a cmux-level config under
+    /// `~/Library/Application Support/<bundle-id>/config.ghostty` last, and last
+    /// wins. `CmuxGhosttyConfigPathResolver` falls back to the *release* bundle
+    /// id when the current bundle has no config of its own, so a dev or flavour
+    /// build can inherit the release app's theme — or, if it ships a non-empty
+    /// config without a `theme` line, silently fail to inherit it. That
+    /// precedence is the whole reason `#cm-21` existed: `cmux RBF.app` carried
+    /// its own themeless `config.ghostty`, never picked up the paired theme one
+    /// level up, and fell through to a single unconditional theme.
     ///
-    /// Static so the update stream's forwarding task does not retain this bridge.
-    private static func pinnedTerminalThemeName() -> String? {
+    /// Deliberately not `currentCmuxAppSupportThemeValue()`, which
+    /// `GhosttySurfaceConfigurationRefresh` uses for its narrower runtime
+    /// question: that reads only cmux's managed config directory, so for a theme
+    /// in the user's own `~/.config/ghostty/config` it returns `nil`.
+    ///
+    /// `GhosttyConfig.load().theme` was tried and reverted. It is *not* a
+    /// rewritten value as an earlier version of this comment claimed — that was
+    /// an artifact of measuring in a test process, where `Bundle.main` is the
+    /// test runner and the two path resolvers disagree about which cmux config to
+    /// include. In the app they agree. It was reverted anyway because this scan
+    /// set is the one whose contents are documented and testable; the lesson kept
+    /// here is that a config question measured outside the app process can answer
+    /// differently than it does inside one.
+    ///
+    /// The scan reads several files, so it runs **off** the main actor (see the
+    /// stream below); `sidebarFontSize()` above documents why main-actor disk I/O
+    /// is worth avoiding in this file.
+    ///
+    /// Static and `nonisolated` so the update stream's forwarding task neither
+    /// retains this bridge nor hops to the main actor to do file I/O.
+    nonisolated private static func pinnedTerminalThemeName() -> String? {
         GhosttyConfig.themeNamePinnedAcrossAppearances(
             GhosttyApp.userAppearanceConfigSummary().lastThemeDirective
         )
