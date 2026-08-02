@@ -76,7 +76,8 @@ Give workspace colours your own meaning — such as **GOAL: Primary (Teal)** —
 ## 🟠⋯ Recognize a workspace by its colour, selected or not
 A workspace's colour stays visible as an identity strip down the leading edge of its row, over a quiet wash of the same colour. Selecting a workspace fills the row with a contrast-corrected version of that colour instead of a generic highlight, so the active one is obvious without rereading titles.
 
-- The active row's strip wears a pale tint of the workspace's own colour, so two similar colours stay distinguishable even while one is selected.
+- **The wash is deliberately faint, and the strip is what carries identity.** Composited over the sidebar material, two nearby colours separate by well under 1.5% per channel however heavy you make the wash — so if a pair ever gets hard to tell apart, the strip is the thing to widen or brighten, not the wash to raise. There is no setting for either; the weights are chosen, not configurable.
+- The active row's strip wears a pale tint of the workspace's own colour, so two similar colours stay distinguishable even while one is selected. That tint is its own value, not a reflection of the resting wash — quieting the rows around it cannot bleach it.
 - The strip's trailing edge curves *into* the row rather than tapering, and follows the row's own corner — so it reads as part of the row's edge, not a bar sitting on top of it.
 - Active row content is white over a fill darkened until it clears 4.5:1; the strip keeps at least 3:1 against that fill.
 - There is no indicator-style setting. This is the only workspace colour treatment — Left Rail and Solid Fill are gone, and a leftover `workspaceColors.indicatorStyle` in `cmux.json` is ignored rather than reported.
@@ -117,10 +118,15 @@ Initialize the checkout once:
 ./scripts/setup.sh
 ```
 
-Build an isolated Debug app with a descriptive tag:
+Then build and run it:
 
 ```sh
-./scripts/reload.sh --tag <tag>
+make run      # build this branch, then launch it
+make build    # build only; prints the App path
+make test     # the unit tests (the only automated gate here)
+make help     # everything else, including disk cleanup and install
 ```
 
-The reload script prints the built `.app` path. It does not launch the app unless you pass `--launch`.
+You never pick a build-id — it comes from your branch (`tom-rigelblu/cm-19` → `cm-19`) and decides the DerivedData directory, the debug socket, the app name and the bundle id suffix, so two builds never collide. `make -C <path> run` builds a different checkout, which is how a worktree names its own build rather than someone else's.
+
+`make install-rbf` installs the result as **cmux RBF** in `/Applications`; `make install-rbf-plan` prints that plan and writes nothing.

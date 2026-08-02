@@ -9,6 +9,21 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.10.0 (2026-08-02) — #cm-20
+## 🟠⋯ Changed for End Users
+- 2026-08-02 - feat (ux) | read a coloured workspace row as a row that carries a colour, rather than as a filled swatch — the same-colour wash `#cm-10` puts behind every coloured sidebar row drops to a quiet tint. Resting `14% → 5%`, hovered `24% → 9%`, multi-selected `35% → 13%`, scaled together so the resting → hover → multi-select ladder keeps its shape instead of flattening at the bottom. The identity strip comes down with them, `95% → 85%`, and stays the strongest colour on a resting row (#cm-20)
+- 2026-08-02 - fix (ux) | keep the selected workspace's strip exactly as bright while the rows around it go quiet — the active strip's tint and the resting wash were **one shared number**, so lowering the wash would have bleached the one strip that names the workspace you are in. They are now separate values, and a test pins them apart (#cm-20)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-02 - docs (dx) | get handed a command you can run instead of a path that has gone stale — an agent finishing a change hands back `make run`, or `make -C <worktree> run` when it built somewhere other than your checkout. A `file://` link addresses a bundle that was *already* built, so it keeps resolving after the tree moves on and launches the previous build without saying so. `make help` carries the `-C` example too, so an agent that never opens `rbf/AGENTS.md` still sees it (#cm-19)
+
+## 🟠⋯ Known Limitations
+- **The weights are not configurable, by design.** An opacity knob was considered and declined: `#cm-10` had just removed `workspaceColors.indicatorStyle` on the argument that one good treatment beats three configurable ones, a raw float is a value nobody can set by reading it, and it is not independent of the hover/multi ladder or the strip's 3:1 contrast floor (#cm-20)
+- Hover now sits at `9%`, below what *resting* used to be at `14%`. It still lifts a row measurably, but the hover→resting gap is the first thing to check if a row starts reading flat (#cm-20)
+- If two near-twin workspace colours become hard to tell apart, **the strip is the thing to widen or brighten, not the wash to raise back.** Composited over the sidebar material, a nearby pair separates by well under 1.5% per channel even at `#cm-10`'s original `14%` — the wash never was the discriminator. What separates them at rest is the strip (#cm-20)
+
+---
+
 # 🔵⋯ v0.9.0 (2026-08-02) — #cm-17, #cm-18, #cm-19
 ## 🟠⋯ Added for End Users
 - 2026-08-02 - feat (ux) | use the cmux you build as your everyday app instead of launching it out of a build directory — the fork installs as **cmux RBF** in `/Applications`, with its own green `RBF` banner icon, its own bundle id and its own socket. Upstream's `cmux.app` is never read, written or replaced, so it stays as the fallback and both can run at once (#cm-17)

@@ -53,12 +53,40 @@ struct SidebarWorkspaceRowVisualPalette {
     /// Weight of the workspace colour in a resting row's wash, applied as a
     /// layer *alpha* over whatever the sidebar material composites against.
     ///
-    /// The active strip's tint reuses this number as a *blend fraction against
-    /// white* — deliberately the same weight, but not the same operation. The
-    /// two agree in light appearance and diverge in dark, where a resting wash
-    /// composites dark while the active tint stays a light pastel. Do not read
-    /// this as "the strip wears the row's resting colour".
-    static let restingWashOpacity: CGFloat = 0.14
+    /// Lowered from 0.14, first to 0.09, then 0.07, then 0.05 across three dogfood passes. At 0.14 a
+    /// sidebar of coloured workspaces read as a stack of filled swatches rather
+    /// than as rows carrying a hint of identity. Hue still has to survive — two
+    /// workspaces with nearby colours must stay tellable apart at rest — so this
+    /// is a reduction, not a removal, and there is a floor somewhere below here.
+    ///
+    /// `hoverWashOpacity` and `multiSelectWashOpacity` are scaled from the same
+    /// change so the resting → hover → multi-select ladder keeps its shape.
+    ///
+    /// This is *not* the active strip's tint weight; see
+    /// `activeStripTintFraction`, which is a blend fraction against white and is
+    /// deliberately pinned. Do not re-merge the two.
+    static let restingWashOpacity: CGFloat = 0.05
+
+    /// Wash weight while the pointer is over a resting row.
+    static let hoverWashOpacity: CGFloat = 0.09
+
+    /// Wash weight for a row in a multi-selection.
+    static let multiSelectWashOpacity: CGFloat = 0.13
+
+    /// Opacity the Accent Strip is drawn at, in **both** renderers.
+    ///
+    /// Lowered from 0.95 on dogfood: as the wash got quieter the strip stopped
+    /// reading as part of the row and started reading as a bar stuck to it. It
+    /// stays the strongest colour on a resting row on purpose — with the wash at
+    /// `restingWashOpacity` the strip is what actually distinguishes two
+    /// workspaces with nearby colours, so this can be softened but not much
+    /// further without taking identity with it.
+    ///
+    /// **This existed as a bare `0.95` in two places** — the AppKit cell and the
+    /// SwiftUI row — which is the same renderer-drift hazard `accentStripPath`
+    /// was written to close for the strip's geometry, left open for its opacity.
+    /// Both now read this. Do not re-inline it.
+    static let accentStripOpacity: CGFloat = 0.85
 
     /// Extra leading inset row content needs so the title clears the strip.
     /// Resolves to 0 at the shipped 5pt width (5 + 5 gap == the row's 10pt
@@ -171,7 +199,9 @@ struct SidebarWorkspaceRowVisualPalette {
         } else if let identityColor {
             resolvedBackground = .init(
                 color: identityColor,
-                opacity: isMultiSelected ? 0.35 : (isHovered ? 0.24 : Self.restingWashOpacity)
+                opacity: isMultiSelected
+                    ? Self.multiSelectWashOpacity
+                    : (isHovered ? Self.hoverWashOpacity : Self.restingWashOpacity)
             )
             resolvedStrip = identityColor
             resolvedPrimary = .labelColor
@@ -241,9 +271,17 @@ struct SidebarWorkspaceRowVisualPalette {
             .withAlphaComponent(1)
     }
 
-    /// Strip colour for an active row: the same pale tint of the workspace
-    /// colour that an *unselected* row wears as its resting wash, rather than
-    /// flat black or white.
+    /// Weight of the workspace colour in the active row's strip tint, as a
+    /// blend fraction against white.
+    ///
+    /// Pinned at the value `restingWashOpacity` used to carry. Lowering the
+    /// resting wash is about quieting *unselected* rows; letting this follow
+    /// would bleach the one strip whose whole job is to say which workspace the
+    /// active row belongs to — the identity loss the inverse-edge strip had.
+    static let activeStripTintFraction: CGFloat = 0.14
+
+    /// Strip colour for an active row: a pale tint of the workspace colour,
+    /// rather than flat black or white.
     ///
     /// This keeps hue on the strip in the one state where it used to vanish.
     /// The previous inverse edge made every selected row's strip identical, so
@@ -252,17 +290,28 @@ struct SidebarWorkspaceRowVisualPalette {
     /// resting colour", and still separates cleanly from the fill because the
     /// fill is darkened until white clears 4.5:1.
     ///
-    /// The 3:1 guard below is defensive, not load-bearing: because
-    /// `darkenedForWhiteText` already forces the fill to clear 4.5:1 against
-    /// white, and the tint is 86% white, the ratio cannot currently drop below
-    /// ~3.7 for any sRGB input. It is kept so that changing `restingWashOpacity`
-    /// or the darkening rule cannot silently breach the floor — but no test can
-    /// exercise the fallback today, and an assertion on it would be vacuous.
+    /// The 3:1 guard below measures the strip **as it is rendered**, not the
+    /// opaque tint. Neither renderer draws the strip opaque — both set it at
+    /// `accentStripOpacity` over this same fill — so the colour that reaches
+    /// the eye sits between the tint and the fill, and is always the lower
+    /// contrast of the two. Measuring the tint overstates it by ~22%.
+    ///
+    /// That gap was harmless while the strip was near-opaque and is not now.
+    /// Swept across a 13³ sRGB grid on 2026-08-02: at `accentStripOpacity`
+    /// 0.85 the worst case is pure red, 3.714:1 opaque against 3.047:1
+    /// rendered. Nothing breaches the floor today — the margin is 1.6%, and
+    /// the previous version of this guard could not see it shrink.
+    ///
+    /// So the guard is load-bearing now rather than defensive: lower
+    /// `accentStripOpacity` or `activeStripTintFraction` far enough and it
+    /// fires, swapping the tint for the inverse edge instead of silently
+    /// shipping an unreadable strip.
     private static func activeStripColor(identity: NSColor, on fill: NSColor) -> NSColor {
         let opaqueIdentity = (identity.usingColorSpace(.sRGB) ?? identity).withAlphaComponent(1)
-        let tint = (NSColor.white.blended(withFraction: restingWashOpacity, of: opaqueIdentity)
+        let tint = (NSColor.white.blended(withFraction: activeStripTintFraction, of: opaqueIdentity)
             ?? .white).withAlphaComponent(1)
-        guard cmuxContrastRatio(foreground: tint, background: fill) >= 3 else {
+        let rendered = fill.blended(withFraction: accentStripOpacity, of: tint) ?? tint
+        guard cmuxContrastRatio(foreground: rendered, background: fill) >= 3 else {
             return highestContrastEdgeColor(on: fill)
         }
         return tint
