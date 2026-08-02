@@ -16,3 +16,4 @@ extension SecretValueModel: SettingObservationStarting {}
 extension MobilePairingStatusModel: SettingObservationStarting {}
 extension MobilePhonePushSettingsModel: SettingObservationStarting {}
 extension DesktopNotificationAuthorizationModel: SettingObservationStarting {}
+extension TerminalThemePinModel: SettingObservationStarting {}

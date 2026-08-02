@@ -158936,6 +158936,131 @@
         }
       }
     },
+    "settings.app.theme.pinnedAcrossAppearances": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يبقي الطرفية على «%@» في المظهرين. عيّن سمتين منفصلتين للفاتح والداكن كي تتبع النظام."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal zadržava „%@“ u oba izgleda. Postavite zasebne svijetlu i tamnu temu da prati Sistem."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminalen beholder “%@” i begge udseender. Vælg separate lyse og mørke temaer, så den følger System."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Terminal behält „%@“ in beiden Erscheinungsbildern. Lege separate helle und dunkle Themes fest, damit es „System“ folgt."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal keeps “%@” in both appearances. Set separate light and dark themes for it to follow System."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La terminal mantiene «%@» en ambas apariencias. Define temas claro y oscuro por separado para que siga el sistema."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le terminal conserve « %@ » dans les deux apparences. Définissez des thèmes clair et sombre distincts pour qu’il suive le système."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il terminale mantiene “%@” in entrambi gli aspetti. Imposta temi chiaro e scuro separati perché segua Sistema."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ターミナルは外観を問わず「%@」のままです。システムに追従させるには、ライトとダークのテーマを個別に設定してください。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ស្ថានីយរក្សា «%@» ក្នុងរូបរាងទាំងពីរ។ កំណត់ស្បែកភ្លឺ និងស្បែកងងឹតដោយឡែកពីគ្នា ដើម្បីឱ្យវាធ្វើតាម System។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널이 밝은 모드와 어두운 모드 모두에서 “%@”을(를) 유지합니다. 시스템을 따르려면 라이트와 다크 테마를 각각 설정하세요."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminalen beholder «%@» i begge utseender. Angi separate lyse og mørke temaer for at den skal følge System."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal zachowuje „%@” w obu wyglądach. Ustaw osobne motywy jasny i ciemny, aby podążał za systemem."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O terminal mantém “%@” nas duas aparências. Defina temas claro e escuro separados para que ele siga o Sistema."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Терминал сохраняет «%@» в обоих оформлениях. Задайте отдельные светлую и тёмную темы, чтобы он следовал системе."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "เทอร์มินัลใช้ “%@” ทั้งสองลักษณะ ตั้งธีมสว่างและมืดแยกกันเพื่อให้ตามระบบ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal her iki görünümde de “%@” temasını koruyor. Sistemi izlemesi için ayrı açık ve koyu temalar belirleyin."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Термінал зберігає «%@» в обох оформленнях. Задайте окремі світлу й темну теми, щоб він стежив за системою."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端在浅色和深色下都使用“%@”。分别设置浅色和深色主题，它才会跟随系统。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終端機在淺色與深色下都使用「%@」。請分別設定淺色與深色佈景主題，它才會跟隨系統。"
+          }
+        }
+      }
+    },
     "settings.app.warnBeforeClosingTab": {
       "extractionState": "manual",
       "localizations": {
