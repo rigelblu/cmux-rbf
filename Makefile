@@ -40,9 +40,10 @@ help: ## Show this help
 	@echo
 	@echo "Examples"
 	@printf '  \033[36m%-29s\033[0m %s\n' \
-		"make run"                    "rebuild, then launch (~10 min; always rebuilds, no launch-only)" \
-		"make build"                  "build only, ~10 min; prints the App path" \
-		"make test"                   "run the unit tests, ~10 min (the only gate here)" \
+		"make run"                    "rebuild, then launch (always rebuilds; no launch-only mode)" \
+		"make build"                  "build only; prints the App path" \
+		"make -C <path> run"          "build+launch ANOTHER checkout (agents: name your worktree, not a BUILD_ID)" \
+		"make test"                   "run the unit tests (the only gate here)" \
 		"make run BUILD_ID=spike"     "name the build yourself, instead of using the branch" \
 		"make build ARGS=--prod-auth" "forward a flag: reload.sh for run/build, xcodebuild for test" \
 		"make clean-builds"           "reclaim disk; keeps running + most-recent + current only" \
@@ -61,7 +62,7 @@ help: ## Show this help
 run: ## Rebuild this branch's build-id, then launch it
 	@$(DEV) run $(ARGS)
 
-build: ## Build only; prints the App path to cmd-click
+build: ## Build only; prints the App path
 	@$(DEV) build $(ARGS)
 
 test: ## Run unit tests via the cmux-unit scheme (nothing else compiles them)
