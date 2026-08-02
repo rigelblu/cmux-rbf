@@ -16,7 +16,7 @@ Always build with a tag. **Never run bare `xcodebuild` or `open` an untagged `cm
 ./scripts/reload.sh --tag <branch-slug> --launch   # also open it
 ```
 
-A tag gives the app its own name, bundle ID, socket, and derived data path, so it runs side-by-side with the user's main app. Report the build to the user as a markdown link to `http://127.0.0.1:17320/<tag>`. Never put a `file://` URL, a raw `.app` path, or `/tmp/cmux-<tag>/...` in chat output.
+A tag gives the app its own name, bundle ID, socket, and derived data path, so it runs side-by-side with the user's main app. Never put a `file://` URL, a raw `.app` path, or `/tmp/cmux-<tag>/...` in chat output. <!-- cmux-rbf: pruned upstream text — removed 'report the build to the user as a markdown link to http://127.0.0.1:17320/<tag>' (upstream's replacement for the older file:// App-path recipe): no such build server runs in this fork, and a link addresses a bundle that was already built, so it goes stale or names someone else's build. Hand back the make command instead — `make run`, or `make -C <absolute worktree> run` from an agent worktree; see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 Other variants: `reloadp.sh` (Release), `reloads.sh` (Release as isolated "cmux STAGING"), `reload2.sh --tag <tag>` (both).
 
