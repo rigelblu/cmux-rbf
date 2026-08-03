@@ -1,5 +1,6 @@
 import AppKit
 import CmuxSettings
+import CmuxWorkspaces
 import SwiftUI
 
 /// Resolves every color used by a workspace row from one immutable snapshot.
@@ -88,6 +89,75 @@ struct SidebarWorkspaceRowVisualPalette {
     /// Both now read this. Do not re-inline it.
     static let accentStripOpacity: CGFloat = 0.85
 
+    /// Whether a row's lane suppresses its leading Accent Strip.
+    ///
+    /// **The two lanes at the ends of the lifecycle suppress: not started, and
+    /// finished.** The three between them — `.working`, `.needsAttention`,
+    /// `.review` — mean work is in play and keep the strip. The strip is the
+    /// loudest element on a resting row, drawn at `accentStripOpacity`, so it is
+    /// what a workspace gives up when it is not in play; the same-colour wash
+    /// stays as the trace of identity.
+    ///
+    /// This reads the **effective** lane, so a manual override outranks live
+    /// activity, and `.todo` therefore means either "nothing is happening" or
+    /// "the user parked it by hand".
+    ///
+    /// `.done` joined `.todo` on 2026-08-03. It previously kept a full-strength
+    /// strip on the argument that it de-emphasises by dimming content instead —
+    /// but that left the most finished state in the sidebar wearing the loudest
+    /// element while dimming its own title **wherever the status was visible**.
+    /// That qualifier matters: the dim is gated on `taskStatus`, which respects
+    /// `statusHidden`, and `statusHidden` defaults to `true` — so in the default
+    /// state a done row wore the strip and did not dim at all. Suppression is
+    /// gated on `attentionTaskStatus`, which does not respect `statusHidden`, so
+    /// the two rules deliberately do not share a trigger.
+    ///
+    /// **The consequence, intended and pinned by
+    /// `aParkedRowAndAFinishedRowAreDeliberatelyIndistinguishable`:** in that
+    /// default state a row whose lane is *inferred* `.done` (all pull requests
+    /// merged or closed) is identical to a `.todo` one — same absent strip, same
+    /// wash, and neither the glyph nor the dim to separate them, because both
+    /// are gated off. The rule is binary, in play or not, so two "not in play"
+    /// lanes looking alike is the rule working. It does widen an already-shipped
+    /// limitation ("an absent strip has several causes you cannot tell apart"),
+    /// and it is reachable without ever touching the status UI. If the
+    /// distinction is ever wanted back, gate the dim on `attentionTaskStatus`
+    /// too — do not give `.done` its strip back.
+    ///
+    /// `nil` means the todo feature is off; nothing suppresses.
+    static func suppressesAccentStrip(attentionTaskStatus: WorkspaceTaskStatus?) -> Bool {
+        attentionTaskStatus == .todo || attentionTaskStatus == .done
+    }
+
+    /// Alpha applied to a `.done` row's CONTENT (never its background, strip, or
+    /// drop chrome) so a finished row reads as settled.
+    ///
+    /// Named here because `#cm-22` adds a second "status modulates row weight"
+    /// rule; leaving its only neighbour inlined in two renderers would give one
+    /// concept two homes — the same drift hazard `#cm-20` closed for
+    /// `accentStripOpacity`.
+    static let doneRowContentAlpha: CGFloat = 0.6
+
+    /// Alpha for a row's content, given the lane the **status glyph** reads.
+    ///
+    /// The sibling of ``suppressesAccentStrip(attentionTaskStatus:)``, and the
+    /// two are deliberately gated on different fields — this one on `taskStatus`,
+    /// which respects `statusHidden`, and suppression on `attentionTaskStatus`,
+    /// which does not. Since `statusHidden` defaults to `true`, this dim almost
+    /// never fires while suppression always does. **Do not unify them.**
+    ///
+    /// Extracted from two inlined ternaries (the AppKit cell and the SwiftUI
+    /// row) so the decision has one home and a seam a test can reach. A cold
+    /// review found the rule had **zero assertions in either renderer**, which
+    /// left the "separate mechanism" half of `#cm-22`'s central claim entirely
+    /// unpinned — the claim was documented in three places and tested nowhere.
+    /// Asserting it inside a renderer was not available: both apply it to a
+    /// `private` content container, which is the wrong seam. This is the right
+    /// one.
+    static func contentAlpha(taskStatus: WorkspaceTaskStatus?) -> CGFloat {
+        taskStatus == .done ? doneRowContentAlpha : 1
+    }
+
     /// Extra leading inset row content needs so the title clears the strip.
     /// Resolves to 0 at the shipped 5pt width (5 + 5 gap == the row's 10pt
     /// content padding); it only becomes non-zero if the strip is widened.
@@ -143,6 +213,15 @@ struct SidebarWorkspaceRowVisualPalette {
 
     private let secondaryBaseColor: NSColor
 
+    /// - Parameters:
+    ///   - attentionTaskStatus: The workspace's attention lane, or `nil` when
+    ///     the todo feature is off for it — see
+    ///     `SidebarWorkspaceSnapshotFactory.attentionTaskStatus`. Deliberately
+    ///     **not** defaulted: both row renderers build this palette
+    ///     (`SidebarRowPalette.init`, `ContentView.rowVisualPalette`), and a
+    ///     default would let one of them silently keep the old treatment — the
+    ///     shared-behavior policy enforced by a reviewer instead of by the
+    ///     compiler.
     init(
         isActive: Bool,
         isMultiSelected: Bool,
@@ -151,7 +230,8 @@ struct SidebarWorkspaceRowVisualPalette {
         customColorHex: String?,
         colorScheme: ColorScheme,
         selectionColorHex: String?,
-        notificationBadgeColorHex: String?
+        notificationBadgeColorHex: String?,
+        attentionTaskStatus: WorkspaceTaskStatus?
     ) {
         self.colorScheme = colorScheme
         self.isActive = isActive
@@ -203,7 +283,9 @@ struct SidebarWorkspaceRowVisualPalette {
                     ? Self.multiSelectWashOpacity
                     : (isHovered ? Self.hoverWashOpacity : Self.restingWashOpacity)
             )
-            resolvedStrip = identityColor
+            resolvedStrip = Self.suppressesAccentStrip(attentionTaskStatus: attentionTaskStatus)
+                ? nil
+                : identityColor
             resolvedPrimary = .labelColor
         } else if isMultiSelected {
             resolvedBackground = .init(color: accentBackground, opacity: 0.25)

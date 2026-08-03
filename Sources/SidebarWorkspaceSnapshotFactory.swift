@@ -15,6 +15,13 @@ struct SidebarWorkspaceSnapshotFactory {
     let workspace: Workspace
     let settings: SidebarTabItemSettingsSnapshot
     let showsAgentActivity: Bool
+    /// Whether the workspace-todo feature is on, passed in rather than read
+    /// here. `WorkspaceTodoFeature.isEnabled` reaches `UserDefaults.standard`
+    /// and `CmuxFeatureFlags.shared`, which made this factory's one real
+    /// decision — which lane suppression reads — impossible to unit test, and
+    /// that decision is where `#cm-22`'s shipped defect lived. The caller sits
+    /// above the sidebar's lazy boundary and already owns store access.
+    let todoControlsEnabled: Bool
 
     func makeSnapshot() -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         let detailVisibility = settings.visibleAuxiliaryDetails
@@ -55,7 +62,6 @@ struct SidebarWorkspaceSnapshotFactory {
             guard detailVisibility.showsPullRequests, let orderedPanelIds else { return [] }
             return pullRequestDisplays(orderedPanelIds: orderedPanelIds)
         }()
-        let todoControlsEnabled = WorkspaceTodoFeature.isEnabled
         let workspaceStatusVisible = todoControlsEnabled && !workspace.todoState.statusHidden
         let inferredTaskStatus = workspaceStatusVisible ? workspace.inferredTaskStatus : nil
         let taskStatusResolution: WorkspaceTaskStatusOverride.Resolution? = inferredTaskStatus.map { inferred in
@@ -74,6 +80,15 @@ struct SidebarWorkspaceSnapshotFactory {
             )
         }
         let checklistProgress = workspace.checklistProgressSummary
+        // Suppression asks "is this workspace parked?", which is not the same
+        // question as "should a status glyph be shown". `taskStatus` above is
+        // gated on `statusHidden`; this deliberately is not — see
+        // `SidebarWorkspaceRowVisualPalette.suppressesAccentStrip`. Prefer the
+        // already-resolved value so the visible case does not sample twice; the
+        // ternary means the feature-off case samples not at all.
+        let attentionTaskStatus: WorkspaceTaskStatus? = todoControlsEnabled
+            ? (taskStatusResolution?.effective ?? workspace.effectiveTaskStatus)
+            : nil
 
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
@@ -114,6 +129,7 @@ struct SidebarWorkspaceSnapshotFactory {
             taskStatus: taskStatusResolution?.effective,
             todoStatusMenuModel: todoStatusMenuModel,
             hasManualTaskStatus: hasManualTaskStatus,
+            attentionTaskStatus: attentionTaskStatus,
             checklistItems: workspace.todoState.checklist,
             checklistCompletedCount: checklistProgress.completedCount,
             checklistTotalCount: checklistProgress.totalCount,

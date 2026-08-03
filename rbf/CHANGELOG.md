@@ -5,7 +5,19 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(empty)
+## 🟠⋯ Changed for End Users
+- 2026-08-03 - feat (ux) | let the workspaces you have not started stop competing for your attention — a workspace row that carries a colour no longer draws its leading identity strip while its status lane is **Todo**. The row keeps its faint same-colour wash, so it still reads as belonging to a colour; it just stops using the sidebar's loudest element to say so. The strip comes back the moment the lane moves — an agent starts, the tree goes dirty, a PR opens, or you set a lane by hand. **Your colour assignment is never touched**, so nothing has to be restored (#cm-22)
+- 2026-08-03 - feat (ux) | a workspace you have explicitly parked stays quiet — setting a workspace's status to **Todo** by hand suppresses its strip even while an agent runs in it. An explicit *"this is parked"* outranks what cmux can infer, which is the whole point of setting it (#cm-22)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-03 - refactor | the `.done` row's content dimming is named once as `doneRowContentAlpha` instead of sitting as a bare `0.6` in both the AppKit and SwiftUI row renderers — the same duplication v0.10.0 closed for the accent strip's opacity and left open here. No behaviour change (#cm-22)
+
+## 🟠⋯ Known Limitations
+- **This is off unless the workspace todo feature is on**, and that defaults to off: Settings → Beta Features → **Workspace Todo Controls**. With it off, every row draws exactly as before and this change does nothing (#cm-22)
+- **A parked row's only remaining identity signal is the wash, and the wash has never had a contrast floor.** The strip that goes away was full-hue at 85% opacity; what is left is a 5% tint. Two nearby workspace colours are not tellable apart while both are parked — that is the feature working, not failing, since a parked workspace is not asking to be identified at a glance. But it does mean **colour stops being a navigation aid for parked work**. Accepted deliberately rather than mitigated: every mitigation adds visual weight back to a row whose whole purpose here is to have less (#cm-22)
+- **An absent strip has three causes you cannot tell apart by looking** — the workspace is parked, its status is hidden, or it has no colour assigned. If most of your workspaces are parked, the sidebar shows almost no strips at all, which looks the same as the feature being broken (#cm-22)
+- **Renaming a parked workspace briefly brings its strip back** for the duration of the inline edit. The editing state is resolved before the parked state, and you are interacting with that row anyway (#cm-22)
+- **The sibling `.done` dimming is gated differently.** Suppression ignores whether you asked to *see* a status badge; the done-row dimming does not, and that gate defaults to hiding status. So a Done workspace usually will not dim while a Todo one always loses its strip (#cm-22)
 
 ---
 

@@ -60,10 +60,17 @@ struct SidebarWorkspaceSnapshotBuilder {
         // Workspace todo status/checklist; taskStatus is nil when the
         // workspace opted out of status display or the remote todo-controls
         // flag is off. Manual status draws a compact row indicator, while
-        // automatic status still only drives the done-row dim.
+        // automatic status drives the done-row dim — and, through
+        // `attentionTaskStatus` below, the Accent Strip suppression.
         let taskStatus: WorkspaceTaskStatus?
         let todoStatusMenuModel: SidebarWorkspaceCompactStatusMenuModel?
         let hasManualTaskStatus: Bool
+        /// The lane `#cm-22`'s Accent Strip suppression reads — the
+        /// **effective** lane: the manual override when set, the inference
+        /// otherwise. Deliberately ungated on `statusHidden`, unlike
+        /// `taskStatus` above, which only exists when the user wants a status
+        /// glyph shown.
+        let attentionTaskStatus: WorkspaceTaskStatus?
         let checklistItems: [WorkspaceChecklistItem]
         let checklistCompletedCount: Int
         let checklistTotalCount: Int
