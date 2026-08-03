@@ -26,7 +26,8 @@ struct SidebarRowPalette {
             customColorHex: model.snapshot.customColorHex,
             colorScheme: colorScheme,
             selectionColorHex: model.settings.selectionColorHex,
-            notificationBadgeColorHex: model.settings.notificationBadgeColorHex
+            notificationBadgeColorHex: model.settings.notificationBadgeColorHex,
+            attentionTaskStatus: model.snapshot.attentionTaskStatus
         )
     }
 

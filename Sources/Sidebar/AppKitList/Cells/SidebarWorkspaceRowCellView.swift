@@ -525,7 +525,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         alphaValue = model.isBeingDragged ? 0.6 : 1
         // Done rows read as settled (legacy parity): dim the row CONTENT to
         // ~60% — never the selection background, rail, or drop chrome.
-        contentContainer.alphaValue = snapshot.taskStatus == .done ? 0.6 : 1
+        // Deliberately reads `taskStatus` (gated on `statusHidden`), unlike the strip
+        // suppression which reads `attentionTaskStatus` (ungated). Do not unify them.
+        // The decision lives in the palette so both renderers share it and a test
+        // can reach it — this container is private.
+        contentContainer.alphaValue = SidebarWorkspaceRowVisualPalette
+            .contentAlpha(taskStatus: snapshot.taskStatus)
 
         setAccessibilityIdentifier("sidebarWorkspace.\(model.workspaceId.uuidString)")
         setAccessibilityLabel(String(

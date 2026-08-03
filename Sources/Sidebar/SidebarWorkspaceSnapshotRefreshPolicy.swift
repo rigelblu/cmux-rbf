@@ -11,6 +11,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let taskStatus: WorkspaceTaskStatus?
         let todoStatusMenuModel: SidebarWorkspaceCompactStatusMenuModel?
         let hasManualTaskStatus: Bool
+        let attentionTaskStatus: WorkspaceTaskStatus?
         let checklistItems: [WorkspaceChecklistItem]
         let checklistCompletedCount: Int
         let checklistTotalCount: Int
@@ -29,6 +30,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             taskStatus: taskStatus,
             todoStatusMenuModel: todoStatusMenuModel,
             hasManualTaskStatus: hasManualTaskStatus,
+            attentionTaskStatus: attentionTaskStatus,
             checklistItems: checklistItems,
             checklistCompletedCount: checklistCompletedCount,
             checklistTotalCount: checklistTotalCount,
@@ -70,11 +72,13 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             // visually worse than ordinary telemetry text while the menu is open.
             mediaActivity: snapshot.mediaActivity,
             // Todo status/checklist are mutated FROM this context menu (Status
-            // submenu, Mark as Done, checkbox clicks), so the done-row dim and
-            // checklist must reflect the change immediately, not on menu close.
+            // submenu, Mark as Done, checkbox clicks), so the done-row dim,
+            // the strip suppression (`attentionTaskStatus`), and the checklist
+            // must reflect the change immediately, not on menu close.
             taskStatus: snapshot.taskStatus,
             todoStatusMenuModel: snapshot.todoStatusMenuModel,
             hasManualTaskStatus: snapshot.hasManualTaskStatus,
+            attentionTaskStatus: snapshot.attentionTaskStatus,
             checklistItems: snapshot.checklistItems,
             checklistCompletedCount: snapshot.checklistCompletedCount,
             checklistTotalCount: snapshot.checklistTotalCount,

@@ -127,7 +127,8 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
             customColorHex: "#C0392B",
             colorScheme: .light,
             selectionColorHex: nil,
-            notificationBadgeColorHex: nil
+            notificationBadgeColorHex: nil,
+            attentionTaskStatus: nil
         )
 
         let fill = palette.backgroundStyle.color
@@ -158,7 +159,8 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
                 customColorHex: customColorHex,
                 colorScheme: .light,
                 selectionColorHex: "#123456",
-                notificationBadgeColorHex: nil
+                notificationBadgeColorHex: nil,
+                attentionTaskStatus: nil
             ).backgroundStyle.color
         }
 
@@ -178,7 +180,8 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
             customColorHex: "#C0392B",
             colorScheme: .light,
             selectionColorHex: nil,
-            notificationBadgeColorHex: nil
+            notificationBadgeColorHex: nil,
+            attentionTaskStatus: nil
         )
 
         XCTAssertEqual(palette.backgroundStyle.color?.hexString(), "#C0392B")

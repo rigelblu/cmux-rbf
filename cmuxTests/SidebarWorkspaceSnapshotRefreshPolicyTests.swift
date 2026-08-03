@@ -103,6 +103,38 @@ import Testing
         #expect(decision.pendingWorkspaceSnapshot == next)
         #expect(decision.hasDeferredWorkspaceObservationInvalidation)
     }
+    @Test func contextMenuAttentionLaneChangeUpdatesStripSuppressionImmediately() {
+        // Parking a workspace happens THROUGH the context menu (Status submenu),
+        // so the strip suppression lane must update while the menu is still
+        // open; if it fell out of ContextMenuImmediateFields the strip would
+        // silently linger until menu dismiss.
+        let current = Self.snapshot(
+            remoteConnectionStatusText: "Connected",
+            latestConversationMessage: "old message",
+            listeningPorts: [3000],
+            attentionTaskStatus: .working
+        )
+        let next = Self.snapshot(
+            remoteConnectionStatusText: "Disconnected",
+            latestConversationMessage: "new message",
+            listeningPorts: [3000, 4000],
+            attentionTaskStatus: .todo
+        )
+
+        let decision = SidebarWorkspaceSnapshotRefreshPolicy().decision(
+            current: current,
+            next: next,
+            force: false,
+            contextMenuVisible: true
+        )
+
+        #expect(decision.workspaceSnapshotStorage?.attentionTaskStatus == .todo)
+        #expect(decision.workspaceSnapshotStorage?.remoteConnectionStatusText == "Connected")
+        #expect(decision.workspaceSnapshotStorage?.latestConversationMessage == "old message")
+        #expect(decision.workspaceSnapshotStorage?.listeningPorts == [3000])
+        #expect(decision.pendingWorkspaceSnapshot == next)
+        #expect(decision.hasDeferredWorkspaceObservationInvalidation)
+    }
     @Test func closedContextMenuStoresNextAndClearsPending() {
         let current = Self.snapshot(title: "old", isPinned: false)
         let next = Self.snapshot(title: "new", isPinned: true)
@@ -130,7 +162,8 @@ import Testing
         listeningPorts: [Int] = [],
         finderDirectoryPath: String? = nil,
         mediaActivity: BrowserMediaActivity = BrowserMediaActivity(),
-        activeCodingAgentCount: Int = 0
+        activeCodingAgentCount: Int = 0,
+        attentionTaskStatus: WorkspaceTaskStatus? = nil
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey ?? Self.presentationKey(),
@@ -161,6 +194,7 @@ import Testing
             taskStatus: nil,
             todoStatusMenuModel: nil,
             hasManualTaskStatus: false,
+            attentionTaskStatus: attentionTaskStatus,
             checklistItems: [],
             checklistCompletedCount: 0,
             checklistTotalCount: 0,
