@@ -12021,7 +12021,8 @@ struct VerticalTabsSidebar: View, Equatable {
         return SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: settings,
-            showsAgentActivity: showsAgentActivity
+            showsAgentActivity: showsAgentActivity,
+            todoControlsEnabled: WorkspaceTodoFeature.isEnabled
         ).makeSnapshot()
     }
 
@@ -14746,7 +14747,8 @@ struct TabItemView: View, Equatable {
             customColorHex: workspaceSnapshot.customColorHex,
             colorScheme: colorScheme,
             selectionColorHex: sidebarSelectionColorHex,
-            notificationBadgeColorHex: sidebarNotificationBadgeColorHex
+            notificationBadgeColorHex: sidebarNotificationBadgeColorHex,
+            attentionTaskStatus: workspaceSnapshot.attentionTaskStatus
         )
     }
 
@@ -15395,7 +15397,13 @@ struct TabItemView: View, Equatable {
         }
         // Done rows read as settled: dim the row content (not the selection
         // background) to ~60%; hit-testing is unaffected by opacity.
-        .opacity(workspaceSnapshot.taskStatus == .done ? 0.6 : 1)
+        // Deliberately reads `taskStatus` (gated on `statusHidden`), unlike the strip
+        // suppression which reads `attentionTaskStatus` (ungated). Do not unify them.
+        // The decision lives in the palette so both renderers share it.
+        .opacity(
+            SidebarWorkspaceRowVisualPalette
+                .contentAlpha(taskStatus: workspaceSnapshot.taskStatus)
+        )
         // No implicit .animation(value:) on agent-mutable fields: animating a
         // row-height change interpolates the LazyVStack's measured height over
         // every frame of the 0.2s curve, and with dozens of agent sessions some

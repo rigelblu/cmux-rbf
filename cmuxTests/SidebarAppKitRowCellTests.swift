@@ -1,5 +1,6 @@
 import AppKit
 import CmuxSidebar
+import CmuxWorkspaces
 import Testing
 @testable import cmux_DEV
 
@@ -10,7 +11,9 @@ import Testing
 struct SidebarAppKitRowCellTests {
     private static func makeSnapshot(
         title: String = "Workspace",
-        metadataEntries: [SidebarStatusEntry] = []
+        metadataEntries: [SidebarStatusEntry] = [],
+        customColorHex: String? = nil,
+        attentionTaskStatus: WorkspaceTaskStatus? = nil
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: SidebarWorkspaceSnapshotFactory.presentationKey(
@@ -20,7 +23,7 @@ struct SidebarAppKitRowCellTests {
             title: title,
             customDescription: nil,
             isPinned: false,
-            customColorHex: nil,
+            customColorHex: customColorHex,
             remoteWorkspaceSidebarText: nil,
             remoteConnectionStatusText: "",
             remoteStateHelpText: "",
@@ -44,6 +47,7 @@ struct SidebarAppKitRowCellTests {
             taskStatus: nil,
             todoStatusMenuModel: nil,
             hasManualTaskStatus: false,
+            attentionTaskStatus: attentionTaskStatus,
             checklistItems: [],
             checklistCompletedCount: 0,
             checklistTotalCount: 0,
@@ -56,15 +60,15 @@ struct SidebarAppKitRowCellTests {
         isActive: Bool = false,
         canClose: Bool = true,
         settings: SidebarTabItemSettingsSnapshot? = nil,
-        metadataEntries: [SidebarStatusEntry] = [],
-        shortcutHintText: String? = nil
+        shortcutHintText: String? = nil,
+        snapshot: SidebarWorkspaceSnapshotBuilder.Snapshot? = nil
     ) -> SidebarWorkspaceRowModel {
         let resolvedSettings = settings
             ?? SidebarTabItemSettingsSnapshot(defaults: UserDefaults(suiteName: UUID().uuidString)!)
         return SidebarWorkspaceRowModel(
             workspaceId: workspaceId,
             index: 0,
-            snapshot: makeSnapshot(metadataEntries: metadataEntries),
+            snapshot: snapshot ?? makeSnapshot(),
             settings: resolvedSettings,
             isActive: isActive,
             isMultiSelected: false,
@@ -240,7 +244,9 @@ struct SidebarAppKitRowCellTests {
     func metadataStatusURLRendersAnActionBoundToItsDestination() throws {
         let url = try #require(URL(string: "https://example.com/issues/8520"))
         let model = Self.makeModel(
-            metadataEntries: [SidebarStatusEntry(key: "repro_link", value: "click me", url: url)]
+            snapshot: Self.makeSnapshot(
+                metadataEntries: [SidebarStatusEntry(key: "repro_link", value: "click me", url: url)]
+            )
         )
         var openedURL: URL?
         let cell = Self.configuredCell(model: model) { openedURL = $0 }
@@ -296,7 +302,19 @@ struct SidebarAppKitRowCellTests {
         pill.configure(text: "⌘1", fontSize: 9, emphasis: 1)
         CATransaction.commit()
 
-        #expect(!(pill.layer?.animationKeys() ?? []).isEmpty)
+        // `#cm-23` — was `#expect(!(pill.layer?.animationKeys() ?? []).isEmpty)`,
+        // which FAILED on a non-empty collection: the macro rendered
+        // `isEmpty -> ()` and `<not evaluated>`, never evaluating the negated
+        // member access. Third `#expect` defect found in this toolchain, after
+        // `Double == CGFloat` (always false) and `Double != CGFloat` (always
+        // true, and silent). Binding first sidesteps it.
+        //
+        // Naming the key is also a stronger assertion than "not empty": the
+        // point of this test is that the pill adds an EXPLICIT animation a
+        // disabled-actions transaction cannot suppress, and any incidental
+        // animation would have satisfied the old form.
+        let animationKeys = pill.layer?.animationKeys() ?? []
+        #expect(animationKeys.contains("shortcutHintVisibility"))
     }
 
     @Test
@@ -512,5 +530,42 @@ struct SidebarAppKitRowCellTests {
             #expect(!Self.makeSwiftUIRow(settings: settings).settings.details[keyPath: detailKey])
             #expect(!Self.makeModel(settings: settings).settings.details[keyPath: detailKey])
         }
+    }
+
+    /// `#cm-22` — the AppKit side of the strip decision, which is the DEFAULT
+    /// renderer (`appKitSidebarListDefault = true`) and had no test at this
+    /// branch.
+    ///
+    /// The palette tests build `SidebarWorkspaceRowVisualPalette` directly and
+    /// so never exercise `SidebarRowPalette`, which is what actually reads
+    /// `model.snapshot.attentionTaskStatus` on this path. The AppKit cell then
+    /// gates purely on `stripColor == nil`, so this is the last decision the
+    /// two renderers could drift on — and `#cm-10` and `#cm-20` both shipped
+    /// drift bugs behind parity arguments that read as sound.
+    @Test
+    func appKitRowPaletteSuppressesTheStripForAParkedWorkspace() {
+        let parked = SidebarRowPalette(
+            model: Self.makeModel(snapshot: Self.makeSnapshot(customColorHex: "#006B6B", attentionTaskStatus: .todo))
+        )
+        let busy = SidebarRowPalette(
+            model: Self.makeModel(snapshot: Self.makeSnapshot(customColorHex: "#006B6B", attentionTaskStatus: .working))
+        )
+        let ungated = SidebarRowPalette(
+            model: Self.makeModel(snapshot: Self.makeSnapshot(customColorHex: "#006B6B", attentionTaskStatus: nil))
+        )
+
+        #expect(parked.visual.stripColor == nil)
+        // Compared against each row's OWN resolved identity colour rather than
+        // a literal hex: this fixture is dark-scheme, so `#006B6B` displays as
+        // `#00C7C7`, and pinning the literal tests the brightening rule instead
+        // of the suppression decision. The identity colour is still resolved on
+        // a parked row — suppression is presentation only.
+        #expect(busy.visual.stripColor?.hexString() == busy.visual.identityColor?.hexString())
+        #expect(busy.visual.stripColor != nil)
+        // Feature gate off: identical to how `#cm-10` drew it.
+        #expect(ungated.visual.stripColor?.hexString() == ungated.visual.identityColor?.hexString())
+        #expect(ungated.visual.stripColor != nil)
+        // The parked row keeps its identity, it just stops advertising it.
+        #expect(parked.visual.identityColor != nil)
     }
 }

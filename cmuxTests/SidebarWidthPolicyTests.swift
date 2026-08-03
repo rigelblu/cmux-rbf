@@ -292,7 +292,8 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
                     customColorHex: customColorHex,
                     colorScheme: colorScheme,
                     selectionColorHex: nil,
-                    notificationBadgeColorHex: nil
+                    notificationBadgeColorHex: nil,
+                    attentionTaskStatus: nil
                 ).backgroundStyle.color
             }
 
@@ -321,7 +322,8 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
                 customColorHex: customColorHex,
                 colorScheme: .light,
                 selectionColorHex: "#123456",
-                notificationBadgeColorHex: nil
+                notificationBadgeColorHex: nil,
+                attentionTaskStatus: nil
             ).backgroundStyle.color
         }
 
