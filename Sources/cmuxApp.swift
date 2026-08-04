@@ -1099,11 +1099,23 @@ struct cmuxApp: App {
                 let selectWorkspaceByNumberShortcut = menuShortcut(for: .selectWorkspaceByNumber)
                 if selectWorkspaceByNumberShortcut.isUnbound || selectWorkspaceByNumberShortcut.hasChord {
                     Button(String(localized: "menu.view.workspace", defaultValue: "Workspace \(number)")) {
-                        activeTabManager.selectWorkspaceByNumber(number)
+                        let manager = activeTabManager
+                        if let targetIndex = WorkspaceShortcutMapper.workspaceFlatIndex(
+                            forDigit: number,
+                            eligibility: manager.workspaceShortcutEligibility
+                        ) {
+                            manager.selectTab(at: targetIndex)
+                        }
                     }
                 } else {
                     Button(String(localized: "menu.view.workspace", defaultValue: "Workspace \(number)")) {
-                        activeTabManager.selectWorkspaceByNumber(number)
+                        let manager = activeTabManager
+                        if let targetIndex = WorkspaceShortcutMapper.workspaceFlatIndex(
+                            forDigit: number,
+                            eligibility: manager.workspaceShortcutEligibility
+                        ) {
+                            manager.selectTab(at: targetIndex)
+                        }
                     }
                     .keyboardShortcut(
                         KeyEquivalent(Character("\(number)")),

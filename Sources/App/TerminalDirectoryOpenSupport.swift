@@ -2,6 +2,7 @@ import CmuxFoundation
 import CmuxCore
 import AppKit
 import CmuxCommandPalette
+import CmuxWorkspaces
 import Darwin
 import Foundation
 
@@ -914,30 +915,208 @@ final class ServeWebOutputCollector {
 }
 
 enum WorkspaceShortcutMapper {
-    /// Maps numbered workspace shortcuts to a zero-based workspace index.
-    /// 1...8 target fixed indices; 9 always targets the last workspace.
-    static func workspaceIndex(forDigit digit: Int, workspaceCount: Int) -> Int? {
-        guard workspaceCount > 0 else { return nil }
+    // MARK: - Digit arithmetic (private: it speaks eligible positions, not rows)
+    //
+    // These two were the whole public API before `#cm-28`, named for *workspace
+    // rows* and taking `workspaceCount`. They now range over the **eligible
+    // set**, so the same call with `tabs.count` is no longer merely stale — it
+    // silently reinstates the bug this slice fixes, and both index spaces are
+    // plain `Int`, so nothing catches it. Upstream's six call sites called
+    // exactly the old names, which makes an upstream merge the likely way it
+    // comes back. Renamed to say which space they speak, and `private` so the
+    // eligibility-taking overloads below are the only way in.
+
+    /// The eligible position a digit selects. 1…8 target fixed positions;
+    /// 9 always targets the last eligible workspace.
+    private static func eligiblePosition(forDigit digit: Int, eligibleCount: Int) -> Int? {
+        guard eligibleCount > 0 else { return nil }
         guard (1...9).contains(digit) else { return nil }
 
         if digit == 9 {
-            return workspaceCount - 1
+            return eligibleCount - 1
         }
 
-        let index = digit - 1
-        return index < workspaceCount ? index : nil
+        let position = digit - 1
+        return position < eligibleCount ? position : nil
     }
 
-    /// Returns the primary digit badge to display for a workspace row.
-    /// Picks the lowest digit that maps to that row index.
-    static func digitForWorkspace(at index: Int, workspaceCount: Int) -> Int? {
-        guard index >= 0 && index < workspaceCount else { return nil }
+    /// The primary digit badge for an eligible position — the lowest digit that
+    /// maps to it. `nil` when the position carries no digit, which is every
+    /// position between 8 and the last once more than nine are eligible.
+    private static func digit(forEligiblePosition position: Int, eligibleCount: Int) -> Int? {
+        guard position >= 0 && position < eligibleCount else { return nil }
         for digit in 1...9 {
-            if workspaceIndex(forDigit: digit, workspaceCount: workspaceCount) == index {
+            if eligiblePosition(forDigit: digit, eligibleCount: eligibleCount) == position {
                 return digit
             }
         }
         return nil
+    }
+
+    /// The digit badge a workspace row shows, given which workspaces are
+    /// eligible. `nil` when the row carries no digit.
+    static func digitForWorkspace(
+        atFlatIndex flatIndex: Int,
+        eligibility: WorkspaceShortcutEligibility
+    ) -> Int? {
+        guard let position = eligibility.position(forFlatIndex: flatIndex) else { return nil }
+        return digit(forEligiblePosition: position, eligibleCount: eligibility.count)
+    }
+
+    /// The flat `tabs` index a digit selects, given which workspaces are
+    /// eligible. `nil` when the digit selects nothing.
+    ///
+    /// The exact inverse of ``digitForWorkspace(atFlatIndex:eligibility:)`` over
+    /// every flat index that carries a digit — the property the badge telling
+    /// the truth depends on.
+    static func workspaceFlatIndex(
+        forDigit digit: Int,
+        eligibility: WorkspaceShortcutEligibility
+    ) -> Int? {
+        guard let position = eligiblePosition(forDigit: digit, eligibleCount: eligibility.count) else {
+            return nil
+        }
+        return eligibility.flatIndex(forPosition: position)
+    }
+}
+
+/// The ordered set of workspaces `⌘1…9` ranges over, plus the two conversions
+/// between a workspace's flat position in `TabManager.tabs` and its position in
+/// that set.
+///
+/// `#cm-28`. Before this type, ``WorkspaceShortcutMapper``'s two halves both
+/// ranged over the flat `tabs` count, which made them exact inverses for free.
+/// Once the digits range over a *subset*, that guarantee has to be built rather
+/// than inherited — so both directions live here, on one stored array, and the
+/// mapper's digit arithmetic sits unchanged on top. Split the two conversions
+/// across two types and the badge and the key drift, which shows up as a row
+/// wearing a number that selects a different row.
+///
+/// **Eligible = in play AND ungrouped.**
+/// - *In play* reuses ``SidebarWorkspaceRowVisualPalette/suppressesAccentStrip(attentionTaskStatus:)``
+///   verbatim, over the lane ``Workspace/attentionTaskStatus(todoControlsEnabled:)``
+///   resolves, rather than re-deriving either. The user need is literally "the
+///   ones with an Accent Strip", so sharing both halves is what stops
+///   "numbered" and "striped" drifting apart later. **That buys one *rule*, not
+///   one *sampling instant*:** the strip is drawn from a cached row snapshot
+///   whose `presentationKey` excludes task status, so inside a refresh window an
+///   unrelated re-render can pair a stale strip with a fresh badge. Bounded and
+///   self-healing — and not worth closing by feeding the numbering from those
+///   snapshots, which would move the skew onto badge-vs-key, the pair this type
+///   exists to keep exact.
+/// - *Ungrouped* — **unconditionally; the rule never reads collapse state.** A
+///   collapsed group is the case that motivated it: it hides its non-anchor
+///   members, so a grouped workspace holding a digit meant a key firing at a
+///   row the user could not see. But an *expanded* group's members are visible
+///   rows and they get no digit either, because groups leave the numbering
+///   entirely rather than leaving it when hidden. `#cm-29` should read this
+///   paragraph and not the motivating case alone: it gives groups their own
+///   namespace (`⌘⇧1…9`), and until then they carry no digit at all, which is a
+///   shipped Known Limitation.
+struct WorkspaceShortcutEligibility: Equatable {
+    /// One workspace's inputs to the eligibility rule, in flat `tabs` order.
+    struct Candidate: Equatable {
+        let isGrouped: Bool
+        /// The lane the Accent Strip reads — `nil` when the workspace todo
+        /// feature is off, which is why an off feature leaves every workspace
+        /// eligible and the numbering exactly as it was.
+        let attentionTaskStatus: WorkspaceTaskStatus?
+    }
+
+    /// Flat `tabs` indices that carry a digit, ascending. The array *is* the
+    /// mapping: its element is the flat index, its offset the digit position.
+    private let flatIndices: [Int]
+
+    private init(flatIndices: [Int]) {
+        self.flatIndices = flatIndices
+    }
+
+    /// How many workspaces the digits range over — what the mapper's existing
+    /// `workspaceCount` parameter now receives.
+    var count: Int { flatIndices.count }
+
+    /// Resolves which workspaces carry a digit, in flat order.
+    ///
+    /// **The fallback:** when nothing is eligible, the digits range over every
+    /// *ungrouped* workspace instead of nothing. The default lane is `.todo`, so
+    /// without this a fresh morning would have no keyboard workspace switching
+    /// at all, and a dead `⌘1` reads as a broken build rather than a feature.
+    /// It widens only the status axis — the group exclusion stays absolute, so
+    /// the rule carries no conditional. The leftover case (every workspace
+    /// grouped, so the digits are still dead) is deliberately not engineered
+    /// for; `#cm-29` gives groups their own keys.
+    static func resolve(candidates: [Candidate]) -> WorkspaceShortcutEligibility {
+        let ungrouped = candidates.indices.filter { !candidates[$0].isGrouped }
+        let inPlay = ungrouped.filter { index in
+            !SidebarWorkspaceRowVisualPalette.suppressesAccentStrip(
+                attentionTaskStatus: candidates[index].attentionTaskStatus
+            )
+        }
+        return WorkspaceShortcutEligibility(flatIndices: inPlay.isEmpty ? ungrouped : inPlay)
+    }
+
+    /// Flat `tabs` index → position among the digit-carrying workspaces.
+    /// `nil` when that workspace carries no digit.
+    func position(forFlatIndex flatIndex: Int) -> Int? {
+        flatIndices.firstIndex(of: flatIndex)
+    }
+
+    /// Position among the digit-carrying workspaces → flat `tabs` index.
+    /// `nil` when the position is out of range.
+    func flatIndex(forPosition position: Int) -> Int? {
+        guard flatIndices.indices.contains(position) else { return nil }
+        return flatIndices[position]
+    }
+}
+
+/// The one bridge from live workspaces to the pure rule above.
+///
+/// Both halves of the feature call this — the sidebar builds it once per render
+/// pass and hands it to the badge, the key handlers build it per keystroke from
+/// `TabManager.tabs`. A second construction site anywhere would be a second
+/// answer to "which workspaces carry a digit", which is the drift this type
+/// exists to prevent.
+@MainActor
+extension WorkspaceShortcutEligibility {
+    /// Resolves eligibility from workspaces in flat `tabs` order.
+    ///
+    /// - Parameter todoControlsEnabled: `WorkspaceTodoFeature.isEnabled`, passed
+    ///   in rather than read here for the same reason
+    ///   ``SidebarWorkspaceSnapshotFactory`` takes it — the flag reaches
+    ///   `UserDefaults` and `CmuxFeatureFlags`, and the callers already sit
+    ///   where store access belongs.
+    static func resolve(
+        workspaces: [Workspace],
+        todoControlsEnabled: Bool
+    ) -> WorkspaceShortcutEligibility {
+        resolve(candidates: workspaces.map { workspace in
+            Candidate(
+                isGrouped: workspace.groupId != nil,
+                // Both fields come from the same place the sidebar reads them,
+                // never a local re-derivation: the lane from the palette that
+                // owns strip suppression, so "numbered" and "striped" answer to
+                // one definition.
+                attentionTaskStatus: workspace.attentionTaskStatus(
+                    todoControlsEnabled: todoControlsEnabled
+                )
+            )
+        })
+    }
+}
+
+extension TabManager {
+    /// Which of this window's workspaces `⌘1…9` ranges over (`#cm-28`).
+    ///
+    /// The single live construction site: the sidebar reads it once per render
+    /// pass to draw badges, the key handlers read it per keystroke to resolve a
+    /// digit. Both must see the same set or a row wears a number that selects a
+    /// different row — so the feature flag is read here, once, rather than at
+    /// each of the six call sites.
+    var workspaceShortcutEligibility: WorkspaceShortcutEligibility {
+        WorkspaceShortcutEligibility.resolve(
+            workspaces: tabs,
+            todoControlsEnabled: WorkspaceTodoFeature.isEnabled
+        )
     }
 }
 

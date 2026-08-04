@@ -10928,6 +10928,37 @@ struct VerticalTabsSidebar: View, Equatable {
         /// Drag-scope row ids shared by every visible row for this render pass.
         let sidebarReorderIds: [UUID]
         let workspaceCount: Int
+        /// Which workspaces `⌘1…9` ranges over (`#cm-28`), resolved once per
+        /// render pass — every row's badge reads it, and resolving it per row
+        /// would be quadratic.
+        ///
+        /// **Once per pass is not free, and this is the honest accounting.**
+        /// Resolving it live-samples `effectiveTaskStatus` for every workspace,
+        /// and each sample walks that workspace's agent lifecycle states plus
+        /// `sidebarPullRequestsInDisplayOrder()` and
+        /// `sidebarGitBranchesInDisplayOrder()`.
+        ///
+        /// **This doubles an existing cost rather than introducing a new one.**
+        /// `workspaceRowInput` already samples `tab.inferredTaskStatus` live for
+        /// every workspace on every pass — the cached-snapshot lookup sits above
+        /// it, but the `todoStatusResolution` line below that cache is
+        /// unconditional. So the shape was N before `#cm-28` and is 2N after.
+        /// (An earlier version of this comment claimed the row inputs read only
+        /// cached snapshots and that this was therefore new work. It is not; the
+        /// line is twenty below the badge in the same function.)
+        ///
+        /// The unit is bigger than one traversal: both branch and pull-request
+        /// helpers rebuild `sidebarOrderedPanelIds()` independently, each taking
+        /// a full bonsplit tree snapshot. And "if the sidebar gets hot" is not
+        /// hypothetical — the row projection reads
+        /// `modifierKeyMonitor.isModifierPressed`, so **holding `⌘`, this
+        /// feature's own reveal gesture, invalidates this body**, as do hover
+        /// and drag. That invalidation predates `#cm-28`; the doubling does not.
+        /// The cheap win if it ever matters is a `taskStatusSignals(
+        /// orderedPanelIds:)` overload — the parameterized helpers already
+        /// exist. Caching eligibility itself means invalidating on live git and
+        /// PR state, which is the harder problem — measure before taking it on.
+        let workspaceShortcutEligibility: WorkspaceShortcutEligibility
         let canCloseWorkspace: Bool
         let workspaceNumberShortcut: StoredShortcut
         let tabItemSettings: SidebarTabItemSettingsSnapshot
@@ -11011,6 +11042,7 @@ struct VerticalTabsSidebar: View, Equatable {
         // snapshot from the current model before the controller applies again.
         let tabs = isPresented ? tabManager.tabs : []
         let workspaceCount = tabs.count
+        let workspaceShortcutEligibility = tabManager.workspaceShortcutEligibility
         let canCloseWorkspace = workspaceCount > 1
         let workspaceNumberShortcut = self.workspaceNumberShortcut
         let tabItemSettings = tabItemSettingsStore.snapshot
@@ -11079,6 +11111,7 @@ struct VerticalTabsSidebar: View, Equatable {
             tabIds: tabIds,
             sidebarReorderIds: sidebarReorderIds,
             workspaceCount: workspaceCount,
+            workspaceShortcutEligibility: workspaceShortcutEligibility,
             canCloseWorkspace: canCloseWorkspace,
             workspaceNumberShortcut: workspaceNumberShortcut,
             tabItemSettings: tabItemSettings,
@@ -14118,12 +14151,10 @@ struct VerticalTabsSidebar: View, Equatable {
             hasCustomTitle: tab.hasCustomTitle,
             hasCustomDescription: tab.hasCustomDescription,
             customTitle: tab.customTitle,
-            workspaceShortcutDigit: renderContext.numberedWorkspaceIndexById[tab.id].flatMap {
-                WorkspaceShortcutMapper.digitForWorkspace(
-                    at: $0,
-                    workspaceCount: renderContext.numberedWorkspaceIndexById.count
-                )
-            },
+            workspaceShortcutDigit: WorkspaceShortcutMapper.digitForWorkspace(
+                atFlatIndex: index,
+                eligibility: renderContext.workspaceShortcutEligibility
+            ),
             workspaceShortcutModifierSymbol: renderContext.workspaceNumberShortcut.numberedDigitHintPrefix,
             canCloseWorkspace: renderContext.canCloseWorkspace,
             unreadCount: unreadSummary.unreadCount,

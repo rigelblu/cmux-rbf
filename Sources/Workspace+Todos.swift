@@ -12,7 +12,21 @@ extension Workspace {
     /// Samples the live signals that drive task-status inference: agent
     /// lifecycle states (needs-input / running) for panels that still exist,
     /// the sidebar pull-request rows, and git working-tree dirtiness.
+    ///
+    /// Takes the panel order **once** and hands it to both sidebar queries.
+    /// Each of them otherwise calls `sidebarOrderedPanelIds()` itself, and that
+    /// is not a cheap read — it snapshots the bonsplit tree and builds a
+    /// dictionary per pane, so the no-argument forms sampled it twice per call.
+    /// `#cm-28` made this path hotter (the sidebar now resolves shortcut
+    /// eligibility for every workspace on every render pass, on top of the
+    /// per-row sampling that was already there), which is what surfaced the
+    /// duplication in a cold review.
     func taskStatusSignals() -> WorkspaceTaskStatusSignals {
+        taskStatusSignals(orderedPanelIds: sidebarOrderedPanelIds())
+    }
+
+    /// The sampling above, for a caller that already holds the panel order.
+    func taskStatusSignals(orderedPanelIds: [UUID]) -> WorkspaceTaskStatusSignals {
         var anyAgentNeedsInput = false
         var anyAgentRunning = false
         for (panelId, states) in agentLifecycleStatesByPanelId where panels[panelId] != nil {
@@ -21,7 +35,7 @@ extension Workspace {
                 if state == .running { anyAgentRunning = true }
             }
         }
-        let pullRequests = sidebarPullRequestsInDisplayOrder()
+        let pullRequests = sidebarPullRequestsInDisplayOrder(orderedPanelIds: orderedPanelIds)
         return WorkspaceTaskStatusSignals(
             anyAgentNeedsInput: anyAgentNeedsInput,
             anyAgentRunning: anyAgentRunning,
@@ -29,7 +43,8 @@ extension Workspace {
             hasPullRequests: !pullRequests.isEmpty,
             allPullRequestsMergedOrClosed: !pullRequests.isEmpty
                 && pullRequests.allSatisfy { $0.status != .open },
-            isGitDirty: sidebarGitBranchesInDisplayOrder().contains { $0.isDirty }
+            isGitDirty: sidebarGitBranchesInDisplayOrder(orderedPanelIds: orderedPanelIds)
+                .contains { $0.isDirty }
         )
     }
 
@@ -50,6 +65,37 @@ extension Workspace {
             override: todoState.statusOverride,
             inferred: inferredTaskStatus
         ).effective
+    }
+
+    /// **The** definition of the "attention lane" — the value
+    /// ``SidebarWorkspaceRowVisualPalette/suppressesAccentStrip(attentionTaskStatus:)``
+    /// is asked about, and the one `#cm-28`'s `⌘1…9` numbering reads to decide
+    /// which workspaces carry a digit.
+    ///
+    /// Two callers must never disagree — the sidebar factory draws the Accent
+    /// Strip from it, the shortcut eligibility decides numbering from it, and
+    /// the user need behind the numbering is literally "the ones with a strip".
+    /// A striped row that carries no number is the drift a single definition
+    /// exists to prevent. **It guarantees one rule, not one sampling instant:**
+    /// the strip is drawn from a cached row snapshot whose `presentationKey`
+    /// does not include task status, so within a refresh window an unrelated
+    /// re-render can pair a stale strip with a fresh badge. Bounded and
+    /// self-healing; do not "fix" it by feeding the numbering from the cached
+    /// snapshots, which would move the skew onto badge-vs-key — the pair
+    /// `#cm-28` deliberately keeps exact.
+    ///
+    /// **Deliberately ignores `statusHidden`**, unlike the status glyph: hiding
+    /// the status is a display opt-out, not a statement that the workspace left
+    /// play. `nil` means the todo feature is off, so nothing suppresses and
+    /// every workspace stays numbered.
+    ///
+    /// Lives here, on `Workspace`, beside the `effectiveTaskStatus` it wraps
+    /// behind one flag. It reached this file the long way: first as a private
+    /// copy inside the shortcut eligibility (which let it drift from the
+    /// factory silently), then on the row *palette* — a type that resolves
+    /// colours from an immutable snapshot and never called this at all.
+    func attentionTaskStatus(todoControlsEnabled: Bool) -> WorkspaceTaskStatus? {
+        todoControlsEnabled ? effectiveTaskStatus : nil
     }
 
     /// Clears the stored override when the live inference has moved away from

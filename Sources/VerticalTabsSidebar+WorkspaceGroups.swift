@@ -90,6 +90,10 @@ extension VerticalTabsSidebar {
             hasLatestNotifications: anchorHasLatestNotification,
             canMarkAllRead: canMarkAllRead,
             canMarkAllUnread: canMarkAllUnread,
+            // Dead until `#cm-29`: a group's anchor is out of the `#cm-28`
+            // numbering, so no hint is computed for group headers. `#cm-29`
+            // gives groups `⌘⇧1…9` and revives exactly this argument; if that
+            // slips, this comment is the only thing saying so.
             shortcutHintText: nil,
             shortcutHintXOffset: settings.sidebarShortcutHintXOffset,
             shortcutHintYOffset: settings.sidebarShortcutHintYOffset,
