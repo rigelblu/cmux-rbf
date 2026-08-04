@@ -129,6 +129,7 @@ struct SidebarWorkspaceRowVisualPalette {
         attentionTaskStatus == .todo || attentionTaskStatus == .done
     }
 
+
     /// Alpha applied to a `.done` row's CONTENT (never its background, strip, or
     /// drop chrome) so a finished row reads as settled.
     ///

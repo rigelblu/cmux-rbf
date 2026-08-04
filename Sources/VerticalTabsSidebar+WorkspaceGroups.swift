@@ -41,9 +41,15 @@ extension VerticalTabsSidebar {
         let canMarkAllRead = notificationStore.canMarkWorkspaceRead(forTabIds: nonAnchorMemberIds)
         let canMarkAllUnread = notificationStore.canMarkWorkspaceUnread(forTabIds: nonAnchorMemberIds)
         let anchorIndex = renderContext.tabIndexById[group.anchorWorkspaceId] ?? 0
+        // Dead until `#cm-29`: always `nil`. A group's anchor carries a
+        // `groupId`, and `#cm-28` takes every grouped workspace out of the
+        // numbering — so this resolves to nothing and the hint pill downstream
+        // is unreachable. Kept wired rather than deleted because `#cm-29` gives
+        // groups `⌘⇧1…9` and revives exactly this path; if that slips, this
+        // comment is the only thing saying so.
         let shortcutDigit = WorkspaceShortcutMapper.digitForWorkspace(
-            at: anchorIndex,
-            workspaceCount: renderContext.workspaceCount
+            atFlatIndex: anchorIndex,
+            eligibility: renderContext.workspaceShortcutEligibility
         )
         let modifierSymbol = renderContext.workspaceNumberShortcut.numberedDigitHintPrefix
         let showsHintForAnchor = showModifierHoldHints && modifierKeyMonitor.isModifierPressed
@@ -245,9 +251,15 @@ extension VerticalTabsSidebar {
             (unreadSummariesByWorkspaceId[$0]?.unreadCount ?? 0) == 0
         }
         let anchorIndex = renderContext.tabIndexById[group.anchorWorkspaceId] ?? 0
+        // Dead until `#cm-29`: always `nil`. A group's anchor carries a
+        // `groupId`, and `#cm-28` takes every grouped workspace out of the
+        // numbering — so this resolves to nothing and the hint pill downstream
+        // is unreachable. Kept wired rather than deleted because `#cm-29` gives
+        // groups `⌘⇧1…9` and revives exactly this path; if that slips, this
+        // comment is the only thing saying so.
         let shortcutDigit = WorkspaceShortcutMapper.digitForWorkspace(
-            at: anchorIndex,
-            workspaceCount: renderContext.workspaceCount
+            atFlatIndex: anchorIndex,
+            eligibility: renderContext.workspaceShortcutEligibility
         )
         let modifierSymbol = renderContext.workspaceNumberShortcut.numberedDigitHintPrefix
         let showsHintForAnchor = showModifierHoldHints && modifierKeyMonitor.isModifierPressed

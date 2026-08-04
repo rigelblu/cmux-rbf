@@ -2820,20 +2820,259 @@ final class StoredShortcutMatchingTests: XCTestCase {
 }
 
 
-final class WorkspaceShortcutMapperTests: XCTestCase {
-    func testCommandNineMapsToLastWorkspaceIndex() {
-        XCTAssertEqual(WorkspaceShortcutMapper.workspaceIndex(forDigit: 9, workspaceCount: 1), 0)
-        XCTAssertEqual(WorkspaceShortcutMapper.workspaceIndex(forDigit: 9, workspaceCount: 4), 3)
-        XCTAssertEqual(WorkspaceShortcutMapper.workspaceIndex(forDigit: 9, workspaceCount: 12), 11)
+// `WorkspaceShortcutMapperTests` lived here and asserted the digit arithmetic
+// through `workspaceIndex(forDigit:workspaceCount:)` / `digitForWorkspace(at:
+// workspaceCount:)` directly. `#cm-28` made both `private` — they range over
+// eligible positions now, not workspace rows, and the old names invited a call
+// with `tabs.count` that would silently reinstate the pre-`#cm-28` numbering.
+// The same arithmetic is covered through the public API below: `⌘9` = last
+// eligible in `testCommandNineSelectsTheLastEligibleWorkspace` and
+// `testADigitBeyondTheEligibleSetSelectsNothing`, and the >9-eligible shape
+// (digits 1-8, then 9 jumping to the last, with the middle carrying none) in
+// `testBadgeAndKeyAreExactInversesOverEveryDigitCarryingRow`.
+
+/// `#cm-28` — `⌘1…9` ranges over the workspaces carrying an Accent Strip.
+final class WorkspaceShortcutEligibilityTests: XCTestCase {
+    private func candidate(
+        grouped: Bool = false,
+        _ status: WorkspaceTaskStatus?
+    ) -> WorkspaceShortcutEligibility.Candidate {
+        .init(isGrouped: grouped, attentionTaskStatus: status)
     }
 
-    func testCommandDigitBadgesUseNineForLastWorkspaceWhenNeeded() {
-        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(at: 0, workspaceCount: 12), 1)
-        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(at: 7, workspaceCount: 12), 8)
-        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(at: 11, workspaceCount: 12), 9)
-        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(at: 8, workspaceCount: 12))
+    /// The headline behaviour: a parked row takes no digit, and the rows after
+    /// it move up rather than leaving a gap.
+    func testParkedWorkspacesAreSkippedAndTheRestRenumber() {
+        let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
+            candidate(.working),
+            candidate(.todo),
+            candidate(.review),
+            candidate(.done),
+            candidate(.needsAttention),
+        ])
+
+        XCTAssertEqual(eligibility.count, 3)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility))
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility), 2)
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 3, eligibility: eligibility))
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 4, eligibility: eligibility), 3)
+    }
+
+    /// The property a display-only filter would fail: every digit a row wears
+    /// selects that same row. Asserted over digit-carrying positions only —
+    /// with more than nine eligible, the positions between 8 and the last carry
+    /// no digit at all, so asserting over every position would be vacuous.
+    func testBadgeAndKeyAreExactInversesOverEveryDigitCarryingRow() {
+        // 20 candidates, every third parked -> 13 eligible. Deliberately more
+        // than nine: at exactly nine the "positions between 8 and the last
+        // carry no digit" case this test's strategy is chosen for never
+        // occurs, and the assertion below would hold vacuously.
+        let candidates = (0..<20).map { index in
+            candidate(index.isMultiple(of: 3) ? .todo : .working)
+        }
+        let eligibility = WorkspaceShortcutEligibility.resolve(candidates: candidates)
+
+        var digitsSeen: [Int] = []
+        for flatIndex in candidates.indices {
+            guard let digit = WorkspaceShortcutMapper.digitForWorkspace(
+                atFlatIndex: flatIndex,
+                eligibility: eligibility
+            ) else { continue }
+            digitsSeen.append(digit)
+            XCTAssertEqual(
+                WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: digit, eligibility: eligibility),
+                flatIndex,
+                "⌘\(digit) is drawn on flat row \(flatIndex) but selects a different row"
+            )
+        }
+        XCTAssertEqual(digitsSeen, [1, 2, 3, 4, 5, 6, 7, 8, 9])
+    }
+
+    /// `⌘9` keeps its "jump to the end" idiom, measured against the eligible
+    /// set rather than the flat list.
+    func testCommandNineSelectsTheLastEligibleWorkspace() {
+        let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
+            candidate(.working),
+            candidate(.working),
+            candidate(.todo),
+        ])
+
+        XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 9, eligibility: eligibility), 1)
+    }
+
+    /// A grouped workspace carries no digit whatever its status, because a
+    /// collapsed group hides its non-anchor members.
+    func testGroupedWorkspacesNeverCarryADigit() {
+        let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
+            candidate(grouped: true, .working),
+            candidate(.working),
+            candidate(grouped: true, .needsAttention),
+        ])
+
+        XCTAssertEqual(eligibility.count, 1)
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility))
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility), 1)
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility))
+    }
+
+    /// The fallback: nothing in play must not mean a dead keyboard. It widens
+    /// the status axis only — grouped workspaces stay out.
+    func testNothingInPlayFallsBackToEveryUngroupedWorkspace() {
+        let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
+            candidate(.todo),
+            candidate(grouped: true, .todo),
+            candidate(.done),
+        ])
+
+        XCTAssertEqual(eligibility.count, 2)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility))
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility), 2)
+    }
+
+    /// With the workspace todo feature off every lane reads `nil`, so nothing
+    /// suppresses and the numbering is exactly what it was before `#cm-28`.
+    func testTodoFeatureOffLeavesEveryUngroupedWorkspaceNumbered() {
+        let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
+            candidate(nil),
+            candidate(nil),
+            candidate(nil),
+        ])
+
+        XCTAssertEqual(eligibility.count, 3)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility), 2)
     }
 }
+
+/// `#cm-28` — the bridge from live workspaces to the rule above. The pure tests
+/// hand-build `Candidate`s; these prove the two fields are read off a real
+/// `Workspace` correctly, which is the layer the six call sites go through.
+@MainActor
+final class WorkspaceShortcutEligibilityLiveWorkspaceTests: XCTestCase {
+    /// Mirrors the flat sidebar order: a working workspace, a parked one, a
+    /// grouped one, and a second working one.
+    func testEligibilityReadsGroupMembershipAndStatusOffLiveWorkspaces() {
+        let working = Workspace(title: "working")
+        working.setTaskStatusOverride(.working)
+        let parked = Workspace(title: "parked")
+        parked.setTaskStatusOverride(.todo)
+        let grouped = Workspace(title: "grouped")
+        grouped.setTaskStatusOverride(.working)
+        grouped.groupId = UUID()
+        let alsoWorking = Workspace(title: "also working")
+        alsoWorking.setTaskStatusOverride(.needsAttention)
+
+        let eligibility = WorkspaceShortcutEligibility.resolve(
+            workspaces: [working, parked, grouped, alsoWorking],
+            todoControlsEnabled: true
+        )
+
+        XCTAssertEqual(eligibility.count, 2)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility))
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility))
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 3, eligibility: eligibility), 2)
+        // The key side must land on the flat row the badge is drawn on, not on
+        // the eligible position — the conversion every call site depends on.
+        XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 2, eligibility: eligibility), 3)
+    }
+
+    /// With the todo feature off every lane reads `nil`, so a parked workspace
+    /// keeps its digit and the numbering is exactly what it was before `#cm-28`.
+    func testTodoFeatureOffNumbersEveryUngroupedWorkspaceRegardlessOfStatus() {
+        let parked = Workspace(title: "parked")
+        parked.setTaskStatusOverride(.todo)
+        let working = Workspace(title: "working")
+        working.setTaskStatusOverride(.working)
+
+        let eligibility = WorkspaceShortcutEligibility.resolve(
+            workspaces: [parked, working],
+            todoControlsEnabled: false
+        )
+
+        XCTAssertEqual(eligibility.count, 2)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility), 2)
+    }
+
+    /// The lane the numbering reads is the palette's, and the palette ignores
+    /// `statusHidden` on purpose: hiding the status glyph is a display opt-out,
+    /// not a statement that the workspace left play. Asserted against that rule
+    /// directly rather than against a transcription of another call site — a
+    /// cold review of `#cm-28` caught the earlier version comparing this
+    /// function to a *copy* of `SidebarWorkspaceSnapshotFactory`'s expression,
+    /// which could never fail if the factory itself changed. There is now one
+    /// definition, and this pins what it must say.
+    func testAttentionLaneIgnoresHiddenStatusAndRespectsTheFeatureFlag() {
+        for hidesStatus in [false, true] {
+            let workspace = Workspace(title: "w hidden=\(hidesStatus)")
+            workspace.setTaskStatusOverride(.review)
+            if hidesStatus { workspace.todoState.statusHidden = true }
+
+            XCTAssertEqual(
+                workspace.attentionTaskStatus(todoControlsEnabled: true),
+                .review,
+                "hiding the status glyph must not park the workspace (hidden=\(hidesStatus))"
+            )
+            XCTAssertNil(
+                workspace.attentionTaskStatus(todoControlsEnabled: false),
+                "the todo feature being off must leave the lane unread (hidden=\(hidesStatus))"
+            )
+        }
+    }
+
+    /// A digit past the eligible set selects nothing — it must not clamp to the
+    /// last workspace. More load-bearing since `#cm-28`, because "this digit
+    /// resolves to nothing" is now reachable with workspaces still on screen.
+    func testADigitBeyondTheEligibleSetSelectsNothing() {
+        let workspaces = (0..<3).map { index -> Workspace in
+            let workspace = Workspace(title: "w\(index)")
+            workspace.setTaskStatusOverride(.working)
+            return workspace
+        }
+        let eligibility = WorkspaceShortcutEligibility.resolve(
+            workspaces: workspaces,
+            todoControlsEnabled: true
+        )
+
+        XCTAssertEqual(eligibility.count, 3)
+        XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 3, eligibility: eligibility), 2)
+        XCTAssertNil(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 4, eligibility: eligibility))
+        XCTAssertNil(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 5, eligibility: eligibility))
+        // `⌘9` still means "the last one", not "the ninth one".
+        XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 9, eligibility: eligibility), 2)
+    }
+
+    /// The two empty shapes: no workspaces at all, and every workspace grouped.
+    /// Both leave the digits dead, and neither may trap. The all-grouped case is
+    /// an accepted limitation until groups get `⌘⇧1…9`, not a defect.
+    func testNoWorkspacesAndAllGroupedBothLeaveEveryDigitDead() {
+        let empty = WorkspaceShortcutEligibility.resolve(workspaces: [], todoControlsEnabled: true)
+        XCTAssertEqual(empty.count, 0)
+
+        let groupId = UUID()
+        let grouped = (0..<2).map { index -> Workspace in
+            let workspace = Workspace(title: "g\(index)")
+            workspace.setTaskStatusOverride(.working)
+            workspace.groupId = groupId
+            return workspace
+        }
+        let allGrouped = WorkspaceShortcutEligibility.resolve(
+            workspaces: grouped,
+            todoControlsEnabled: true
+        )
+        XCTAssertEqual(allGrouped.count, 0)
+
+        for digit in 1...9 {
+            XCTAssertNil(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: digit, eligibility: empty))
+            XCTAssertNil(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: digit, eligibility: allGrouped))
+        }
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: allGrouped))
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: allGrouped))
+    }
+}
+
 @MainActor
 final class WorkspaceCustomDescriptionTests: XCTestCase {
     func testSetCustomDescriptionPreservesMeaningfulLeadingAndTrailingWhitespace() {

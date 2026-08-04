@@ -84,6 +84,17 @@ With Appearance set to System, the Theme picker's System tile shows a split ligh
 - **It only speaks when *both* sides resolve to the same theme.** A one-sided `theme = light:X` leaves your dark appearance on ghostty's default, so the terminal does follow the appearance and no caveat is owed — even though the pair is probably unfinished. cmux cannot tell an unfinished pair from a chosen one, and v0.11.0 shipped the version that guessed: it reported `light:X` as pinned and named a theme the dark side never loads. Fixed in v0.11.1.
 - Two things it cannot warn about: a paired theme whose two halves carry different `background-image-opacity` will change the window image's weight with the appearance, and colour-valued settings like `unfocused-split-fill` have no conditional form in Ghostty at all, so one tuned for a light background stays put in dark.
 
+## 🟠⋯ Reach the workspaces you are working in by number
+`⌘1…9` numbers only the workspaces that are in play — the ones carrying an Accent Strip — instead of counting every row in the sidebar. A workspace you have parked or finished drops out of the numbering, and the rows below it move **up** rather than leaving a gap, so `⌘3` lands on the third workspace that matters, not the third row. Hold `⌘` to see it: a badge appears only where a digit actually works.
+
+- **The badge and the key renumber together, by construction.** They are computed from one set rather than kept in sync, so a badge cannot claim a digit that goes somewhere else. That is also why a parked workspace loses its number instead of just hiding the badge — a hidden badge whose key still fires is the worse lie.
+- **`⌘9` keeps its jump-to-the-end idiom**, now landing on the last workspace in play. The View menu's nine "Workspace N" items follow the same numbering.
+- **A grouped workspace has no number.** Groups leave the numbering entirely — a collapsed group hides its members, so those digits were firing at rows you could not see. This *removes* keyboard reach that existed before; a later release gives groups their own `⌘⇧1…9`.
+- **A number can change under you.** The lane is inferred from live git and pull-request state, so `⌘3` can retarget without you doing anything. That is the accepted cost of renumbering over hiding.
+- **The digit has no accessibility exposure.** It lives only in the visual hint pill, so VoiceOver has no way to say which digit selects a row.
+- **With the workspace todo feature off, nothing changes.** No lane is read, every workspace stays numbered, and the numbering is exactly what it was. Turn it on at Settings → Beta Features → **Workspace Todo Controls**.
+- **When nothing is in play, every ungrouped workspace is numbered again** — a dead `⌘1` would read as a broken build, and Todo is the default lane.
+
 ## 🟠⋯ Recognize a workspace by its colour, selected or not
 A workspace's colour stays visible as an identity strip down the leading edge of its row, over a quiet wash of the same colour — **while there is something going on in that workspace.** Selecting a workspace fills the row with a contrast-corrected version of that colour instead of a generic highlight, so the active one is obvious without rereading titles.
 
