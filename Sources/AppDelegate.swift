@@ -13782,7 +13782,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // goto_tab fallback from creating a new window when the index is out of bounds.
         if let digit = routableNumberedConfiguredShortcutDigit(event: event, action: .selectWorkspaceByNumber) {
             if let manager = tabManagerForNumberedShortcut(event: event),
-               let targetIndex = WorkspaceShortcutMapper.workspaceIndex(forDigit: digit, workspaceCount: manager.tabs.count) {
+               let targetIndex = WorkspaceShortcutMapper.workspaceFlatIndex(
+                   forDigit: digit,
+                   eligibility: manager.workspaceShortcutEligibility
+               ) {
 #if DEBUG
                 cmuxDebugLog(
                     "shortcut.action name=workspaceDigit digit=\(digit) targetIndex=\(targetIndex) manager=\(debugManagerToken(manager)) \(debugShortcutRouteSnapshot(event: event))"

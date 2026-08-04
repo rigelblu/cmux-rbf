@@ -1095,14 +1095,20 @@ struct cmuxApp: App {
                 if selectWorkspaceByNumberShortcut.isUnbound || selectWorkspaceByNumberShortcut.hasChord {
                     Button(String(localized: "menu.view.workspace", defaultValue: "Workspace \(number)")) {
                         let manager = activeTabManager
-                        if let targetIndex = WorkspaceShortcutMapper.workspaceIndex(forDigit: number, workspaceCount: manager.tabs.count) {
+                        if let targetIndex = WorkspaceShortcutMapper.workspaceFlatIndex(
+                            forDigit: number,
+                            eligibility: manager.workspaceShortcutEligibility
+                        ) {
                             manager.selectTab(at: targetIndex)
                         }
                     }
                 } else {
                     Button(String(localized: "menu.view.workspace", defaultValue: "Workspace \(number)")) {
                         let manager = activeTabManager
-                        if let targetIndex = WorkspaceShortcutMapper.workspaceIndex(forDigit: number, workspaceCount: manager.tabs.count) {
+                        if let targetIndex = WorkspaceShortcutMapper.workspaceFlatIndex(
+                            forDigit: number,
+                            eligibility: manager.workspaceShortcutEligibility
+                        ) {
                             manager.selectTab(at: targetIndex)
                         }
                     }

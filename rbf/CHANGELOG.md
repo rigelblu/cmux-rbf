@@ -5,7 +5,21 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
+(nothing yet)
+
+
+---
+
+# 🔵⋯ v0.14.0 (2026-08-04) — #cm-28
+## 🟠⋯ Changed for End Users
+- 2026-08-04 - feat (ux) | `⌘1…9` now numbers only the workspaces you are actually working in. The digits used to count every row in the sidebar, so a workspace you had parked or finished sat between the ones in play and took a number with it. They now range over the workspaces carrying an **Accent Strip** — in play and ungrouped — and the rows below a parked one move **up** rather than leaving a gap. Press `⌘3` and you land on the third workspace in play, not the third row. Hold `⌘` to see it: a badge appears only where a digit actually works. `⌘9` keeps its jump-to-the-end idiom, now landing on the last workspace in play, and the View menu's nine "Workspace N" items follow the same numbering. The badge and the key renumber together by construction rather than by being kept in sync, so a badge cannot claim a digit that goes somewhere else (#cm-28)
+- **Known limitation — a grouped workspace has no number until the next slice.** Grouped workspaces leave the numbering entirely, which **removes keyboard reach you have today**. It is deliberate: a collapsed group hides its members, so those digits were already firing at rows you could not see. `#cm-29` gives groups their own namespace (`⌘⇧1…9`) and hands the reach back (#cm-28)
+- **Known limitation — a number can change under you.** The lane is inferred from live git and pull-request state, so `⌘3` can retarget without you doing anything. That is the accepted cost of renumbering; the alternative was a badge that hides while its key still fires, which is the worse lie (#cm-28)
+- **Known limitation — VoiceOver cannot reach the digit.** The number lives only in the visual hint pill. Before this change it happened to coincide with the row's "workspace N of M" announcement for the first eight rows; now it does not, and there is no accessible way to learn which digit selects a row (#cm-28)
+- **Known limitation — with the workspace todo feature off, this does nothing, silently.** No lane is read, so every workspace stays eligible and the numbering is exactly what it was. Turn it on at Settings → Beta Features → **Workspace Todo Controls** (#cm-28)
+
 ## 🟠⋯ Changed for Developers
+- 2026-08-04 - refactor (#cm-28) | the "is this workspace in play" lane now has exactly one definition, `Workspace.attentionTaskStatus(todoControlsEnabled:)`, read by both the Accent Strip and the `⌘1…9` numbering — so "striped" and "numbered" cannot drift apart. It took three homes to get there: an inline copy inside the shortcut eligibility (which a cold review found could drift from the sidebar factory with every test still green), then the row *palette* — a type that resolves colours from an immutable snapshot and never called it — and finally beside the `effectiveTaskStatus` it wraps. Guarded from both sides: breaking the one definition now reddens the numbering tests **and** `#cm-22`'s factory test. The digit arithmetic that used to be public as `workspaceIndex(forDigit:workspaceCount:)` is `private` and renamed to say it speaks eligible positions — the old name accepted `tabs.count` happily and would have silently reinstated the pre-`#cm-28` numbering, which is the shape an upstream merge would have brought back. `taskStatusSignals(orderedPanelIds:)` takes the panel order once instead of rebuilding the bonsplit tree snapshot twice per sample (#cm-28)
 - 2026-08-04 - refactor | the installer's swap helper reads cleanly for the next person, and the one part v0.13.0 shipped untested now has tests — a post-release engineering-discernment pass (no behaviour change). The parent's detached-launch block moved out of `install-rbf.sh` into `rbf_swap_launch_detached`, which is both testable and where the fork's "a guard inside one entrypoint cannot be inherited by a second" rule wants it; it now covers immediate/late/never claims plus a real daemon asserted to outlive its spawner **and run in its own process group**. That last assertion is load-bearing: without it, removing the double-fork entirely left the suite green. Suite 23 → 28 tests. **Supersedes v0.13.0's known limitation** that the launch block had no unit test (#cm-27)
 
 

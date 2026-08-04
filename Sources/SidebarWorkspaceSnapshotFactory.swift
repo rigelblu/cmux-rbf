@@ -83,12 +83,18 @@ struct SidebarWorkspaceSnapshotFactory {
         // Suppression asks "is this workspace parked?", which is not the same
         // question as "should a status glyph be shown". `taskStatus` above is
         // gated on `statusHidden`; this deliberately is not — see
-        // `SidebarWorkspaceRowVisualPalette.suppressesAccentStrip`. Prefer the
-        // already-resolved value so the visible case does not sample twice; the
-        // ternary means the feature-off case samples not at all.
-        let attentionTaskStatus: WorkspaceTaskStatus? = todoControlsEnabled
-            ? (taskStatusResolution?.effective ?? workspace.effectiveTaskStatus)
-            : nil
+        // `SidebarWorkspaceRowVisualPalette.suppressesAccentStrip`.
+        //
+        // Resolved through the palette rather than inline, because `#cm-28`'s
+        // `⌘1…9` numbering reads the same lane and a second expression here
+        // could drift from it silently — a striped row that carries no number.
+        // This costs one extra inference sample in the status-visible case
+        // (`taskStatusResolution` above already has the value); snapshots are
+        // cached and rebuilt on refresh rather than per frame, so that is the
+        // cheaper half of the trade against two definitions.
+        let attentionTaskStatus = workspace.attentionTaskStatus(
+            todoControlsEnabled: todoControlsEnabled
+        )
 
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
