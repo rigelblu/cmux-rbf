@@ -68,7 +68,6 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/lib/rbf-install-target.sh"
 
 DRY_RUN=0
-QUIT_TIMEOUT_SECONDS=10
 
 usage() {
   cat <<'USAGE'
@@ -97,25 +96,32 @@ done
 die() { printf 'error: %s\n' "$1" >&2; exit "${2:-1}"; }
 step() { printf '⋯ %s\n' "$1"; }
 
-# ---------------------------------------------------------------------------
-# Guard 1 — refuse to replace the app hosting this very terminal.
-#
-# cmux is a terminal, and RBF is by design the terminal you work in, so this
-# command will routinely be typed inside the app it is about to replace. Killing
-# it would kill this script's own parent mid-install. reload.sh and reloadp.sh
-# both kill first and neither faces this, because a tagged build is never where
-# you work. Runs before any build work so a mistake costs a second.
-# ---------------------------------------------------------------------------
+# Load and validate the channel record before anything reads RBF_* — this is
+# the resolver's own guard (rbf-install-target.sh), not Guard 1 below.
 rbf_channel_load "$SCRIPT_DIR/lib" || exit 1
 rbf_assert_safe_target || exit 1
 
-if [[ "${CMUX_BUNDLE_ID:-}" == "$RBF_BUNDLE_ID" ]]; then
-  printf 'error: refusing — this terminal is hosted by the app being replaced.\n' >&2
-  printf '       CMUX_BUNDLE_ID=%s\n' "$CMUX_BUNDLE_ID" >&2
-  printf '       Replacing it from inside would kill this script mid-install.\n' >&2
-  printf '       Run this from upstream cmux (/Applications/cmux.app) or Terminal.app.\n' >&2
-  exit 1
-fi
+# ---------------------------------------------------------------------------
+# Guard 1 — route the swap around the app hosting this very terminal (#cm-27).
+#
+# cmux is a terminal, and RBF is by design the terminal you work in, so this
+# command will routinely be typed inside the app it is about to replace. This
+# used to be a refusal, and the refusal was right about the ~2-second swap and
+# wrong about the ~10-minute build it also blocked: quitting the app kills this
+# script's own parent, but only the tail past `codesign --verify` needs the app
+# to die. So the guard became routing — hosted by the target, the tail runs in
+# a daemonized helper (double-fork + setsid(2); macOS ships no setsid(1)) that
+# outlives the PTY; anywhere else it runs inline with live output, exactly as
+# before the split. reload.sh and reloadp.sh both kill first and face none of
+# this, because a tagged build is never where you work.
+# ---------------------------------------------------------------------------
+# shellcheck source=rbf/scripts/lib/rbf-swap.sh
+source "$SCRIPT_DIR/lib/rbf-swap.sh"
+SWAP_MODE="$(rbf_swap_mode "$RBF_BUNDLE_ID")"
+SWAP_LOG="${HOME}/Library/Logs/cmux-rbf/install.log"
+# Generous on purpose: a healthy helper claims in milliseconds, so waiting costs
+# nothing, while a false timeout costs the user the session they are sitting in.
+SWAP_CLAIM_TIMEOUT_S=30
 
 # ---------------------------------------------------------------------------
 # Guard 2 — a stable signing identity, or nothing.
@@ -208,6 +214,12 @@ printf '  rbf version    %s (%s)\n' "$RBF_VERSION" "$GIT_COMMIT"
 printf '  signing        %s\n'  "$CODESIGN_IDENTITY"
 printf '  zig            %s\n'  "$ZIG_STATUS"
 printf '  derived data   %s\n'  "$DERIVED_DATA"
+if [[ "$SWAP_MODE" == "detached" ]]; then
+  printf '  swap           detached — this terminal is hosted by the app being replaced;\n'
+  printf '                 outcome via notification + %s\n' "$SWAP_LOG"
+else
+  printf '  swap           inline — live output in this terminal\n'
+fi
 printf '  upstream       %s (never touched)\n' "$UPSTREAM_INSTALL_PATH"
 if [[ $FIRST_INSTALL -eq 1 ]]; then
   printf '  state          first install — will migrate from %s\n' "$UPSTREAM_BUNDLE_ID"
@@ -236,7 +248,16 @@ fi
 # `[[ -z "${CMUX_ZIG:-}" ]]` made a wrong CMUX_ZIG the one input that skipped it.
 rbf_ensure_zig --required || exit 1
 
-cleanup() { [[ -n "${STAGING_ROOT:-}" && -d "$STAGING_ROOT" ]] && rm -rf "$STAGING_ROOT"; }
+# Claim-aware: once the swap helper has claimed staging (atomic mkdir of the
+# sentinel — rbf_swap_claim_path in lib/rbf-swap.sh), this trap owns nothing
+# and must delete nothing, even if it fires before the explicit `trap - EXIT`
+# below — bash runs EXIT traps on an untrapped SIGHUP, so a PTY teardown in
+# that gap would otherwise delete the app mid-swap (cold review, 2026-08-04).
+cleanup() {
+  [[ -n "${STAGING_ROOT:-}" && -d "$STAGING_ROOT" ]] || return 0
+  [[ -e "$(rbf_swap_claim_path "$STAGING_ROOT")" ]] && return 0
+  rm -rf "$STAGING_ROOT"
+}
 trap cleanup EXIT
 
 # ---------------------------------------------------------------------------
@@ -330,91 +351,65 @@ codesign --force --deep --timestamp=none \
 codesign --verify --deep --strict "$STAGED_APP" || die "signature verification failed"
 
 # ---------------------------------------------------------------------------
-step "quitting a running cmux RBF"
-# osascript first (lets it save), then SIGTERM, then REFUSE. Never SIGKILL: a
-# cmux that will not quit is usually holding a confirm-close or unsaved-state
-# dialog, and killing it discards the workspaces this feature exists to keep.
-# reloadp.sh's `pkill -x cmux` is fine for a throwaway build and is not fine here.
+# The tail — quit, swap, migrate, report — lives in lib/rbf-swap.sh since
+# #cm-27, because it is the only part that cannot survive this script's own
+# parent dying. Everything below the codesign --verify above only ever touched
+# DerivedData and the staging dir; everything from the quit onward mutates
+# /Applications and must not be interrupted by the app hosting this terminal
+# going away. The helper receives every value through its argument contract and
+# re-derives nothing.
 # ---------------------------------------------------------------------------
-if pgrep -f "$INSTALL_PATH/Contents/MacOS/" >/dev/null 2>&1; then
-  osascript -e "tell application id \"$RBF_BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
-  waited=0
-  while pgrep -f "$INSTALL_PATH/Contents/MacOS/" >/dev/null 2>&1; do
-    [[ $waited -ge $QUIT_TIMEOUT_SECONDS ]] && break
-    sleep 1; waited=$((waited + 1))
-  done
-  if pgrep -f "$INSTALL_PATH/Contents/MacOS/" >/dev/null 2>&1; then
-    pkill -TERM -f "$INSTALL_PATH/Contents/MacOS/" 2>/dev/null || true
-    sleep 2
-  fi
-  if pgrep -f "$INSTALL_PATH/Contents/MacOS/" >/dev/null 2>&1; then
-    printf 'error: cmux RBF is still running after %ds and a SIGTERM.\n' "$QUIT_TIMEOUT_SECONDS" >&2
-    printf '       Refusing to force-quit — it is probably holding an unsaved-state\n' >&2
-    printf '       or confirm-close dialog, and killing it would discard workspaces.\n' >&2
-    printf '       Quit it by hand, then re-run. Nothing was written; the existing\n' >&2
-    printf '       install at %s is untouched.\n' "$INSTALL_PATH" >&2
-    exit 1
-  fi
+SWAP_ARGS=(
+  --staged-app "$STAGED_APP"
+  --staging-root "$STAGING_ROOT"
+  --rollback-root "$ROLLBACK_ROOT"
+  --install-path "$INSTALL_PATH"
+  --bundle-id "$RBF_BUNDLE_ID"
+  --upstream-bundle-id "$UPSTREAM_BUNDLE_ID"
+  --upstream-path "$UPSTREAM_INSTALL_PATH"
+  --first-install "$FIRST_INSTALL"
+  --rbf-version "$RBF_VERSION"
+  --git-commit "$GIT_COMMIT"
+  --log-file "$SWAP_LOG"
+)
+
+if [[ "$SWAP_MODE" == "inline" ]]; then
+  # A child process, deliberately not `exec`: bash skips EXIT traps on exec,
+  # which would orphan the staging cleanup this script still owns. Once the
+  # helper claims staging, our claim-aware trap goes inert and the helper's
+  # own trap cleans up; if the helper dies before claiming, our trap still
+  # holds. One owner at every instant, zero windows.
+  bash "$SCRIPT_DIR/lib/rbf-swap.sh" --mode inline "${SWAP_ARGS[@]}"
+  exit $?
 fi
 
-# ---------------------------------------------------------------------------
-step "installing"
-# Same-volume rename — see the header on why staging is here and not on the
-# external drive. The old bundle is moved aside first so the swap window is a
-# rename, not a delete-then-copy.
-# ---------------------------------------------------------------------------
-PREVIOUS=""
-if [[ -d "$INSTALL_PATH" ]]; then
-  mkdir -p "$ROLLBACK_ROOT" || die "cannot create the rollback dir: $ROLLBACK_ROOT"
-  PREVIOUS="$ROLLBACK_ROOT/previous.app"
-  mv "$INSTALL_PATH" "$PREVIOUS" || die "could not move the existing install aside"
+# Detached: daemonize the helper (double-fork + setsid(2) — macOS ships no
+# setsid(1) binary), then wait for it to CLAIM staging (atomic mkdir) before
+# standing down. Ownership is an election, not a baton: if the wait times out,
+# we reclaim by the same atomic mkdir — whoever wins is the only process that
+# may delete staging or act against the app, so a slow helper either claims
+# in time or finds the claim taken and exits touching nothing. The wait length
+# costs nothing when the helper is healthy (it claims in milliseconds) and a
+# false timeout would cost the user's whole session, so it is deliberately
+# generous.
+step "handing the swap to a detached helper — this terminal is hosted by the app being replaced"
+mkdir -p "$(dirname "$SWAP_LOG")" || die "cannot create log dir for $SWAP_LOG"
+
+if ! rbf_swap_launch_detached "$STAGING_ROOT" "$SWAP_LOG" "$SWAP_CLAIM_TIMEOUT_S" \
+     /bin/bash "$SCRIPT_DIR/lib/rbf-swap.sh" --mode detached "${SWAP_ARGS[@]}"; then
+  # We hold the claim: the helper can never act now. Delete staging ourselves
+  # (the claim-aware trap would refuse — the claim dir exists) and report on a
+  # terminal that is still alive; the app was never quit.
+  rm -rf "$STAGING_ROOT"
+  trap - EXIT
+  die "swap helper never claimed ownership within ${SWAP_CLAIM_TIMEOUT_S}s — ownership reclaimed, staging cleaned up; the helper cannot act and nothing was installed. See $SWAP_LOG"
 fi
 
-if ! mv "$STAGED_APP" "$INSTALL_PATH"; then
-  if [[ -n "$PREVIOUS" ]]; then
-    if mv "$PREVIOUS" "$INSTALL_PATH"; then
-      printf 'rolled back to the previous install\n' >&2
-      rmdir "$ROLLBACK_ROOT" 2>/dev/null || true
-    else
-      # Both moves failed, so /Applications has no app. Say exactly where the
-      # old one is; this is the case the rollback dir exists for, and a path the
-      # user cannot guess.
-      printf 'error: rollback ALSO failed. Your previous install is intact at:\n' >&2
-      printf '       %s\n' "$PREVIOUS" >&2
-      printf '       Move it back by hand; nothing else will clean it up.\n' >&2
-    fi
-  fi
-  die "failed to move the new app into place"
-fi
+# The helper holds the claim: staging is its to guard and ours to leave alone.
+# The claim-aware trap above is already inert; this disarm is hygiene.
+trap - EXIT
 
-# The swap succeeded, so the old bundle is no longer the only copy of a working
-# app. Removed explicitly here rather than by the EXIT trap -- if this line is
-# never reached, the previous install is still on disk and recoverable by hand,
-# which is the entire point of keeping it outside $STAGING_ROOT.
-[[ -n "$PREVIOUS" ]] && rm -rf "$ROLLBACK_ROOT"
-
-# ---------------------------------------------------------------------------
-MIGRATION_RESULT="skipped (existing install)"
-if [[ $FIRST_INSTALL -eq 1 ]]; then
-  step "migrating state from upstream (first install only)"
-  # ${PIPESTATUS[0]}, not the pipeline's own status. `if migrate | sed` reports
-  # SED's exit code unless `pipefail` is set -- it is, at the top of this file,
-  # so that form does work today. But the correctness of the line you are
-  # reading would then live 300 lines away in a shell option nothing here names,
-  # and losing `pipefail` in some future edit would turn the FAILED branch below
-  # into dead code with no error anywhere: every install would end by reporting
-  # a successful migration. Read the migration's own status directly instead.
-  bash "$SCRIPT_DIR/migrate-rbf-state.sh" 2>&1 | sed 's/^/  /'
-  if [[ ${PIPESTATUS[0]} -eq 0 ]]; then
-    MIGRATION_RESULT="migrated from $UPSTREAM_BUNDLE_ID"
-  else
-    MIGRATION_RESULT="FAILED — run rbf/scripts/migrate-rbf-state.sh --reclone"
-  fi
-fi
-
-printf '\n✓ installed\n'
-printf '  %s\n' "$INSTALL_PATH"
-printf '  rbf version  %s (%s)\n' "$RBF_VERSION" "$GIT_COMMIT"
-printf '  bundle id    %s\n' "$RBF_BUNDLE_ID"
-printf '  state        %s\n' "$MIGRATION_RESULT"
-printf '  upstream     %s — untouched\n' "$UPSTREAM_INSTALL_PATH"
+printf '\n⋯ handing off — cmux RBF will quit, ending ALL its shells and agents, then swap and relaunch.\n'
+printf '  log: %s\n' "$SWAP_LOG"
+printf '  a notification will confirm success or failure.\n'
+exit 0

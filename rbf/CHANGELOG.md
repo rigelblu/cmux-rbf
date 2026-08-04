@@ -5,6 +5,26 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
+## 🟠⋯ Changed for Developers
+- 2026-08-04 - refactor | the installer's swap helper reads cleanly for the next person, and the one part v0.13.0 shipped untested now has tests — a post-release engineering-discernment pass (no behaviour change). The parent's detached-launch block moved out of `install-rbf.sh` into `rbf_swap_launch_detached`, which is both testable and where the fork's "a guard inside one entrypoint cannot be inherited by a second" rule wants it; it now covers immediate/late/never claims plus a real daemon asserted to outlive its spawner **and run in its own process group**. That last assertion is load-bearing: without it, removing the double-fork entirely left the suite green. Suite 23 → 28 tests. **Supersedes v0.13.0's known limitation** that the launch block had no unit test (#cm-27)
+
+
+---
+
+# 🔵⋯ v0.13.0 (2026-08-04) — #cm-27
+## 🟠⋯ Changed for End Users
+- 2026-08-04 - feat | install a new build of cmux RBF from inside cmux RBF — `make install-rbf` no longer refuses when the terminal it runs in is hosted by the app it is replacing. The old refusal was right about the 2-second swap and wrong about the ~10-minute build it also blocked; the installer now builds where you are, then hands the quit→swap→relaunch tail to a small detached helper that outlives the app's death. It prints what will happen before your terminal goes away, quits cmux RBF — **ending every shell and agent the app hosts, not just the install shell** — swaps the bundle with the same parked-rollback safety as before, relaunches the new build, and confirms by macOS notification. The full transcript lands in `~/Library/Logs/cmux-rbf/install.log`. Run from Terminal.app or upstream cmux, nothing changes: same live output, same messages, plus one plan line naming which route the swap will take (#cm-27)
+- 2026-08-04 - feat | an install that cannot quit the app never costs you your workspaces — if cmux RBF is holding a dialog when the detached helper tries to quit it, a notification at ~10 seconds asks you to dismiss it; if the app still has not quit after 60 seconds, the install aborts cleanly — existing install untouched, staging removed, failure logged and notified. It never force-quits, in either mode, because killing a cmux that is asking about unsaved state discards exactly the workspaces this installer exists to preserve (#cm-27)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-04 - refactor | the install tail (quit → swap → migrate → report) moved from `install-rbf.sh` into `rbf/scripts/lib/rbf-swap.sh`, seam-structured like `rbf-install-target.sh`, with a 23-test suite (`rbf-swap.test.sh`) covering routing, the argument contract, stuck-quit in both modes, rollback and double-failure, and cleanup ownership — paths unreachable from the real entry point, which takes no target flag by design. Staging cleanup ownership is an **atomic `mkdir` election** (`.rbf-swap-claimed`): the helper claims, a timed-out parent reclaims, exactly one side ever wins, and the parent's EXIT trap defers to an existing claim — closing a two-owner window a cold review found in the first marker-file design. Verified by mutation testing: 8/8 deliberate breaks caught (#cm-27)
+
+## 🟠⋯ Known Limitations
+- **The log cannot tell you which quit path fired.** The first real self-hosted install quit gracefully in seconds — so `osascript … to quit` does work from a detached, terminal-less helper on this machine — but the transcript records only that the app quit, not whether the polite request or the SIGTERM fallback did it. The discriminator today is elapsed time: a fallback run waits the full 60 seconds first. On a machine that declines the Automation grant the install still completes; the app simply skips its save path (#cm-27)
+- **Notifications are best-effort.** The helper posts via `osascript`, whose banners Notification Center can suppress by settings. Delivery is confirmed on this machine — both by probe and on the first real install — but it is not guaranteed on another; the durable outcome record is the log, and the handoff notice names it before the terminal dies (#cm-27)
+- **The parent's launch block — the daemonizer, the claim wait, the reclaim branch — has no unit test.** Everything behind the handoff boundary is suite-covered; the handoff itself is proven by probes (parent-exit and SIGHUP survival) and by the real self-hosted install, not by `rbf-swap.test.sh` (#cm-27)
+- **The routing signal is the hosting bundle id, not the installed app.** A copy of the bundle run from anywhere sets it — including a hand-recovered `previous.app`, in which narrow case a detached run could execute first-install migration. And a tmux session begun inside cmux RBF keeps the id when attached from Terminal.app, so such a run routes detached even though that terminal would have survived: safe, but output goes to the log and the app still quits (#cm-27)
+- **`install.log` grows by append forever.** Each run opens with a delimited header (timestamp, version, commit), so it stays greppable; nothing rotates it (#cm-27)
 
 ---
 
