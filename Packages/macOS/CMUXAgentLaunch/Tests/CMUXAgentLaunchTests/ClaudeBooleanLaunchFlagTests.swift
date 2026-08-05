@@ -48,8 +48,10 @@ struct ClaudeBooleanLaunchFlagTests {
                 kind: "claude",
                 sessionId: "SID",
                 executablePath: nil,
-                arguments: ["claude", "--dangerously-skip-permissions", "ship", "--model", "opus"]
-            ) == ["claude", "--resume", "SID", "--dangerously-skip-permissions", "--model", "opus"]
+                // `--add-dir` trails `--model` so this still proves options *after* the
+                // one-word prompt survive, now that `--model` itself is dropped (#cm-30).
+                arguments: ["claude", "--dangerously-skip-permissions", "ship", "--model", "opus", "--add-dir", "/tmp"]
+            ) == ["claude", "--resume", "SID", "--dangerously-skip-permissions", "--add-dir", "/tmp"]
         )
     }
 
@@ -60,8 +62,8 @@ struct ClaudeBooleanLaunchFlagTests {
                 kind: "claude",
                 sessionId: "SID",
                 executablePath: nil,
-                arguments: ["claude", "--verbose", "ship", "--model", "opus"]
-            ) == ["claude", "--resume", "SID", "--fork-session", "--verbose", "--model", "opus"]
+                arguments: ["claude", "--verbose", "ship", "--model", "opus", "--add-dir", "/tmp"]
+            ) == ["claude", "--resume", "SID", "--fork-session", "--verbose", "--add-dir", "/tmp"]
         )
     }
 

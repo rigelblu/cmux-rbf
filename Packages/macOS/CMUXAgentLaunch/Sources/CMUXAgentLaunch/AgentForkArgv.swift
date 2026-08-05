@@ -31,7 +31,10 @@ public struct AgentForkArgv: Sendable, Equatable {
             guard let preserved = AgentLaunchSanitizer.preservedClaudeTeamsLaunchArguments(args: tail) else {
                 return .resolved(nil)
             }
-            return .resolved([parts.executable, "claude-teams", "--resume", sessionId, "--fork-session"] + preserved)
+            return .resolved(
+                [parts.executable, "claude-teams", "--resume", sessionId, "--fork-session"]
+                    + AgentResumeArgv.claudeArgumentsDroppingSessionRestoredOptions(preserved)
+            )
         case "codexTeams":
             let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
             var tail = parts.tail
@@ -81,7 +84,8 @@ public struct AgentForkArgv: Sendable, Equatable {
                 return nil
             }
             return AgentResumeArgv.claudeArgvApplyingObservedPermissionMode(
-                ["claude", "--resume", sessionId, "--fork-session"] + preserved,
+                ["claude", "--resume", sessionId, "--fork-session"]
+                    + AgentResumeArgv.claudeArgumentsDroppingSessionRestoredOptions(preserved),
                 observedPermissionMode: observedPermissionMode
             )
         case "codex":
