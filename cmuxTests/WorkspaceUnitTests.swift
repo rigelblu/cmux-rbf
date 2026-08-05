@@ -2834,10 +2834,11 @@ final class StoredShortcutMatchingTests: XCTestCase {
 /// `#cm-28` — `⌘1…9` ranges over the workspaces carrying an Accent Strip.
 final class WorkspaceShortcutEligibilityTests: XCTestCase {
     private func candidate(
-        grouped: Bool = false,
+        anchor: Bool = false,
+        collapsed: Bool = false,
         _ status: WorkspaceTaskStatus?
     ) -> WorkspaceShortcutEligibility.Candidate {
-        .init(isGrouped: grouped, attentionTaskStatus: status)
+        .init(isGroupAnchor: anchor, isInCollapsedGroup: collapsed, attentionTaskStatus: status)
     }
 
     /// The headline behaviour: a parked row takes no digit, and the rows after
@@ -2901,34 +2902,48 @@ final class WorkspaceShortcutEligibilityTests: XCTestCase {
         XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 9, eligibility: eligibility), 1)
     }
 
-    /// A grouped workspace carries no digit whatever its status, because a
-    /// collapsed group hides its non-anchor members.
-    func testGroupedWorkspacesNeverCarryADigit() {
+    /// `#cm-37` — the two rows that carry no digit are the group **anchor** (its
+    /// row is the header, which reads as a group) and a member of a **collapsed**
+    /// group (no row at all). An ordinary member is numbered like anything else.
+    ///
+    /// Replaces `#cm-28`'s `testGroupedWorkspacesNeverCarryADigit`, which
+    /// asserted that *every* grouped workspace was excluded — the defect, not the
+    /// rule. Kept as a single compound fixture on purpose: the two exclusions and
+    /// the inclusion have to be asserted together, because a fix that handles
+    /// only one of them satisfies any test that checks only one.
+    func testOnlyAnchorsAndCollapsedMembersCarryNoDigit() {
         let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
-            candidate(grouped: true, .working),
+            candidate(anchor: true, .working),
             candidate(.working),
-            candidate(grouped: true, .needsAttention),
+            candidate(collapsed: true, .working),
+            candidate(.needsAttention),
         ])
 
-        XCTAssertEqual(eligibility.count, 1)
+        XCTAssertEqual(eligibility.count, 2, "the anchor and the collapsed member must both be out")
         XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility))
         XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility), 1)
         XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility))
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 3, eligibility: eligibility), 2)
+        // Badge and key stay exact inverses across the exclusions.
+        XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 2, eligibility: eligibility), 3)
     }
 
     /// The fallback: nothing in play must not mean a dead keyboard. It widens
-    /// the status axis only — grouped workspaces stay out.
-    func testNothingInPlayFallsBackToEveryUngroupedWorkspace() {
+    /// the status axis only — anchors and collapsed members stay out.
+    /// (`#cm-37` widened the set it falls back over; the shape is `#cm-28`'s.)
+    func testNothingInPlayFallsBackToEveryRowVisibleWorkspace() {
         let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
             candidate(.todo),
-            candidate(grouped: true, .todo),
+            candidate(anchor: true, .todo),
+            candidate(collapsed: true, .todo),
             candidate(.done),
         ])
 
         XCTAssertEqual(eligibility.count, 2)
         XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
         XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility))
-        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility), 2)
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility))
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 3, eligibility: eligibility), 2)
     }
 
     /// With the workspace todo feature off every lane reads `nil`, so nothing
@@ -2950,27 +2965,59 @@ final class WorkspaceShortcutEligibilityTests: XCTestCase {
 /// `Workspace` correctly, which is the layer the six call sites go through.
 @MainActor
 final class WorkspaceShortcutEligibilityLiveWorkspaceTests: XCTestCase {
-    /// Mirrors the flat sidebar order: a working workspace, a parked one, a
-    /// grouped one, and a second working one.
-    func testEligibilityReadsGroupMembershipAndStatusOffLiveWorkspaces() {
-        let working = Workspace(title: "working")
-        working.setTaskStatusOverride(.working)
+    /// An expanded group anchored on `anchor`. Expanded is the default state and
+    /// the one `#cm-28` never tested — its fixtures only ever produced the
+    /// excluded case, which is why a green suite certified a dead feature.
+    private func expandedGroup(anchor: Workspace) -> WorkspaceGroup {
+        WorkspaceGroup(
+            id: UUID(),
+            name: "group",
+            isCollapsed: false,
+            isPinned: false,
+            anchorWorkspaceId: anchor.id,
+            customColor: nil,
+            iconSymbol: nil
+        )
+    }
+
+    /// Mirrors the flat sidebar order: an expanded group's anchor and member,
+    /// a parked ungrouped workspace, and a working ungrouped one — so the two
+    /// facts that live on `WorkspaceGroup` rather than `Workspace`
+    /// (`anchorWorkspaceId`, `isCollapsed`) are read off real values.
+    ///
+    /// `#cm-37` rewrote this: it previously asserted the *grouped* workspace was
+    /// excluded, which is the behaviour that made the feature dead for a fully
+    /// grouped sidebar. The member is now numbered and the anchor is not.
+    func testEligibilityReadsAnchorAndCollapseStateOffLiveGroups() {
+        let anchor = Workspace(title: "anchor")
+        anchor.setTaskStatusOverride(.working)
+        let member = Workspace(title: "member")
+        member.setTaskStatusOverride(.working)
         let parked = Workspace(title: "parked")
         parked.setTaskStatusOverride(.todo)
-        let grouped = Workspace(title: "grouped")
-        grouped.setTaskStatusOverride(.working)
-        grouped.groupId = UUID()
         let alsoWorking = Workspace(title: "also working")
         alsoWorking.setTaskStatusOverride(.needsAttention)
 
+        let group = expandedGroup(anchor: anchor)
+        anchor.groupId = group.id
+        member.groupId = group.id
+
         let eligibility = WorkspaceShortcutEligibility.resolve(
-            workspaces: [working, parked, grouped, alsoWorking],
+            workspaces: [anchor, member, parked, alsoWorking],
+            groups: [group],
             todoControlsEnabled: true
         )
 
         XCTAssertEqual(eligibility.count, 2)
-        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
-        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility))
+        XCTAssertNil(
+            WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility),
+            "the anchor's row is the group header and carries no digit"
+        )
+        XCTAssertEqual(
+            WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility),
+            1,
+            "an expanded group's member has its own row and must be numbered"
+        )
         XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: eligibility))
         XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 3, eligibility: eligibility), 2)
         // The key side must land on the flat row the badge is drawn on, not on
@@ -2978,9 +3025,112 @@ final class WorkspaceShortcutEligibilityLiveWorkspaceTests: XCTestCase {
         XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 2, eligibility: eligibility), 3)
     }
 
+    /// Collapsing a group takes its members' digits away and renumbers the rows
+    /// below them — the `#cm-37` decision that keeps *a digit is visible if and
+    /// only if it works* literally true. Asserted as one before/after pair so a
+    /// fix that ignores collapse state cannot pass it.
+    func testCollapsingAGroupRemovesItsMembersDigitsAndRenumbersBelow() {
+        let anchor = Workspace(title: "anchor")
+        anchor.setTaskStatusOverride(.working)
+        let member = Workspace(title: "member")
+        member.setTaskStatusOverride(.working)
+        let below = Workspace(title: "below")
+        below.setTaskStatusOverride(.working)
+
+        var group = expandedGroup(anchor: anchor)
+        anchor.groupId = group.id
+        member.groupId = group.id
+        let workspaces = [anchor, member, below]
+
+        let expanded = WorkspaceShortcutEligibility.resolve(
+            workspaces: workspaces,
+            groups: [group],
+            todoControlsEnabled: true
+        )
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: expanded), 1)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: expanded), 2)
+
+        group.isCollapsed = true
+        let collapsed = WorkspaceShortcutEligibility.resolve(
+            workspaces: workspaces,
+            groups: [group],
+            todoControlsEnabled: true
+        )
+        XCTAssertNil(
+            WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: collapsed),
+            "a collapsed group's member has no row, so it must lose its digit"
+        )
+        XCTAssertEqual(
+            WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 2, eligibility: collapsed),
+            1,
+            "the row below must move up into the freed digit"
+        )
+    }
+
+    /// A workspace whose `groupId` names a group that is not in the window's
+    /// group list draws an ordinary visible row —
+    /// `SidebarWorkspaceRenderItem.renderItems` guards both of its row
+    /// suppressions on that lookup succeeding. So it must stay eligible, or it
+    /// becomes a visible row with no digit: the exact shape `#cm-37` removes.
+    /// Found by cold review of the `#cm-37` brief, 2026-08-05.
+    func testAWorkspaceWithADanglingGroupIdStaysNumbered() {
+        let dangling = Workspace(title: "dangling")
+        dangling.setTaskStatusOverride(.working)
+        dangling.groupId = UUID()
+
+        let eligibility = WorkspaceShortcutEligibility.resolve(
+            workspaces: [dangling],
+            groups: [],
+            todoControlsEnabled: true
+        )
+
+        XCTAssertEqual(eligibility.count, 1)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
+    }
+
+    /// `#cm-37` — a workspace inside a group carries a digit. Groups are
+    /// expanded by default, so a member has a sidebar row of its own and the
+    /// governing rule (*a digit is visible if and only if it works*) says it
+    /// must be numbered. `#cm-28` excluded it anyway, using *ungrouped* as a
+    /// proxy for "has a visible row"; the proxy is wrong in exactly this
+    /// direction, and Tom's real layout is entirely grouped, so the proxy made
+    /// the whole feature dead for its only user.
+    ///
+    /// **This is the recorded red for `#cm-37`.** First written against the
+    /// pre-fix signature so it would be a genuine failure rather than a compile
+    /// error, and observed failing on 2026-08-05 with
+    /// `XCTAssertEqual failed: ("0") is not equal to ("2")` — eligibility count
+    /// zero where two members were expected. Carried forward here on the post-fix
+    /// signature; the fixture and the expectation are unchanged.
+    func testAGroupMemberIsEligibleBecauseAnExpandedGroupShowsItsRows() {
+        let anchor = Workspace(title: "anchor")
+        anchor.setTaskStatusOverride(.working)
+        let member = Workspace(title: "member")
+        member.setTaskStatusOverride(.working)
+        let alsoMember = Workspace(title: "also member")
+        alsoMember.setTaskStatusOverride(.needsAttention)
+
+        let group = expandedGroup(anchor: anchor)
+        for workspace in [anchor, member, alsoMember] { workspace.groupId = group.id }
+
+        let eligibility = WorkspaceShortcutEligibility.resolve(
+            workspaces: [member, alsoMember],
+            groups: [group],
+            todoControlsEnabled: true
+        )
+
+        XCTAssertEqual(
+            eligibility.count,
+            2,
+            "a group's members have their own sidebar rows and must carry digits"
+        )
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: eligibility), 1)
+        XCTAssertEqual(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: eligibility), 2)
+    }
+
     /// With the todo feature off every lane reads `nil`, so a parked workspace
     /// keeps its digit and the numbering is exactly what it was before `#cm-28`.
-    func testTodoFeatureOffNumbersEveryUngroupedWorkspaceRegardlessOfStatus() {
+    func testTodoFeatureOffNumbersEveryRowVisibleWorkspaceRegardlessOfStatus() {
         let parked = Workspace(title: "parked")
         parked.setTaskStatusOverride(.todo)
         let working = Workspace(title: "working")
@@ -2988,6 +3138,7 @@ final class WorkspaceShortcutEligibilityLiveWorkspaceTests: XCTestCase {
 
         let eligibility = WorkspaceShortcutEligibility.resolve(
             workspaces: [parked, working],
+            groups: [],
             todoControlsEnabled: false
         )
 
@@ -3033,6 +3184,7 @@ final class WorkspaceShortcutEligibilityLiveWorkspaceTests: XCTestCase {
         }
         let eligibility = WorkspaceShortcutEligibility.resolve(
             workspaces: workspaces,
+            groups: [],
             todoControlsEnabled: true
         )
 
@@ -3044,32 +3196,56 @@ final class WorkspaceShortcutEligibilityLiveWorkspaceTests: XCTestCase {
         XCTAssertEqual(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: 9, eligibility: eligibility), 2)
     }
 
-    /// The two empty shapes: no workspaces at all, and every workspace grouped.
-    /// Both leave the digits dead, and neither may trap. The all-grouped case is
-    /// an accepted limitation until groups get `⌘⇧1…9`, not a defect.
-    func testNoWorkspacesAndAllGroupedBothLeaveEveryDigitDead() {
-        let empty = WorkspaceShortcutEligibility.resolve(workspaces: [], todoControlsEnabled: true)
-        XCTAssertEqual(empty.count, 0)
-
-        let groupId = UUID()
-        let grouped = (0..<2).map { index -> Workspace in
-            let workspace = Workspace(title: "g\(index)")
-            workspace.setTaskStatusOverride(.working)
-            workspace.groupId = groupId
-            return workspace
-        }
-        let allGrouped = WorkspaceShortcutEligibility.resolve(
-            workspaces: grouped,
+    /// The two shapes that leave every digit dead, and neither may trap: no
+    /// workspaces at all, and every workspace inside a **collapsed** group.
+    ///
+    /// **`#cm-37` rewrote this test, and its history is the point.** As `#cm-28`
+    /// wrote it, the second shape was "every workspace *grouped*", asserted dead,
+    /// and its doc comment called that *"an accepted limitation … not a defect."*
+    /// It was a defect: the maintainer's own sidebar is entirely grouped, so that
+    /// assertion certified a feature that did nothing for its only user, and the
+    /// test passed every run. An all-grouped sidebar is now fully numbered — the
+    /// case below it covers — and only collapsing every group kills the digits.
+    /// That remaining case is accepted, but the lesson is not to trust the word
+    /// "accepted" in a comment: check who the leftover case actually belongs to.
+    func testNoWorkspacesAndAllCollapsedBothLeaveEveryDigitDead() {
+        let empty = WorkspaceShortcutEligibility.resolve(
+            workspaces: [],
+            groups: [],
             todoControlsEnabled: true
         )
-        XCTAssertEqual(allGrouped.count, 0)
+        XCTAssertEqual(empty.count, 0)
+
+        let anchor = Workspace(title: "anchor")
+        anchor.setTaskStatusOverride(.working)
+        let member = Workspace(title: "member")
+        member.setTaskStatusOverride(.working)
+        var group = expandedGroup(anchor: anchor)
+        anchor.groupId = group.id
+        member.groupId = group.id
+
+        // Expanded, the member is numbered — the behaviour `#cm-28` got wrong.
+        let expanded = WorkspaceShortcutEligibility.resolve(
+            workspaces: [anchor, member],
+            groups: [group],
+            todoControlsEnabled: true
+        )
+        XCTAssertEqual(expanded.count, 1, "an all-grouped sidebar must still be numbered")
+
+        group.isCollapsed = true
+        let allCollapsed = WorkspaceShortcutEligibility.resolve(
+            workspaces: [anchor, member],
+            groups: [group],
+            todoControlsEnabled: true
+        )
+        XCTAssertEqual(allCollapsed.count, 0)
 
         for digit in 1...9 {
             XCTAssertNil(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: digit, eligibility: empty))
-            XCTAssertNil(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: digit, eligibility: allGrouped))
+            XCTAssertNil(WorkspaceShortcutMapper.workspaceFlatIndex(forDigit: digit, eligibility: allCollapsed))
         }
-        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: allGrouped))
-        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: allGrouped))
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 0, eligibility: allCollapsed))
+        XCTAssertNil(WorkspaceShortcutMapper.digitForWorkspace(atFlatIndex: 1, eligibility: allCollapsed))
     }
 }
 

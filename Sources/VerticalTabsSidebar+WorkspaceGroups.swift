@@ -41,12 +41,16 @@ extension VerticalTabsSidebar {
         let canMarkAllRead = notificationStore.canMarkWorkspaceRead(forTabIds: nonAnchorMemberIds)
         let canMarkAllUnread = notificationStore.canMarkWorkspaceUnread(forTabIds: nonAnchorMemberIds)
         let anchorIndex = renderContext.tabIndexById[group.anchorWorkspaceId] ?? 0
-        // Dead until `#cm-29`: always `nil`. A group's anchor carries a
-        // `groupId`, and `#cm-28` takes every grouped workspace out of the
-        // numbering — so this resolves to nothing and the hint pill downstream
-        // is unreachable. Kept wired rather than deleted because `#cm-29` gives
-        // groups `⌘⇧1…9` and revives exactly this path; if that slips, this
-        // comment is the only thing saying so.
+        // Dead until `#cm-29`: always `nil`. **Same conclusion as `#cm-28`, but
+        // read the reason — `#cm-37` replaced it.** `#cm-28` said "the anchor
+        // carries a `groupId`, and grouped workspaces leave the numbering", which
+        // stopped being true when `#cm-37` gave an expanded group's *members*
+        // their digits back. What keeps this `nil` now is narrower and permanent:
+        // the anchor is excluded *as an anchor* (`Candidate.isGroupAnchor`),
+        // because this row reads as a group rather than a workspace — not because
+        // it happens to sit in one. Kept wired rather than deleted because
+        // `#cm-29` gives groups `⌘⇧1…9` and revives exactly this path; if that
+        // slips, this comment is the only thing saying so.
         let shortcutDigit = WorkspaceShortcutMapper.digitForWorkspace(
             atFlatIndex: anchorIndex,
             eligibility: renderContext.workspaceShortcutEligibility
@@ -251,12 +255,16 @@ extension VerticalTabsSidebar {
             (unreadSummariesByWorkspaceId[$0]?.unreadCount ?? 0) == 0
         }
         let anchorIndex = renderContext.tabIndexById[group.anchorWorkspaceId] ?? 0
-        // Dead until `#cm-29`: always `nil`. A group's anchor carries a
-        // `groupId`, and `#cm-28` takes every grouped workspace out of the
-        // numbering — so this resolves to nothing and the hint pill downstream
-        // is unreachable. Kept wired rather than deleted because `#cm-29` gives
-        // groups `⌘⇧1…9` and revives exactly this path; if that slips, this
-        // comment is the only thing saying so.
+        // Dead until `#cm-29`: always `nil`. **Same conclusion as `#cm-28`, but
+        // read the reason — `#cm-37` replaced it.** `#cm-28` said "the anchor
+        // carries a `groupId`, and grouped workspaces leave the numbering", which
+        // stopped being true when `#cm-37` gave an expanded group's *members*
+        // their digits back. What keeps this `nil` now is narrower and permanent:
+        // the anchor is excluded *as an anchor* (`Candidate.isGroupAnchor`),
+        // because this row reads as a group rather than a workspace — not because
+        // it happens to sit in one. Kept wired rather than deleted because
+        // `#cm-29` gives groups `⌘⇧1…9` and revives exactly this path; if that
+        // slips, this comment is the only thing saying so.
         let shortcutDigit = WorkspaceShortcutMapper.digitForWorkspace(
             atFlatIndex: anchorIndex,
             eligibility: renderContext.workspaceShortcutEligibility
