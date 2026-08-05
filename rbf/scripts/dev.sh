@@ -23,6 +23,17 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# Pre-grant TCC permissions for this build's bundle id so a new branch's first
+# launch doesn't re-prompt. Fail-soft: every failure inside degrades to the old
+# behavior (one prompt pair), never a broken build.
+tcc_preseed() {
+  # shellcheck source=/dev/null
+  if . "$REPO_ROOT/rbf/scripts/lib/rbf-tcc-preseed.sh" 2>/dev/null \
+      && declare -f rbf_tcc_preseed >/dev/null; then
+    RBF_REPO_ROOT="$REPO_ROOT" rbf_tcc_preseed "$1" || true
+  fi
+}
+
 # Derive a reload.sh-safe build-id from the branch you are on.
 #
 # Ask jj first. This repo's primary checkout is jj, and jj keeps git's HEAD
@@ -144,13 +155,26 @@ case "$cmd" in
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
     check_submodule_sync
     ensure_zig
-    exec ./scripts/reload.sh --tag "$BUILD_ID_VALUE" "$@"
+    tcc_preseed "$BUILD_ID_VALUE"
+    # No exec: the preseed must run again AFTER reload.sh. The app swap can
+    # race TCC — a prompt answered against a mid-swap process records a
+    # one-build cdhash grant the new app never matches (observed 2026-08-05),
+    # and the post-pass repairs it so the next launch is silent.
+    status=0
+    ./scripts/reload.sh --tag "$BUILD_ID_VALUE" "$@" || status=$?
+    tcc_preseed "$BUILD_ID_VALUE"
+    exit "$status"
     ;;
   run)
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
     check_submodule_sync
     ensure_zig
-    exec ./scripts/reload.sh --tag "$BUILD_ID_VALUE" --launch "$@"
+    tcc_preseed "$BUILD_ID_VALUE"
+    # No exec — see `build` for why the preseed runs again after reload.sh.
+    status=0
+    ./scripts/reload.sh --tag "$BUILD_ID_VALUE" --launch "$@" || status=$?
+    tcc_preseed "$BUILD_ID_VALUE"
+    exit "$status"
     ;;
   test)
     # The `cmux` scheme compiles no unit tests and still prints TEST BUILD
@@ -171,6 +195,9 @@ case "$cmd" in
     # one command this fork calls its gate.
     check_submodule_sync
     ensure_zig
+    # The unit-test host is the UNTAGGED "cmux DEV.app" (bundle id
+    # com.cmuxterm.app.debug), not the tagged app — seed that id.
+    tcc_preseed "com.cmuxterm.app.debug"
 
     # A running tagged app makes the test runner die with "Test runner never
     # began executing tests", exit 65, ZERO tests run — and nothing in that
@@ -197,13 +224,30 @@ case "$cmd" in
     resolve_args=()
     [[ "${CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION:-}" == "1" ]] \
       && resolve_args+=(-disableAutomaticPackageResolution)
+    # TCC keys permission grants off the code signature. reload.sh re-signs the
+    # tagged app with CMUX_DEV_CODESIGN_IDENTITY so grants survive rebuilds, but
+    # this path never goes through reload.sh — Xcode ad-hoc signs the test host
+    # ("cmux DEV.app"), whose designated requirement is a cdhash that changes
+    # every build, so EVERY `make test` re-prompts for removable-volume and
+    # app-data access. Passing the identity here gives the host the same stable
+    # identifier-based requirement, so one grant sticks. Unset → ad-hoc, as before.
+    sign_args=()
+    if [[ -n "${CMUX_DEV_CODESIGN_IDENTITY:-}" ]]; then
+      if security find-identity -v -p codesigning 2>/dev/null \
+          | grep -Fq "\"$CMUX_DEV_CODESIGN_IDENTITY\""; then
+        sign_args+=(CODE_SIGN_IDENTITY="$CMUX_DEV_CODESIGN_IDENTITY" CODE_SIGN_STYLE=Manual)
+      else
+        echo "dev.sh: warning: CMUX_DEV_CODESIGN_IDENTITY='$CMUX_DEV_CODESIGN_IDENTITY' not in the keychain; test host stays ad-hoc signed (macOS will re-prompt for permissions)" >&2
+      fi
+    fi
     exec xcodebuild test \
       -project cmux.xcodeproj \
       -scheme cmux-unit \
       -configuration Debug \
       -destination 'platform=macOS' \
       -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/cmux-$dd_slug" \
-      "${resolve_args[@]}" \
+      ${resolve_args[@]+"${resolve_args[@]}"} \
+      ${sign_args[@]+"${sign_args[@]}"} \
       "$@"
     ;;
   *)
