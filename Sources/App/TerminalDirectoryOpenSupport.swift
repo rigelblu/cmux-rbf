@@ -992,7 +992,7 @@ enum WorkspaceShortcutMapper {
 /// across two types and the badge and the key drift, which shows up as a row
 /// wearing a number that selects a different row.
 ///
-/// **Eligible = in play AND ungrouped.**
+/// **Eligible = in play AND the row the digit selects is a visible workspace row.**
 /// - *In play* reuses ``SidebarWorkspaceRowVisualPalette/suppressesAccentStrip(attentionTaskStatus:)``
 ///   verbatim, over the lane ``Workspace/attentionTaskStatus(todoControlsEnabled:)``
 ///   resolves, rather than re-deriving either. The user need is literally "the
@@ -1004,19 +1004,50 @@ enum WorkspaceShortcutMapper {
 ///   self-healing — and not worth closing by feeding the numbering from those
 ///   snapshots, which would move the skew onto badge-vs-key, the pair this type
 ///   exists to keep exact.
-/// - *Ungrouped* — **unconditionally; the rule never reads collapse state.** A
-///   collapsed group is the case that motivated it: it hides its non-anchor
-///   members, so a grouped workspace holding a digit meant a key firing at a
-///   row the user could not see. But an *expanded* group's members are visible
-///   rows and they get no digit either, because groups leave the numbering
-///   entirely rather than leaving it when hidden. `#cm-29` should read this
-///   paragraph and not the motivating case alone: it gives groups their own
-///   namespace (`⌘⇧1…9`), and until then they carry no digit at all, which is a
-///   shipped Known Limitation.
+/// - *Has a visible workspace row* — **`#cm-37` rewrote this half.** `#cm-28`
+///   spelled it *ungrouped*, which was a **proxy** for the governing rule
+///   (*a digit is visible if and only if it works*) and was wrong in one
+///   direction: an **expanded** group's members have rows of their own and were
+///   excluded anyway. The two things that genuinely have no workspace row are
+///   the ones ``SidebarWorkspaceRenderItem/renderItems(tabs:groupsById:)``
+///   suppresses — a **group anchor** (represented exclusively by the header
+///   row) and a **collapsed group's members** — so the rule now names those two
+///   directly instead of approximating them. Read the proxy's history as a
+///   warning: it shipped in v0.14.0, and because the maintainer's own sidebar is
+///   entirely grouped it left him with **no numbered workspaces at all**, which
+///   no test caught because the fixtures and the suite shared the code's premise.
+/// - *The group header is excluded by its own rule, not by this one.* Its row
+///   **is** visible — the header is the anchor's row — so "has a visible row"
+///   would include it. It carries no digit because the row reads as a *group*,
+///   and `#cm-29` gives groups their own namespace (`⌘⇧1…9`). Two rules, stated
+///   as two; collapsing them into one predicate is what produced `#cm-28`'s bug.
+/// - *Accepted leftover:* every workspace grouped **and** every group collapsed
+///   leaves the digits dead. Correct under the rule, and deliberately not
+///   engineered for — but note that `#cm-28` said exactly this about *its*
+///   leftover case, and that case turned out to be the maintainer's daily
+///   layout. If this one ever shows up in dogfood, it is a defect, not a quirk.
 struct WorkspaceShortcutEligibility: Equatable {
     /// One workspace's inputs to the eligibility rule, in flat `tabs` order.
     struct Candidate: Equatable {
-        let isGrouped: Bool
+        /// The group's anchor, whose row is drawn as the group header.
+        let isGroupAnchor: Bool
+        /// A non-anchor member of a group that is currently collapsed, so it has
+        /// no sidebar row at all. Separate from ``isGroupAnchor`` because the two
+        /// exclusions have different *reasons* and different lifetimes: an anchor
+        /// is never numbered, a collapsed member is numbered again the moment the
+        /// user expands its group.
+        ///
+        /// **The split is documentation today, not behaviour — and `#cm-29` is
+        /// where that stops being free.** ``WorkspaceShortcutEligibility/resolve(candidates:)``
+        /// is the only consumer and unions the two symmetrically (`!a && !b`), so
+        /// swapping which flag the bridge assigns is *observationally identical*
+        /// on every input, including a collapsed group's anchor (both true either
+        /// way). No test can catch that swap, because nothing behavioural depends
+        /// on the routing. The moment `#cm-29` reads `isGroupAnchor` alone to give
+        /// a header its own digit, a mis-assignment becomes a real bug that this
+        /// suite is structurally blind to — so that slice must assert candidate
+        /// construction, not just eligibility. Found by cold code review 2026-08-05.
+        let isInCollapsedGroup: Bool
         /// The lane the Accent Strip reads — `nil` when the workspace todo
         /// feature is off, which is why an off feature leaves every workspace
         /// eligible and the numbering exactly as it was.
@@ -1038,21 +1069,22 @@ struct WorkspaceShortcutEligibility: Equatable {
     /// Resolves which workspaces carry a digit, in flat order.
     ///
     /// **The fallback:** when nothing is eligible, the digits range over every
-    /// *ungrouped* workspace instead of nothing. The default lane is `.todo`, so
+    /// *row-visible* workspace instead of nothing. The default lane is `.todo`, so
     /// without this a fresh morning would have no keyboard workspace switching
     /// at all, and a dead `⌘1` reads as a broken build rather than a feature.
-    /// It widens only the status axis — the group exclusion stays absolute, so
-    /// the rule carries no conditional. The leftover case (every workspace
-    /// grouped, so the digits are still dead) is deliberately not engineered
-    /// for; `#cm-29` gives groups their own keys.
+    /// It widens only the status axis — the row-visibility exclusion stays
+    /// absolute, so the rule carries no conditional. `#cm-37` widened the set it
+    /// falls back over (`ungrouped` → `rowVisible`) without changing that shape.
     static func resolve(candidates: [Candidate]) -> WorkspaceShortcutEligibility {
-        let ungrouped = candidates.indices.filter { !candidates[$0].isGrouped }
-        let inPlay = ungrouped.filter { index in
+        let rowVisible = candidates.indices.filter {
+            !candidates[$0].isGroupAnchor && !candidates[$0].isInCollapsedGroup
+        }
+        let inPlay = rowVisible.filter { index in
             !SidebarWorkspaceRowVisualPalette.suppressesAccentStrip(
                 attentionTaskStatus: candidates[index].attentionTaskStatus
             )
         }
-        return WorkspaceShortcutEligibility(flatIndices: inPlay.isEmpty ? ungrouped : inPlay)
+        return WorkspaceShortcutEligibility(flatIndices: inPlay.isEmpty ? rowVisible : inPlay)
     }
 
     /// Flat `tabs` index → position among the digit-carrying workspaces.
@@ -1085,17 +1117,35 @@ extension WorkspaceShortcutEligibility {
     ///   ``SidebarWorkspaceSnapshotFactory`` takes it — the flag reaches
     ///   `UserDefaults` and `CmuxFeatureFlags`, and the callers already sit
     ///   where store access belongs.
+    /// - Parameter groups: this window's groups, source of both row-visibility
+    ///   facts. Passed in rather than read off the workspaces because neither
+    ///   fact lives on `Workspace`: `isCollapsed` and `anchorWorkspaceId` are
+    ///   ``WorkspaceGroup`` fields, and `Workspace` carries only `groupId`.
+    ///   That asymmetry is why `#cm-28` reached for `groupId != nil` — it was the
+    ///   only fact in reach at the call site, and the rule got shaped by what was
+    ///   convenient to read rather than by what it meant.
     static func resolve(
         workspaces: [Workspace],
+        groups: [WorkspaceGroup],
         todoControlsEnabled: Bool
     ) -> WorkspaceShortcutEligibility {
-        resolve(candidates: workspaces.map { workspace in
-            Candidate(
-                isGrouped: workspace.groupId != nil,
-                // Both fields come from the same place the sidebar reads them,
-                // never a local re-derivation: the lane from the palette that
-                // owns strip suppression, so "numbered" and "striped" answer to
-                // one definition.
+        // Keyed exactly the way `SidebarWorkspaceRenderItem.renderItems` keys it,
+        // and both flags resolved through the *same* lookup, so this rule and the
+        // rows agree by construction. It matters on the dangling-`groupId` path: a
+        // workspace whose group is absent from this map draws an ordinary visible
+        // row (`renderItems` guards both suppressions on the lookup succeeding),
+        // so it must stay eligible here. Deriving either flag from `groupId`
+        // alone would make it a numberless visible row — the shape `#cm-37` exists
+        // to remove.
+        let groupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        return resolve(candidates: workspaces.map { workspace in
+            let group = workspace.groupId.flatMap { groupsById[$0] }
+            return Candidate(
+                isGroupAnchor: group?.anchorWorkspaceId == workspace.id,
+                isInCollapsedGroup: group?.isCollapsed == true,
+                // The lane comes from the same place the sidebar reads it, never
+                // a local re-derivation: the palette that owns strip suppression,
+                // so "numbered" and "striped" answer to one definition.
                 attentionTaskStatus: workspace.attentionTaskStatus(
                     todoControlsEnabled: todoControlsEnabled
                 )
@@ -1115,6 +1165,7 @@ extension TabManager {
     var workspaceShortcutEligibility: WorkspaceShortcutEligibility {
         WorkspaceShortcutEligibility.resolve(
             workspaces: tabs,
+            groups: workspaceGroups,
             todoControlsEnabled: WorkspaceTodoFeature.isEnabled
         )
     }
