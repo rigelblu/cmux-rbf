@@ -28,7 +28,9 @@ struct ClaudeResumeHookSettingsTests {
         // injection fires; the captured real-binary path must not survive.
         #expect(argv.first == "claude")
         #expect(!argv.contains("/opt/homebrew/bin/claude"))
-        #expect(argv == ["claude", "--resume", "s", "--model", "opus"])
+        // `--model` is dropped so Claude restores the session's own model (#cm-30);
+        // the wrapper routing this test exists for is unaffected.
+        #expect(argv == ["claude", "--resume", "s"])
     }
 
     @Test("A captured hook --settings is still stripped (the wrapper re-adds current hooks)")
@@ -49,7 +51,9 @@ struct ClaudeResumeHookSettingsTests {
                 ]
             )
         )
-        #expect(argv == ["claude", "--resume", "s", "--model", "opus"])
+        // `--model` is dropped so Claude restores the session's own model (#cm-30);
+        // the wrapper routing this test exists for is unaffected.
+        #expect(argv == ["claude", "--resume", "s"])
     }
 
     @Test("A non-hook --settings is preserved and still routes through the wrapper")

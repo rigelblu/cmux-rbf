@@ -324,4 +324,69 @@ struct AgentResumeArgvTests {
             ) == "'/Applications/cmux.app/Contents/Resources/bin/cmux' 'codex-teams' 'resume' 'SID'"
         )
     }
+
+    /// Claude Code restores a resumed session's model and reasoning effort itself, and an explicit
+    /// flag *overrides* that restore — so replaying the launch-time `--model`/`--effort` forces the
+    /// session back onto whatever it started with, discarding any in-session `/model` or `/effort`
+    /// change and costing a full prompt-cache miss (#cm-30).
+    ///
+    /// Every other flag must survive: the drop is targeted, not a blanket strip.
+    @Test("Claude resume omits model and effort so Claude restores its own")
+    func claudeResumeOmitsModelAndEffort() {
+        #expect(
+            AgentResumeArgv().builtInKind(
+                kind: "claude",
+                sessionId: "SID",
+                executablePath: "/opt/bin/claude",
+                arguments: [
+                    "/opt/bin/claude",
+                    "--model", "sonnet",
+                    "--effort", "high",
+                    "--dangerously-skip-permissions",
+                ]
+            ) == ["claude", "--resume", "SID", "--dangerously-skip-permissions"]
+        )
+    }
+
+    /// The sanitizer can emit either spelling, and a captured argv can end mid-option. Both
+    /// branches of the drop exist for real inputs, so both are pinned here rather than left
+    /// to inspection (#cm-30).
+    @Test("Claude resume drops joined-form and value-less session-restored options")
+    func claudeResumeDropsJoinedAndValuelessForms() {
+        // Joined form: `--model=sonnet` is one token, not two.
+        #expect(
+            AgentResumeArgv().builtInKind(
+                kind: "claude",
+                sessionId: "SID",
+                executablePath: nil,
+                arguments: ["claude", "--model=sonnet", "--effort=high", "--verbose"]
+            ) == ["claude", "--resume", "SID", "--verbose"]
+        )
+        // Trailing `--model` with no value must drop alone, never swallow a following
+        // argument that is not its value — there is none here, and the argv must not crash.
+        #expect(
+            AgentResumeArgv().builtInKind(
+                kind: "claude",
+                sessionId: "SID",
+                executablePath: nil,
+                arguments: ["claude", "--verbose", "--model"]
+            ) == ["claude", "--resume", "SID", "--verbose"]
+        )
+    }
+
+    /// The `claudeTeams` launcher resolves *before* `builtInKind`, so a teams-launched pane never
+    /// reaches that builder. Its policy is `var policy = claudePolicy`, inheriting `--model` and
+    /// `--effort` as preserved — fixing only the built-in path would leave every `cmux claude-teams`
+    /// user with the bug, and nothing would report it (#cm-30).
+    @Test("Claude teams resume omits model and effort")
+    func claudeTeamsResumeOmitsModelAndEffort() {
+        #expect(
+            AgentResumeArgv().launcherResolution(
+                launcher: "claudeTeams",
+                sessionId: "SID",
+                executablePath: nil,
+                arguments: ["cmux", "claude-teams", "--model", "sonnet", "--effort", "high", "--verbose"]
+            ) == .resolved(["cmux", "claude-teams", "--resume", "SID", "--verbose"])
+        )
+    }
 }

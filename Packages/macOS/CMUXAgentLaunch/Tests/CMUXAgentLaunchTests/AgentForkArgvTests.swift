@@ -11,8 +11,10 @@ struct AgentForkArgvTests {
                 sessionId: "SID",
                 executablePath: "/opt/bin/claude",
                 arguments: ["/opt/bin/claude", "--model", "sonnet"]
-            ) == ["claude", "--resume", "SID", "--fork-session", "--model", "sonnet"]
+            ) == ["claude", "--resume", "SID", "--fork-session"]
         )
+        // Claude drops `--model` (it restores its own, #cm-30); every other kind below
+        // keeps theirs, which is what makes the drop provably claude-only.
         #expect(
             AgentForkArgv().builtInKind(
                 kind: "codex",
@@ -181,6 +183,41 @@ struct AgentForkArgvTests {
         )
         #expect(
             AgentForkArgv().builtInKind(kind: "amp", sessionId: "SID", executablePath: nil, arguments: ["amp"]) == nil
+        )
+    }
+
+    /// A fork is a resume (`--resume <id> --fork-session`) through the same sanitizer, so it carries
+    /// the identical defect: replaying the launch-time `--model`/`--effort` overrides the state
+    /// Claude Code restores for itself. Splitting resume from fork would ship half a fix for one
+    /// user need (#cm-30).
+    @Test("Claude fork omits model and effort so Claude restores its own")
+    func claudeForkOmitsModelAndEffort() {
+        #expect(
+            AgentForkArgv().builtInKind(
+                kind: "claude",
+                sessionId: "SID",
+                executablePath: "/opt/bin/claude",
+                arguments: [
+                    "/opt/bin/claude",
+                    "--model", "sonnet",
+                    "--effort", "high",
+                    "--dangerously-skip-permissions",
+                ]
+            ) == ["claude", "--resume", "SID", "--fork-session", "--dangerously-skip-permissions"]
+        )
+    }
+
+    /// The `claudeTeams` launcher resolves before `builtInKind` on the fork path too — the fourth
+    /// and last site where cmux authors a claude resume command (#cm-30).
+    @Test("Claude teams fork omits model and effort")
+    func claudeTeamsForkOmitsModelAndEffort() {
+        #expect(
+            AgentForkArgv().launcherResolution(
+                launcher: "claudeTeams",
+                sessionId: "SID",
+                executablePath: nil,
+                arguments: ["cmux", "claude-teams", "--model", "sonnet", "--effort", "high", "--verbose"]
+            ) == .resolved(["cmux", "claude-teams", "--resume", "SID", "--fork-session", "--verbose"])
         )
     }
 }

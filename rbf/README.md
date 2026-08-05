@@ -23,6 +23,16 @@ The flavour installs as **cmux RBF** in `/Applications`, with its own green `RBF
 - **About still reports upstream's version** (`0.64.20 / 100`) — both version keys were inherited at the fork point. A fork-owned version key (`RBFVersion`) is already written into the installed bundle, but nothing reads it yet; until `#cm-17.3` lands that reader, `env | grep CMUX_BUNDLE_ID` answers "which cmux am I in?"; `com.cmuxterm.app.rbf` is the flavour.
 - If a state clone half-completes, `rbf/scripts/migrate-rbf-state.sh` is the way back — it reports and guards each store separately, and re-clones only what is missing.
 
+## 🟠⋯ Resume an agent on the model and effort you left it on
+
+A restored Claude pane comes back on the model and reasoning effort you were **last using**, not the ones the pane was originally launched with. Switch with `/model` or `/effort` mid-session, restart cmux, and the session picks up where you left it. Nothing to turn on.
+
+- **The saving is the prompt cache, not the setting.** A session restored onto a different model cannot reuse its cached context, so the whole conversation re-enters as fresh input — you pay to rebuild context you already had, on a model you did not pick. That cost, not the wrong label in the status line, is why this is worth a release.
+- **cmux stopped doing something rather than started doing something.** Claude Code restores its own model and effort on `--resume` — the command it prints when you exit is a bare `claude --resume <id>` — but an explicit flag overrides that restore. cmux was rebuilding the resume command from the process arguments it captured at snapshot time, replaying a choice you had since revoked. It now emits the command Claude itself prescribes.
+- **Launch flags still work.** Starting a pane with `--model` or `--effort` puts it on those; only the *replay on resume* is gone.
+- **Claude only.** codex, gemini, cursor, amp, opencode, kimi and grok are deliberately unchanged. Whether a tool restores its own model is an empirical fact about that tool, and only Claude has been tested — a wrong guess here would silently discard a model you asked for.
+- **Resuming from the Sessions panel still names a model.** That path builds its command a different way, reading the last-known model from the session transcript. It does not have the bug this fixes — it reads the *current* model, not the launch-time one — but it means cmux currently has two answers to "how do we resume Claude". A later release reconciles them.
+
 ## 🟠⋯ Read a colour-coded plan as colour, not as raw emoji
 
 If your notes mark status with 🔴🟠🟡🟢🔵🟣⚫, the markdown panel reads them as formatting instead of showing them as glyphs. The first marker in a block disappears; outside a heading it tints the code span beside it, so `**🟢`PASS`**` becomes a green `PASS` highlight and a verification table scans by colour. A heading keeps its marker's colour as text tint — colour is pre-attentive where a 4px size step is not, so sections separate at scroll distance.

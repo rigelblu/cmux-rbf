@@ -10,6 +10,18 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.15.0 (2026-08-04) — #cm-30
+## 🟠⋯ Changed for End Users
+- 2026-08-04 - fix | a restored Claude session comes back on the model and reasoning effort you were last using, instead of the ones the pane was originally launched with — because Claude Code restores them itself, and cmux no longer overrides it. Switching model or effort mid-session used to be silently undone by any cmux restart, and because the restored session then ran on a *different* model, the whole conversation was re-sent as fresh input rather than reused from cache: you paid to rebuild context you already had, on a model you did not pick. Nothing to turn on. Sessions launched with explicit `--model`/`--effort` still start on those; only the replay on resume is gone (#cm-30)
+- **Known limitation — Claude only.** codex, gemini, cursor, amp, opencode, kimi and grok are deliberately unchanged: whether each restores its own model on resume is an empirical fact about that tool, and only Claude has been tested. `#cm-33` tracks codex (#cm-30)
+- **Known limitation — the Sessions panel still names a model.** Resuming from the sidebar's Sessions list builds its command a different way, reading the last-known model from the session transcript rather than letting Claude restore it. That path does not have the bug this fixes — it reads the *current* model, not the launch-time one — but it means cmux has two answers to "how do we resume Claude". `#cm-33` reconciles them (#cm-30)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-04 - fix (#cm-30) | `--model` and `--effort` are dropped from **all four** places cmux authors a Claude resume command: `AgentResumeArgv.claudeResumeArgv`, `AgentForkArgv.builtInKind`, and both `claudeTeams` launcher resolutions — the last two resolve *before* `builtInKind`, so fixing only the built-in path would have left every `cmux claude-teams` pane broken with nothing reporting it. The shared `claudePolicy` is deliberately untouched: `AgentLaunchSanitizer.sanitizedLaunchArguments` has **six** production callers and at least one starts a *fresh* session (`TerminalForegroundCommandCapture` save-layout replay), where dropping `--model` would discard a model the user explicitly asked for. Seven pre-existing tests across four files carried `--model opus` as fixture data and were updated; two were **strengthened** rather than trimmed, gaining a trailing `--add-dir /tmp` so they still prove options after a one-word prompt survive. Mutation testing removed a dead guard from the new helper — a trailing-option ternary no test could discriminate, because both step sizes exit the loop identically (#cm-30)
+
+
+---
+
 # 🔵⋯ v0.14.0 (2026-08-04) — #cm-28
 ## 🟠⋯ Changed for End Users
 - 2026-08-04 - feat (ux) | `⌘1…9` now numbers only the workspaces you are actually working in. The digits used to count every row in the sidebar, so a workspace you had parked or finished sat between the ones in play and took a number with it. They now range over the workspaces carrying an **Accent Strip** — in play and ungrouped — and the rows below a parked one move **up** rather than leaving a gap. Press `⌘3` and you land on the third workspace in play, not the third row. Hold `⌘` to see it: a badge appears only where a digit actually works. `⌘9` keeps its jump-to-the-end idiom, now landing on the last workspace in play, and the View menu's nine "Workspace N" items follow the same numbering. The badge and the key renumber together by construction rather than by being kept in sync, so a badge cannot claim a digit that goes somewhere else (#cm-28)
