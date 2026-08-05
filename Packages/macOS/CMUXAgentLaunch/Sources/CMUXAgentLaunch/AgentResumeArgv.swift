@@ -268,7 +268,10 @@ public struct AgentResumeArgv: Sendable, Equatable {
             guard let preserved = AgentLaunchSanitizer.preservedClaudeTeamsLaunchArguments(args: tail) else {
                 return .resolved(nil)
             }
-            return .resolved([parts.executable, "claude-teams", "--resume", sessionId] + preserved)
+            return .resolved(
+                [parts.executable, "claude-teams", "--resume", sessionId]
+                    + Self.claudeArgumentsDroppingSessionRestoredOptions(preserved)
+            )
         case "codexTeams":
             let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
             var tail = parts.tail
@@ -414,7 +417,8 @@ public struct AgentResumeArgv: Sendable, Equatable {
         guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "claude", args: parts.tail) else {
             return nil
         }
-        return ["claude", "--resume", sessionId] + preserved
+        return ["claude", "--resume", sessionId]
+            + Self.claudeArgumentsDroppingSessionRestoredOptions(preserved)
     }
 
     private func withOption(

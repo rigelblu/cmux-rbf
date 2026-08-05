@@ -29,7 +29,9 @@ struct ClaudePermissionModeRestoreTests {
                 executablePath: nil,
                 arguments: ["claude", "--model", "opus"],
                 observedPermissionMode: "plan"
-            ) == ["claude", "--resume", "SID", "--model", "opus", "--permission-mode", "plan"]
+            // `--model` drops (Claude restores its own, #cm-30); the observed
+            // permission mode this test exists for is still appended.
+            ) == ["claude", "--resume", "SID", "--permission-mode", "plan"]
         )
         #expect(
             AgentResumeArgv().builtInKind(
@@ -169,7 +171,7 @@ struct ClaudePermissionModeRestoreTests {
                 sessionId: "SID",
                 executablePath: nil,
                 arguments: ["cmux", "claude-teams", "--model", "sonnet"]
-            ) == .resolved(["cmux", "claude-teams", "--resume", "SID", "--model", "sonnet"])
+            ) == .resolved(["cmux", "claude-teams", "--resume", "SID"])
         )
     }
 }
