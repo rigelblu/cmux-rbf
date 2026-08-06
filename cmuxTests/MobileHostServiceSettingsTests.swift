@@ -11,12 +11,16 @@ import Testing
 #endif
 
 struct MobileHostServiceSettingsTests {
-    @Test func mobileHostListenerHonorsDevelopmentDefaultUntilIOSPairingIsOverridden() throws {
+    @Test func devListenerStaysOffUntilIOSPairingIsExplicitlyEnabled() throws {
         let suiteName = "MobileHostServiceSettingsTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
+        // Dev builds default the Bonjour listener OFF, like stable: every
+        // branch mints a fresh bundle id, and a default-on listener costs a
+        // Local Network permission prompt per branch. Pairing is opt-in via
+        // the existing setting.
+        #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
 
         defaults.set(true, forKey: MobileHostService.listeningEnabledDefaultsKey)
         #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
