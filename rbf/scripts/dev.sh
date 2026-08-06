@@ -207,16 +207,46 @@ case "$cmd" in
     # com.cmuxterm.app.debug), not the tagged app — seed that id.
     tcc_preseed "com.cmuxterm.app.debug"
 
-    # A running tagged app makes the test runner die with "Test runner never
-    # began executing tests", exit 65, ZERO tests run — and nothing in that
-    # message says why. Documented in rbf/AGENTS.md, which is no help to someone
-    # who has not read it. Detect it and say the fix.
-    if pgrep -f "cmux DEV $BUILD_ID_VALUE.app/Contents/MacOS/" >/dev/null 2>&1; then
-      echo "dev.sh: REFUSING — 'cmux DEV $BUILD_ID_VALUE' is running." >&2
+    # A running app makes the test runner die with "Test runner never began
+    # executing tests", exit 65, ZERO tests run — and nothing in that message
+    # says why. Documented in rbf/AGENTS.md, which is no help to someone who has
+    # not read it. Detect it and say the fix.
+    #
+    # BOTH shapes block, and checking only the tagged one was a real gap. The
+    # unit-test host is the UNTAGGED "cmux DEV.app" — the tcc_preseed six lines
+    # above says so — so an untagged app left running by ANY other worktree
+    # occupies the host bundle id. Its name never contains a build-id, so a
+    # tagged-only pattern can never match it no matter which build-id you are on.
+    # Observed 2026-08-05: a stray untagged app from an unrelated tree wedged a
+    # full run at 0% CPU for 49 minutes, with no error until it was killed.
+    #
+    # `\.app` is escaped because pgrep -f takes a regex — unescaped, `DEV.app`
+    # also matches a one-character build-id, so the untagged probe would fire on
+    # a tagged app and misname the offender.
+    #
+    # if/then rather than `pgrep … && flag=1`: under `set -e` a non-matching
+    # pgrep makes the && compound return non-zero and kills the script, so the
+    # guard would abort exactly when nothing is wrong.
+    tagged_running=0
+    untagged_running=0
+    if pgrep -f "cmux DEV $BUILD_ID_VALUE\.app/Contents/MacOS/" >/dev/null 2>&1; then
+      tagged_running=1
+    fi
+    if pgrep -f "cmux DEV\.app/Contents/MacOS/" >/dev/null 2>&1; then
+      untagged_running=1
+    fi
+    if [[ "$tagged_running" -eq 1 || "$untagged_running" -eq 1 ]]; then
+      echo "dev.sh: REFUSING — a 'cmux DEV' app is running:" >&2
+      [[ "$tagged_running" -eq 1 ]] \
+        && echo "          · cmux DEV $BUILD_ID_VALUE — your build-id" >&2
+      [[ "$untagged_running" -eq 1 ]] \
+        && echo "          · cmux DEV (untagged) — THE unit-test host, possibly another worktree's" >&2
       echo "        The test runner would die with 'Test runner never began" >&2
       echo "        executing tests', exit 65, and zero tests run — a failure" >&2
       echo "        that looks like broken tests and is not." >&2
-      echo "        Quit that app, then re-run." >&2
+      echo "        Running now:" >&2
+      pgrep -fl "cmux DEV.*\.app/Contents/MacOS/" 2>/dev/null | sed 's/^/          /' >&2 || true
+      echo "        Quit them, then re-run." >&2
       exit 1
     fi
 
