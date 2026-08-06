@@ -190,13 +190,19 @@ ROLLBACK_ROOT="$(dirname "$INSTALL_PATH")/.cmux-rbf-rollback.$$"
 # A Release DerivedData is multi-GB, and repo policy keeps large build
 # artifacts off the near-full internal SSD. Prefer the external drive when it
 # is mounted; fall back to TMPDIR when it is not, rather than failing.
+#
+# The mount check and the fallback used to be spelled out here, and dev.sh grew
+# a second copy of the same decision. Both now call rbf_tmp_dir, so there is one
+# answer to "where do big throwaway artifacts go" instead of two that drift.
+# The on-drive path is byte-identical to the old one, so an existing build is
+# reused rather than recompiled. Only the drive-offline fallback moves, from
+# $TMPDIR/cmux-rbf-derived to $TMPDIR/cmux-rbf-cm-17-install/derived — both
+# internal, both throwaway, and reached only when the drive is unplugged.
+# shellcheck source=rbf/scripts/lib/rbf-tmp.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-tmp.sh"
 DERIVED_DATA="${CMUX_RBF_DERIVED_DATA:-}"
 if [[ -z "$DERIVED_DATA" ]]; then
-  if [[ -d "/Volumes/Tom's HDD" ]]; then
-    DERIVED_DATA="/Volumes/Tom's HDD/tmp/cmux-rbf-cm-17-install/derived"
-  else
-    DERIVED_DATA="${TMPDIR:-/tmp}/cmux-rbf-derived"
-  fi
+  DERIVED_DATA="$(rbf_tmp_dir "cmux-rbf-cm-17-install")/derived"
 fi
 
 # Is this a first install? Decides whether state migration runs. Destination
