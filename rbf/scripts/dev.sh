@@ -117,6 +117,11 @@ RBF_REPO_ROOT="$REPO_ROOT"
 . "$REPO_ROOT/rbf/scripts/lib/rbf-zig.sh"
 ensure_zig() { rbf_ensure_zig; }
 
+# --- Landmine 3: multi-GB artifacts defaulting to the near-full internal disk --
+# Same lib-not-here reasoning as Zig above. See the lib header.
+# shellcheck source=rbf/scripts/lib/rbf-tmp.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-tmp.sh"
+
 # --- Guard: submodule parked behind the pointer the commit records ------------
 # The pointer moves with a merge or rebase; the submodule working directory does
 # not follow on its own. `ensure-ghosttykit.sh` keys its artifact cache on the
@@ -153,6 +158,7 @@ case "$cmd" in
     ;;
   build)
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
+    rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
     tcc_preseed "$BUILD_ID_VALUE"
@@ -167,6 +173,7 @@ case "$cmd" in
     ;;
   run)
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
+    rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
     tcc_preseed "$BUILD_ID_VALUE"
@@ -193,6 +200,7 @@ case "$cmd" in
     # while `make build` succeeds. And a stale submodule would link a ghostty the
     # commit does not record — a green test run against code nobody wrote, in the
     # one command this fork calls its gate.
+    rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
     # The unit-test host is the UNTAGGED "cmux DEV.app" (bundle id
@@ -240,12 +248,31 @@ case "$cmd" in
         echo "dev.sh: warning: CMUX_DEV_CODESIGN_IDENTITY='$CMUX_DEV_CODESIGN_IDENTITY' not in the keychain; test host stays ad-hoc signed (macOS will re-prompt for permissions)" >&2
       fi
     fi
+    # xcodebuild writes a ~450MB .xcresult per run into $TMPDIR — on the
+    # internal disk — and never removes it. 108 of them (19GB) piled up in five
+    # days and helped take the SSD to 570MB free; 47 landed on 2026-08-04 alone.
+    # Nothing reported this, because a leak that only shows up as "disk full"
+    # three days later reads as an unrelated problem.
+    #
+    # Two fixes in one line. The path moves to the external drive, AND it is
+    # stable per build-id rather than a fresh UUID per run: xcodebuild refuses
+    # to write over an existing bundle, so the rm is required regardless, and a
+    # stable name is what caps this at one bundle per build-id instead of
+    # relocating an unbounded pile onto the other drive.
+    #
+    # Keep the newest rather than deleting after the run — `make test`'s tail is
+    # app-log noise, so a real failure can only be read out of the bundle.
+    result_bundle="$(rbf_tmp_dir "cmux-rbf/xcresults")/cmux-$dd_slug.xcresult"
+    rm -rf "$result_bundle"
+    echo "dev.sh: result bundle -> $result_bundle" >&2
+
     exec xcodebuild test \
       -project cmux.xcodeproj \
       -scheme cmux-unit \
       -configuration Debug \
       -destination 'platform=macOS' \
       -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/cmux-$dd_slug" \
+      -resultBundlePath "$result_bundle" \
       ${resolve_args[@]+"${resolve_args[@]}"} \
       ${sign_args[@]+"${sign_args[@]}"} \
       "$@"
