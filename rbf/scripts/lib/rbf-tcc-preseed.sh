@@ -113,16 +113,13 @@ rbf_tcc_preseed() {
     select_exprs="${select_exprs:+$select_exprs,}$expr"
   done
 
-  # Local Network (multicast) is a separate root-owned store, not TCC. The
-  # helper is only callable when its root-owned copy + sudoers rule were
-  # installed (see rbf/scripts/install-localnet-preseed.sh); otherwise sudo -n
-  # fails fast and the branch's first launch shows that one prompt. The rule
-  # points at the root-owned copy, never this repo's editable one.
-  local localnet_helper="/usr/local/lib/cmux-rbf/rbf-localnet-preseed.py"
-  if [[ -f "$localnet_helper" ]]; then
-    sudo -n /usr/bin/python3 "$localnet_helper" "$bundle_id" 2>&1 | command sed 's/^/rbf-tcc-preseed: /' >&2 || true
-  fi
-
+  # Local Network (multicast) is deliberately NOT handled here. It lives in a
+  # root-owned NSKeyedArchiver store (/Library/Preferences/
+  # com.apple.networkextension.plist) whose owning daemons rewrite it from
+  # memory, erasing out-of-band edits — a seeding attempt on 2026-08-05 lost
+  # every record within a minute. The durable fix is app-side: dev builds
+  # default the Bonjour listener off (MobileHostService.isListeningEnabled),
+  # so no dev build multicasts at launch and the prompt never fires.
   if sqlite3 "$db" "INSERT OR IGNORE INTO access ($cols) SELECT $select_exprs FROM access WHERE client = '$template' AND auth_value IN (2,5);" 2>/dev/null; then
     local n
     n="$(sqlite3 "$db" "SELECT count(*) FROM access WHERE client = '$bundle_id' AND auth_value IN (2,5);")"

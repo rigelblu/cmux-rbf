@@ -438,10 +438,10 @@ final class MobileHostService {
     /// Whether the mobile pairing host should bind a network listener at all.
     ///
     /// An explicit current or legacy preference always wins. Without one,
-    /// dev and nightly builds preserve their historical listener default so an
+    /// only nightly builds preserve their historical listener default so an
     /// older iOS app can still reach an updated Mac over Tailscale. Stable
-    /// remains opt-in so macOS does not ask every user for Local Network
-    /// permission.
+    /// and dev are opt-in so macOS does not ask for Local Network permission
+    /// — for dev, once per branch, since each branch is its own bundle id.
     nonisolated static var isListeningEnabled: Bool {
         isListeningEnabled(defaults: .standard)
     }
@@ -472,7 +472,11 @@ final class MobileHostService {
         if let legacyOverride = defaults.object(forKey: legacyListeningEnabledDefaultsKey) as? Bool {
             return legacyOverride
         }
-        return buildFlavor != .stable
+        // Dev joins stable as opt-in: every dev branch mints a fresh bundle
+        // id, and a default-on Bonjour listener costs a Local Network
+        // permission prompt per branch. Nightly keeps its historical default
+        // so an older iOS app can still reach an updated Mac over Tailscale.
+        return buildFlavor == .nightly
     }
 
     /// User-default key for the preferred iOS pairing listener port.
