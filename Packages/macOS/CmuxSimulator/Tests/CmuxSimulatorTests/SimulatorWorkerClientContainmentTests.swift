@@ -192,7 +192,11 @@ extension SimulatorWorkerClientTests {
             ),
             sleeper: ContinuousSimulatorWorkerSleeper()
         )
-        weak let weakClient = client
+        // cmux-rbf: `weak var`, not `weak let` — Swift 6.2 rejects `weak let`
+        // ("must be a mutable variable, because it may change at runtime"), and
+        // becoming nil is exactly what this assertion tests. Upstream compiles
+        // this on an older Swift. Reject this hunk on upstream sync.
+        weak var weakClient = client
         await client?.send(.releaseInputs)
         for _ in 0..<10_000 where !FileManager.default.fileExists(atPath: marker.path) {
             await Task.yield()

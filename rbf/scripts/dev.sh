@@ -107,7 +107,7 @@ BUILD_ID_VALUE="$(derive_build_id)"
 # `make run` is reproducible. Set it to 0 when you genuinely add a dependency.
 export CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION="${CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION:-1}"
 
-# --- Landmine 2: ghostty needs Zig 0.15.2 exactly -----------------------------
+# --- Landmine 2: ghostty needs one exact Zig version --------------------------
 # Lives in rbf/scripts/lib/rbf-zig.sh, not here, because `make install-rbf` reaches
 # install-rbf.sh without passing through this file — and when this was a private
 # function, that path silently had no Zig guard and died inside an xcodebuild
@@ -121,6 +121,37 @@ ensure_zig() { rbf_ensure_zig; }
 # Same lib-not-here reasoning as Zig above. See the lib header.
 # shellcheck source=rbf/scripts/lib/rbf-tmp.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-tmp.sh"
+
+# --- Landmine 4: a Metal compiler Xcode installs but cannot run ---------------
+# Same lib-not-here reasoning again. See the lib header for why naming the
+# toolchain is the only fix and why TOOLCHAINS is never exported.
+# shellcheck source=rbf/scripts/lib/rbf-metal.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-metal.sh"
+
+# Build GhosttyKit.xcframework up front, with a Metal compiler that runs.
+#
+# TWO bugs, one preflight:
+#
+#  1. The shader step needs a toolchain `xcrun` will not select on its own.
+#     reload.sh calls ensure-ghosttykit.sh without one, so `make build` and
+#     `make run` die in the zig build. Running it here first means reload.sh's
+#     own call is a cache hit and never reaches that step.
+#
+#  2. `make test` never refreshed the framework AT ALL — only setup.sh and
+#     reload.sh call ensure-ghosttykit.sh, and `test` goes straight to
+#     xcodebuild. So a `make test` after any ghostty change silently compiled
+#     Swift against the PREVIOUS framework. Observed 2026-08-10 during the
+#     upstream sync: hours of "cannot find type 'ghostty_font_size_action_cb'"
+#     against a framework nine days old, while the merged ghostty on disk
+#     defined it. The submodule guard above cannot see this — the pointer and
+#     the checkout agreed; it was the BUILT ARTIFACT that lagged.
+#
+# ensure-ghosttykit.sh keys its cache on the checked-out ghostty SHA, so this is
+# a stamp comparison and costs nothing when nothing moved.
+ensure_ghosttykit() {
+  rbf_ensure_metal_toolchain
+  TOOLCHAINS="$CMUX_METAL_TOOLCHAIN" "$REPO_ROOT/scripts/ensure-ghosttykit.sh"
+}
 
 # --- Guard: submodule parked behind the pointer the commit records ------------
 # The pointer moves with a merge or rebase; the submodule working directory does
@@ -161,6 +192,7 @@ case "$cmd" in
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
+    ensure_ghosttykit
     tcc_preseed "$BUILD_ID_VALUE"
     # No exec: the preseed must run again AFTER reload.sh. The app swap can
     # race TCC — a prompt answered against a mid-swap process records a
@@ -176,6 +208,7 @@ case "$cmd" in
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
+    ensure_ghosttykit
     tcc_preseed "$BUILD_ID_VALUE"
     # No exec — see `build` for why the preseed runs again after reload.sh.
     status=0
@@ -195,7 +228,7 @@ case "$cmd" in
     # cleanup-dev-builds.sh cannot map back to a build-id.
     # Both guards, same as `build` and `run` — omitting them here was a real bug.
     # `cmux-unit.xcscheme` sets buildForTesting="YES" on the app target, so
-    # `make test` runs the ghostty script phase and needs Zig 0.15.2 exactly like
+    # `make test` runs the ghostty script phase and needs that exact Zig like
     # a build does; without this it dies ~200 lines into an xcodebuild phase
     # while `make build` succeeds. And a stale submodule would link a ghostty the
     # commit does not record — a green test run against code nobody wrote, in the
@@ -203,6 +236,7 @@ case "$cmd" in
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
+    ensure_ghosttykit
     # The unit-test host is the UNTAGGED "cmux DEV.app" (bundle id
     # com.cmuxterm.app.debug), not the tagged app — seed that id.
     tcc_preseed "com.cmuxterm.app.debug"

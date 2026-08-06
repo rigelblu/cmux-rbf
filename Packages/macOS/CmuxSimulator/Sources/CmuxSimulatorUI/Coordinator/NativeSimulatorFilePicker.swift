@@ -58,7 +58,15 @@ public final class NativeSimulatorFilePicker: SimulatorFilePicking {
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 panel.begin { response in
-                    continuation.resume(returning: response == .OK ? panel.urls : [])
+                    // cmux-rbf: read the selection on the main actor. This target is
+                    // .swiftLanguageMode(.v6), and the macOS 26 SDK marks
+                    // `NSOpenPanel.begin`'s completion handler @Sendable, so touching the
+                    // main-actor-isolated `urls` inside it is an error here. AppKit runs
+                    // this handler on the main thread, so assuming isolation is sound.
+                    // Upstream compiles as-is against an SDK without that annotation.
+                    // Reject this hunk on upstream sync.
+                    let urls = MainActor.assumeIsolated { panel.urls }
+                    continuation.resume(returning: response == .OK ? urls : [])
                 }
             }
         } onCancel: {
@@ -75,7 +83,10 @@ public final class NativeSimulatorFilePicker: SimulatorFilePicking {
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 panel.begin { response in
-                    continuation.resume(returning: response == .OK ? panel.url : nil)
+                    // cmux-rbf: same main-actor read as the open-panel case above.
+                    // Reject this hunk on upstream sync.
+                    let url = MainActor.assumeIsolated { panel.url }
+                    continuation.resume(returning: response == .OK ? url : nil)
                 }
             }
         } onCancel: {

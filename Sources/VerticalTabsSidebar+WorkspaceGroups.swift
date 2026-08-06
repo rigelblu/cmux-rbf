@@ -23,7 +23,6 @@ extension VerticalTabsSidebar {
             configured: resolvedConfig?.iconSymbol
         )
         let multiSelectionBackgroundStyle = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: settings.activeTabIndicatorStyle,
             isActive: false,
             isMultiSelected: true,
             customColorHex: effectiveColor,
@@ -279,7 +278,6 @@ extension VerticalTabsSidebar {
             configured: resolvedConfig?.iconSymbol
         )
         let multiSelectionBackgroundStyle = sidebarWorkspaceRowBackgroundStyle(
-            activeTabIndicatorStyle: settings.activeTabIndicatorStyle,
             isActive: false,
             isMultiSelected: true,
             customColorHex: effectiveColor,

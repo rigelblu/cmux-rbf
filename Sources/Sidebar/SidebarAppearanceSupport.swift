@@ -273,3 +273,58 @@ struct SidebarWorkspaceRowBackgroundStyle: Equatable, Hashable {
     static let clear = Self(color: nil, opacity: 0)
 }
 
+
+// cmux-rbf: upstream's `sidebarWorkspaceRowBackgroundStyle` minus the
+// `activeTabIndicatorStyle` parameter.
+//
+// Upstream branches this on `WorkspaceIndicatorStyle` (.leftRail vs .solidFill).
+// This fork removed that enum in #cm-22, which replaced upstream's indicator
+// styling with `SidebarWorkspaceRowVisualPalette` (identity fills and strips).
+// The 2026-08 sync reinstated upstream's CALLERS of this helper without its
+// callee, so the tree did not compile — the callers live in group-header code,
+// which is about multi-selection background and is a separate concern from the
+// per-row palette #cm-22 owns.
+//
+// The `.solidFill` branch is the one kept: it is what this fork's own palette
+// already does, including `forceBright: false` for custom colours, where the
+// `.leftRail` branch forces bright. Behaviour is therefore unchanged from
+// pre-sync for every case a fork build could reach.
+// Reject this hunk on upstream sync.
+func sidebarWorkspaceRowBackgroundStyle(
+    isActive: Bool,
+    isMultiSelected: Bool,
+    customColorHex: String?,
+    colorScheme: ColorScheme,
+    sidebarSelectionColorHex: String?
+) -> SidebarWorkspaceRowBackgroundStyle {
+    if isActive {
+        return SidebarWorkspaceRowBackgroundStyle(
+            color: sidebarSelectedWorkspaceBackgroundNSColor(
+                for: colorScheme,
+                sidebarSelectionColorHex: sidebarSelectionColorHex
+            ),
+            opacity: 1
+        )
+    }
+
+    let customBackground = customColorHex.flatMap {
+        WorkspaceTabColorSettings.displayNSColor(
+            hex: $0,
+            colorScheme: colorScheme,
+            forceBright: false
+        )
+    }
+    if let customBackground {
+        return SidebarWorkspaceRowBackgroundStyle(
+            color: customBackground,
+            opacity: isMultiSelected ? 0.35 : 0.7
+        )
+    }
+    if isMultiSelected {
+        return SidebarWorkspaceRowBackgroundStyle(
+            color: cmuxAccentNSColor(for: colorScheme),
+            opacity: 0.25
+        )
+    }
+    return .clear
+}

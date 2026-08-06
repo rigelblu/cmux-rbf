@@ -95,6 +95,13 @@ extension KeyboardShortcutSettings.Action {
              .increaseWorkspaceTerminalFontSize,
              .decreaseWorkspaceTerminalFontSize,
              .resetWorkspaceTerminalFontSize,
+             // cmux-rbf: #cm-14 global zoom sits here, not in .dockScoped or
+             // .focusResolved. KeyboardShortcutActionContext scopes it
+             // .application on purpose — "the global scale answers the chord no
+             // matter what holds focus" — so letting the Dock or the focused
+             // panel claim it first would defeat the feature. Upstream's own
+             // workspace font-size actions above route the same way.
+             .globalZoomIn, .globalZoomOut, .globalZoomReset,
              .toggleCanvasLayout,
              .canvasRevealFocusedPane, .canvasOverview,
              .canvasZoomIn, .canvasZoomOut, .canvasZoomReset,

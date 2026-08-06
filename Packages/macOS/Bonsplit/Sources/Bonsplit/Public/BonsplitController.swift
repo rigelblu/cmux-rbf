@@ -81,6 +81,35 @@ public final class BonsplitController {
     /// remain visible but disabled; hidden actions are omitted.
     @ObservationIgnored public var tabContextForkConversationAvailabilityProvider: ((TabID, PaneID) -> TabContextForkConversationAvailability)?
 
+    /// Host-provided refresh invoked when Fork Conversation availability is still loading
+    /// as the tab context menu opens. When it returns, the open menu re-evaluates the
+    /// synchronous availability provider and updates its items in place.
+    ///
+    /// cmux-rbf: DECLARED BUT NEVER INVOKED HERE — this is a deliberate stub, and the
+    /// feature it belongs to does not work in this fork yet.
+    ///
+    /// Upstream bonsplit calls this from `TabBarView`'s tab-context-menu presenter
+    /// (bonsplit 529913b7). This fork carries bonsplit as a SUBTREE at
+    /// Packages/macOS/Bonsplit rather than upstream cmux's vendor/bonsplit submodule,
+    /// and the subtree still sits at bonsplit 10563e2f. The 2026-08 upstream sync
+    /// brought cmux code that SETS this handler
+    /// (Sources/Workspace+ForkAgentConversationAvailability.swift), so without the
+    /// declaration the whole tree failed to compile.
+    ///
+    /// Only the declaration is ported. Bringing over the call site means a three-way
+    /// merge of TabBarView, where upstream changes ~509 lines and this fork already
+    /// carries ~314 of its own, plus TabItemView and the tests — a slice of its own,
+    /// tracked separately, and it also touches tab drag-and-drop.
+    ///
+    /// What this costs today: a tab context menu opened while Fork Conversation
+    /// availability is still loading keeps whatever state it opened with instead of
+    /// refreshing in place. Setting the handler is a no-op; nothing else regresses.
+    ///
+    /// Delete this note when the subtree is ported to 529913b7 or later — upstream's
+    /// own declaration is identical, so the port supersedes it.
+    /// Reject this hunk on upstream sync.
+    @ObservationIgnored public var tabContextForkConversationAvailabilityRefreshHandler: (@MainActor (TabID, PaneID) async -> Void)?
+
     /// Host-provided default destination for the tab context menu's primary "Fork
     /// Conversation" action. Return a destination-specific fork action; invalid values
     /// fall back to `.forkConversationRight`.

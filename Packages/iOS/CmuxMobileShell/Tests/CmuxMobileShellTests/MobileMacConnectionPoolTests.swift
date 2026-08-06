@@ -2872,7 +2872,11 @@ import Testing
             runtime: runtime,
             isSignedIn: true
         )
-        weak let weakShell = shell
+        // cmux-rbf: `weak var`, not `weak let` — Swift 6.2 rejects `weak let`
+        // ("must be a mutable variable, because it may change at runtime"), and
+        // becoming nil is exactly what this assertion tests. Upstream compiles
+        // this on an older Swift. Reject this hunk on upstream sync.
+        weak var weakShell = shell
         shell?.secondaryMacSubscriptions["mac-retain".pairingKey] = subscription
         shell?.startSecondaryEventConsumer(subscription, displayName: "Retain Mac")
 

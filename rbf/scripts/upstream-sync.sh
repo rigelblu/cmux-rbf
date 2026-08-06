@@ -8,15 +8,22 @@
 # deliberately, inspect unexpected fork-owned collisions, then run your verify command.
 #
 # Requires an 'upstream' git remote carrying the upstream branch (default: main;
-# set UPSTREAM_BRANCH to override). To gate a clean rebase on a build/test suite,
-# set UPSTREAM_SYNC_VERIFY_CMD or pass --verify-cmd — the project supplies its own.
+# set UPSTREAM_BRANCH to override). A clean rebase is gated on `make test` by
+# default; override with UPSTREAM_SYNC_VERIFY_CMD / --verify-cmd, or skip with
+# --skip-verify. Quit any running tagged cmux app first or the test run aborts.
+#
+# cmux notes:
+#  - Local 'main' IS the fork's published branch and rides the rebased stack;
+#    'main@upstream' tracks manaflow. Nothing here moves local bookmarks.
+#  - Submodule pointers (ghostty) conflict on both-sides moves; keep the fork's
+#    pointer and take upstream ghostty inside the submodule per CLAUDE.md.
 
 set -euo pipefail
 
 check_only=false
 skip_verify=false
 log_path=""
-verify_cmd="${UPSTREAM_SYNC_VERIFY_CMD:-}"
+verify_cmd="${UPSTREAM_SYNC_VERIFY_CMD:-make test}"
 
 usage() {
   cat <<'USAGE'
@@ -27,14 +34,14 @@ report any conflicts with their divergence classification.
 
 Options:
   --check-only        Fetch and report divergence and classification; no rebase.
-  --verify-cmd <cmd>  Shell command to run after a clean rebase (build/test gates).
+  --verify-cmd <cmd>  Shell command to run after a clean rebase (default: make test).
   --skip-verify       Skip the verify command after a clean rebase.
   --log-path <path>   Sync log. Default: $HOME/Library/Logs/<repo>-upstream-sync.log.
   -h, --help          Show this help.
 
 Environment:
   UPSTREAM_BRANCH           Upstream branch to track (default: main).
-  UPSTREAM_SYNC_VERIFY_CMD  Default for --verify-cmd.
+  UPSTREAM_SYNC_VERIFY_CMD  Default for --verify-cmd (falls back to: make test).
 USAGE
 }
 
@@ -160,6 +167,11 @@ owned_files=""
 hooked_files=""
 deleted_files=""
 
+# Submodule pointers need their own conflict advice: jj cannot materialize a
+# conflict inside a gitlink, and the fork's pointer must win (upstream's
+# submodule changes are taken inside the submodule, not at the pointer).
+submodule_paths="$(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk '{print $2}' || true)"
+
 parse_rename_or_copy_paths() {
   local display_path="$1"
   local prefix
@@ -262,7 +274,10 @@ run_logged jj log -r "${fork_base}..${stack_tip}" --no-graph -T 'change_id.short
 
 log ""
 log "== rebase =="
-if ! run_logged jj rebase -b @ -d "$upstream_ref"; then
+# The fork stack lives on the fork's main (jj trunk()), so jj marks it immutable.
+# Transplant-and-force-push is this fork's sync model; the merge-base check above
+# guarantees only fork commits are rewritten, so overriding immutability is safe.
+if ! run_logged jj rebase -b @ -d "$upstream_ref" --ignore-immutable; then
   log "Error: jj rebase failed. Undo rebase/local-history changes with: jj op restore $pre_op"
   exit 1
 fi
@@ -272,8 +287,12 @@ conflicted_revs="$(jj log -r "conflicts() & ${upstream_ref}..${stack_tip}" --no-
 
 if [[ -z "$conflicted_revs" ]]; then
   log "Rebase complete - no conflicts."
-  if ! run_logged jj bookmark set "$upstream_branch" -r "$upstream_ref"; then
-    log "Warning: could not move local $upstream_branch to $upstream_ref."
+  # Local 'main' is the fork's published branch; it followed the rebased stack.
+  # Never point it at upstream — 'main@upstream' already tracks that.
+
+  if [[ -n "$submodule_paths" ]]; then
+    log ""
+    log "Submodules: jj does not update submodule checkouts. Verify pointers vs checkouts with: git submodule status"
   fi
 
   log ""
@@ -304,7 +323,9 @@ printf '%s' "$conflicted_revs" | while IFS= read -r rev; do
   log "$(jj log -r "$rev" --no-graph -T 'change_id.short() ++ " " ++ commit_id.short() ++ " " ++ description.first_line()')"
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    if printf '%s' "$hooked_files" | grep -Fxq "$file"; then
+    if printf '%s' "$submodule_paths" | grep -Fxq "$file"; then
+      log "  $file - submodule pointer: keep the FORK's pointer (jj restore it from the fork side); take upstream's submodule changes inside the submodule by merging its upstream remote, then bump the pointer deliberately"
+    elif printf '%s' "$hooked_files" | grep -Fxq "$file"; then
       log "  $file - fork edit: accept upstream's new version, then re-apply the fork's change on top"
     elif printf '%s' "$owned_files" | grep -Fxq "$file"; then
       log "  $file - UNEXPECTED: upstream collided with a fork-owned file; inspect manually"
@@ -318,6 +339,9 @@ done
 
 log ""
 log "Resolve with: jj edit <rev>, fix the files, then continue up the stack."
+if [[ -n "$submodule_paths" ]]; then
+  log "Submodules: jj does not update submodule checkouts. After resolving, verify with: git submodule status"
+fi
 log "Undo rebase/local-history changes with: jj op restore $pre_op"
 log "After resolving all conflicts, rerun your verify command${verify_cmd:+: $verify_cmd}."
 exit 1

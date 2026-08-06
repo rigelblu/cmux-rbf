@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# rbf-zig.sh — put a Zig 0.15.2 where the ghostty build can find it.
+# rbf-zig.sh — put the Zig ghostty demands where the ghostty build can find it.
 #
 #   source rbf/scripts/lib/rbf-zig.sh
 #   rbf_ensure_zig [--required]
 #
-# ghostty pins 0.15.2 exactly (`ZIG_REQUIRED` in scripts/build-ghostty-cli-helper.sh)
-# and a stock PATH here carries 0.16.0, which it rejects outright:
+# ghostty pins ONE version exactly (`ZIG_REQUIRED` in
+# scripts/build-ghostty-cli-helper.sh, derived from ghostty/build.zig.zon) and
+# rejects anything else outright:
 #
-#   error: zig 0.15.2 is required to build the Ghostty CLI helper
+#   error: zig <version> is required to build the Ghostty CLI helper
+#
+# Which version that is has changed once already — 0.15.2 until the 2026-08
+# upstream sync, 0.16.0 after — so this file derives it and never names it.
 #
 # That error arrives ~200 lines into an xcodebuild Run Script phase, wrapped in
 # a wall of `export FOO=bar`, so it reads like an Xcode problem rather than a
@@ -38,7 +42,37 @@
 [[ -n "${RBF_ZIG_SH_LOADED:-}" ]] && return 0
 RBF_ZIG_SH_LOADED=1
 
-RBF_ZIG_REQUIRED="${RBF_ZIG_REQUIRED:-0.15.2}"
+# The required version is ghostty's, not ours, so read it from the submodule's
+# own manifest instead of hardcoding it. build-ghostty-cli-helper.sh derives
+# ZIG_REQUIRED from the same function, so the two cannot disagree.
+#
+# This used to be a literal 0.15.2. The 2026-08 upstream sync moved ghostty to a
+# tree declaring minimum_zig_version 0.16.0 (it uses the @Int builtin, which
+# 0.15.2 rejects outright), and a hardcoded pin then forced the WRONG toolchain
+# into CMUX_ZIG and PATH — the exact "build succeeded, wrong thing built" class
+# this file exists to prevent, only inverted. Deriving it means the next ghostty
+# bump needs no edit here.
+rbf__zig_required_default() {
+  local root helper version
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+  helper="$root/scripts/ghostty-zig-version.sh"
+  if [[ -r "$helper" ]]; then
+    # shellcheck source=/dev/null
+    source "$helper" 2>/dev/null || true
+    if declare -F ghostty_minimum_zig_version >/dev/null 2>&1; then
+      version="$(ghostty_minimum_zig_version "$root" 2>/dev/null)" || version=""
+      if [[ -n "$version" ]]; then
+        printf '%s' "$version"
+        return 0
+      fi
+    fi
+  fi
+  # Submodule not checked out yet, or upstream moved the helper. Name the
+  # current floor rather than failing to resolve anything at all.
+  printf '0.16.0'
+}
+
+RBF_ZIG_REQUIRED="${RBF_ZIG_REQUIRED:-$(rbf__zig_required_default)}"
 
 # Candidates, in priority order. The external-drive entry is machine-specific
 # on purpose: it is where the working toolchain actually is on this machine, and
@@ -100,7 +134,8 @@ rbf_ensure_zig() {
 
   echo "rbf-zig: no Zig $RBF_ZIG_REQUIRED found (PATH zig is '$(zig version 2>/dev/null || echo none)')." >&2
   echo "         ghostty rejects anything else. Set CMUX_ZIG=/path/to/zig." >&2
-  echo "         (Not ./scripts/setup.sh — it only suggests 'brew install zig', which gives 0.16.0.)" >&2
+  echo "         (Since the 2026-08 ghostty bump the floor is 0.16.0, which is what" >&2
+  echo "         'brew install zig' currently gives — so setup.sh's suggestion now works.)" >&2
   if [[ $strict -eq 1 ]]; then
     echo "         Refusing to start a Release build that would fail in a script phase." >&2
     return 1

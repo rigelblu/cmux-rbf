@@ -4919,7 +4919,12 @@ final class AppDelegateEqualizeSplitsShortcutTests {
             XCTFail("Expected an unvisited terminal")
             return
         }
-        weak let weakRemovablePanel = removablePanel
+        // cmux-rbf: `weak var`, not `weak let` — Swift 6.2 rejects a `weak let`
+        // ("must be a mutable variable, because it may change at runtime"), which
+        // is the whole point of this assertion: the binding has to be allowed to
+        // become nil. Upstream compiles this on an older Swift.
+        // Reject this hunk on upstream sync.
+        weak var weakRemovablePanel = removablePanel
         workspace.panels.removeValue(forKey: removablePanelId)
         removablePanel = nil
 

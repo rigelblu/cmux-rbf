@@ -11,7 +11,10 @@ After a successful build `reload.sh` terminates any running app with the same ta
 
 ## App path links
 
-`reload.sh` prints an `App path:` line with the absolute path to the built `.app`. Use it to confirm the tag built, but link the build in chat as `http://127.0.0.1:17320/<tag>` through the local Tag Opener. Never put a `file://` URL, a raw `.app` or DerivedData path, or a `/tmp/cmux-<tag>/...` link in chat output.
+`reload.sh` prints an `App path:` line with the absolute path to the built `.app`. Use it to confirm the tag built. Never put a `file://` URL, a raw `.app` or DerivedData path, or a `/tmp/cmux-<tag>/...` link in chat output.
+
+<!-- cmux-rbf: pruned upstream text — removed "link the build in chat as `http://127.0.0.1:17320/<tag>` through the local Tag Opener": no such build server runs in this fork, and a link addresses a bundle that was already built, so it goes stale or names someone else's build. Hand back the `make` command instead — `make run`, or `make -C <absolute worktree> run` from an agent worktree; see rbf/AGENTS.md. This is the same recipe pruned at CLAUDE.md's "Build and reload"; it arrived here unmarked because the prune net never covered this reference file. Reject this hunk on upstream sync. -->
+
 
 ## Tagged CLI and socket
 

@@ -24,7 +24,7 @@
 # wearing this one's name.
 #
 # Two of these directories are LOAD-BEARING and deleting them breaks the build:
-#   - the Zig 0.15.2 toolchain            (rbf/scripts/lib/rbf-zig.sh)
+#   - the pinned Zig toolchain            (rbf/scripts/lib/rbf-zig.sh)
 #   - the Release install DerivedData     (rbf/scripts/install-rbf.sh)
 # An age rule would have deleted the toolchain, which is old precisely BECAUSE
 # it is stable. That is why protection here is by reference, not by mtime.

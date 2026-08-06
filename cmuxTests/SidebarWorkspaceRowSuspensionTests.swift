@@ -49,6 +49,13 @@ struct SidebarWorkspaceRowSuspensionTests {
                 )
             },
             hasManualTaskStatus: manualTaskStatus != nil,
+            // cmux-rbf: #cm-22 adds this required field, which upstream's copy of
+            // this test does not know about. It is the *effective* lane the Accent
+            // Strip suppression reads — manual override when set, inference
+            // otherwise — so mirroring `taskStatus` above is the faithful value for
+            // a helper whose only input is a manual status.
+            // Reject this hunk on upstream sync.
+            attentionTaskStatus: manualTaskStatus,
             checklistItems: checklistItems,
             checklistCompletedCount: checklistItems.filter { $0.state == .completed }.count,
             checklistTotalCount: checklistItems.count,
