@@ -3777,6 +3777,24 @@ final class Workspace: Identifiable, ObservableObject {
     private var isDetachingCloseTransaction: Bool { splitLayout.isDetachingCloseTransaction }
     /// Single transaction owner for focus-neutral remote-tmux topology bookkeeping.
     let remoteTmuxMirrorMutations = RemoteTmuxMirrorMutationCoordinator()
+    /// cmux-rbf `#cm-45`: set by `didReorderTabsInPane`, consumed by the `didSelectTab`
+    /// bonsplit fires immediately afterwards from the same function.
+    ///
+    /// `#cm-45` gave `TabDropDelegate.performSamePaneReorder` a `selectTab` call the two
+    /// paths it replaced never had — the deleted manual-drag path called `focusPane` only.
+    /// Selecting the dragged tab is fine and conventional. What rode in with it is not:
+    /// `applyTabSelection` defaults `resumeHibernatedAgent` to `true`, so **dragging a tab
+    /// to tidy the order resumed a hibernated agent in it** — a prompt-cache miss and a
+    /// re-billed context, which is the cost `#cm-30` exists to stop. The default is right
+    /// for every caller that existed when it was written; its comment says "selecting a
+    /// hibernated tab means the user is visiting it again", and a reorder is not a visit.
+    ///
+    /// Safe as a flag rather than a scoped transaction because bonsplit has exactly one
+    /// production call site for `didReorderTabsInPane` (`TabBarView.swift:3428`) and it is
+    /// followed synchronously by `selectTab` in the same function. Cleared on the next
+    /// main-actor turn regardless, so it can never leak into a later genuine click if that
+    /// ordering ever changes upstream. Reject this hunk on upstream sync.
+    private var suppressesResumeForTabReorder = false
     private var pendingRemoteSurfaceTTYName: String?
     private var pendingRemoteSurfaceTTYSurfaceId: UUID?
     private var pendingRemoteSurfacePortKickReason: PortScanKickReason?
@@ -12748,7 +12766,16 @@ extension Workspace: BonsplitDelegate {
     func splitTabBar(_ controller: BonsplitController, didSelectTab tab: Bonsplit.Tab, inPane pane: PaneID) {
         // Mirror bookkeeping restores selection from its transaction snapshot.
         guard !remoteTmuxMirrorMutations.suppressesFocusActivation else { return }
-        applyTabSelection(tabId: tab.id, inPane: pane)
+        // cmux-rbf `#cm-45`: a selection that is really a drag-reorder still selects, but
+        // must not resume a hibernated agent. See `suppressesResumeForTabReorder`.
+        // Reject this hunk on upstream sync.
+        let isReorderSelection = suppressesResumeForTabReorder
+        suppressesResumeForTabReorder = false
+        applyTabSelection(
+            tabId: tab.id,
+            inPane: pane,
+            resumeHibernatedAgent: isReorderSelection ? false : nil
+        )
     }
 
     func splitTabBar(_ controller: BonsplitController, shouldSplitPane pane: PaneID, orientation: SplitOrientation) -> Bool {
@@ -12763,6 +12790,17 @@ extension Workspace: BonsplitDelegate {
     }
 
     func splitTabBar(_ controller: BonsplitController, didReorderTabsInPane pane: PaneID, orderedTabIds: [TabID]) {
+        // cmux-rbf `#cm-45`: arm the resume suppression for the `didSelectTab` bonsplit
+        // fires next, from the same function. Set BEFORE the mirror guard below — this
+        // applies to every workspace, not just a tmux mirror. The clear is unconditional
+        // and runs on the next main-actor turn, after the synchronous `selectTab` has been
+        // delivered, so the flag cannot survive into a later genuine click.
+        // Reject this hunk on upstream sync.
+        suppressesResumeForTabReorder = true
+        Task { @MainActor [weak self] in
+            self?.suppressesResumeForTabReorder = false
+        }
+
         // A remote tmux mirror tab reorder propagates to tmux window order.
         guard isRemoteTmuxMirror else { return }
         let orderedPanelIds = orderedTabIds.compactMap { panelIdFromSurfaceId($0) }
