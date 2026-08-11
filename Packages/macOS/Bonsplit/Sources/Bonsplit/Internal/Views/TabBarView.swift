@@ -810,6 +810,11 @@ struct TabBarView: View {
     @State private var contentWidth: CGFloat = 0
     @State private var tabContentWidthExcludingSplitButtonLane: CGFloat?
     @State private var containerWidth: CGFloat = 0
+    /// cmux-rbf `#cm-44`: measured width of the caption chip, for the empty-chrome drop
+    /// bounds below. Caption centres one item in a row forced to `containerWidth`, so
+    /// `containerWidth - contentWidth` is 0 there and cannot express the empty space.
+    /// Reject this hunk on upstream sync.
+    @State private var captionItemWidth: CGFloat = 0
     @State private var measuredSplitButtonLaneWidth: CGFloat = 0
     @State private var splitButtonScrollOffset: CGFloat = 0
     @State private var splitButtonContentWidth: CGFloat = 0
@@ -875,6 +880,27 @@ struct TabBarView: View {
 
     private var tabRowAlignment: Alignment {
         presentation == .caption ? .center : .leading
+    }
+
+    /// cmux-rbf `#cm-44`: width of the empty header chrome on ONE side of the caption
+    /// chip, which caption centres.
+    ///
+    /// The trailing overlay that carries the append-drop for `.tabs` is gated on
+    /// `containerWidth - contentWidth >= 1`. Caption forces the row to `containerWidth`
+    /// (`tabRowMinWidth`), so that difference is 0 and the overlay never renders — while
+    /// the chip itself is only its natural width, centred. The empty space is real and
+    /// that arithmetic cannot see it. Measured live 2026-08-12: a tab dropped beside the
+    /// caption label was refused and sprang back; 1266 of 1400pt of a wide caption header
+    /// registered no drop destination at all, where the pre-`#cm-44` tree had none dead.
+    ///
+    /// Deliberately NOT full-width. A single overlay spanning the bar is what `#cm-44`
+    /// deleted: it shadowed every per-tab target and resolved every drop to one index.
+    /// `testTrailingTabBarChromeDropDestinationStaysOffTabPixels` now fails if a chrome
+    /// destination covers a rendered tab, so that mistake cannot come back silently.
+    /// Reject this hunk on upstream sync.
+    private var captionEmptyChromeWidth: CGFloat {
+        guard presentation == .caption, containerWidth > 0, captionItemWidth > 0 else { return 0 }
+        return max(0, (containerWidth - captionItemWidth) / 2)
     }
 
     private var tabBarHeight: CGFloat {
@@ -1057,14 +1083,26 @@ struct TabBarView: View {
             performNewTerminalSplitButtonAction()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onDrop(of: [.tabTransfer, .fileURL], delegate: TabDropDelegate(
-            targetIndex: pane.tabs.count,
-            pane: pane,
-            bonsplitController: controller,
-            controller: splitViewController,
-            dropTargetIndex: $dropTargetIndex,
-            dropLifecycle: $dropLifecycle
-        ))
+        // cmux-rbf `#cm-44`: deliberately NO .onDrop here.
+        //
+        // This overlay spans the whole bar so its CLICKS reach empty chrome, and its
+        // AppKit hit region (`registeredTrailingEmptyChrome` → `shouldCaptureHit`)
+        // already declines points owned by a rendered tab. A SwiftUI `.onDrop`
+        // attached to the same `maxWidth: .infinity` frame gets no such exclusion: it
+        // registers a drop destination across the entire bar — measured
+        // `(0,15,480,30)` against a 53pt tab — and wins every drop. Because
+        // `TabDropDelegate` never reads `info.location`, every drop then resolved to
+        // its `targetIndex: pane.tabs.count`. The result was that a tab could ONLY be
+        // dropped at the end; the per-tab targets carrying a real `targetIndex: index`
+        // were shadowed and never saw it. Confirmed live by Tom 2026-08-11.
+        //
+        // Dropping is already covered without this: the bounded trailing overlay
+        // below (`width: trailing + 30`, `alignment: .trailing`) appends from genuinely
+        // empty space, the per-tab targets reorder, and the leading zone takes index 0.
+        // That is also the destination set upstream bonsplit ended up with — it shipped
+        // this same full-width `.onDrop` in 48643102d6 and deleted it five commits
+        // later in 0d073d9a5f, "fix: keep tab drops out of empty chrome overlay".
+        // Reject this hunk on upstream sync.
     }
 
     private var dragAndHoverBackground: some View {
@@ -1098,6 +1136,18 @@ struct TabBarView: View {
             if presentation == .caption, let tab = pane.tabs.first {
                 captionItem(for: tab)
                     .id(tab.id)
+                    // cmux-rbf `#cm-44`: the chip's own width, which is what separates
+                    // the header's empty chrome from the tab in caption mode.
+                    // Reject this hunk on upstream sync.
+                    .background(
+                        GeometryReader { captionGeo in
+                            Color.clear
+                                .onAppear { captionItemWidth = captionGeo.size.width }
+                                .onChange(of: captionGeo.size.width) { _, newWidth in
+                                    captionItemWidth = newWidth
+                                }
+                        }
+                    )
             } else {
                 ForEach(visibleTabEntries, id: \.tab.id) { entry in
                     tabItem(for: entry.tab, at: entry.index)
@@ -1211,6 +1261,46 @@ struct TabBarView: View {
         }
         .overlay(selectionChrome)
         .overlay(trailingEmptyChromeDragZone)
+        // cmux-rbf `#cm-44`: bounded drop targets for caption's empty chrome, one per
+        // side, mirroring what `TabBarEmptyChromeHitRegion` already grants CLICKS via
+        // `includesLeadingSpace: presentation == .caption`. The click rule knew about
+        // caption's two-sided empty space; no drop layer consulted it.
+        //
+        // Leading takes index 0 and trailing appends, matching where the pointer is
+        // relative to the one tab. Both sit above `trailingEmptyChromeDragZone` so they
+        // receive the drop, and below the split buttons so those keep their lane.
+        // Reject this hunk on upstream sync.
+        .overlay(alignment: .leading) {
+            if captionEmptyChromeWidth >= 1 {
+                Color.clear
+                    .frame(width: captionEmptyChromeWidth, height: tabBarHeight)
+                    .onDrop(of: [.tabTransfer, .fileURL], delegate: TabDropDelegate(
+                        targetIndex: 0,
+                        pane: pane,
+                        bonsplitController: controller,
+                        controller: splitViewController,
+                        dropTargetIndex: $dropTargetIndex,
+                        dropLifecycle: $dropLifecycle
+                    ))
+            }
+        }
+        .overlay(alignment: .trailing) {
+            let reserved = shouldRenderSplitButtons ? splitButtonsBackdropWidth : 0
+            let trailingCaptionChrome = max(0, captionEmptyChromeWidth - reserved)
+            if trailingCaptionChrome >= 1 {
+                Color.clear
+                    .frame(width: trailingCaptionChrome, height: tabBarHeight)
+                    .padding(.trailing, reserved)
+                    .onDrop(of: [.tabTransfer, .fileURL], delegate: TabDropDelegate(
+                        targetIndex: pane.tabs.count,
+                        pane: pane,
+                        bonsplitController: controller,
+                        controller: splitViewController,
+                        dropTargetIndex: $dropTargetIndex,
+                        dropLifecycle: $dropLifecycle
+                    ))
+            }
+        }
         .overlay(alignment: .trailing) {
             splitButtonChrome
                 .frame(width: splitButtonsBackdropWidth, height: tabBarHeight, alignment: .trailing)
