@@ -124,6 +124,7 @@ A pane holding a single surface shows a centered caption instead of a lone tab, 
 
 - The header keeps its icon, status marks, actions, and context menu — only the tab treatment goes.
 - Drag and middle-click close stay on the caption itself; clicking the empty header focuses the pane.
+- The empty header either side of the caption accepts a dropped tab — leading inserts before, trailing appends. Until v0.16.0 only the caption itself did, which left most of a wide header refusing drops.
 - A focused pane draws a contrast-safe rule along its header, but only when more than one pane is on screen and only while the window is active.
 
 ## 🟠⋯ One background image across the whole window
