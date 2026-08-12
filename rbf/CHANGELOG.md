@@ -7,6 +7,19 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 # 🔵⋯ [Unreleased]
 (nothing yet)
 
+---
+
+# 🔵⋯ v0.15.3 (2026-08-12) — #cm-44
+## 🟠⋯ Changed for End Users
+- 2026-08-12 - fix | **a tab lands where you drop it.** Dragging a tab onto another tab in the same pane used to accept the drag and then ignore where it ended — the tab went to the end of the bar, every time, so reordering was impossible. The tab bar's full-width click surface was also registering itself as a drop target across the whole bar, and it answered every drop with "put it at the end", shadowing the per-tab targets that knew better (#cm-44)
+- 2026-08-12 - fix | **a pane showing a single tab accepts drops on its header again.** When a pane has one tab, cmux draws it as a centred caption rather than a tab strip — and that is every freshly split pane. Removing the full-width drop target above took that layout's *only* coverage with it, leaving roughly 90% of a wide header dead: a tab dropped beside the label sprang back, and a folder dropped there no longer opened as a tab. Both sides of the caption now take drops, and dropping onto the label still works (#cm-44)
+- **Known limitation — a narrow band of the tab bar still refuses drops.** With the full-width target gone, an 84pt strip just past the tabs takes no drop in the normal multi-tab layout. Measured, not reported by anyone, and it did not exist before this release. Not yet fixed because nobody has hit it in use (#cm-44)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-12 - fix (test) (#cm-44) | **the drop suite could not detect its own defect returning.** Restoring the removed `.onDrop` left the filtered set 6/6 green, so the "6/6" recorded as this fix's evidence proved nothing. Upstream's discriminating assertion was sitting commented out in the file — disabled because the fork's own code violated it — with its `chromeDragZones` helper dead alongside. Restored live, probing the tab's **midpoint** rather than the last owned x: the tail of the owned run is `horizontalSlop`, where the registry claims pixels the SwiftUI layer treats as chrome, so the tail cannot satisfy both this assertion and the hit-capture one. New `testCaptionEmptyChromeAcceptsTabDrops` covers the caption layout nothing had ever constructed, and carries a setup guard that fails loudly when `presentation` does not reach the view — a stored default of `.tabs` had silently defeated two earlier measurements of the same defect (#cm-44)
+- 2026-08-12 - fix (technical) (#cm-44) | one rule, two owners, still. The AppKit hit region and the SwiftUI drop layer each derive "where empty chrome begins" independently, and they disagree by 9.5pt — the click-forgiveness slop. Benign today, and the same shape that produced this release's drop bug. Both would collapse if the drop bounds were derived from `TabBarEmptyChromeHitRegion`, which is the route not taken here (#cm-44)
+
+---
 
 # 🔵⋯ v0.15.2 (2026-08-12) — #cm-45
 ## 🟠⋯ Changed for End Users
@@ -19,7 +32,6 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 - 2026-08-12 - feat (technical) | Bonsplit was caught up from `10563e2f` to `529913b7` across the fork's subtree rather than by moving the upstream gitlink. The port preserves the fork's tab-bar behavior and adds the upstream context-menu presenter and fallback coverage; the Bonsplit package checks passed 6/6 for the focused tab-context and drop-delegate cases, with the full app build clean apart from six environmental diagnostics (#cm-45)
 - 2026-08-12 - fix (technical) (#cm-45) | `#cm-44` is a **hard dependency of this port, not optional follow-up.** The port deletes `TabBarManualReorderTrackingView` (269 lines) — the AppKit mouse monitor that computed a drop index from the pointer's real x, and the only thing compensating for the fork's shadowing overlay. At that revision alone, tab reordering does not work at all. Do not cherry-pick or bisect to it without `#cm-44` (#cm-45)
 - 2026-08-12 - fix (test) (#cm-45) | `BonsplitTests` has no `pbxproj` entry, so `make test` never reaches any of it. Every guard above runs only under `swift test --package-path Packages/macOS/Bonsplit`, by hand. Second bonsplit change in a row in that state (#cm-45)
-
 
 ---
 
