@@ -31260,6 +31260,12 @@
             "value": "デフォルトブラウザで開く"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បើកក្នុងកម្មវិធីរុករកលំនាំដើម"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
