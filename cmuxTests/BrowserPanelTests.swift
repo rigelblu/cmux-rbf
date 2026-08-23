@@ -36,6 +36,110 @@ struct BrowserWebViewUserAgentRegressionTests {
     }
 }
 
+@MainActor
+@Suite("Browser current page default-browser action", .serialized)
+struct BrowserCurrentPageDefaultBrowserActionTests {
+    @Test(
+        "Only committed valid-host web pages are eligible",
+        arguments: [
+            "https://example.com/path?query=1#fragment",
+            "http://example.com/path",
+        ]
+    )
+    func eligibleWebPages(rawURL: String) throws {
+        let url = try #require(URL(string: rawURL))
+        let panel = BrowserPanel(
+            workspaceId: UUID(),
+            initialURL: url,
+            renderInitialNavigation: false
+        )
+
+        #expect(panel.currentDefaultBrowserURL() == url)
+        #expect(panel.canOpenCurrentPageInDefaultBrowser)
+    }
+
+    @Test(
+        "Blank, internal, file, custom-scheme, malformed, and hostless pages are ineligible",
+        arguments: [
+            "about:blank",
+            "file:///tmp/cm-46.html",
+            "mailto:test@example.com",
+            "cmux-diff-viewer://token/index.html",
+            "http://127.0.0.1:49152/token/diff.html#cmux-diff-viewer",
+            "https:///tmp/cmux.txt",
+        ]
+    )
+    func ineligiblePages(rawURL: String) throws {
+        let panel = BrowserPanel(
+            workspaceId: UUID(),
+            initialURL: try #require(URL(string: rawURL)),
+            renderInitialNavigation: false
+        )
+
+        #expect(panel.currentDefaultBrowserURL() == nil)
+        #expect(!panel.canOpenCurrentPageInDefaultBrowser)
+    }
+
+    @Test("Current page opens exactly once and remains in the cmux panel")
+    func opensCurrentPageWithoutMutatingPanel() throws {
+        let url = try #require(URL(string: "https://example.com/?cmux=cm-46-browser"))
+        let panel = BrowserPanel(
+            workspaceId: UUID(),
+            initialURL: url,
+            renderInitialNavigation: false
+        )
+        var openedURLs: [URL] = []
+        var presentedAlertCount = 0
+
+        let opened = panel.openCurrentPageInDefaultBrowser(
+            defaultBrowserOpenAction: DefaultBrowserOpenAction { openedURL in
+                openedURLs.append(openedURL)
+                return true
+            },
+            presentAlert: { _, _, _, _ in
+                presentedAlertCount += 1
+            }
+        )
+
+        #expect(opened)
+        #expect(openedURLs == [url])
+        #expect(panel.currentURL == url)
+        #expect(panel.preferredURLStringForOmnibar() == url.absoluteString)
+        #expect(presentedAlertCount == 0)
+    }
+
+    @Test("External-open refusal presents existing recovery once without retrying")
+    func refusalPresentsRecoveryWithoutRetry() throws {
+        let url = try #require(URL(string: "https://example.com/refused"))
+        let panel = BrowserPanel(
+            workspaceId: UUID(),
+            initialURL: url,
+            renderInitialNavigation: false
+        )
+        var openedURLs: [URL] = []
+        var presentedAlertTitles: [String] = []
+
+        let opened = panel.openCurrentPageInDefaultBrowser(
+            defaultBrowserOpenAction: DefaultBrowserOpenAction { openedURL in
+                openedURLs.append(openedURL)
+                return false
+            },
+            presentAlert: { alert, _, completion, _ in
+                presentedAlertTitles.append(alert.messageText)
+                completion(.alertFirstButtonReturn)
+            }
+        )
+
+        #expect(!opened)
+        #expect(openedURLs == [url])
+        #expect(presentedAlertTitles == [String(
+            localized: "browser.externalOpenFailure.title",
+            defaultValue: "Cannot Open Link"
+        )])
+        #expect(panel.currentURL == url)
+    }
+}
+
 private func drainBrowserPanelMainQueue() {
     let expectation = XCTestExpectation(description: "drain main queue")
     DispatchQueue.main.async {

@@ -3,13 +3,29 @@ import CmuxTerminalCore
 import CmuxTestSupport
 import Foundation
 
+struct DefaultBrowserOpenAction {
+    private let openURL: @MainActor @Sendable (URL) -> Bool
+
+    init(
+        openURL: @escaping @MainActor @Sendable (URL) -> Bool = { NSWorkspace.shared.open($0) }
+    ) {
+        self.openURL = openURL
+    }
+
+    @discardableResult
+    @MainActor
+    func perform(_ url: URL) -> Bool {
+        openURL(url)
+    }
+}
+
 /// Owns terminal-link policy and routes the resulting action through whichever
 /// panel container currently owns the source terminal.
 @MainActor
 struct TerminalLinkOpenCoordinator {
     private let defaults: UserDefaults
     private let containerResolver: @MainActor (UUID?, UUID?) -> (any TerminalLinkOpenContainer)?
-    private let externalOpen: @MainActor @Sendable (URL) -> Bool
+    private let defaultBrowserOpenAction: DefaultBrowserOpenAction
     private let deferOperation: @MainActor (@escaping @MainActor @Sendable () -> Void) -> Void
 
     init(
@@ -22,7 +38,7 @@ struct TerminalLinkOpenCoordinator {
     ) {
         self.defaults = defaults
         self.containerResolver = containerResolver
-        self.externalOpen = externalOpen
+        self.defaultBrowserOpenAction = DefaultBrowserOpenAction(openURL: externalOpen)
         self.deferOperation = deferOperation
     }
 
@@ -135,7 +151,9 @@ struct TerminalLinkOpenCoordinator {
         guard container.deferTerminalFileLinkOpen(
             sourcePanelId: sourcePanelId,
             filePath: fileURL.path,
-            fallback: { [externalOpen] in _ = externalOpen(fileURL) }
+            fallback: { [defaultBrowserOpenAction] in
+                _ = defaultBrowserOpenAction.perform(fileURL)
+            }
         ) else {
             return openExternally(fileURL, reason: unavailableReason)
         }
@@ -160,7 +178,7 @@ struct TerminalLinkOpenCoordinator {
                 sourcePanelId
             )
             let externalFallback: @MainActor @Sendable () -> Void = { [self] in
-                if !self.externalOpen(fileURL) {
+                if !self.defaultBrowserOpenAction.perform(fileURL) {
                     NSSound.beep()
                 }
             }
@@ -240,7 +258,7 @@ struct TerminalLinkOpenCoordinator {
                 "link.openURL embedded open failed, opening externally " +
                 "host=\(host) surfaceId=\(sourcePanelId) url=\(url)"
             )
-            if !self.externalOpen(url) {
+            if !self.defaultBrowserOpenAction.perform(url) {
                 NSSound.beep()
             }
         }
@@ -262,7 +280,7 @@ struct TerminalLinkOpenCoordinator {
 
     private func openExternally(_ url: URL, reason: String) -> Bool {
         log("link.openURL opening externally reason=\(reason) url=\(url)")
-        return externalOpen(url)
+        return defaultBrowserOpenAction.perform(url)
     }
 
     private static func resolveContainer(

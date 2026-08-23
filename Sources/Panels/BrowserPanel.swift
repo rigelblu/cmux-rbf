@@ -1140,13 +1140,15 @@ private func browserPresentExternalNavigationFailure(
 }
 
 @discardableResult
+@MainActor
 private func browserOpenExternalNavigationURL(
     _ url: URL,
     source: String,
     webView: WKWebView,
+    defaultBrowserOpenAction: DefaultBrowserOpenAction = DefaultBrowserOpenAction(),
     presentAlert: BrowserAlertPresenter = browserPresentAlert
 ) -> Bool {
-    let opened = NSWorkspace.shared.open(url)
+    let opened = defaultBrowserOpenAction.perform(url)
     if !opened {
         browserPresentExternalNavigationFailure(for: url, in: webView, presentAlert: presentAlert)
     }
@@ -1160,6 +1162,7 @@ private func browserOpenExternalNavigationURL(
 }
 
 @discardableResult
+@MainActor
 func browserHandleExternalNavigation(
     _ url: URL,
     source: String,
@@ -8344,6 +8347,37 @@ extension BrowserPanel {
         }
 
         return nil
+    }
+
+    func currentDefaultBrowserURL() -> URL? {
+        guard let rawURL = preferredURLStringForOmnibar(),
+              let url = URL(string: rawURL),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              BrowserInsecureHTTPSettings.normalizeHost(url.host ?? "") != nil,
+              !browserIsTemporaryHistoryURL(url) else {
+            return nil
+        }
+        return url
+    }
+
+    var canOpenCurrentPageInDefaultBrowser: Bool {
+        currentDefaultBrowserURL() != nil
+    }
+
+    @discardableResult
+    func openCurrentPageInDefaultBrowser(
+        defaultBrowserOpenAction: DefaultBrowserOpenAction = DefaultBrowserOpenAction(),
+        presentAlert: @escaping BrowserAlertPresenter = browserPresentAlert
+    ) -> Bool {
+        guard let url = currentDefaultBrowserURL() else { return false }
+        return browserOpenExternalNavigationURL(
+            url,
+            source: "toolbar.currentPage",
+            webView: webView,
+            defaultBrowserOpenAction: defaultBrowserOpenAction,
+            presentAlert: presentAlert
+        )
     }
 
     private func resolvedCurrentSessionHistoryURL() -> URL? {

@@ -596,6 +596,10 @@ struct BrowserPanelView: View {
         panel.reload()
     }
 
+    private func handleOpenCurrentPageInDefaultBrowser() {
+        _ = panel.openCurrentPageInDefaultBrowser()
+    }
+
     private func handleHardRefreshButtonAction() {
 #if DEBUG
         cmuxDebugLog("browser.hardRefresh.contextMenu panel=\(panel.id.uuidString.prefix(5))")
@@ -1120,6 +1124,9 @@ struct BrowserPanelView: View {
                 .accessibilityLabel("Browser omnibar")
 
             HStack(spacing: browserToolbarAccessorySpacing) {
+                if !isChromeCompact {
+                    openCurrentPageInDefaultBrowserButton
+                }
                 if shouldShowToolbarImportHintChip {
                     browserImportHintToolbarChip
                 }
@@ -1283,6 +1290,29 @@ struct BrowserPanelView: View {
         .animation(.easeOut(duration: 0.12), value: screenshotPageCopied)
     }
 
+    private var openCurrentPageInDefaultBrowserTitle: String {
+        String(localized: "browser.openInDefaultBrowser", defaultValue: "Open in Default Browser")
+    }
+
+    private var openCurrentPageInDefaultBrowserButton: some View {
+        Button(action: handleOpenCurrentPageInDefaultBrowser) {
+            CmuxSystemSymbolImage(
+                systemName: "arrow.up.right.square",
+                pointSize: devToolsButtonIconSize,
+                weight: .medium
+            )
+            .foregroundStyle(devToolsColorOption.color)
+            .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
+        }
+        .buttonStyle(OmnibarAddressButtonStyle())
+        .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
+        .disabled(!panel.canOpenCurrentPageInDefaultBrowser)
+        .opacity(panel.canOpenCurrentPageInDefaultBrowser ? 1.0 : 0.4)
+        .safeHelp(openCurrentPageInDefaultBrowserTitle)
+        .accessibilityLabel(openCurrentPageInDefaultBrowserTitle)
+        .accessibilityIdentifier("BrowserOpenCurrentPageInDefaultBrowserButton")
+    }
+
     private var browserFocusModeButtonWithShortcutHint: some View {
         ZStack(alignment: .top) {
             browserFocusModeButton
@@ -1399,6 +1429,13 @@ struct BrowserPanelView: View {
     /// Profile and theme stay as visible buttons since they anchor popovers.
     private var browserOverflowMenu: some View {
         Menu {
+            Button(action: handleOpenCurrentPageInDefaultBrowser) {
+                Label(openCurrentPageInDefaultBrowserTitle, systemImage: "arrow.up.right.square")
+            }
+            .disabled(!panel.canOpenCurrentPageInDefaultBrowser)
+
+            Divider()
+
             Button(action: handleBrowserFocusModeButtonAction) {
                 Label(
                     panel.isBrowserFocusModeActive
