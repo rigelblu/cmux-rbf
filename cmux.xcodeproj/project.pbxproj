@@ -872,9 +872,9 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		918100000000000000000041 /* CodexHookFailureSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918100000000000000000040 /* CodexHookFailureSummary.swift */; };
 		918100000000000000000061 /* CodexHookUserInputCandidate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918100000000000000000060 /* CodexHookUserInputCandidate.swift */; };
 		918100000000000000000091 /* CodexMonitorOwnerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918100000000000000000090 /* CodexMonitorOwnerState.swift */; };
+		3BCBA8A43B46439E933D5CF6 /* CodexRenameSubmissionKeyDownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7037714E5486486187F947DB /* CodexRenameSubmissionKeyDownTests.swift */; };
 		C8711C000000000000000002 /* CodexRolloutIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8711C000000000000000001 /* CodexRolloutIdentity.swift */; };
 		C8711D000000000000000002 /* CodexRolloutIdentityResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8711D000000000000000001 /* CodexRolloutIdentityResolver.swift */; };
-		3BCBA8A43B46439E933D5CF6 /* CodexRenameSubmissionKeyDownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7037714E5486486187F947DB /* CodexRenameSubmissionKeyDownTests.swift */; };
 		C0DECAFE0000000000000001 /* CodexTeamsApprovalBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DECAFE0000000000000002 /* CodexTeamsApprovalBridge.swift */; };
 		C0DECAFE0000000000000003 /* CodexTeamsApprovalBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DECAFE0000000000000002 /* CodexTeamsApprovalBridge.swift */; };
 		C0DEBACC0000000000000001 /* CodexTeamsAppServerFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEBACC0000000000000004 /* CodexTeamsAppServerFixture.swift */; };
@@ -2178,6 +2178,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		F87910190000000000000001 /* TerminalConfigurationReloadCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87910190000000000000002 /* TerminalConfigurationReloadCoordinator.swift */; };
 		F87930000000000000000001 /* TerminalConfigurationReloadEnqueueResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87930000000000000000002 /* TerminalConfigurationReloadEnqueueResult.swift */; };
 		F87920000000000000000005 /* TerminalConfigurationReloadPhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87920000000000000000006 /* TerminalConfigurationReloadPhase.swift */; };
+		46C460000000000000000001 /* TerminalContextMenuLinkAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C460000000000000000002 /* TerminalContextMenuLinkAction.swift */; };
 		D35A00000000000000000014 /* TerminalController+AgentPromptDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35B00000000000000000014 /* TerminalController+AgentPromptDelivery.swift */; };
 		8054A0030000000000000003 /* TerminalController+BrowserAutomationRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8054A0040000000000000004 /* TerminalController+BrowserAutomationRecovery.swift */; };
 		D35A00000000000000000011 /* TerminalController+BrowserDesignMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35B00000000000000000011 /* TerminalController+BrowserDesignMode.swift */; };
@@ -3513,9 +3514,9 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		918100000000000000000040 /* CodexHookFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookFailureSummary.swift; sourceTree = "<group>"; };
 		918100000000000000000060 /* CodexHookUserInputCandidate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookUserInputCandidate.swift; sourceTree = "<group>"; };
 		918100000000000000000090 /* CodexMonitorOwnerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexMonitorOwnerState.swift; sourceTree = "<group>"; };
+		7037714E5486486187F947DB /* CodexRenameSubmissionKeyDownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexRenameSubmissionKeyDownTests.swift; sourceTree = "<group>"; };
 		C8711C000000000000000001 /* CodexRolloutIdentity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexRolloutIdentity.swift; sourceTree = "<group>"; };
 		C8711D000000000000000001 /* CodexRolloutIdentityResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexRolloutIdentityResolver.swift; sourceTree = "<group>"; };
-		7037714E5486486187F947DB /* CodexRenameSubmissionKeyDownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexRenameSubmissionKeyDownTests.swift; sourceTree = "<group>"; };
 		C0DECAFE0000000000000002 /* CodexTeamsApprovalBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTeamsApprovalBridge.swift; sourceTree = "<group>"; };
 		C0DEBACC0000000000000004 /* CodexTeamsAppServerFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTeamsAppServerFixture.swift; sourceTree = "<group>"; };
 		C0DEBACC0000000000000006 /* CodexTeamsResumedBackfillTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTeamsResumedBackfillTests.swift; sourceTree = "<group>"; };
@@ -4800,6 +4801,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		F87910190000000000000002 /* TerminalConfigurationReloadCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalConfigurationReloadCoordinator.swift; sourceTree = "<group>"; };
 		F87930000000000000000002 /* TerminalConfigurationReloadEnqueueResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalConfigurationReloadEnqueueResult.swift; sourceTree = "<group>"; };
 		F87920000000000000000006 /* TerminalConfigurationReloadPhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalConfigurationReloadPhase.swift; sourceTree = "<group>"; };
+		46C460000000000000000002 /* TerminalContextMenuLinkAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalContextMenuLinkAction.swift; sourceTree = "<group>"; };
 		D35B00000000000000000014 /* TerminalController+AgentPromptDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+AgentPromptDelivery.swift"; sourceTree = "<group>"; };
 		8054A0040000000000000004 /* TerminalController+BrowserAutomationRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+BrowserAutomationRecovery.swift"; sourceTree = "<group>"; };
 		D35B00000000000000000011 /* TerminalController+BrowserDesignMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+BrowserDesignMode.swift"; sourceTree = "<group>"; };
@@ -6239,6 +6241,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				C4041001000000000000001A /* CommandClickFileOpenRouter.swift */,
 				859110000000000000000004 /* DockSplitStore+TerminalLinkOpening.swift */,
 				859110000000000000000006 /* TerminalLinkOpenContainer.swift */,
+				46C460000000000000000002 /* TerminalContextMenuLinkAction.swift */,
 				859110000000000000000008 /* TerminalLinkOpenCoordinator.swift */,
 				C86270000000000000000002 /* TerminalHTMLFileBrowserAction.swift */,
 				85911000000000000000000A /* TerminalLinkOpenRequest.swift */,
@@ -9848,6 +9851,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				F87910190000000000000001 /* TerminalConfigurationReloadCoordinator.swift in Sources */,
 				F87930000000000000000001 /* TerminalConfigurationReloadEnqueueResult.swift in Sources */,
 				F87920000000000000000005 /* TerminalConfigurationReloadPhase.swift in Sources */,
+				46C460000000000000000001 /* TerminalContextMenuLinkAction.swift in Sources */,
 				D35A00000000000000000014 /* TerminalController+AgentPromptDelivery.swift in Sources */,
 				8054A0030000000000000003 /* TerminalController+BrowserAutomationRecovery.swift in Sources */,
 				D35A00000000000000000011 /* TerminalController+BrowserDesignMode.swift in Sources */,
@@ -10634,8 +10638,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 					A6AC72080000000000000001 /* CMUXWorkspaceLoadingCLIRegressionTests.swift in Sources */,
 				AAE06C3AEC68484DA33D42A1 /* CoalesceLatestPublisherDemandTests.swift in Sources */,
 				A9E040000000000000000002 /* CodexAppServerSessionTests.swift in Sources */,
-				3BCBA8A43B46439E933D5CF6 /* CodexRenameSubmissionKeyDownTests.swift in Sources */,
 				C8711B000000000000000002 /* CodexCodeModeRolloutIdentityTests.swift in Sources */,
+				3BCBA8A43B46439E933D5CF6 /* CodexRenameSubmissionKeyDownTests.swift in Sources */,
 				C0DECAFE0000000000000003 /* CodexTeamsApprovalBridge.swift in Sources */,
 				C0DEBACC0000000000000001 /* CodexTeamsAppServerFixture.swift in Sources */,
 				C0DEBACC0000000000000003 /* CodexTeamsResumedBackfillTests.swift in Sources */,
@@ -10757,8 +10761,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				17C9F5BA0DD14EDC8C3E5001 /* MainWindowVisibilityControllerTests.swift in Sources */,
 				A6D1F0100000000000000002 /* MainWindowVisibilityLifecycleTests.swift in Sources */,
 				730600000000000000000001 /* MainWindowVisibleFrameFitCoreTests.swift in Sources */,
-				D9154002D9154002D9154002 /* MarkdownCodespanRenderingTests.swift in Sources */,
 				F5168A0C0000000000000001 /* MarkdownBackgroundStyleTests.swift in Sources */,
+				D9154002D9154002D9154002 /* MarkdownCodespanRenderingTests.swift in Sources */,
 				D7470002D7470002D7470002 /* MarkdownLinkBoundaryRegressionTests.swift in Sources */,
 				D6069002D6069002D6069002 /* MarkdownMermaidZoomTests.swift in Sources */,
 				D3664002D3664002D3664002 /* MarkdownPanelTests.swift in Sources */,

@@ -103,6 +103,12 @@ struct TerminalLinkOpenCoordinator {
         }
     }
 
+    /// Opens one already-resolved terminal web URL in the system default browser.
+    @discardableResult
+    func openInDefaultBrowser(_ url: URL) -> Bool {
+        openExternally(url, reason: "explicit default browser action")
+    }
+
     private func routeLocalFile(
         _ fileURL: URL,
         request: TerminalLinkOpenRequest,

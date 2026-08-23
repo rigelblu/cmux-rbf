@@ -7492,9 +7492,20 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         }
 
         window?.makeFirstResponder(self)
-        if sendsTerminalPointerEvent {
-            let point = convert(event.locationInWindow, from: nil)
-            ghostty_surface_mouse_pos(surface, point.x, bounds.height - point.y, mouseModsFromEvent(event))
+        let terminalPoint = sendsTerminalPointerEvent
+            ? convert(event.locationInWindow, from: nil)
+            : nil
+        let contextLinkAction = TerminalContextMenuLinkAction(
+            rawValue: terminalPoint.flatMap { contextLinkRawValue(at: $0, surface: surface) },
+            isTerminalViewport: sendsTerminalPointerEvent
+        )
+        if let terminalPoint {
+            ghostty_surface_mouse_pos(
+                surface,
+                terminalPoint.x,
+                bounds.height - terminalPoint.y,
+                mouseModsFromEvent(event)
+            )
             _ = ghostty_surface_mouse_button(
                 surface,
                 GHOSTTY_MOUSE_PRESS,
@@ -7504,6 +7515,11 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         }
 
         let menu = NSMenu()
+        contextLinkAction?.prepend(
+            to: menu,
+            target: self,
+            action: #selector(openTerminalLinkInDefaultBrowser(_:))
+        )
         if onTriggerFlash != nil {
             let flashItem = menu.addItem(
                 withTitle: String(localized: "terminalContextMenu.triggerFlash", defaultValue: "Trigger Flash"),
@@ -7591,6 +7607,28 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         return menu
     }
 
+    /// Copies Ghostty's exact OSC 8 or configured-link target at one viewport point.
+    private func contextLinkRawValue(
+        at point: NSPoint,
+        surface: ghostty_surface_t
+    ) -> String? {
+        var text = ghostty_text_s()
+        guard ghostty_surface_link_at_point(
+            surface,
+            point.x,
+            bounds.height - point.y,
+            &text
+        ) else {
+            return nil
+        }
+        defer { ghostty_surface_free_text(surface, &text) }
+        guard let pointer = text.text, text.text_len > 0 else { return nil }
+        return String(
+            decoding: Data(bytes: pointer, count: Int(text.text_len)),
+            as: UTF8.self
+        )
+    }
+
     private func addDirectionalSplitMenuItem(
         to menu: NSMenu,
         title: String,
@@ -7676,6 +7714,14 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
 
     @objc private func triggerFlash(_ sender: Any?) {
         onTriggerFlash?()
+    }
+
+    @objc private func openTerminalLinkInDefaultBrowser(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem,
+              let url = item.representedObject as? URL else {
+            return
+        }
+        _ = TerminalLinkOpenCoordinator().openInDefaultBrowser(url)
     }
 
     @objc private func resetTerminal(_ sender: Any?) {
