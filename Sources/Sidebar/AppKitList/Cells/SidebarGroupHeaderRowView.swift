@@ -178,7 +178,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             ofSize: GlobalFontMagnification.scaledSize(metrics.nameFontSize, percent: percent),
             weight: .semibold
         )
-        nameField.textColor = model.isAnchorActive ? .labelColor : NSColor.labelColor.withAlphaComponent(0.9)
+        nameField.textColor = bandPalette(for: model).primaryTextColor
 
         let showsBadge = model.anchorUnreadCount > 0
         unreadBadgeView.isHidden = !showsBadge
@@ -270,9 +270,11 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         backgroundView.layer?.cornerRadius = 4
-        backgroundView.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.08).cgColor
+        let palette = bandPalette(for: model, isAnchorActive: true)
+        backgroundView.layer?.backgroundColor = palette.bandColor
+            .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
-        nameField.textColor = .labelColor
+        nameField.textColor = palette.primaryTextColor
     }
 
     /// Modifier-click preview: paints the same dim membership tint as an
@@ -293,9 +295,11 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         backgroundView.layer?.cornerRadius = 4
-        backgroundView.layer?.backgroundColor = NSColor.clear.cgColor
+        let palette = bandPalette(for: model, isAnchorActive: false, isMultiSelected: false)
+        backgroundView.layer?.backgroundColor = palette.bandColor
+            .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
-        nameField.textColor = NSColor.labelColor.withAlphaComponent(0.9)
+        nameField.textColor = palette.primaryTextColor
     }
 
     /// Inverse of the press treatment: previewing a different row must peel a
@@ -308,14 +312,26 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         applyModel(model)
     }
 
+    /// The band behind this header, from the one shared source the SwiftUI
+    /// renderer also consumes (`#cm-49`). The optimistic paint paths below take
+    /// the same resolution with an overridden state, so a press, a preview, and
+    /// the authoritative apply cannot disagree about what a header looks like.
+    private func bandPalette(
+        for model: SidebarGroupHeaderRowModel,
+        isAnchorActive: Bool? = nil,
+        isMultiSelected: Bool? = nil
+    ) -> SidebarGroupHeaderBandPalette {
+        SidebarGroupHeaderBandPalette(
+            tintHex: model.tintHex,
+            isAnchorActive: isAnchorActive ?? model.isAnchorActive,
+            isMultiSelected: isMultiSelected ?? model.isMultiSelected,
+            multiSelectionBackgroundStyle: model.multiSelectionBackgroundStyle
+        )
+    }
+
     private func headerBackgroundColor(for model: SidebarGroupHeaderRowModel) -> NSColor {
-        if model.isAnchorActive {
-            return NSColor.labelColor.withAlphaComponent(0.08)
-        }
-        if model.isMultiSelected {
-            return headerMultiSelectionBackgroundColor(for: model)
-        }
-        return .clear
+        let palette = bandPalette(for: model)
+        return palette.bandColor.withAlphaComponent(palette.bandOpacity)
     }
 
     private func headerMultiSelectionBackgroundColor(

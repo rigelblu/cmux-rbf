@@ -128,6 +128,18 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
         String(localized: "workspaceGroup.pinned.tooltip", defaultValue: "Pinned group")
     }
 
+    /// The band behind this header, resolved from the one shared source both
+    /// renderers consume. Pure over the scalar snapshot fields, so it is legal
+    /// below the `LazyVStack` boundary.
+    private var bandPalette: SidebarGroupHeaderBandPalette {
+        SidebarGroupHeaderBandPalette(
+            tintHex: tintHex,
+            isAnchorActive: isAnchorActive,
+            isMultiSelected: isMultiSelected,
+            multiSelectionBackgroundStyle: multiSelectionBackgroundStyle
+        )
+    }
+
     private var multiSelectionBackgroundColor: Color {
         guard let color = multiSelectionBackgroundStyle.color else {
             return .clear
@@ -182,7 +194,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     .accessibilityHidden(true)
                 Text(name)
                     .cmuxFont(size: metrics.nameFontSize, weight: .semibold)
-                    .foregroundStyle(isAnchorActive ? Color.primary : Color.primary.opacity(0.9))
+                    .foregroundStyle(Color(nsColor: bandPalette.primaryTextColor))
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if anchorUnreadCount > 0 {
@@ -281,11 +293,8 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
         .padding(.trailing, SidebarWorkspaceListMetrics.rowContentHorizontalPadding)
         .contentShape(Rectangle())
         .background(
-            isAnchorActive
-                ? Color.primary.opacity(0.08)
-                : isMultiSelected
-                    ? multiSelectionBackgroundColor
-                    : Color.clear
+            Color(nsColor: bandPalette.bandColor)
+                .opacity(bandPalette.bandOpacity)
         )
         .clipShape(RoundedRectangle(
             cornerRadius: isMultiSelected && !isAnchorActive ? 6 : 4,
