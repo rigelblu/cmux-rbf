@@ -105,10 +105,23 @@ extension Workspace {
     /// of its focused panel. Resolved panel titles include intentional surface
     /// names, so later raw OSC title events cannot replace a friendly surface
     /// name with the serialized command that launched a resumed agent.
+    ///
+    /// An agent-named panel is the one title that does *not* reconcile. A Codex
+    /// session names its own tab and nothing around it, so a session `#cm-9`
+    /// already ruled ineligible for the workspace title cannot reach that title
+    /// anyway through the panel it *is* allowed to rename. A name the user or
+    /// the process put on the panel still fills in an unnamed workspace.
+    ///
+    /// The check lives here rather than at the call sites because four paths
+    /// reach this helper with a possibly agent-owned panel title — both
+    /// branches of `setPanelCustomTitle`, snapshot restore, and focused-surface
+    /// transfer — and a guard written into one entrypoint is not inherited by
+    /// the next.
     @discardableResult
     func applyFocusedPanelTitle(panelId: UUID, requiresFocus: Bool = true) -> Bool {
         guard !isRemoteTmuxMirror,
               !requiresFocus || focusedPanelId == panelId,
+              !panelTitleIsAgentOwned(panelId: panelId),
               let resolvedTitle = panelTitle(panelId: panelId)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !resolvedTitle.isEmpty else {
             return false
@@ -117,6 +130,22 @@ extension Workspace {
         let previousTitle = title
         applyProcessTitle(resolvedTitle)
         return processTitle != previousProcessTitle || title != previousTitle
+    }
+
+    /// Whether the panel's visible name was written by an agent session.
+    ///
+    /// Mirrors `resolvedPanelTitle`: only a non-empty custom title counts,
+    /// because that is the only case where the panel shows something other than
+    /// its own process or display title. A custom title carrying no recorded
+    /// source reads as the user's, matching how panel ownership resolves
+    /// everywhere else.
+    private func panelTitleIsAgentOwned(panelId: UUID) -> Bool {
+        guard let custom = panelCustomTitles[panelId]?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !custom.isEmpty else {
+            return false
+        }
+        return (panelCustomTitleSources[panelId] ?? .user) == .agentSession
     }
 
     /// The single write path for automatic (non-user) workspace titles.

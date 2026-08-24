@@ -49,10 +49,13 @@ enum WorkspaceAgentOccupancy {
         }
     }
 
-    /// Reads `workspace`'s occupancy from the two places that know it — live
-    /// registry-tracked sessions bound to it, and its agent-session panels —
-    /// and decides whether `claimant` is alone. Both adapters call this, each
-    /// passing only its own identity, so neither can invent its own rule.
+    /// Reads `workspace`'s occupancy from the places that know it — live
+    /// registry sessions bound either to the workspace or one of its terminal
+    /// surfaces, plus its embedded agent-session panels — and decides whether
+    /// `claimant` is alone. Surface binding matters because Codex hook events
+    /// identify their terminal before workspace backfill completes. Both
+    /// adapters call this, each passing only its own identity, so neither can
+    /// invent its own rule.
     ///
     /// - Parameters:
     ///   - claimant: Identity of the surface asking to claim the title.
@@ -64,11 +67,20 @@ enum WorkspaceAgentOccupancy {
         in workspace: Workspace,
         registry: AgentChatSessionRegistry?
     ) -> Bool {
-        isSoleAgentSurface(
+        var terminalSessionIDs = Set(
+            registry?.liveSessionIDs(workspaceID: workspace.id.uuidString) ?? []
+        )
+        if let registry {
+            for (panelID, panel) in workspace.panels where panel is TerminalPanel {
+                if let session = registry.liveSession(surfaceID: panelID.uuidString) {
+                    terminalSessionIDs.insert(session.sessionID)
+                }
+            }
+        }
+
+        return isSoleAgentSurface(
             claimant,
-            terminalSessionIDs: registry?.liveSessionIDs(
-                workspaceID: workspace.id.uuidString
-            ) ?? [],
+            terminalSessionIDs: Array(terminalSessionIDs),
             embeddedPanelIDs: workspace.panels.compactMap { id, panel in
                 panel is AgentSessionPanel ? id : nil
             }

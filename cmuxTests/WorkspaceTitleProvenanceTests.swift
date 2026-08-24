@@ -372,6 +372,28 @@ import Testing
         #expect(workspace.panelCustomTitles[panelId] == "Sibling Codex name")
     }
 
+    /// The ceiling of the rule above: blocking an *agent* from the workspace
+    /// name must not block the user from it.
+    ///
+    /// An unnamed workspace still takes the name of its focused tab when a
+    /// person put that name there. Without this, the guard that stops a sibling
+    /// Codex session could be widened to stop every custom panel title and
+    /// nothing here would fail — the workspace would silently go back to
+    /// showing the raw process title after a rename the user typed.
+    @Test func userPanelRenameStillNamesAnUnnamedWorkspace() throws {
+        let manager = TabManager()
+        let workspace = try #require(manager.selectedWorkspace)
+        let pane = try #require(workspace.bonsplitController.allPaneIds.first)
+        let panelId = try #require(workspace.newTerminalSurface(inPane: pane, focus: true)?.id)
+        workspace.applyProcessTitle("zsh")
+
+        #expect(workspace.setPanelCustomTitle(panelId: panelId, title: "My own tab name"))
+
+        #expect(workspace.customTitle == nil)
+        #expect(workspace.title == "My own tab name")
+        #expect(workspace.panelCustomTitles[panelId] == "My own tab name")
+    }
+
     /// A rename changes names and nothing else.
     ///
     /// The riskiest routing case is renaming a panel that is *not* focused: a

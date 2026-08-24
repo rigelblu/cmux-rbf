@@ -1,3 +1,4 @@
+import CMUXAgentLaunch
 import Foundation
 import Testing
 
@@ -90,6 +91,40 @@ struct WorkspaceAgentOccupancyTests {
                 .embeddedPanel(panelId: panelId),
                 terminalSessionIDs: [],
                 embeddedPanelIDs: [panelId, siblingPanelId]
+            )
+        )
+    }
+
+    /// Codex hook events identify their terminal surface before they can carry
+    /// a workspace binding. Two such sessions in one workspace are still two
+    /// occupants: the second rename must stay on its own tab.
+    @MainActor
+    @Test func unboundSiblingSessionsOnWorkspaceSurfacesDenyWorkspaceClaim() throws {
+        let manager = TabManager()
+        let workspace = try #require(manager.selectedWorkspace)
+        let pane = try #require(workspace.bonsplitController.allPaneIds.first)
+        let leadPanel = try #require(workspace.newTerminalSurface(inPane: pane, focus: true))
+        let siblingPanel = try #require(workspace.newTerminalSurface(inPane: pane, focus: false))
+        let registry = AgentChatSessionRegistry()
+
+        registry.noteHookEvent(WorkstreamEvent(
+            sessionId: "lead",
+            hookEventName: .userPromptSubmit,
+            source: "codex",
+            surfaceId: leadPanel.id.uuidString
+        ))
+        registry.noteHookEvent(WorkstreamEvent(
+            sessionId: "sibling",
+            hookEventName: .userPromptSubmit,
+            source: "codex",
+            surfaceId: siblingPanel.id.uuidString
+        ))
+
+        #expect(
+            !WorkspaceAgentOccupancy.isSoleAgentSurface(
+                .terminalSession(sessionID: "lead"),
+                in: workspace,
+                registry: registry
             )
         )
     }
