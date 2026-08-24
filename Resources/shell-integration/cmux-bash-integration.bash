@@ -386,6 +386,15 @@ _cmux_claude_wrapper_command() {
         command claude "$@"
     fi
 }
+_cmux_codex_wrapper_command() {
+    if [[ -x "${CMUX_CODEX_WRAPPER_SHIM:-}" ]]; then
+        "$CMUX_CODEX_WRAPPER_SHIM" "$@"
+    elif [[ -x "${_CMUX_CODEX_WRAPPER:-}" ]]; then
+        "$_CMUX_CODEX_WRAPPER" "$@"
+    else
+        command codex "$@"
+    fi
+}
 _cmux_install_cli_wrapper() {
     local command_name="$1"
     local wrapper_variable="$2"
@@ -415,11 +424,14 @@ _cmux_install_cli_wrapper() {
     unalias "$command_name" >/dev/null 2>&1 || true
     if [[ "$command_name" == "claude" ]]; then
         eval "$command_name() { _cmux_claude_wrapper_command \"\$@\"; }"
+    elif [[ "$command_name" == "codex" ]]; then
+        eval "$command_name() { _cmux_codex_wrapper_command \"\$@\"; }"
     else
         eval "$command_name() { \"\${$wrapper_variable}\" \"\$@\"; }"
     fi
 }
 _cmux_install_cli_wrapper claude _CMUX_CLAUDE_WRAPPER cmux-claude-wrapper
+_cmux_install_cli_wrapper codex _CMUX_CODEX_WRAPPER cmux-codex-wrapper
 _cmux_install_cli_wrapper grok _CMUX_GROK_WRAPPER
 _cmux_now() {
     printf '%s\n' "${EPOCHSECONDS:-$SECONDS}"

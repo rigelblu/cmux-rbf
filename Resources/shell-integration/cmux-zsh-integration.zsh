@@ -401,11 +401,21 @@ _cmux_claude_wrapper_command() {
         command claude "$@"
     fi
 }
+_cmux_codex_wrapper_command() {
+    if [[ -x "${CMUX_CODEX_WRAPPER_SHIM:-}" ]]; then
+        "$CMUX_CODEX_WRAPPER_SHIM" "$@"
+    elif [[ -x "${_CMUX_CODEX_WRAPPER:-}" ]]; then
+        "$_CMUX_CODEX_WRAPPER" "$@"
+    else
+        command codex "$@"
+    fi
+}
 _cmux_install_cli_wrapper() {
     local command_name="$1"
     local wrapper_variable="$2"
     local wrapper_file="${3:-$command_name}"
     local integration_dir="${CMUX_SHELL_INTEGRATION_DIR:-}"
+    local existing_type=""
     [[ -n "$integration_dir" ]] || return 0
 
     integration_dir="${integration_dir%/}"
@@ -413,20 +423,40 @@ _cmux_install_cli_wrapper() {
     local wrapper_path="$bundle_dir/bin/$wrapper_file"
     [[ -x "$wrapper_path" ]] || return 0
 
+    if (( ${+aliases[$command_name]} )); then
+        existing_type="alias"
+    elif (( ${+functions[$command_name]} )); then
+        existing_type="function"
+    fi
     # Keep the bundled wrapper ahead of later PATH mutations. Install it
     # via eval so an existing alias cannot break parsing.
     typeset -g "$wrapper_variable=$wrapper_path"
     if [[ "$command_name" == "claude" ]]; then
         _cmux_install_cli_command_shim "$command_name" "$wrapper_path"
     fi
+    if [[ "$command_name" == "codex" ]]; then
+        # Preserve deliberate user replacements. The cmux-owned function is
+        # refreshable because _cmux_fix_path calls this installer at precmd.
+        case "$existing_type" in
+            alias)
+                return 0
+                ;;
+            function)
+                [[ "${functions[$command_name]}" == *"_cmux_codex_wrapper_command"* ]] || return 0
+                ;;
+        esac
+    fi
     builtin unalias "$command_name" >/dev/null 2>&1 || true
     if [[ "$command_name" == "claude" ]]; then
         eval "$command_name() { _cmux_claude_wrapper_command \"\$@\"; }"
+    elif [[ "$command_name" == "codex" ]]; then
+        eval "$command_name() { _cmux_codex_wrapper_command \"\$@\"; }"
     else
         eval "$command_name() { \"\${$wrapper_variable}\" \"\$@\"; }"
     fi
 }
 _cmux_install_cli_wrapper claude _CMUX_CLAUDE_WRAPPER cmux-claude-wrapper
+_cmux_install_cli_wrapper codex _CMUX_CODEX_WRAPPER cmux-codex-wrapper
 _cmux_install_cli_wrapper grok _CMUX_GROK_WRAPPER
 
 _cmux_normalize_claude_config_dir() {
@@ -1899,6 +1929,7 @@ _cmux_fix_path() {
         fi
     fi
     _cmux_install_cli_wrapper claude _CMUX_CLAUDE_WRAPPER cmux-claude-wrapper
+    _cmux_install_cli_wrapper codex _CMUX_CODEX_WRAPPER cmux-codex-wrapper
     _cmux_install_cli_wrapper grok _CMUX_GROK_WRAPPER
     add-zsh-hook -d precmd _cmux_fix_path
 }

@@ -407,6 +407,16 @@ if test "$_cmux_integration_enabled" != 0
                         command claude $argv
                     end
                 end
+            case codex
+                function codex --wraps "$wrapper_path" --inherit-variable wrapper_path
+                    if test -x "$CMUX_CODEX_WRAPPER_SHIM"
+                        "$CMUX_CODEX_WRAPPER_SHIM" $argv
+                    else if test -x "$wrapper_path"
+                        "$wrapper_path" $argv
+                    else
+                        command codex $argv
+                    end
+                end
             case grok
                 function grok --wraps "$wrapper_path" --inherit-variable wrapper_path
                     "$wrapper_path" $argv
@@ -415,6 +425,7 @@ if test "$_cmux_integration_enabled" != 0
     end
 
     _cmux_install_cli_wrapper claude cmux-claude-wrapper
+    _cmux_install_cli_wrapper codex cmux-codex-wrapper
     _cmux_install_cli_wrapper grok grok
 
     function _cmux_report_tty_once

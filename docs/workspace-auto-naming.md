@@ -28,6 +28,10 @@ Only a rename you explicitly type syncs. The names Codex generates for a session
 
 Precedence is unchanged: a name you set in cmux yourself still wins, and stays until you clear it.
 
+Ordinary `codex` launches from cmux-integrated zsh, bash, and fish shells use cmux's per-terminal wrapper even if your shell later changes `PATH`. Aliases that expand to the ordinary `codex` command use the same path. There is no setup or `PATH` repair to perform.
+
+An already-running Codex process that started without cmux hooks must exit and relaunch; cmux itself does not need to restart. A replacement `codex` alias or function, an absolute Codex path, and `command codex` deliberately bypass cmux's wrapper, so `/rename` from those processes does not sync to cmux.
+
 **Two cases where a rename does not reach the workspace.** Dragging a Codex tab into a different workspace stops its rename sync until the surface is recreated — the tab itself is unaffected. And when two Codex sessions share one workspace but their hook payloads carry no workspace binding, each can read as the only agent present, so the second rename can claim the workspace title instead of only its own tab. In both cases the tab title stays correct; only the workspace title is at risk.
 
 **A `/rename` only lands once the session has said something.** Codex 0.146.0 registers a session with cmux at that session's first real prompt submission - it never runs a session-start hook - so a `/rename` typed before you have sent Codex any message is declined and nothing changes. Send one message first, and renames land from then on. This is Codex behavior, not a cmux setting, and there is nothing to configure.
