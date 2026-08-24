@@ -11,6 +11,16 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Open one web link in your default browser, without changing where the next one opens
+
+Terminal links follow whatever routing you configured — usually into a cmux browser tab. Sometimes you want *this one* link in Safari or Chrome instead, and nothing about that decision should stick.
+
+- **From the terminal:** right-click a recognized web link and choose **Open in Default Browser**. It opens that exact URL and changes no setting; the next `⌘`-click routes as before.
+- **From a cmux browser tab:** an external-link button sits immediately after the address bar. Narrow the pane and the same command moves to the top of **More Actions**. Either way the cmux tab stays open on the same page — nothing is handed off or closed.
+- The action appears only on real web targets. File paths, `mailto:`, custom schemes, and malformed or hostless URLs leave the menu unchanged; in browser chrome the button stays visible but disabled, so the toolbar never rearranges itself under you.
+- The browser action uses the page that is **loaded**, not what you have half-typed in the address bar. Editing the address bar retargets nothing until you press Return.
+- **Known limitation:** on a remote workspace whose proxy endpoint has not resolved yet, the action can open a page that was requested but never finished loading. Local workspaces are unaffected.
+
 ## 🟠⋯ Use the cmux you build as your everyday app
 
 The flavour installs as **cmux RBF** in `/Applications`, with its own green `RBF` banner icon, its own bundle id and its own socket — so it is something you open from the Dock rather than something you launch out of a build directory. Upstream's `cmux.app` is never read, written or replaced; it stays as the fallback, and both can run at once. `make install-rbf-plan` prints the whole plan and writes nothing; `make install-rbf` does it.

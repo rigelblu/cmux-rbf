@@ -9,6 +9,17 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.16.0 (2026-08-24) — #cm-46
+## 🟠⋯ Changed for End Users
+- 2026-08-24 - feat | open a web link in your default browser without changing where the next one opens. Right-click a recognized terminal web link and choose **Open in Default Browser**; after a page is already open in a cmux browser tab, use the external-link button beside the address bar—or the same command first in **More Actions** when the pane is narrow. The cmux tab stays open and terminal-link routing settings stay unchanged (#cm-46)
+- **Known limitation — on a remote workspace whose proxy endpoint has not resolved yet, the action can open a page that was requested but never loaded.** `BrowserPanel.navigate` assigns `currentURL` optimistically on that path, and the action reads `currentURL`, so a URL you submitted but that never finished loading is what reaches your default browser. Local workspaces are unaffected: there `currentURL` follows the committed document. Found by reading the navigation path, not reported by anyone (#cm-46)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-24 - feat (technical) (#cm-46) | one shared `DefaultBrowserOpenAction` backs both entry points. The terminal right-click path and the browser toolbar path keep their own eligibility rules and their own failure recovery — the terminal closes its menu silently, the browser keeps its existing alert and Copy Link — but they hand macOS the URL through the same injected action, so a test can substitute it and neither path can drift into opening links a different way (#cm-46)
+- 2026-08-24 - fix (test) (#cm-46) | **the committed-vs-draft rule has no automated test, and that is now proven rather than assumed.** A test was written for it and removed after mutation showed it could not fail. `openCurrentPageInDefaultBrowser()` takes no URL; the omnibar's draft lives in view-local `OmnibarState.buffer` and never reaches `BrowserPanel`, so the guarantee is structural — enforced by the method signature. The mutation was complete, not a token one: a stored draft on the panel *plus* the view feeding it `omnibarState.buffer`, which is the whole regression and sits one line from being real (`omnibarState` at `BrowserPanelView.swift:265`, the handler at `:599`). The suite stayed green. **The behavior now rests entirely on a human check** — Scenario 8's draft step — recorded as such in the brief. A first mutation attempt went red on `extensions must not contain stored properties` and was discarded; a red from a build break is not a result, and it is the flattering direction to be wrong in (#cm-46)
+
+---
+
 # 🔵⋯ v0.15.3 (2026-08-12) — #cm-44
 ## 🟠⋯ Changed for End Users
 - 2026-08-12 - fix | **a tab lands where you drop it.** Dragging a tab onto another tab in the same pane used to accept the drag and then ignore where it ended — the tab went to the end of the bar, every time, so reordering was impossible. The tab bar's full-width click surface was also registering itself as a drop target across the whole bar, and it answered every drop with "put it at the end", shadowing the per-tab targets that knew better (#cm-44)
