@@ -8,6 +8,19 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 (nothing yet)
 
 
+# 🔵⋯ v0.15.2 (2026-08-12) — #cm-45
+## 🟠⋯ Changed for End Users
+- 2026-08-12 - fix | **dragging a tab to tidy the order no longer starts an agent you were not running.** Reordering a tab selects it, which is intended and matches every browser. What came with it was not: selecting a tab resumes a hibernated agent in it, and a hibernated tab is one whose agent has already exited — so a drag meant to rearrange your tabs was silently launching a session and billing a fresh context from cold. Selection still happens; the resume no longer does. Only affects you if you have turned Agent Hibernation on, which is off by default (#cm-45)
+- 2026-08-12 - feat (technical) | the tab context menu now refreshes fork-conversation availability while it is open, so a menu no longer remains stuck on the answer it had when it was first opened (#cm-45)
+- **Known limitation — the live refresh race remains difficult to reproduce deliberately.** The wiring is covered and the implementation is always on, but the open-menu re-evaluation was not observed in dogfood; the feature ships on traced source behavior rather than that observation (#cm-45)
+- **Known limitation — the drag-reorder resume fix ships unverified by hand.** The mechanism was traced link by link in the source and the change compiles clean, but no one has watched it work, and the scenario first designed to check it turned out to be unreachable: a *running* agent is never a hibernation candidate. If the suppression misses, the behaviour is exactly what it was before the fix, so the downside is bounded (#cm-45)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-12 - feat (technical) | Bonsplit was caught up from `10563e2f` to `529913b7` across the fork's subtree rather than by moving the upstream gitlink. The port preserves the fork's tab-bar behavior and adds the upstream context-menu presenter and fallback coverage; the Bonsplit package checks passed 6/6 for the focused tab-context and drop-delegate cases, with the full app build clean apart from six environmental diagnostics (#cm-45)
+- 2026-08-12 - fix (technical) (#cm-45) | `#cm-44` is a **hard dependency of this port, not optional follow-up.** The port deletes `TabBarManualReorderTrackingView` (269 lines) — the AppKit mouse monitor that computed a drop index from the pointer's real x, and the only thing compensating for the fork's shadowing overlay. At that revision alone, tab reordering does not work at all. Do not cherry-pick or bisect to it without `#cm-44` (#cm-45)
+- 2026-08-12 - fix (test) (#cm-45) | `BonsplitTests` has no `pbxproj` entry, so `make test` never reaches any of it. Every guard above runs only under `swift test --package-path Packages/macOS/Bonsplit`, by hand. Second bonsplit change in a row in that state (#cm-45)
+
+
 ---
 
 # 🔵⋯ v0.15.1 (2026-08-05) — #cm-37
