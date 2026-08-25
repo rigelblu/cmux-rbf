@@ -5289,6 +5289,18 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             event: event,
             committedText: committedText
         ) else {
+#if DEBUG
+            // A Return the buffer could not prove — an arrow, paste, or other
+            // edit it cannot model invalidated the line, so the rename the user
+            // typed arms nothing and the confirmation later reads as
+            // `detectedButUnarmed`. Silence here made those two sides of the
+            // same event look unrelated and cost a full diagnosis to connect.
+            // Gated on the flag rather than on the `nil`, so it fires once per
+            // submit and never per keystroke.
+            if codexInputLine.lastSubmitWasUnproven {
+                cmuxDebugLog("codexRename.submissionUnproven")
+            }
+#endif
             return
         }
         guard let name = CodexExplicitRenameSubmissionStore.explicitRenameName(

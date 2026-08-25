@@ -28,6 +28,17 @@ struct TerminalInputLineBuffer {
     private var characters: String = ""
     private var isTrustworthy: Bool = true
 
+    /// Whether the most recent submit was one this buffer could not prove.
+    ///
+    /// `consume` returns `nil` for two unrelated reasons — the event was not a
+    /// submit at all, which is every ordinary keystroke, or it was a submit on a
+    /// line an earlier edit invalidated. Callers cannot tell those apart from
+    /// the `nil`, and logging on the `nil` alone would fire on every keystroke,
+    /// on the path `CLAUDE.md` protects. This separates them: it is written only
+    /// when a plain Return is folded in, so reading it costs a submit, never a
+    /// keypress.
+    private(set) var lastSubmitWasUnproven = false
+
     /// The line as typed, or `nil` when nothing since the last reset can be
     /// trusted as authored by the user.
     var provenLine: String? {
@@ -77,7 +88,9 @@ struct TerminalInputLineBuffer {
     /// Consumes the line on submit, returning it only if it is proven.
     mutating func takeSubmittedLine() -> String? {
         defer { reset() }
-        return provenLine
+        let line = provenLine
+        lastSubmitWasUnproven = line == nil
+        return line
     }
 
     /// Folds one key event in, given the text the input system committed for it.

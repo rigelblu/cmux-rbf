@@ -73,6 +73,53 @@ struct TerminalInputLineBufferTests {
         }
     }
 
+    /// An unproven submit must be distinguishable from an ordinary keystroke.
+    ///
+    /// `consume` returns `nil` for both, and that ambiguity is what made the
+    /// real-world failure invisible: the user typed a rename after pressing Up,
+    /// nothing armed, and the only trace was a `detectedButUnarmed` line whose
+    /// cause sat several seconds earlier in the log with nothing connecting
+    /// them. A caller must be able to log the poisoned submit without logging
+    /// every keypress on the typing path `CLAUDE.md` protects.
+    @Test func unprovenSubmitIsDistinguishableFromAnOrdinaryKeystroke() {
+        var buffer = TerminalInputLineBuffer()
+        Self.type("/rename test", into: &buffer)
+
+        // An ordinary keystroke is not a submit and must not claim to be one.
+        #expect(buffer.lastSubmitWasUnproven == false)
+
+        _ = buffer.consume(event: Self.key(keyCode: 126), committedText: [])
+        #expect(
+            buffer.lastSubmitWasUnproven == false,
+            "invalidating the line is not itself a submit"
+        )
+
+        #expect(buffer.consume(event: Self.key(keyCode: 36), committedText: []) == nil)
+        #expect(
+            buffer.lastSubmitWasUnproven,
+            "a Return on an invalidated line is an unproven submit"
+        )
+    }
+
+    /// The flag must not latch. A poisoned submit followed by a clean one has to
+    /// report the clean one honestly, or the log would accuse every later rename
+    /// of a fault that happened once.
+    @Test func aProvenSubmitClearsTheUnprovenFlag() {
+        var buffer = TerminalInputLineBuffer()
+        Self.type("/rename first", into: &buffer)
+        _ = buffer.consume(event: Self.key(keyCode: 126), committedText: [])
+        _ = buffer.consume(event: Self.key(keyCode: 36), committedText: [])
+        #expect(buffer.lastSubmitWasUnproven)
+
+        Self.type("/rename second", into: &buffer)
+
+        #expect(buffer.consume(event: Self.key(keyCode: 36), committedText: []) == "/rename second")
+        #expect(
+            buffer.lastSubmitWasUnproven == false,
+            "the previous line's fault must not follow a proven submit"
+        )
+    }
+
     /// Command-modified keys are app or shell actions — paste and history recall
     /// among them — that rewrite the composer where this cannot follow.
     @Test func commandChordInvalidatesTheLine() {
