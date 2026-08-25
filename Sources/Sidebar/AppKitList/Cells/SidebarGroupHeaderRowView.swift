@@ -84,10 +84,21 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         addSubview(bottomDropIndicator)
 
         addSubview(hintPill)
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(accessibilityDisplayOptionsDidChange),
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil
+        )
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     override func prepareForReuse() {
@@ -95,6 +106,17 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         suspendPresentation()
         model = nil
         hintPill.resetForReuse()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        guard let model else { return }
+        applyModel(model)
+    }
+
+    @objc private func accessibilityDisplayOptionsDidChange() {
+        guard let model else { return }
+        applyModel(model)
     }
 
     func suspendPresentation() {
@@ -141,6 +163,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         defer { CATransaction.commit() }
         let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale)
         let percent = model.globalFontMagnificationPercent
+        let headerPalette = bandPalette(for: model)
 
         pinImageView.isHidden = !model.isPinned
         if model.isPinned {
@@ -178,7 +201,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             ofSize: GlobalFontMagnification.scaledSize(metrics.nameFontSize, percent: percent),
             weight: .semibold
         )
-        nameField.textColor = bandPalette(for: model).primaryTextColor
+        nameField.textColor = headerPalette.primaryTextColor
 
         let showsBadge = model.anchorUnreadCount > 0
         unreadBadgeView.isHidden = !showsBadge
@@ -213,7 +236,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         backgroundView.layer?.cornerRadius = model.isMultiSelected && !model.isAnchorActive
             ? 6
             : 4
-        backgroundView.layer?.backgroundColor = headerBackgroundColor(for: model).cgColor
+        backgroundView.layer?.backgroundColor = headerPalette.bandColor
+            .withAlphaComponent(headerPalette.bandOpacity).cgColor
 
         topDropIndicator.layer?.backgroundColor = cmuxAccentNSColor().cgColor
         bottomDropIndicator.layer?.backgroundColor = cmuxAccentNSColor().cgColor
@@ -245,6 +269,10 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
 #if DEBUG
     var dropIndicatorPaintForTesting: (top: Bool, bottom: Bool) {
         (!topDropIndicator.isHidden, !bottomDropIndicator.isHidden)
+    }
+
+    var nameTextColorForTesting: NSColor {
+        nameField.textColor ?? .clear
     }
 #endif
 
@@ -281,11 +309,14 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     /// unfocused multi-selected workspace row.
     func showOptimisticMultiSelection() {
         guard let model, !model.isAnchorActive, !model.isMultiSelected else { return }
+        let palette = bandPalette(for: model, isMultiSelected: true)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         backgroundView.layer?.cornerRadius = 6
-        backgroundView.layer?.backgroundColor = headerMultiSelectionBackgroundColor(for: model).cgColor
+        backgroundView.layer?.backgroundColor = palette.bandColor
+            .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
+        nameField.textColor = palette.primaryTextColor
     }
 
     /// Plain-click counterpart: clears active and multi-selected header paint
@@ -325,22 +356,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             tintHex: model.tintHex,
             isAnchorActive: isAnchorActive ?? model.isAnchorActive,
             isMultiSelected: isMultiSelected ?? model.isMultiSelected,
-            multiSelectionBackgroundStyle: model.multiSelectionBackgroundStyle
-        )
-    }
-
-    private func headerBackgroundColor(for model: SidebarGroupHeaderRowModel) -> NSColor {
-        let palette = bandPalette(for: model)
-        return palette.bandColor.withAlphaComponent(palette.bandOpacity)
-    }
-
-    private func headerMultiSelectionBackgroundColor(
-        for model: SidebarGroupHeaderRowModel
-    ) -> NSColor {
-        let style = model.multiSelectionBackgroundStyle
-        guard let color = style.color else { return .clear }
-        return color.withAlphaComponent(
-            color.alphaComponent * style.opacity
+            multiSelectionBackgroundStyle: model.multiSelectionBackgroundStyle,
+            renderedAppearance: .init(effectiveAppearance)
         )
     }
 

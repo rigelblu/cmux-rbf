@@ -95,6 +95,8 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     let onContextMenuDisappear: () -> Void
 
     @State private var contextMenuVisible = false
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
 #if DEBUG
     // Plain-value environment probe set only by SidebarLazyLayoutScaleTests;
@@ -136,7 +138,11 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             tintHex: tintHex,
             isAnchorActive: isAnchorActive,
             isMultiSelected: isMultiSelected,
-            multiSelectionBackgroundStyle: multiSelectionBackgroundStyle
+            multiSelectionBackgroundStyle: multiSelectionBackgroundStyle,
+            renderedAppearance: .init(
+                colorScheme: colorScheme,
+                contrast: colorSchemeContrast
+            )
         )
     }
 

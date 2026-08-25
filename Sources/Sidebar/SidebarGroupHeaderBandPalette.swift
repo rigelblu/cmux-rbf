@@ -23,6 +23,64 @@ import SwiftUI
 /// same hazard `accentStripOpacity` was pulled out of two files to close.
 /// Resolve here; do not re-inline a rung at a call site.
 struct SidebarGroupHeaderBandPalette: Equatable {
+    /// The concrete appearance a renderer is drawing.
+    ///
+    /// Dynamic AppKit colours otherwise resolve against whichever appearance
+    /// happens to be current while the palette is constructed. A cached or
+    /// offscreen row can therefore derive a Light foreground from a Dark base
+    /// (or the reverse), which is exactly how the group name became black on a
+    /// dark band. Make the rendered appearance an input instead of consulting
+    /// ambient drawing state.
+    enum RenderedAppearance: CaseIterable {
+        case aqua
+        case darkAqua
+        case highContrastAqua
+        case highContrastDarkAqua
+
+        init(colorScheme: ColorScheme, contrast: ColorSchemeContrast) {
+            switch (colorScheme, contrast) {
+            case (.light, .standard):
+                self = .aqua
+            case (.dark, .standard):
+                self = .darkAqua
+            case (.light, .increased):
+                self = .highContrastAqua
+            case (.dark, .increased):
+                self = .highContrastDarkAqua
+            @unknown default:
+                self = colorScheme == .dark ? .darkAqua : .aqua
+            }
+        }
+
+        init(
+            _ appearance: NSAppearance,
+            contrastIncreased: Bool = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        ) {
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            self = switch (isDark, contrastIncreased) {
+            case (false, false): .aqua
+            case (true, false): .darkAqua
+            case (false, true): .highContrastAqua
+            case (true, true): .highContrastDarkAqua
+            }
+        }
+
+        var appKitAppearance: NSAppearance {
+            // AppKit normalizes its named accessibility appearances back to
+            // their Aqua family on supported macOS releases. Contrast is a
+            // separate accessibility state; this appearance is only the
+            // dynamic-colour resolution context.
+            let name: NSAppearance.Name = switch self {
+            case .aqua, .highContrastAqua: .aqua
+            case .darkAqua, .highContrastDarkAqua: .darkAqua
+            }
+            // Both system appearances are present on every supported macOS
+            // release. Keeping the fallback explicit still makes the palette
+            // safe if AppKit ever declines one.
+            return NSAppearance(named: name) ?? NSAppearance(named: .aqua)!
+        }
+    }
+
     /// The band's colour before `bandOpacity` is applied.
     let bandColor: NSColor
 
@@ -159,35 +217,47 @@ struct SidebarGroupHeaderBandPalette: Equatable {
         isAnchorActive: Bool,
         isMultiSelected: Bool,
         multiSelectionBackgroundStyle: SidebarWorkspaceRowBackgroundStyle,
+        renderedAppearance: RenderedAppearance,
         base: NSColor = .windowBackgroundColor
     ) {
         let identity = tintHex.flatMap { NSColor(hex: $0) }
+        let unresolvedBandColor: NSColor
 
         if isMultiSelected, !isAnchorActive, let style = multiSelectionBackgroundStyle.color {
             // Multi-selection keeps its existing treatment and sits on top of
             // the band rather than beside it on the ladder.
-            bandColor = style
+            unresolvedBandColor = style
             bandOpacity = style.alphaComponent * multiSelectionBackgroundStyle.opacity
         } else if let identity {
-            bandColor = identity
+            unresolvedBandColor = identity
             bandOpacity = isAnchorActive ? Self.activeBandOpacity : Self.restingBandOpacity
         } else {
-            bandColor = Self.neutralBandColor
+            unresolvedBandColor = Self.neutralBandColor
             bandOpacity = isAnchorActive
                 ? Self.neutralActiveBandOpacity
                 : Self.neutralRestingBandOpacity
         }
 
+        var resolvedBandColor = unresolvedBandColor
+        var resolvedBase = base
+        var resolvedLabelColor = NSColor.labelColor
+        renderedAppearance.appKitAppearance.performAsCurrentDrawingAppearance {
+            resolvedBandColor = unresolvedBandColor.usingColorSpace(.sRGB) ?? unresolvedBandColor
+            resolvedBase = base.usingColorSpace(.sRGB) ?? base
+            resolvedLabelColor = NSColor.labelColor.usingColorSpace(.sRGB) ?? .labelColor
+        }
+        bandColor = resolvedBandColor
+
         let composited = cmuxCompositedNSColor(
             bandColor.withAlphaComponent(bandOpacity),
-            over: base
+            over: resolvedBase
         )
         // The header's name was a fixed `Color.primary` while its background
         // was clear. Once the band can carry a saturated config-supplied colour
         // that is no longer safe, so the foreground is derived — the same
         // contrast path the workspace rows already use.
         primaryTextColor = cmuxReadableForegroundNSColor(
-            preferred: .labelColor,
+            preferred: resolvedLabelColor,
             on: composited
         )
     }
