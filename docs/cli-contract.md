@@ -407,9 +407,11 @@ Hook subcommands:
 | `hooks claude <event>` | Handle Claude Code hook events. `claude-hook <event>` remains as the main-compatibility alias. |
 | `hooks codex <event>` | Handle Codex hook events. `codex install-hooks` remains as the main-compatibility installer alias. |
 | `hooks feed --source <agent>` | Convert agent hook events into Feed context. |
-| `hooks <agent> <event>` | Generic hook surface for `grok`, `opencode`, `pi`, `amp`, `cursor`, `gemini`, `kimi`, `rovodev`, `copilot`, `codebuddy`, `factory`, and `qoder`. |
+| `hooks <agent> <event>` | Generic hook surface for `grok`, `opencode`, `pi`, `amp`, `cursor`, `gemini`, `kimi`, `antigravity` (alias `agy`), `rovodev`, `hermes-agent`, `copilot`, `codebuddy`, `factory`, and `qoder`. |
 
 Kimi hook setup targets `${KIMI_SHARE_DIR:-~/.kimi}/config.toml`. Setup and uninstall also remove only cmux's marker-delimited block from the legacy `${KIMI_CODE_HOME:-~/.kimi-code}/config.toml` path.
+
+Antigravity hook setup is `cmux hooks agy install --yes`. It writes cmux's named group to `~/.gemini/config/hooks.json`; the generated internal commands use the canonical `antigravity` slug. With workspace auto-naming enabled, only a fully-idle completion can name the current conversation, and it currently requires an explicitly selected supported Naming Agent rather than **Automatic**.
 
 Right sidebar commands:
 

@@ -273,6 +273,21 @@ Opt-in AI auto-naming of workspaces and tabs from agent conversation content. Wh
 
 Default: `false`. Manual renames (sidebar, command palette, CLI, or `/rename`) always win: a workspace or tab you renamed yourself is never auto-named again until you clear its custom name. Enable it from **Settings > Automation > Workspace Auto-Naming**.
 
+## `automation.autoNamingAgent`
+
+Selects which supported agent binary generates names for every session. The default, `"auto"`, uses each session's own supported agent. Antigravity currently provides a transcript source but not a safe self-summarizer, so Antigravity naming requires an explicit installed supported value such as `"claude"`, `"codex"`, `"grok"`, `"opencode"`, `"pi"`, or `"omp"`:
+
+```json
+{
+  "automation": {
+    "workspaceAutoNaming": true,
+    "autoNamingAgent": "codex"
+  }
+}
+```
+
+Install the Antigravity hooks separately with `cmux hooks agy install --yes`. If the selected naming agent is missing, signed out, or unavailable—or the hooks are absent—the current name remains unchanged. Missing hooks cannot be diagnosed by Settings because they produce no naming attempt.
+
 ## `diffViewer.defaultLayout`
 
 Controls the initial layout for newly opened diff viewers.

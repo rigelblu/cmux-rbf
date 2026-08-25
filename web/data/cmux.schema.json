@@ -1287,7 +1287,7 @@
           "type": "string",
           "default": "auto",
           "descriptionKey": "schemaDescriptions.automation.autoNamingAgent",
-          "description": "Which agent generates auto-names for every session. \"auto\" (default) names each session with its own agent; any agent slug (claude, codex, grok, opencode, pi, omp, …) overrides naming for all sessions, even other agents' sessions. Undriveable or uninstalled agents fall back to the session's own agent, so naming never breaks."
+          "description": "Which agent generates auto-names for every session. \"auto\" (default) names each session with its own supported agent; an explicit supported slug (claude, codex, grok, opencode, pi, or omp) overrides naming for all sessions. Antigravity currently requires one of those explicit choices and does not fall back to running agy itself."
         },
         "ripgrepBinaryPath": {
           "type": "string",

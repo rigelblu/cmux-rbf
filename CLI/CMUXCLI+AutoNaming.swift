@@ -1,4 +1,6 @@
 import CMUXAgentLaunch
+import CmuxSettings
+import Darwin
 import Foundation
 
 // Auto-naming engine: pure, dependency-injected logic for naming workspaces
@@ -161,6 +163,28 @@ struct AutoNamingEnvironmentPolicy: Sendable {
             "--mcp-config", Self.emptyMCPConfigJSON
         ]
     }
+
+    /// Argument vector for the isolated, tool-disabled `codex exec`
+    /// summarizer call.
+    func codexSummarizerArguments(workingDirectory: String, outputFile: String) -> [String] {
+        [
+            "exec",
+            "-c", "default_tools_enabled=false",
+            "-c", "tools={}",
+            "-c", "mcp_servers={}",
+            "-c", #"web_search="disabled""#,
+            "-c", "approval_policy=never",
+            "-c", "shell_environment_policy.inherit=none",
+            "--skip-git-repo-check",
+            "--ephemeral",
+            "--ignore-user-config",
+            "--ignore-rules",
+            "--sandbox", "read-only",
+            "--cd", workingDirectory,
+            "--output-last-message", outputFile,
+            "-"
+        ]
+    }
 }
 
 /// Pure auto-naming logic: throttle decisions, transcript extraction,
@@ -321,6 +345,38 @@ struct AutoNamingEngine: Sendable {
                   !trimmed.isEmpty else {
                 continue
             }
+            messages.append(AutoNamingTranscriptMessage(role: role, text: trimmed))
+        }
+        return messages
+    }
+
+    // MARK: - Transcript extraction (Antigravity transcript JSONL)
+
+    /// Extracts only the human conversation records observed in Antigravity
+    /// 1.1.20 transcripts. Tool, system, checkpoint, incomplete, malformed,
+    /// and unknown future records are deliberately ignored.
+    func extractAntigravityMessages(fromTranscriptLines lines: [String]) -> [AutoNamingTranscriptMessage] {
+        var messages: [AutoNamingTranscriptMessage] = []
+        for line in lines {
+            guard let data = line.data(using: .utf8),
+                  let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  object["status"] as? String == "DONE",
+                  let source = object["source"] as? String,
+                  let type = object["type"] as? String,
+                  let content = object["content"] as? String else {
+                continue
+            }
+            let role: String
+            switch (source, type) {
+            case ("USER_EXPLICIT", "USER_INPUT"):
+                role = "user"
+            case ("MODEL", "PLANNER_RESPONSE"):
+                role = "assistant"
+            default:
+                continue
+            }
+            let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
             messages.append(AutoNamingTranscriptMessage(role: role, text: trimmed))
         }
         return messages
@@ -536,4 +592,141 @@ struct AutoNamingEngine: Sendable {
         }
         return firstString(in: block, keys: ["text", "input_text", "content"])
     }
+}
+
+// MARK: - Antigravity transcript access and generic-hook eligibility
+//
+// These helpers are pure and shared: the CLI drives them from the generic
+// agent hook path, and the unit-test target exercises them directly. They
+// live here rather than in CMUXCLI+AutoNamingGenericHooks.swift because only
+// this file is compiled into both targets.
+
+struct AntigravityTranscriptSnapshot: Equatable {
+    let lines: [String]
+    let fileSize: Int
+}
+
+/// Opens Antigravity's fixed transcript shape component-by-component with
+/// `O_NOFOLLOW`, then reads the bounded tail from the same verified descriptor.
+/// This limits accidental or forged cross-session reads; it does not
+/// authenticate a malicious process running as the same user.
+enum AntigravityTranscriptReader {
+    static func isNonEmptyRegularFile(_ metadata: stat) -> Bool {
+        metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) && metadata.st_size > 0
+    }
+
+    static func read(
+        transcriptPath: String,
+        conversationID: String,
+        homeDirectory: String,
+        maxBytes: UInt64
+    ) -> AntigravityTranscriptSnapshot? {
+        let conversationID = conversationID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !conversationID.isEmpty,
+              conversationID != ".",
+              conversationID != "..",
+              !conversationID.contains("/") else {
+            return nil
+        }
+
+        let homeURL = URL(fileURLWithPath: homeDirectory, isDirectory: true).standardizedFileURL
+        let expectedURL = [
+            ".gemini", "antigravity-cli", "brain", conversationID,
+            ".system_generated", "logs", "transcript_full.jsonl",
+        ].reduce(homeURL) { url, component in
+            url.appendingPathComponent(component, isDirectory: component != "transcript_full.jsonl")
+        }.standardizedFileURL
+        let actualPath = URL(
+            fileURLWithPath: NSString(string: transcriptPath).expandingTildeInPath,
+            isDirectory: false
+        ).standardizedFileURL.path
+        guard actualPath == expectedURL.path else { return nil }
+
+        let homeFD = open(homeURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+        guard homeFD >= 0 else { return nil }
+        var openedDirectoryFDs = [homeFD]
+        defer {
+            for fd in openedDirectoryFDs.reversed() {
+                Darwin.close(fd)
+            }
+        }
+
+        var parentFD = homeFD
+        for component in [
+            ".gemini", "antigravity-cli", "brain", conversationID,
+            ".system_generated", "logs",
+        ] {
+            let nextFD = component.withCString {
+                openat(parentFD, $0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+            }
+            guard nextFD >= 0 else { return nil }
+            openedDirectoryFDs.append(nextFD)
+            parentFD = nextFD
+        }
+
+        // O_NONBLOCK because the S_IFREG check below runs AFTER this open, so it
+        // cannot rescue us from a FIFO parked at this path: open() would block
+        // forever waiting for a writer, and this read happens before
+        // beginAutoNaming takes the in-flight lock, so every later fully-idle
+        // turn would leak another wedged `cmux hooks antigravity auto-name`.
+        // For a regular file O_NONBLOCK changes nothing.
+        let fileFD = "transcript_full.jsonl".withCString {
+            openat(parentFD, $0, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+        }
+        guard fileFD >= 0 else { return nil }
+        defer { Darwin.close(fileFD) }
+
+        var metadata = stat()
+        guard fstat(fileFD, &metadata) == 0,
+              isNonEmptyRegularFile(metadata) else {
+            return nil
+        }
+        let fileSize = UInt64(metadata.st_size)
+        let readLength = min(fileSize, maxBytes)
+        let readStart = fileSize - readLength
+        guard lseek(fileFD, off_t(readStart), SEEK_SET) >= 0 else { return nil }
+
+        var data = Data()
+        data.reserveCapacity(Int(readLength))
+        var remaining = Int(readLength)
+        var buffer = [UInt8](repeating: 0, count: min(64 * 1024, remaining))
+        while remaining > 0 {
+            let requested = min(buffer.count, remaining)
+            let count = buffer.withUnsafeMutableBytes { bytes in
+                Darwin.read(fileFD, bytes.baseAddress, requested)
+            }
+            if count < 0, errno == EINTR { continue }
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+            remaining -= count
+        }
+        guard !data.isEmpty else { return nil }
+
+        if readStart > 0 {
+            guard let newline = data.firstIndex(of: 0x0A) else { return nil }
+            data.removeSubrange(data.startIndex...newline)
+        }
+        guard !data.isEmpty,
+              let text = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return AntigravityTranscriptSnapshot(
+            lines: text.components(separatedBy: "\n"),
+            fileSize: fileSize > UInt64(Int.max) ? Int.max : Int(fileSize)
+        )
+    }
+}
+
+func genericAgentAutoNamingEventEligible(agentName: String, fullyIdle: Bool?) -> Bool {
+    agentName != "antigravity" || fullyIdle == true
+}
+
+func explicitSupportedAutoNamingAgent(_ rawChoice: String?) -> String? {
+    guard let choice = rawChoice?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !choice.isEmpty,
+          choice != AutoNamingAgentCatalog.autoSlug,
+          AutoNamingAgentCatalog.summarizerSupported(slug: choice) else {
+        return nil
+    }
+    return choice
 }

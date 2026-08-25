@@ -17,7 +17,9 @@ public struct AutoNamingAgentOption: Sendable, Hashable {
     public let displayName: String
     /// Whether cmux currently knows how to drive this agent as a summarizer.
     /// Unsupported agents are still selectable (the user asked for any agent),
-    /// but naming falls back to each session's own agent.
+    /// but naming normally falls back to each session's own agent. A source-only
+    /// adapter may impose a stricter caller-side gate: Antigravity requires an
+    /// explicitly selected supported agent until its own runner is proven safe.
     public let summarizerSupported: Bool
 
     public init(slug: String, displayName: String, summarizerSupported: Bool) {
@@ -45,8 +47,8 @@ public enum AutoNamingAgentCatalog {
     ]
 
     /// All agents offered in the picker, in display order. Supported agents
-    /// first, then the remainder (selectable but fall back to the session's own
-    /// agent until cmux learns to drive them).
+    /// come first, then the remainder. The CLI owns source-specific fallback
+    /// policy; Antigravity remains unsupported as a summarizer in cm-47.1.
     public static let agents: [AutoNamingAgentOption] = [
         .init(slug: "claude", displayName: "Claude Code", summarizerSupported: true),
         .init(slug: "codex", displayName: "Codex", summarizerSupported: true),

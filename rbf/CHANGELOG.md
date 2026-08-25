@@ -5,7 +5,12 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(nothing yet)
+## 🟠⋯ Changed for End Users
+- 2026-08-23 - feat | Antigravity CLI sessions can now automatically name their cmux workspace and tab through a supported Naming Agent you explicitly select. Run `cmux hooks agy install --yes`, enable Workspace Auto-Naming, and choose an installed supported Naming Agent; manual names still always win (#cm-47)
+- **Known limitation — Naming Agent → Automatic does not run Antigravity itself yet.** cmux reads Antigravity's bounded current-conversation transcript, but it will not invoke `agy` as a summarizer until that can be proven isolated from the real Antigravity home and useful tools. Select Claude Code, Codex, Grok, OpenCode, Pi, or OMP for now (#cm-47)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-23 - feat (technical) | the `antigravity` hook adapter now accepts only explicit `fullyIdle: true` completion boundaries, validates the current conversation's fixed transcript path with descriptor-relative no-follow opens, reads at most the final 512 KiB from the verified regular-file descriptor, and feeds only completed human user/model text into the existing locked auto-naming and `workspace.set_auto_title` path (#cm-47)
 
 
 ---

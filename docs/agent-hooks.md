@@ -11,7 +11,7 @@ cmux hooks setup --agent <agent>
 cmux hooks uninstall <agent>
 ```
 
-Supported agent names are `codex`, `grok`, `opencode`, `pi`, `omp`, `campfire`, `amp`, `cursor`, `gemini`, `kimi`, `kiro`, `rovodev` (or `rovo`), `copilot`, `codebuddy`, `factory`, and `qoder`. `cmux hooks setup` skips agents whose binary is not on `PATH` and prints a summary.
+Supported agent names are `codex`, `grok`, `opencode`, `pi`, `omp`, `campfire`, `amp`, `cursor`, `gemini`, `kimi`, `kiro`, `antigravity` (or `agy`), `rovodev` (or `rovo`), `hermes-agent`, `copilot`, `codebuddy`, `factory`, and `qoder`. `cmux hooks setup` skips agents whose binary is not on `PATH` and prints a summary.
 
 ## Integrations
 
@@ -28,6 +28,7 @@ Supported agent names are `codex`, `grok`, `opencode`, `pi`, `omp`, `campfire`, 
 | Cursor CLI | `cursor-agent` | `~/.cursor/hooks.json` | `cursor-agent --resume <id>` | beforeShellExecution |
 | Gemini | `gemini` | `~/.gemini/settings.json` | `gemini --resume <id>` | PreToolUse |
 | Kiro CLI | `kiro-cli` | `~/.kiro/agents/cmux.json` or `$KIRO_HOME/agents/cmux.json` | `kiro-cli chat --resume-id <id>` | preToolUse, postToolUse |
+| Antigravity | `agy` | `~/.gemini/config/hooks.json` | `agy --conversation <id>` | none |
 | Rovo Dev | `acli` | `~/.rovodev/config.yml` | `acli rovodev run --restore <id>` | none |
 | Copilot | `copilot` | `~/.copilot/config.json` | `copilot --resume <id>` | PreToolUse |
 | CodeBuddy | `codebuddy` | `~/.codebuddy/settings.json` | `codebuddy --resume <id>` | PreToolUse |
@@ -55,7 +56,15 @@ Grok uses its `Notification` hook for user-facing completion messages. cmux reco
 
 ## Workspace auto-naming
 
-When the opt-in `automation.workspaceAutoNaming` setting is enabled, turn-end hooks also drive AI naming of workspaces and tabs. Supported adapters are Claude Code, Codex, Grok, OpenCode, Pi, and OMP; each adapter gates on the live setting over the socket, reuses the session store above for throttle state, summarizes with that agent's own CLI in a no-tools or isolated headless mode, and never overwrites a name the user set. Gemini, Amp, Cursor, Antigravity, Kiro, Rovo Dev, Hermes Agent, Copilot, CodeBuddy, Factory, and Qoder are skipped until they have both a verified conversation source and a safe cheap non-interactive summarizer runner. See [workspace-auto-naming.md](workspace-auto-naming.md).
+When the opt-in `automation.workspaceAutoNaming` setting is enabled, turn-end hooks also drive AI naming of workspaces and tabs. Supported adapters are Claude Code, Codex, Grok, OpenCode, Pi, OMP, and Antigravity; every adapter gates on the live setting over the socket, reuses the session store above for throttle state, and never overwrites a name the user set. Antigravity currently supplies conversation content only: explicitly select an installed supported Naming Agent such as Codex or Claude Code. **Automatic** does not yet run Antigravity as a summarizer. See [workspace-auto-naming.md](workspace-auto-naming.md).
+
+For Antigravity, install or refresh the six native hook groups explicitly:
+
+```bash
+cmux hooks agy install --yes
+```
+
+cmux writes only its named `cmux` group in `~/.gemini/config/hooks.json` and preserves unrelated groups. The integration covers `SessionStart`, `PreInvocation`, `Stop`, `turn-completion`, `Notification`, and `SessionEnd`; only `Stop` or `turn-completion` with explicit `fullyIdle: true` can schedule naming. Set `CMUX_ANTIGRAVITY_HOOKS_DISABLED=1` to disable the generated hook commands for a process. If hooks are absent, Settings receives no attempt to diagnose—re-run the install command when in doubt.
 
 ## Agent Hibernation
 

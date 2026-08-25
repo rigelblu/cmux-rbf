@@ -4,11 +4,22 @@ Opt-in AI naming of sidebar workspaces and tabs from agent conversation content.
 
 Off by default. Enable it in **Settings > Automation > Workspace Auto-Naming** or via `automation.workspaceAutoNaming` in `cmux.json` (see [configuration.md](configuration.md#automationworkspaceautonaming)).
 
+## Enable Antigravity naming
+
+Antigravity needs one explicit hook step and, for now, an explicit supported Naming Agent:
+
+1. Run `cmux hooks agy install --yes`. cmux writes its named `cmux` group in `~/.gemini/config/hooks.json` and preserves unrelated groups.
+2. Enable **Settings > Automation > Workspace Auto-Naming**.
+3. In **Naming Agent**, select an installed supported agent such as Claude Code, Codex, Grok, OpenCode, Pi, or OMP. Do not leave it on **Automatic** for Antigravity yet.
+4. Start a new `agy` session in cmux and complete a substantive turn until Antigravity reports fully idle.
+
+If the name does not change, confirm the hook group exists, the setting is on, the workspace has no manual custom name, and the selected Naming Agent is installed and authenticated. Missing hooks produce no naming attempt and therefore no Settings failure status; re-run the install command when in doubt.
+
 ## What it does
 
 - At the end of an agent turn, cmux summarizes the session's recent conversation into a 2-5 word title (in the conversation's language) and applies it to the workspace. When a workspace has multiple tabs, the agent's own tab is named too.
 - Names refresh when the topic shifts, throttled by transcript growth and a minimum interval, so quiet or single-topic sessions converge to a stable name without repeated summarization calls.
-- Summarization runs through your own agent binary: `claude -p` for Claude Code sessions (model from `ANTHROPIC_SMALL_FAST_MODEL` when set, the fast default otherwise; Vertex/Bedrock backend selection is preserved), `codex exec` for Codex sessions, and each supported hook agent's own non-interactive CLI for its sessions. Each agent names itself, so the calls use the account you already authenticated, and a machine without another agent installed simply skips that adapter.
+- Summarization runs through your own agent binary: `claude -p` for Claude Code sessions (model from `ANTHROPIC_SMALL_FAST_MODEL` when set, the fast default otherwise; Vertex/Bedrock backend selection is preserved), `codex exec` for Codex sessions, and each supported hook agent's own non-interactive CLI for its sessions. Antigravity is the one source-only adapter: it requires an explicitly selected existing supported Naming Agent and never falls back to running `agy` from the user's real Antigravity home.
 
 ## Precedence: manual names always win
 
@@ -48,13 +59,14 @@ Auto-naming currently has source adapters and summarizer runners for:
 - Grok: reads Grok's `chat_history.jsonl` for the active session and summarizes with `grok --prompt-file` with tools and web search disabled.
 - OpenCode: caches recent prompt/assistant text from the cmux OpenCode session plugin and summarizes with `opencode run --pure` from an isolated temporary directory.
 - Pi and OMP: cache prompt/assistant text from their cmux hooks and summarize with their own non-interactive CLIs (`pi --print --no-tools` and `omp --print --no-tools`).
+- Antigravity: at `Stop` or `turn-completion` with explicit `fullyIdle: true`, reads only completed user input and model response text from the current conversation's bounded `~/.gemini/antigravity-cli/brain/<conversationId>/.system_generated/logs/transcript_full.jsonl` tail. It uses the explicitly selected supported Naming Agent; **Automatic** does not run Antigravity itself yet.
 
 The other hook integrations are intentionally skipped for now:
 
 - Amp's current cmux plugin reports lifecycle/status but does not expose a usable prompt or assistant transcript.
 - Gemini has hook payload text, but the available non-interactive CLI invocation has not been verified to disable tools/project access, so it is skipped rather than running untrusted transcript text through a tool-capable summarizer.
-- Cursor, Antigravity, Kiro, Rovo Dev, Hermes Agent, Copilot, CodeBuddy, Factory, and Qoder have cmux Stop/notification hooks, but this branch does not yet have both a verified transcript source and a safe cheap non-interactive summarizer invocation that disables tools/project access.
+- Cursor, Kiro, Rovo Dev, Hermes Agent, Copilot, CodeBuddy, Factory, and Qoder have cmux Stop/notification hooks, but this branch does not yet have both a verified transcript source and a safe cheap non-interactive summarizer invocation that disables tools/project access.
 
 ## Mechanics
 
-The Claude Code wrapper registers an async `Stop` hook (`cmux hooks claude auto-name`); other supported agents spawn an equivalent detached pass from their turn-end hook. Each pass reads the adapter's transcript source, evaluates the throttle against per-session state in `~/.cmuxterm/<agent>-hook-sessions.json`, and applies the title through the `workspace.set_auto_title` socket method, which enforces the setting and the user-provenance rule app-side.
+The Claude Code wrapper registers an async `Stop` hook (`cmux hooks claude auto-name`); other supported agents spawn an equivalent detached pass from their turn-end hook. Each pass reads the adapter's transcript source, evaluates the throttle against per-session state in `~/.cmuxterm/<agent>-hook-sessions.json`, and applies the title through the `workspace.set_auto_title` socket method, which enforces the setting and the user-provenance rule app-side. For Antigravity, the transcript path must match the current stored conversation and the exact documented root; every component is opened without following symlinks, the final descriptor must be a regular file, and no more than the final 512 KiB is read from that same descriptor. Unknown, malformed, system, tool, artifact, and incomplete records are ignored.
