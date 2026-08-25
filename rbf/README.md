@@ -85,6 +85,15 @@ Give workspace colours your own meaning — such as **GOAL: Primary (Teal)** —
 - Automation reads the palette with `cmux workspace-color list [--json]` and can assign by label: `cmux workspace-action set-color "GOAL: Primary"`.
 - **No Color** itself cannot be labelled, `workspace-group set-color` stays hex-only, and if two entries share a hex both show as assigned — cmux stores a colour, not which entry you picked.
 
+## 🟠⋯ Tell a group header from the workspaces inside it at a glance
+
+Every workspace-group header carries a band across its whole row, so the container is visible without hunting for a small folder icon. A coloured group uses its colour; a group with no colour gets a neutral band. The active group's band deepens while member workspaces keep their narrow leading strip, so container and contents remain different shapes.
+
+- Always on; no setting or migration.
+- Works in both sidebar renderers and in normal Light and Dark appearances.
+- **Known limitation:** a group name can render black on its dark band after an appearance change. The separate `#cm-53` fix is not part of v0.17.0.
+- **Unverified:** Reduce Transparency and Increase Contrast. Tom accepted releasing without those two checks.
+
 ## 🟠⋯ Zoom once and have all of cmux scale
 `⇧⌘=` and `⇧⌘-` resize everything together — terminals, the sidebar, tab bars, the command palette, Settings, browser panes, the markdown viewer, and text previews. `⇧⌘0` returns to normal.
 

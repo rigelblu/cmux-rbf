@@ -9,6 +9,17 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.17.0 (2026-08-25) — #cm-49
+## 🟠⋯ Changed for End Users
+- 2026-08-25 - feat (ux) | **group headers now read as containers instead of looking like one more workspace row.** A full-width band carries the group's colour across the header; a group with no colour gets a neutral band, and the active group's band deepens. Member workspaces keep their narrow identity strip, so the container and its contents speak through different shapes (#cm-49)
+- **Known limitation — a group name can render black on its dark band after an appearance change.** The separate `#cm-53` fix is not included in this release; Tom explicitly approved releasing `#cm-49` alone with that dependency unresolved (#cm-49)
+- **Known limitation — Reduce Transparency and Increase Contrast were accepted unverified.** The normal Light and Dark appearances passed, including Dark → Light → Dark while the group was resting and active, but neither accessibility setting was exercised (#cm-49)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-25 - feat (ux) (#cm-49) | SwiftUI and AppKit consume one `SidebarGroupHeaderBandPalette` for coloured, neutral, active and multi-selected group states. The final focused group-header suite passed 13/13 and project test wiring passed across 665 files; five author-run mutations were applied and caught. No independent verification verdict exists after two attempts returned none (#cm-49)
+
+---
+
 # 🔵⋯ v0.16.0 (2026-08-24) — #cm-46
 ## 🟠⋯ Changed for End Users
 - 2026-08-24 - feat | open a web link in your default browser without changing where the next one opens. Right-click a recognized terminal web link and choose **Open in Default Browser**; after a page is already open in a cmux browser tab, use the external-link button beside the address bar—or the same command first in **More Actions** when the pane is narrow. The cmux tab stays open and terminal-link routing settings stay unchanged (#cm-46)
