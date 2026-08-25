@@ -492,6 +492,7 @@ final class ClaudeHookSessionStore {
         transcriptPath: String? = nil,
         turnId: String? = nil,
         terminalActivePromptTurnIds: Set<String> = [],
+        completesAllActivePrompts: Bool = false,
         pid: Int?,
         launchCommand: AgentHookLaunchCommandRecord?,
         agentLifecycle: AgentHibernationLifecycleState? = nil,
@@ -515,7 +516,7 @@ final class ClaudeHookSessionStore {
                 now: now
             )
             let depthBeforeStop = max(0, record.activePromptDepth ?? 0)
-            let depthAfterStop = max(0, depthBeforeStop - 1)
+            let depthAfterStop = completesAllActivePrompts ? 0 : max(0, depthBeforeStop - 1)
             update(
                 &record,
                 workspaceId: workspaceId,
@@ -536,6 +537,17 @@ final class ClaudeHookSessionStore {
             )
             appendAutoNameMessages(autoNameMessages, to: &record)
             let normalizedTurnId = normalizeOptional(turnId)
+            if completesAllActivePrompts {
+                markPromptTurnsTerminal(activePromptTurnStack(from: record), on: &record)
+                if let normalizedTurnId {
+                    markPromptTurnTerminal(normalizedTurnId, on: &record)
+                }
+                record.activePromptDepth = nil
+                record.activePromptTurnId = nil
+                record.activePromptTurnIds = nil
+                state.sessions[normalized] = record
+                return false
+            }
             if let normalizedTurnId {
                 var turnStack = activePromptTurnStack(from: record)
                 var totalDepthBeforeStop = max(depthBeforeStop, turnStack.count)
@@ -15910,6 +15922,7 @@ struct CMUXCLI {
               ~/.campfire/agent/extensions/cmux-campfire-session.ts
               ~/.config/amp/plugins/cmux-session.ts
               ~/.kiro/agents/cmux.json
+              ~/.gemini/config/hooks.json
               See docs/agent-hooks.md for the full integration matrix.
 
             Examples:
@@ -15919,6 +15932,7 @@ struct CMUXCLI {
               cmux hooks setup omp
               cmux hooks uninstall rovo
               cmux hooks codex install
+              cmux hooks agy install --yes
               cmux hooks opencode install --project
               cmux hooks uninstall
             """
@@ -32030,6 +32044,12 @@ export default CMUXSessionRestore;
             }
             let nestedPromptStop: Bool
             if !sessionId.isEmpty, !staleIdleStopHasNewerRunningSession {
+                // Antigravity emits PreInvocation once per model invocation, not
+                // once per human turn. A tool-using turn can therefore produce
+                // several prompt-submit hooks but only one final fully-idle Stop.
+                // That explicit idle signal is the authoritative turn boundary.
+                let completesAllActivePrompts = def.name == "antigravity"
+                    && (input.rawObject?["fullyIdle"] as? Bool) == true
                 nestedPromptStop = (try? store.recordPromptStop(
                     sessionId: sessionId,
                     workspaceId: workspaceId,
@@ -32038,6 +32058,7 @@ export default CMUXSessionRestore;
                     transcriptPath: input.transcriptPath ?? mapped?.transcriptPath,
                     turnId: input.turnId,
                     terminalActivePromptTurnIds: terminalActivePromptTurnIdsForStop,
+                    completesAllActivePrompts: completesAllActivePrompts,
                     pid: pid,
                     launchCommand: resumeLaunchCommand,
                     agentLifecycle: lifecycleAfterStop,
@@ -32230,23 +32251,31 @@ export default CMUXSessionRestore;
             // Gate the fork on the live setting (one cheap socket probe) so a
             // disabled feature spawns nothing extra on turn end; the detached
             // process re-probes to honor a toggle that lands mid-pass.
-            if autoNamingSource(for: def) != nil, !suppressVisibleMutations, !sessionId.isEmpty,
-               let autoNameProbe = try? client.sendV2(
-                   method: "workspace.set_auto_title",
-                   params: ["probe": true, "workspace_id": workspaceId]
-               ),
-               autoNameProbe["enabled"] as? Bool == true,
-               autoNameProbe["workspace_user_owned"] as? Bool != true {
-                spawnDetachedAgentAutoName(
-                    def: def,
-                    sessionId: sessionId,
-                    workspaceId: workspaceId,
-                    surfaceId: surfaceId,
-                    transcriptPath: normalizedHookValue(input.transcriptPath ?? mapped?.transcriptPath),
-                    cwd: cwd,
-                    env: env,
-                    telemetry: telemetry
+            if autoNamingSource(for: def) != nil {
+                let autoNamingEventEligible = genericAgentAutoNamingEventEligible(
+                    agentName: def.name,
+                    fullyIdle: input.rawObject?["fullyIdle"] as? Bool
                 )
+                if !autoNamingEventEligible {
+                    telemetry.breadcrumb("\(def.name)-hook.auto-name.ineligible-event")
+                } else if !suppressVisibleMutations, !sessionId.isEmpty,
+                          let autoNameProbe = try? client.sendV2(
+                              method: "workspace.set_auto_title",
+                              params: ["probe": true, "workspace_id": workspaceId]
+                          ),
+                          autoNameProbe["enabled"] as? Bool == true,
+                          autoNameProbe["workspace_user_owned"] as? Bool != true {
+                    spawnDetachedAgentAutoName(
+                        def: def,
+                        sessionId: sessionId,
+                        workspaceId: workspaceId,
+                        surfaceId: surfaceId,
+                        transcriptPath: normalizedHookValue(input.transcriptPath ?? mapped?.transcriptPath),
+                        cwd: cwd,
+                        env: env,
+                        telemetry: telemetry
+                    )
+                }
             }
 
         case .approvalResponse:

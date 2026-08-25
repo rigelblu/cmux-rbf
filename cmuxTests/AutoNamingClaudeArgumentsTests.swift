@@ -52,3 +52,23 @@ import Testing
         #expect(value(of: "--model", in: overridden) == "claude-haiku-4-5")
     }
 }
+
+/// Behavior tests for the argument vector cmux hands `codex exec` when it
+/// summarizes a transcript into a workspace title.
+@Suite struct AutoNamingCodexArgumentsTests {
+    private let policy = AutoNamingEnvironmentPolicy()
+
+    @Test func disablesWebSearchWithCodexStringConfiguration() {
+        let arguments = policy.codexSummarizerArguments(
+            workingDirectory: "/tmp/codex-autoname-cwd",
+            outputFile: "/tmp/codex-autoname-output"
+        )
+        let configValues = arguments.indices.compactMap { index -> String? in
+            guard arguments[index] == "-c", index + 1 < arguments.count else { return nil }
+            return arguments[index + 1]
+        }
+
+        #expect(configValues.contains(#"web_search="disabled""#))
+        #expect(!configValues.contains("web_search=false"))
+    }
+}

@@ -4,6 +4,7 @@ extension CMUXCLI {
     enum AgentAutoNamingSource: Equatable {
         case codexRollout
         case grokHistory
+        case antigravityTranscript
         case hookMessageCache
     }
 
@@ -13,6 +14,8 @@ extension CMUXCLI {
             return .codexRollout
         case "grok":
             return .grokHistory
+        case "antigravity":
+            return .antigravityTranscript
         case "opencode", "pi", "omp":
             return .hookMessageCache
         default:
@@ -80,6 +83,31 @@ extension CMUXCLI {
         }
 
         let engine = AutoNamingEngine()
+        // Antigravity resolves its Naming Agent up front so an unselected or
+        // uninstalled agent bails before any transcript is read. Every other
+        // source keeps resolving after extraction, as it always has: that call
+        // probes PATH and emits breadcrumbs, and this slice must not add either
+        // to sessions that would have returned empty-handed anyway.
+        var antigravityAgent: String?
+        if source == .antigravityTranscript {
+            guard let selectedAgent = explicitSupportedAutoNamingAgent(
+                probe["summarizer_agent"] as? String
+            ) else {
+                telemetry.breadcrumb("antigravity-hook.auto-name.explicit-agent-required")
+                return
+            }
+            guard summarizerBinaryAvailable(agent: selectedAgent, env: env) else {
+                telemetry.breadcrumb("antigravity-hook.auto-name.no-binary")
+                reportAutoNamingProblem(
+                    "not_installed",
+                    agent: selectedAgent,
+                    workspaceId: workspaceId,
+                    client: client
+                )
+                return
+            }
+            antigravityAgent = selectedAgent
+        }
         let sourceResult: (messages: [AutoNamingTranscriptMessage], lineCount: Int)? = {
             switch source {
             case .codexRollout:
@@ -96,6 +124,24 @@ extension CMUXCLI {
                 }
                 let lineCount = textFileGrowthMetric(path: historyURL.path, fallbackLineCount: lines.count)
                 return (engine.extractGrokMessages(fromChatHistoryLines: lines), lineCount)
+            case .antigravityTranscript:
+                guard let transcriptPath = normalizedHookValue(optionValue(commandArgs, name: "--transcript")),
+                      let mappedTranscriptPath = normalizedHookValue(mapped?.transcriptPath),
+                      URL(fileURLWithPath: transcriptPath).standardizedFileURL.path
+                        == URL(fileURLWithPath: mappedTranscriptPath).standardizedFileURL.path,
+                      let homeDirectory = normalizedHookValue(env["HOME"]),
+                      let snapshot = AntigravityTranscriptReader.read(
+                          transcriptPath: transcriptPath,
+                          conversationID: sessionId,
+                          homeDirectory: homeDirectory,
+                          maxBytes: 512 * 1024
+                      ) else {
+                    return nil
+                }
+                return (
+                    engine.extractAntigravityMessages(fromTranscriptLines: snapshot.lines),
+                    max(snapshot.lines.count, snapshot.fileSize / 128)
+                )
             case .hookMessageCache:
                 guard let snapshot = try? sessionStore.autoNamingRecentMessagesSnapshot(sessionId: sessionId),
                       !snapshot.messages.isEmpty else {
@@ -112,9 +158,11 @@ extension CMUXCLI {
         }()
         guard let sourceResult, !sourceResult.messages.isEmpty else { return }
 
-        let resolution = resolvedSummarizerAgent(
-            probe: probe, sessionAgent: def.name, env: env, telemetry: telemetry
-        )
+        let resolution: (agent: String, missingOverride: String?) =
+            antigravityAgent.map { (agent: $0, missingOverride: String?.none) }
+            ?? resolvedSummarizerAgent(
+                probe: probe, sessionAgent: def.name, env: env, telemetry: telemetry
+            )
         runMessageBackedAutoName(
             sessionId: sessionId,
             workspaceId: workspaceId,

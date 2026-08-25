@@ -552,6 +552,321 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
     }
 
+    func testAntigravityFullyIdleStopCompletesAllModelInvocationsForOneTurn() throws {
+        let cliPath = try bundledCLIPath()
+        let socketPath = makeSocketPath("antigravity-fully-idle")
+        let listenerFD = try bindUnixSocket(at: socketPath)
+        let state = MockSocketServerState()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cmux-antigravity-fully-idle-\(UUID().uuidString)", isDirectory: true)
+        let workspaceId = "11111111-1111-1111-1111-111111111111"
+        let surfaceId = "22222222-2222-2222-2222-222222222222"
+        let sessionId = "antigravity-multi-invocation-123"
+
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer {
+            Darwin.close(listenerFD)
+            unlink(socketPath)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let environment: [String: String] = [
+            "HOME": root.path,
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            "PWD": root.path,
+            "CMUX_SOCKET_PATH": socketPath,
+            "CMUX_WORKSPACE_ID": workspaceId,
+            "CMUX_SURFACE_ID": surfaceId,
+            "CMUX_AGENT_HOOK_STATE_DIR": root.path,
+            "CMUX_CLI_SENTRY_DISABLED": "1",
+        ]
+
+        startDetachedMockServer(listenerFD: listenerFD, state: state) { line in
+            guard let payload = self.jsonObject(line) else { return "OK" }
+            guard let id = payload["id"] as? String,
+                  let method = payload["method"] as? String else {
+                return self.malformedRequestResponse(id: payload["id"] as? String, raw: line)
+            }
+            switch method {
+            case "surface.list":
+                return self.surfaceListResponse(id: id, surfaceId: surfaceId)
+            case "workspace.set_auto_title":
+                return self.v2Response(id: id, ok: true, result: [
+                    "enabled": false,
+                    "workspace_user_owned": false,
+                ])
+            default:
+                return self.v2Response(id: id, ok: true, result: [:])
+            }
+        }
+
+        func runAntigravityHook(_ subcommand: String, payload: [String: Any]) throws -> ProcessRunResult {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            return runProcess(
+                executablePath: cliPath,
+                arguments: ["hooks", "antigravity", subcommand],
+                environment: environment,
+                standardInput: String(data: data, encoding: .utf8),
+                timeout: 5
+            )
+        }
+
+        let commonPayload: [String: Any] = [
+            "conversationId": sessionId,
+            "workspacePaths": [root.path],
+        ]
+        let start = try runAntigravityHook(
+            "session-start",
+            payload: commonPayload.merging(["hook_event_name": "SessionStart"]) { _, new in new }
+        )
+        XCTAssertEqual(start.status, 0, start.stderr)
+
+        for invocationNumber in 0 ... 1 {
+            let prompt = try runAntigravityHook(
+                "prompt-submit",
+                payload: commonPayload.merging([
+                    "hook_event_name": "PreInvocation",
+                    "invocationNum": invocationNumber,
+                ]) { _, new in new }
+            )
+            XCTAssertEqual(prompt.status, 0, prompt.stderr)
+        }
+
+        let stopCommandStart = state.snapshot().count
+        let stop = try runAntigravityHook(
+            "stop",
+            payload: commonPayload.merging([
+                "hook_event_name": "Stop",
+                "fullyIdle": true,
+                "terminationReason": "NO_TOOL_CALL",
+            ]) { _, new in new }
+        )
+        XCTAssertEqual(stop.status, 0, stop.stderr)
+
+        let stopCommands = Array(state.snapshot().dropFirst(stopCommandStart))
+        XCTAssertTrue(
+            stopCommands.contains { $0.contains("set_status antigravity Idle") },
+            "A fully-idle Stop is the authoritative end of one Antigravity turn, even after multiple model invocations. Saw \(stopCommands)"
+        )
+
+        let storeURL = root.appendingPathComponent("antigravity-hook-sessions.json", isDirectory: false)
+        let store = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any])
+        let sessions = try XCTUnwrap(store["sessions"] as? [String: Any])
+        let session = try XCTUnwrap(sessions[sessionId] as? [String: Any])
+        XCTAssertNil(session["activePromptDepth"])
+        XCTAssertEqual(session["agentLifecycle"] as? String, "idle")
+        XCTAssertEqual(session["runtimeStatus"] as? String, "idle")
+    }
+
+    func testAntigravityAutoNamingRequiresFullyIdleAndExplicitSupportedAgent() throws {
+        let cliPath = try bundledCLIPath()
+        let socketPath = makeSocketPath("antigravity-auto-name")
+        let listenerFD = try bindUnixSocket(at: socketPath)
+        let state = MockSocketServerState()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cmux-antigravity-auto-name-\(UUID().uuidString)", isDirectory: true)
+        let bin = root.appendingPathComponent("bin", isDirectory: true)
+        let workspaceId = "11111111-1111-1111-1111-111111111111"
+        let surfaceId = "22222222-2222-2222-2222-222222222222"
+        let conversationId = "antigravity-conversation-456"
+        let transcript = root
+            .appendingPathComponent(".gemini/antigravity-cli/brain/\(conversationId)/.system_generated/logs", isDirectory: true)
+            .appendingPathComponent("transcript_full.jsonl", isDirectory: false)
+        let summarizerCalls = root.appendingPathComponent("summarizer-calls.txt", isDirectory: false)
+        let antigravitySummarizerCalls = root.appendingPathComponent("antigravity-summarizer-calls.txt", isDirectory: false)
+        let explicitAgentMarker = root.appendingPathComponent("use-explicit-agent", isDirectory: false)
+
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: transcript.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        defer {
+            Darwin.close(listenerFD)
+            unlink(socketPath)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        func jsonLine(_ object: [String: Any]) throws -> String {
+            let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+            return try XCTUnwrap(String(data: data, encoding: .utf8))
+        }
+        let transcriptText = try [
+            jsonLine([
+                "step_index": 1,
+                "source": "USER_EXPLICIT",
+                "type": "USER_INPUT",
+                "status": "DONE",
+                "created_at": "2026-08-23T10:00:00Z",
+                "content": String(repeating: "Name this Antigravity transcript safely. ", count: 48),
+            ]),
+            jsonLine([
+                "step_index": 2,
+                "source": "MODEL",
+                "type": "RUN_COMMAND",
+                "status": "DONE",
+                "created_at": "2026-08-23T10:00:01Z",
+                "content": "tool output must not become naming context",
+            ]),
+            jsonLine([
+                "step_index": 3,
+                "source": "MODEL",
+                "type": "PLANNER_RESPONSE",
+                "status": "DONE",
+                "created_at": "2026-08-23T10:00:02Z",
+                "content": "I will preserve the shared title authority.",
+            ]),
+        ].joined(separator: "\n") + "\n"
+        try transcriptText.write(to: transcript, atomically: true, encoding: .utf8)
+
+        let fakeCodex = bin.appendingPathComponent("codex", isDirectory: false)
+        let escapedCallsPath = summarizerCalls.path.replacingOccurrences(of: "'", with: "'\\''")
+        try """
+        #!/bin/sh
+        output=''
+        while [ "$#" -gt 0 ]; do
+          if [ "$1" = "--output-last-message" ] && [ "$#" -ge 2 ]; then
+            output="$2"
+            shift 2
+          else
+            shift
+          fi
+        done
+        cat >/dev/null
+        printf 'call\\n' >> '\(escapedCallsPath)'
+        printf 'Antigravity Transcript Naming\\n' > "$output"
+        """.write(to: fakeCodex, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeCodex.path)
+
+        let fakeAntigravity = bin.appendingPathComponent("agy", isDirectory: false)
+        let escapedAntigravityCallsPath = antigravitySummarizerCalls.path.replacingOccurrences(of: "'", with: "'\\''")
+        try """
+        #!/bin/sh
+        cat >/dev/null
+        printf 'call\\n' >> '\(escapedAntigravityCallsPath)'
+        printf 'Unsupported Antigravity Summarizer\\n'
+        """.write(to: fakeAntigravity, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeAntigravity.path)
+
+        startDetachedMockServer(listenerFD: listenerFD, state: state) { line in
+            guard let payload = self.jsonObject(line) else { return "OK" }
+            guard let id = payload["id"] as? String,
+                  let method = payload["method"] as? String else {
+                return self.malformedRequestResponse(id: payload["id"] as? String, raw: line)
+            }
+            switch method {
+            case "surface.list":
+                return self.surfaceListResponse(id: id, surfaceId: surfaceId)
+            case "workspace.set_auto_title":
+                let params = payload["params"] as? [String: Any]
+                if params?["probe"] as? Bool == true {
+                    return self.v2Response(id: id, ok: true, result: [
+                        "enabled": true,
+                        "workspace_user_owned": false,
+                        "summarizer_agent": FileManager.default.fileExists(atPath: explicitAgentMarker.path)
+                            ? "codex"
+                            : "auto",
+                    ])
+                }
+                return self.v2Response(id: id, ok: true, result: [
+                    "workspace_applied": true,
+                    "panel_applied": true,
+                ])
+            default:
+                return self.v2Response(id: id, ok: true, result: [:])
+            }
+        }
+
+        let environment: [String: String] = [
+            "HOME": root.path,
+            "PATH": "\(bin.path):/usr/bin:/bin:/usr/sbin:/sbin",
+            "PWD": root.path,
+            "CMUX_SOCKET_PATH": socketPath,
+            "CMUX_WORKSPACE_ID": workspaceId,
+            "CMUX_SURFACE_ID": surfaceId,
+            "CMUX_AGENT_HOOK_STATE_DIR": root.path,
+            "CMUX_BUNDLED_CLI_PATH": cliPath,
+            "CMUX_CLI_SENTRY_DISABLED": "1",
+        ]
+        func runHook(_ subcommand: String, fullyIdle: Bool?) -> ProcessRunResult {
+            var payload: [String: Any] = [
+                "conversationId": conversationId,
+                "cwd": root.path,
+                "hook_event_name": subcommand == "session-start" ? "SessionStart" : "Stop",
+                "transcriptPath": transcript.path,
+            ]
+            if let fullyIdle { payload["fullyIdle"] = fullyIdle }
+            let data = try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            return runProcess(
+                executablePath: cliPath,
+                arguments: ["hooks", "antigravity", subcommand],
+                environment: environment,
+                standardInput: String(data: data, encoding: .utf8),
+                timeout: 5
+            )
+        }
+
+        let start = runHook("session-start", fullyIdle: nil)
+        XCTAssertEqual(start.status, 0, start.stderr)
+
+        let ineligibleStart = state.snapshot().count
+        for fullyIdle in [false, nil] as [Bool?] {
+            let stop = runHook("stop", fullyIdle: fullyIdle)
+            XCTAssertEqual(stop.status, 0, stop.stderr)
+        }
+        Thread.sleep(forTimeInterval: 0.25)
+        let ineligibleCommands = state.snapshot().dropFirst(ineligibleStart)
+        XCTAssertFalse(ineligibleCommands.contains { line in
+            self.jsonObject(line)?["method"] as? String == "workspace.set_auto_title"
+        }, "fullyIdle false or missing must not probe, summarize, or apply a title")
+
+        let unsupportedAgent = runHook("stop", fullyIdle: true)
+        XCTAssertEqual(unsupportedAgent.status, 0, unsupportedAgent.stderr)
+        Thread.sleep(forTimeInterval: 0.25)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: summarizerCalls.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: antigravitySummarizerCalls.path))
+        XCTAssertFalse(state.snapshot().contains { line in
+            guard let payload = self.jsonObject(line),
+                  payload["method"] as? String == "workspace.set_auto_title",
+                  let params = payload["params"] as? [String: Any] else {
+                return false
+            }
+            return params["probe"] == nil
+        }, "auto must not let Antigravity recursively summarize its own transcript")
+
+        try Data().write(to: explicitAgentMarker)
+        let firstEligible = runHook("stop", fullyIdle: true)
+        let duplicateEligible = runHook("stop", fullyIdle: true)
+        XCTAssertEqual(firstEligible.status, 0, firstEligible.stderr)
+        XCTAssertEqual(duplicateEligible.status, 0, duplicateEligible.stderr)
+
+        let deadline = Date().addingTimeInterval(8)
+        var titleRequests: [[String: Any]] = []
+        repeat {
+            titleRequests = state.snapshot().compactMap { line in
+                guard let payload = self.jsonObject(line),
+                      payload["method"] as? String == "workspace.set_auto_title",
+                      let params = payload["params"] as? [String: Any],
+                      params["probe"] == nil else {
+                    return nil
+                }
+                return params
+            }
+            if !titleRequests.isEmpty { break }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+
+        XCTAssertEqual(titleRequests.count, 1, "duplicate eligible hooks must converge before title mutation")
+        let request = try XCTUnwrap(titleRequests.first)
+        XCTAssertEqual(request["workspace_id"] as? String, workspaceId)
+        XCTAssertEqual(request["panel_id"] as? String, surfaceId)
+        XCTAssertEqual(request["title"] as? String, "Antigravity Transcript Naming")
+        XCTAssertEqual(request["panel_only_if_multiple"] as? Bool, true)
+
+        let callText = try XCTUnwrap(try? String(contentsOf: summarizerCalls, encoding: .utf8))
+        XCTAssertEqual(callText.split(separator: "\n").count, 1)
+    }
+
     func testHermesAgentNotificationsUseShellHookExtraPayload() throws {
         let cliPath = try bundledCLIPath()
         let socketPath = makeSocketPath("hermes-notification")
