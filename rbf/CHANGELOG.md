@@ -9,6 +9,12 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.17.1 (2026-08-25) — #cm-53
+## 🟠⋯ Fixed for End Users
+- 2026-08-25 - fix (ux) | **read my group workspace names in dark mode.** Workspace-group names now follow the appearance of their bands, so the group structure remains scannable without switching to Light appearance. The primary Light/Dark scenario passed; Reduce Transparency and Increase Contrast remain accepted unverified (#cm-53)
+
+---
+
 # 🔵⋯ v0.17.0 (2026-08-25) — #cm-49
 ## 🟠⋯ Changed for End Users
 - 2026-08-25 - feat (ux) | **group headers now read as containers instead of looking like one more workspace row.** A full-width band carries the group's colour across the header; a group with no colour gets a neutral band, and the active group's band deepens. Member workspaces keep their narrow identity strip, so the container and its contents speak through different shapes (#cm-49)

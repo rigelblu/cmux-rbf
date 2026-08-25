@@ -91,7 +91,7 @@ Every workspace-group header carries a band across its whole row, so the contain
 
 - Always on; no setting or migration.
 - Works in both sidebar renderers and in normal Light and Dark appearances.
-- **Known limitation:** a group name can render black on its dark band after an appearance change. The separate `#cm-53` fix is not part of v0.17.0.
+- Group names follow the appearance of their bands, including live Light ↔ Dark changes. v0.17.1 retires v0.17.0's black-on-dark limitation.
 - **Unverified:** Reduce Transparency and Increase Contrast. Tom accepted releasing without those two checks.
 
 ## 🟠⋯ Zoom once and have all of cmux scale
