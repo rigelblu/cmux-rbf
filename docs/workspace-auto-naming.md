@@ -34,6 +34,10 @@ An already-running Codex process that started without cmux hooks must exit and r
 
 **A moved tab may stop syncing until its surface is recreated.** Dragging a Codex tab into a different workspace stops its rename sync until the surface is recreated. With sibling agents in one workspace, an agent-sourced rename is confined to its exact tab; it does not claim the workspace. A name you set directly in cmux keeps its existing workspace behavior.
 
+**An arrow key while you are composing the rename cancels it.** cmux proves a rename from the keystrokes you committed, and an arrow, Home, End, Page Up, or Page Down means the composer now holds something those keystrokes cannot account for — history recall and transcript scrolling look identical from the outside. Rather than guess, cmux stops trusting that line, so the `/rename` you then type changes nothing and says nothing.
+
+This lasts one line, not the session. Any Enter clears it, as do Escape and Ctrl-U or Ctrl-C. **If a rename does not take, press Escape and type it again.** The only rule is no arrow keys between your previous Enter and the Enter that submits the rename.
+
 **A `/rename` only lands once the session has said something.** Codex 0.146.0 registers a session with cmux at that session's first real prompt submission - it never runs a session-start hook - so a `/rename` typed before you have sent Codex any message is declined and nothing changes. Send one message first, and renames land from then on. This is Codex behavior, not a cmux setting, and there is nothing to configure.
 
 ## Guarantees
