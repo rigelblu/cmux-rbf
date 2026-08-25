@@ -123,6 +123,44 @@ struct SidebarGroupHeaderBandTests {
         }
     }
 
+    /// The accepted neutral band carries the configured sidebar tint's hue.
+    ///
+    /// Replaces two tests that asserted *proportional darkening* and hue
+    /// preservation. Those described the previous `.labelColor` behaviour and
+    /// would fail here by design — the band now asserts a hue rather than
+    /// darkening what is behind it. If that decision is reversed, restore them;
+    /// they encode the property that made `.labelColor` correct.
+    @Test
+    func neutralBandCarriesTheConfiguredSidebarTint() {
+        let suiteName = "SidebarGroupHeaderBandTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("#315A73", forKey: "sidebarTintHexLight")
+
+        var resolved = NSColor.clear
+        NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
+            resolved = SidebarGroupHeaderBandPalette.makeNeutralBandColor(defaults: defaults)
+                .usingColorSpace(.sRGB) ?? .clear
+        }
+        let want = NSColor(hex: "#315A73")!.usingColorSpace(.sRGB)!
+        #expect(abs(resolved.redComponent - want.redComponent) < 0.01)
+        #expect(abs(resolved.blueComponent - want.blueComponent) < 0.01)
+    }
+
+    /// The neutral band must not be fainter than a member row's wash.
+    ///
+    /// An uncoloured group otherwise re-creates the exact inversion this feature
+    /// exists to remove — the container rendering quieter than its contents.
+    /// Dogfood caught this at the shipped 0.06; nothing in the suite did.
+    @Test
+    func neutralBandIsNotFainterThanAMemberRowWash() {
+        #expect(
+            SidebarGroupHeaderBandPalette.neutralRestingBandOpacity
+                > SidebarWorkspaceRowVisualPalette.restingWashOpacity,
+            "an uncoloured group's band must still out-weigh a member row's wash"
+        )
+    }
+
     /// Clearing an optimistic active paint must restore the resting band.
     ///
     /// The AppKit cell keeps `clearOptimisticAnchorActive()` because an
