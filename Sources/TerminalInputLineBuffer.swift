@@ -28,15 +28,21 @@ struct TerminalInputLineBuffer {
     private var characters: String = ""
     private var isTrustworthy: Bool = true
 
-    /// Whether the most recent submit was one this buffer could not prove.
+    /// Whether the key event just folded in was a submit this buffer could not
+    /// prove.
     ///
     /// `consume` returns `nil` for two unrelated reasons — the event was not a
     /// submit at all, which is every ordinary keystroke, or it was a submit on a
     /// line an earlier edit invalidated. Callers cannot tell those apart from
     /// the `nil`, and logging on the `nil` alone would fire on every keystroke,
     /// on the path `CLAUDE.md` protects. This separates them: it is written only
-    /// when a plain Return is folded in, so reading it costs a submit, never a
-    /// keypress.
+    /// when a plain Return is folded in, and cleared at the top of every
+    /// `consume`, so it describes **this** event and not a stale earlier one.
+    ///
+    /// Clearing is the load-bearing half. Setting it only on Return is not
+    /// enough: the caller reads it on the `nil` path, which every ordinary
+    /// keystroke takes, so a flag left standing after one unproven submit makes
+    /// every following keypress look like one too.
     private(set) var lastSubmitWasUnproven = false
 
     /// The line as typed, or `nil` when nothing since the last reset can be
@@ -104,6 +110,9 @@ struct TerminalInputLineBuffer {
         event: NSEvent,
         committedText: [String]
     ) -> String? {
+        // Describes the event about to be folded in, not a previous one. One
+        // Bool store, no allocation — safe on the typing path.
+        lastSubmitWasUnproven = false
         let mods = event.modifierFlags.intersection([.command, .control, .option, .shift])
 
         // Command-modified keys are app or shell actions this cannot model —

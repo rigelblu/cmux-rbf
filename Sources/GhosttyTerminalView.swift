@@ -5295,8 +5295,11 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             // typed arms nothing and the confirmation later reads as
             // `detectedButUnarmed`. Silence here made those two sides of the
             // same event look unrelated and cost a full diagnosis to connect.
-            // Gated on the flag rather than on the `nil`, so it fires once per
-            // submit and never per keystroke.
+            // Gated on the flag rather than on the `nil`, which every
+            // ordinary keystroke reaches. The flag is cleared at the top of
+            // every `consume`, so it describes this event alone — without that
+            // it would latch after one unproven submit and log every following
+            // keypress.
             if codexInputLine.lastSubmitWasUnproven {
                 cmuxDebugLog("codexRename.submissionUnproven")
             }

@@ -101,6 +101,39 @@ struct TerminalInputLineBufferTests {
         )
     }
 
+    /// The flag must describe **this** key event, not a previous one.
+    ///
+    /// A cold review caught the original of this: the flag was set only on
+    /// Return and never cleared, while the caller reads it on the `nil` path
+    /// that every ordinary keystroke takes. One unproven submit therefore made
+    /// every following keypress log as one too — per-keystroke I/O on the path
+    /// `CLAUDE.md` protects, and a log whose timestamps point at keystrokes
+    /// instead of at the submit. That is the exact cause-and-effect
+    /// disconnection this diagnostic exists to remove.
+    ///
+    /// The earlier tests all asserted at submit boundaries, so none of them
+    /// looked here.
+    @Test func theUnprovenFlagDescribesOnlyTheEventJustHandled() {
+        var buffer = TerminalInputLineBuffer()
+        Self.type("/rename test", into: &buffer)
+        _ = buffer.consume(event: Self.key(keyCode: 126), committedText: [])
+        _ = buffer.consume(event: Self.key(keyCode: 36), committedText: [])
+        #expect(buffer.lastSubmitWasUnproven, "precondition: the submit was unproven")
+
+        // The documented recovery — Escape, then retype — must be silent.
+        _ = buffer.consume(event: Self.key(keyCode: 53), committedText: [])
+        #expect(
+            buffer.lastSubmitWasUnproven == false,
+            "Escape is not a submit and must not still read as an unproven one"
+        )
+
+        Self.type("/", into: &buffer)
+        #expect(
+            buffer.lastSubmitWasUnproven == false,
+            "an ordinary keystroke must not inherit the previous submit's fault"
+        )
+    }
+
     /// The flag must not latch. A poisoned submit followed by a clean one has to
     /// report the clean one honestly, or the log would accuse every later rename
     /// of a fault that happened once.
