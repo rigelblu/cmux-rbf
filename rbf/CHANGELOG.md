@@ -9,6 +9,18 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.20.0 (2026-08-25) — #cm-48
+## 🟠⋯ Fixed for End Users
+- 2026-08-25 - fix (ux) | **have every Codex session I rename update its cmux tab.** Ordinary `codex` launches from cmux-integrated zsh, bash, and fish keep using cmux's per-terminal wrapper even after shell startup or later tooling reorders `PATH`, so concurrent sessions no longer depend on which command happens to resolve first (#cm-48.1)
+- 2026-08-25 - fix (ux) | **rename one Codex session without it claiming my workspace name.** An agent-sourced tab title now stays with its own tab when sibling agents share the workspace; a workspace name set directly in cmux keeps its existing behavior and still wins (#cm-48.2)
+- 2026-08-25 - fix (diagnostics) | a typed `/rename` submission that cmux cannot prove now leaves one DEBUG explanation at submit time, without weakening the fail-closed input rule or adding work to later keystrokes (#cm-48.3)
+- **Relaunch boundary:** a Codex process that was already running without cmux hooks must exit and relaunch; cmux itself does not need to restart (#cm-48.1)
+- **Known limitation — fish dispatch is unproven at runtime on this machine.** zsh and bash passed the executable dispatch matrix; fish is implemented and inspected but the cases skipped because fish is not installed (#cm-48.1)
+- **Known limitation — arrow-edited and pasted `/rename` submissions may fail closed.** Press Escape and type the command again without arrow keys. The DEBUG receipt for that live failure was accepted unverified (#cm-48.3)
+- **Verification ceiling:** focused shell, hook-lifecycle, title-provenance, session-registry, and input-buffer checks pass. The repository-wide suite attempt was characterized but did not produce a green verdict (#cm-48)
+
+---
+
 # 🔵⋯ v0.17.1 (2026-08-25) — #cm-53
 ## 🟠⋯ Fixed for End Users
 - 2026-08-25 - fix (ux) | **read my group workspace names in dark mode.** Workspace-group names now follow the appearance of their bands, so the group structure remains scannable without switching to Light appearance. The primary Light/Dark scenario passed; Reduce Transparency and Increase Contrast remain accepted unverified (#cm-53)
