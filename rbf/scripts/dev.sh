@@ -107,7 +107,7 @@ BUILD_ID_VALUE="$(derive_build_id)"
 # `make run` is reproducible. Set it to 0 when you genuinely add a dependency.
 export CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION="${CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION:-1}"
 
-# --- Landmine 2: ghostty needs one exact Zig version --------------------------
+# --- Landmine 2: ghostty needs a compatible Zig toolchain ---------------------
 # Lives in rbf/scripts/lib/rbf-zig.sh, not here, because `make install-rbf` reaches
 # install-rbf.sh without passing through this file — and when this was a private
 # function, that path silently had no Zig guard and died inside an xcodebuild
@@ -228,7 +228,7 @@ case "$cmd" in
     # cleanup-dev-builds.sh cannot map back to a build-id.
     # Both guards, same as `build` and `run` — omitting them here was a real bug.
     # `cmux-unit.xcscheme` sets buildForTesting="YES" on the app target, so
-    # `make test` runs the ghostty script phase and needs that exact Zig like
+    # `make test` runs the ghostty script phase and needs the resolved Zig like
     # a build does; without this it dies ~200 lines into an xcodebuild phase
     # while `make build` succeeds. And a stale submodule would link a ghostty the
     # commit does not record — a green test run against code nobody wrote, in the

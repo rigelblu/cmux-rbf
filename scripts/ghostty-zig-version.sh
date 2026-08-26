@@ -33,6 +33,10 @@ ghostty_zig_version_is_compatible() {
   local actual_major actual_minor actual_patch actual_extra
   local required_major required_minor required_patch required_extra
 
+  # Build entrypoints must select a stable release. Treat prerelease/build
+  # suffixes as a different toolchain even when their numeric core would pass.
+  [[ "$actual" == "$actual_core" && "$required" == "$required_core" ]] || return 1
+
   IFS=. read -r actual_major actual_minor actual_patch actual_extra <<< "$actual_core"
   IFS=. read -r required_major required_minor required_patch required_extra <<< "$required_core"
 

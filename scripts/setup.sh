@@ -9,27 +9,20 @@ cd "$PROJECT_DIR"
 echo "==> Initializing submodules..."
 git submodule update --init --recursive
 
-echo "==> Checking for zig..."
-if ! command -v zig &> /dev/null; then
-    echo "Error: zig is not installed."
-    echo "Install via: brew install zig"
-    exit 1
-fi
-# shellcheck source=/dev/null
-source "$SCRIPT_DIR/ghostty-zig-version.sh"
-ZIG_REQUIRED="$(ghostty_minimum_zig_version "$PROJECT_DIR")"
-ZIG_ACTUAL="$(zig version)"
-if ! ghostty_zig_version_is_compatible "$ZIG_ACTUAL" "$ZIG_REQUIRED"; then
-    echo "Error: Ghostty requires zig ${ZIG_REQUIRED} or a newer patch release in the same major/minor series, but $(command -v zig) reports ${ZIG_ACTUAL}."
-    echo "Install or upgrade via: brew install zig"
-    exit 1
-fi
-echo "zig ${ZIG_ACTUAL} found at $(command -v zig)"
+echo "==> Resolving Zig..."
+# shellcheck source=scripts/zig-toolchain.sh
+source "$SCRIPT_DIR/zig-toolchain.sh"
+CMUX_ZIG="$(cmux_zig_install)"
+export CMUX_ZIG
+PATH="$(dirname "$CMUX_ZIG"):$PATH"
+export PATH
+echo "==> Using Zig $("$CMUX_ZIG" version) at $CMUX_ZIG"
 
 echo "==> Checking for Rust..."
 # Xcode uses a non-login shell, so verify the same PATH used by the sidecar
 # build phase rather than relying on the caller's interactive shell setup.
-export PATH="${CARGO_HOME:-${HOME}/.cargo}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
+PATH="$(dirname "$CMUX_ZIG"):${CARGO_HOME:-${HOME}/.cargo}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
+export PATH
 if ! command -v rustup &> /dev/null; then
     echo "Error: Rust is not installed."
     echo "Install via: https://rustup.rs"
