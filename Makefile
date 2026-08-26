@@ -71,8 +71,8 @@ test: ## Run unit tests via the cmux-unit scheme (nothing else compiles them)
 setup: ## First-time checkout setup - submodules, GhosttyKit, pbxproj hook
 	@./scripts/setup.sh
 	@echo
-	@echo "Zig is handled for you: rbf/scripts/lib/rbf-zig.sh finds 0.15.2 on this"
-	@echo "machine. Do NOT 'brew install zig' — that gives 0.16.0, which ghostty rejects."
+	@echo "Zig is handled for you: setup reuses a Ghostty-compatible installation or"
+	@echo "installs the verified minimum under this checkout's ignored .cmux-tools/."
 
 # Renamed from `install`. Every package manager uses `install` for "fetch my
 # dependencies", so in a list reading build / test / install it scans as the

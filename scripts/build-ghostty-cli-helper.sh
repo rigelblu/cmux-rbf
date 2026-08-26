@@ -31,8 +31,8 @@ EOF
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 GHOSTTY_DIR="$REPO_ROOT/ghostty"
-# shellcheck source=ghostty-zig-version.sh
-source "$SCRIPT_DIR/ghostty-zig-version.sh"
+# shellcheck source=scripts/zig-toolchain.sh
+source "$SCRIPT_DIR/zig-toolchain.sh"
 
 ZIG_REQUIRED="${ZIG_REQUIRED:-$(ghostty_minimum_zig_version "$REPO_ROOT")}"
 
@@ -66,93 +66,11 @@ detected_host_arch() {
   echo "$host_arch"
 }
 
-zig_has_required_version() {
-  local zig_path="$1"
-  [[ -x "$zig_path" ]] || return 1
-  [[ "$("$zig_path" version 2>/dev/null || true)" == "$ZIG_REQUIRED" ]]
-}
-
 select_zig_for_target() {
-  local target="${1:-}"
-  local desired_arch
-  desired_arch="$(target_arch_for_triple "$target")"
-  local host_arch
-  host_arch="$(detected_host_arch)"
-
-  if [[ -n "${CMUX_ZIG:-}" ]]; then
-    if [[ ! -x "$CMUX_ZIG" ]]; then
-      echo "error: CMUX_ZIG is not executable: $CMUX_ZIG" >&2
-      return 1
-    fi
-    if ! zig_has_required_version "$CMUX_ZIG"; then
-      echo "error: CMUX_ZIG must be zig ${ZIG_REQUIRED}: $CMUX_ZIG" >&2
-      return 1
-    fi
-    echo "$CMUX_ZIG"
-    return 0
-  fi
-
-  local -a candidates=()
-  # Prefer Apple Silicon Homebrew Zig on macOS runners. Some CI shells expose
-  # /usr/local/bin first or run under Rosetta, but the x86_64 Zig link path can
-  # fail against newer macOS SDKs while arm64 Zig cross-compiles both slices.
-  candidates+=("/opt/homebrew/bin/zig")
-  local path_zig=""
-  path_zig="$(command -v zig 2>/dev/null || true)"
-  [[ -n "$path_zig" ]] && candidates+=("$path_zig")
-  candidates+=("/usr/local/bin/zig")
-
-  local fallback=""
-  local host_match=""
-  local desired_match=""
-  local apple_silicon_match=""
-  local seen=" "
-  local candidate=""
-  local canonical=""
-  local arch=""
-  for candidate in "${candidates[@]}"; do
-    [[ -x "$candidate" ]] || continue
-    canonical="$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"
-    [[ "$seen" == *" $canonical "* ]] && continue
-    seen="${seen}${canonical} "
-    zig_has_required_version "$canonical" || continue
-    [[ -z "$fallback" ]] && fallback="$canonical"
-    arch="$(zig_binary_arch "$canonical")"
-    if [[ -z "$apple_silicon_match" && "$arch" == "arm64" ]]; then
-      apple_silicon_match="$canonical"
-    fi
-    if [[ -n "$host_arch" && -z "$host_match" && "$arch" == "$host_arch" ]]; then
-      host_match="$canonical"
-    fi
-    if [[ -n "$desired_arch" && -z "$desired_match" && "$arch" == "$desired_arch" ]]; then
-      desired_match="$canonical"
-    fi
-  done
-
-  # Prefer the arm64 Zig when it exists because it can cross-compile the x86_64
-  # helper slice and avoids Rosetta linker failures on macOS CI runners.
-  if [[ -n "$apple_silicon_match" ]]; then
-    echo "$apple_silicon_match"
-    return 0
-  fi
-
-  if [[ -n "$desired_match" ]]; then
-    echo "$desired_match"
-    return 0
-  fi
-
-  if [[ -n "$host_match" ]]; then
-    echo "$host_match"
-    return 0
-  fi
-
-  if [[ -n "$fallback" ]]; then
-    echo "$fallback"
-    return 0
-  fi
-
-  echo "error: zig ${ZIG_REQUIRED} is required to build the Ghostty CLI helper" >&2
-  return 1
+  # Zig cross-compiles both supported macOS slices. The shared resolver keeps
+  # target selection, setup, reload, and RBF installation on one validation
+  # path rather than maintaining another version predicate here.
+  cmux_zig_resolve
 }
 
 while [[ $# -gt 0 ]]; do
@@ -291,7 +209,7 @@ build_helper() {
     # Zig 0.15.x treats SDKROOT as a sysroot override. Xcode exports SDKROOT to
     # the macOS SDK, which makes Zig look for SDK paths under that SDK again and
     # leaves build-runner binaries unlinked against libSystem on a cold cache.
-    env -u SDKROOT "${args[@]}"
+    env -u SDKROOT PATH="$(dirname "$zig_bin"):$PATH" "${args[@]}"
   )
 }
 

@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-# shellcheck source=ghostty-zig-version.sh
-source "$SCRIPT_DIR/ghostty-zig-version.sh"
+# shellcheck source=scripts/zig-toolchain.sh
+source "$SCRIPT_DIR/zig-toolchain.sh"
 
 ZIG_REQUIRED="${ZIG_REQUIRED:-$(ghostty_minimum_zig_version "$REPO_ROOT")}"
 ZIG_MINISIGN_PUBLIC_KEY="${ZIG_MINISIGN_PUBLIC_KEY:-RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U}"
@@ -30,26 +30,9 @@ publish_zig_for_later_steps() {
   fi
 }
 
-read_zig_lib_dir() {
-  local zig_path="$1"
-  "$zig_path" env 2>/dev/null | python3 -c 'import json, re, sys
-text = sys.stdin.read()
-try:
-    print(json.loads(text).get("lib_dir", ""))
-except Exception:
-    match = re.search(r"(?m)^\s*\.lib_dir\s*=\s*\"([^\"]*)\"", text)
-    print(match.group(1) if match else "")
-'
-}
-
 zig_has_required_version() {
   local zig_path="$1"
-  local zig_lib_dir
-  [ -x "$zig_path" ] || return 1
-  [ "$("$zig_path" version 2>/dev/null || true)" = "$ZIG_REQUIRED" ] || return 1
-  zig_lib_dir="$(read_zig_lib_dir "$zig_path" || true)"
-  [ -n "$zig_lib_dir" ] || return 1
-  [ -f "$zig_lib_dir/compiler/build_runner.zig" ] || return 1
+  cmux_zig_is_usable "$zig_path" "$ZIG_REQUIRED"
 }
 
 use_existing_zig_if_available() {
@@ -57,22 +40,16 @@ use_existing_zig_if_available() {
     return 0
   fi
 
-  local candidate
-  local seen=" "
-  for candidate in "$(command -v zig 2>/dev/null || true)" /opt/homebrew/bin/zig /usr/local/bin/zig; do
-    [ -n "$candidate" ] || continue
-    [ -x "$candidate" ] || continue
-    candidate="$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"
-    case "$seen" in
-      *" $candidate "*) continue ;;
-    esac
-    seen="${seen}${candidate} "
-    if zig_has_required_version "$candidate"; then
-      echo "zig ${ZIG_REQUIRED} already installed at $candidate"
-      publish_zig_for_later_steps "$candidate"
-      exit 0
-    fi
-  done
+  local candidate=""
+  local status=0
+  if candidate="$(cmux_zig_resolve --quiet)"; then
+    echo "zig $("$candidate" version) already installed at $candidate"
+    publish_zig_for_later_steps "$candidate"
+    exit 0
+  else
+    status=$?
+  fi
+  [ "$status" -ne 2 ] || exit 2
 }
 
 use_existing_zig_if_available

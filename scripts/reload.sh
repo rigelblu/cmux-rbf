@@ -693,6 +693,16 @@ trap reload_finalize EXIT
 # Tell the user we're starting (visible even though body output is redirected).
 echo "==> reload starting (tag: ${TAG}, log: ${RELOAD_LOG})" >&3
 
+# Resolve once and use the same compiler for GhosttyKit, Xcode script phases,
+# the Ghostty CLI helper, and cmuxd.
+# shellcheck source=scripts/zig-toolchain.sh
+source "$PWD/scripts/zig-toolchain.sh"
+CMUX_ZIG="$(cmux_zig_resolve)"
+export CMUX_ZIG
+PATH="$(dirname "$CMUX_ZIG"):$PATH"
+export PATH
+echo "==> Using Zig $("$CMUX_ZIG" version) at $CMUX_ZIG" >&3
+
 "$PWD/scripts/ensure-ghosttykit.sh"
 
 if should_skip_ghostty_cli_helper_zig_build; then
@@ -735,6 +745,7 @@ fi
 if [[ "${CMUX_SKIP_ZIG_BUILD:-}" == "1" ]]; then
   XCODEBUILD_ARGS+=(CMUX_SKIP_ZIG_BUILD=1)
 fi
+XCODEBUILD_ARGS+=(CMUX_ZIG="$CMUX_ZIG")
 if [[ "$SWIFT_FRONTEND_WORKAROUND" -eq 1 || "${CMUX_SWIFT_FRONTEND_WORKAROUND:-}" == "1" || "${CMUX_SWIFT_DISABLE_GLOBAL_ISEL:-}" == "1" ]]; then
   SWIFT_FRONTEND_WORKAROUND_EFFECTIVE=1
   echo "==> Swift frontend workaround enabled for this reload"

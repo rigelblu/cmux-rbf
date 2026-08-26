@@ -13,6 +13,7 @@ xcuserdata/
 .env
 .envrc
 !web/.envrc
+.cmux-tools/
 ios/Config/AppStoreConnect.local.plist
 
 # Swift Package Manager

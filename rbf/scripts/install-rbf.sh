@@ -145,10 +145,11 @@ if ! security find-identity -v -p codesigning 2>/dev/null | grep -Fq "$CODESIGN_
 fi
 
 # ---------------------------------------------------------------------------
-# Guard 3 — a Zig ghostty will accept, or nothing.
+# Guard 3 — a complete Zig ghostty will accept, or nothing.
 #
-# ghostty pins one exact Zig version (derived from ghostty/build.zig.zon, 0.16.0
-# since the 2026-08 sync). If PATH carries a different one, without this the
+# ghostty declares a minimum Zig version (derived from ghostty/build.zig.zon,
+# 0.16.0 since the 2026-08 sync) and accepts newer patches in that series. If
+# PATH carries an incompatible one, without this the
 # Release build ran for minutes and then died inside an xcodebuild Run Script
 # phase with "zig <version> is required to build the Ghostty CLI helper", buried in
 # a wall of `export FOO=bar` that reads like an Xcode fault.
@@ -169,9 +170,9 @@ source "$SCRIPT_DIR/lib/rbf-zig.sh"
 if rbf_ensure_zig --required >/dev/null 2>&1; then
   ZIG_STATUS="$CMUX_ZIG"
 elif [[ -n "${CMUX_ZIG:-}" ]]; then
-  ZIG_STATUS="UNUSABLE — CMUX_ZIG=$CMUX_ZIG is not $RBF_ZIG_REQUIRED; build will fail"
+  ZIG_STATUS="UNUSABLE — CMUX_ZIG=$CMUX_ZIG is not compatible with $RBF_ZIG_REQUIRED; build will fail"
 else
-  ZIG_STATUS="NOT FOUND — build will fail (need $RBF_ZIG_REQUIRED)"
+  ZIG_STATUS="NOT FOUND — build will fail (need compatible Zig >= $RBF_ZIG_REQUIRED)"
 fi
 
 # Same Metal landmine dev.sh handles, and the same reason this is a lib: this
