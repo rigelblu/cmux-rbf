@@ -1108,6 +1108,89 @@ final class CommandPaletteSearchEngineTests: XCTestCase {
         XCTAssertFalse(ContentView.commandPaletteShouldDismissBeforeRun(forCommandId: "palette.terminalFocusTextBoxInput"))
     }
 
+    func testWorkflowCommandsDismissBeforeStagingAndOnlyAppearForLocalTerminals() throws {
+        let workflow = try JustRBFWorkflowListParser().parse(
+            "claude-ssu\tStart session usage\n"
+        )
+        let workflowCommandId = try XCTUnwrap(workflow.first?.commandPaletteID)
+
+        XCTAssertTrue(
+            ContentView.commandPaletteShouldDismissBeforeRun(
+                forCommandId: workflowCommandId
+            )
+        )
+        XCTAssertFalse(
+            ContentView.commandPaletteShouldLogCommandIdentifier(forCommandId: workflowCommandId)
+        )
+        XCTAssertFalse(
+            ContentView.commandPaletteShouldRecordUsage(forCommandId: workflowCommandId)
+        )
+        XCTAssertEqual(workflowCommandId, "palette.workflow.claude-ssu")
+        XCTAssertTrue(
+            ContentView.commandPaletteIncludesJustRBFWorkflows(
+                focusedPanelIsTerminal: true,
+                isRemoteTerminal: false
+            )
+        )
+        XCTAssertFalse(
+            ContentView.commandPaletteIncludesJustRBFWorkflows(
+                focusedPanelIsTerminal: false,
+                isRemoteTerminal: false
+            )
+        )
+        XCTAssertFalse(
+            ContentView.commandPaletteIncludesJustRBFWorkflows(
+                focusedPanelIsTerminal: true,
+                isRemoteTerminal: true
+            )
+        )
+    }
+
+    func testWorkflowActivationUsesExactCapturedLocalTerminalAndInputBytes() {
+        let workspaceId = UUID()
+        let panelId = UUID()
+        let otherWorkspaceId = UUID()
+        let otherPanelId = UUID()
+
+        XCTAssertEqual(
+            JustRBFWorkflowCommandPalettePolicy.activation(
+                named: "claude-ssu",
+                targetWorkspaceId: workspaceId,
+                targetPanelId: panelId,
+                resolvedWorkspaceId: workspaceId,
+                resolvedPanelId: panelId,
+                resolvedPanelIsTerminal: true,
+                resolvedPanelIsRemote: false
+            ),
+            JustRBFWorkflowActivation(
+                workspaceId: workspaceId,
+                panelId: panelId,
+                input: "claude-ssu"
+            )
+        )
+
+        let invalidTargets: [(UUID?, UUID?, Bool, Bool)] = [
+            (nil, nil, false, false),
+            (otherWorkspaceId, panelId, true, false),
+            (workspaceId, otherPanelId, true, false),
+            (workspaceId, panelId, false, false),
+            (workspaceId, panelId, true, true),
+        ]
+        for (resolvedWorkspaceId, resolvedPanelId, isTerminal, isRemote) in invalidTargets {
+            XCTAssertNil(
+                JustRBFWorkflowCommandPalettePolicy.activation(
+                    named: "claude-ssu",
+                    targetWorkspaceId: workspaceId,
+                    targetPanelId: panelId,
+                    resolvedWorkspaceId: resolvedWorkspaceId,
+                    resolvedPanelId: resolvedPanelId,
+                    resolvedPanelIsTerminal: isTerminal,
+                    resolvedPanelIsRemote: isRemote
+                )
+            )
+        }
+    }
+
     func testForkableAgentCacheKeepsVerifiedOpenCodeVisible() {
         let workspaceId = UUID()
         let panelId = UUID()
@@ -1759,6 +1842,40 @@ final class CommandPaletteSearchEngineTests: XCTestCase {
                 resultIDs: []
             ),
             0
+        )
+    }
+
+    func testMissingWorkflowSelectionRefusesNumericFallback() {
+        let resultIDs = ["command.0", "command.1"]
+
+        XCTAssertTrue(
+            ContentView.commandPaletteShouldRefuseWorkflowSelectionFallback(
+                preferredCommandID: "palette.workflow.claude-ssu",
+                resultIDs: resultIDs
+            )
+        )
+        XCTAssertFalse(
+            ContentView.commandPaletteShouldRefuseWorkflowSelectionFallback(
+                preferredCommandID: "command.missing",
+                resultIDs: resultIDs
+            )
+        )
+        XCTAssertFalse(
+            ContentView.commandPaletteShouldRefuseWorkflowSelectionFallback(
+                preferredCommandID: "palette.workflow.claude-ssu",
+                resultIDs: ["command.0", "palette.workflow.claude-ssu"]
+            )
+        )
+        XCTAssertNil(
+            ContentView.commandPaletteResolvedPendingActivation(
+                .selected(
+                    requestID: 41,
+                    fallbackSelectedIndex: 1,
+                    preferredCommandID: "palette.workflow.claude-ssu"
+                ),
+                requestID: 41,
+                resultIDs: resultIDs
+            )
         )
     }
 

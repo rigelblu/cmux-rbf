@@ -844,6 +844,7 @@ struct ContentView: View {
     let featureFlags: CmuxFeatureFlags
     let sidebarUnread: SidebarUnreadModel
     let titlebarControlsLayoutModel: TitlebarControlsLayoutModel
+    let justRBFWorkflowCatalog: JustRBFWorkflowCatalog
 
     @MainActor
     init(
@@ -851,7 +852,8 @@ struct ContentView: View {
         windowId: UUID,
         featureFlags: CmuxFeatureFlags? = nil,
         sidebarUnread: SidebarUnreadModel? = nil,
-        titlebarControlsLayoutModel: TitlebarControlsLayoutModel? = nil
+        titlebarControlsLayoutModel: TitlebarControlsLayoutModel? = nil,
+        justRBFWorkflowCatalog: JustRBFWorkflowCatalog? = nil
     ) {
         self.updateViewModel = updateViewModel
         self.windowId = windowId
@@ -859,6 +861,8 @@ struct ContentView: View {
         self.sidebarUnread = sidebarUnread ?? TerminalNotificationStore.shared.sidebarUnread
         self.titlebarControlsLayoutModel = titlebarControlsLayoutModel
             ?? TitlebarControlsLayoutModel()
+        self.justRBFWorkflowCatalog = justRBFWorkflowCatalog
+            ?? JustRBFWorkflowCatalog(commandRunner: CommandRunner())
     }
 
     @EnvironmentObject var tabManager: TabManager
@@ -943,6 +947,7 @@ struct ContentView: View {
     @State private var commandPaletteWorkspaceDescriptionHeight: CGFloat = CommandPaletteMultilineTextEditorRepresentable.defaultMinimumHeight
     @State private var commandPaletteSelectedResultIndex: Int = 0
     @State private var commandPaletteSelectionAnchorCommandID: String?
+    @State private var commandPaletteJustRBFWorkflowTarget: CommandPaletteRestoreFocusTarget?
     @State private var commandPaletteScrollTargetIndex: Int?
     @State private var commandPaletteScrollTargetAnchor: UnitPoint?
     @State private var commandPaletteRestoreFocusTarget: CommandPaletteRestoreFocusTarget?
@@ -1228,6 +1233,8 @@ struct ContentView: View {
     )
     private static let commandPaletteUsageDefaultsKey = "commandPalette.commandUsage.v1"
     nonisolated private static let commandPaletteCommandsPrefix = ">"
+    nonisolated private static let justRBFWorkflowCommandIDPrefix =
+        JustRBFWorkflowCommandPalettePolicy.commandIDPrefix
     private static let commandPaletteVisiblePreviewResultLimit = 48
     private static let commandPaletteVisiblePreviewCandidateLimit = 128
     private static let maximumSidebarWidthRatio: CGFloat = 1.0 / 3.0
@@ -3759,7 +3766,12 @@ struct ContentView: View {
                 fallbackSelectedIndex: commandPaletteSelectedResultIndex,
                 resultIDs: resultIDs
             )
-            syncCommandPaletteSelectionAnchorFromCurrentResults()
+            if !Self.commandPaletteShouldRefuseWorkflowSelectionFallback(
+                preferredCommandID: commandPaletteSelectionAnchorCommandID,
+                resultIDs: resultIDs
+            ) {
+                syncCommandPaletteSelectionAnchorFromCurrentResults()
+            }
             let visibleResultCount = commandPaletteVisibleResults.count
             updateCommandPaletteScrollTarget(resultCount: visibleResultCount, animated: false)
             syncCommandPaletteOverlayCommandListState()
@@ -5095,6 +5107,7 @@ struct ContentView: View {
             CommandPaletteRenderResultRow(
                 id: result.id,
                 title: result.command.title,
+                titleCodeToken: result.command.titleCodeToken,
                 matchedIndices: result.titleMatchIndices,
                 trailingLabel: commandPaletteRenderTrailingLabel(for: result.command)
             )
@@ -5369,6 +5382,14 @@ struct ContentView: View {
         var hasher = Hasher()
         hasher.combine(commandsContext.snapshot.fingerprint())
         hasher.combine(cmuxConfigStore.configRevision)
+        if let workflowTarget = commandPaletteJustRBFWorkflowTarget {
+            hasher.combine(true)
+            hasher.combine(workflowTarget.workspaceId)
+            hasher.combine(workflowTarget.panelId)
+            hasher.combine(justRBFWorkflowCatalog.revision)
+        } else {
+            hasher.combine(false)
+        }
         return hasher.finalize()
     }
 
@@ -5409,7 +5430,11 @@ struct ContentView: View {
         return CommandPaletteSwitcherFingerprintContext.fingerprint(windowContexts: fingerprintContexts)
     }
 
-    private static func commandPaletteHighlightedTitleText(_ title: String, matchedIndices: Set<Int>) -> Text {
+    private static func commandPaletteHighlightedTitleText(
+        _ title: String,
+        matchedIndices: Set<Int>,
+        indexOffset: Int = 0
+    ) -> Text {
         guard !matchedIndices.isEmpty else {
             return Text(title).foregroundColor(.primary)
         }
@@ -5419,9 +5444,9 @@ struct ContentView: View {
         var result = Text("")
 
         while index < chars.count {
-            let isMatched = matchedIndices.contains(index)
+            let isMatched = matchedIndices.contains(index + indexOffset)
             var end = index + 1
-            while end < chars.count, matchedIndices.contains(end) == isMatched {
+            while end < chars.count, matchedIndices.contains(end + indexOffset) == isMatched {
                 end += 1
             }
 
@@ -5435,6 +5460,78 @@ struct ContentView: View {
         }
 
         return result
+    }
+
+    private static func commandPaletteTitleCodeSegments(
+        title: String,
+        titleCodeToken: String?
+    ) -> (prefix: String, code: String, suffix: String)? {
+        guard let titleCodeToken,
+              !titleCodeToken.isEmpty,
+              let tokenRange = title.range(of: titleCodeToken) else {
+            return nil
+        }
+
+        return (
+            prefix: String(title[..<tokenRange.lowerBound]),
+            code: String(title[tokenRange]),
+            suffix: String(title[tokenRange.upperBound...])
+        )
+    }
+
+    @ViewBuilder
+    private static func commandPaletteRenderTitleView(
+        title: String,
+        titleCodeToken: String?,
+        matchedIndices: Set<Int>
+    ) -> some View {
+        if let segments = commandPaletteTitleCodeSegments(
+            title: title,
+            titleCodeToken: titleCodeToken
+        ) {
+            let codeOffset = segments.prefix.count
+            let suffixOffset = codeOffset + segments.code.count
+
+            HStack(spacing: 0) {
+                commandPaletteHighlightedTitleText(
+                    segments.prefix,
+                    matchedIndices: matchedIndices
+                )
+                .cmuxFont(size: 13, weight: .regular)
+                .layoutPriority(1)
+
+                commandPaletteHighlightedTitleText(
+                    segments.code,
+                    matchedIndices: matchedIndices,
+                    indexOffset: codeOffset
+                )
+                .cmuxFont(size: 13, weight: .regular, design: .monospaced)
+                .padding(.horizontal, 3)
+                .padding(.vertical, 1)
+                .background(
+                    Color.primary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 4, style: .continuous)
+                )
+                .layoutPriority(2)
+
+                commandPaletteHighlightedTitleText(
+                    segments.suffix,
+                    matchedIndices: matchedIndices,
+                    indexOffset: suffixOffset
+                )
+                .cmuxFont(size: 13, weight: .regular)
+            }
+            .lineLimit(1)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+        } else {
+            commandPaletteHighlightedTitleText(
+                title,
+                matchedIndices: matchedIndices
+            )
+            .cmuxFont(size: 13, weight: .regular)
+            .lineLimit(1)
+        }
     }
 
     @ViewBuilder
@@ -5462,16 +5559,16 @@ struct ContentView: View {
 
     static func commandPaletteRenderResultLabelContent(
         title: String,
+        titleCodeToken: String?,
         matchedIndices: Set<Int>,
         trailingLabel: CommandPaletteRenderTrailingLabel?
     ) -> some View {
         HStack(spacing: 8) {
-            commandPaletteHighlightedTitleText(
-                title,
+            commandPaletteRenderTitleView(
+                title: title,
+                titleCodeToken: titleCodeToken,
                 matchedIndices: matchedIndices
             )
-                .cmuxFont(size: 13, weight: .regular)
-                .lineLimit(1)
             Spacer()
             commandPaletteRenderTrailingLabelView(trailingLabel)
         }
@@ -6678,7 +6775,10 @@ struct ContentView: View {
         registerCommandPaletteHandlers(&handlerRegistry)
 
         var commands: [CommandPaletteCommand] = []
-        commands.reserveCapacity(contributions.count)
+        let workflowCount = commandPaletteJustRBFWorkflowTarget == nil
+            ? 0
+            : justRBFWorkflowCatalog.workflows.count
+        commands.reserveCapacity(contributions.count + workflowCount)
         var nextRank = 0
 
         for contribution in contributions {
@@ -6708,6 +6808,29 @@ struct ContentView: View {
                 )
             )
             nextRank += 1
+        }
+
+        if let workflowTarget = commandPaletteJustRBFWorkflowTarget {
+            let category = String(localized: "commandPalette.workflow.category", defaultValue: "Workflow")
+            for workflow in justRBFWorkflowCatalog.workflows {
+                commands.append(
+                    CommandPaletteCommand(
+                        id: workflow.commandPaletteID,
+                        rank: nextRank,
+                        title: workflow.commandPaletteTitle(category: category),
+                        titleCodeToken: workflow.name,
+                        subtitle: "",
+                        shortcutHint: nil,
+                        kindLabel: nil,
+                        keywords: workflow.commandPaletteKeywords,
+                        dismissOnRun: true,
+                        action: {
+                            stageJustRBFWorkflow(named: workflow.name, target: workflowTarget)
+                        }
+                    )
+                )
+                nextRank += 1
+            }
         }
 
         return commands
@@ -8889,6 +9012,13 @@ struct ContentView: View {
         return (workspace, panelId, panel)
     }
 
+    static func commandPaletteIncludesJustRBFWorkflows(
+        focusedPanelIsTerminal: Bool,
+        isRemoteTerminal: Bool
+    ) -> Bool {
+        focusedPanelIsTerminal && !isRemoteTerminal
+    }
+
     private static func commandPaletteWorkspaceDisplayName(_ workspace: Workspace) -> String {
         let custom = workspace.customTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !custom.isEmpty {
@@ -8927,6 +9057,17 @@ struct ContentView: View {
             return anchoredIndex
         }
         return min(max(fallbackSelectedIndex, 0), resultIDs.count - 1)
+    }
+
+    static func commandPaletteShouldRefuseWorkflowSelectionFallback(
+        preferredCommandID: String?,
+        resultIDs: [String]
+    ) -> Bool {
+        guard let preferredCommandID,
+              preferredCommandID.hasPrefix(Self.justRBFWorkflowCommandIDPrefix) else {
+            return false
+        }
+        return !resultIDs.contains(preferredCommandID)
     }
 
     static func commandPaletteSelectionAnchorCommandID(
@@ -8977,6 +9118,12 @@ struct ContentView: View {
         switch pendingActivation {
         case .selected(let activationRequestID, let fallbackSelectedIndex, let preferredCommandID):
             guard activationRequestID == requestID else { return nil }
+            guard !commandPaletteShouldRefuseWorkflowSelectionFallback(
+                preferredCommandID: preferredCommandID,
+                resultIDs: resultIDs
+            ) else {
+                return nil
+            }
             let resolvedIndex = commandPaletteResolvedSelectionIndex(
                 preferredCommandID: preferredCommandID,
                 fallbackSelectedIndex: fallbackSelectedIndex,
@@ -9148,6 +9295,13 @@ struct ContentView: View {
             }
             runCommandPaletteCommand(command)
         case .selected(let fallbackIndex):
+            let resultIDs = cachedCommandPaletteResults.map(\.id)
+            guard !Self.commandPaletteShouldRefuseWorkflowSelectionFallback(
+                preferredCommandID: commandPaletteSelectionAnchorCommandID,
+                resultIDs: resultIDs
+            ) else {
+                return
+            }
             guard !cachedCommandPaletteResults.isEmpty else {
                 NSSound.beep()
                 return
@@ -9155,7 +9309,7 @@ struct ContentView: View {
             let resolvedIndex = Self.commandPaletteResolvedSelectionIndex(
                 preferredCommandID: commandPaletteSelectionAnchorCommandID,
                 fallbackSelectedIndex: fallbackIndex,
-                resultIDs: cachedCommandPaletteResults.map(\.id)
+                resultIDs: resultIDs
             )
             commandPaletteSelectedResultIndex = resolvedIndex
             syncCommandPaletteSelectionAnchorFromCurrentResults()
@@ -9219,10 +9373,14 @@ struct ContentView: View {
 
     private func runCommandPaletteCommand(_ command: CommandPaletteCommand) {
 #if DEBUG
-        cmuxDebugLog("palette.run commandId=\(command.id) dismissOnRun=\(command.dismissOnRun ? 1 : 0)")
+        if Self.commandPaletteShouldLogCommandIdentifier(forCommandId: command.id) {
+            cmuxDebugLog("palette.run commandId=\(command.id) dismissOnRun=\(command.dismissOnRun ? 1 : 0)")
+        }
 #endif
         let postRunFocusTarget = commandPalettePostRunFocusTarget(for: command)
-        recordCommandPaletteUsage(command.id)
+        if Self.commandPaletteShouldRecordUsage(forCommandId: command.id) {
+            recordCommandPaletteUsage(command.id)
+        }
         if command.dismissOnRun,
            Self.commandPaletteShouldDismissBeforeRun(forCommandId: command.id) {
             if let postRunFocusTarget {
@@ -9243,7 +9401,30 @@ struct ContentView: View {
         }
     }
 
+    private func stageJustRBFWorkflow(
+        named name: String,
+        target: CommandPaletteRestoreFocusTarget
+    ) {
+        let workspace = tabManager.tabs.first(where: { $0.id == target.workspaceId })
+        let panel = workspace?.panels[target.panelId]
+        guard let activation = JustRBFWorkflowCommandPalettePolicy.activation(
+            named: name,
+            targetWorkspaceId: target.workspaceId,
+            targetPanelId: target.panelId,
+            resolvedWorkspaceId: workspace?.id,
+            resolvedPanelId: panel?.id,
+            resolvedPanelIsTerminal: panel is TerminalPanel,
+            resolvedPanelIsRemote: workspace?.isRemoteTerminalSurface(target.panelId) ?? false
+        ), let terminalPanel = panel as? TerminalPanel else {
+            return
+        }
+        terminalPanel.sendInput(activation.input)
+    }
+
     private func commandPalettePostRunFocusTarget(for command: CommandPaletteCommand) -> CommandPaletteRestoreFocusTarget? {
+        if command.id.hasPrefix(Self.justRBFWorkflowCommandIDPrefix) {
+            return commandPaletteJustRBFWorkflowTarget
+        }
         guard let intent = Self.commandPalettePostRunRestoreFocusIntent(forCommandId: command.id),
               let panelContext = focusedPanelContext else {
             return nil
@@ -9356,6 +9537,9 @@ struct ContentView: View {
     }
 
     static func commandPaletteShouldDismissBeforeRun(forCommandId commandId: String) -> Bool {
+        if commandId.hasPrefix(Self.justRBFWorkflowCommandIDPrefix) {
+            return true
+        }
         switch commandId {
         case "palette.forkAgentConversationRight",
              "palette.forkAgentConversationLeft",
@@ -9372,6 +9556,14 @@ struct ContentView: View {
         default:
             return false
         }
+    }
+
+    static func commandPaletteShouldLogCommandIdentifier(forCommandId commandId: String) -> Bool {
+        !JustRBFWorkflowCommandPalettePolicy.recognizes(commandID: commandId)
+    }
+
+    static func commandPaletteShouldRecordUsage(forCommandId commandId: String) -> Bool {
+        !JustRBFWorkflowCommandPalettePolicy.recognizes(commandID: commandId)
     }
 
     static func commandPalettePostRunRestoreFocusIntent(forCommandId commandId: String) -> PanelFocusIntent? {
@@ -9426,6 +9618,7 @@ struct ContentView: View {
     }
 
     private func presentCommandPalette(initialQuery: String) {
+        captureJustRBFWorkflowTargetAndRefresh()
         refreshCachedDefaultTerminalStatus(refreshSearchCorpusIfPresented: false)
         commandPaletteFocusRestoreCoordinator.clear()
         if let panelContext = focusedPanelContext {
@@ -9443,6 +9636,31 @@ struct ContentView: View {
         scheduleCommandPaletteForkableAgentProbeResultExpiryRefresh()
         refreshCommandPaletteUsageHistory()
         resetCommandPaletteListState(initialQuery: initialQuery)
+    }
+
+    private func captureJustRBFWorkflowTargetAndRefresh() {
+        guard let panelContext = focusedPanelContext,
+              Self.commandPaletteIncludesJustRBFWorkflows(
+                  focusedPanelIsTerminal: panelContext.panel is TerminalPanel,
+                  isRemoteTerminal: panelContext.workspace.isRemoteTerminalSurface(panelContext.panelId)
+              ) else {
+            commandPaletteJustRBFWorkflowTarget = nil
+            return
+        }
+
+        commandPaletteJustRBFWorkflowTarget = CommandPaletteRestoreFocusTarget(
+            workspaceId: panelContext.workspace.id,
+            panelId: panelContext.panelId,
+            intent: .terminal(.surface)
+        )
+        let shellPath = TerminalShellResolver.resolveCurrentUserShell() ?? "/bin/zsh"
+        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path
+        Task {
+            await justRBFWorkflowCatalog.refresh(
+                shellPath: shellPath,
+                homeDirectory: homeDirectory
+            )
+        }
     }
 
     private func resetCommandPaletteListState(initialQuery: String) {
@@ -9564,6 +9782,7 @@ struct ContentView: View {
         commandPaletteWorkspaceDescriptionHeight = CommandPaletteMultilineTextEditorRepresentable.defaultMinimumHeight
         commandPaletteSelectedResultIndex = 0
         commandPaletteSelectionAnchorCommandID = nil
+        commandPaletteJustRBFWorkflowTarget = nil
         commandPaletteScrollTargetIndex = nil
         commandPaletteScrollTargetAnchor = nil
         commandPaletteShouldFocusWorkspaceDescriptionEditor = false

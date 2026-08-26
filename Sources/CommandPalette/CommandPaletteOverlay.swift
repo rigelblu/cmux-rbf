@@ -15,6 +15,7 @@ struct CommandPaletteRenderTrailingLabel: Equatable {
 struct CommandPaletteRenderResultRow: Identifiable, Equatable {
     let id: String
     let title: String
+    let titleCodeToken: String?
     let matchedIndices: Set<Int>
     let trailingLabel: CommandPaletteRenderTrailingLabel?
 }
@@ -117,6 +118,7 @@ struct CommandPaletteCommandListRowsView: View {
                         } label: {
                             ContentView.commandPaletteRenderResultLabelContent(
                                 title: row.title,
+                                titleCodeToken: row.titleCodeToken,
                                 matchedIndices: row.matchedIndices,
                                 trailingLabel: row.trailingLabel
                             )

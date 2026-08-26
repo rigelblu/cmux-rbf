@@ -9,6 +9,12 @@ public struct CommandPaletteCommand: Identifiable {
     public let rank: Int
     /// Display title.
     public let title: String
+    /// Optional exact title token rendered with inline-code styling.
+    ///
+    /// The plain `title` remains the search and accessibility value. Callers
+    /// supply this token instead of asking presentation code to infer one from
+    /// localized title text.
+    public let titleCodeToken: String?
     /// Display subtitle.
     public let subtitle: String
     /// Optional keyboard-shortcut hint shown trailing the row.
@@ -27,6 +33,7 @@ public struct CommandPaletteCommand: Identifiable {
         id: String,
         rank: Int,
         title: String,
+        titleCodeToken: String? = nil,
         subtitle: String,
         shortcutHint: String?,
         kindLabel: String?,
@@ -37,6 +44,7 @@ public struct CommandPaletteCommand: Identifiable {
         self.id = id
         self.rank = rank
         self.title = title
+        self.titleCodeToken = titleCodeToken
         self.subtitle = subtitle
         self.shortcutHint = shortcutHint
         self.kindLabel = kindLabel

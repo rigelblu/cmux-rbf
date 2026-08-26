@@ -1117,6 +1117,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var didDisableSuddenTermination = false
     /// Owns the per-window command-palette state.
     let commandPaletteWindowStore = CommandPaletteWindowStore()
+    /// Owns the app-wide last-success just-rbf workflow snapshot and refresh flight.
+    let justRBFWorkflowCatalog = JustRBFWorkflowCatalog(commandRunner: CommandRunner())
     private static let sessionAutosaveTypingQuietPeriod: TimeInterval = 0.65
     private let mainThreadHangWatchdog: MainThreadHangWatchdog
 
@@ -9014,7 +9016,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let root = ContentView(
             updateViewModel: updateViewModel,
             windowId: windowId,
-            titlebarControlsLayoutModel: titlebarControlsLayoutModel
+            titlebarControlsLayoutModel: titlebarControlsLayoutModel,
+            justRBFWorkflowCatalog: justRBFWorkflowCatalog
         )
             .environmentObject(tabManager)
             .environmentObject(notificationStore)
