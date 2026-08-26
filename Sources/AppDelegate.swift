@@ -2251,6 +2251,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         self.settingsRuntime = settingsRuntime
         self.notificationStore = notificationStore
         self.sidebarState = sidebarState
+        tabManager.revealSelectedWorkspaceInSidebar = { [weak sidebarState] workspace in
+            sidebarState?.expandColorSection(containing: workspace)
+        }
         self.auth = auth
         VMClient.bootstrap(auth: auth.coordinator)
         RemotesClient.bootstrap(auth: auth.coordinator)
@@ -3985,6 +3988,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         context.sidebarState.persistedWidth = CGFloat(
             SessionPersistencePolicy.sanitizedSidebarWidth(snapshot.sidebar.width)
         )
+        context.sidebarState.restoreCollapsedColorSections(snapshot.sidebar.colorSectionCollapsedHexes)
+        if let selected = context.tabManager.selectedTab {
+            context.sidebarState.expandColorSection(containing: selected)
+        }
         context.sidebarSelectionState.selection = snapshot.sidebar.selection.sidebarSelection
 
         if let restoredFrame = resolvedWindowFrame(from: snapshot), let window {
@@ -5022,7 +5029,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             sidebar: SessionSidebarSnapshot(
                 isVisible: context.sidebarState.isVisible,
                 selection: SessionSidebarSelection(selection: context.sidebarSelectionState.selection),
-                width: SessionPersistencePolicy.sanitizedSidebarWidth(Double(context.sidebarState.persistedWidth))
+                width: SessionPersistencePolicy.sanitizedSidebarWidth(Double(context.sidebarState.persistedWidth)),
+                colorSectionCollapsedHexes: context.sidebarState.collapsedColorSectionHexes.sorted()
             ),
             configFrames: windowConfigFrames[context.windowId]?.entries,
             dock: context.windowDockSessionSnapshot(includeScrollback: includeScrollback, restorableAgentIndex: restorableAgentIndex, surfaceResumeBindingIndex: surfaceResumeBindingIndex)
@@ -9338,8 +9346,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             isVisible: shouldStartWithHiddenSidebarForTerminalViewportUITest
                 ? false
                 : (sessionWindowSnapshot?.sidebar.isVisible ?? true),
-            persistedWidth: CGFloat(sidebarWidth)
+            persistedWidth: CGFloat(sidebarWidth),
+            collapsedColorSectionHexes: Set(
+                sessionWindowSnapshot?.sidebar.colorSectionCollapsedHexes ?? []
+            )
         )
+        if let selected = tabManager.selectedTab {
+            sidebarState.expandColorSection(containing: selected)
+        }
+        tabManager.revealSelectedWorkspaceInSidebar = { [weak sidebarState] workspace in
+            sidebarState?.expandColorSection(containing: workspace)
+        }
         let sidebarSelectionState = SidebarSelectionState(
             selection: sessionWindowSnapshot?.sidebar.selection.sidebarSelection ?? .tabs
         )

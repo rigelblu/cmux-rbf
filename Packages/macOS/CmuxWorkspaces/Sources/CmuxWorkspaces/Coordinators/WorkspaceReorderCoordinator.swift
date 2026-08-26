@@ -166,6 +166,46 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
         return reorderWorkspace(tabId: tabId, toIndex: plan.toIndex, isDragOperation: isDragOperation)
     }
 
+    /// Reorders within a generated color section while leaving every
+    /// nonmember object at exactly the same source index.
+    @discardableResult
+    public func reorderWorkspaceWithinColorSection(
+        tabId: UUID,
+        targetWorkspaceId: UUID,
+        insertBefore: Bool,
+        memberWorkspaceIds: [UUID]
+    ) -> Bool {
+        let memberSet = Set(memberWorkspaceIds)
+        guard memberSet.count == memberWorkspaceIds.count,
+              memberSet.contains(tabId),
+              memberSet.contains(targetWorkspaceId),
+              let dragged = model.tabs.first(where: { $0.id == tabId }),
+              dragged.groupId == nil else { return false }
+        if tabId == targetWorkspaceId { return true }
+
+        let members = model.tabs.filter { memberSet.contains($0.id) }
+        guard members.count == memberWorkspaceIds.count,
+              members.allSatisfy({ $0.groupId == nil && $0.isPinned == dragged.isPinned }),
+              members.map(\.id) == memberWorkspaceIds else { return false }
+
+        var reordered = members
+        guard let from = reordered.firstIndex(where: { $0.id == tabId }),
+              let targetBeforeRemoval = reordered.firstIndex(where: { $0.id == targetWorkspaceId }) else {
+            return false
+        }
+        let moved = reordered.remove(at: from)
+        var target = targetBeforeRemoval
+        if from < target { target -= 1 }
+        if !insertBefore { target += 1 }
+        reordered.insert(moved, at: min(max(0, target), reordered.count))
+        guard reordered.map(\.id) != members.map(\.id) else { return true }
+
+        var iterator = reordered.makeIterator()
+        model.tabs = model.tabs.map { memberSet.contains($0.id) ? iterator.next()! : $0 }
+        host?.workspaceOrderDidChange(movedWorkspaceIds: [tabId])
+        return true
+    }
+
     /// Preserve explicit group-drop row space from the sidebar.
     private func explicitGroupWorkspaceReorderPlan(tabId: UUID, toIndex targetIndex: Int) -> WorkspaceReorderPlanItem? {
         guard let currentIndex = model.tabs.firstIndex(where: { $0.id == tabId }) else { return nil }

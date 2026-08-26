@@ -228,6 +228,45 @@ struct SessionSidebarSnapshot: Codable, Sendable {
     var isVisible: Bool
     var selection: SessionSidebarSelection
     var width: Double?
+    var colorSectionCollapsedHexes: [String]? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case isVisible
+        case selection
+        case width
+        case colorSectionCollapsedHexes
+    }
+
+    init(
+        isVisible: Bool,
+        selection: SessionSidebarSelection,
+        width: Double?,
+        colorSectionCollapsedHexes: [String]? = nil
+    ) {
+        self.isVisible = isVisible
+        self.selection = selection
+        self.width = width
+        self.colorSectionCollapsedHexes = colorSectionCollapsedHexes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isVisible = try container.decode(Bool.self, forKey: .isVisible)
+        selection = try container.decode(SessionSidebarSelection.self, forKey: .selection)
+        width = try container.decodeIfPresent(Double.self, forKey: .width)
+        colorSectionCollapsedHexes = try? container.decodeIfPresent(
+            [String].self,
+            forKey: .colorSectionCollapsedHexes
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(isVisible, forKey: .isVisible)
+        try container.encode(selection, forKey: .selection)
+        try container.encodeIfPresent(width, forKey: .width)
+        try container.encodeIfPresent(colorSectionCollapsedHexes, forKey: .colorSectionCollapsedHexes)
+    }
 }
 
 struct SessionStatusEntrySnapshot: Codable, Sendable {

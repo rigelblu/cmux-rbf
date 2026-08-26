@@ -575,6 +575,10 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             return .invalid
         }
         let configuration = rows[row]
+        if let toggle = configuration.colorSectionToggle {
+            toggle()
+            return .dispatched
+        }
         if let actions = configuration.appKitWorkspaceRowActions {
             previewSelection(row: row, modifiers: click.modifiers, hitView: nil)
             dispatchSelection(modifiers: click.modifiers) {
@@ -589,7 +593,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             }
             return .dispatched
         }
-        if configuration.appKitWorkspaceRowModel != nil
+        if configuration.isColorSectionHeader
+            || configuration.appKitWorkspaceRowModel != nil
             || configuration.appKitGroupHeaderModel != nil {
             return .awaitingActions
         }
@@ -711,7 +716,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
         // Group headers intentionally mint their anchor payload: anchor drags
         // route to top-level whole-group plans and are rejected cross-window.
-        guard rows.indices.contains(row), let actions else { return nil }
+        guard rows.indices.contains(row), !rows[row].isColorSectionHeader, let actions else { return nil }
         let workspaceId = rows[row].workspaceId
         actions.beginWorkspaceDrag(workspaceId)
         workspaceDragSessionDidBegin()
@@ -1168,7 +1173,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // it is excluded here just as the SwiftUI sidebar accepts only .workspace
         // rows. Group lifecycle runs through the header's own menu (Ungroup /
         // Delete Group), not a middle-click on the header.
-        guard rows.indices.contains(row), !rows[row].isGroupHeader else { return }
+        guard rows.indices.contains(row), !rows[row].isGroupHeader, !rows[row].isColorSectionHeader else { return }
         actions?.closeWorkspace(rows[row].workspaceId)
     }
 

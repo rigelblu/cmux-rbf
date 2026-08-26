@@ -10820,6 +10820,7 @@ struct VerticalTabsSidebar: View, Equatable {
     let observedWindowReference: WeakWindowReference
     var observedWindow: NSWindow? { observedWindowReference.window }
     @EnvironmentObject var tabManager: TabManager
+    @EnvironmentObject var sidebarState: SidebarState
     // Plain reference by design. Native row and titlebar subscribers own the
     // unread invalidation boundary, so this O(workspaces) root stays inert.
     var notificationStore: TerminalNotificationStore { .shared }
@@ -10909,6 +10910,7 @@ struct VerticalTabsSidebar: View, Equatable {
     /// has no TabItemView, so no implicit per-row publisher subscription
     /// would otherwise fire on `cd` while it's not selected.
     @State private var anchorCwdRevision: Int = 0
+    @State private var workspaceColorPaletteRevision: UInt64 = 0
     @AppStorage(CmuxExtensionSidebarSelection.defaultsKey)
     private var selectedExtensionSidebarProviderId = CmuxExtensionSidebarSelection.defaultProviderId
     @LiveSetting(\.betaFeatures.extensions) private var extensionsExperimentalEnabled
@@ -11043,6 +11045,9 @@ struct VerticalTabsSidebar: View, Equatable {
             targetTabId: nil,
             tabManager: tabManager,
             workspaceGroupIdByWorkspaceId: renderContext.workspaceGroupIdByWorkspaceId,
+            generatedColorSectionWorkspaceIds: Set(
+                renderContext.colorSectionProjection.sectionByWorkspaceId.keys
+            ),
             dragState: dragState,
             selectedTabIds: $selectedTabIds,
             lastSidebarSelectionIndex: $lastSidebarSelectionIndex,
@@ -11195,6 +11200,7 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceGroupById: [UUID: WorkspaceGroup]
         let memberWorkspaceIdsByGroupId: [UUID: [UUID]]
         let workspaceGroupMenuSnapshot: WorkspaceGroupMenuSnapshot
+        let colorSectionProjection: SidebarWorkspaceColorSectionProjection
         let workspaceRenderItems: [SidebarWorkspaceRenderItem]
         let visibleWorkspaceRowIds: [UUID]
 
@@ -11293,14 +11299,30 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
             items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name) }
         )
-        let workspaceRenderItems = SidebarWorkspaceRenderItem.renderItems(
+        let baseWorkspaceRenderItems = SidebarWorkspaceRenderItem.renderItems(
             tabs: tabs,
             groupsById: workspaceGroupById
         )
+        let _ = workspaceColorPaletteRevision
+        let colorSectionProjection = SidebarWorkspaceColorSectionProjection.project(
+            workspaces: tabs.map {
+                SidebarWorkspaceColorSectionWorkspaceSnapshot(
+                    id: $0.id,
+                    groupId: $0.groupId,
+                    isPinned: $0.isPinned,
+                    customColor: $0.customColor
+                )
+            },
+            paletteEntries: WorkspaceTabColorSettings.labeledPaletteEntries(),
+            collapsedHexes: sidebarState.collapsedColorSectionHexes
+        )
+        let workspaceRenderItems = colorSectionProjection.applying(to: baseWorkspaceRenderItems)
         let numberedWorkspaceIndexById = SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(
+            from: baseWorkspaceRenderItems
+        )
+        let visibleWorkspaceRowIds = SidebarWorkspaceRenderItem.numberedWorkspaceIds(
             from: workspaceRenderItems
         )
-        let visibleWorkspaceRowIds = workspaceRenderItems.map(\.rowWorkspaceId)
         let draggedSidebarTabId = dragState.draggedTabId
         let dropIndicatorScope = dragState.dropIndicatorScope
         let sidebarReorderIds = draggedSidebarTabId.map {
@@ -11349,6 +11371,7 @@ struct VerticalTabsSidebar: View, Equatable {
             workspaceGroupById: workspaceGroupById,
             memberWorkspaceIdsByGroupId: memberWorkspaceIdsByGroupId,
             workspaceGroupMenuSnapshot: workspaceGroupMenuSnapshot,
+            colorSectionProjection: colorSectionProjection,
             workspaceRenderItems: workspaceRenderItems,
             visibleWorkspaceRowIds: visibleWorkspaceRowIds
         )
@@ -11389,6 +11412,9 @@ struct VerticalTabsSidebar: View, Equatable {
         }
         .onDisappear {
             deactivateSidebarInteractions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            workspaceColorPaletteRevision &+= 1
         }
         .onChange(of: isPresented) { _, presented in
             if presented {
@@ -11918,6 +11944,23 @@ struct VerticalTabsSidebar: View, Equatable {
                     group: group,
                     memberWorkspaceIds: renderContext.memberWorkspaceIdsByGroupId[groupId] ?? [],
                     renderContext: renderContext
+                )
+            case .colorSectionHeader(let section):
+                let header = SidebarWorkspaceColorSectionHeader(
+                    section: section,
+                    colorScheme: renderContext.environment.colorScheme,
+                    onToggle: { sidebarState.toggleColorSection(hex: section.id.normalizedHex) }
+                )
+                return SidebarWorkspaceTableRowConfiguration(
+                    id: .colorSection(section.id),
+                    workspaceId: section.memberWorkspaceIds[0],
+                    groupId: nil,
+                    isGroupHeader: false,
+                    isPinned: section.id.pinTier == .pinned,
+                    colorSectionToggle: { sidebarState.toggleColorSection(hex: section.id.normalizedHex) },
+                    environment: renderContext.environment,
+                    equivalenceValue: header,
+                    makeContent: { _, _ in AnyView(header) }
                 )
             case .workspace(let workspaceId):
                 guard let workspace = renderContext.workspaceById[workspaceId],
@@ -13606,6 +13649,12 @@ struct VerticalTabsSidebar: View, Equatable {
                     if let snapshot = listSnapshot.groupRowsById[groupId] {
                         sidebarWorkspaceGroupRow(snapshot: snapshot)
                     }
+                case .colorSectionHeader(let section):
+                    SidebarWorkspaceColorSectionHeader(
+                        section: section,
+                        colorScheme: renderContext.environment.colorScheme,
+                        onToggle: { sidebarState.toggleColorSection(hex: section.id.normalizedHex) }
+                    )
                 case .workspace(let workspaceId):
                     if let input = listSnapshot.workspaceRowsById[workspaceId] {
                         workspaceRow(
@@ -13877,7 +13926,7 @@ struct VerticalTabsSidebar: View, Equatable {
         renderContext: WorkspaceListRenderContext
     ) -> SidebarWorkspaceReorderDropPlan? {
         guard let draggedTabId = dragState.draggedTabId else { return nil }
-        return SidebarWorkspaceReorderDropResolver().plan(
+        guard let basePlan = SidebarWorkspaceReorderDropResolver().plan(
             for: SidebarWorkspaceReorderDropRequest(
                 point: point,
                 draggedWorkspaceId: draggedTabId,
@@ -13904,6 +13953,23 @@ struct VerticalTabsSidebar: View, Equatable {
                         frame: $0.frame
                     )
                 }
+            )
+        ) else { return nil }
+        guard let sourceSection = renderContext.colorSectionProjection.sectionByWorkspaceId[draggedTabId] else {
+            return basePlan
+        }
+        guard let indicator = basePlan.indicator,
+              let targetWorkspaceId = indicator.tabId,
+              let targetSection = renderContext.colorSectionProjection.sectionByWorkspaceId[targetWorkspaceId],
+              targetSection.id == sourceSection.id else { return nil }
+        return SidebarWorkspaceReorderDropPlan(
+            draggedWorkspaceId: draggedTabId,
+            indicator: indicator,
+            indicatorScope: .raw,
+            action: .colorSection(
+                targetWorkspaceId: targetWorkspaceId,
+                insertBefore: indicator.edge == .top,
+                memberWorkspaceIds: sourceSection.memberWorkspaceIds
             )
         )
     }
@@ -13948,6 +14014,30 @@ struct VerticalTabsSidebar: View, Equatable {
             return didReorder
         case .crossWindow(insertionIndex: _, proposedInsertionIndex: let proposedInsertionIndex):
             return performCrossWindowWorkspaceDrop(plan: plan, proposedInsertionIndex: proposedInsertionIndex)
+        case .colorSection(let targetWorkspaceId, let insertBefore, let memberWorkspaceIds):
+            let freshProjection = SidebarWorkspaceColorSectionProjection.project(
+                workspaces: tabManager.tabs.map {
+                    SidebarWorkspaceColorSectionWorkspaceSnapshot(
+                        id: $0.id,
+                        groupId: $0.groupId,
+                        isPinned: $0.isPinned,
+                        customColor: $0.customColor
+                    )
+                },
+                paletteEntries: WorkspaceTabColorSettings.labeledPaletteEntries(),
+                collapsedHexes: []
+            )
+            guard let freshSection = freshProjection.sectionByWorkspaceId[plan.draggedWorkspaceId],
+                  freshSection.memberWorkspaceIds == memberWorkspaceIds,
+                  freshProjection.sectionByWorkspaceId[targetWorkspaceId]?.id == freshSection.id else {
+                return false
+            }
+            return tabManager.reorderWorkspaceWithinColorSection(
+                tabId: plan.draggedWorkspaceId,
+                targetWorkspaceId: targetWorkspaceId,
+                insertBefore: insertBefore,
+                memberWorkspaceIds: memberWorkspaceIds
+            )
         }
     }
 
@@ -16915,6 +17005,7 @@ struct SidebarTabDropDelegate: DropDelegate {
     let targetTabId: UUID?
     let tabManager: TabManager
     let workspaceGroupIdByWorkspaceId: [UUID: UUID?]
+    let generatedColorSectionWorkspaceIds: Set<UUID>
     let dragState: SidebarDragState
     @Binding var selectedTabIds: Set<UUID>
     @Binding var lastSidebarSelectionIndex: Int?
@@ -17043,6 +17134,9 @@ struct SidebarTabDropDelegate: DropDelegate {
             #endif
             return true
         }
+        guard !generatedColorSectionWorkspaceIds.contains(draggedTabId) else {
+            return false
+        }
         let targetIsInReorderScope: Bool = {
             guard let targetTabId else { return true }
             let usesTopLevelRows = tabManager.sidebarReorderUsesTopLevelRows(
@@ -17122,6 +17216,9 @@ struct SidebarTabDropDelegate: DropDelegate {
         }
         if isCrossWindowDrag(draggedTabId) {
             return performCrossWindowDrop(draggedTabId: draggedTabId)
+        }
+        guard !generatedColorSectionWorkspaceIds.contains(draggedTabId) else {
+            return false
         }
         let defaultUsesTopLevelRows = tabManager.sidebarReorderUsesTopLevelRows(
             forDraggedWorkspaceId: draggedTabId,

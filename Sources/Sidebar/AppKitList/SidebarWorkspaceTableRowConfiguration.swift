@@ -27,7 +27,9 @@ struct SidebarWorkspaceTableRowConfiguration {
     let workspaceId: UUID
     let groupId: UUID?
     let isGroupHeader: Bool
+    let isColorSectionHeader: Bool
     let isPinned: Bool
+    let colorSectionToggle: (@MainActor () -> Void)?
     let makeContent: ContentFactory
     /// Present when this row renders through the pure-AppKit group header cell
     /// instead of a hosted SwiftUI cell.
@@ -56,6 +58,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         workspaceId: UUID,
         groupId: UUID?,
         isGroupHeader: Bool,
+        isColorSectionHeader: Bool = false,
         isPinned: Bool,
         makeContent: @escaping ContentFactory,
         appKitGroupHeaderModel: SidebarGroupHeaderRowModel?,
@@ -68,7 +71,9 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.workspaceId = workspaceId
         self.groupId = groupId
         self.isGroupHeader = isGroupHeader
+        self.isColorSectionHeader = isColorSectionHeader
         self.isPinned = isPinned
+        self.colorSectionToggle = nil
         self.makeContent = makeContent
         self.appKitGroupHeaderModel = appKitGroupHeaderModel
         self.appKitGroupHeaderActions = nil
@@ -90,6 +95,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         groupId: UUID?,
         isGroupHeader: Bool,
         isPinned: Bool,
+        colorSectionToggle: (@MainActor () -> Void)? = nil,
         environment: SidebarWorkspaceTableEnvironmentSnapshot,
         equivalenceValue: Content,
         makeContent: @escaping ContentFactory
@@ -98,7 +104,9 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.workspaceId = workspaceId
         self.groupId = groupId
         self.isGroupHeader = isGroupHeader
+        self.isColorSectionHeader = colorSectionToggle != nil
         self.isPinned = isPinned
+        self.colorSectionToggle = colorSectionToggle
         self.environment = environment
         self.makeContent = makeContent
         self.appKitGroupHeaderModel = nil
@@ -128,7 +136,9 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.workspaceId = groupHeaderModel.anchorWorkspaceId
         self.groupId = groupHeaderModel.groupId
         self.isGroupHeader = true
+        self.isColorSectionHeader = false
         self.isPinned = groupHeaderModel.isPinned
+        self.colorSectionToggle = nil
         self.environment = environment
         self.makeContent = { _, _ in AnyView(EmptyView()) }
         self.appKitGroupHeaderModel = groupHeaderModel
@@ -161,7 +171,9 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.workspaceId = workspaceRowModel.workspaceId
         self.groupId = groupId
         self.isGroupHeader = false
+        self.isColorSectionHeader = false
         self.isPinned = isPinned
+        self.colorSectionToggle = nil
         self.environment = environment
         self.makeContent = { _, _ in AnyView(EmptyView()) }
         self.appKitGroupHeaderModel = nil
@@ -224,6 +236,7 @@ struct SidebarWorkspaceTableRowConfiguration {
             workspaceId: workspaceId,
             groupId: groupId,
             isGroupHeader: isGroupHeader,
+            isColorSectionHeader: isColorSectionHeader,
             isPinned: isPinned,
             makeContent: { _, _ in AnyView(EmptyView()) },
             appKitGroupHeaderModel: appKitGroupHeaderModel,
@@ -235,6 +248,7 @@ struct SidebarWorkspaceTableRowConfiguration {
     }
 
     var estimatedHeight: CGFloat {
+        if isColorSectionHeader { return 26 }
         let fontScale = CGFloat(environment.globalFontMagnificationPercent) / 100
         let calculator = SidebarWorkspaceTableRowHeightCalculator()
         if isGroupHeader {

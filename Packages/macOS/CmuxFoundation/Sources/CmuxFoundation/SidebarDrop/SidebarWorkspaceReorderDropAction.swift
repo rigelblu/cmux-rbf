@@ -12,4 +12,11 @@ public enum SidebarWorkspaceReorderDropAction: Equatable, Sendable {
     /// preserves the raw pointer slot so multi-selection commits can clamp each
     /// pin tier independently.
     case crossWindow(insertionIndex: Int, proposedInsertionIndex: Int)
+
+    /// Permute only the ungrouped members of one generated color section.
+    case colorSection(
+        targetWorkspaceId: UUID,
+        insertBefore: Bool,
+        memberWorkspaceIds: [UUID]
+    )
 }

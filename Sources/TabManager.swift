@@ -183,6 +183,8 @@ class TabManager: ObservableObject {
     /// Stable identifier of the owning macOS window. Used only for opt-in title
     /// templates that expose a WM-matchable per-window token.
     var windowId: UUID?
+    /// Window-owned reveal hook shared by every selection entrypoint.
+    var revealSelectedWorkspaceInSidebar: ((Workspace) -> Void)?
 
     // Wave-4 sub-model (TabManager decomposition): the workspace list, the
     // sidebar group sections, and the selected-workspace id storage live in
@@ -296,6 +298,10 @@ class TabManager: ObservableObject {
     func selectedWorkspaceIdDidChange(from oldValue: UUID?) {
             guard selectedTabId != oldValue else { return }
             pendingProjectedNotificationFocusRequestID = nil
+            if let selectedTabId,
+               let selected = tabs.first(where: { $0.id == selectedTabId }) {
+                revealSelectedWorkspaceInSidebar?(selected)
+            }
             if !isRestoringSessionSnapshot {
                 workspaces.expandWorkspaceGroupForSelectionIfNeeded()
             }
@@ -1781,6 +1787,21 @@ class TabManager: ObservableObject {
 
     func workspaceReorderPlan(tabId: UUID, before beforeId: UUID? = nil, after afterId: UUID? = nil) -> WorkspaceReorderPlanItem? {
         workspaceReordering.workspaceReorderPlan(tabId: tabId, before: beforeId, after: afterId)
+    }
+
+    @discardableResult
+    func reorderWorkspaceWithinColorSection(
+        tabId: UUID,
+        targetWorkspaceId: UUID,
+        insertBefore: Bool,
+        memberWorkspaceIds: [UUID]
+    ) -> Bool {
+        workspaceReordering.reorderWorkspaceWithinColorSection(
+            tabId: tabId,
+            targetWorkspaceId: targetWorkspaceId,
+            insertBefore: insertBefore,
+            memberWorkspaceIds: memberWorkspaceIds
+        )
     }
 
     func workspaceBatchReorderPlan(

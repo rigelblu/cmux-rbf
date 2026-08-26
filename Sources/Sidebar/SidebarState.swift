@@ -1,4 +1,5 @@
 import CmuxWorkspaces
+import CmuxSettings
 import Combine
 import CoreGraphics
 import Foundation
@@ -6,13 +7,21 @@ import Foundation
 final class SidebarState: ObservableObject {
     @Published var isVisible: Bool
     @Published var persistedWidth: CGFloat
+    @Published private(set) var collapsedColorSectionHexes: Set<String>
     private var visibilityWillChangeOwnerId: UUID?
     private var visibilityWillChange: ((Bool) -> Void)?
 
-    init(isVisible: Bool = true, persistedWidth: CGFloat = CGFloat(SessionPersistencePolicy.defaultSidebarWidth)) {
+    init(
+        isVisible: Bool = true,
+        persistedWidth: CGFloat = CGFloat(SessionPersistencePolicy.defaultSidebarWidth),
+        collapsedColorSectionHexes: Set<String> = []
+    ) {
         self.isVisible = isVisible
         let sanitized = SessionPersistencePolicy.sanitizedSidebarWidth(Double(persistedWidth))
         self.persistedWidth = CGFloat(sanitized)
+        self.collapsedColorSectionHexes = Set(
+            collapsedColorSectionHexes.compactMap(WorkspaceColorHex.normalized)
+        )
     }
 
     func toggle() {
@@ -23,6 +32,29 @@ final class SidebarState: ObservableObject {
         guard nextValue != isVisible else { return }
         visibilityWillChange?(nextValue)
         isVisible = nextValue
+    }
+
+    func toggleColorSection(hex: String) {
+        guard let normalized = WorkspaceColorHex.normalized(hex) else { return }
+        if collapsedColorSectionHexes.remove(normalized) == nil {
+            collapsedColorSectionHexes.insert(normalized)
+        }
+    }
+
+    @MainActor
+    func expandColorSection(containing workspace: Workspace) {
+        guard workspace.groupId == nil,
+              let rawColor = workspace.customColor else { return }
+        expandColorSection(hex: rawColor)
+    }
+
+    func expandColorSection(hex: String) {
+        guard let normalized = WorkspaceColorHex.normalized(hex) else { return }
+        collapsedColorSectionHexes.remove(normalized)
+    }
+
+    func restoreCollapsedColorSections(_ rawHexes: [String]?) {
+        collapsedColorSectionHexes = Set((rawHexes ?? []).compactMap(WorkspaceColorHex.normalized))
     }
 
     func installVisibilityWillChangeHandler(

@@ -207,6 +207,8 @@ struct WorkspaceGroupTests {
                 groupMemberIds = memberWorkspaceIdsByGroupId[renderedGroupId] ?? []
             case .groupHeader:
                 break
+            case .colorSectionHeader:
+                break
             case .workspace(let workspaceId):
                 visibleWorkspaceIds.append(workspaceId)
             }
