@@ -54,6 +54,7 @@ struct cmuxApp: App {
     private let authComposition: MacAuthComposition
     @StateObject private var tabManager: TabManager
     @StateObject private var notificationStore: TerminalNotificationStore
+    @StateObject private var restartSummaryStore: RestartCommandRestoreSummaryStore
     @StateObject var closedItemHistoryStore: ClosedItemHistoryStore
     @StateObject private var sidebarState: SidebarState
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
@@ -198,6 +199,9 @@ struct cmuxApp: App {
         )
         _tabManager = StateObject(wrappedValue: tabManager)
         _notificationStore = StateObject(wrappedValue: notificationStore)
+        _restartSummaryStore = StateObject(
+            wrappedValue: RestartCommandRestoreSummaryStore.shared
+        )
         _closedItemHistoryStore = StateObject(wrappedValue: closedItemHistoryStore)
         _sidebarState = StateObject(wrappedValue: sidebarState)
         _focusHistoryMenuInvalidator = StateObject(wrappedValue: focusHistoryMenuInvalidator)
@@ -495,7 +499,7 @@ struct cmuxApp: App {
                 }
 
                 splitCommandButton(title: String(localized: "menu.notifications.jumpToUnread", defaultValue: "Jump to Latest Unread"), shortcut: menuShortcut(for: .jumpToUnread)) {
-                    appDelegate.jumpToLatestUnread()
+                    _ = appDelegate.jumpToLatestMacNotificationUnread()
                 }
                 .disabled(!snapshot.hasUnreadNotifications)
 
@@ -505,12 +509,12 @@ struct cmuxApp: App {
                 .disabled(activeTabManager.selectedWorkspace == nil)
 
                 Button(String(localized: "menu.notifications.markAllRead", defaultValue: "Mark All Read")) {
-                    notificationStore.markAllRead()
+                    appDelegate.markAllMacNotificationsRead()
                 }
                 .disabled(!snapshot.hasUnreadNotifications)
 
                 Button(String(localized: "menu.notifications.clearAll", defaultValue: "Clear All")) {
-                    notificationStore.clearAll()
+                    appDelegate.clearAllMacNotifications()
                 }
                 .disabled(!snapshot.hasNotifications)
             }
@@ -1176,8 +1180,10 @@ struct cmuxApp: App {
         return KeyboardShortcutSettings.menuShortcut(for: action)
     }
 
-    private var notificationMenuSnapshot: NotificationMenuSnapshot {
-        notificationStore.notificationMenuSnapshot
+    private var notificationMenuSnapshot: MacNotificationMenuProjection {
+        restartSummaryStore.menuProjection(
+            terminal: notificationStore.notificationMenuSnapshot
+        )
     }
 
     private var browserFocusModeMenuSnapshot: (title: String, canToggle: Bool) {

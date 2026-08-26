@@ -3,6 +3,7 @@ import CmuxCore
 import Foundation
 import Bonsplit
 import CmuxWorkspaces
+import CmuxRestartCommands
 #if canImport(CryptoKit)
 import CryptoKit
 #endif
@@ -1427,6 +1428,8 @@ struct SessionTerminalPanelSnapshot: Codable, Sendable {
     /// Agent-hook identity kept separately when a process-detected binding is
     /// the effective terminal resume target.
     var managedAgentResumeBinding: SurfaceResumeBindingSnapshot?
+    /// Minimal allowlisted-command observation; replay authority is resolved at restore time.
+    var restartCommandBinding: PaneRestartCommandBinding?
     var textBoxDraft: SessionTextBoxInputDraftSnapshot?
     var isRemoteTerminal: Bool?
     var remotePTYSessionID: String?
@@ -1444,6 +1447,7 @@ struct SessionTerminalPanelSnapshot: Codable, Sendable {
         hibernation: SessionAgentHibernationSnapshot? = nil,
         resumeBinding: SurfaceResumeBindingSnapshot? = nil,
         managedAgentResumeBinding: SurfaceResumeBindingSnapshot? = nil,
+        restartCommandBinding: PaneRestartCommandBinding? = nil,
         textBoxDraft: SessionTextBoxInputDraftSnapshot? = nil,
         isRemoteTerminal: Bool? = nil,
         remotePTYSessionID: String? = nil,
@@ -1458,6 +1462,7 @@ struct SessionTerminalPanelSnapshot: Codable, Sendable {
         self.hibernation = hibernation
         self.resumeBinding = resumeBinding
         self.managedAgentResumeBinding = managedAgentResumeBinding
+        self.restartCommandBinding = restartCommandBinding
         self.textBoxDraft = textBoxDraft
         self.isRemoteTerminal = isRemoteTerminal
         self.remotePTYSessionID = remotePTYSessionID
@@ -1888,6 +1893,8 @@ struct AppSessionSnapshot: Codable, Sendable {
     var version: Int
     var createdAt: TimeInterval
     var windows: [SessionWindowSnapshot]
+    /// Optional so pre-cm-54 snapshots decode but remain command-ineligible.
+    var restartCommandEnvelope: RestartCommandSnapshotEnvelope? = nil
 }
 
 extension AppSessionSnapshot: SessionSnapshotRepresenting {

@@ -2,8 +2,28 @@ import Bonsplit
 import CmuxWorkspaces
 import Darwin
 import Foundation
+import CmuxRestartCommands
 
 extension DockSplitStore {
+    /// Local Dock terminal ownership projected from cmux state, never child `CMUX_*` values.
+    func restartCommandPanelTTYDevices() -> [RestartCommandPanelKey: Int64] {
+        var result: [RestartCommandPanelKey: Int64] = [:]
+        for (panelID, transfer) in detachedSurfaceTransfersByPanelId {
+            guard panels[panelID] is TerminalPanel,
+                  !transfer.isRemoteTerminal,
+                  transfer.ttyNameWasReportedByCurrentRuntime,
+                  let ttyName = transfer.ttyName,
+                  let device = CmuxTopProcessSnapshot.deviceIdentifier(forTTYName: ttyName) else {
+                continue
+            }
+            result[RestartCommandPanelKey(
+                workspaceID: transfer.sessionRestoreWorkspaceId,
+                panelID: panelID
+            )] = device
+        }
+        return result
+    }
+
     func sessionSnapshot(
         includeScrollback: Bool,
         restorableAgentIndex: RestorableAgentSessionIndex? = nil,
@@ -54,6 +74,10 @@ extension DockSplitStore {
                         panelId: panelId
                     ),
                     detectedResumeBinding: surfaceResumeBindingIndex?.binding(
+                        workspaceId: observationWorkspaceId,
+                        panelId: panelId
+                    ),
+                    restartCommandBinding: surfaceResumeBindingIndex?.restartCommandBinding(
                         workspaceId: observationWorkspaceId,
                         panelId: panelId
                     ),
@@ -125,6 +149,7 @@ extension DockSplitStore {
                 panelId: panelId
             ),
             detectedResumeBinding: nil,
+            restartCommandBinding: nil,
             terminalFontSizeSnapshotProjection:
                 terminalFontSizeSnapshotProjection,
             currentAgentProcessIdentity: {
@@ -163,6 +188,7 @@ extension DockSplitStore {
         includeScrollback: Bool,
         observation: RestorableAgentSessionIndex.Entry?,
         detectedResumeBinding: SurfaceResumeBindingSnapshot?,
+        restartCommandBinding: PaneRestartCommandBinding?,
         terminalFontSizeSnapshotProjection:
             WorkspaceTerminalFontSizeSnapshotProjection?,
         currentAgentProcessIdentity: (Int) -> AgentPIDProcessIdentity?,
@@ -279,6 +305,7 @@ extension DockSplitStore {
                 },
                 resumeBinding: resumeBinding,
                 managedAgentResumeBinding: managedResumeBinding,
+                restartCommandBinding: restartCommandBinding,
                 textBoxDraft: terminal.sessionTextBoxDraftSnapshot(),
                 isRemoteTerminal: transfer?.isRemoteTerminal ?? false,
                 remotePTYSessionID: transfer?.remotePTYSessionID,

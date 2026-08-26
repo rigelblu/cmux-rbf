@@ -1,10 +1,12 @@
 import CmuxFoundation
+import CmuxRestartCommands
 import Bonsplit
 import SwiftUI
 
 struct NotificationsPage: View {
     @EnvironmentObject var notificationStore: TerminalNotificationStore
     @EnvironmentObject var tabManager: TabManager
+    @ObservedObject private var restartSummaryStore = RestartCommandRestoreSummaryStore.shared
     @Binding var selection: SidebarSelection
     @FocusState private var focusedNotificationId: UUID?
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
@@ -22,23 +24,29 @@ struct NotificationsPage: View {
             phoneForwardingRow
             Divider()
 
-            if !notificationStore.notificationMenuSnapshot.hasNotifications {
+            if !macMenuProjection.hasNotifications {
                 emptyState
-            } else if notificationStore.notifications.isEmpty {
+            } else if feedItems.isEmpty {
                 workspaceUnreadIndicatorState
             } else {
-                notificationsList
+                notificationsList(feedItems)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear(perform: setInitialFocus)
-        .onChange(of: notificationStore.notifications.first?.id) { _ in
+        .onChange(of: feedItems.first?.id) { _ in
             setInitialFocus()
+        }
+        .onChange(of: restartSummaryStore.requestedFocusSummaryID) { _, id in
+            guard let id else { return }
+            focusSummary(id: id)
         }
     }
 
-    private var notificationsList: some View {
+    private func notificationsList(
+        _ items: [MacNotificationFeedItem<TerminalNotification>]
+    ) -> some View {
         // Build one tabId -> title index per render instead of an O(tabs) lookup
         // for every notification row. Constructing the ForEach then costs
         // O(rows + tabs) rather than O(rows × tabs), which matters when many
@@ -46,32 +54,45 @@ struct NotificationsPage: View {
         let tabTitles = AppDelegate.shared?.tabTitlesByTabId() ?? [:]
         return ScrollView {
             LazyVStack(spacing: 8) {
-                ForEach(notificationStore.notifications) { notification in
-                    NotificationRow(
-                        notification: notification,
-                        tabTitle: tabTitle(for: notification.tabId, in: tabTitles),
-                        isFocused: focusedNotificationId == notification.id,
-                        onOpen: {
-                            // SwiftUI action closures aren't guaranteed to be main-actor
-                            // isolated; hop to the main actor for window focus + tab selection.
-                            Task { @MainActor in
-                                _ = AppDelegate.shared?.openTerminalNotification(notification)
-                                if notification.clickAction == nil {
-                                    selection = .tabs
+                ForEach(items) { item in
+                    switch item {
+                    case .terminal(let notification, _, _):
+                        NotificationRow(
+                            notification: notification,
+                            tabTitle: tabTitle(for: notification.tabId, in: tabTitles),
+                            isFocused: focusedNotificationId == notification.id,
+                            onOpen: {
+                                // SwiftUI action closures aren't guaranteed to be main-actor
+                                // isolated; hop to the main actor for window focus + tab selection.
+                                Task { @MainActor in
+                                    _ = AppDelegate.shared?.openTerminalNotification(notification)
+                                    if notification.clickAction == nil {
+                                        selection = .tabs
+                                    }
                                 }
+                            },
+                            onClear: {
+                                notificationStore.remove(id: notification.id)
+                            },
+                            focusedNotificationId: $focusedNotificationId
+                        )
+                        // Each row consumes an immutable snapshot below the LazyVStack.
+                        .equatable()
+                    case .restartSummary(let summary):
+                        RestartCommandRestoreSummaryRowView(
+                            summary: summary,
+                            isFocused: focusedNotificationId == summary.id,
+                            onClear: {
+                                restartSummaryStore.remove(id: summary.id)
+                            },
+                            onToggleRead: {
+                                restartSummaryStore.setRead(!summary.isRead, id: summary.id)
                             }
-                        },
-                        onClear: {
-                            notificationStore.remove(id: notification.id)
-                        },
-                        focusedNotificationId: $focusedNotificationId
-                    )
-                    // Each NotificationRow renders heavily-modified nested stacks.
-                    // Equatable + .equatable() lets a NotificationStore publish that
-                    // touches one notification skip body re-evaluation for the other
-                    // rows, instead of re-laying out the whole LazyVStack on every
-                    // publish (issue #5794, same class as #2586 / #5752).
-                    .equatable()
+                        )
+                        .equatable()
+                        .focusable()
+                        .focused($focusedNotificationId, equals: summary.id)
+                    }
                 }
             }
             .padding(16)
@@ -82,12 +103,27 @@ struct NotificationsPage: View {
         // Only set focus when the notifications page is visible
         // to avoid stealing focus from the terminal when notifications arrive
         guard selection == .notifications else { return }
-        guard let firstId = notificationStore.notifications.first?.id else {
+        if let requestedID = restartSummaryStore.requestedFocusSummaryID {
+            focusSummary(id: requestedID)
+            return
+        }
+        guard let firstId = feedItems.first?.id else {
             focusedNotificationId = nil
             return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             focusedNotificationId = firstId
+        }
+    }
+
+    private func focusSummary(id: UUID) {
+        guard selection == .notifications,
+              restartSummaryStore.summaries.contains(where: { $0.id == id }) else {
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            focusedNotificationId = id
+            restartSummaryStore.clearFocusRequest(id: id)
         }
     }
 
@@ -99,11 +135,11 @@ struct NotificationsPage: View {
 
             Spacer()
 
-            if notificationStore.notificationMenuSnapshot.hasNotifications {
+            if macMenuProjection.hasNotifications {
                 jumpToUnreadButton
 
                 Button(String(localized: "notifications.clearAll", defaultValue: "Clear All")) {
-                    notificationStore.clearAll()
+                    AppDelegate.shared?.clearAllMacNotifications()
                 }
                 .buttonStyle(.bordered)
             }
@@ -226,7 +262,7 @@ struct NotificationsPage: View {
     private var jumpToUnreadButton: some View {
         if let key = jumpToUnreadShortcut.keyEquivalent {
             Button(action: {
-                AppDelegate.shared?.jumpToLatestUnread()
+                _ = AppDelegate.shared?.jumpToLatestMacNotificationUnread()
             }) {
                 HStack(spacing: 6) {
                     Text(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Latest Unread"))
@@ -239,7 +275,7 @@ struct NotificationsPage: View {
             .disabled(!hasUnreadNotifications)
         } else {
             Button(action: {
-                AppDelegate.shared?.jumpToLatestUnread()
+                _ = AppDelegate.shared?.jumpToLatestMacNotificationUnread()
             }) {
                 HStack(spacing: 6) {
                     Text(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Latest Unread"))
@@ -262,7 +298,19 @@ struct NotificationsPage: View {
     }
 
     private var hasUnreadNotifications: Bool {
-        notificationStore.notificationMenuSnapshot.hasUnreadNotifications
+        macMenuProjection.hasUnreadNotifications
+    }
+
+    private var feedItems: [MacNotificationFeedItem<TerminalNotification>] {
+        restartSummaryStore.feedItems(
+            terminalNotifications: notificationStore.notifications
+        )
+    }
+
+    private var macMenuProjection: MacNotificationMenuProjection {
+        restartSummaryStore.menuProjection(
+            terminal: notificationStore.notificationMenuSnapshot
+        )
     }
 }
 

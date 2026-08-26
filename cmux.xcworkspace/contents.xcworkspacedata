@@ -169,6 +169,9 @@
          location = "group:CmuxRemoteWorkspace">
       </FileRef>
       <FileRef
+         location = "group:CmuxRestartCommands">
+      </FileRef>
+      <FileRef
          location = "group:CmuxSettings">
       </FileRef>
       <FileRef

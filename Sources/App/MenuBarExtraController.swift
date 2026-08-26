@@ -8,6 +8,7 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let menu = NSMenu(title: "cmux")
     private let notificationStore: TerminalNotificationStore
+    private let restartSummaryStore: RestartCommandRestoreSummaryStore
     private let onShowGlobalSearch: (NSStatusBarButton, (() -> Void)?) -> Void
     private let onShowMainWindow: () -> Void
     private let onShowNotifications: () -> Void
@@ -19,6 +20,7 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
     private let onOpenPreferences: () -> Void
     private let onQuitApp: () -> Void
     private var notificationMenuSnapshotCancellable: AnyCancellable?
+    private var restartSummarySnapshotCancellable: AnyCancellable?
     private var globalFontObserver: NSObjectProtocol?
     private let buildHintTitle: String?
 
@@ -41,6 +43,7 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
     private var notificationItems: [NSMenuItem] = []
     init(
         notificationStore: TerminalNotificationStore,
+        restartSummaryStore: RestartCommandRestoreSummaryStore,
         onShowGlobalSearch: @escaping (NSStatusBarButton, (() -> Void)?) -> Void,
         onShowMainWindow: @escaping () -> Void,
         onShowNotifications: @escaping () -> Void,
@@ -53,6 +56,7 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
         onQuitApp: @escaping () -> Void
     ) {
         self.notificationStore = notificationStore
+        self.restartSummaryStore = restartSummaryStore
         self.onShowGlobalSearch = onShowGlobalSearch
         self.onShowMainWindow = onShowMainWindow
         self.onShowNotifications = onShowNotifications
@@ -78,8 +82,13 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
 
         notificationMenuSnapshotCancellable = notificationStore.$notificationMenuSnapshot
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] snapshot in
-                self?.refreshUI(snapshot: snapshot)
+            .sink { [weak self] _ in
+                self?.refreshUI()
+            }
+        restartSummarySnapshotCancellable = restartSummaryStore.$summaries
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshUI()
             }
         globalFontObserver = NotificationCenter.default.addObserver(
             forName: GlobalFontMagnification.didChangeNotification,
@@ -171,6 +180,8 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
     func removeFromMenuBar() {
         notificationMenuSnapshotCancellable?.cancel()
         notificationMenuSnapshotCancellable = nil
+        restartSummarySnapshotCancellable?.cancel()
+        restartSummarySnapshotCancellable = nil
         if let globalFontObserver {
             NotificationCenter.default.removeObserver(globalFontObserver)
             self.globalFontObserver = nil
@@ -180,10 +191,14 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
     }
 
     private func refreshUI() {
-        refreshUI(snapshot: notificationStore.notificationMenuSnapshot)
+        refreshUI(
+            snapshot: restartSummaryStore.menuProjection(
+                terminal: notificationStore.notificationMenuSnapshot
+            )
+        )
     }
 
-    private func refreshUI(snapshot: NotificationMenuSnapshot) {
+    private func refreshUI(snapshot: MacNotificationMenuProjection) {
         let actualUnreadCount = snapshot.unreadCount
 
         let displayedUnreadCount: Int
@@ -295,10 +310,12 @@ final class MenuBarExtraController: NSObject, NSMenuDelegate {
 
     @objc private func markAllReadAction() {
         notificationStore.markAllRead()
+        restartSummaryStore.markAllRead()
     }
 
     @objc private func clearAllAction() {
         notificationStore.clearAll()
+        restartSummaryStore.clearAll()
     }
 
     @objc private func checkForUpdatesAction() {

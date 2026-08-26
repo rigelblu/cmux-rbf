@@ -128,6 +128,11 @@ ensure_zig() { rbf_ensure_zig; }
 # shellcheck source=rbf/scripts/lib/rbf-metal.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-metal.sh"
 
+# The parent tree's recorded submodule pointer must also be readable from linked
+# JJ workspaces, which deliberately have no `.git` directory.
+# shellcheck source=scripts/lib/recorded-gitlink.sh
+. "$REPO_ROOT/scripts/lib/recorded-gitlink.sh"
+
 # Build GhosttyKit.xcframework up front, with a Metal compiler that runs.
 #
 # TWO bugs, one preflight:
@@ -166,9 +171,7 @@ ensure_ghosttykit() {
 check_submodule_sync() {
   local sub="ghostty" recorded actual        # .gitmodules declares only this one
   [[ -d "$sub/.git" || -f "$sub/.git" ]] || return 0
-  # In a jj checkout git HEAD is detached at the working-copy commit, which is
-  # still the right tree to read the recorded pointer from.
-  recorded="$(git ls-tree HEAD "$sub" 2>/dev/null | awk '{print $3}')"
+  recorded="$(cmux_recorded_gitlink_sha "$REPO_ROOT" "$sub" || true)"
   actual="$(git -C "$sub" rev-parse HEAD 2>/dev/null || true)"
   [[ -n "$recorded" && -n "$actual" ]] || return 0
   [[ "$recorded" == "$actual" ]] && return 0

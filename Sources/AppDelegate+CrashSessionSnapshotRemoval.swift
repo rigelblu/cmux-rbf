@@ -14,13 +14,29 @@ extension AppDelegate {
                 .snapshot else {
                 return
             }
-            _ = sessionSnapshotStore.save(prunedSnapshot, fileURL: backupURL)
+            let didSave = sessionSnapshotStore.save(prunedSnapshot, fileURL: backupURL)
+            if didSave,
+               let identity = prunedSnapshot.restartCommandEnvelope?.validatedIdentity,
+               let fileData = try? Data(contentsOf: backupURL) {
+                _ = restartCommandCoordinator.registerReceipt(
+                    identity: identity,
+                    fileData: fileData,
+                    source: .manualBackup
+                )
+            } else if didSave {
+                restartCommandCoordinator.clearReceipt(source: .manualBackup)
+            }
         case .missing:
+            restartCommandCoordinator.clearReceipt(source: .automaticPrimary)
             if !Self.hasCrashOnlyPrimarySnapshotRemovalMarker() {
                 sessionSnapshotStore.removeSnapshot(fileURL: backupURL)
+                if !FileManager.default.fileExists(atPath: backupURL.path) {
+                    restartCommandCoordinator.clearReceipt(source: .manualBackup)
+                }
             }
         case .unusable:
             Self.clearCrashOnlyPrimarySnapshotRemovalMarker()
+            restartCommandCoordinator.clearReceipt(source: .automaticPrimary)
         }
     }
 

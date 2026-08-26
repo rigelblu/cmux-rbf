@@ -1,5 +1,6 @@
 import AppKit
 import CMUXMobileCore
+import CmuxRestartCommands
 import CmuxWorkspaces
 import CmuxSettings
 import CmuxSettingsUI
@@ -121,6 +122,122 @@ final class HostSettingsActions: SettingsHostActions {
         // through `NSWorkspace.shared.open` would route to the default
         // `.json` handler and ignore the cmux setting.
         PreferredEditorService(defaults: .standard).open(configFileURL)
+    }
+
+    func restartAllowlistedCommandsStatus() -> RestartAllowlistedCommandsSettingsStatus {
+        guard let coordinator = AppDelegate.shared?.restartCommandCoordinator else {
+            return .stateUnavailable
+        }
+        return Self.restartAllowlistedCommandsStatus(from: coordinator.settingsProjection())
+    }
+
+    func restartAllowlistedCommandsStatusUpdates() -> AsyncStream<RestartAllowlistedCommandsSettingsStatus> {
+        guard let coordinator = AppDelegate.shared?.restartCommandCoordinator else {
+            return AsyncStream { continuation in
+                continuation.yield(.stateUnavailable)
+                continuation.finish()
+            }
+        }
+        let watcher = FileWatcher(
+            path: coordinator.definitionsRepository.definitionsFileURL.path,
+            throttle: .milliseconds(150)
+        )
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let drainTask = Task { @MainActor [weak self] in
+                guard self != nil else {
+                    continuation.finish()
+                    return
+                }
+                var lastStatus: RestartAllowlistedCommandsSettingsStatus?
+                @MainActor func yieldCurrentStatus() {
+                    let status = Self.restartAllowlistedCommandsStatus(
+                        from: coordinator.settingsProjection()
+                    )
+                    guard status != lastStatus else { return }
+                    lastStatus = status
+                    continuation.yield(status)
+                }
+
+                yieldCurrentStatus()
+                for await _ in watcher.events {
+                    guard !Task.isCancelled else { break }
+                    yieldCurrentStatus()
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                drainTask.cancel()
+                Task { await watcher.stop() }
+            }
+        }
+    }
+
+    func setRestartAllowlistedCommandsEnabled(
+        _ enabled: Bool
+    ) -> RestartAllowlistedCommandsSettingsMutationResult {
+        guard let coordinator = AppDelegate.shared?.restartCommandCoordinator else {
+            return RestartAllowlistedCommandsSettingsMutationResult(
+                status: .stateUnavailable,
+                inlineError: Self.restartCommandStatePersistenceError
+            )
+        }
+        let state = coordinator.setEnabled(enabled)
+        let projection = coordinator.settingsProjection()
+        let status = Self.restartAllowlistedCommandsStatus(from: projection)
+        let inlineError: String? = switch state {
+        case .disabledNeedsApproval(.invalidDefinitions(let error)):
+            error.localizedMessage
+        case .disabledNeedsApproval(.stateUnavailable):
+            Self.restartCommandStatePersistenceError
+        case .disabledNeedsApproval(.definitionsChanged):
+            nil
+        case .enabledAppDefaults, .enabledApproved, .disabledByUser:
+            nil
+        }
+        return RestartAllowlistedCommandsSettingsMutationResult(
+            status: status,
+            inlineError: inlineError
+        )
+    }
+
+    func openRestartCommandDefinitionsFile() -> Bool {
+        guard let repository = AppDelegate.shared?.restartCommandCoordinator.definitionsRepository,
+              let schemaData = RestartCommandSchema.materializedData(),
+              repository.materializeForEditing(schemaData: schemaData) else {
+            return false
+        }
+        PreferredEditorService(defaults: .standard).open(repository.definitionsFileURL)
+        return true
+    }
+
+    func legacyResumeCommandCount() -> Int {
+        SurfaceResumeApprovalStore.loadRecords().count
+    }
+
+    private static func restartAllowlistedCommandsStatus(
+        from projection: RestartCommandSettingsProjection
+    ) -> RestartAllowlistedCommandsSettingsStatus {
+        return switch projection.state {
+        case .enabledAppDefaults:
+            .enabledBuiltIn(commandCount: projection.commandCount)
+        case .enabledApproved:
+            .enabledApproved(commandCount: projection.commandCount)
+        case .disabledByUser:
+            .off
+        case .disabledNeedsApproval(.definitionsChanged):
+            .needsApproval(validationMessage: nil)
+        case .disabledNeedsApproval(.invalidDefinitions(let error)):
+            .needsApproval(validationMessage: error.localizedMessage)
+        case .disabledNeedsApproval(.stateUnavailable):
+            .stateUnavailable
+        }
+    }
+
+    private static var restartCommandStatePersistenceError: String {
+        String(
+            localized: "settings.terminal.restartCommands.persistenceError",
+            defaultValue: "cmux couldn’t save this setting. Automatic restart is off for this launch."
+        )
     }
 
     func sendFeedback() {

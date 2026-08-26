@@ -30,6 +30,7 @@ import CmuxFoundation
 import CmuxSentryReporting
 import CmuxSidebar
 import CmuxGit
+import CmuxRestartCommands
 
 private enum CmuxThemeNotifications {
     static let reloadConfig = Notification.Name("com.cmuxterm.themes.reload-config")
@@ -1036,6 +1037,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Reset to `.zero` so the first window seeds the point from its own position.
     private var lastCascadePoint = NSPoint.zero
     private(set) var startupSessionSnapshot: AppSessionSnapshot?
+    private var startupRestartCommandSource: RestartCommandRestoreSource?
+    private var startupRestartCommandFileDigest: String?
+    private var activeRestartCommandRestorePlan: RestartCommandRestorePlan?
+    private var restartCommandLaunchClaims: Set<RestartCommandLaunchClaim> = []
+    private var activeRestartCommandRefusals: [RestartCommandRestoreRefusal] = []
     private var didPrepareStartupSessionSnapshot = false
     var didAttemptStartupSessionRestore = false
     var isApplyingSessionRestore = false
@@ -1056,6 +1062,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         schemaVersion: SessionSnapshotSchema.currentVersion,
         bundleIdentifier: Bundle.main.bundleIdentifier
     )
+    /// Dedicated restart-command authority; it never reads or writes shared `cmux.json`.
+    nonisolated let restartCommandCoordinator: RestartCommandCoordinator = {
+        let fileManager = FileManager.default
+        let definitionsURL = RestartCommandDefinitionsRepository.defaultDefinitionsFileURL()
+        let stateURL = RestartCommandStateRepository.defaultFileURL(
+            bundleIdentifier: Bundle.main.bundleIdentifier,
+            fileManager: fileManager
+        ) ?? fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/cmux", isDirectory: true)
+            .appendingPathComponent("restart-commands-state-com.cmuxterm.app.json", isDirectory: false)
+        return RestartCommandCoordinator(
+            definitionsRepository: RestartCommandDefinitionsRepository(
+                definitionsFileURL: definitionsURL,
+                fileManager: fileManager
+            ),
+            stateRepository: RestartCommandStateRepository(
+                fileURL: stateURL,
+                fileManager: fileManager
+            )
+        )
+    }()
+    /// Separate Mac-only presentation persistence and projection. This store
+    /// is intentionally absent from terminal delivery, Dock/workspace badges,
+    /// mobile sync, desktop hooks, and terminal notification history.
+    let restartCommandSummaryStore = RestartCommandRestoreSummaryStore.shared
     /// Accessibility window-hierarchy cache (CmuxWindowing); composition-root
     /// owned. The `NSApplication` AX swizzle forwards to it behind
     /// ``AccessibilityWindowCaching``.
@@ -2023,7 +2054,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func prepareForConfirmedAppTermination() {
         isTerminatingApp = true
-        _ = saveSessionSnapshotIncludingProcessDetectedIndexes(includeScrollback: true, removeWhenEmpty: false)
+        _ = saveSessionSnapshotIncludingProcessDetectedIndexes(
+            includeScrollback: true,
+            removeWhenEmpty: false,
+            restartCommandCaptureKind: .pendingTermination
+        )
         ClosedItemHistoryStore.shared.flushPendingSaves()
         // The hard AppKit watchdog is armed immediately before the terminate
         // reply, after any owned asynchronous cleanup has finished. This keeps
@@ -2151,7 +2186,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // method, so the primary arm above is what bounds #6758; this only
         // widens coverage to other entrypoints.
         isTerminatingApp = true
-        _ = saveSessionSnapshotIncludingProcessDetectedIndexes(includeScrollback: true, removeWhenEmpty: false)
+        _ = saveSessionSnapshotIncludingProcessDetectedIndexes(
+            includeScrollback: true,
+            removeWhenEmpty: false,
+            restartCommandCaptureKind: .terminationCandidate
+        )
         ClosedItemHistoryStore.shared.flushPendingSaves()
         terminationWatchdog.arm()
         sentryStopMemoryContextRefresh()
@@ -2190,7 +2229,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func persistSessionForUpdateRelaunch() {
         isTerminatingApp = true
-        _ = saveSessionSnapshotIncludingProcessDetectedIndexes(includeScrollback: true, removeWhenEmpty: false)
+        _ = saveSessionSnapshotIncludingProcessDetectedIndexes(
+            includeScrollback: true,
+            removeWhenEmpty: false,
+            restartCommandCaptureKind: .pendingTermination
+        )
         ClosedItemHistoryStore.shared.flushPendingSaves()
     }
 
@@ -3362,6 +3405,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             if let prunedSnapshot = SessionPersistencePolicy
                 .pruningCmuxCrashDiagnosticWindows(from: snapshot)
                 .snapshot {
+                startupRestartCommandSource = .automaticPrimary
+                startupRestartCommandFileDigest = Self.restartCommandFileDigest(primaryURL)
                 return prunedSnapshot
             }
             return loadManualRestoreSessionSnapshotPruningCrashDiagnostics()
@@ -3376,9 +3421,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func loadManualRestoreSessionSnapshotPruningCrashDiagnostics() -> AppSessionSnapshot? {
-        sessionSnapshotStore.loadReopenSessionSnapshot(fileURL: nil).flatMap {
-            SessionPersistencePolicy.pruningCmuxCrashDiagnosticWindows(from: $0).snapshot
+        guard let backupURL = sessionSnapshotStore.manualRestoreSnapshotFileURL(),
+              let snapshot = sessionSnapshotStore.loadReopenSessionSnapshot(fileURL: backupURL),
+              let pruned = SessionPersistencePolicy.pruningCmuxCrashDiagnosticWindows(from: snapshot).snapshot else {
+            return nil
         }
+        startupRestartCommandSource = .automaticBackup
+        startupRestartCommandFileDigest = Self.restartCommandFileDigest(backupURL)
+        return pruned
+    }
+
+    private nonisolated static func restartCommandFileDigest(_ url: URL) -> String? {
+        (try? Data(contentsOf: url)).map(RestartCommandDefinitionSet.sha256Hex)
     }
 
     private func persistedWindowGeometry(defaults: UserDefaults = .standard) -> PersistedWindowGeometry? {
@@ -3508,6 +3562,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard let primaryContext = contextForMainTerminalWindow(primaryWindow) else { return false }
 
         let startupSnapshot = startupSessionSnapshot
+        if let startupSnapshot,
+           let source = startupRestartCommandSource,
+           let digest = startupRestartCommandFileDigest {
+            beginRestartCommandRestoreAuthorization(
+                snapshot: startupSnapshot,
+                source: source,
+                fileDigest: digest
+            )
+        } else {
+            clearRestartCommandRestoreOperation()
+        }
         primaryContext.tabManager.prepareLegacyWorkspaceCustomizationMigration(
             afterRestoring: startupSnapshot?.windows.flatMap(\.tabManager.workspaces) ?? []
         )
@@ -3582,6 +3647,177 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return true
     }
 
+    private func beginRestartCommandRestoreAuthorization(
+        snapshot: AppSessionSnapshot,
+        source: RestartCommandRestoreSource,
+        fileDigest: String
+    ) {
+        clearRestartCommandRestoreOperation()
+        let request = RestartCommandAuthorizationRequest(
+            source: source,
+            envelope: snapshot.restartCommandEnvelope,
+            fileDigest: fileDigest,
+            candidates: restartCommandPaneCandidates(in: snapshot)
+        )
+        switch restartCommandCoordinator.authorize(request) {
+        case .quiet:
+            break
+        case .plan(let plan):
+            activeRestartCommandRestorePlan = plan
+            activeRestartCommandRefusals = plan.refusals
+        }
+    }
+
+    private func restartCommandPaneCandidates(
+        in snapshot: AppSessionSnapshot
+    ) -> [RestartCommandPaneCandidate] {
+        snapshot.windows.prefix(SessionPersistencePolicy.maxWindowsPerSnapshot).flatMap {
+            windowSnapshot in
+            let workspaceCandidates = windowSnapshot.tabManager.workspaces
+                .prefix(SessionPersistencePolicy.maxWorkspacesPerWindow)
+                .flatMap {
+                workspaceSnapshot in
+                restartCommandPaneCandidates(
+                    in: workspaceSnapshot.panels,
+                    workspaceIsRemote: workspaceSnapshot.remote != nil
+                ) + restartCommandPaneCandidates(
+                    in: workspaceSnapshot.dock?.panels ?? [],
+                    workspaceIsRemote: workspaceSnapshot.remote != nil
+                )
+            }
+            return workspaceCandidates + restartCommandPaneCandidates(
+                in: windowSnapshot.dock?.panels ?? [],
+                workspaceIsRemote: false
+            )
+        }
+    }
+
+    private func restartCommandPaneCandidates(
+        in panels: [SessionPanelSnapshot],
+        workspaceIsRemote: Bool
+    ) -> [RestartCommandPaneCandidate] {
+        panels.compactMap { panel in
+            guard panel.type == .terminal, let terminal = panel.terminal else { return nil }
+            let hasExistingResumeIntent = terminal.agent != nil
+                || terminal.tmuxStartCommand != nil
+                || terminal.hibernation != nil
+                || terminal.resumeBinding != nil
+                || terminal.managedAgentResumeBinding != nil
+            return RestartCommandPaneCandidate(
+                panelID: panel.id,
+                binding: terminal.restartCommandBinding,
+                hasExistingResumeIntent: hasExistingResumeIntent,
+                isRemote: workspaceIsRemote || terminal.isRemoteTerminal == true,
+                savedWorkingDirectory: terminal.workingDirectory ?? panel.directory
+            )
+        }
+    }
+
+    private func deliverRestartCommands(
+        workspacePanelMaps: [[UUID: UUID]],
+        workspaceDockPanelMaps: [[UUID: UUID]],
+        windowDockPanelMap: [UUID: UUID],
+        tabManager: TabManager,
+        windowDock: DockSplitStore?
+    ) {
+        guard let plan = activeRestartCommandRestorePlan else { return }
+        var panelMap: [UUID: UUID] = [:]
+        var ambiguousOriginalPanelIDs: Set<UUID> = []
+        for map in workspacePanelMaps + workspaceDockPanelMaps + [windowDockPanelMap] {
+            for (originalPanelID, restoredPanelID) in map {
+                if let existing = panelMap[originalPanelID], existing != restoredPanelID {
+                    panelMap.removeValue(forKey: originalPanelID)
+                    ambiguousOriginalPanelIDs.insert(originalPanelID)
+                } else if !ambiguousOriginalPanelIDs.contains(originalPanelID) {
+                    panelMap[originalPanelID] = restoredPanelID
+                }
+            }
+        }
+
+        for launchItem in plan.launchItems {
+            let claim = RestartCommandLaunchClaim(
+                operationID: plan.operationID,
+                panelID: launchItem.originalPanelID
+            )
+            if ambiguousOriginalPanelIDs.contains(launchItem.originalPanelID) {
+                guard restartCommandLaunchClaims.insert(claim).inserted else { continue }
+                activeRestartCommandRefusals.append(
+                    .init(definitionID: nil, reason: .invalidBinding)
+                )
+                continue
+            }
+            guard let restoredPanelID = panelMap[launchItem.originalPanelID] else {
+                // This launch item can belong to another window restored in the
+                // same operation. That window's mapping will claim it later.
+                continue
+            }
+            guard restartCommandLaunchClaims.insert(claim).inserted else { continue }
+
+            var delivered = false
+            for workspace in tabManager.tabs {
+                if let panel = workspace.panels[restoredPanelID] as? TerminalPanel {
+                    workspace.sendInputWhenReady(
+                        launchItem.command + "\n",
+                        to: panel,
+                        reason: .restartAllowlistedCommand
+                    )
+                    delivered = true
+                    break
+                }
+                if workspace._dockSplit?.sendRestartCommandWhenReady(
+                    launchItem.command,
+                    toPanelID: restoredPanelID
+                ) == true {
+                    delivered = true
+                    break
+                }
+            }
+            if !delivered {
+                delivered = windowDock?.sendRestartCommandWhenReady(
+                    launchItem.command,
+                    toPanelID: restoredPanelID
+                ) == true
+            }
+            if !delivered {
+                activeRestartCommandRefusals.append(
+                    .init(definitionID: nil, reason: .invalidBinding)
+                )
+            }
+        }
+    }
+
+    private func completeRestartCommandRestoreOperation() {
+        guard let plan = activeRestartCommandRestorePlan else {
+            clearRestartCommandRestoreOperation()
+            return
+        }
+        for launchItem in plan.launchItems {
+            let claim = RestartCommandLaunchClaim(
+                operationID: plan.operationID,
+                panelID: launchItem.originalPanelID
+            )
+            if !restartCommandLaunchClaims.contains(claim) {
+                activeRestartCommandRefusals.append(
+                    .init(definitionID: nil, reason: .invalidBinding)
+                )
+            }
+        }
+        let summary = RestartCommandRestoreSummary.make(
+            operationID: plan.operationID,
+            refusals: activeRestartCommandRefusals,
+            createdAt: Date()
+        )
+        clearRestartCommandRestoreOperation()
+        guard let summary else { return }
+        restartCommandSummaryStore.insert(summary)
+    }
+
+    private func clearRestartCommandRestoreOperation() {
+        activeRestartCommandRestorePlan = nil
+        activeRestartCommandRefusals.removeAll(keepingCapacity: false)
+        restartCommandLaunchClaims.removeAll(keepingCapacity: false)
+    }
+
     private func completeSessionRestoreOperation(isManualReopen: Bool) {
         startupSessionSnapshot = nil
         let wasApplyingSessionRestore = isApplyingSessionRestore
@@ -3597,6 +3833,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             scheduleScreenChangeReconcileWhenIdle()
         }
         flushPendingStartupNavigationURLRequests()
+        completeRestartCommandRestoreOperation()
         if Self.shouldSaveSessionSnapshotOnRestoreCompletion(isManualReopen: isManualReopen) {
             // Auto-resume input can be queued before tmux has spawned; preserve
             // restored process-detected bindings until a later live scan.
@@ -3606,16 +3843,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     @discardableResult
     func reopenPreviousSession(shouldActivate: Bool = true) -> Bool {
-        guard let snapshot = sessionSnapshotStore.loadReopenSessionSnapshot(fileURL: nil) else {
+        guard let backupURL = sessionSnapshotStore.manualRestoreSnapshotFileURL(),
+              let snapshot = sessionSnapshotStore.loadReopenSessionSnapshot(fileURL: backupURL),
+              let fileDigest = Self.restartCommandFileDigest(backupURL) else {
             return false
         }
-        return restorePreviousSessionSnapshot(snapshot, shouldActivate: shouldActivate)
+        return restorePreviousSessionSnapshot(
+            snapshot,
+            shouldActivate: shouldActivate,
+            restartCommandSource: .manualBackup,
+            restartCommandFileDigest: fileDigest
+        )
     }
 
     @discardableResult
     func restorePreviousSessionSnapshot(
         _ snapshot: AppSessionSnapshot,
-        shouldActivate: Bool = true
+        shouldActivate: Bool = true,
+        restartCommandSource: RestartCommandRestoreSource? = nil,
+        restartCommandFileDigest: String? = nil
     ) -> Bool {
         guard let snapshot = SessionPersistencePolicy.pruningCmuxCrashDiagnosticWindows(from: snapshot).snapshot else {
             return false
@@ -3624,6 +3870,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             snapshot.windows.prefix(SessionPersistencePolicy.maxWindowsPerSnapshot)
         )
         guard !snapshotWindows.isEmpty else { return false }
+
+        if let restartCommandSource, let restartCommandFileDigest {
+            beginRestartCommandRestoreAuthorization(
+                snapshot: snapshot,
+                source: restartCommandSource,
+                fileDigest: restartCommandFileDigest
+            )
+        } else {
+            clearRestartCommandRestoreOperation()
+        }
 
         (tabManager ?? mainWindowContexts.values.first?.tabManager)?
             .prepareLegacyWorkspaceCustomizationMigration(
@@ -3679,8 +3935,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 "snapshotDisplay={\(debugSessionDisplayDescription(snapshot.display))}"
         )
 #endif
-        context.tabManager.restoreSessionSnapshot(snapshot.tabManager, workspaceCreateIdempotencyCache: TerminalController.shared.workspaceCreateIdempotencyCache)
-        context.restoreWindowDockSessionSnapshot(snapshot)
+        let workspacePanelMaps = context.tabManager.restoreSessionSnapshot(
+            snapshot.tabManager,
+            workspaceCreateIdempotencyCache: TerminalController.shared.workspaceCreateIdempotencyCache
+        )
+        let windowDockPanelMap = context.restoreWindowDockSessionSnapshot(snapshot)
+        deliverRestartCommands(
+            workspacePanelMaps: workspacePanelMaps,
+            workspaceDockPanelMaps: context.tabManager.lastRestoredDockPanelIdsByWorkspaceIndex,
+            windowDockPanelMap: windowDockPanelMap,
+            tabManager: context.tabManager,
+            windowDock: context.existingWindowDock()
+        )
         // Seed restored per-config frames for later configuration switches.
         if let configFrames = snapshot.configFrames {
             windowConfigFrames[context.windowId] = SessionConfigFrameRing(entries: configFrames)
@@ -4001,7 +4267,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.isTerminatingApp = true
-                _ = self.saveSessionSnapshotIncludingProcessDetectedIndexes(includeScrollback: true, removeWhenEmpty: false)
+                _ = self.saveSessionSnapshotIncludingProcessDetectedIndexes(
+                    includeScrollback: true,
+                    removeWhenEmpty: false,
+                    restartCommandCaptureKind: .pendingTermination
+                )
                 ClosedItemHistoryStore.shared.flushPendingSaves()
             }
         }
@@ -4015,7 +4285,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if self.isTerminatingApp {
-                    _ = self.saveSessionSnapshotIncludingProcessDetectedIndexes(includeScrollback: true, removeWhenEmpty: false)
+                    _ = self.saveSessionSnapshotIncludingProcessDetectedIndexes(
+                        includeScrollback: true,
+                        removeWhenEmpty: false,
+                        restartCommandCaptureKind: .pendingTermination
+                    )
                     ClosedItemHistoryStore.shared.flushPendingSaves()
                 } else {
                     self.saveSessionSnapshotAfterLoadingProcessDetectedIndexes(includeScrollback: false)
@@ -4103,6 +4377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             lhs.windowId.uuidString < rhs.windowId.uuidString
         }
         hasher.combine(contexts.count)
+        hasher.combine(surfaceResumeBindingIndex.restartCommandBindingFingerprint)
 
         for context in contexts.prefix(SessionPersistencePolicy.maxWindowsPerSnapshot) {
             hasher.combine(context.windowId)
@@ -4140,7 +4415,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         removeWhenEmpty: Bool = false,
         preserveManualRestoreBackupOnMissingPrimary: Bool = false,
         restorableAgentIndex: RestorableAgentSessionIndex? = nil,
-        surfaceResumeBindingIndex: SurfaceResumeBindingIndex? = nil
+        surfaceResumeBindingIndex: SurfaceResumeBindingIndex? = nil,
+        restartCommandCaptureContext: RestartCommandCaptureContext? = nil
     ) -> Bool {
         if Self.shouldSkipSessionSaveDuringStartupTransition(
             isStartupSessionRestorePending: !didAttemptStartupSessionRestore,
@@ -4176,7 +4452,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let snapshotBuildResult = buildSessionSnapshotResult(
             includeScrollback: includeScrollback,
             restorableAgentIndex: restorableAgentIndex,
-            surfaceResumeBindingIndex: surfaceResumeBindingIndex
+            surfaceResumeBindingIndex: surfaceResumeBindingIndex,
+            restartCommandCaptureContext: restartCommandCaptureContext
         )
         guard let snapshot = snapshotBuildResult.snapshot else {
             let preserveManualRestoreBackup =
@@ -4372,10 +4649,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 #endif
 
         let now = Date()
+        let restartCommandCaptureContext = restartCommandCoordinator.captureContext(kind: .autosave)
+        let restartCommandPanelTTYDevices = restartCommandPanelTTYDevices()
 #if DEBUG
         let loadStart = ProcessInfo.processInfo.systemUptime
 #endif
-        let resumeIndexes = await ProcessDetectedResumeIndexes.load()
+        let resumeIndexes = await ProcessDetectedResumeIndexes.load(
+            restartCommandPanelTTYDevices: restartCommandPanelTTYDevices,
+            restartCommandCaptureContext: restartCommandCaptureContext
+        )
 #if DEBUG
         loadMs = (ProcessInfo.processInfo.systemUptime - loadStart) * 1000.0
         let fingerprintStart = ProcessInfo.processInfo.systemUptime
@@ -4419,7 +4701,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let didSave = saveSessionSnapshot(
             includeScrollback: false,
             restorableAgentIndex: resumeIndexes.restorableAgentIndex,
-            surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex
+            surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex,
+            restartCommandCaptureContext: restartCommandCaptureContext
         )
 #if DEBUG
         saveMs = (ProcessInfo.processInfo.systemUptime - saveStart) * 1000.0
@@ -4435,25 +4718,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     @discardableResult
     private func saveSessionSnapshotIncludingProcessDetectedIndexes(
         includeScrollback: Bool,
-        removeWhenEmpty: Bool = false
+        removeWhenEmpty: Bool = false,
+        restartCommandCaptureKind: RestartCommandCaptureKind = .autosave
     ) -> Bool {
-        let resumeIndexes = ProcessDetectedResumeIndexes.loadSynchronously()
+        let restartCommandCaptureContext = restartCommandCoordinator.captureContext(
+            kind: restartCommandCaptureKind
+        )
+        let resumeIndexes = ProcessDetectedResumeIndexes.loadSynchronously(
+            restartCommandPanelTTYDevices: restartCommandPanelTTYDevices(),
+            restartCommandCaptureContext: restartCommandCaptureContext
+        )
         return saveSessionSnapshot(
             includeScrollback: includeScrollback,
             removeWhenEmpty: removeWhenEmpty,
             restorableAgentIndex: resumeIndexes.restorableAgentIndex,
-            surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex
+            surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex,
+            restartCommandCaptureContext: restartCommandCaptureContext
         )
     }
 
     private func saveSessionSnapshotAfterLoadingProcessDetectedIndexes(
         includeScrollback: Bool,
         removeWhenEmpty: Bool = false,
-        preserveManualRestoreBackupOnMissingPrimary: Bool = false
+        preserveManualRestoreBackupOnMissingPrimary: Bool = false,
+        restartCommandCaptureKind: RestartCommandCaptureKind = .autosave
     ) {
         let generation = nextProcessDetectedSessionSaveGeneration()
+        let restartCommandCaptureContext = restartCommandCoordinator.captureContext(
+            kind: restartCommandCaptureKind
+        )
+        let restartCommandPanelTTYDevices = restartCommandPanelTTYDevices()
         Task { @MainActor [weak self] in
-            let resumeIndexes = await ProcessDetectedResumeIndexes.load()
+            let resumeIndexes = await ProcessDetectedResumeIndexes.load(
+                restartCommandPanelTTYDevices: restartCommandPanelTTYDevices,
+                restartCommandCaptureContext: restartCommandCaptureContext
+            )
             guard let self,
                   !self.isTerminatingApp,
                   self.isCurrentProcessDetectedSessionSaveGeneration(generation) else { return }
@@ -4462,7 +4761,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 removeWhenEmpty: removeWhenEmpty,
                 preserveManualRestoreBackupOnMissingPrimary: preserveManualRestoreBackupOnMissingPrimary,
                 restorableAgentIndex: resumeIndexes.restorableAgentIndex,
-                surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex
+                surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex,
+                restartCommandCaptureContext: restartCommandCaptureContext
             )
         }
     }
@@ -4548,7 +4848,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             if let snapshot {
                 Self.clearCrashOnlyPrimarySnapshotRemovalMarker()
-                _ = self.sessionSnapshotStore.save(snapshot, fileURL: nil)
+                let didSave = self.sessionSnapshotStore.save(snapshot, fileURL: nil)
+                if didSave,
+                   let identity = snapshot.restartCommandEnvelope?.validatedIdentity,
+                   let primaryURL = self.sessionSnapshotStore.defaultSnapshotFileURL(),
+                   let fileData = try? Data(contentsOf: primaryURL) {
+                    _ = self.restartCommandCoordinator.registerReceipt(
+                        identity: identity,
+                        fileData: fileData,
+                        source: .automaticPrimary
+                    )
+                } else if didSave {
+                    self.restartCommandCoordinator.clearReceipt(source: .automaticPrimary)
+                }
             } else if removeWhenEmpty {
                 if preserveManualRestoreBackupOnMissingPrimary {
                     Self.markCrashOnlyPrimarySnapshotRemoval()
@@ -4556,6 +4868,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     Self.clearCrashOnlyPrimarySnapshotRemovalMarker()
                 }
                 self.sessionSnapshotStore.removeSnapshot(fileURL: nil)
+                self.restartCommandCoordinator.clearReceipt(source: .automaticPrimary)
             }
         }
 
@@ -4579,22 +4892,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    private func restartCommandPanelTTYDevices() -> [RestartCommandPanelKey: Int64] {
+        var result: [RestartCommandPanelKey: Int64] = [:]
+        for context in mainWindowContexts.values {
+            for workspace in context.tabManager.tabs {
+                result.merge(workspace.restartCommandPanelTTYDevices()) { current, _ in current }
+            }
+            if let windowDock = context.existingWindowDock() {
+                result.merge(windowDock.restartCommandPanelTTYDevices()) { current, _ in current }
+            }
+        }
+        return result
+    }
+
     private func buildSessionSnapshot(
         includeScrollback: Bool,
         restorableAgentIndex suppliedRestorableAgentIndex: RestorableAgentSessionIndex? = nil,
-        surfaceResumeBindingIndex suppliedSurfaceResumeBindingIndex: SurfaceResumeBindingIndex? = nil
+        surfaceResumeBindingIndex suppliedSurfaceResumeBindingIndex: SurfaceResumeBindingIndex? = nil,
+        restartCommandCaptureContext: RestartCommandCaptureContext? = nil
     ) -> AppSessionSnapshot? {
         buildSessionSnapshotResult(
             includeScrollback: includeScrollback,
             restorableAgentIndex: suppliedRestorableAgentIndex,
-            surfaceResumeBindingIndex: suppliedSurfaceResumeBindingIndex
+            surfaceResumeBindingIndex: suppliedSurfaceResumeBindingIndex,
+            restartCommandCaptureContext: restartCommandCaptureContext
         ).snapshot
     }
 
     private func buildSessionSnapshotResult(
         includeScrollback: Bool,
         restorableAgentIndex suppliedRestorableAgentIndex: RestorableAgentSessionIndex? = nil,
-        surfaceResumeBindingIndex suppliedSurfaceResumeBindingIndex: SurfaceResumeBindingIndex? = nil
+        surfaceResumeBindingIndex suppliedSurfaceResumeBindingIndex: SurfaceResumeBindingIndex? = nil,
+        restartCommandCaptureContext: RestartCommandCaptureContext? = nil
     ) -> (snapshot: AppSessionSnapshot?, removedCrashDiagnosticState: Bool) {
         let contexts = sortedMainWindowContextsForSessionSnapshot()
         guard !contexts.isEmpty else { return (nil, false) }
@@ -4633,7 +4962,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let snapshot = AppSessionSnapshot(
             version: SessionSnapshotSchema.currentVersion,
             createdAt: createdAt,
-            windows: windows
+            windows: windows,
+            restartCommandEnvelope: restartCommandCaptureContext.map {
+                RestartCommandSnapshotEnvelope(identity: $0.identity)
+            }
         )
         return (snapshot, removedCrashDiagnosticState)
     }
@@ -8948,8 +9280,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             nativeSSHConnectionBroker: TerminalController.shared.nativeSSHConnectionBroker
         )
         tabManager.windowId = windowId
+        var restoredPanelIdsByWorkspaceIndex: [[UUID: UUID]] = []
         if let sessionWindowSnapshot {
-            let restoredPanelIdsByWorkspaceIndex = tabManager.restoreSessionSnapshot(
+            restoredPanelIdsByWorkspaceIndex = tabManager.restoreSessionSnapshot(
                 sessionWindowSnapshot.tabManager,
                 remapClosedPanelHistory: remapClosedPanelHistoryFromSessionSnapshot,
                 excludingStableIdentities: excludingStableIdentitiesFromSessionSnapshot,
@@ -9153,7 +9486,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             fileExplorerState: fileExplorerState,
             cmuxConfigStore: cmuxConfigStore
         )
-        restoreWindowDockSessionSnapshot(forWindowId: windowId, from: sessionWindowSnapshot, excludingStableIdentities: excludingStableIdentitiesFromSessionSnapshot)
+        let restoredWindowDockPanelIds = restoreWindowDockSessionSnapshot(
+            forWindowId: windowId,
+            from: sessionWindowSnapshot,
+            excludingStableIdentities: excludingStableIdentitiesFromSessionSnapshot
+        )
+        if sessionWindowSnapshot != nil {
+            deliverRestartCommands(
+                workspacePanelMaps: restoredPanelIdsByWorkspaceIndex,
+                workspaceDockPanelMaps: tabManager.lastRestoredDockPanelIdsByWorkspaceIndex,
+                windowDockPanelMap: restoredWindowDockPanelIds,
+                tabManager: tabManager,
+                windowDock: existingWindowDock(forWindowId: windowId)
+            )
+        }
         publishCmuxWindowLifecycle(name: "window.created", windowId: windowId, origin: "create")
         installFileDropOverlay(on: window, tabManager: tabManager)
         if !shouldActivate || TerminalController.shouldSuppressSocketCommandActivation() {
@@ -9347,6 +9693,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let store = TerminalNotificationStore.shared
         return MenuBarExtraController(
             notificationStore: store,
+            restartSummaryStore: restartCommandSummaryStore,
             onShowGlobalSearch: { button, onDismiss in
                 GlobalSearchCoordinator.shared.togglePalette(anchor: button, onDismiss: onDismiss)
             },
@@ -9360,7 +9707,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 _ = self?.openTerminalNotification(notification)
             },
             onJumpToLatestUnread: { [weak self] in
-                self?.jumpToLatestUnread()
+                _ = self?.jumpToLatestMacNotificationUnread()
             },
             onOpenTaskManager: {
                 TaskManagerWindowController.shared.show()
@@ -12766,6 +13113,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return notificationStore.notifications.first(where: { $0.id == openedId })
     }
 
+    /// Routes the two-kind Mac feed without widening the terminal/mobile
+    /// notification coordinator. A restart summary opens the full Mac
+    /// Notifications page and requests focus for that app-scoped row; terminal
+    /// items retain their existing workspace-navigation path.
+    @discardableResult
+    func jumpToLatestMacNotificationUnread() -> Bool {
+        let newestSummary = restartCommandSummaryStore.summaries.first(where: { !$0.isRead })
+        let newestTerminal = notificationStore?.notifications.first(where: { !$0.isRead })
+        if let newestSummary,
+           newestTerminal.map({ newestSummary.createdAt >= $0.createdAt }) ?? true {
+            return focusRestartCommandSummary(newestSummary)
+        }
+        return jumpToLatestUnread() != nil
+    }
+
+    func markAllMacNotificationsRead() {
+        notificationStore?.markAllRead()
+        restartCommandSummaryStore.markAllRead()
+    }
+
+    func clearAllMacNotifications() {
+        notificationStore?.clearAll()
+        restartCommandSummaryStore.clearAll()
+    }
+
+    private func focusRestartCommandSummary(
+        _ summary: RestartCommandRestoreSummary
+    ) -> Bool {
+        let window = preferredMainWindowForVisibilityActivation()
+            ?? showMainWindowFromMenuBar()
+        guard let window,
+              let context = contextForMainTerminalWindow(window) else {
+            return false
+        }
+        setActiveMainWindow(window)
+        bringToFront(window)
+        restartCommandSummaryStore.requestFocus(id: summary.id)
+        restartCommandSummaryStore.setRead(true, id: summary.id)
+        context.sidebarSelectionState.selection = .notifications
+        return true
+    }
+
     /// Forwards to `notificationNavigation` (the extracted
     /// `NotificationNavigationCoordinator` and its `FocusedNotificationMarker`).
     /// The state machine and its workspace/store predicates now live in
@@ -13996,7 +14385,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 writeJumpUnreadTestData(["jumpUnreadShortcutHandled": "1"])
             }
 #endif
-            jumpToLatestUnread()
+            _ = jumpToLatestMacNotificationUnread()
             return true
         }
 

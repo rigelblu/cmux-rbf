@@ -64,6 +64,8 @@ final class DockSplitStore: BonsplitDelegate {
     @ObservationIgnored var invalidatedCachedTransferAgentSessionPanelIds: Set<UUID> = []
     @ObservationIgnored var replacedCachedTransferAgentSessionPanelIds: Set<UUID> = []
     @ObservationIgnored var restoredResumeSessionWorkingDirectoriesByPanelId: [UUID: String] = [:]
+    @ObservationIgnored var pendingRestartCommandInputObserversByPanelId:
+        [UUID: [WorkspacePendingTerminalInputObserver]] = [:]
     var hasLoadedConfiguration = false
     var configurationLoadTask: Task<Void, Never>?
     var configurationIdentityTask: Task<Void, Never>?

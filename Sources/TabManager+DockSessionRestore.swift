@@ -1,10 +1,11 @@
 import Foundation
 
 extension TabManager {
+    @discardableResult
     func restoreWorkspaceDockSessionSnapshots(
         from snapshot: SessionTabManagerSnapshot,
         excludingStableIdentities: Set<UUID>
-    ) {
+    ) -> [[UUID: UUID]] {
         let pairs = restoredSessionWorkspacePairs(from: snapshot)
         var workspacesByOriginalId: [UUID: Workspace] = [:]
         for pair in pairs {
@@ -12,9 +13,9 @@ extension TabManager {
                 workspacesByOriginalId[originalId] = pair.workspace
             }
         }
-        for pair in pairs {
-            guard let dockSnapshot = pair.snapshot.dock else { continue }
-            pair.workspace.dockSplit.restoreSessionSnapshot(
+        return pairs.map { pair in
+            guard let dockSnapshot = pair.snapshot.dock else { return [:] }
+            return pair.workspace.dockSplit.restoreSessionSnapshot(
                 dockSnapshot,
                 excludingStableIdentities: excludingStableIdentities,
                 sourceWorkspaceResolver: { workspacesByOriginalId[$0] }

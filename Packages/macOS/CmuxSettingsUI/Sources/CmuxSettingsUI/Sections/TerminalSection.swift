@@ -32,6 +32,8 @@ public struct TerminalSection: View {
     @State private var rendererMaxWarm: DefaultsValueModel<Int>
     @State private var memGuardrailEnabled: DefaultsValueModel<Bool>
     @State private var memGuardrailThresholdGB: DefaultsValueModel<Double>
+    @State private var restartCommandsStatus: RestartAllowlistedCommandsSettingsStatus
+    @State private var restartCommandsInlineError: String?
 
     public init(
         defaultsStore: UserDefaultsSettingsStore,
@@ -58,6 +60,8 @@ public struct TerminalSection: View {
         _rendererMaxWarm = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.terminal.rendererRealizationMaxWarmRenderers))
         _memGuardrailEnabled = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.terminal.runawayMemoryGuardrailEnabled))
         _memGuardrailThresholdGB = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.terminal.runawayMemoryGuardrailThresholdGB))
+        _restartCommandsStatus = State(initialValue: hostActions.restartAllowlistedCommandsStatus())
+        _restartCommandsInlineError = State(initialValue: nil)
     }
 
     public var body: some View {
@@ -66,7 +70,17 @@ public struct TerminalSection: View {
             mainCard
             resumeCommandsCard
         }
-        .task { startObservingSettings() }
+        .task {
+            startObservingSettings()
+            for await status in hostActions.restartAllowlistedCommandsStatusUpdates() {
+                restartCommandsStatus = status
+                if case .needsApproval(let validationMessage) = status {
+                    restartCommandsInlineError = validationMessage
+                } else {
+                    restartCommandsInlineError = nil
+                }
+            }
+        }
     }
 
     private func startObservingSettings() {
@@ -183,6 +197,73 @@ public struct TerminalSection: View {
     private var resumeCommandsCard: some View {
         SettingsCard {
             SettingsCardRow(
+                configurationReview: .settingsOnly,
+                searchAnchorID: "settings.terminal.restart-allowlisted-commands",
+                String(
+                    localized: "settings.terminal.restartCommands",
+                    defaultValue: "Restart Allowlisted Commands"
+                ),
+                subtitle: String(
+                    localized: "settings.terminal.restartCommands.subtitle",
+                    defaultValue: "Restart approved commands that were running in restored panes."
+                ),
+                controlWidth: 300
+            ) {
+                VStack(alignment: .trailing, spacing: 6) {
+                    HStack(spacing: 10) {
+                        Text(restartCommandsStatus.displayText)
+                            .cmuxFont(.caption, monospacedDigit: true)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { restartCommandsStatus.isEnabled },
+                                set: { enabled in
+                                    let result = hostActions
+                                        .setRestartAllowlistedCommandsEnabled(enabled)
+                                    restartCommandsStatus = result.status
+                                    restartCommandsInlineError = result.inlineError
+                                }
+                            )
+                        )
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .accessibilityIdentifier("SettingsRestartAllowlistedCommandsToggle")
+                        .accessibilityLabel(
+                            String(
+                                localized: "settings.terminal.restartCommands",
+                                defaultValue: "Restart Allowlisted Commands"
+                            )
+                        )
+                        .accessibilityValue(Text(restartCommandsStatus.displayText))
+                    }
+
+                    Button(
+                        String(
+                            localized: "settings.terminal.restartCommands.openDefinitions",
+                            defaultValue: "Open Definitions File"
+                        )
+                    ) {
+                        _ = hostActions.openRestartCommandDefinitionsFile()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("SettingsRestartCommandsOpenDefinitionsButton")
+
+                    if let restartCommandsInlineError {
+                        Text(restartCommandsInlineError)
+                            .cmuxFont(.caption)
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("SettingsRestartCommandsInlineError")
+                    }
+                }
+            }
+            SettingsCardDivider()
+            SettingsCardRow(
                 configurationReview: .json("terminal.resumeCommands"),
                 String(localized: "settings.terminal.resumeCommands", defaultValue: "Resume Commands"),
                 subtitle: String(
@@ -192,7 +273,7 @@ public struct TerminalSection: View {
                 controlWidth: 170
             ) {
                 HStack(spacing: 8) {
-                    Text(verbatim: "0")
+                    Text(verbatim: "\(hostActions.legacyResumeCommandCount())")
                         .cmuxFont(.caption, monospacedDigit: true)
                         .foregroundColor(.secondary)
                     Button(String(localized: "settings.settingsJSON.openButton", defaultValue: "Open")) {

@@ -4,6 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# shellcheck source=scripts/lib/recorded-gitlink.sh
+source "$PROJECT_DIR/scripts/lib/recorded-gitlink.sh"
+
 cd "$PROJECT_DIR"
 
 hash_stdin() {
@@ -82,7 +85,7 @@ GHOSTTY_SHA="$(git -C ghostty rev-parse HEAD)"
 # happily while the source you read is not the source you run. cmux linked a
 # framework 65 commits away from its recorded pointer without a single signal.
 # A warning, not a failure: building a modified submodule on purpose is normal.
-GHOSTTY_RECORDED_SHA="$(git ls-tree HEAD ghostty 2>/dev/null | awk '{print $3}')"
+GHOSTTY_RECORDED_SHA="$(cmux_recorded_gitlink_sha "$PROJECT_DIR" ghostty || true)"
 if [[ -n "$GHOSTTY_RECORDED_SHA" && "$GHOSTTY_RECORDED_SHA" != "$GHOSTTY_SHA" ]]; then
   echo "==> WARNING: ghostty checkout does not match the recorded pointer." >&2
   echo "    recorded: ${GHOSTTY_RECORDED_SHA:0:12}   checked out: ${GHOSTTY_SHA:0:12}" >&2

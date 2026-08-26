@@ -9,12 +9,17 @@ public enum WorkspacePendingTerminalInputReason: Sendable, Equatable {
     /// Input injected by a workspace configuration command (cmux.json).
     case configurationCommand
 
+    /// A canonical command authorized from an exact restored-session receipt.
+    case restartAllowlistedCommand
+
     /// How long queued input for this reason may wait for shell readiness
     /// before being dropped, or `nil` to wait indefinitely.
     public var timeout: TimeInterval? {
         switch self {
         case .configurationCommand:
             return 3.0
+        case .restartAllowlistedCommand:
+            return nil
         }
     }
 }

@@ -482,3 +482,79 @@ extension DockSplitStore {
 #endif
     }
 }
+
+// MARK: - Restored allowlisted command delivery
+
+extension DockSplitStore {
+    @discardableResult
+    func sendRestartCommandWhenReady(
+        _ command: String,
+        toPanelID panelID: UUID
+    ) -> Bool {
+        guard let panel = panels[panelID] as? TerminalPanel else { return false }
+        PendingTerminalInputCoordinator.send(
+            command + "\n",
+            to: panel,
+            reason: .restartAllowlistedCommand,
+            retain: { [weak self] registration, retainedPanelID in
+                self?.pendingRestartCommandInputObserversByPanelId[
+                    retainedPanelID,
+                    default: []
+                ].append(registration)
+            },
+            release: { [weak self] registration, retainedPanelID in
+                guard let self,
+                      self.hasPendingRestartCommandInputObserver(
+                          registration,
+                          forPanelId: retainedPanelID
+                      ) else {
+                    return
+                }
+                self.removePendingRestartCommandInputObserver(
+                    registration,
+                    forPanelId: retainedPanelID
+                )
+            }
+        )
+        return true
+    }
+
+    private func hasPendingRestartCommandInputObserver(
+        _ registration: WorkspacePendingTerminalInputObserver,
+        forPanelId panelId: UUID
+    ) -> Bool {
+        pendingRestartCommandInputObserversByPanelId[panelId]?.contains {
+            $0 === registration
+        } == true
+    }
+
+    private func removePendingRestartCommandInputObserver(
+        _ registration: WorkspacePendingTerminalInputObserver,
+        forPanelId panelId: UUID
+    ) {
+        if let observer = registration.observer {
+            NotificationCenter.default.removeObserver(observer)
+            registration.observer = nil
+        }
+        pendingRestartCommandInputObserversByPanelId[panelId]?.removeAll {
+            $0 === registration
+        }
+        if pendingRestartCommandInputObserversByPanelId[panelId]?.isEmpty == true {
+            pendingRestartCommandInputObserversByPanelId.removeValue(forKey: panelId)
+        }
+    }
+
+    func removePendingRestartCommandInputObservers(forPanelId panelId: UUID) {
+        guard let observers = pendingRestartCommandInputObserversByPanelId.removeValue(
+            forKey: panelId
+        ) else {
+            return
+        }
+        for registration in observers {
+            if let observer = registration.observer {
+                NotificationCenter.default.removeObserver(observer)
+                registration.observer = nil
+            }
+        }
+    }
+}

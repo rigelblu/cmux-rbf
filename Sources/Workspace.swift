@@ -20,6 +20,7 @@ import CmuxCanvasUI
 import CmuxPanes
 import CmuxSidebar
 import CmuxNotifications
+import CmuxRestartCommands
 import Combine
 import CryptoKit
 import Darwin
@@ -53,8 +54,49 @@ func debugWorkspaceDescriptionPreview(_ text: String?, limit: Int = 120) -> Stri
 }
 #endif
 
-private final class WorkspacePendingTerminalInputObserver: @unchecked Sendable {
+final class WorkspacePendingTerminalInputObserver: @unchecked Sendable {
     var observer: NSObjectProtocol?
+}
+
+@MainActor
+enum PendingTerminalInputCoordinator {
+    static func send(
+        _ text: String,
+        to panel: TerminalPanel,
+        reason: WorkspacePendingTerminalInputReason,
+        retain: (WorkspacePendingTerminalInputObserver, UUID) -> Void,
+        release: @escaping (WorkspacePendingTerminalInputObserver, UUID) -> Void
+    ) {
+        if panel.surface.surface != nil {
+            panel.sendInput(text)
+            return
+        }
+
+        let panelID = panel.id
+        let registration = WorkspacePendingTerminalInputObserver()
+        registration.observer = NotificationCenter.default.addObserver(
+            forName: .terminalSurfaceDidBecomeReady,
+            object: panel.surface,
+            queue: .main
+        ) { [weak panel, registration] _ in
+            Task { @MainActor in
+                release(registration, panelID)
+                panel?.sendInput(text)
+            }
+        }
+        retain(registration, panelID)
+        panel.surface.requestBackgroundSurfaceStartIfNeeded()
+
+        guard let timeout = reason.timeout else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [registration] in
+            Task { @MainActor in
+                release(registration, panelID)
+                #if DEBUG
+                NSLog("[CmuxConfig] surface not ready after 3s, dropping command (%d chars)", text.count)
+                #endif
+            }
+        }
+    }
 }
 
 private struct SessionPaneRestoreEntry {
@@ -63,6 +105,26 @@ private struct SessionPaneRestoreEntry {
 }
 
 extension Workspace {
+    /// App-owned local panel-to-tty map used by one detached process observation scan.
+    func restartCommandPanelTTYDevices() -> [RestartCommandPanelKey: Int64] {
+        guard !isRemoteWorkspace else { return [:] }
+        var result: [RestartCommandPanelKey: Int64] = [:]
+        for panelID in panels.keys {
+            guard panels[panelID] is TerminalPanel,
+                  !isRemoteTerminalSurface(panelID),
+                  !remoteDetectedSurfaceIds.contains(panelID),
+                  let ttyName = surfaceTTYNames[panelID],
+                  let device = CmuxTopProcessSnapshot.deviceIdentifier(forTTYName: ttyName) else {
+                continue
+            }
+            result[RestartCommandPanelKey(workspaceID: id, panelID: panelID)] = device
+        }
+        if let dock = _dockSplit {
+            result.merge(dock.restartCommandPanelTTYDevices()) { current, _ in current }
+        }
+        return result
+    }
+
     func sessionSnapshot(
         includeScrollback: Bool,
         restorableAgentIndex: RestorableAgentSessionIndex? = nil,
@@ -108,6 +170,10 @@ extension Workspace {
                     resumeBinding: effectiveSurfaceResumeBinding(
                         panelId: panelId,
                         surfaceResumeBindingIndex: surfaceResumeBindingIndex
+                    ),
+                    restartCommandBinding: surfaceResumeBindingIndex?.restartCommandBinding(
+                        workspaceId: id,
+                        panelId: panelId
                     ),
                     terminalFontSizeSnapshotProjection:
                         terminalFontSizeSnapshotProjection,
@@ -348,6 +414,7 @@ extension Workspace {
         includeScrollback: Bool,
         restorableAgentObservation: RestorableAgentSessionIndex.Entry?,
         resumeBinding: SurfaceResumeBindingSnapshot?,
+        restartCommandBinding: PaneRestartCommandBinding? = nil,
         terminalFontSizeSnapshotProjection:
             WorkspaceTerminalFontSizeSnapshotProjection? = nil,
         currentAgentProcessIdentity: (Int) -> AgentPIDProcessIdentity? = {
@@ -609,6 +676,7 @@ extension Workspace {
                     )
                 },
                 resumeBinding: resumeBinding,
+                restartCommandBinding: restartCommandBinding,
                 textBoxDraft: terminalPanel.sessionTextBoxDraftSnapshot(),
                 isRemoteTerminal: activeRemoteTerminalSurfaceIds.contains(panelId),
                 remotePTYSessionID: remotePTYSessionIDForSnapshot(panelId: panelId),
@@ -2005,53 +2073,21 @@ extension Workspace {
         to panel: TerminalPanel,
         reason: WorkspacePendingTerminalInputReason = .configurationCommand
     ) {
-        if panel.surface.surface != nil {
-            panel.sendInput(text)
-            return
-        }
-
-        let timeout = reason.timeout
-        let panelId = panel.id
-        let registration = WorkspacePendingTerminalInputObserver()
-
-        registration.observer = NotificationCenter.default.addObserver(
-            forName: .terminalSurfaceDidBecomeReady,
-            object: panel.surface,
-            queue: .main
-        ) { [weak self, registration] _ in
-            Task { @MainActor [weak self, registration] in
-                guard
-                    let self,
-                    self.hasPendingTerminalInputObserver(registration, forPanelId: panelId)
-                else {
+        PendingTerminalInputCoordinator.send(
+            text,
+            to: panel,
+            reason: reason,
+            retain: { [weak self] registration, panelID in
+                self?.pendingTerminalInputObserversByPanelId[panelID, default: []].append(registration)
+            },
+            release: { [weak self] registration, panelID in
+                guard let self,
+                      self.hasPendingTerminalInputObserver(registration, forPanelId: panelID) else {
                     return
                 }
-
-                self.removePendingTerminalInputObserver(registration, forPanelId: panelId)
-                if let panel = self.panels[panelId] as? TerminalPanel {
-                    panel.sendInput(text)
-                }
+                self.removePendingTerminalInputObserver(registration, forPanelId: panelID)
             }
-        }
-        pendingTerminalInputObserversByPanelId[panelId, default: []].append(registration)
-        panel.surface.requestBackgroundSurfaceStartIfNeeded()
-
-        guard let timeout else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self, registration] in
-            Task { @MainActor [weak self, registration] in
-                guard
-                    let self,
-                    self.hasPendingTerminalInputObserver(registration, forPanelId: panelId)
-                else {
-                    return
-                }
-
-                self.removePendingTerminalInputObserver(registration, forPanelId: panelId)
-                #if DEBUG
-                NSLog("[CmuxConfig] surface not ready after 3s, dropping command (%d chars)", text.count)
-                #endif
-            }
-        }
+        )
     }
 
     private func hasPendingTerminalInputObserver(

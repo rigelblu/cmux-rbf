@@ -19,13 +19,13 @@ extension AppDelegate.MainWindowContext {
     func restoreWindowDockSessionSnapshot(
         _ snapshot: SessionWindowSnapshot?,
         excludingStableIdentities: Set<UUID> = []
-    ) {
+    ) -> [UUID: UUID] {
         let promptBatch = SurfaceResumeRunPromptBatch.shared
         promptBatch.beginRestorePass()
         defer { promptBatch.endRestorePass() }
 
-        guard let dockSnapshot = snapshot?.dock, let tabManagerSnapshot = snapshot?.tabManager else { return }
-        windowDockStore().restoreSessionSnapshot(
+        guard let dockSnapshot = snapshot?.dock, let tabManagerSnapshot = snapshot?.tabManager else { return [:] }
+        return windowDockStore().restoreSessionSnapshot(
             dockSnapshot,
             excludingStableIdentities: excludingStableIdentities,
             sourceWorkspaceResolver: { [tabManager] originalId in
@@ -77,9 +77,12 @@ extension AppDelegate {
         forWindowId windowId: UUID,
         from snapshot: SessionWindowSnapshot?,
         excludingStableIdentities: Set<UUID>
-    ) {
+    ) -> [UUID: UUID] {
         mainWindowContexts.values.first(where: { $0.windowId == windowId })?
-            .restoreWindowDockSessionSnapshot(snapshot, excludingStableIdentities: excludingStableIdentities)
+            .restoreWindowDockSessionSnapshot(
+                snapshot,
+                excludingStableIdentities: excludingStableIdentities
+            ) ?? [:]
     }
 
     /// Legacy Dock routing alias, kept for CLI compatibility with the retired

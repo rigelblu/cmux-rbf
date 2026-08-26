@@ -292,6 +292,22 @@ resume bindings it marks trusted, such as live process-detected tmux bindings or
 user-approved prefixes. Sensitive environment keys such as tokens, passwords,
 secrets, and API keys are dropped before a resume binding is stored.
 
+cmux can also restart a small allowlist of ordinary commands that were running
+in local panes when the session was saved. **Settings > Terminal > Restart
+Allowlisted Commands** controls this globally and is on by default. The built-in
+definitions recognize `jjui`, `jjui-brief`, and Hunk's `diff` process; cmux
+starts the canonical `jjui`, `jjui-brief`, or `hunk` shell command in the
+pane's restored working directory rather than replaying captured arguments or
+environment values. Agent, tmux, and custom surface resume bindings take
+precedence when a pane already has one.
+
+Choose **Open Definitions File** to edit the dedicated primary-global file at
+`~/.config/cmux/restart-commands.json`. Editing a definition turns automatic
+restart off until you review the file and re-enable the single global setting.
+The same rules apply to clean relaunch, crash recovery, **File > Reopen Previous
+Session**, and `cmux restore-session`; automatic recovery consumes a saved
+snapshot once, while an explicit manual restore may intentionally run it again.
+
 To keep restored agent terminals idle instead of automatically running their resume commands,
 turn off **Settings > Terminal > Resume Agent Sessions on Reopen** or set this in
 `~/.config/cmux/cmux.json`:

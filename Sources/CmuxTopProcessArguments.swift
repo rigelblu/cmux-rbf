@@ -59,7 +59,7 @@ extension CmuxTopProcessSnapshot {
         return CmuxTopProcessArguments(arguments: arguments, environment: environment)
     }
 
-    private static func kernProcArgsBytes(for pid: Int) -> [UInt8]? {
+    static func kernProcArgsBytes(for pid: Int) -> [UInt8]? {
         var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, Int32(pid)]
         var size: size_t = 0
         guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0,

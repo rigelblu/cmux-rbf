@@ -1,4 +1,5 @@
 import Foundation
+import CmuxRestartCommands
 
 struct SurfaceResumeBindingIndex: Sendable {
     static let empty = SurfaceResumeBindingIndex(bindingsByPanel: [:])
@@ -7,9 +8,14 @@ struct SurfaceResumeBindingIndex: Sendable {
 
     private let bindingsByPanel: [PanelKey: SurfaceResumeBindingSnapshot]
     private let bindingsByPanelId: [UUID: SurfaceResumeBindingSnapshot]
+    private let restartCommandBindingsByPanel: [RestartCommandPanelKey: PaneRestartCommandBinding]
 
-    init(bindingsByPanel: [PanelKey: SurfaceResumeBindingSnapshot]) {
+    init(
+        bindingsByPanel: [PanelKey: SurfaceResumeBindingSnapshot],
+        restartCommandBindingsByPanel: [RestartCommandPanelKey: PaneRestartCommandBinding] = [:]
+    ) {
         self.bindingsByPanel = bindingsByPanel
+        self.restartCommandBindingsByPanel = restartCommandBindingsByPanel
         var bindingsByPanelId: [UUID: SurfaceResumeBindingSnapshot] = [:]
         for (key, binding) in bindingsByPanel {
             let existing = bindingsByPanelId[key.panelId]
@@ -22,6 +28,30 @@ struct SurfaceResumeBindingIndex: Sendable {
 
     func binding(workspaceId: UUID, panelId: UUID) -> SurfaceResumeBindingSnapshot? {
         bindingsByPanel[PanelKey(workspaceId: workspaceId, panelId: panelId)] ?? bindingsByPanelId[panelId]
+    }
+
+    func restartCommandBinding(workspaceId: UUID, panelId: UUID) -> PaneRestartCommandBinding? {
+        restartCommandBindingsByPanel[
+            RestartCommandPanelKey(workspaceID: workspaceId, panelID: panelId)
+        ]
+    }
+
+    var restartCommandBindingFingerprint: Int {
+        var hasher = Hasher()
+        for (key, binding) in restartCommandBindingsByPanel.sorted(by: {
+            if $0.key.workspaceID != $1.key.workspaceID {
+                return $0.key.workspaceID.uuidString < $1.key.workspaceID.uuidString
+            }
+            return $0.key.panelID.uuidString < $1.key.panelID.uuidString
+        }) {
+            hasher.combine(key.workspaceID)
+            hasher.combine(key.panelID)
+            hasher.combine(binding.definitionID)
+            hasher.combine(binding.detectorFingerprint)
+            hasher.combine(binding.snapshotGenerationID)
+            hasher.combine(binding.captureKind)
+        }
+        return hasher.finalize()
     }
 
     static func loadProcessDetectedBindingsSynchronously(

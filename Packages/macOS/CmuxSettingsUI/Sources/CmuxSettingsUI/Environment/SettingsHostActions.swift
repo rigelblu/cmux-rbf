@@ -2,6 +2,65 @@ import CMUXMobileCore
 import CmuxSettings
 import Foundation
 
+/// Host-owned global restart state projected into the package-only Settings UI.
+public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
+    case enabledBuiltIn(commandCount: Int)
+    case enabledApproved(commandCount: Int)
+    case off
+    case needsApproval(validationMessage: String?)
+    case stateUnavailable
+
+    public var isEnabled: Bool {
+        switch self {
+        case .enabledBuiltIn, .enabledApproved: true
+        case .off, .needsApproval, .stateUnavailable: false
+        }
+    }
+
+    public var displayText: String {
+        switch self {
+        case .enabledBuiltIn(let commandCount):
+            String.localizedStringWithFormat(
+                String(
+                    localized: "settings.terminal.restartCommands.status.builtIn",
+                    defaultValue: "Enabled · %lld built-in commands"
+                ),
+                Int64(commandCount)
+            )
+        case .enabledApproved(let commandCount):
+            String.localizedStringWithFormat(
+                String(
+                    localized: "settings.terminal.restartCommands.status.approved",
+                    defaultValue: "Enabled · %lld approved commands"
+                ),
+                Int64(commandCount)
+            )
+        case .off:
+            String(localized: "settings.terminal.restartCommands.status.off", defaultValue: "Off")
+        case .needsApproval:
+            String(
+                localized: "settings.terminal.restartCommands.status.needsApproval",
+                defaultValue: "Off · Review changes before re-enabling"
+            )
+        case .stateUnavailable:
+            String(
+                localized: "settings.terminal.restartCommands.status.stateUnavailable",
+                defaultValue: "Off · Restart state unavailable"
+            )
+        }
+    }
+}
+
+public struct RestartAllowlistedCommandsSettingsMutationResult: Equatable, Sendable {
+    public let status: RestartAllowlistedCommandsSettingsStatus
+    public let inlineError: String?
+
+    public init(status: RestartAllowlistedCommandsSettingsStatus, inlineError: String? = nil) {
+        self.status = status
+        self.inlineError = inlineError
+    }
+}
+
 /// Host-supplied callbacks the package's section views invoke for
 /// actions that live outside the catalog — clearing browser history,
 /// opening the user's editor on cmux.json, sending feedback, posting
@@ -25,6 +84,24 @@ public protocol SettingsHostActions: AnyObject {
     /// this is the escape hatch for users who prefer their own
     /// editor.
     func openConfigInExternalEditor()
+
+    /// Current effective state of the separate restart-command authority.
+    func restartAllowlistedCommandsStatus() -> RestartAllowlistedCommandsSettingsStatus
+
+    /// Live state changes caused by file edits or another Settings action.
+    func restartAllowlistedCommandsStatusUpdates() -> AsyncStream<RestartAllowlistedCommandsSettingsStatus>
+
+    /// Applies the one global enable/disable decision.
+    func setRestartAllowlistedCommandsEnabled(
+        _ enabled: Bool
+    ) -> RestartAllowlistedCommandsSettingsMutationResult
+
+    /// Materializes and opens the dedicated definitions file.
+    @discardableResult
+    func openRestartCommandDefinitionsFile() -> Bool
+
+    /// Existing signed-prefix approvals shown in the preserved legacy row.
+    func legacyResumeCommandCount() -> Int
 
     /// Launches the host's feedback flow (typically a "Send Feedback"
     /// URL or in-app form).
@@ -239,6 +316,25 @@ public protocol SettingsHostActions: AnyObject {
 }
 
 public extension SettingsHostActions {
+    func restartAllowlistedCommandsStatus() -> RestartAllowlistedCommandsSettingsStatus {
+        .stateUnavailable
+    }
+
+    func restartAllowlistedCommandsStatusUpdates() -> AsyncStream<RestartAllowlistedCommandsSettingsStatus> {
+        AsyncStream { $0.finish() }
+    }
+
+    func setRestartAllowlistedCommandsEnabled(
+        _ enabled: Bool
+    ) -> RestartAllowlistedCommandsSettingsMutationResult {
+        _ = enabled
+        return .init(status: restartAllowlistedCommandsStatus())
+    }
+
+    func openRestartCommandDefinitionsFile() -> Bool { false }
+
+    func legacyResumeCommandCount() -> Int { 0 }
+
     /// Default no-op for previews and tests without a live control socket.
     func socketControlConfigurationDidChange() {}
 

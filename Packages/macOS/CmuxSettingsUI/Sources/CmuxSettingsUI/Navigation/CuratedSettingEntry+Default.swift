@@ -135,6 +135,13 @@ extension Array where Element == CuratedSettingEntry {
                 detailText: String(localized: "settings.terminal.memoryGuardrail.threshold.subtitle", defaultValue: "A pane is flagged once its combined process-tree memory crosses this many gigabytes."),
                 synonyms: "terminal.runawayMemoryGuardrail.thresholdGB memory warning threshold gb gigabytes limit process tree pane"
             ),
+            .init(
+                section: .terminal,
+                id: "restart-allowlisted-commands",
+                title: String(localized: "settings.terminal.restartCommands", defaultValue: "Restart Allowlisted Commands"),
+                detailText: String(localized: "settings.terminal.restartCommands.subtitle", defaultValue: "Restart approved commands that were running in restored panes."),
+                synonyms: "jjui jjui-brief hunk command restart restore reopen allowlist approved definitions"
+            ),
             .init(section: .terminal, id: "resume-commands", title: "Resume Commands", synonyms: "terminal.resumeCommands surface resume command approvals prefixes auto restore prompt manual tmux hibernation"),
             .init(
                 section: .terminal,

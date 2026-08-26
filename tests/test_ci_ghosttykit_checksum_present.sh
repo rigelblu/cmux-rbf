@@ -7,15 +7,19 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CHECKSUMS_FILE="$ROOT_DIR/scripts/ghosttykit-checksums.txt"
 
+# shellcheck source=scripts/lib/recorded-gitlink.sh
+source "$ROOT_DIR/scripts/lib/recorded-gitlink.sh"
+
 if [ ! -f "$CHECKSUMS_FILE" ]; then
   echo "FAIL: missing checksum file $CHECKSUMS_FILE"
   exit 1
 fi
 
-GHOSTTY_SHA="$(
-  git -C "$ROOT_DIR" ls-tree HEAD ghostty \
-    | awk '$4 == "ghostty" { print $3; found = 1 } END { if (!found) exit 1 }'
-)"
+GHOSTTY_SHA="$(cmux_recorded_gitlink_sha "$ROOT_DIR" ghostty || true)"
+if [[ -z "$GHOSTTY_SHA" ]]; then
+  echo "FAIL: could not read the recorded ghostty gitlink from $ROOT_DIR"
+  exit 1
+fi
 
 MATCH_COUNT="$(
   awk -v sha="$GHOSTTY_SHA" '
