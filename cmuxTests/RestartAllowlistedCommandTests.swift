@@ -150,6 +150,7 @@ struct RestartAllowlistedCommandTests {
         for entry in environment {
             bytes += Array(entry.utf8) + [0]
         }
+        bytes.append(0)
         return bytes
     }
 }

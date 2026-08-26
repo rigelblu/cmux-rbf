@@ -7,7 +7,7 @@ extension AppDelegate {
             return
         }
         switch sessionSnapshotStore.loadOutcome(fileURL: primaryURL) {
-        case .loaded(let snapshot):
+        case .loaded(let snapshot, _):
             Self.clearCrashOnlyPrimarySnapshotRemovalMarker()
             guard let prunedSnapshot = SessionPersistencePolicy
                 .pruningCmuxCrashDiagnosticWindows(from: snapshot)

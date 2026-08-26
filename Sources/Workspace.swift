@@ -108,11 +108,22 @@ extension Workspace {
     /// App-owned local panel-to-tty map used by one detached process observation scan.
     func restartCommandPanelTTYDevices() -> [RestartCommandPanelKey: Int64] {
         guard !isRemoteWorkspace else { return [:] }
+        let directoryExists: (String) -> Bool = { path in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+                && isDirectory.boolValue
+        }
         var result: [RestartCommandPanelKey: Int64] = [:]
         for panelID in panels.keys {
-            guard panels[panelID] is TerminalPanel,
+            guard let terminal = panels[panelID] as? TerminalPanel,
                   !isRemoteTerminalSurface(panelID),
                   !remoteDetectedSurfaceIds.contains(panelID),
+                  let workingDirectory = terminal.surface.reportedWorkingDirectory
+                    ?? (panelDirectories[panelID]?.isEmpty == false ? panelDirectories[panelID] : nil)
+                    ?? (terminal.directory.isEmpty ? nil : terminal.directory)
+                    ?? terminal.requestedWorkingDirectory,
+                  !workingDirectory.isEmpty,
+                  directoryExists(workingDirectory),
                   let ttyName = surfaceTTYNames[panelID],
                   let device = CmuxTopProcessSnapshot.deviceIdentifier(forTTYName: ttyName) else {
                 continue
@@ -2065,6 +2076,35 @@ extension Workspace {
 // MARK: - Config-driven terminal input delivery
 
 extension Workspace {
+
+    /// Delivers a restored allowlisted command only while the restored pane is
+    /// still in the exact directory authorized from the snapshot.
+    @discardableResult
+    func sendRestartCommandWhenReady(
+        _ command: String,
+        to panel: TerminalPanel,
+        expectedWorkingDirectory: String
+    ) -> Bool {
+        let currentWorkingDirectory = panel.surface.reportedWorkingDirectory
+            ?? (panelDirectories[panel.id]?.isEmpty == false ? panelDirectories[panel.id] : nil)
+            ?? (panel.directory.isEmpty ? nil : panel.directory)
+            ?? panel.requestedWorkingDirectory
+        var isDirectory: ObjCBool = false
+        guard currentWorkingDirectory == expectedWorkingDirectory,
+              FileManager.default.fileExists(
+                  atPath: expectedWorkingDirectory,
+                  isDirectory: &isDirectory
+              ),
+              isDirectory.boolValue else {
+            return false
+        }
+        sendInputWhenReady(
+            command + "\n",
+            to: panel,
+            reason: .restartAllowlistedCommand
+        )
+        return true
+    }
 
     /// Delivers config-driven startup input (`Workspace+CustomLayout.swift`) once
     /// the terminal surface is ready, or immediately when it already is.

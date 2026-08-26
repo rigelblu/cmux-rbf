@@ -89,6 +89,22 @@ struct RestartCommandDefinitionTests {
         }
     }
 
+    @Test func commandGrammarAllowsArgumentsButRejectsPromptInjection() throws {
+        #expect(try replacingCommand(.hunk, with: "hunk diff --stat").definition(id: .hunk)?.command == "hunk diff --stat")
+        #expect(try replacingCommand(.hunk, with: "hunk 'a file'").definition(id: .hunk)?.command == "hunk 'a file'")
+        #expect(try replacingCommand(.hunk, with: "hunk a\\ file").definition(id: .hunk)?.command == "hunk a\\ file")
+
+        for unsafe in [
+            " hunk", "hunk ", "hunk\tdiff", "hunk\ndiff", "hunk\rdiff",
+            "hunk; whoami", "hunk | cat", "hunk && whoami", "hunk $(whoami)",
+            "hunk `whoami`", "hunk *", "hunk > out", "hunk 'unterminated",
+        ] {
+            #expect(throws: RestartCommandDefinitionError.unsafeCommand) {
+                try replacingCommand(.hunk, with: unsafe)
+            }
+        }
+    }
+
     private func evidence(
         argv: [String],
         configDirectory: RestartCommandEnvironmentEvidence

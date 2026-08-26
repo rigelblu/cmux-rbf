@@ -117,6 +117,19 @@ Use `cmux surface resume set --shell <command>` to attach a resume command to th
 
 Approvals are prefix-based and signed by cmux. They also bind the working directory and exact environment values when present. A process can propose a command, but it cannot make that command sticky without the user choosing Auto-Restore or Ask Each Time in cmux.
 
+## Allowlisted ordinary command restart
+
+Restarting `jjui`, `jjui-brief`, and `hunk` is a separate path from agent hooks
+and custom surface resume commands. It installs no shell or agent hook, does not
+reuse the signed-prefix approval list, and reads editable definitions only from
+`~/.config/cmux/restart-commands.json`. One global switch in **Settings >
+Terminal > Resume Commands** controls the complete built-in set.
+
+When a pane already has an agent, tmux, hibernation, or custom-surface resume
+intent, that existing mechanism keeps precedence and the ordinary-command path
+does nothing for the pane. See [configuration.md](configuration.md#restart-allowlisted-commands)
+for the file and approval contract.
+
 ## Disable automatic resume
 
 To restore panes without automatically restarting saved agent sessions, turn off

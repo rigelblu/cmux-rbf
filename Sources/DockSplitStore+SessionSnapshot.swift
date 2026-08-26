@@ -7,10 +7,21 @@ import CmuxRestartCommands
 extension DockSplitStore {
     /// Local Dock terminal ownership projected from cmux state, never child `CMUX_*` values.
     func restartCommandPanelTTYDevices() -> [RestartCommandPanelKey: Int64] {
+        let directoryExists: (String) -> Bool = { path in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+                && isDirectory.boolValue
+        }
         var result: [RestartCommandPanelKey: Int64] = [:]
         for (panelID, transfer) in detachedSurfaceTransfersByPanelId {
-            guard panels[panelID] is TerminalPanel,
+            guard let terminal = panels[panelID] as? TerminalPanel,
                   !transfer.isRemoteTerminal,
+                  let workingDirectory = terminal.surface.reportedWorkingDirectory
+                    ?? (terminal.directory.isEmpty ? nil : terminal.directory)
+                    ?? (transfer.directory?.isEmpty == false ? transfer.directory : nil)
+                    ?? terminal.requestedWorkingDirectory,
+                  !workingDirectory.isEmpty,
+                  directoryExists(workingDirectory),
                   transfer.ttyNameWasReportedByCurrentRuntime,
                   let ttyName = transfer.ttyName,
                   let device = CmuxTopProcessSnapshot.deviceIdentifier(forTTYName: ttyName) else {

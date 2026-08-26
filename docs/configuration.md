@@ -2,6 +2,26 @@
 
 Global app preferences live in `~/.config/cmux/cmux.json`.
 
+## Restart allowlisted commands
+
+cmux can restart three approved interactive commands that were running in local
+terminal panes when a saved session is restored: `jjui`, `jjui-brief`, and
+`hunk`. One global control in **Settings > Terminal > Resume Commands** enables
+or disables all three. It is enabled by default for the built-in definitions.
+
+Editable definitions live separately at
+`~/.config/cmux/restart-commands.json`. This is strict JSON: comments, trailing
+commas, unknown fields, partial definition sets, and shell-control syntax are
+invalid. **Open Definitions File** creates the built-in document when it is
+missing and refreshes the adjacent `restart-commands.schema.json` editor schema.
+The schema is descriptive only and cannot grant execution authority.
+
+Changing a matcher or canonical command turns the feature off until the global
+control is enabled again. `cmux.json`, project-local configuration, and an
+`enabled` field inside the definitions file cannot approve or enable restart.
+Eligible commands restart from their entry command in the pane's exact saved
+working directory; cmux does not recover their in-memory application state.
+
 ## `mobile.artifactFolderAccess`
 
 Controls which files and folders cmux on iOS may browse after a chat references a directory or a directory path appears in a terminal.

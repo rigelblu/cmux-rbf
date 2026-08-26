@@ -118,11 +118,18 @@ public enum RestartCommandRestoreSource: String, Codable, Sendable {
 /// A copied command authorized for exactly one restored pane in one operation.
 public struct RestartCommandLaunchItem: Equatable, Sendable {
     public let originalPanelID: UUID
+    public let definitionID: RestartCommandDefinitionID
     public let command: String
     public let savedWorkingDirectory: String
 
-    public init(originalPanelID: UUID, command: String, savedWorkingDirectory: String) {
+    public init(
+        originalPanelID: UUID,
+        definitionID: RestartCommandDefinitionID,
+        command: String,
+        savedWorkingDirectory: String
+    ) {
         self.originalPanelID = originalPanelID
+        self.definitionID = definitionID
         self.command = command
         self.savedWorkingDirectory = savedWorkingDirectory
     }
@@ -142,13 +149,16 @@ public enum RestartCommandRestoreRefusalReason: String, Codable, Equatable, Send
 
 /// One refusal before duplicate definition/reason rows are grouped for presentation.
 public struct RestartCommandRestoreRefusal: Equatable, Sendable {
+    public let panelID: UUID?
     public let definitionID: RestartCommandDefinitionID?
     public let reason: RestartCommandRestoreRefusalReason
 
     public init(
+        panelID: UUID? = nil,
         definitionID: RestartCommandDefinitionID?,
         reason: RestartCommandRestoreRefusalReason
     ) {
+        self.panelID = panelID
         self.definitionID = definitionID
         self.reason = reason
     }

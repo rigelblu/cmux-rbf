@@ -64,8 +64,21 @@ struct RestartCommandProcessEvidenceTests {
         ) == nil)
 
         var truncated = kernProcArgs(argv: ["jjui"], environment: [])
+        truncated.removeLast()
         truncated.append(contentsOf: Data("JJUI_CONFIG_DIR=/tmp/brief".utf8))
         #expect(decoder.decode(truncated, environmentKeys: ["JJUI_CONFIG_DIR"])?.environment["JJUI_CONFIG_DIR"] == .unavailable)
+
+        var truncatedAfterCompleteEntry = kernProcArgs(
+            argv: ["jjui"],
+            environment: [Data("OTHER=value".utf8)]
+        )
+        truncatedAfterCompleteEntry.removeLast()
+        #expect(
+            decoder.decode(
+                truncatedAfterCompleteEntry,
+                environmentKeys: ["JJUI_CONFIG_DIR"]
+            )?.environment["JJUI_CONFIG_DIR"] == .unavailable
+        )
         invalidArg.removeAll()
     }
 

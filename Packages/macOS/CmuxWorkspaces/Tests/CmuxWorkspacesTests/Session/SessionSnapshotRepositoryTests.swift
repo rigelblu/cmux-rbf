@@ -130,6 +130,23 @@ struct SessionSnapshotRepositoryTests {
         #expect(abs(secondStamp.timeIntervalSince(firstStamp.addingTimeInterval(-3600))) < 5)
     }
 
+    @Test("loaded outcome carries the exact decoded bytes")
+    func loadedOutcomeCarriesExactBytes() throws {
+        let dir = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let repository = makeRepository(appSupport: dir)
+        let fileURL = try #require(repository.defaultSnapshotFileURL())
+        #expect(repository.save(makeSnapshot(), fileURL: fileURL))
+        let fileData = try Data(contentsOf: fileURL)
+
+        guard case .loaded(let snapshot, let loadedData) = repository.loadOutcome(fileURL: fileURL) else {
+            Issue.record("expected a loaded snapshot")
+            return
+        }
+        #expect(snapshot == makeSnapshot())
+        #expect(loadedData == fileData)
+    }
+
     @Test("removeSnapshot deletes the default snapshot file")
     func removeSnapshot() throws {
         let dir = try makeTempDirectory()

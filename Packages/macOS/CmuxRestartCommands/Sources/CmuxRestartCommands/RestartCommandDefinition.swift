@@ -89,6 +89,7 @@ public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
     case invalidArgumentPrefix
     case invalidEnvironmentPredicate
     case emptyCommand
+    case unsafeCommand
     case commandTooLong
 
     /// Stable user-facing validation copy for the Settings inline error slot.
@@ -373,6 +374,9 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
             guard !definition.command.isEmpty else {
                 throw RestartCommandDefinitionError.emptyCommand
             }
+            guard RestartCommandGrammar.isSafeSingleCommand(definition.command) else {
+                throw RestartCommandDefinitionError.unsafeCommand
+            }
             guard definition.command.utf8.count <= maximumCommandUTF8Bytes else {
                 throw RestartCommandDefinitionError.commandTooLong
             }
@@ -407,5 +411,83 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
         } else if match["environment"] != nil {
             throw RestartCommandDefinitionError.invalidEnvironmentPredicate
         }
+    }
+}
+
+private enum RestartCommandGrammar {
+    /// Shell text is typed into an interactive prompt, so definitions must be
+    /// one expansion-free command. Quoting and escaping ordinary arguments is
+    /// allowed; control operators, substitutions, globbing, control bytes,
+    /// and leading/trailing whitespace are not.
+    static func isSafeSingleCommand(_ command: String) -> Bool {
+        guard command == command.trimmingCharacters(in: .whitespacesAndNewlines),
+              !command.isEmpty else {
+            return false
+        }
+
+        let scalars = command.unicodeScalars
+        var index = scalars.startIndex
+        var quote: UnicodeScalar?
+        var isAtTokenStart = true
+
+        while index < scalars.endIndex {
+            let scalar = scalars[index]
+            if scalar.value < 0x20 || scalar.value == 0x7f {
+                return false
+            }
+            if quote == "'" {
+                if scalar == "'" { quote = nil }
+                index = scalars.index(after: index)
+                continue
+            }
+            if quote == "\"" {
+                if scalar == "\\" {
+                    let next = scalars.index(after: index)
+                    guard next < scalars.endIndex,
+                          scalars[next].value >= 0x20,
+                          scalars[next].value != 0x7f else {
+                        return false
+                    }
+                    index = scalars.index(after: next)
+                    continue
+                }
+                if scalar == "\"" {
+                    quote = nil
+                } else if scalar == "$" || scalar == "`" || scalar == "!" {
+                    return false
+                }
+                index = scalars.index(after: index)
+                continue
+            }
+            if scalar == "\\" {
+                let next = scalars.index(after: index)
+                guard next < scalars.endIndex,
+                      scalars[next].value >= 0x20,
+                      scalars[next].value != 0x7f else {
+                    return false
+                }
+                isAtTokenStart = false
+                index = scalars.index(after: next)
+                continue
+            }
+            if scalar == "'" || scalar == "\"" {
+                quote = scalar
+                isAtTokenStart = false
+            } else if scalar == " " {
+                isAtTokenStart = true
+            } else if scalar == "$" || scalar == "`" || scalar == "!" ||
+                        scalar == "*" || scalar == "?" || scalar == "[" ||
+                        scalar == "{" || scalar == "}" || scalar == ";" ||
+                        scalar == "|" || scalar == "&" || scalar == "<" ||
+                        scalar == ">" || scalar == "(" || scalar == ")" {
+                return false
+            } else if isAtTokenStart && (scalar == "~" || scalar == "=") {
+                return false
+            } else {
+                isAtTokenStart = false
+            }
+            index = scalars.index(after: index)
+        }
+        return quote == nil && !isAtTokenStart
     }
 }

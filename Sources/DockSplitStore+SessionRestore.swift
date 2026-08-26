@@ -489,9 +489,22 @@ extension DockSplitStore {
     @discardableResult
     func sendRestartCommandWhenReady(
         _ command: String,
-        toPanelID panelID: UUID
+        toPanelID panelID: UUID,
+        expectedWorkingDirectory: String
     ) -> Bool {
         guard let panel = panels[panelID] as? TerminalPanel else { return false }
+        let currentWorkingDirectory = panel.surface.reportedWorkingDirectory
+            ?? (panel.directory.isEmpty ? nil : panel.directory)
+            ?? panel.requestedWorkingDirectory
+        var isDirectory: ObjCBool = false
+        guard currentWorkingDirectory == expectedWorkingDirectory,
+              FileManager.default.fileExists(
+                  atPath: expectedWorkingDirectory,
+                  isDirectory: &isDirectory
+              ),
+              isDirectory.boolValue else {
+            return false
+        }
         PendingTerminalInputCoordinator.send(
             command + "\n",
             to: panel,

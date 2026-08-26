@@ -80,7 +80,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     public let definitionsRepository: RestartCommandDefinitionsRepository
     public let stateRepository: RestartCommandStateRepository
     private let coordinationLock = OSAllocatedUnfairLock(initialState: ())
-    private let processExecutionAvailable = OSAllocatedUnfairLock(initialState: true)
     private let now: @Sendable () -> TimeInterval
     private let directoryExists: @Sendable (String) -> Bool
 
@@ -137,9 +136,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     @discardableResult
     public func setEnabled(_ enabled: Bool) -> RestartCommandAllowlistState {
         coordinationLock.withLock {
-            guard processExecutionAvailable.withLock({ $0 }) else {
-                return .disabledNeedsApproval(.stateUnavailable)
-            }
             let definitionRead = definitionsRepository.read()
             let definitionSnapshot: RestartCommandDefinitionSnapshot?
             switch definitionRead {
@@ -168,7 +164,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
                 at: now()
             )
             guard stateRepository.save(record) else {
-                processExecutionAvailable.withLock { $0 = false }
                 return .disabledNeedsApproval(.stateUnavailable)
             }
             guard let definitionSnapshot else { return .disabledByUser }
@@ -188,7 +183,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
         source: RestartCommandRestoreSource
     ) -> Bool {
         coordinationLock.withLock {
-            guard processExecutionAvailable.withLock({ $0 }) else { return false }
             let projection = effectiveStateUnserialized()
             guard var record = projection.record else { return false }
             record.register(
@@ -199,7 +193,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
                 source: source
             )
             guard stateRepository.save(record) else {
-                processExecutionAvailable.withLock { $0 = false }
                 return false
             }
             return true
@@ -216,9 +209,7 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             case .automaticBackup, .manualBackup:
                 record.clearManualBackupReceipt()
             }
-            if !stateRepository.save(record) {
-                processExecutionAvailable.withLock { $0 = false }
-            }
+            _ = stateRepository.save(record)
         }
     }
 
@@ -231,14 +222,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             guard !boundCandidates.isEmpty else {
                 return authorizeZeroBindingPlanIfPossible(request)
             }
-            guard processExecutionAvailable.withLock({ $0 }) else {
-                return .plan(refusalPlan(
-                    request: request,
-                    candidates: boundCandidates,
-                    reason: .approvalUnavailable
-                ))
-            }
-
             let firstProjection = effectiveStateUnserialized()
             switch firstProjection.state {
             case .disabledByUser:
@@ -300,7 +283,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             if request.source.isAutomatic {
                 guard secondRecord.consumeAutomatically(identity),
                       stateRepository.save(secondRecord) else {
-                    processExecutionAvailable.withLock { $0 = false }
                     return .plan(refusalPlan(
                         request: request,
                         candidates: boundCandidates,
@@ -319,13 +301,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     }
 
     private func effectiveStateUnserialized() -> Projection {
-        guard processExecutionAvailable.withLock({ $0 }) else {
-            return Projection(
-                state: .disabledNeedsApproval(.stateUnavailable),
-                definitions: nil,
-                record: nil
-            )
-        }
         let definitionRead = definitionsRepository.read()
         switch definitionRead {
         case .invalid(let error):
@@ -362,7 +337,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
                 }
                 let record = RestartCommandStateRecord.enabledDefaults(at: now())
                 guard stateRepository.save(record) else {
-                    processExecutionAvailable.withLock { $0 = false }
                     return Projection(
                         state: .disabledNeedsApproval(.stateUnavailable),
                         definitions: definitions,
@@ -383,7 +357,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     private func authorizeZeroBindingPlanIfPossible(
         _ request: RestartCommandAuthorizationRequest
     ) -> RestartCommandAuthorizationOutcome {
-        guard processExecutionAvailable.withLock({ $0 }) else { return .quiet }
         let firstProjection = effectiveStateUnserialized()
         guard firstProjection.state.isEnabled,
               let firstDefinitions = firstProjection.definitions,
@@ -417,7 +390,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
         }
         if request.source.isAutomatic {
             guard record.consumeAutomatically(identity), stateRepository.save(record) else {
-                processExecutionAvailable.withLock { $0 = false }
                 return .quiet
             }
         }
@@ -441,31 +413,31 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
                 continue
             }
             guard let definitionID = binding.validatedDefinitionID(envelope: envelope) else {
-                refusals.append(.init(definitionID: nil, reason: .invalidBinding))
+                refusals.append(.init(panelID: candidate.panelID, definitionID: nil, reason: .invalidBinding))
                 continue
             }
             guard let definition = definitions.definition(id: definitionID),
                   let fingerprint = definitions.detectorFingerprint(for: definitionID) else {
-                refusals.append(.init(definitionID: definitionID, reason: .definitionRemoved))
+                refusals.append(.init(panelID: candidate.panelID, definitionID: definitionID, reason: .definitionRemoved))
                 continue
             }
             guard fingerprint == binding.detectorFingerprint else {
-                refusals.append(.init(definitionID: definitionID, reason: .detectorChanged))
+                refusals.append(.init(panelID: candidate.panelID, definitionID: definitionID, reason: .detectorChanged))
                 continue
             }
             guard !candidate.isRemote else {
-                refusals.append(.init(definitionID: definitionID, reason: .paneBecameRemote))
+                refusals.append(.init(panelID: candidate.panelID, definitionID: definitionID, reason: .paneBecameRemote))
                 continue
             }
-            guard let workingDirectory = candidate.savedWorkingDirectory?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
+            guard let workingDirectory = candidate.savedWorkingDirectory,
                   !workingDirectory.isEmpty,
                   directoryExists(workingDirectory) else {
-                refusals.append(.init(definitionID: definitionID, reason: .missingWorkingDirectory))
+                refusals.append(.init(panelID: candidate.panelID, definitionID: definitionID, reason: .missingWorkingDirectory))
                 continue
             }
             launchItems.append(RestartCommandLaunchItem(
                 originalPanelID: candidate.panelID,
+                definitionID: definitionID,
                 command: definition.command,
                 savedWorkingDirectory: workingDirectory
             ))
@@ -487,8 +459,9 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             launchItems: [],
             refusals: candidates.map { candidate in
                 RestartCommandRestoreRefusal(
-                    definitionID: candidate.binding.flatMap {
-                        RestartCommandDefinitionID(rawValue: $0.definitionID)
+                    panelID: candidate.panelID,
+                    definitionID: request.envelope.flatMap { envelope in
+                        candidate.binding?.validatedDefinitionID(envelope: envelope)
                     },
                     reason: reason
                 )

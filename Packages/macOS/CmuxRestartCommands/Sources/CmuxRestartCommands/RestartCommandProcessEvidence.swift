@@ -65,13 +65,17 @@ public struct RestartCommandProcessEvidenceDecoder: Sendable {
             ($0, RestartCommandEnvironmentEvidence.absent)
         })
         var seenKeys: Set<String> = []
-        var structurallyComplete = true
+        var structurallyComplete = false
 
         while index < bytes.count {
-            while index < bytes.count, bytes[index] == 0 { index += 1 }
-            guard index < bytes.count else { break }
+            // KERN_PROCARGS2 terminates the environment with an empty C
+            // string. Reaching the end immediately after a nonempty entry is
+            // ambiguous with kernel-buffer truncation and must fail closed.
+            if bytes[index] == 0 {
+                structurallyComplete = true
+                break
+            }
             guard let raw = consumeTerminatedString(in: bytes, index: &index) else {
-                structurallyComplete = false
                 break
             }
             for key in environmentKeys {

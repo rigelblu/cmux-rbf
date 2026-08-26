@@ -59,12 +59,12 @@ public struct SessionSnapshotRepository<SnapshotValue: SessionSnapshotRepresenti
         guard let snapshot = try? decoder.decode(SnapshotValue.self, from: data) else { return .unusable }
         guard snapshot.version == schemaVersion else { return .unusable }
         guard snapshot.hasWindows else { return .unusable }
-        return .loaded(snapshot)
+        return .loaded(snapshot: snapshot, data: data)
     }
 
     public func load(fileURL: URL? = nil) -> SnapshotValue? {
         guard let fileURL = fileURL ?? defaultSnapshotFileURL() else { return nil }
-        guard case .loaded(let snapshot) = loadOutcome(fileURL: fileURL) else { return nil }
+        guard case .loaded(let snapshot, _) = loadOutcome(fileURL: fileURL) else { return nil }
         return snapshot
     }
 
@@ -107,7 +107,7 @@ public struct SessionSnapshotRepository<SnapshotValue: SessionSnapshotRepresenti
         guard let backupURL = manualRestoreSnapshotFileURL() else { return }
         guard let primaryURL = defaultSnapshotFileURL() else { return }
         switch loadOutcome(fileURL: primaryURL) {
-        case .loaded(let snapshot):
+        case .loaded(let snapshot, _):
             _ = save(snapshot, fileURL: backupURL)
         case .missing:
             removeSnapshot(fileURL: backupURL)
@@ -122,7 +122,7 @@ public struct SessionSnapshotRepository<SnapshotValue: SessionSnapshotRepresenti
     public func loadStartupSnapshot() -> SnapshotValue? {
         guard let primaryURL = defaultSnapshotFileURL() else { return nil }
         switch loadOutcome(fileURL: primaryURL) {
-        case .loaded(let snapshot):
+        case .loaded(let snapshot, _):
             return snapshot
         case .missing:
             return nil

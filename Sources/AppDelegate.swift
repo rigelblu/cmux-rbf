@@ -3401,12 +3401,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func loadStartupSessionSnapshotPruningCrashDiagnostics() -> AppSessionSnapshot? {
         guard let primaryURL = sessionSnapshotStore.defaultSnapshotFileURL() else { return nil }
         switch sessionSnapshotStore.loadOutcome(fileURL: primaryURL) {
-        case .loaded(let snapshot):
+        case .loaded(let snapshot, let data):
             if let prunedSnapshot = SessionPersistencePolicy
                 .pruningCmuxCrashDiagnosticWindows(from: snapshot)
                 .snapshot {
                 startupRestartCommandSource = .automaticPrimary
-                startupRestartCommandFileDigest = Self.restartCommandFileDigest(primaryURL)
+                startupRestartCommandFileDigest = RestartCommandDefinitionSet.sha256Hex(data)
                 return prunedSnapshot
             }
             return loadManualRestoreSessionSnapshotPruningCrashDiagnostics()
@@ -3422,17 +3422,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func loadManualRestoreSessionSnapshotPruningCrashDiagnostics() -> AppSessionSnapshot? {
         guard let backupURL = sessionSnapshotStore.manualRestoreSnapshotFileURL(),
-              let snapshot = sessionSnapshotStore.loadReopenSessionSnapshot(fileURL: backupURL),
+              case .loaded(let snapshot, let data) = sessionSnapshotStore.loadOutcome(fileURL: backupURL),
               let pruned = SessionPersistencePolicy.pruningCmuxCrashDiagnosticWindows(from: snapshot).snapshot else {
             return nil
         }
         startupRestartCommandSource = .automaticBackup
-        startupRestartCommandFileDigest = Self.restartCommandFileDigest(backupURL)
+        startupRestartCommandFileDigest = RestartCommandDefinitionSet.sha256Hex(data)
         return pruned
-    }
-
-    private nonisolated static func restartCommandFileDigest(_ url: URL) -> String? {
-        (try? Data(contentsOf: url)).map(RestartCommandDefinitionSet.sha256Hex)
     }
 
     private func persistedWindowGeometry(defaults: UserDefaults = .standard) -> PersistedWindowGeometry? {
@@ -3742,7 +3738,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             if ambiguousOriginalPanelIDs.contains(launchItem.originalPanelID) {
                 guard restartCommandLaunchClaims.insert(claim).inserted else { continue }
                 activeRestartCommandRefusals.append(
-                    .init(definitionID: nil, reason: .invalidBinding)
+                    .init(
+                        panelID: launchItem.originalPanelID,
+                        definitionID: launchItem.definitionID,
+                        reason: .invalidBinding
+                    )
                 )
                 continue
             }
@@ -3756,17 +3756,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             var delivered = false
             for workspace in tabManager.tabs {
                 if let panel = workspace.panels[restoredPanelID] as? TerminalPanel {
-                    workspace.sendInputWhenReady(
-                        launchItem.command + "\n",
+                    delivered = workspace.sendRestartCommandWhenReady(
+                        launchItem.command,
                         to: panel,
-                        reason: .restartAllowlistedCommand
+                        expectedWorkingDirectory: launchItem.savedWorkingDirectory
                     )
-                    delivered = true
-                    break
+                    if delivered { break }
                 }
                 if workspace._dockSplit?.sendRestartCommandWhenReady(
                     launchItem.command,
-                    toPanelID: restoredPanelID
+                    toPanelID: restoredPanelID,
+                    expectedWorkingDirectory: launchItem.savedWorkingDirectory
                 ) == true {
                     delivered = true
                     break
@@ -3775,12 +3775,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             if !delivered {
                 delivered = windowDock?.sendRestartCommandWhenReady(
                     launchItem.command,
-                    toPanelID: restoredPanelID
+                    toPanelID: restoredPanelID,
+                    expectedWorkingDirectory: launchItem.savedWorkingDirectory
                 ) == true
             }
             if !delivered {
                 activeRestartCommandRefusals.append(
-                    .init(definitionID: nil, reason: .invalidBinding)
+                    .init(
+                        panelID: launchItem.originalPanelID,
+                        definitionID: launchItem.definitionID,
+                        reason: .invalidBinding
+                    )
                 )
             }
         }
@@ -3798,10 +3803,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             )
             if !restartCommandLaunchClaims.contains(claim) {
                 activeRestartCommandRefusals.append(
-                    .init(definitionID: nil, reason: .invalidBinding)
+                    .init(
+                        panelID: launchItem.originalPanelID,
+                        definitionID: launchItem.definitionID,
+                        reason: .invalidBinding
+                    )
                 )
             }
         }
+#if DEBUG
+        let refusedPanelIDs = Set(activeRestartCommandRefusals.compactMap(\.panelID))
+        for launchItem in plan.launchItems where !refusedPanelIDs.contains(launchItem.originalPanelID) {
+            cmuxDebugLog(
+                "restart.command.binding pane=\(launchItem.originalPanelID.uuidString) " +
+                    "definition=\(launchItem.definitionID.rawValue) outcome=queued"
+            )
+        }
+        for refusal in activeRestartCommandRefusals {
+            let definition = refusal.definitionID?.rawValue ?? "invalid-record"
+            let pane = refusal.panelID?.uuidString ?? "unknown"
+            cmuxDebugLog(
+                "restart.command.binding pane=\(pane) definition=\(definition) " +
+                    "outcome=\(refusal.reason.rawValue)"
+            )
+        }
+#endif
         let summary = RestartCommandRestoreSummary.make(
             operationID: plan.operationID,
             refusals: activeRestartCommandRefusals,
@@ -3844,15 +3870,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     @discardableResult
     func reopenPreviousSession(shouldActivate: Bool = true) -> Bool {
         guard let backupURL = sessionSnapshotStore.manualRestoreSnapshotFileURL(),
-              let snapshot = sessionSnapshotStore.loadReopenSessionSnapshot(fileURL: backupURL),
-              let fileDigest = Self.restartCommandFileDigest(backupURL) else {
+              case .loaded(let snapshot, let data) = sessionSnapshotStore.loadOutcome(fileURL: backupURL) else {
             return false
         }
         return restorePreviousSessionSnapshot(
             snapshot,
             shouldActivate: shouldActivate,
             restartCommandSource: .manualBackup,
-            restartCommandFileDigest: fileDigest
+            restartCommandFileDigest: RestartCommandDefinitionSet.sha256Hex(data)
         )
     }
 
