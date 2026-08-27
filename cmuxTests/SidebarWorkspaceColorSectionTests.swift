@@ -133,6 +133,8 @@ import Testing
         #expect(projection.sectionByWorkspaceId[pinned]?.memberWorkspaceIds == [pinned])
         #expect(projection.sectionByWorkspaceId[unpinned]?.memberWorkspaceIds == [unpinned])
         #expect(projection.sectionByWorkspaceId[other]?.id != projection.sectionByWorkspaceId[unpinned]?.id)
+        #expect(projection.sectionByWorkspaceId[pinned]?.title == "Custom (#123456)")
+        #expect(projection.sectionByWorkspaceId[other]?.title == "Custom (#654321)")
     }
 
     @Test func legalReorderPermutesOnlySectionMemberSlots() throws {

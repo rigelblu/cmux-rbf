@@ -11320,7 +11320,7 @@ struct VerticalTabsSidebar: View, Equatable {
         let numberedWorkspaceIndexById = SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(
             from: baseWorkspaceRenderItems
         )
-        let visibleWorkspaceRowIds = SidebarWorkspaceRenderItem.numberedWorkspaceIds(
+        let visibleWorkspaceRowIds = SidebarWorkspaceRenderItem.interactiveRowIds(
             from: workspaceRenderItems
         )
         let draggedSidebarTabId = dragState.draggedTabId

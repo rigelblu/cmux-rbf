@@ -94,6 +94,19 @@ enum SidebarWorkspaceRenderItem {
         }
     }
 
+    /// Row ids valid as drag/reorder targets: every workspace row, plus each
+    /// real group's anchor (its header stands in for it as a target). Color
+    /// section headers are excluded — they duplicate their first member's id
+    /// and accept no drop of their own (`#cm-56`).
+    static func interactiveRowIds(
+        from renderItems: [SidebarWorkspaceRenderItem]
+    ) -> [UUID] {
+        renderItems.compactMap { item in
+            if case .colorSectionHeader = item { return nil }
+            return item.rowWorkspaceId
+        }
+    }
+
     static func numberedWorkspaceIndexById(
         from renderItems: [SidebarWorkspaceRenderItem]
     ) -> [UUID: Int] {
