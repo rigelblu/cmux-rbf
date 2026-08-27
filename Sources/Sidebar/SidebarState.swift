@@ -7,6 +7,10 @@ import Foundation
 final class SidebarState: ObservableObject {
     @Published var isVisible: Bool
     @Published var persistedWidth: CGFloat
+    /// Keyed by hex alone, not by `(hex, pinTier)`. Deliberate (`#cm-56`
+    /// Decisions): the same hex can render one section in each pin tier, and
+    /// they're meant to share one collapsed state — expanding either
+    /// expands both. Not an oversight; don't key this on section id.
     @Published private(set) var collapsedColorSectionHexes: Set<String>
     private var visibilityWillChangeOwnerId: UUID?
     private var visibilityWillChange: ((Bool) -> Void)?

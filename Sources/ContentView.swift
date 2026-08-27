@@ -11413,7 +11413,10 @@ struct VerticalTabsSidebar: View, Equatable {
         .onDisappear {
             deactivateSidebarInteractions()
         }
-        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+                .receive(on: DispatchQueue.main)
+        ) { _ in
             workspaceColorPaletteRevision &+= 1
         }
         .onChange(of: isPresented) { _, presented in

@@ -29,12 +29,16 @@ enum SidebarWorkspaceRenderItem {
         }
     }
 
-    var rowWorkspaceId: UUID {
+    /// `nil` only for a color-section header with no members — unreachable
+    /// through `SidebarWorkspaceColorSectionProjection.project`, but
+    /// `SidebarWorkspaceColorSection`'s public initializer doesn't enforce
+    /// it, so this stays safe rather than trapping on `memberWorkspaceIds[0]`.
+    var rowWorkspaceId: UUID? {
         switch self {
         case .groupHeader(_, let anchorWorkspaceId):
             return anchorWorkspaceId
         case .colorSectionHeader(let section):
-            return section.memberWorkspaceIds[0]
+            return section.memberWorkspaceIds.first
         case .workspace(let workspaceId):
             return workspaceId
         }

@@ -201,7 +201,9 @@ struct WorkspaceGroupTests {
         var visibleWorkspaceIds: [UUID] = []
         var visibleRowIds: [UUID] = []
         for item in items {
-            visibleRowIds.append(item.rowWorkspaceId)
+            if let rowId = item.rowWorkspaceId {
+                visibleRowIds.append(rowId)
+            }
             switch item {
             case .groupHeader(let renderedGroupId, _) where renderedGroupId == groupId:
                 groupMemberIds = memberWorkspaceIdsByGroupId[renderedGroupId] ?? []

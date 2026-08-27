@@ -1026,8 +1026,14 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         let lower = max(0, visibleRange.location)
         let upper = min(rows.count, visibleRange.location + visibleRange.length)
         guard lower < upper else { return [] }
-        return (lower..<upper).map { row in
+        // A color-section header's `workspaceId` duplicates its first member
+        // (`#cm-56`) and, when the section is collapsed, names a workspace
+        // that isn't even in the visible range — exclude it here the same
+        // way SwiftUI's `interactiveRowIds` does, or it supplies a phantom
+        // target against a hidden row.
+        return (lower..<upper).compactMap { row in
             let configuration = rows[row]
+            guard !configuration.isColorSectionHeader else { return nil }
             return SidebarWorkspaceReorderDropOverlay.Target(
                 workspaceId: configuration.workspaceId,
                 groupId: configuration.groupId,
