@@ -196,6 +196,38 @@ import Testing
         )
     }
 
+    @Test func interactiveRowIdsKeepsGroupAnchorsAndDropsOnlyColorSectionDupes() {
+        let groupId = UUID()
+        let anchor = UUID()
+        let member = UUID()
+        let colorMember = UUID()
+        let loose = UUID()
+        let section = SidebarWorkspaceColorSection(
+            id: .init(normalizedHex: "#14B8A6", pinTier: .unpinned),
+            title: "Backend (Teal)",
+            memberWorkspaceIds: [colorMember],
+            isCollapsed: false
+        )
+        let items: [SidebarWorkspaceRenderItem] = [
+            .groupHeader(groupId: groupId, anchorWorkspaceId: anchor),
+            .workspace(workspaceId: member),
+            .colorSectionHeader(section: section),
+            .workspace(workspaceId: colorMember),
+            .workspace(workspaceId: loose),
+        ]
+
+        let interactive = SidebarWorkspaceRenderItem.interactiveRowIds(from: items)
+
+        // Regression guard: a real group's anchor must remain a valid
+        // drag/reorder target (`#cm-56` silently dropped it while narrowing
+        // out the color-section header's duplicate id). `numberedWorkspaceIds`
+        // stays `.workspace`-only by design — verify the two never collapse
+        // to the same behavior.
+        #expect(interactive == [anchor, member, colorMember, loose])
+        #expect(SidebarWorkspaceRenderItem.numberedWorkspaceIds(from: items) == [member, colorMember, loose])
+        #expect(interactive != SidebarWorkspaceRenderItem.numberedWorkspaceIds(from: items))
+    }
+
     @Test func headerBandMatchesCM49ContainerBandAcrossAppearances() {
         let appearances: [(ColorScheme, ColorSchemeContrast, SidebarGroupHeaderBandPalette.RenderedAppearance)] = [
             (.light, .standard, .aqua),
