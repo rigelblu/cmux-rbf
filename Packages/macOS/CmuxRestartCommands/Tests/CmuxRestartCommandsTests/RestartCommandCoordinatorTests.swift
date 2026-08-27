@@ -77,6 +77,53 @@ struct RestartCommandCoordinatorTests {
         }
     }
 
+    @Test func mixedCandidatesIgnoreExistingResumeIntentPaneWhileLaunchingTheOrdinaryOne() throws {
+        let fixture = try Fixture()
+        let identity = RestartCommandSnapshotIdentity(rootGenerationID: UUID(), captureKind: .autosave)
+        let bytes = Data("snapshot".utf8)
+        #expect(fixture.coordinator.registerReceipt(
+            identity: identity,
+            fileData: bytes,
+            source: .manualBackup
+        ))
+        let fingerprint = try #require(
+            RestartCommandDefinitionSet.appDefaults.detectorFingerprint(for: .hunk)
+        )
+        let existingIntentPanelID = UUID()
+        let ordinaryPanelID = UUID()
+        let binding = PaneRestartCommandBinding(
+            definitionID: .hunk,
+            detectorFingerprint: fingerprint,
+            observedAt: 100,
+            snapshotIdentity: identity
+        )
+        let request = RestartCommandAuthorizationRequest(
+            source: .manualBackup,
+            envelope: RestartCommandSnapshotEnvelope(identity: identity),
+            fileDigest: RestartCommandDefinitionSet.sha256Hex(bytes),
+            candidates: [
+                RestartCommandPaneCandidate(
+                    panelID: existingIntentPanelID,
+                    binding: binding,
+                    hasExistingResumeIntent: true,
+                    isRemote: false,
+                    savedWorkingDirectory: fixture.workingDirectory.path
+                ),
+                RestartCommandPaneCandidate(
+                    panelID: ordinaryPanelID,
+                    binding: binding,
+                    hasExistingResumeIntent: false,
+                    isRemote: false,
+                    savedWorkingDirectory: fixture.workingDirectory.path
+                ),
+            ]
+        )
+
+        let result = try #require(plan(from: fixture.coordinator.authorize(request)))
+        #expect(result.launchItems.map(\.originalPanelID) == [ordinaryPanelID])
+        #expect(result.refusals.isEmpty)
+    }
+
     @Test func anEditDisablesTheGlobalAuthorityUntilOneReenable() throws {
         let fixture = try Fixture()
         #expect(fixture.coordinator.settingsProjection() == RestartCommandSettingsProjection(
