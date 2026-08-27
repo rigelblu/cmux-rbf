@@ -141,6 +141,8 @@ Each was first patched at whichever entrypoint surfaced it, and each then failed
 
 **Quit any running tagged app before `make test`**, or the run dies with "Test runner never began executing tests", exit 65, zero tests run.
 
+**`SessionPersistenceTests` can hang `make test` indefinitely on a stray `codex resume session-duplicate-turn --yolo` fixture process** — it shells out to a real `codex` CLI with no timeout, and if that process doesn't exit on its own the whole suite sits at 0% CPU with no error, indistinguishable from "still building" unless you check. Hit at least twice (a prior `#cm-56` session, then twice more in one `#cm-54` session on 2026-08-27, including two orphans left behind when an earlier interrupted run's fixture processes never got reaped). Diagnose: the `xcodebuild` PID is alive but at 0% CPU; `grep -c "Test Case '.*' started"` in the log outruns `'.*' passed\|'.*' failed"`; `ps aux | grep codex` finds a `session-duplicate-turn --yolo` process whose parent is the tagged test-host app (or `PPID 1` if it's an orphan from an earlier interrupted run). Fix: kill that pid — the suite resumes from where it stalled. The real fix, bounding the fixture with a timeout instead of patching this ad hoc each time, is filed as `#cm-58`.
+
 ### 🟣⋯ `/Applications` holds **two** cmux apps — check which one you are in
 Since v0.9.0 (`#cm-17`) the flavour installs beside upstream rather than replacing it:
 
