@@ -1,5 +1,6 @@
 import CmuxSettings
 import Foundation
+import SwiftUI
 import Testing
 
 #if canImport(cmux_DEV)
@@ -183,6 +184,43 @@ import Testing
             onToggle: {}
         )
         #expect(header.accessibilityLabel == "Color section, Backend (Teal), 1 workspaces, expanded")
+        #expect(
+            header.headerBand
+                == SidebarWorkspaceColorSectionHeaderBand.resolve(
+                    normalizedHex: section.id.normalizedHex,
+                    colorScheme: .light,
+                    contrast: .standard
+                )
+        )
+    }
+
+    @Test func headerBandMatchesCM49ContainerBandAcrossAppearances() {
+        let appearances: [(ColorScheme, ColorSchemeContrast, SidebarGroupHeaderBandPalette.RenderedAppearance)] = [
+            (.light, .standard, .aqua),
+            (.dark, .standard, .darkAqua),
+            (.light, .increased, .highContrastAqua),
+            (.dark, .increased, .highContrastDarkAqua),
+        ]
+
+        for (colorScheme, contrast, renderedAppearance) in appearances {
+            let actual = SidebarWorkspaceColorSectionHeaderBand.resolve(
+                normalizedHex: "#14B8A6",
+                colorScheme: colorScheme,
+                contrast: contrast
+            )
+            let cm49Band = SidebarGroupHeaderBandPalette(
+                tintHex: "#14B8A6",
+                isAnchorActive: false,
+                isMultiSelected: false,
+                multiSelectionBackgroundStyle: .clear,
+                renderedAppearance: renderedAppearance
+            )
+
+            #expect(actual.bandColor == cm49Band.bandColor)
+            #expect(actual.bandOpacity == cm49Band.bandOpacity)
+            #expect(actual.primaryTextColor == cm49Band.primaryTextColor)
+            #expect(actual.bandOpacity == SidebarGroupHeaderBandPalette.restingBandOpacity)
+        }
     }
 }
 

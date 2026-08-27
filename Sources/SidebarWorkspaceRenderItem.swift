@@ -1,3 +1,4 @@
+import AppKit
 import CmuxWorkspaces
 import CmuxSettings
 import Foundation
@@ -150,16 +151,54 @@ struct SidebarWorkspaceColorSection: Equatable {
     let isCollapsed: Bool
 }
 
+/// The color-section header band resolved from immutable appearance inputs.
+///
+/// Kept as a value so this header shares one presentation contract with the
+/// `#cm-49` real-group header band, and tests can compare it directly against
+/// `SidebarGroupHeaderBandPalette`. A color section has no anchor or multi-select
+/// state, so its band always rests at `restingBandOpacity` — it never rises to
+/// `activeBandOpacity` the way a real group's does when its anchor is active.
+struct SidebarWorkspaceColorSectionHeaderBand: Equatable {
+    let bandColor: NSColor
+    let bandOpacity: CGFloat
+    let primaryTextColor: NSColor
+
+    static func resolve(
+        normalizedHex: String,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Self {
+        let palette = SidebarGroupHeaderBandPalette(
+            tintHex: normalizedHex,
+            isAnchorActive: false,
+            isMultiSelected: false,
+            multiSelectionBackgroundStyle: .clear,
+            renderedAppearance: .init(
+                colorScheme: colorScheme,
+                contrast: contrast
+            )
+        )
+        return Self(
+            bandColor: palette.bandColor,
+            bandOpacity: palette.bandOpacity,
+            primaryTextColor: palette.primaryTextColor
+        )
+    }
+}
+
 struct SidebarWorkspaceColorSectionHeader: View, Equatable {
     let section: SidebarWorkspaceColorSection
     let colorScheme: ColorScheme
     let onToggle: () -> Void
+
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.section == rhs.section && lhs.colorScheme == rhs.colorScheme
     }
 
     var body: some View {
+        let band = headerBand
         Button(action: onToggle) {
             HStack(spacing: 7) {
                 Image(systemName: section.isCollapsed ? "chevron.right" : "chevron.down")
@@ -170,13 +209,19 @@ struct SidebarWorkspaceColorSectionHeader: View, Equatable {
                     .frame(width: 8, height: 8)
                 Text(section.title)
                     .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: band.primaryTextColor))
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 2)
             .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26)
             .contentShape(Rectangle())
-            .background(sectionColor.opacity(0.07))
+            .background(
+                Color(nsColor: band.bandColor)
+                    .opacity(band.bandOpacity)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .padding(.horizontal, SidebarWorkspaceListMetrics.rowOuterHorizontalPadding)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
@@ -188,6 +233,14 @@ struct SidebarWorkspaceColorSectionHeader: View, Equatable {
             hex: section.id.normalizedHex,
             colorScheme: colorScheme
         ) ?? .secondary
+    }
+
+    var headerBand: SidebarWorkspaceColorSectionHeaderBand {
+        .resolve(
+            normalizedHex: section.id.normalizedHex,
+            colorScheme: colorScheme,
+            contrast: colorSchemeContrast
+        )
     }
 
     var accessibilityLabel: String {
