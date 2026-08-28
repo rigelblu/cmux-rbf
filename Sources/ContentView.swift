@@ -12151,6 +12151,7 @@ struct VerticalTabsSidebar: View, Equatable {
             topDropIndicatorVisible: input.topDropIndicatorVisible,
             bottomDropIndicatorVisible: input.bottomDropIndicatorVisible,
             isGrouped: input.groupId != nil,
+            isColorSectionMember: input.isColorSectionMember,
             isFirstRow: input.index == 0,
             shortcutHintText: hintText,
             showsShortcutHints: input.showsModifierShortcutHints,
@@ -13961,6 +13962,9 @@ struct VerticalTabsSidebar: View, Equatable {
         guard let sourceSection = renderContext.colorSectionProjection.sectionByWorkspaceId[draggedTabId] else {
             return basePlan
         }
+        if SidebarWorkspaceColorSectionDropPolicy.allowsDropOutOfSection(action: basePlan.action) {
+            return basePlan
+        }
         guard let indicator = basePlan.indicator,
               let targetWorkspaceId = indicator.tabId,
               let targetSection = renderContext.colorSectionProjection.sectionByWorkspaceId[targetWorkspaceId],
@@ -14454,6 +14458,8 @@ struct VerticalTabsSidebar: View, Equatable {
         let result = SidebarWorkspaceRowInput(
             workspaceId: tab.id,
             groupId: tab.groupId,
+            isColorSectionMember: renderContext.colorSectionProjection
+                .sectionByWorkspaceId[tab.id] != nil,
             index: index,
             workspaceCount: renderContext.workspaceCount,
             workspace: workspaceSnapshot,
@@ -17010,6 +17016,16 @@ struct SidebarTabDropDelegate: DropDelegate {
     let workspaceGroupIdByWorkspaceId: [UUID: UUID?]
     let generatedColorSectionWorkspaceIds: Set<UUID>
     let dragState: SidebarDragState
+
+    /// This delegate serves the sidebar's **empty area** only — its sole
+    /// construction site passes `targetTabId: nil`. A color-section member
+    /// dropped on blank space would leave its section to become a loose
+    /// top-level row, which is not one of the moves `#cm-56` allows, so the
+    /// refusal here is unconditional and stays that way. Dragging into a real
+    /// group is decided by the shared plan both renderers use, not here.
+    private func colorSectionDragIsRefused(draggedTabId: UUID) -> Bool {
+        generatedColorSectionWorkspaceIds.contains(draggedTabId)
+    }
     @Binding var selectedTabIds: Set<UUID>
     @Binding var lastSidebarSelectionIndex: Int?
     let targetRowHeight: CGFloat?
@@ -17137,7 +17153,7 @@ struct SidebarTabDropDelegate: DropDelegate {
             #endif
             return true
         }
-        guard !generatedColorSectionWorkspaceIds.contains(draggedTabId) else {
+        guard !colorSectionDragIsRefused(draggedTabId: draggedTabId) else {
             return false
         }
         let targetIsInReorderScope: Bool = {
@@ -17220,7 +17236,7 @@ struct SidebarTabDropDelegate: DropDelegate {
         if isCrossWindowDrag(draggedTabId) {
             return performCrossWindowDrop(draggedTabId: draggedTabId)
         }
-        guard !generatedColorSectionWorkspaceIds.contains(draggedTabId) else {
+        guard !colorSectionDragIsRefused(draggedTabId: draggedTabId) else {
             return false
         }
         let defaultUsesTopLevelRows = tabManager.sidebarReorderUsesTopLevelRows(

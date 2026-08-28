@@ -1,4 +1,5 @@
 import AppKit
+import CmuxFoundation
 import CmuxWorkspaces
 import CmuxSettings
 import Foundation
@@ -138,6 +139,38 @@ enum SidebarWorkspaceRenderItem {
             }
         }
         return result
+    }
+}
+
+/// Which drops a workspace inside a generated color section may accept.
+///
+/// Extracted as a pure rule because the view-level wrapper that used to hold
+/// it could not be tested, and an untested wrapper is exactly how `#cm-56`
+/// shipped a too-broad refusal once already.
+enum SidebarWorkspaceColorSectionDropPolicy {
+    /// Whether a color-section member's drag may proceed on `action` without
+    /// consulting the same-section rule.
+    ///
+    /// True only for a drop into a real workspace group. That move is already
+    /// reachable from the context menu's **Move to Group**, and one behavior
+    /// may not disagree across entrypoints — joining a group sets `groupId`,
+    /// which makes the workspace ineligible for any color section, so it
+    /// leaves its section exactly as the menu would take it, keeping its color.
+    /// Every other action falls through to the same-section rule, which is
+    /// what keeps a cross-color, standalone-row, or cross-tier drop refused.
+    static func allowsDropOutOfSection(action: SidebarWorkspaceReorderDropAction) -> Bool {
+        guard case .reorder(_, _, let explicitGroupId) = action else { return false }
+        return explicitGroupId != nil
+    }
+
+    /// Whether a row sits *inside* a header and so carries the leading indent.
+    ///
+    /// A real group and a generated color section are different things, but to
+    /// the eye both are containers, and a member of either should read as
+    /// contained. Both renderers delegate here so the inset cannot drift
+    /// between them.
+    static func indentsUnderHeader(isGrouped: Bool, isColorSectionMember: Bool) -> Bool {
+        isGrouped || isColorSectionMember
     }
 }
 

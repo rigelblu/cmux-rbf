@@ -29,6 +29,10 @@ struct SidebarWorkspaceRowModel: Equatable {
     let topDropIndicatorVisible: Bool
     let bottomDropIndicatorVisible: Bool
     let isGrouped: Bool
+    /// Whether this row sits under a generated color-section header (`#cm-56`).
+    /// Kept separate from `isGrouped`, which stays truthful about real
+    /// `WorkspaceGroup` membership; only the indent treats the two alike.
+    let isColorSectionMember: Bool
     let isFirstRow: Bool
     /// Resolved modifier-hold hint text (nil hides the pill).
     let shortcutHintText: String?
@@ -57,6 +61,16 @@ struct SidebarWorkspaceRowModel: Equatable {
     /// apply pass.
     let isMetadataExpanded: Bool
     let isMarkdownExpanded: Bool
+
+    /// Mirrors `SidebarWorkspaceRowSnapshot.isIndentedUnderHeader` so both
+    /// renderers inset a row under a header — real group or color section —
+    /// by the same rule rather than by two independent conditions.
+    var isIndentedUnderHeader: Bool {
+        SidebarWorkspaceColorSectionDropPolicy.indentsUnderHeader(
+            isGrouped: isGrouped,
+            isColorSectionMember: isColorSectionMember
+        )
+    }
 
     var fontScale: CGFloat { settings.sidebarFontScale }
 

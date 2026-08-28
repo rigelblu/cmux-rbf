@@ -9,6 +9,10 @@ import Foundation
 struct SidebarWorkspaceRowSnapshot: Equatable {
     let workspaceId: UUID
     let groupId: UUID?
+    /// Whether this row sits under a generated color-section header (`#cm-56`).
+    /// Mutually exclusive with `groupId != nil` — a workspace inside a real
+    /// group is never projected into a color section.
+    let isColorSectionMember: Bool
     let index: Int
     let workspaceCount: Int
     let workspace: SidebarWorkspaceSnapshotBuilder.Snapshot
@@ -36,4 +40,15 @@ struct SidebarWorkspaceRowSnapshot: Equatable {
     let checklistAddFieldActivationToken: Int
     let isChecklistPopoverPresented: Bool
     let contextMenu: SidebarWorkspaceContextMenuSnapshot
+
+    /// Rows that sit *inside* a header — a real workspace group or a generated
+    /// color section — carry the same leading indent, so the container reads as
+    /// a container in both cases. Defined once here and mirrored by the AppKit
+    /// row model, rather than recomputed at each place that draws an inset.
+    var isIndentedUnderHeader: Bool {
+        SidebarWorkspaceColorSectionDropPolicy.indentsUnderHeader(
+            isGrouped: groupId != nil,
+            isColorSectionMember: isColorSectionMember
+        )
+    }
 }

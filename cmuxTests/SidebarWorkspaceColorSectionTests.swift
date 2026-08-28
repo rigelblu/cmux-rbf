@@ -228,6 +228,48 @@ import Testing
         #expect(interactive != SidebarWorkspaceRenderItem.numberedWorkspaceIds(from: items))
     }
 
+    @Test func colorSectionMemberMayOnlyLeaveItsSectionForARealGroup() {
+        let group = UUID()
+
+        // The one allowed escape: a group-scoped reorder. `Move to Group` in
+        // the context menu performs this same move, so the drag must agree.
+        #expect(SidebarWorkspaceColorSectionDropPolicy.allowsDropOutOfSection(
+            action: .reorder(targetIndex: 2, usesTopLevelRows: false, explicitGroupId: group)
+        ))
+
+        // Everything Scenario 4 exercised stays refused here, and so falls
+        // through to the same-section rule rather than escaping the section.
+        #expect(!SidebarWorkspaceColorSectionDropPolicy.allowsDropOutOfSection(
+            action: .reorder(targetIndex: 2, usesTopLevelRows: true, explicitGroupId: nil)
+        ))
+        #expect(!SidebarWorkspaceColorSectionDropPolicy.allowsDropOutOfSection(
+            action: .crossWindow(insertionIndex: 0, proposedInsertionIndex: 0)
+        ))
+        #expect(!SidebarWorkspaceColorSectionDropPolicy.allowsDropOutOfSection(
+            action: .colorSection(
+                targetWorkspaceId: UUID(),
+                insertBefore: true,
+                memberWorkspaceIds: [UUID()]
+            )
+        ))
+    }
+
+    @Test func colorSectionMembersIndentLikeRealGroupMembers() {
+        // Dogfood 2026-08-28: a color section read as a flat run because its
+        // members sat flush left while a real group's members were inset. Both
+        // headers are containers, so both sets of members carry the indent.
+        #expect(SidebarWorkspaceColorSectionDropPolicy.indentsUnderHeader(
+            isGrouped: false, isColorSectionMember: true
+        ))
+        #expect(SidebarWorkspaceColorSectionDropPolicy.indentsUnderHeader(
+            isGrouped: true, isColorSectionMember: false
+        ))
+        // A loose, uncolored workspace still hangs at the sidebar's own edge.
+        #expect(!SidebarWorkspaceColorSectionDropPolicy.indentsUnderHeader(
+            isGrouped: false, isColorSectionMember: false
+        ))
+    }
+
     @Test func headerBandMatchesCM49ContainerBandAcrossAppearances() {
         let appearances: [(ColorScheme, ColorSchemeContrast, SidebarGroupHeaderBandPalette.RenderedAppearance)] = [
             (.light, .standard, .aqua),

@@ -91,6 +91,7 @@ struct SidebarAppKitRowCellTests {
             topDropIndicatorVisible: false,
             bottomDropIndicatorVisible: false,
             isGrouped: false,
+            isColorSectionMember: false,
             isFirstRow: true,
             shortcutHintText: shortcutHintText,
             showsShortcutHints: shortcutHintText != nil,
@@ -112,6 +113,7 @@ struct SidebarAppKitRowCellTests {
         SidebarWorkspaceRowSnapshot(
             workspaceId: UUID(),
             groupId: nil,
+            isColorSectionMember: false,
             index: 0,
             workspaceCount: 1,
             workspace: makeSnapshot(),

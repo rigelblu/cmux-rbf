@@ -101,6 +101,7 @@ struct SidebarWorkspaceRowSuspensionTests {
             topDropIndicatorVisible: false,
             bottomDropIndicatorVisible: false,
             isGrouped: false,
+            isColorSectionMember: false,
             isFirstRow: true,
             shortcutHintText: nil,
             showsShortcutHints: false,

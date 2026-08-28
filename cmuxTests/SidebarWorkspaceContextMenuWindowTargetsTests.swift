@@ -63,6 +63,7 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
         return SidebarWorkspaceRowSnapshot(
             workspaceId: UUID(),
             groupId: nil,
+            isColorSectionMember: false,
             index: 0,
             workspaceCount: 1,
             workspace: SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(),

@@ -104,8 +104,7 @@ Workspaces that carry a colour but sit outside any group now gather under compac
 - Sections are keyed by hex, so renaming a colour's label retitles the header without disturbing the section or its collapsed state. An unlisted colour reads as **Custom (#RRGGBB)**.
 - Pinned and unpinned tiers stay separate — the same colour can head a section in each, and both share one collapsed state.
 - Collapsing survives relaunch, and selecting a workspace hidden inside a collapsed section expands it first, whether you got there by sidebar history, `⌘1…9`, the CLI, or session restore.
-- Reordering works within a colour section and pin tier. Every other drop — another colour, a real group, a standalone row, the other tier — is refused without changing colour, group, pin, or order.
-- **Known limitation — a coloured workspace can no longer be dragged into a real group.** That drop is now refused along with the rest. Drag an uncoloured workspace in, or use **Move to Group**.
+- Reordering works within a colour section and pin tier. Dragging into a real workspace group also works, matching what **Move to Group** does from the row's menu — the workspace joins the group and keeps its colour. Every other drop — another colour section, a standalone row, the other pin tier — is refused without changing colour, group, pin, or order.
 - **Known limitation — the header ignores global font magnification.** Every other sidebar row scales; this one is pinned at 26pt.
 - **Unverified:** Increase Contrast, Reduce Transparency, grayscale, keyboard focus, and VoiceOver. Light and Dark passed; Tom accepted releasing without the accessibility pass.
 

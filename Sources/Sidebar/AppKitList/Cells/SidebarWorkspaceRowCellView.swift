@@ -1074,7 +1074,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let stripInset = SidebarWorkspaceRowVisualPalette
             .accentStripContentInset(contentPadding: contentPad)
         let leading = outerPad + contentPad + stripInset
-            + (model.isGrouped ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
+            + (model.isIndentedUnderHeader ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
         let trailing = width - outerPad - contentPad
         let contentWidth = max(10, trailing - leading)
         var y: CGFloat = 8
@@ -1331,7 +1331,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             // and hover background shift right with the content. Indenting
             // only the content left the full-width highlight hiding the
             // nesting ("can't tell when a workspace is in a group").
-            let bgX = outerPad + (model.isGrouped ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
+            let bgX = outerPad + (model.isIndentedUnderHeader ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
             backgroundView.frame = NSRect(x: bgX, y: 0, width: max(0, width - outerPad - bgX), height: y)
             // railView is a child of backgroundView, so this frame is in
             // background-local coordinates. The strip runs flush to the

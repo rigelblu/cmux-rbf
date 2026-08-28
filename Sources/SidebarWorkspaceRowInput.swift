@@ -12,6 +12,10 @@ import Foundation
 struct SidebarWorkspaceRowInput {
     let workspaceId: UUID
     let groupId: UUID?
+    /// Whether this workspace is projected into a generated color section
+    /// (`#cm-56`). Resolved once by the sidebar owner from the shared
+    /// projection so both renderers indent from one answer.
+    let isColorSectionMember: Bool
     let index: Int
     let workspaceCount: Int
     let workspace: SidebarWorkspaceSnapshotBuilder.Snapshot
@@ -51,6 +55,7 @@ struct SidebarWorkspaceRowInput {
         return SidebarWorkspaceRowSnapshot(
             workspaceId: workspaceId,
             groupId: groupId,
+            isColorSectionMember: isColorSectionMember,
             index: index,
             workspaceCount: workspaceCount,
             workspace: workspace,

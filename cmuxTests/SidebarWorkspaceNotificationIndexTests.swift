@@ -325,6 +325,7 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         SidebarWorkspaceRowInput(
             workspaceId: workspaceId,
             groupId: groupId,
+            isColorSectionMember: false,
             index: 0,
             workspaceCount: 3,
             workspace: SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: customColorHex),
