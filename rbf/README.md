@@ -95,6 +95,20 @@ Every workspace-group header carries a band across its whole row, so the contain
 - Group names follow the appearance of their bands, including live Light ↔ Dark changes. v0.17.1 retires v0.17.0's black-on-dark limitation.
 - **Unverified:** Reduce Transparency and Increase Contrast. Tom accepted releasing without those two checks.
 
+## 🟠⋯ Scan your standalone workspaces by what their colour means
+
+Workspaces that carry a colour but sit outside any group now gather under compact, collapsible colour headers, named from the label you gave that colour — **Focus (Teal)**, **Review (Amber)**. The flat run of loose rows becomes a list you can scan by meaning. Real workspace groups and uncoloured workspaces are left exactly as they were.
+
+- **A colour section is not a group.** It has a chevron, a swatch, and a title, and nothing else — no folder icon, no workspace number, no active state, no group actions. Membership is derived from the colour, so there is nothing to maintain.
+- **Real group membership always wins.** A coloured workspace inside a group stays in that group; only loose workspaces gather. Recolouring a group member changes its colour and moves nothing.
+- Sections are keyed by hex, so renaming a colour's label retitles the header without disturbing the section or its collapsed state. An unlisted colour reads as **Custom (#RRGGBB)**.
+- Pinned and unpinned tiers stay separate — the same colour can head a section in each, and both share one collapsed state.
+- Collapsing survives relaunch, and selecting a workspace hidden inside a collapsed section expands it first, whether you got there by sidebar history, `⌘1…9`, the CLI, or session restore.
+- Reordering works within a colour section and pin tier. Every other drop — another colour, a real group, a standalone row, the other tier — is refused without changing colour, group, pin, or order.
+- **Known limitation — a coloured workspace can no longer be dragged into a real group.** That drop is now refused along with the rest. Drag an uncoloured workspace in, or use **Move to Group**.
+- **Known limitation — the header ignores global font magnification.** Every other sidebar row scales; this one is pinned at 26pt.
+- **Unverified:** Increase Contrast, Reduce Transparency, grayscale, keyboard focus, and VoiceOver. Light and Dark passed; Tom accepted releasing without the accessibility pass.
+
 ## 🟠⋯ Zoom once and have all of cmux scale
 `⇧⌘=` and `⇧⌘-` resize everything together — terminals, the sidebar, tab bars, the command palette, Settings, browser panes, the markdown viewer, and text previews. `⇧⌘0` returns to normal.
 

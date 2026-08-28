@@ -6,17 +6,28 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 ## 🟠⋯ Changed for End Users
+- 2026-08-23 - feat | Antigravity CLI sessions can now automatically name their cmux workspace and tab through a supported Naming Agent you explicitly select. Run `cmux hooks agy install --yes`, enable Workspace Auto-Naming, and choose an installed supported Naming Agent; manual names still always win (#cm-47)
+- **Known limitation — Naming Agent → Automatic does not run Antigravity itself yet.** cmux reads Antigravity's bounded current-conversation transcript, but it will not invoke `agy` as a summarizer until that can be proven isolated from the real Antigravity home and useful tools. Select Claude Code, Codex, Grok, OpenCode, Pi, or OMP for now (#cm-47)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-23 - feat (technical) | the `antigravity` hook adapter now accepts only explicit `fullyIdle: true` completion boundaries, validates the current conversation's fixed transcript path with descriptor-relative no-follow opens, reads at most the final 512 KiB from the verified regular-file descriptor, and feeds only completed human user/model text into the existing locked auto-naming and `workspace.set_auto_title` path (#cm-47)
+
+---
+
+# 🔵⋯ v0.21.0 (2026-08-28) — #cm-56
+*Cuts v0.21.0 for local dogfooding. Releases `#cm-56` only — `#cm-47` stays unreleased, held for one combined CM-47 delivery, and `#cm-54`/`#cm-55` remain in Review. Versions track release order, so those take later numbers than this one despite lower ids.*
+
+## 🟠⋯ Changed for End Users
 - 2026-08-26 - feat (ux) | **scan standalone workspaces by the meaning of their color.** Ungrouped colored workspaces now appear under compact collapsible color headers named from the effective palette label and name, styled with the same rounded, inset, appearance-aware band as a real group's header; real groups and uncolored workspaces keep their existing shape, and selecting a hidden member expands its color first (#cm-56)
 - **Known limitation — Increase Contrast, Reduce Transparency, grayscale, keyboard focus, and VoiceOver were accepted unverified.** Light and Dark passed, along with same-color-section reorder and every rejected cross-color, cross-group, standalone-row, and cross-tier drop; the accessibility-state pass was explicitly skipped (#cm-56)
 - **Known limitation — a colored ungrouped workspace can no longer be dragged into a real group.** Any workspace with a color now rejects that drop, the same way a drop into a different color section is rejected; drag a colorless workspace in, or use the group's own **Move to Group** action to move a colored one (#cm-56)
-- 2026-08-23 - feat | Antigravity CLI sessions can now automatically name their cmux workspace and tab through a supported Naming Agent you explicitly select. Run `cmux hooks agy install --yes`, enable Workspace Auto-Naming, and choose an installed supported Naming Agent; manual names still always win (#cm-47)
-- **Known limitation — Naming Agent → Automatic does not run Antigravity itself yet.** cmux reads Antigravity's bounded current-conversation transcript, but it will not invoke `agy` as a summarizer until that can be proven isolated from the real Antigravity home and useful tools. Select Claude Code, Codex, Grok, OpenCode, Pi, or OMP for now (#cm-47)
+- **Known limitation — the color-section header ignores the global font-magnification setting.** Every other sidebar row scales with it; this header is pinned at 26pt. Recorded as a dated decision, to fix before any further sidebar row work (#cm-56)
 
 ## 🟠⋯ Changed for Developers
 - 2026-08-26 - feat (technical) | one immutable color-section projection and one mutation path now drive SwiftUI/AppKit headers, shared-hex collapse persistence, active-member reveal, and same-color/same-pin-tier slot-preserving reorder without creating real workspace groups; the header band reuses `SidebarGroupHeaderBandPalette` from #cm-49 for renderer parity. The focused CM-56 suite passed 10/10 including 2/2 renderer-parity checks, adjacent real-group/numbering/drop suites passed 78/78, and test wiring passed across 666 files (#cm-56)
 - 2026-08-27 - fix (technical) | an independent scope-review sweep found that switching `visibleWorkspaceRowIds` to `.workspace`-only filtering silently dropped every real group's header from the set of valid SwiftUI reorder-drop targets too, not just the intended color-section duplicate — restored via a dedicated `interactiveRowIds` helper that keeps real-group anchors. Also closed a coverage gap: the `Custom (#RRGGBB)` fallback label had no test asserting its actual title (#cm-56)
 - 2026-08-27 - fix (technical) | a second, independent code review of the full slice found and closed: the AppKit renderer's own `reorderDropTargets()` still supplied a phantom target for a collapsed color section's hidden first member (SwiftUI already excluded it); `rowWorkspaceId` trapped on an empty `memberWorkspaceIds` array reachable through the public initializer, now returns `nil` instead; and the live-label-update `UserDefaults` observer could mutate `@State` off the main thread (#cm-56)
-- 2026-08-23 - feat (technical) | the `antigravity` hook adapter now accepts only explicit `fullyIdle: true` completion boundaries, validates the current conversation's fixed transcript path with descriptor-relative no-follow opens, reads at most the final 512 KiB from the verified regular-file descriptor, and feeds only completed human user/model text into the existing locked auto-naming and `workspace.set_auto_title` path (#cm-47)
+- 2026-08-28 - test (technical) | the `interactiveRowIds` regression guard is mutation-verified: reverting it to the buggy body makes its test fail on the missing group anchor while every other test stays green, so the guard genuinely discriminates rather than passing by construction (#cm-56)
 
 ---
 
