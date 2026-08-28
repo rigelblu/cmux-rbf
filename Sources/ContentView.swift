@@ -15418,7 +15418,13 @@ struct TabItemView: View, Equatable {
         lhs.snapshot == rhs.snapshot
     }
 
-    @Environment(\.colorScheme) private var colorScheme
+    // Not `private`: the colour submenu's rows moved out of this file into
+    // `WorkspaceColorMenuRows` so the group header could draw the same ones
+    // (`#cm-60`), and that call site passes this row's scheme in. Left `private`,
+    // `colorScheme` resolves to SwiftUI's `View.colorScheme(_:)` modifier there
+    // instead — a method reference, not a value — which is a confusing type error
+    // rather than a missing-member one.
+    @Environment(\.colorScheme) var colorScheme
     // Global font magnification percent, read once per row instead of through a
     // per-label `CmuxFontModifier`. Each `.cmuxFont(...)` is a custom
     // `@Environment`-reading `ViewModifier`; with 100+ workspaces continuously
@@ -16554,17 +16560,13 @@ struct TabItemView: View, Equatable {
     }
 
     private func showInvalidColorAlert(_ value: String) {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = String(localized: "alert.invalidColor.title", defaultValue: "Invalid Color")
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            alert.informativeText = String(localized: "alert.invalidColor.emptyMessage", defaultValue: "Enter a hex color in the format #RRGGBB.")
-        } else {
-            alert.informativeText = String(localized: "alert.invalidColor.invalidMessage", defaultValue: "\"\(trimmed)\" is not a valid hex color. Use #RRGGBB.")
-        }
-        alert.addButton(withTitle: String(localized: "alert.invalidColor.ok", defaultValue: "OK"))
-        _ = alert.runCmuxModal(
+        // One alert body for all three custom-colour prompts — this SwiftUI row,
+        // the AppKit row, and the group header (`SidebarWorkspaceGroupDialogs`).
+        // There were three identical copies before `#cm-60`; a wording fix to one
+        // of them would have left the other two saying something different about
+        // the same bad hex.
+        presentInvalidWorkspaceColorAlert(
+            value,
             presentingWindow: AppDelegate.shared?.mainWindowContainingWorkspace(workspaceId)
         )
     }

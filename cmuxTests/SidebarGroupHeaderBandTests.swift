@@ -460,7 +460,7 @@ struct SidebarColorSubmenuTests {
 
     /// Fires a menu item the way AppKit does, so the stored closure runs.
     private static func click(_ item: NSMenuItem) {
-        guard let action = item.action, let target = item.target else { return }
+        guard let action = item.action, let target = item.target as? NSObject else { return }
         _ = target.perform(action, with: item)
     }
 
@@ -551,43 +551,30 @@ struct SidebarColorSubmenuTests {
         }
         Self.click(noColor)
 
-        let paletteRow = menu.items.first { item in
-            !item.isSeparatorItem
-                && item.title != Self.noColorTitle
-                && item.title != Self.customColorTitle
-                && item.image != nil
+        // Resolve the row's own hex from the shared candidate model, so the
+        // assertion below is "this row applies ITS colour" rather than the far
+        // weaker "it applies some colour". A mutation that made every palette
+        // row apply one fixed hex survived the non-nil form of this check.
+        let entries = WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: [nil])
+            .compactMap { candidate -> (title: String, hex: String)? in
+                if case let .paletteEntry(entry) = candidate.kind {
+                    return (entry.displayName, entry.hex)
+                }
+                return nil
+            }
+        guard let expected = entries.first else {
+            Issue.record("palette has no entries to click")
+            return
         }
-        guard let paletteRow else {
-            Issue.record("no palette row to click")
+        guard let paletteRow = Self.item(menu, titled: expected.title) else {
+            Issue.record("palette row \(expected.title) missing from the submenu")
             return
         }
         Self.click(paletteRow)
 
         #expect(applied.count == 2)
         #expect(applied.first ?? "unset" == nil)
-        #expect(applied.last.flatMap { $0 } != nil)
-    }
-
-    /// Omitting the prompt drops that row and nothing else.
-    ///
-    /// The parameter exists so a caller without a hex-entry alert can still render
-    /// the palette. If it ever removed more than its own row the two menus would
-    /// diverge silently.
-    @Test
-    func omittingTheCustomColorPromptRemovesOnlyThatRow() {
-        let withPrompt = SidebarColorSubmenu.make(
-            targetHexes: [nil], apply: { _ in }, promptCustomColor: {}
-        )
-        let withoutPrompt = SidebarColorSubmenu.make(
-            targetHexes: [nil], apply: { _ in }, promptCustomColor: nil
-        )
-
-        #expect(Self.titles(withPrompt).contains(Self.customColorTitle))
-        #expect(!Self.titles(withoutPrompt).contains(Self.customColorTitle))
-        #expect(
-            Self.titles(withPrompt).filter { $0 != Self.customColorTitle }
-                == Self.titles(withoutPrompt)
-        )
+        #expect(applied.last.flatMap { $0 } == expected.hex)
     }
 }
 
@@ -763,7 +750,7 @@ struct SidebarGroupHeaderColorMenuTests {
         let noColor = try #require(submenu.items.first { $0.title == Self.noColorTitle })
 
         let action = try #require(noColor.action)
-        let target = try #require(noColor.target)
+        let target = try #require(noColor.target as? NSObject)
         _ = target.perform(action, with: noColor)
 
         #expect(applied.count == 1)

@@ -32,8 +32,9 @@ struct WorkspaceColorMenuRows: View {
     let colorScheme: ColorScheme
     /// The chosen hex, or `nil` for **No Color**.
     let apply: (String?) -> Void
-    /// Opens the `#RRGGBB` entry alert. `nil` omits that row.
-    let promptCustomColor: (() -> Void)?
+    /// Opens the `#RRGGBB` entry alert. Required, not optional: both menus offer the
+    /// row, and an optional here would be a branch only a test could take.
+    let promptCustomColor: () -> Void
 
     var body: some View {
         let candidates = WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: targetHexes)
@@ -53,15 +54,13 @@ struct WorkspaceColorMenuRows: View {
                     )
                 }
 
-                if let promptCustomColor {
-                    Button {
-                        promptCustomColor()
-                    } label: {
-                        Label(
-                            String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
-                            systemImage: "paintpalette"
-                        )
-                    }
+                Button {
+                    promptCustomColor()
+                } label: {
+                    Label(
+                        String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
+                        systemImage: "paintpalette"
+                    )
                 }
 
                 Divider()

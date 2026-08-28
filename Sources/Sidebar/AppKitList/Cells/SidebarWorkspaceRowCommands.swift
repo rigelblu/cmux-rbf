@@ -850,11 +850,13 @@ enum SidebarColorSubmenu {
     ///     **No Color** looking inert. Collapsing an unresolvable target to `nil` instead
     ///     of dropping it would make No Color read as mixed.
     ///   - apply: the chosen hex, or `nil` for **No Color**.
-    ///   - promptCustomColor: opens the `#RRGGBB` entry alert. `nil` omits that row.
+    ///   - promptCustomColor: opens the `#RRGGBB` entry alert. Required, not optional:
+    ///     both menus offer the row, and an optional here would be a branch only a test
+    ///     could take — a guard that stays green whatever the code does.
     static func make(
         targetHexes: [String?],
         apply: @escaping (String?) -> Void,
-        promptCustomColor: (() -> Void)?
+        promptCustomColor: @escaping () -> Void
     ) -> NSMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
@@ -875,17 +877,15 @@ enum SidebarColorSubmenu {
                 noColorItem.state = menuItemState(candidate.state)
                 submenu.addItem(noColorItem)
 
-                if let promptCustomColor {
-                    let customItem = SidebarRowMenuActionItem(
-                        title: String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
-                        run: promptCustomColor
-                    )
-                    customItem.isEnabled = true
-                    customItem.image = RenderableSystemSymbol.configuredAppKitImage(
-                        systemName: "paintpalette", pointSize: 13, weight: nil
-                    )
-                    submenu.addItem(customItem)
-                }
+                let customItem = SidebarRowMenuActionItem(
+                    title: String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
+                    run: promptCustomColor
+                )
+                customItem.isEnabled = true
+                customItem.image = RenderableSystemSymbol.configuredAppKitImage(
+                    systemName: "paintpalette", pointSize: 13, weight: nil
+                )
+                submenu.addItem(customItem)
                 submenu.addItem(.separator())
 
             case let .paletteEntry(entry):
