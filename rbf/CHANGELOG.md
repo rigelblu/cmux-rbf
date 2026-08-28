@@ -6,14 +6,23 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 ## 🟠⋯ Changed for End Users
-- 2026-08-28 - fix (ux) | **a colour section now reads as a container.** Workspaces inside one are indented like the members of a real workspace group, instead of sitting flush against the sidebar edge (#cm-56)
-- 2026-08-28 - fix (ux) | **you can drag a coloured workspace into a real group again.** v0.21.0 refused that drop and its release notes recorded the refusal as intended; it was not. The row's own **Move to Group** menu already performed the same move, so the drag was disagreeing with the menu about one behaviour. Every other rejected drop still rejects — another colour section, a standalone row, the other pin tier — and this retires v0.21.0's Known limitation (#cm-56)
 - 2026-08-23 - feat | Antigravity CLI sessions can now automatically name their cmux workspace and tab through a supported Naming Agent you explicitly select. Run `cmux hooks agy install --yes`, enable Workspace Auto-Naming, and choose an installed supported Naming Agent; manual names still always win (#cm-47)
 - **Known limitation — Naming Agent → Automatic does not run Antigravity itself yet.** cmux reads Antigravity's bounded current-conversation transcript, but it will not invoke `agy` as a summarizer until that can be proven isolated from the real Antigravity home and useful tools. Select Claude Code, Codex, Grok, OpenCode, Pi, or OMP for now (#cm-47)
 
 ## 🟠⋯ Changed for Developers
-- 2026-08-28 - fix (technical) | colour-section membership is resolved once from the shared projection and threaded to both sidebar renderers, which now delegate the indent to one rule (`SidebarWorkspaceColorSectionDropPolicy.indentsUnderHeader`) rather than each testing `groupId != nil`. `isGrouped` stays truthful about real `WorkspaceGroup` membership. The drop rule that refused a colour member every non-same-section target moved out of an untestable view wrapper into `allowsDropOutOfSection`, with tests for both — the previous version of that logic was unreachable from any test, which is how a too-broad refusal shipped unseen (#cm-56)
 - 2026-08-23 - feat (technical) | the `antigravity` hook adapter now accepts only explicit `fullyIdle: true` completion boundaries, validates the current conversation's fixed transcript path with descriptor-relative no-follow opens, reads at most the final 512 KiB from the verified regular-file descriptor, and feeds only completed human user/model text into the existing locked auto-naming and `workspace.set_auto_title` path (#cm-47)
+
+---
+
+# 🔵⋯ v0.21.1 (2026-08-28) — #cm-56
+*Two fixes from dogfooding v0.21.0, cut the same day. One of them retires a Known limitation v0.21.0 shipped: that release recorded the refused drag as intended behaviour, and it was not.*
+
+## 🟠⋯ Changed for End Users
+- 2026-08-28 - fix (ux) | **a colour section now reads as a container.** Workspaces inside one are indented like the members of a real workspace group, instead of sitting flush against the sidebar edge (#cm-56)
+- 2026-08-28 - fix (ux) | **you can drag a coloured workspace into a real group again.** v0.21.0 refused that drop and its release notes recorded the refusal as intended; it was not. The row's own **Move to Group** menu already performed the same move, so the drag was disagreeing with the menu about one behaviour. Every other rejected drop still rejects — another colour section, a standalone row, the other pin tier — and this retires v0.21.0's Known limitation (#cm-56)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-28 - fix (technical) | colour-section membership is resolved once from the shared projection and threaded to both sidebar renderers, which now delegate the indent to one rule (`SidebarWorkspaceColorSectionDropPolicy.indentsUnderHeader`) rather than each testing `groupId != nil`. `isGrouped` stays truthful about real `WorkspaceGroup` membership. The drop rule that refused a colour member every non-same-section target moved out of an untestable view wrapper into `allowsDropOutOfSection`, with tests for both — the previous version of that logic was unreachable from any test, which is how a too-broad refusal shipped unseen (#cm-56)
 
 ---
 
