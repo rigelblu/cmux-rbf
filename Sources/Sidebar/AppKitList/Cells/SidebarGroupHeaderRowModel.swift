@@ -12,7 +12,16 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     let anchorWorkspaceId: UUID
     let name: String
     let iconSymbol: String
+    /// What the band paints: the group's own colour if it has one, else the
+    /// `cmux.json` colour resolved for the anchor's cwd (`#cm-49`).
     let tintHex: String?
+    /// The group's own colour override, and nothing resolved on its behalf.
+    ///
+    /// Separate from `tintHex` because the colour menu's checkmark has to mean
+    /// *you picked this*. Feeding it the resolved tint would tick a palette row
+    /// on a group that only inherited a cwd colour, and leave **No Color**
+    /// looking inert on the one group where it is the truthful state.
+    let customColorHex: String?
     let isCollapsed: Bool
     let isPinned: Bool
     let isAnchorActive: Bool
@@ -48,6 +57,10 @@ struct SidebarGroupHeaderRowActions {
     let onTapPlus: () -> Void
     let onRunResolvedItem: (CmuxResolvedConfigMenuAction) -> Void
     let onRename: () -> Void
+    /// Sets or clears the group's colour override; `nil` is **No Color**.
+    let onSetColor: (String?) -> Void
+    /// Opens the `#RRGGBB` entry alert for this group.
+    let onPromptCustomColor: () -> Void
     let onTogglePinned: () -> Void
     let onMarkRead: () -> Void
     let onMarkUnread: () -> Void

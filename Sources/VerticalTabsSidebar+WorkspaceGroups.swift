@@ -77,6 +77,7 @@ extension VerticalTabsSidebar {
             name: group.name,
             iconSymbol: effectiveIcon,
             tintHex: effectiveColor,
+            customColorHex: group.customColor,
             isCollapsed: group.isCollapsed,
             isPinned: group.isPinned,
             isAnchorActive: isAnchorActive,
@@ -156,6 +157,18 @@ extension VerticalTabsSidebar {
                     tabManager: tabManager,
                     groupId: groupId,
                     currentName: currentName
+                )
+            },
+            onSetColor: { [weak tabManager, groupId = group.id] hex in
+                tabManager?.setWorkspaceGroupColor(groupId: groupId, hex: hex)
+            },
+            onPromptCustomColor: { [weak tabManager, groupId = group.id, anchorId = group.anchorWorkspaceId, currentHex = group.customColor] in
+                guard let tabManager else { return }
+                presentSidebarWorkspaceGroupCustomColorPrompt(
+                    tabManager: tabManager,
+                    groupId: groupId,
+                    anchorWorkspaceId: anchorId,
+                    currentHex: currentHex
                 )
             },
             onTogglePinned: { [weak tabManager, groupId = group.id] in
@@ -334,6 +347,7 @@ extension VerticalTabsSidebar {
             name: group.name,
             iconSymbol: effectiveIcon,
             tintHex: effectiveColor,
+            customColorHex: group.customColor,
             isCollapsed: group.isCollapsed,
             isPinned: group.isPinned,
             isAnchorActive: isAnchorActive,
@@ -384,6 +398,7 @@ extension VerticalTabsSidebar {
             name: snapshot.name,
             iconSymbol: snapshot.iconSymbol,
             tintHex: snapshot.tintHex,
+            customColorHex: snapshot.customColorHex,
             isCollapsed: snapshot.isCollapsed,
             isPinned: snapshot.isPinned,
             isAnchorActive: snapshot.isAnchorActive,
@@ -456,6 +471,18 @@ extension VerticalTabsSidebar {
                     tabManager: tabManager,
                     groupId: groupId,
                     currentName: currentName
+                )
+            },
+            onSetColor: { [weak tabManager, groupId = snapshot.groupId] hex in
+                tabManager?.setWorkspaceGroupColor(groupId: groupId, hex: hex)
+            },
+            onPromptCustomColor: { [weak tabManager, groupId = snapshot.groupId, anchorId = snapshot.anchorWorkspaceId, currentHex = snapshot.customColorHex] in
+                guard let tabManager else { return }
+                presentSidebarWorkspaceGroupCustomColorPrompt(
+                    tabManager: tabManager,
+                    groupId: groupId,
+                    anchorWorkspaceId: anchorId,
+                    currentHex: currentHex
                 )
             },
             onTogglePinned: { [weak tabManager, groupId = snapshot.groupId] in

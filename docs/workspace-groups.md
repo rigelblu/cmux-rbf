@@ -40,7 +40,7 @@ Right-click any workspace in the sidebar, choose **New Empty Workspace Group** f
 
 ### From the group header context menu
 
-Right-click an existing group's header for: **Rename Group…**, **Pin / Unpin Group**, **Edit Group Config…** (opens `~/.config/cmux/cmux.json`), **Open Workspace Groups Docs**, **Ungroup Workspaces**, **Delete Group**. Ungroup Workspaces keeps the workspaces and removes only the group container. Delete Group closes the group header workspace and every workspace inside the group; if the group contains child workspaces, it prompts for confirmation first.
+Right-click an existing group's header for: **Rename Group…**, **Group Color**, **Pin / Unpin Group**, **Edit Group Config…** (opens `~/.config/cmux/cmux.json`), **Open Workspace Groups Docs**, **Ungroup Workspaces**, **Delete Group**. **Group Color** is the same palette a workspace offers, semantic labels included, and it sets the group's own `customColor`. **No Color** clears that override — which returns the header to the neutral band *unless* `cmux.json` resolves a color for the anchor's cwd, in which case the configured color shows through. The checkmark always tracks the group's own color, never a color it inherited from config, so a ticked **No Color** beside a colored band means “the color is coming from your config, not from you”. Ungroup Workspaces keeps the workspaces and removes only the group container. Delete Group closes the group header workspace and every workspace inside the group; if the group contains child workspaces, it prompts for confirmation first.
 
 ### From the `+` button on a group header
 

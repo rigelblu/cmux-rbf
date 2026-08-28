@@ -1,4 +1,5 @@
 import AppKit
+import CmuxSettings
 
 @MainActor
 func presentSidebarWorkspaceGroupRenamePrompt(
@@ -39,6 +40,67 @@ func presentSidebarWorkspaceGroupRenamePrompt(
     let response = alert.runCmuxModal()
     guard response == .alertFirstButtonReturn else { return }
     tabManager.renameWorkspaceGroup(groupId: groupId, name: input.stringValue)
+}
+
+/// `#RRGGBB` entry for a group's colour, the twin of the workspace row's
+/// **Choose Custom Color…**.
+///
+/// Deliberately hex-only, like `workspace.group.set_color`: it normalizes through
+/// `addCustomColor`, which never resolves a palette name or a semantic label. A
+/// typed label such as `GOAL` is an invalid colour here, and says so, rather than
+/// quietly resolving — the group menu shows labels, but only ever passes hexes.
+@MainActor
+func presentSidebarWorkspaceGroupCustomColorPrompt(
+    tabManager: TabManager,
+    groupId: UUID,
+    anchorWorkspaceId: UUID,
+    currentHex: String?
+) {
+    let presentingWindow = AppDelegate.shared?.mainWindowContainingWorkspace(anchorWorkspaceId)
+    let alert = NSAlert()
+    alert.messageText = String(
+        localized: "workspaceGroup.customColor.title",
+        defaultValue: "Custom Group Color"
+    )
+    alert.informativeText = String(
+        localized: "alert.customColor.message",
+        defaultValue: "Enter a hex color in the format #RRGGBB."
+    )
+    let seed = currentHex ?? WorkspaceTabColorSettings.customPaletteEntries().first?.hex ?? ""
+    let input = NSTextField(string: seed)
+    input.placeholderString = "#1565C0"
+    input.frame = NSRect(x: 0, y: 0, width: 240, height: 22)
+    alert.accessoryView = input
+    alert.addButton(withTitle: String(localized: "alert.customColor.apply", defaultValue: "Apply"))
+    alert.addButton(withTitle: String(localized: "alert.customColor.cancel", defaultValue: "Cancel"))
+    let alertWindow = alert.window
+    alertWindow.initialFirstResponder = input
+    let response = alert.runCmuxModal(presentingWindow: presentingWindow) { _ in
+        alertWindow.makeFirstResponder(input)
+        input.selectText(nil)
+    }
+    guard response == .alertFirstButtonReturn else { return }
+    guard let normalized = WorkspaceTabColorSettings.addCustomColor(input.stringValue) else {
+        presentInvalidWorkspaceColorAlert(input.stringValue, presentingWindow: presentingWindow)
+        return
+    }
+    tabManager.setWorkspaceGroupColor(groupId: groupId, hex: normalized)
+}
+
+/// Shared "that is not a hex colour" alert for both custom-colour prompts.
+@MainActor
+func presentInvalidWorkspaceColorAlert(_ value: String, presentingWindow: NSWindow?) {
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = String(localized: "alert.invalidColor.title", defaultValue: "Invalid Color")
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+        alert.informativeText = String(localized: "alert.invalidColor.emptyMessage", defaultValue: "Enter a hex color in the format #RRGGBB.")
+    } else {
+        alert.informativeText = String(localized: "alert.invalidColor.invalidMessage", defaultValue: "\"\(trimmed)\" is not a valid hex color. Use #RRGGBB.")
+    }
+    alert.addButton(withTitle: String(localized: "alert.invalidColor.ok", defaultValue: "OK"))
+    _ = alert.runCmuxModal(presentingWindow: presentingWindow)
 }
 
 /// Confirmation dialog for destructive group deletion.

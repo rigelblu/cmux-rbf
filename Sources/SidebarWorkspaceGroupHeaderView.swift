@@ -16,6 +16,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             lhs.name == rhs.name &&
             lhs.iconSymbol == rhs.iconSymbol &&
             lhs.tintHex == rhs.tintHex &&
+            lhs.customColorHex == rhs.customColorHex &&
             lhs.isCollapsed == rhs.isCollapsed &&
             lhs.isPinned == rhs.isPinned &&
             lhs.isAnchorActive == rhs.isAnchorActive &&
@@ -48,7 +49,11 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     let anchorWorkspaceId: UUID
     let name: String
     let iconSymbol: String
+    /// What the band paints: `customColor ?? cwdConfig.color` (`#cm-49`).
     let tintHex: String?
+    /// The group's own colour override, so the colour menu's checkmark means
+    /// *you picked this* rather than *something resolved this for you*.
+    let customColorHex: String?
     let isCollapsed: Bool
     let isPinned: Bool
     let isAnchorActive: Bool
@@ -81,6 +86,10 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     let onTapPlus: () -> Void
     let onRunResolvedItem: (CmuxResolvedConfigMenuAction) -> Void
     let onRename: () -> Void
+    /// Sets or clears the group's colour override; `nil` is **No Color**.
+    let onSetColor: (String?) -> Void
+    /// Opens the `#RRGGBB` entry alert for this group.
+    let onPromptCustomColor: () -> Void
     let onTogglePinned: () -> Void
     let onMarkRead: () -> Void
     let onMarkUnread: () -> Void
@@ -357,6 +366,24 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                 ),
                 action: onRename
             )
+            // Beside Rename, above Pin: a group's name and its colour are its
+            // identity, and the pin is where it sits. Appending it near
+            // Ungroup/Delete would bury an everyday action between two
+            // destructive ones.
+            Menu(
+                String(
+                    localized: "workspaceGroup.contextMenu.color",
+                    defaultValue: "Group Color"
+                )
+            ) {
+                // `customColorHex`, never `tintHex` — see the property's doc.
+                WorkspaceColorMenuRows(
+                    targetHexes: [customColorHex],
+                    colorScheme: colorScheme,
+                    apply: onSetColor,
+                    promptCustomColor: onPromptCustomColor
+                )
+            }
             Button(
                 isPinned
                     ? String(

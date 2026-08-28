@@ -227,17 +227,10 @@ struct SidebarWorkspaceRowCommands {
     }
 
     private func showInvalidColorAlert(_ value: String) {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = String(localized: "alert.invalidColor.title", defaultValue: "Invalid Color")
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            alert.informativeText = String(localized: "alert.invalidColor.emptyMessage", defaultValue: "Enter a hex color in the format #RRGGBB.")
-        } else {
-            alert.informativeText = String(localized: "alert.invalidColor.invalidMessage", defaultValue: "\"\(trimmed)\" is not a valid hex color. Use #RRGGBB.")
-        }
-        alert.addButton(withTitle: String(localized: "alert.invalidColor.ok", defaultValue: "OK"))
-        _ = alert.runCmuxModal(
+        // One alert for both custom-colour prompts (`SidebarWorkspaceGroupDialogs`),
+        // so a workspace and a group say the same thing about the same bad hex.
+        presentInvalidWorkspaceColorAlert(
+            value,
             presentingWindow: AppDelegate.shared?.mainWindowContainingWorkspace(tab.id)
         )
     }
@@ -572,85 +565,15 @@ struct SidebarWorkspaceRowMenuBuilder {
     }
 
     private func addColorMenu(to menu: NSMenu, tabManager: TabManager) {
-        let submenu = NSMenu()
-        submenu.autoenablesItems = false
-
         // Every workspace the action will apply to, not just the clicked one. This menu
         // has always acted on `targetIds` while reading `tab.customColor`, so a checkmark
         // could not be truthful for a multi-selection.
-        let targetHexes = colorMenuTargetHexes(tabManager)
-        let candidates = WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: targetHexes)
-
-        for candidate in candidates {
-            switch candidate.kind {
-            case .noColor:
-                // Unconditional: a row that disappears when nothing is coloured cannot
-                // carry state, and "Clear Color" with a checkmark reads as "clearing is on".
-                let noColorItem = item(
-                    String(localized: "contextMenu.noColor", defaultValue: "No Color")
-                ) { [commands] in
-                    commands.applyTabColor(nil)
-                }
-                noColorItem.image = RenderableSystemSymbol.configuredAppKitImage(
-                    systemName: "xmark.circle", pointSize: 13, weight: nil
-                )
-                noColorItem.state = Self.menuItemState(candidate.state)
-                submenu.addItem(noColorItem)
-
-                let customItem = item(
-                    String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…")
-                ) { [commands] in
-                    commands.promptCustomColor()
-                }
-                customItem.image = RenderableSystemSymbol.configuredAppKitImage(
-                    systemName: "paintpalette", pointSize: 13, weight: nil
-                )
-                submenu.addItem(customItem)
-                submenu.addItem(.separator())
-
-            case let .paletteEntry(entry):
-                // Meaning first, raw identity second: "GOAL: Primary (Teal)".
-                submenu.addItem(colorMenuItem(
-                    title: entry.displayName,
-                    hex: entry.hex,
-                    state: candidate.state
-                ))
-
-            case let .unlisted(hex):
-                // A colour a selected workspace still carries after its palette entry was
-                // removed. Truthful current state, never a palette write.
-                // One format string taking the hex, so the frame is translated and the
-                // colour value never is.
-                submenu.addItem(colorMenuItem(
-                    title: String(
-                        format: String(
-                            localized: "contextMenu.unlistedColor",
-                            defaultValue: "Custom (%@)"
-                        ),
-                        hex
-                    ),
-                    hex: hex,
-                    state: candidate.state
-                ))
-
-            case .editLabels:
-                // Assignment above, label management below. A transient menu is the wrong
-                // place for a text field, so this navigates to Settings instead.
-                submenu.addItem(.separator())
-                let editItem = item(
-                    String(localized: "contextMenu.editColorLabels", defaultValue: "Edit Color Labels…")
-                ) {
-                    AppDelegate.presentWorkspaceColorLabelEditor()
-                }
-                editItem.image = RenderableSystemSymbol.configuredAppKitImage(
-                    systemName: "tag", pointSize: 13, weight: nil
-                )
-                submenu.addItem(editItem)
-            }
-        }
-
         let parent = item(String(localized: "contextMenu.workspaceColor", defaultValue: "Workspace Color")) {}
-        parent.submenu = submenu
+        parent.submenu = SidebarColorSubmenu.make(
+            targetHexes: colorMenuTargetHexes(tabManager),
+            apply: { [commands] hex in commands.applyTabColor(hex) },
+            promptCustomColor: { [commands] in commands.promptCustomColor() }
+        )
         menu.addItem(parent)
     }
 
@@ -663,34 +586,6 @@ struct SidebarWorkspaceRowMenuBuilder {
         // A target we cannot resolve contributes nothing; a resolved uncoloured one
         // contributes nil. Collapsing those would make No Color read as mixed.
         return targetIds.compactMap { workspaceById[$0].map(\.customColor) }
-    }
-
-    private func colorMenuItem(
-        title: String,
-        hex: String,
-        state: WorkspaceColorAssignmentState
-    ) -> NSMenuItem {
-        let colorItem = item(title) { [commands] in
-            commands.applyTabColor(hex)
-        }
-        let swatch = WorkspaceTabColorSettings.displayNSColor(
-            hex: hex,
-            colorScheme: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light,
-            forceBright: false
-        ) ?? NSColor(hex: hex) ?? .gray
-        colorItem.image = SidebarWorkspaceRowMenuBuilder.coloredCircleImage(color: swatch)
-        colorItem.state = Self.menuItemState(state)
-        return colorItem
-    }
-
-    /// Native menu state, so assignment is communicated without a second icon competing
-    /// with the swatch and without relying on hue.
-    private static func menuItemState(_ state: WorkspaceColorAssignmentState) -> NSControl.StateValue {
-        switch state {
-        case .on: .on
-        case .mixed: .mixed
-        case .off: .off
-        }
     }
 
     private func addSSHErrorItem(to menu: NSMenu) {
@@ -924,6 +819,131 @@ struct SidebarWorkspaceRowMenuBuilder {
         return image
     }
 }
+
+/// The colour submenu, rendered once for every menu that offers a colour.
+///
+/// The *data* has been shared since `#cm-11`: `WorkspaceTabColorSettings.colorMenuCandidates`
+/// answers "which rows, in what state" for any set of targets. The *drawing* was not — it
+/// lived `private` inside the workspace row's menu builder. `#cm-60` needed the identical
+/// submenu on a group header, and copying it would have left two renderers of one model in
+/// the AppKit sidebar and two more in the SwiftUI one, so a palette or label change would
+/// have to find four call sites and would silently reach only the ones someone remembered.
+/// This is the AppKit one; `workspaceColorMenuRow` in `TabItemView+WorkspaceContextMenu`
+/// is its SwiftUI twin.
+@MainActor
+enum SidebarColorSubmenu {
+    /// Native menu state, so assignment is communicated without a second icon competing
+    /// with the swatch and without relying on hue.
+    static func menuItemState(_ state: WorkspaceColorAssignmentState) -> NSControl.StateValue {
+        switch state {
+        case .on: .on
+        case .mixed: .mixed
+        case .off: .off
+        }
+    }
+
+    /// - Parameters:
+    ///   - targetHexes: what each target carries **now** — one entry per target, `nil` for
+    ///     an uncoloured one. This must be the stored override and never a resolved tint.
+    ///     A group renders `customColor ?? cwdConfig.color` (`#cm-49`), so passing the
+    ///     resolved value would tick a palette row the user never picked and leave
+    ///     **No Color** looking inert. Collapsing an unresolvable target to `nil` instead
+    ///     of dropping it would make No Color read as mixed.
+    ///   - apply: the chosen hex, or `nil` for **No Color**.
+    ///   - promptCustomColor: opens the `#RRGGBB` entry alert. `nil` omits that row.
+    static func make(
+        targetHexes: [String?],
+        apply: @escaping (String?) -> Void,
+        promptCustomColor: (() -> Void)?
+    ) -> NSMenu {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+
+        for candidate in WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: targetHexes) {
+            switch candidate.kind {
+            case .noColor:
+                // Unconditional: a row that disappears when nothing is coloured cannot
+                // carry state, and "Clear Color" with a checkmark reads as "clearing is on".
+                let noColorItem = SidebarRowMenuActionItem(
+                    title: String(localized: "contextMenu.noColor", defaultValue: "No Color"),
+                    run: { apply(nil) }
+                )
+                noColorItem.isEnabled = true
+                noColorItem.image = RenderableSystemSymbol.configuredAppKitImage(
+                    systemName: "xmark.circle", pointSize: 13, weight: nil
+                )
+                noColorItem.state = menuItemState(candidate.state)
+                submenu.addItem(noColorItem)
+
+                if let promptCustomColor {
+                    let customItem = SidebarRowMenuActionItem(
+                        title: String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
+                        run: promptCustomColor
+                    )
+                    customItem.isEnabled = true
+                    customItem.image = RenderableSystemSymbol.configuredAppKitImage(
+                        systemName: "paintpalette", pointSize: 13, weight: nil
+                    )
+                    submenu.addItem(customItem)
+                }
+                submenu.addItem(.separator())
+
+            case let .paletteEntry(entry):
+                // Meaning first, raw identity second: "GOAL: Primary (Teal)".
+                submenu.addItem(colorItem(title: entry.displayName, hex: entry.hex, state: candidate.state, apply: apply))
+
+            case let .unlisted(hex):
+                // A colour a selected target still carries after its palette entry was
+                // removed. Truthful current state, never a palette write.
+                // One format string taking the hex, so the frame is translated and the
+                // colour value never is.
+                submenu.addItem(colorItem(
+                    title: String(
+                        format: String(localized: "contextMenu.unlistedColor", defaultValue: "Custom (%@)"),
+                        hex
+                    ),
+                    hex: hex,
+                    state: candidate.state,
+                    apply: apply
+                ))
+
+            case .editLabels:
+                // Assignment above, label management below. A transient menu is the wrong
+                // place for a text field, so this navigates to Settings instead.
+                submenu.addItem(.separator())
+                let editItem = SidebarRowMenuActionItem(
+                    title: String(localized: "contextMenu.editColorLabels", defaultValue: "Edit Color Labels…"),
+                    run: { AppDelegate.presentWorkspaceColorLabelEditor() }
+                )
+                editItem.isEnabled = true
+                editItem.image = RenderableSystemSymbol.configuredAppKitImage(
+                    systemName: "tag", pointSize: 13, weight: nil
+                )
+                submenu.addItem(editItem)
+            }
+        }
+        return submenu
+    }
+
+    private static func colorItem(
+        title: String,
+        hex: String,
+        state: WorkspaceColorAssignmentState,
+        apply: @escaping (String?) -> Void
+    ) -> NSMenuItem {
+        let colorItem = SidebarRowMenuActionItem(title: title, run: { apply(hex) })
+        colorItem.isEnabled = true
+        let swatch = WorkspaceTabColorSettings.displayNSColor(
+            hex: hex,
+            colorScheme: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light,
+            forceBright: false
+        ) ?? NSColor(hex: hex) ?? .gray
+        colorItem.image = SidebarWorkspaceRowMenuBuilder.coloredCircleImage(color: swatch)
+        colorItem.state = menuItemState(state)
+        return colorItem
+    }
+}
+
 
 /// NSMenu subclass reporting open/close so the controller keeps hover stable.
 @MainActor

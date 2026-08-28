@@ -72,6 +72,7 @@ struct SidebarGroupHeaderBandTests {
             name: "Group",
             iconSymbol: "folder",
             tintHex: tintHex,
+            customColorHex: tintHex,
             isCollapsed: false,
             isPinned: false,
             isAnchorActive: isAnchorActive,
@@ -436,5 +437,336 @@ struct SidebarGroupHeaderBandTests {
         let cleared = Self.palette(tintHex: "#006B6B", isAnchorActive: false)
         #expect(cleared.bandOpacity == SidebarGroupHeaderBandPalette.restingBandOpacity)
         #expect(cleared.bandOpacity < active.bandOpacity, "re-applying an inactive model must step back down")
+    }
+}
+
+/// Behavior tests for the shared colour submenu (`#cm-60`).
+///
+/// `#cm-60` put the workspace colour submenu on the group header. The risk it
+/// carries is not that the menu looks wrong — it is that the two copies drift,
+/// or that the group's *resolved* tint reaches the menu instead of the colour
+/// the user actually picked. Both are invisible in a screenshot.
+@Suite
+@MainActor
+struct SidebarColorSubmenuTests {
+    /// Titles of everything that is not a separator, in menu order.
+    private static func titles(_ menu: NSMenu) -> [String] {
+        menu.items.filter { !$0.isSeparatorItem }.map(\.title)
+    }
+
+    private static func item(_ menu: NSMenu, titled title: String) -> NSMenuItem? {
+        menu.items.first { $0.title == title }
+    }
+
+    /// Fires a menu item the way AppKit does, so the stored closure runs.
+    private static func click(_ item: NSMenuItem) {
+        guard let action = item.action, let target = item.target else { return }
+        _ = target.perform(action, with: item)
+    }
+
+    private static let noColorTitle = String(
+        localized: "contextMenu.noColor", defaultValue: "No Color"
+    )
+    private static let customColorTitle = String(
+        localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"
+    )
+
+    /// The one decision a test can pin: the checkmark means *you picked this*.
+    ///
+    /// A group's band paints `customColor ?? cwdConfig.color`, so both header views
+    /// carry a resolved `tintHex`. Feeding that to the submenu instead of the override
+    /// would tick a palette row on a group that merely inherited a cwd colour, and
+    /// leave **No Color** looking inert on the one group where it is the truthful
+    /// state. This asserts the submenu reads what it is given, so the call sites
+    /// passing `customColorHex` are the whole contract.
+    @Test
+    func noColorIsCheckedForAnUncolouredTargetAndClearForAColouredOne() {
+        let uncoloured = SidebarColorSubmenu.make(
+            targetHexes: [nil], apply: { _ in }, promptCustomColor: {}
+        )
+        let coloured = SidebarColorSubmenu.make(
+            targetHexes: ["#1565C0"], apply: { _ in }, promptCustomColor: {}
+        )
+
+        let uncolouredRow = Self.item(uncoloured, titled: Self.noColorTitle)
+        let colouredRow = Self.item(coloured, titled: Self.noColorTitle)
+
+        #expect(uncolouredRow?.state == .on)
+        #expect(colouredRow?.state == .off)
+    }
+
+    /// The group menu and the workspace menu must keep drawing the same rows.
+    ///
+    /// They share `colorMenuCandidates` for the *data*; `#cm-60` made them share the
+    /// *drawing* too, because copying it would have left four renderers of one model
+    /// across the two sidebar implementations. This fails the moment one grows a row
+    /// the other does not, which is how a palette change reaches one menu only.
+    @Test
+    func submenuRowsMatchTheSharedCandidateModelExactly() {
+        let targetHexes: [String?] = [nil]
+        let menu = SidebarColorSubmenu.make(
+            targetHexes: targetHexes, apply: { _ in }, promptCustomColor: {}
+        )
+
+        var expected: [String] = []
+        for candidate in WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: targetHexes) {
+            switch candidate.kind {
+            case .noColor:
+                expected.append(Self.noColorTitle)
+                expected.append(Self.customColorTitle)
+            case let .paletteEntry(entry):
+                expected.append(entry.displayName)
+            case let .unlisted(hex):
+                expected.append(String(
+                    format: String(localized: "contextMenu.unlistedColor", defaultValue: "Custom (%@)"),
+                    hex
+                ))
+            case .editLabels:
+                expected.append(String(
+                    localized: "contextMenu.editColorLabels", defaultValue: "Edit Color Labels…"
+                ))
+            }
+        }
+
+        #expect(Self.titles(menu) == expected)
+        // The palette is the user's, so an empty expectation would pass vacuously.
+        #expect(expected.count > 2)
+    }
+
+    /// **No Color** must clear, not write an empty string.
+    ///
+    /// `setWorkspaceGroupColor(groupId:hex:)` takes `String?` and treats `nil` as
+    /// "no override"; `""` would store an unparseable colour, which `#cm-49`'s band
+    /// renders as neutral — visually identical, and wrong in the model and on disk.
+    @Test
+    func noColorAppliesNilWhilePaletteRowsApplyTheirHex() {
+        var applied: [String?] = []
+        let menu = SidebarColorSubmenu.make(
+            targetHexes: [nil], apply: { applied.append($0) }, promptCustomColor: {}
+        )
+
+        guard let noColor = Self.item(menu, titled: Self.noColorTitle) else {
+            Issue.record("No Color row missing")
+            return
+        }
+        Self.click(noColor)
+
+        let paletteRow = menu.items.first { item in
+            !item.isSeparatorItem
+                && item.title != Self.noColorTitle
+                && item.title != Self.customColorTitle
+                && item.image != nil
+        }
+        guard let paletteRow else {
+            Issue.record("no palette row to click")
+            return
+        }
+        Self.click(paletteRow)
+
+        #expect(applied.count == 2)
+        #expect(applied.first ?? "unset" == nil)
+        #expect(applied.last.flatMap { $0 } != nil)
+    }
+
+    /// Omitting the prompt drops that row and nothing else.
+    ///
+    /// The parameter exists so a caller without a hex-entry alert can still render
+    /// the palette. If it ever removed more than its own row the two menus would
+    /// diverge silently.
+    @Test
+    func omittingTheCustomColorPromptRemovesOnlyThatRow() {
+        let withPrompt = SidebarColorSubmenu.make(
+            targetHexes: [nil], apply: { _ in }, promptCustomColor: {}
+        )
+        let withoutPrompt = SidebarColorSubmenu.make(
+            targetHexes: [nil], apply: { _ in }, promptCustomColor: nil
+        )
+
+        #expect(Self.titles(withPrompt).contains(Self.customColorTitle))
+        #expect(!Self.titles(withoutPrompt).contains(Self.customColorTitle))
+        #expect(
+            Self.titles(withPrompt).filter { $0 != Self.customColorTitle }
+                == Self.titles(withoutPrompt)
+        )
+    }
+}
+
+/// The group header's own context menu (`#cm-60`), through the real cell.
+///
+/// `SidebarColorSubmenuTests` pins the submenu builder. These pin the two things
+/// only the *call site* can get wrong, and both are invisible in a screenshot:
+/// shipping the item into one sidebar renderer and not the other, and handing the
+/// menu the group's resolved tint instead of the colour the user picked.
+@Suite
+@MainActor
+struct SidebarGroupHeaderColorMenuTests {
+    private static let groupColorTitle = String(
+        localized: "workspaceGroup.contextMenu.color", defaultValue: "Group Color"
+    )
+    private static let renameTitle = String(
+        localized: "workspaceGroup.contextMenu.rename", defaultValue: "Rename Group..."
+    )
+    private static let noColorTitle = String(
+        localized: "contextMenu.noColor", defaultValue: "No Color"
+    )
+
+    private static func model(
+        tintHex: String?,
+        customColorHex: String?
+    ) -> SidebarGroupHeaderRowModel {
+        SidebarGroupHeaderRowModel(
+            groupId: UUID(),
+            anchorWorkspaceId: UUID(),
+            name: "Group",
+            iconSymbol: "folder",
+            tintHex: tintHex,
+            customColorHex: customColorHex,
+            isCollapsed: false,
+            isPinned: false,
+            isAnchorActive: false,
+            isMultiSelected: false,
+            multiSelectionBackgroundStyle: .clear,
+            memberCount: 2,
+            anchorUnreadCount: 0,
+            canMarkRead: false,
+            canMarkUnread: true,
+            hasLatestNotifications: false,
+            canMarkAllRead: false,
+            canMarkAllUnread: true,
+            shortcutHintText: nil,
+            shortcutHintXOffset: 0,
+            shortcutHintYOffset: 0,
+            fontScale: 1,
+            globalFontMagnificationPercent: 100,
+            cwdContextMenuItems: [],
+            rowSpacing: 2,
+            isFirstRow: false,
+            isBeingDragged: false,
+            topDropIndicatorVisible: false,
+            bottomDropIndicatorVisible: false
+        )
+    }
+
+    private static func actions(
+        onSetColor: @escaping (String?) -> Void = { _ in }
+    ) -> SidebarGroupHeaderRowActions {
+        SidebarGroupHeaderRowActions(
+            onToggleCollapsed: {},
+            onFocusAnchor: { _ in },
+            onTapPlus: {},
+            onRunResolvedItem: { _ in },
+            onRename: {},
+            onSetColor: onSetColor,
+            onPromptCustomColor: {},
+            onTogglePinned: {},
+            onMarkRead: {},
+            onMarkUnread: {},
+            onClearLatestNotifications: {},
+            onMarkAllRead: {},
+            onMarkAllUnread: {},
+            onUngroup: {},
+            onDelete: {},
+            onEditConfig: {},
+            onOpenDocs: {}
+        )
+    }
+
+    /// The header menu the cell would show on a right-click away from the plus button.
+    private static func headerMenu(
+        tintHex: String?,
+        customColorHex: String?,
+        onSetColor: @escaping (String?) -> Void = { _ in }
+    ) throws -> NSMenu {
+        let cell = SidebarGroupHeaderTableCellView()
+        cell.frame = NSRect(x: 0, y: 0, width: 240, height: 28)
+        cell.layoutSubtreeIfNeeded()
+        cell.configure(
+            model: model(tintHex: tintHex, customColorHex: customColorHex),
+            actions: actions(onSetColor: onSetColor),
+            isPointerHovering: false,
+            contextMenuDidOpen: {},
+            contextMenuDidClose: {}
+        )
+        // Far from the trailing plus button, so this is the header menu and not
+        // the plus button's own.
+        let event = try #require(NSEvent.mouseEvent(
+            with: .rightMouseDown,
+            location: NSPoint(x: 4, y: 4),
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        ))
+        return try #require(cell.menu(for: event))
+    }
+
+    /// The item exists at all, in the AppKit renderer — the one Tom actually sees.
+    ///
+    /// `CmuxFeatureFlags.appKitSidebarListDefault` is `true`, so this list is the
+    /// default. Its SwiftUI twin carries the same item; nothing but a human opening
+    /// both menus proves that half, which is why the dogfood scenario exists.
+    @Test
+    func groupHeaderMenuOffersGroupColorRightAfterRename() throws {
+        let menu = try Self.headerMenu(tintHex: nil, customColorHex: nil)
+        let titles = menu.items.filter { !$0.isSeparatorItem }.map(\.title)
+
+        let renameIndex = try #require(titles.firstIndex(of: Self.renameTitle))
+        let colorIndex = try #require(titles.firstIndex(of: Self.groupColorTitle))
+
+        // Identity together: name, then colour, then where it sits.
+        #expect(colorIndex == renameIndex + 1)
+        #expect(menu.items.first { $0.title == Self.groupColorTitle }?.submenu != nil)
+    }
+
+    /// The checkmark means *you picked this*, not *something resolved this for you*.
+    ///
+    /// A group's band paints `customColor ?? cwdConfig.color`, so the cell carries a
+    /// resolved `tintHex`. Handing that to the submenu instead of `customColorHex`
+    /// would tick a palette row on a group whose colour came from `cmux.json`, and
+    /// leave **No Color** looking inert on the one group where it is the truth.
+    @Test
+    func aConfigResolvedTintDoesNotTickAPaletteRowTheUserNeverPicked() throws {
+        let menu = try Self.headerMenu(tintHex: "#1565C0", customColorHex: nil)
+        let submenu = try #require(menu.items.first { $0.title == Self.groupColorTitle }?.submenu)
+
+        let noColor = try #require(submenu.items.first { $0.title == Self.noColorTitle })
+        #expect(noColor.state == .on)
+        // Nothing else may claim to be the group's colour.
+        let ticked = submenu.items.filter { $0.state == .on }.map(\.title)
+        #expect(ticked == [Self.noColorTitle])
+    }
+
+    /// The group's own colour ticks, and only it.
+    @Test
+    func theGroupsOwnColorIsTheOnlyTickedRow() throws {
+        let menu = try Self.headerMenu(tintHex: "#1565C0", customColorHex: "#1565C0")
+        let submenu = try #require(menu.items.first { $0.title == Self.groupColorTitle }?.submenu)
+
+        let noColor = try #require(submenu.items.first { $0.title == Self.noColorTitle })
+        #expect(noColor.state == .off)
+        #expect(submenu.items.filter { $0.state == .on }.count <= 1)
+    }
+
+    /// **No Color** clears the override rather than storing an empty string.
+    @Test
+    func choosingNoColorClearsTheOverride() throws {
+        var applied: [String?] = []
+        let menu = try Self.headerMenu(
+            tintHex: "#1565C0",
+            customColorHex: "#1565C0",
+            onSetColor: { applied.append($0) }
+        )
+        let submenu = try #require(menu.items.first { $0.title == Self.groupColorTitle }?.submenu)
+        let noColor = try #require(submenu.items.first { $0.title == Self.noColorTitle })
+
+        let action = try #require(noColor.action)
+        let target = try #require(noColor.target)
+        _ = target.perform(action, with: noColor)
+
+        #expect(applied.count == 1)
+        #expect(applied.first ?? "unset" == nil)
     }
 }

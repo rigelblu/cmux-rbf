@@ -16,15 +16,102 @@ struct TabItemWorkspaceContextMenuContent: View {
     }
 }
 
-extension TabItemView {
-    /// One workspace-color row: assignment state, color identity, then meaning.
+/// Every row of the colour submenu, for any menu that offers one.
+///
+/// The *data* has been shared since `#cm-11`: `colorMenuCandidates` answers "which rows,
+/// in what state" for any set of targets. The *drawing* was not — it lived `fileprivate`
+/// here, so `#cm-60`'s group-header menu would have had to copy it, leaving two SwiftUI
+/// renderers of one model beside the two AppKit ones. `SidebarColorSubmenu` is the AppKit
+/// twin; the two must keep drawing the same rows in the same order.
+struct WorkspaceColorMenuRows: View {
+    /// What each target carries **now** — one entry per target, `nil` for an uncoloured
+    /// one. Must be the stored override, never a resolved tint: a group renders
+    /// `customColor ?? cwdConfig.color`, so the resolved value would tick a row the user
+    /// never picked and leave **No Color** looking inert.
+    let targetHexes: [String?]
+    let colorScheme: ColorScheme
+    /// The chosen hex, or `nil` for **No Color**.
+    let apply: (String?) -> Void
+    /// Opens the `#RRGGBB` entry alert. `nil` omits that row.
+    let promptCustomColor: (() -> Void)?
+
+    var body: some View {
+        let candidates = WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: targetHexes)
+
+        ForEach(Array(candidates.enumerated()), id: \.offset) { _, candidate in
+            switch candidate.kind {
+            case .noColor:
+                // Unconditional, so it can carry state. A row that vanishes when
+                // nothing is colored cannot say "none of these are colored".
+                Button {
+                    apply(nil)
+                } label: {
+                    label(
+                        title: String(localized: "contextMenu.noColor", defaultValue: "No Color"),
+                        swatchHex: nil,
+                        state: candidate.state
+                    )
+                }
+
+                if let promptCustomColor {
+                    Button {
+                        promptCustomColor()
+                    } label: {
+                        Label(
+                            String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
+                            systemImage: "paintpalette"
+                        )
+                    }
+                }
+
+                Divider()
+
+            case let .paletteEntry(entry):
+                Button {
+                    apply(entry.hex)
+                } label: {
+                    label(title: entry.displayName, swatchHex: entry.hex, state: candidate.state)
+                }
+
+            case let .unlisted(hex):
+                Button {
+                    apply(hex)
+                } label: {
+                    label(
+                        title: String(
+                            format: String(localized: "contextMenu.unlistedColor", defaultValue: "Custom (%@)"),
+                            hex
+                        ),
+                        swatchHex: hex,
+                        state: candidate.state
+                    )
+                }
+
+            case .editLabels:
+                // Assignment above, label management below. A transient menu is the
+                // wrong place for a text field, so this navigates to Settings instead.
+                Divider()
+
+                Button {
+                    AppDelegate.presentWorkspaceColorLabelEditor()
+                } label: {
+                    Label(
+                        String(localized: "contextMenu.editColorLabels", defaultValue: "Edit Color Labels…"),
+                        systemImage: "tag"
+                    )
+                }
+            }
+        }
+    }
+
+    /// One row: assignment state, color identity, then meaning.
     ///
     /// AppKit gets tri-state free via `NSMenuItem.state`. SwiftUI menus expose no
     /// `.mixed`, so state is drawn as a leading glyph beside the swatch — a checkmark for
     /// on, a dash for mixed, and a same-size clear placeholder for off so titles stay
     /// aligned. State never depends on hue, and the swatch keeps its own slot.
     @ViewBuilder
-    fileprivate func workspaceColorMenuLabel(
+    private func label(
         title: String,
         swatchHex: String?,
         state: WorkspaceColorAssignmentState
@@ -42,7 +129,7 @@ extension TabItemView {
                     Image(systemName: "checkmark").hidden()
                 }
                 if let swatchHex {
-                    Image(nsImage: coloredCircleImage(color: tabColorSwatchColor(for: swatchHex)))
+                    Image(nsImage: coloredCircleImage(color: swatchColor(for: swatchHex)))
                 } else {
                     Image(systemName: "xmark.circle")
                 }
@@ -50,6 +137,16 @@ extension TabItemView {
         }
     }
 
+    private func swatchColor(for hex: String) -> NSColor {
+        WorkspaceTabColorSettings.displayNSColor(
+            hex: hex,
+            colorScheme: colorScheme,
+            forceBright: false
+        ) ?? NSColor(hex: hex) ?? .gray
+    }
+}
+
+extension TabItemView {
     private func contextMenuLabel(multi: String, single: String, isMulti: Bool) -> String {
         isMulti ? multi : single
     }
@@ -174,82 +271,15 @@ extension TabItemView {
         }
 
         Menu(String(localized: "contextMenu.workspaceColor", defaultValue: "Workspace Color")) {
-            // Same model the AppKit builder uses, fed from the pre-computed multi-target
+            // Same rows the AppKit builder draws, fed from the pre-computed multi-target
             // snapshot. Rows below the LazyVStack boundary must not read a store, so the
             // colors arrive as an immutable value rather than a live workspace read.
-            let candidates = WorkspaceTabColorSettings.colorMenuCandidates(
-                targetHexes: context.targetColorHexes
+            WorkspaceColorMenuRows(
+                targetHexes: context.targetColorHexes,
+                colorScheme: colorScheme,
+                apply: { hex in applyTabColor(hex, targetIds: targetIds) },
+                promptCustomColor: { promptCustomColor(targetIds: targetIds) }
             )
-
-            ForEach(Array(candidates.enumerated()), id: \.offset) { _, candidate in
-                switch candidate.kind {
-                case .noColor:
-                    // Unconditional, so it can carry state. A row that vanishes when
-                    // nothing is colored cannot say "none of these are colored".
-                    Button {
-                        applyTabColor(nil, targetIds: targetIds)
-                    } label: {
-                        workspaceColorMenuLabel(
-                            title: String(localized: "contextMenu.noColor", defaultValue: "No Color"),
-                            swatchHex: nil,
-                            state: candidate.state
-                        )
-                    }
-
-                    Button {
-                        promptCustomColor(targetIds: targetIds)
-                    } label: {
-                        Label(
-                            String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"),
-                            systemImage: "paintpalette"
-                        )
-                    }
-
-                    Divider()
-
-                case let .paletteEntry(entry):
-                    Button {
-                        applyTabColor(entry.hex, targetIds: targetIds)
-                    } label: {
-                        workspaceColorMenuLabel(
-                            title: entry.displayName,
-                            swatchHex: entry.hex,
-                            state: candidate.state
-                        )
-                    }
-
-                case let .unlisted(hex):
-                    Button {
-                        applyTabColor(hex, targetIds: targetIds)
-                    } label: {
-                        workspaceColorMenuLabel(
-                            title: String(
-                                format: String(
-                                    localized: "contextMenu.unlistedColor",
-                                    defaultValue: "Custom (%@)"
-                                ),
-                                hex
-                            ),
-                            swatchHex: hex,
-                            state: candidate.state
-                        )
-                    }
-
-                case .editLabels:
-                    // Assignment above, label management below. A transient menu is the
-                    // wrong place for a text field, so this navigates to Settings instead.
-                    Divider()
-
-                    Button {
-                        AppDelegate.presentWorkspaceColorLabelEditor()
-                    } label: {
-                        Label(
-                            String(localized: "contextMenu.editColorLabels", defaultValue: "Edit Color Labels…"),
-                            systemImage: "tag"
-                        )
-                    }
-                }
-            }
         }
 
         if let copyableSidebarSSHError = workspaceSnapshot.copyableSidebarSSHError {

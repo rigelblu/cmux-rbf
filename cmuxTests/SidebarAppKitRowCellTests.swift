@@ -1148,6 +1148,7 @@ struct SidebarPinnedIndicatorColorTests {
             name: "Group",
             iconSymbol: "folder",
             tintHex: nil,
+            customColorHex: nil,
             isCollapsed: false,
             isPinned: true,
             isAnchorActive: false,

@@ -12,7 +12,12 @@ struct SidebarWorkspaceGroupRowSnapshot {
     let anchorWorkspaceId: UUID
     let name: String
     let iconSymbol: String
+    /// What the band paints: `customColor ?? cwdConfig.color` (`#cm-49`).
     let tintHex: String?
+    /// The group's own colour override, and nothing resolved on its behalf, so the
+    /// colour menu's checkmark can mean *you picked this*. See
+    /// `SidebarGroupHeaderRowModel.customColorHex`.
+    let customColorHex: String?
     let isCollapsed: Bool
     let isPinned: Bool
     let isAnchorActive: Bool

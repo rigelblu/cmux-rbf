@@ -575,6 +575,20 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             String(localized: "workspaceGroup.contextMenu.rename", defaultValue: "Rename Group..."),
             action: actions.onRename
         ))
+        // Beside Rename, above Pin: a group's name and its colour are its identity,
+        // and the pin is where it sits. Appending it near Ungroup/Delete would bury
+        // an everyday action between two destructive ones.
+        let colorParent = menuItem(
+            String(localized: "workspaceGroup.contextMenu.color", defaultValue: "Group Color"),
+            action: {}
+        )
+        // `customColorHex`, never `tintHex` — see SidebarGroupHeaderRowModel.
+        colorParent.submenu = SidebarColorSubmenu.make(
+            targetHexes: [model.customColorHex],
+            apply: actions.onSetColor,
+            promptCustomColor: actions.onPromptCustomColor
+        )
+        menu.addItem(colorParent)
         menu.addItem(menuItem(
             model.isPinned
                 ? String(localized: "workspaceGroup.contextMenu.unpin", defaultValue: "Unpin Group")
