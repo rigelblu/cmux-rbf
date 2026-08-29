@@ -14,6 +14,21 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.22.0 (2026-08-28) — #cm-60
+*Cuts v0.22.0 for local dogfooding. Releases `#cm-60` only — `#cm-47` stays unreleased, still held for one combined CM-47 delivery, and `#cm-54`/`#cm-55` remain in Review.*
+
+## 🟠⋯ Added for End Users
+- 2026-08-28 - feat (ux) | **you can give a workspace group a colour from inside the app.** Right-click a group header → **Group Color**, and pick from the same palette, with the same names, the workspace colour menu already offers. The colour itself is not new — `#cm-49` shipped the field and drew it as the header band — but until now the only way to set one was the `workspace.group.set_color` socket command. The checkmark marks the colour **you picked**, never one resolved on the group's behalf (#cm-60)
+
+## 🟠⋯ Known Limitations
+- **No Color does not always leave you with a neutral band.** It clears the group's own colour, which is exactly what it says. But if that group's anchor workspace has a cwd entry in `~/.config/cmux/cmux.json` carrying a colour, the configured colour then shows through — so **No Color** reads as ticked beside a band that is still coloured. The menu is telling the truth about the override and the band is telling the truth about what renders; they are answering different questions. Clear the colour on that cwd entry in `cmux.json` to get a neutral band (#cm-60)
+- **A group's icon is still not reachable from the app.** `iconSymbol` has no UI; this release adds colour only (#cm-60)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-28 - feat (technical) | the workspace colour submenu is now built once per renderer and shared by both menus — `SidebarColorSubmenu.make` for AppKit's `NSMenu`, `WorkspaceColorMenuRows` for SwiftUI — with both reading the same `WorkspaceTabColorSettings.colorMenuCandidates`. A palette or label change now reaches the workspace menu and the group menu together instead of one of them silently. The invalid-hex alert collapsed the same way, from three identical copies to one `presentInvalidWorkspaceColorAlert`. The group menu reads `customColorHex` and never the resolved `tintHex`, so a colour arriving from a `cmux.json` cwd config cannot tick a row the user never chose (#cm-60)
+
+---
+
 # 🔵⋯ v0.21.1 (2026-08-28) — #cm-56
 *Two fixes from dogfooding v0.21.0, cut the same day. One of them retires a Known limitation v0.21.0 shipped: that release recorded the refused drag as intended behaviour, and it was not.*
 

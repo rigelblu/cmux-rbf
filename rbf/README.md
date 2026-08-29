@@ -88,12 +88,21 @@ Give workspace colours your own meaning — such as **GOAL: Primary (Teal)** —
 
 ## 🟠⋯ Tell a group header from the workspaces inside it at a glance
 
-Every workspace-group header carries a band across its whole row, so the container is visible without hunting for a small folder icon. A coloured group uses its colour; a group with no colour gets a neutral band. The active group's band deepens while member workspaces keep their narrow leading strip, so container and contents remain different shapes.
+Every workspace-group header carries a band across its whole row, so the container is visible without hunting for a small folder icon. A coloured group uses its colour; a group with no colour gets a neutral band. Set that colour from the header's **Group Color** menu (below). The active group's band deepens while member workspaces keep their narrow leading strip, so container and contents remain different shapes.
 
 - Always on; no setting or migration.
 - Works in both sidebar renderers and in normal Light and Dark appearances.
 - Group names follow the appearance of their bands, including live Light ↔ Dark changes. v0.17.1 retires v0.17.0's black-on-dark limitation.
 - **Unverified:** Reduce Transparency and Increase Contrast. Tom accepted releasing without those two checks.
+
+## 🟠⋯ Give a workspace group a colour without dropping to the CLI
+
+Right-click a group header and pick **Group Color**. It offers the same palette a workspace does, semantic labels included, and the header band takes the colour at once. Before this, the colour existed but the only way to set one was the `workspace.group.set_color` socket command.
+
+- The checkmark marks the colour **you** picked. A colour arriving from a `cmux.json` cwd config is drawn on the band but never ticked in the menu.
+- **No Color** clears the group's own colour. If `cmux.json` colours the anchor's cwd, that configured colour then shows through — so **No Color** can read as ticked beside a still-coloured band. The menu answers "what did you set", the band answers "what renders".
+- A group's icon is still not reachable from the app; `iconSymbol` has no UI.
+- Always on; no setting or migration. Both sidebar renderers carry the menu, though only the AppKit list is reachable in a shipped build.
 
 ## 🟠⋯ Scan your standalone workspaces by what their colour means
 
