@@ -727,14 +727,34 @@ struct SidebarGroupHeaderColorMenuTests {
     }
 
     /// The group's own colour ticks, and only it.
+    ///
+    /// Name the ticked row, never just count it. The first version of this asserted
+    /// `count <= 1`, which zero satisfies — so a build that ticked *nothing* passed a
+    /// test called "the only ticked row". A cold scope review found it; it is the same
+    /// vacuous shape as the M5 mutation escape earlier in this suite, and the mutation
+    /// campaign missed it because M1 was caught by the neighbouring negative test and
+    /// this one was never exercised on its own.
     @Test
     func theGroupsOwnColorIsTheOnlyTickedRow() throws {
-        let menu = try Self.headerMenu(tintHex: "#1565C0", customColorHex: "#1565C0")
+        let hex = "#1565C0"
+        let expectedTitle = try #require(
+            WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: [hex])
+                .compactMap { candidate -> String? in
+                    guard case let .paletteEntry(entry) = candidate.kind else { return nil }
+                    return entry.hex.caseInsensitiveCompare(hex) == .orderedSame
+                        ? entry.displayName
+                        : nil
+                }
+                .first,
+            "no palette entry carries \(hex); the fixture hex must be a palette colour"
+        )
+
+        let menu = try Self.headerMenu(tintHex: hex, customColorHex: hex)
         let submenu = try #require(menu.items.first { $0.title == Self.groupColorTitle }?.submenu)
 
         let noColor = try #require(submenu.items.first { $0.title == Self.noColorTitle })
         #expect(noColor.state == .off)
-        #expect(submenu.items.filter { $0.state == .on }.count <= 1)
+        #expect(submenu.items.filter { $0.state == .on }.map(\.title) == [expectedTitle])
     }
 
     /// **No Color** clears the override rather than storing an empty string.

@@ -834,7 +834,7 @@ struct SidebarWorkspaceRowMenuBuilder {
 enum SidebarColorSubmenu {
     /// Native menu state, so assignment is communicated without a second icon competing
     /// with the swatch and without relying on hue.
-    static func menuItemState(_ state: WorkspaceColorAssignmentState) -> NSControl.StateValue {
+    private static func menuItemState(_ state: WorkspaceColorAssignmentState) -> NSControl.StateValue {
         switch state {
         case .on: .on
         case .mixed: .mixed

@@ -102,7 +102,7 @@ Right-click a group header and pick **Group Color**. It offers the same palette 
 - The checkmark marks the colour **you** picked. A colour arriving from a `cmux.json` cwd config is drawn on the band but never ticked in the menu.
 - **No Color** clears the group's own colour. If `cmux.json` colours the anchor's cwd, that configured colour then shows through — so **No Color** can read as ticked beside a still-coloured band. The menu answers "what did you set", the band answers "what renders".
 - A group's icon is still not reachable from the app; `iconSymbol` has no UI.
-- Always on; no setting or migration. Both sidebar renderers carry the menu, though only the AppKit list is reachable in a shipped build.
+- Always on; no setting or migration. Both sidebar renderers carry the menu, but in practice you only ever see the AppKit one: `sidebar-appkit-list-experiment` is pinned **on** by upstream's control plane, and a local override is inert while a remote value is cached (`Sources/FeatureFlags.swift:576`). The SwiftUI list is reachable only on a machine that has never cached one — so the menu is there, and nobody has watched it work.
 
 ## 🟠⋯ Scan your standalone workspaces by what their colour means
 
