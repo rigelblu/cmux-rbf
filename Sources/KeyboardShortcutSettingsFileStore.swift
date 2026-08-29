@@ -698,11 +698,36 @@ final class CmuxSettingsFileStore {
         // selects nothing, and warning about it would punish users for a
         // setting cmux itself retired.
         //
-        // `labels` is parsed FIRST, deliberately. Three unconditional returns follow — bad
+        // Name metadata is parsed FIRST, deliberately. Three unconditional returns follow — bad
         // `selectionColor`, bad `notificationBadgeColor`, and the `colors` block's own
         // trailing return. A `labels` block placed below any of them would silently never
         // run for a user who also sets `colors` — which is every user who has customised
         // a palette.
+        if section.keys.contains("displayNames") {
+            if let rawDisplayNames = section["displayNames"] as? [String: Any] {
+                var normalizedDisplayNames: [String: String] = [:]
+                for (rawName, rawValue) in rawDisplayNames {
+                    let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !name.isEmpty else {
+                        cmuxSettingsFileStoreLogger.warning("ignoring empty workspace color name in workspaceColors.displayNames in \(sourcePath, privacy: .private(mask: .hash))")
+                        continue
+                    }
+                    guard let rawDisplayName = jsonString(rawValue) else {
+                        cmuxSettingsFileStoreLogger.warning("ignoring non-string workspace color display name for '\(name, privacy: .private(mask: .hash))' in \(sourcePath, privacy: .private(mask: .hash))")
+                        continue
+                    }
+                    let displayName = rawDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !displayName.isEmpty else { continue }
+                    normalizedDisplayNames[name] = displayName
+                }
+                // Shape only. The shared resolver owns built-in, orphan, length, and
+                // cross-kind collision validation so every consumer agrees.
+                snapshot.managedUserDefaults[SettingCatalog().workspaceColors.displayNames.userDefaultsKey] = .stringDictionary(normalizedDisplayNames)
+            } else {
+                logInvalid("workspaceColors.displayNames", sourcePath: sourcePath)
+            }
+        }
+
         if section.keys.contains("labels") {
             if let rawLabels = section["labels"] as? [String: Any] {
                 var normalizedLabels: [String: String] = [:]

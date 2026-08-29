@@ -37,6 +37,16 @@ public struct WorkspaceColorsCatalogSection: SettingCatalogSection {
         userDefaultsKey: "workspaceTabColor.labels"
     )
 
+    /// Optional editable display names keyed by stable raw custom palette identity.
+    ///
+    /// Additive metadata. Built-in or missing raw names fail closed in the shared
+    /// resolver; clearing one restores the raw `Custom N` fallback.
+    public let displayNames = DefaultsKey<[String: String]>(
+        id: "workspaceColors.displayNames",
+        defaultValue: [:],
+        userDefaultsKey: "workspaceTabColor.displayNames"
+    )
+
     /// Highest `Custom N` index ever minted. Internal bookkeeping, not user configuration:
     /// no `cmux.json` parsing writes it. It lives in the catalog so `CmuxSettingsUI` can
     /// advance it through the typed store, which never hands out raw `UserDefaults`.

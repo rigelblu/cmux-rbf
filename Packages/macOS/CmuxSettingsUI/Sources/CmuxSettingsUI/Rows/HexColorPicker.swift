@@ -1,17 +1,37 @@
+import AppKit
 import SwiftUI
+
+enum HexColorPickerCommitBehavior: Equatable {
+    case continuous
+    case interactionEnd
+}
 
 @MainActor
 struct HexColorPicker: View {
     private let reconcileState: HexColorPickerReconcileState
     private let onChange: (String) -> Void
+    private let commitBehavior: HexColorPickerCommitBehavior
 
     @State private var selection: HexColorPickerSelection
 
-    init(storedHex: String, fallback: Color, reconcileRevision: Int, onChange: @escaping (String) -> Void) {
+    init(
+        storedHex: String,
+        fallback: Color,
+        reconcileRevision: Int,
+        commitBehavior: HexColorPickerCommitBehavior = .continuous,
+        onChange: @escaping (String) -> Void
+    ) {
         let initialState = HexColorPickerReconcileState(storedHex: storedHex, revision: reconcileRevision)
         self.reconcileState = initialState
         self.onChange = onChange
+        self.commitBehavior = commitBehavior
         _selection = State(initialValue: HexColorPickerSelection(state: initialState, fallback: fallback))
+    }
+
+    private func finishInteraction() {
+        guard commitBehavior == .interactionEnd,
+              let hex = selection.finishPendingSelection() else { return }
+        onChange(hex)
     }
 
     var body: some View {
@@ -19,7 +39,8 @@ struct HexColorPicker: View {
             selection: Binding(
                 get: { selection.color },
                 set: { newColor in
-                    onChange(selection.applyPickerSelection(newColor))
+                    let hex = selection.applyPickerSelection(newColor)
+                    if commitBehavior == .continuous { onChange(hex) }
                 }
             ),
             supportsOpacity: false
@@ -31,5 +52,13 @@ struct HexColorPicker: View {
         .onChange(of: reconcileState) { _, newState in
             selection.reconcile(state: newState)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSColorPanel.willCloseNotification)) { _ in
+            finishInteraction()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
+            guard notification.object is NSColorPanel else { return }
+            finishInteraction()
+        }
+        .onDisappear { finishInteraction() }
     }
 }

@@ -1178,6 +1178,16 @@
             "maxLength": 64
           }
         },
+        "displayNames": {
+          "type": "object",
+          "descriptionKey": "schemaDescriptions.workspaceColors.displayNames",
+          "description": "Optional editable names for custom palette entries, keyed by stable raw color name. Display names, semantic labels, and raw names share one case-insensitive namespace. Clear or omit a value to show the raw Custom N name again.",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
         "paletteOverrides": {
           "type": "object",
           "description": "Legacy workspace color overrides for built-in palette names. Prefer workspaceColors.colors for new configs.",

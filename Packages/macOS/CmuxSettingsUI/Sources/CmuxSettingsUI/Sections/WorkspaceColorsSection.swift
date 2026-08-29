@@ -12,10 +12,13 @@ public struct WorkspaceColorsSection: View {
     private let jsonStore: JSONConfigStore
     private let catalog: SettingCatalog
     private let errorLog: SettingsErrorLog
+    private let hostActions: SettingsHostActions
 
     @State private var selectionHex: DefaultsValueModel<String>
     @State private var badgeHex: DefaultsValueModel<String>
     @State private var paletteModel: DefaultsValueModel<[String: String]>
+    /// Editable display names for custom entries, keyed by stable raw identity.
+    @State private var displayNamesModel: DefaultsValueModel<[String: String]>
     /// Optional semantic labels keyed by raw palette name.
     @State private var labelsModel: DefaultsValueModel<[String: String]>
     /// Highest `Custom N` ever minted. This section writes the palette straight to
@@ -23,6 +26,8 @@ public struct WorkspaceColorsSection: View {
     /// removed custom name becomes reusable — taking its label and command ID with it.
     @State private var customNameHighWaterMark: DefaultsValueModel<Int>
     @State private var paletteReconcileTracker = WorkspacePaletteColorReconcileTracker()
+    @State private var pendingColorEdit: WorkspacePaletteColorEditPreview?
+    @State private var colorEditErrors: [String: String] = [:]
 
     /// Built-in palette order and default hexes. Mirrors
     /// `WorkspaceTabColorSettings.defaultPalette` in the legacy app target.
@@ -52,14 +57,17 @@ public struct WorkspaceColorsSection: View {
         defaultsStore: UserDefaultsSettingsStore,
         jsonStore: JSONConfigStore,
         catalog: SettingCatalog,
-        errorLog: SettingsErrorLog
+        errorLog: SettingsErrorLog,
+        hostActions: SettingsHostActions
     ) {
         self.jsonStore = jsonStore
         self.catalog = catalog
         self.errorLog = errorLog
+        self.hostActions = hostActions
         _selectionHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.selectionColorHex))
         _badgeHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.notificationBadgeColorHex))
         _paletteModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.palette))
+        _displayNamesModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.displayNames))
         _labelsModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.labels))
         _customNameHighWaterMark = State(
             initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.customNameHighWaterMark)
@@ -79,6 +87,27 @@ public struct WorkspaceColorsSection: View {
             paletteReconcileTracker.reconcileExternalHexes(effectivePaletteMap(stored: newPalette))
             advanceCustomNameHighWaterMark(for: newPalette)
         }
+        .confirmationDialog(
+            colorEditConfirmationTitle,
+            isPresented: Binding(
+                get: { pendingColorEdit != nil },
+                set: { if !$0 { pendingColorEdit = nil } }
+            ),
+            presenting: pendingColorEdit
+        ) { preview in
+            Button(String(localized: "settings.workspaceColors.edit.updateAssignments", defaultValue: "Update Assignments")) {
+                applyColorEdit(preview, decision: .paletteAndAssignments)
+            }
+            Button(String(localized: "settings.workspaceColors.edit.paletteOnly", defaultValue: "Palette Only")) {
+                applyColorEdit(preview, decision: .paletteOnly)
+            }
+            Button(String(localized: "alert.customColor.cancel", defaultValue: "Cancel"), role: .cancel) {
+                paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+                pendingColorEdit = nil
+            }
+        } message: { preview in
+            Text(colorEditConfirmationMessage(preview))
+        }
         .task {
             // Cover a palette that already contained Custom N entries before this section
             // was ever opened — Remove could otherwise free the highest name on first use.
@@ -94,6 +123,7 @@ public struct WorkspaceColorsSection: View {
             // Without these, a cmux.json reload would not refresh the label fields and the
             // mint mark could be read stale after an external palette write.
             labelsModel,
+            displayNamesModel,
             customNameHighWaterMark,
         ]
         models.forEach { $0.startObserving() }
@@ -145,7 +175,8 @@ public struct WorkspaceColorsSection: View {
             ) {
                 Button(String(localized: "settings.workspaceColors.resetPalette.button", defaultValue: "Reset")) {
                     paletteModel.reset()
-                    pruneOrphanedLabels(against: effectivePaletteMap(stored: [:]))
+                    displayNamesModel.reset()
+                    pruneOrphanedMetadata(against: effectivePaletteMap(stored: [:]))
                     paletteReconcileTracker.recordPaletteReset(resultingHexes: effectivePaletteMap(stored: [:]))
                 }
                 .buttonStyle(.bordered)
@@ -164,16 +195,17 @@ public struct WorkspaceColorsSection: View {
         customNameHighWaterMark.set(highest)
     }
 
-    /// Labels that currently resolve, and why any others were rejected.
-    private func labelValidation() -> (
-        valid: [String: String],
-        rejections: [String: WorkspaceColorSemanticLabelResolver.LabelRejection]
-    ) {
+    /// Names that currently resolve, and why any claimant was rejected.
+    private func nameValidation(
+        displayNames: [String: String]? = nil,
+        labels: [String: String]? = nil
+    ) -> WorkspaceColorNameResolver.Validation {
         let palette = effectivePaletteMap(stored: paletteModel.current)
-        let raw = labelsModel.current
-        return (
-            WorkspaceColorSemanticLabelResolver.validLabels(rawLabels: raw, palette: palette),
-            WorkspaceColorSemanticLabelResolver.rejections(rawLabels: raw, palette: palette)
+        return WorkspaceColorNameResolver().validate(
+            rawDisplayNames: displayNames ?? displayNamesModel.current,
+            rawLabels: labels ?? labelsModel.current,
+            palette: palette,
+            builtInNames: Set(Self.builtInPalette.map(\.name))
         )
     }
 
@@ -185,8 +217,10 @@ public struct WorkspaceColorsSection: View {
     /// persist a label keyed to a colour nothing renders, where no `.unknownPaletteName`
     /// message can ever surface it. It would then silently reattach if a name with the
     /// same spelling ever returned.
-    private func commitLabel(_ text: String, for paletteName: String) {
-        guard effectivePaletteMap(stored: paletteModel.current)[paletteName] != nil else { return }
+    private func commitLabel(_ text: String, for paletteName: String) -> String? {
+        guard effectivePaletteMap(stored: paletteModel.current)[paletteName] != nil else {
+            return Self.aliasRejectionMessage(.unknownPaletteName)
+        }
         var labels = labelsModel.current
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
@@ -194,7 +228,30 @@ public struct WorkspaceColorsSection: View {
         } else {
             labels[paletteName] = trimmed
         }
+        if let rejection = nameValidation(labels: labels).labelRejections[paletteName] {
+            return Self.aliasRejectionMessage(rejection)
+        }
         labelsModel.set(labels)
+        return nil
+    }
+
+    private func commitDisplayName(_ text: String, for paletteName: String) -> String? {
+        guard effectivePaletteMap(stored: paletteModel.current)[paletteName] != nil,
+              baseHex(for: paletteName) == nil else {
+            return Self.aliasRejectionMessage(.builtInPaletteEntry)
+        }
+        var displayNames = displayNamesModel.current
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            displayNames.removeValue(forKey: paletteName)
+        } else {
+            displayNames[paletteName] = trimmed
+        }
+        if let rejection = nameValidation(displayNames: displayNames).displayNameRejections[paletteName] {
+            return Self.aliasRejectionMessage(rejection)
+        }
+        displayNamesModel.set(displayNames)
+        return nil
     }
 
     /// Drops label keys whose palette entry is gone.
@@ -204,38 +261,42 @@ public struct WorkspaceColorsSection: View {
     /// no row there is nothing to render its rejection on — and silently reattached if
     /// that name ever came back. Monotonic minting covers `Custom N`, but a `cmux.json`
     /// entry removed and re-added by hand keeps its old meaning.
-    private func pruneOrphanedLabels(against palette: [String: String]) {
+    private func pruneOrphanedMetadata(against palette: [String: String]) {
         let labels = labelsModel.current
         let survivors = labels.filter { palette[$0.key] != nil }
-        guard survivors.count != labels.count else { return }
-        labelsModel.set(survivors)
+        if survivors.count != labels.count { labelsModel.set(survivors) }
+        let displayNames = displayNamesModel.current
+        let survivingDisplayNames = displayNames.filter { palette[$0.key] != nil && baseHex(for: $0.key) == nil }
+        if survivingDisplayNames.count != displayNames.count {
+            displayNamesModel.set(survivingDisplayNames)
+        }
     }
 
     /// Why a label cannot be used, in the user's words.
-    private static func rejectionMessage(
-        _ rejection: WorkspaceColorSemanticLabelResolver.LabelRejection
+    private static func aliasRejectionMessage(
+        _ rejection: WorkspaceColorNameResolver.AliasRejection
     ) -> String {
         switch rejection {
         case .empty:
-            String(localized: "settings.workspaceColors.label.error.empty", defaultValue: "Enter a label or leave the field blank to use the color name.")
+            return String(localized: "settings.workspaceColors.label.error.empty", defaultValue: "Enter a label or leave the field blank to use the color name.")
         case .tooLong:
-            String(
+            return String(
                 format: String(
                     localized: "settings.workspaceColors.label.error.tooLong",
                     defaultValue: "Labels are limited to %lld characters."
                 ),
-                WorkspaceColorSemanticLabelResolver.maximumLabelLength
+                WorkspaceColorNameResolver.maximumAliasLength
             )
-        case let .duplicateLabel(otherName):
-            String(
+        case let .collidesWithAlias(otherName, _):
+            return String(
                 format: String(
                     localized: "settings.workspaceColors.label.error.duplicate",
                     defaultValue: "Already used by %@. Labels must be unique."
                 ),
                 otherName
             )
-        case let .collidesWithPaletteName(name):
-            String(
+        case let .collidesWithRawName(name):
+            return String(
                 format: String(
                     localized: "settings.workspaceColors.label.error.collides",
                     defaultValue: "“%@” is already a color name. Choose different wording."
@@ -243,7 +304,9 @@ public struct WorkspaceColorsSection: View {
                 name
             )
         case .unknownPaletteName:
-            String(localized: "settings.workspaceColors.label.error.unknown", defaultValue: "No color with this name exists.")
+            return String(localized: "settings.workspaceColors.label.error.unknown", defaultValue: "No color with this name exists.")
+        case .builtInPaletteEntry:
+            return String(localized: "settings.workspaceColors.label.error.unknown", defaultValue: "No color with this name exists.")
         }
     }
 
@@ -281,57 +344,245 @@ public struct WorkspaceColorsSection: View {
         entry: (name: String, hex: String),
         paletteModel: DefaultsValueModel<[String: String]>
     ) -> some View {
-        let baseHex = baseHex(for: entry.name)
-        let subtitle: String = {
-            if let baseHex {
-                return String(localized: "settings.workspaceColors.base", defaultValue: "Base: \(baseHex)")
-            }
-            return String(localized: "settings.workspaceColors.customEntry", defaultValue: "Named palette entry.")
-        }()
-        let validation = labelValidation()
-        let rejection = validation.rejections[entry.name]
-        SettingsCardRow(
-            configurationReview: .json("workspaceColors.colors"),
+        if let baseHex = baseHex(for: entry.name) {
+            builtInPaletteEntryRow(entry: entry, baseHex: baseHex, paletteModel: paletteModel)
+        } else {
+            customPaletteEntryRow(entry: entry, paletteModel: paletteModel)
+        }
+    }
+
+    private func builtInPaletteEntryRow(
+        entry: (name: String, hex: String),
+        baseHex: String,
+        paletteModel: DefaultsValueModel<[String: String]>
+    ) -> some View {
+        let validation = nameValidation()
+        return SettingsCardRow(
+            configurationReview: .json("workspaceColors.colors", "workspaceColors.labels"),
             entry.name,
-            subtitle: subtitle
+            subtitle: String(localized: "settings.workspaceColors.base", defaultValue: "Base: \(baseHex)")
         ) {
             HStack(spacing: 8) {
-                WorkspaceColorLabelField(
+                WorkspaceColorAliasField(
                     paletteName: entry.name,
-                    storedLabel: labelsModel.current[entry.name] ?? "",
-                    errorMessage: rejection.map(Self.rejectionMessage),
+                    storedValue: labelsModel.current[entry.name] ?? "",
+                    placeholder: String(localized: "settings.workspaceColors.label.placeholder", defaultValue: "Label"),
+                    accessibilityLabel: String(
+                        format: String(
+                            localized: "settings.workspaceColors.label.accessibility",
+                            defaultValue: "Label for %@"
+                        ),
+                        entry.name
+                    ),
+                    accessibilityIdentifier: "SettingsWorkspaceColorLabelField.\(entry.name)",
+                    importedErrorMessage: validation.labelRejections[entry.name].map(Self.aliasRejectionMessage),
                     commit: { commitLabel($0, for: entry.name) }
                 )
                 HexColorPicker(
                     storedHex: entry.hex,
                     fallback: Color(nsColor: .systemBlue),
-                    reconcileRevision: paletteReconcileTracker.revision(for: entry.name)
+                    reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
+                    commitBehavior: .interactionEnd
                 ) { hex in
-                    // Legacy semantics: persist the full effective
-                    // palette (built-ins filled in at their default
-                    // hex when missing) so editing one entry never
-                    // drops the rest.
-                    var snapshot = effectivePaletteMap(stored: paletteModel.current)
-                    snapshot[entry.name] = hex
-                    paletteModel.set(snapshot)
-                    paletteReconcileTracker.recordPickerWrite(name: entry.name, resultingHexes: snapshot)
+                    requestBuiltInColorEdit(name: entry.name, proposedHex: hex)
                 }
-                Text(entry.hex)
-                    .cmuxFont(size: 12, weight: .medium, design: .monospaced)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 76, alignment: .trailing)
-                if baseHex == nil {
-                    Button(String(localized: "settings.workspaceColors.remove", defaultValue: "Remove")) {
-                        var snapshot = effectivePaletteMap(stored: paletteModel.current)
-                        snapshot.removeValue(forKey: entry.name)
-                        paletteModel.set(snapshot)
-                        pruneOrphanedLabels(against: snapshot)
-                        paletteReconcileTracker.reconcileExternalHexes(snapshot)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(entry.hex)
+                        .cmuxFont(size: 12, weight: .medium, design: .monospaced)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 190, alignment: .trailing)
+                    if let error = colorEditErrors[entry.name] {
+                        Text(error)
+                            .cmuxFont(size: 10, weight: .regular)
+                            .foregroundStyle(.red)
+                            .frame(width: 190, alignment: .trailing)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
             }
+        }
+    }
+
+    private func customPaletteEntryRow(
+        entry: (name: String, hex: String),
+        paletteModel: DefaultsValueModel<[String: String]>
+    ) -> some View {
+        let validation = nameValidation()
+        return SettingsEditableTitleCardRow(
+            configurationReview: .json(
+                "workspaceColors.colors",
+                "workspaceColors.displayNames",
+                "workspaceColors.labels"
+            ),
+            subtitle: String(localized: "settings.workspaceColors.customEntry", defaultValue: "Named palette entry.")
+        ) {
+            WorkspaceColorAliasField(
+                paletteName: entry.name,
+                storedValue: displayNamesModel.current[entry.name] ?? "",
+                placeholder: entry.name,
+                accessibilityLabel: String(localized: "settings.workspaceColors.displayName.accessibility", defaultValue: "Custom color name"),
+                accessibilityIdentifier: "SettingsWorkspaceColorDisplayNameField.\(entry.name)",
+                importedErrorMessage: validation.displayNameRejections[entry.name].map(Self.aliasRejectionMessage),
+                commit: { commitDisplayName($0, for: entry.name) }
+            )
+        } trailing: {
+            HStack(spacing: 8) {
+                WorkspaceColorAliasField(
+                    paletteName: entry.name,
+                    storedValue: labelsModel.current[entry.name] ?? "",
+                    placeholder: String(localized: "settings.workspaceColors.label.placeholder", defaultValue: "Label"),
+                    accessibilityLabel: String(
+                        format: String(
+                            localized: "settings.workspaceColors.label.accessibility",
+                            defaultValue: "Label for %@"
+                        ),
+                        entry.name
+                    ),
+                    accessibilityIdentifier: "SettingsWorkspaceColorLabelField.\(entry.name)",
+                    importedErrorMessage: validation.labelRejections[entry.name].map(Self.aliasRejectionMessage),
+                    commit: { commitLabel($0, for: entry.name) }
+                )
+                HexColorPicker(
+                    storedHex: entry.hex,
+                    fallback: Color(nsColor: .systemBlue),
+                    reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
+                    commitBehavior: .interactionEnd
+                ) { hex in
+                    requestColorEdit(name: entry.name, oldHex: entry.hex, proposedHex: hex)
+                }
+                WorkspaceColorHexField(
+                    paletteName: entry.name,
+                    storedHex: entry.hex,
+                    reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
+                    errorMessage: colorEditErrors[entry.name],
+                    commit: { requestColorEdit(name: entry.name, oldHex: entry.hex, proposedHex: $0) }
+                )
+                Button(String(localized: "settings.workspaceColors.remove", defaultValue: "Remove")) {
+                    var snapshot = effectivePaletteMap(stored: paletteModel.current)
+                    snapshot.removeValue(forKey: entry.name)
+                    paletteModel.set(snapshot)
+                    pruneOrphanedMetadata(against: snapshot)
+                    colorEditErrors.removeValue(forKey: entry.name)
+                    paletteReconcileTracker.reconcileExternalHexes(snapshot)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private var colorEditConfirmationTitle: String {
+        String(localized: "settings.workspaceColors.edit.confirmation.title", defaultValue: "Update existing assignments?")
+    }
+
+    private func colorEditConfirmationMessage(_ preview: WorkspacePaletteColorEditPreview) -> String {
+        String(
+            format: String(
+                localized: "settings.workspaceColors.edit.confirmation.message",
+                defaultValue: "Change %@ from %@ to %@? This value is used by %lld explicit workspaces and %lld explicit groups."
+            ),
+            preview.paletteName,
+            preview.oldHex,
+            preview.newHex,
+            preview.workspaceCount,
+            preview.groupCount
+        )
+    }
+
+    private func requestColorEdit(name: String, oldHex: String, proposedHex: String) {
+        colorEditErrors.removeValue(forKey: name)
+        guard WorkspaceColorHex.normalized(oldHex) != WorkspaceColorHex.normalized(proposedHex) else { return }
+        switch hostActions.previewWorkspacePaletteColorEdit(
+            paletteName: name,
+            expectedOldHex: oldHex,
+            proposedHex: proposedHex
+        ) {
+        case .success(let preview) where preview.requiresConfirmation:
+            pendingColorEdit = preview
+        case .success(let preview):
+            applyColorEdit(preview, decision: .paletteOnly)
+        case .failure(let rejection):
+            colorEditErrors[name] = Self.colorEditRejectionMessage(rejection)
+            paletteReconcileTracker.rejectPickerWrite(name: name)
+        }
+    }
+
+    private func requestBuiltInColorEdit(name: String, proposedHex: String) {
+        colorEditErrors.removeValue(forKey: name)
+        guard let normalized = WorkspaceColorHex.normalized(proposedHex) else {
+            colorEditErrors[name] = Self.colorEditRejectionMessage(.invalidHex)
+            paletteReconcileTracker.rejectPickerWrite(name: name)
+            return
+        }
+        var snapshot = effectivePaletteMap(stored: paletteModel.current)
+        if let duplicate = snapshot.first(where: { entry in
+            entry.key != name && WorkspaceColorHex.normalized(entry.value) == normalized
+        }) {
+            colorEditErrors[name] = Self.colorEditRejectionMessage(
+                .duplicatePaletteValue(paletteName: duplicate.key)
+            )
+            paletteReconcileTracker.rejectPickerWrite(name: name)
+            return
+        }
+        snapshot[name] = normalized
+        paletteModel.set(snapshot)
+        paletteReconcileTracker.recordPickerWrite(name: name, resultingHexes: snapshot)
+    }
+
+    private func applyColorEdit(
+        _ preview: WorkspacePaletteColorEditPreview,
+        decision: WorkspacePaletteColorEditDecision
+    ) {
+        pendingColorEdit = nil
+        switch hostActions.applyWorkspacePaletteColorEdit(preview, decision: decision) {
+        case .applied(let palette):
+            paletteModel.acceptCommittedValue(palette)
+            paletteReconcileTracker.reconcileExternalHexes(palette)
+            colorEditErrors.removeValue(forKey: preview.paletteName)
+        case .stale:
+            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+            colorEditErrors[preview.paletteName] = String(
+                localized: "settings.workspaceColors.edit.error.stale",
+                defaultValue: "This color changed elsewhere. Review the current value and try again."
+            )
+        case .rejected(let rejection):
+            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+            colorEditErrors[preview.paletteName] = Self.colorEditRejectionMessage(rejection)
+        case .failedRestored(let palette):
+            paletteModel.acceptCommittedValue(palette)
+            paletteReconcileTracker.reconcileExternalHexes(palette)
+            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+            colorEditErrors[preview.paletteName] = String(
+                localized: "settings.workspaceColors.edit.error.restored",
+                defaultValue: "cmux couldn’t save the complete change, so it restored the previous colors."
+            )
+        case .failedUnrecovered(let palette):
+            paletteModel.acceptCommittedValue(palette)
+            paletteReconcileTracker.reconcileExternalHexes(palette)
+            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+            colorEditErrors[preview.paletteName] = String(
+                localized: "settings.workspaceColors.edit.error.unrecovered",
+                defaultValue: "cmux couldn’t restore every color. Review the current values before continuing."
+            )
+        }
+    }
+
+    private static func colorEditRejectionMessage(_ rejection: WorkspacePaletteColorEditRejection) -> String {
+        switch rejection {
+        case .invalidHex:
+            String(localized: "alert.invalidColor.emptyMessage", defaultValue: "Enter a hex color in the format #RRGGBB.")
+        case .duplicatePaletteValue(let paletteName):
+            String(
+                format: String(
+                    localized: "settings.workspaceColors.edit.error.duplicateHex",
+                    defaultValue: "Already used by %@. Palette colors must be unique."
+                ),
+                paletteName
+            )
+        case .unavailablePaletteEntry:
+            String(localized: "settings.workspaceColors.edit.error.stale", defaultValue: "This color changed elsewhere. Review the current value and try again.")
+        case .staleValue:
+            String(localized: "settings.workspaceColors.edit.error.stale", defaultValue: "This color changed elsewhere. Review the current value and try again.")
         }
     }
 
@@ -385,18 +636,21 @@ public struct WorkspaceColorsSection: View {
     }
 }
 
-/// Editable semantic label for one palette entry.
+/// Editable custom display name or semantic label for one palette entry.
 ///
 /// Keeps a local draft and commits on submit or when focus leaves, so a settings write
 /// happens once per edit rather than once per keystroke. Invalid text stays visible and
 /// editable — it simply never enters the effective resolver — because silently discarding
 /// what someone typed is worse than showing why it cannot be used.
 @MainActor
-private struct WorkspaceColorLabelField: View {
+private struct WorkspaceColorAliasField: View {
     let paletteName: String
-    let storedLabel: String
-    let errorMessage: String?
-    let commit: (String) -> Void
+    let storedValue: String
+    let placeholder: String
+    let accessibilityLabel: String
+    let accessibilityIdentifier: String
+    let importedErrorMessage: String?
+    let commit: (String) -> String?
 
     @State private var draft: String
     /// The value `draft` was last set *from* — an external label, or our own commit.
@@ -406,20 +660,27 @@ private struct WorkspaceColorLabelField: View {
     /// `storedLabel` underneath an untouched draft. Comparing against what we last
     /// synced separates the two: only the user can make `draft` diverge from this.
     @State private var syncedValue: String
+    @State private var localErrorMessage: String?
     @FocusState private var isFocused: Bool
 
     init(
         paletteName: String,
-        storedLabel: String,
-        errorMessage: String?,
-        commit: @escaping (String) -> Void
+        storedValue: String,
+        placeholder: String,
+        accessibilityLabel: String,
+        accessibilityIdentifier: String,
+        importedErrorMessage: String?,
+        commit: @escaping (String) -> String?
     ) {
         self.paletteName = paletteName
-        self.storedLabel = storedLabel
-        self.errorMessage = errorMessage
+        self.storedValue = storedValue
+        self.placeholder = placeholder
+        self.accessibilityLabel = accessibilityLabel
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.importedErrorMessage = importedErrorMessage
         self.commit = commit
-        _draft = State(initialValue: storedLabel)
-        _syncedValue = State(initialValue: storedLabel)
+        _draft = State(initialValue: storedValue)
+        _syncedValue = State(initialValue: storedValue)
     }
 
     /// Commits `draft` and records what was written, so the same edit cannot commit twice.
@@ -428,8 +689,10 @@ private struct WorkspaceColorLabelField: View {
     /// a submitted `"  GOAL: X  "` stayed untrimmed forever — `onChange(of: storedLabel)`
     /// is suppressed while focused — and that row re-committed on every later close.
     private func commitDraft() {
+        guard draft != syncedValue else { return }
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        commit(trimmed)
+        localErrorMessage = commit(trimmed)
+        guard localErrorMessage == nil else { return }
         draft = trimmed
         syncedValue = trimmed
     }
@@ -437,7 +700,7 @@ private struct WorkspaceColorLabelField: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
             TextField(
-                String(localized: "settings.workspaceColors.label.placeholder", defaultValue: "Label"),
+                placeholder,
                 text: $draft
             )
             .textFieldStyle(.roundedBorder)
@@ -450,11 +713,15 @@ private struct WorkspaceColorLabelField: View {
             }
             // An external edit (cmux.json reload, Reset Palette) wins over a stale draft
             // the user is not currently typing into.
-            .onChange(of: storedLabel) { _, newValue in
+            .onChange(of: storedValue) { _, newValue in
                 if !isFocused {
                     draft = newValue
                     syncedValue = newValue
+                    localErrorMessage = nil
                 }
+            }
+            .onChange(of: draft) { _, _ in
+                localErrorMessage = nil
             }
             // Teardown backstop. @FocusState reports focus *transitions*, and a view
             // that is destroyed never transitions — it just stops existing. Closing
@@ -475,16 +742,89 @@ private struct WorkspaceColorLabelField: View {
             .onDisappear {
                 if draft != syncedValue { commitDraft() }
             }
-            .accessibilityLabel(
-                String(
-                    format: String(
-                        localized: "settings.workspaceColors.label.accessibility",
-                        defaultValue: "Label for %@"
-                    ),
-                    paletteName
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityIdentifier(accessibilityIdentifier)
+
+            if let errorMessage = localErrorMessage ?? importedErrorMessage {
+                Text(errorMessage)
+                    .cmuxFont(size: 10, weight: .regular)
+                    .foregroundStyle(.red)
+                    .frame(width: 190, alignment: .trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// Direct `#RRGGBB` editor that commits once on Return, blur, or teardown.
+@MainActor
+private struct WorkspaceColorHexField: View {
+    let paletteName: String
+    let storedHex: String
+    let reconcileRevision: Int
+    let errorMessage: String?
+    let commit: (String) -> Void
+
+    @State private var draft: String
+    @State private var syncedValue: String
+    @FocusState private var isFocused: Bool
+
+    init(
+        paletteName: String,
+        storedHex: String,
+        reconcileRevision: Int,
+        errorMessage: String?,
+        commit: @escaping (String) -> Void
+    ) {
+        self.paletteName = paletteName
+        self.storedHex = storedHex
+        self.reconcileRevision = reconcileRevision
+        self.errorMessage = errorMessage
+        self.commit = commit
+        _draft = State(initialValue: storedHex)
+        _syncedValue = State(initialValue: storedHex)
+    }
+
+    private func commitDraft() {
+        guard draft != syncedValue else { return }
+        commit(draft)
+        syncedValue = draft
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            TextField("#RRGGBB", text: $draft)
+                .textFieldStyle(.roundedBorder)
+                .cmuxFont(size: 12, weight: .regular, design: .monospaced)
+                .frame(width: 92)
+                .focused($isFocused)
+                .onSubmit { commitDraft() }
+                .onChange(of: isFocused) { _, focused in
+                    if !focused { commitDraft() }
+                }
+                .onChange(of: storedHex) { _, newValue in
+                    if !isFocused {
+                        draft = newValue
+                        syncedValue = newValue
+                    }
+                }
+                .onChange(of: reconcileRevision) { _, _ in
+                    draft = storedHex
+                    syncedValue = storedHex
+                }
+                .onDisappear {
+                    if draft != syncedValue { commitDraft() }
+                }
+                .accessibilityLabel(
+                    String(
+                        format: String(
+                            localized: "settings.workspaceColors.hex.accessibility",
+                            defaultValue: "Hex color for %@"
+                        ),
+                        paletteName
+                    )
                 )
-            )
-            .accessibilityIdentifier("SettingsWorkspaceColorLabelField.\(paletteName)")
+                .accessibilityIdentifier("SettingsWorkspaceColorHexField.\(paletteName)")
 
             if let errorMessage {
                 Text(errorMessage)

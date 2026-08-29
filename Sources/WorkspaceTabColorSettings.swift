@@ -83,6 +83,7 @@ enum WorkspaceTabColorSettings {
         var palette = editablePaletteMap(defaults: defaults)
         palette.removeValue(forKey: normalizedName)
         persistPaletteMap(palette, defaults: defaults)
+        removeMetadata(for: normalizedName, defaults: defaults)
     }
 
     static func persistPaletteMap(_ rawPalette: [String: String], defaults: UserDefaults = .standard) {
@@ -133,6 +134,17 @@ enum WorkspaceTabColorSettings {
         defaults.removeObject(forKey: paletteKey)
         defaults.removeObject(forKey: legacyDefaultOverridesKey)
         defaults.removeObject(forKey: legacyCustomColorsKey)
+        defaults.removeObject(forKey: SettingCatalog().workspaceColors.displayNames.userDefaultsKey)
+        let labelsKey = SettingCatalog().workspaceColors.labels.userDefaultsKey
+        if let labels = defaults.dictionary(forKey: labelsKey) as? [String: String] {
+            let builtInNames = Set(defaultPalette.map(\.name))
+            let survivingLabels = labels.filter { builtInNames.contains($0.key) }
+            if survivingLabels.isEmpty {
+                defaults.removeObject(forKey: labelsKey)
+            } else {
+                defaults.set(survivingLabels, forKey: labelsKey)
+            }
+        }
         // Deliberately does NOT clear WorkspaceColorCustomNameMint.highWaterMarkDefaultsKey.
         // Resetting the palette restores default colors; it must not restore the ability to
         // recycle a name that already carried a label and a command-palette identity.
@@ -241,6 +253,19 @@ enum WorkspaceTabColorSettings {
             normalized[name] = hex
         }
         return normalized
+    }
+
+    private static func removeMetadata(for paletteName: String, defaults: UserDefaults) {
+        let catalog = SettingCatalog().workspaceColors
+        for key in [catalog.displayNames.userDefaultsKey, catalog.labels.userDefaultsKey] {
+            guard var values = defaults.dictionary(forKey: key) as? [String: String] else { continue }
+            values.removeValue(forKey: paletteName)
+            if values.isEmpty {
+                defaults.removeObject(forKey: key)
+            } else {
+                defaults.set(values, forKey: key)
+            }
+        }
     }
 
     private static var defaultPaletteMap: [String: String] {

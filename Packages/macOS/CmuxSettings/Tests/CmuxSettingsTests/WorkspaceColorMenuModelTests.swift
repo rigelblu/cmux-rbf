@@ -13,6 +13,7 @@ struct WorkspaceColorMenuModelTests {
     private static let order = ["Teal", "Red", "Blue"]
 
     private func candidates(
+        displayNames: [String: String] = [:],
         labels: [String: String] = [:],
         targets: [String?],
         palette: [String: String] = WorkspaceColorMenuModelTests.palette,
@@ -21,6 +22,7 @@ struct WorkspaceColorMenuModelTests {
         WorkspaceColorMenuModel.candidates(
             orderedNames: order,
             palette: palette,
+            displayNames: displayNames,
             labels: labels,
             targetHexes: targets
         )
@@ -55,6 +57,26 @@ struct WorkspaceColorMenuModelTests {
             return entry.displayName
         }
         #expect(displays == ["GOAL: Primary (Teal)", "Red", "Blue"])
+    }
+
+    @Test("A semantic label shows the editable display name instead of raw identity")
+    func entriesComposeLabelAndDisplayName() {
+        var palette = Self.palette
+        palette["Custom 11"] = "#FF8300"
+        let rows = candidates(
+            displayNames: ["Custom 11": "Tangerine"],
+            labels: ["Custom 11": "GOAL: Primary"],
+            targets: [nil],
+            palette: palette,
+            order: Self.order + ["Custom 11"]
+        )
+        let custom = rows.compactMap { row -> WorkspaceColorPaletteEntry? in
+            guard case let .paletteEntry(entry) = row.kind, entry.name == "Custom 11" else { return nil }
+            return entry
+        }.first
+
+        #expect(custom?.displayName == "GOAL: Primary (Tangerine)")
+        #expect(custom?.name == "Custom 11", "raw identity remains stable")
     }
 
     // MARK: - State

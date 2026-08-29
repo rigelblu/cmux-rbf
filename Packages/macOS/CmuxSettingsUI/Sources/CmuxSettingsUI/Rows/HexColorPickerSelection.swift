@@ -22,6 +22,14 @@ struct HexColorPickerSelection {
         return hex
     }
 
+    mutating func finishPendingSelection() -> String? {
+        defer {
+            pendingPickerHex = nil
+            pendingPickerReconcileRevision = nil
+        }
+        return pendingPickerHex
+    }
+
     mutating func reconcile(state: HexColorPickerReconcileState) {
         latestReconcileRevision = state.revision
         if pendingPickerHex == state.storedHex,

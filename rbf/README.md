@@ -74,16 +74,18 @@ Type `/rename` in a Codex session and the cmux tab hosting it takes the same nam
 - **The session has to have said something first.** Codex registers a session with cmux at its first real prompt, so a `/rename` typed before you have sent it any message is declined and nothing happens. Send one message, then rename.
 - Two smaller gaps are documented in `docs/workspace-auto-naming.md`: dragging a Codex tab into another workspace stops its rename sync until the surface is recreated, and arrow-edited or pasted `/rename` commands may fail closed. Press Escape and type the rename again without arrow keys.
 
-## 🟠⋯ Name a workspace colour by what it means to you
-Give workspace colours your own meaning — such as **GOAL: Primary (Teal)** — and see which one is assigned whenever you open the chooser. Labels are optional and change nothing underneath: colour names, hex values, saved workspaces, and scripts keep working exactly as before.
+## 🟠⋯ Name and edit a workspace colour
+Give workspace colours your own meaning — such as **GOAL: Primary (Tangerine)** — and see which one is assigned whenever you open the chooser. A custom colour can have an editable display name, while an optional label says what the colour means. Both leave its stable raw identity, such as `Custom 11`, available to existing workspaces and scripts.
 
-- Meaning comes first and the colour's own name stays in parentheses, so a label never costs you the identity underneath it. With no label, you just see the colour name.
+- Meaning comes first and the custom display name stays in parentheses. With no label, you see the display name; with neither, you see the stable raw name.
 - The colour menu marks what is already assigned — checked for one workspace, mixed when several selected workspaces disagree — instead of making you assign one and look.
 - **Edit Color Labels…** at the foot of the menu opens Settings on the Workspace Colors rows, rather than leaving you to find them.
 - **No Color** is always offered and carries its own state. The command palette calls it **No Color** too, so one action has one name; `clear-color` remains its CLI spelling.
 - A colour a workspace still wears after you removed it from the palette appears as a temporary **Custom (#RRGGBB)** row rather than vanishing.
-- Edit labels in Settings or in `~/.config/cmux/cmux.json` under `workspaceColors.labels`. Clearing one restores the raw colour name.
-- Automation reads the palette with `cmux workspace-color list [--json]` and can assign by label: `cmux workspace-action set-color "GOAL: Primary"`.
+- Edit custom names and hex values in Settings. You can also set names in `~/.config/cmux/cmux.json` under `workspaceColors.displayNames`; clearing one restores the raw colour name. Labels remain under `workspaceColors.labels`.
+- Custom palette hex values must be unique. Existing imported duplicates remain visible so you can repair them, but a new duplicate is rejected.
+- When an edited custom hex is explicitly assigned to workspaces or groups, cmux asks whether to update those assignments too. Config-derived named or literal colours are never rewritten.
+- Automation reads the palette with `cmux workspace-color list [--json]` and can assign by raw name, custom display name, or label: `cmux workspace-action set-color "GOAL: Primary"`.
 - **No Color** itself cannot be labelled, `workspace-group set-color` stays hex-only, and if two entries share a hex both show as assigned — cmux stores a colour, not which entry you picked.
 
 ## 🟠⋯ Tell a group header from the workspaces inside it at a glance

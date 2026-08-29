@@ -232,16 +232,18 @@ Workspace and tab action names:
 ### Workspace colors
 
 `workspace-action set-color` accepts any of three spellings of the same colour,
-resolved in this order: a normalized `#RRGGBB` hex, a palette name (`Teal`), or a
-semantic label (`GOAL: Primary`). Labels are matched exactly after trimming and
-case-folding, and an ambiguous label fails closed rather than guessing.
+resolved in this order: a normalized `#RRGGBB` hex, a stable raw palette name
+(`Custom 11`), a custom display name (`Tangerine`), or a semantic label
+(`GOAL: Primary`). Non-raw names are matched after trimming and case-folding.
+Display names and labels share one namespace; imported collisions all fail closed
+rather than choosing a winner, while the stable raw name remains usable.
 
 Run `cmux workspace-color list` to see what a given machine accepts:
 
 ```console
 $ cmux workspace-color list
 NAME	LABEL	DISPLAY NAME	HEX
-Teal	GOAL: Primary	GOAL: Primary (Teal)	#006B6B
+Custom 11	GOAL: Primary	GOAL: Primary (Tangerine)	#FF8300
 Red		Red	#C0392B
 ```
 
@@ -249,9 +251,11 @@ Red		Red	#C0392B
 `hex`; `label` is `null` when unset, so a consumer can tell an unlabelled entry
 from one labelled with its own name.
 
-The command is read-only and has no mutating verbs. Labels are edited in
-Settings → Workspace Colors or in `cmux.json` under `workspaceColors.labels`, so
-cmux keeps exactly one durable owner of what a colour means.
+The command is read-only and has no mutating verbs. Custom display names and
+labels are edited in Settings → Workspace Colors or in `cmux.json` under
+`workspaceColors.displayNames` and `workspaceColors.labels`. Editing a custom
+palette hex in Settings is the mutation path that can also update explicit
+workspace and group assignments; it never rewrites config-derived colour values.
 
 `workspace-action clear-color` is the automation spelling of the **No Color**
 menu row; the verb is unchanged for compatibility.

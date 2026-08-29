@@ -87,6 +87,32 @@ struct HexColorPickerSelectionTests {
         #expect(hueDistance(sourceHue, try hue(of: selection.color)) > 0.2)
     }
 
+    @Test func interactionEndCommitsOnlyTheLatestPendingSelectionOnce() {
+        var selection = HexColorPickerSelection(
+            state: HexColorPickerReconcileState(storedHex: "#FF0000", revision: 0),
+            fallback: Color(nsColor: .systemBlue)
+        )
+
+        _ = selection.applyPickerSelection(Color(nsColor: .green))
+        let latest = selection.applyPickerSelection(Color(nsColor: .blue))
+
+        #expect(selection.finishPendingSelection() == latest)
+        #expect(selection.finishPendingSelection() == nil)
+    }
+
+    @Test func externalReconcileCancelsAStalePendingSelection() {
+        var selection = HexColorPickerSelection(
+            state: HexColorPickerReconcileState(storedHex: "#FF0000", revision: 0),
+            fallback: Color(nsColor: .systemBlue)
+        )
+
+        _ = selection.applyPickerSelection(Color(nsColor: .green))
+        selection.reconcile(state: HexColorPickerReconcileState(storedHex: "#0000FF", revision: 1))
+
+        #expect(selection.finishPendingSelection() == nil)
+        #expect(selection.color.cmuxHexString == "#0000FF")
+    }
+
     private func nsColor(hue: CGFloat, brightness: CGFloat) -> NSColor {
         NSColor(calibratedHue: hue, saturation: 1, brightness: brightness, alpha: 1)
     }

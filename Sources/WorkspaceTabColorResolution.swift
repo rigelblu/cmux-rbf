@@ -2,6 +2,23 @@ import CmuxSettings
 import Foundation
 
 extension WorkspaceTabColorSettings {
+    /// Editable custom display names exactly as stored, before validation.
+    static func rawColorDisplayNames(defaults: UserDefaults = .standard) -> [String: String] {
+        defaults.dictionary(forKey: SettingCatalog().workspaceColors.displayNames.userDefaultsKey)
+            as? [String: String] ?? [:]
+    }
+
+    /// Display names that survive shared namespace validation, for display and lookup.
+    static func effectiveColorDisplayNames(defaults: UserDefaults = .standard) -> [String: String] {
+        let validation = WorkspaceColorNameResolver().validate(
+            rawDisplayNames: rawColorDisplayNames(defaults: defaults),
+            rawLabels: rawColorLabels(defaults: defaults),
+            palette: resolvedPaletteMap(defaults: defaults),
+            builtInNames: Set(defaultPalette.map(\.name))
+        )
+        return validation.displayNames
+    }
+
     /// Labels exactly as stored, before validation.
     ///
     /// Handed to the resolver un-validated on purpose: `resolve` applies the same
@@ -14,18 +31,22 @@ extension WorkspaceTabColorSettings {
 
     /// Labels that survive validation against the current palette, for display.
     static func effectiveColorLabels(defaults: UserDefaults = .standard) -> [String: String] {
-        WorkspaceColorSemanticLabelResolver.validLabels(
+        WorkspaceColorNameResolver().validate(
+            rawDisplayNames: rawColorDisplayNames(defaults: defaults),
             rawLabels: rawColorLabels(defaults: defaults),
-            palette: resolvedPaletteMap(defaults: defaults)
-        )
+            palette: resolvedPaletteMap(defaults: defaults),
+            builtInNames: Set(defaultPalette.map(\.name))
+        ).labels
     }
 
     /// The effective palette as display entries, in `palette()` order, labels attached.
     static func labeledPaletteEntries(defaults: UserDefaults = .standard) -> [WorkspaceColorPaletteEntry] {
-        WorkspaceColorSemanticLabelResolver.effectiveEntries(
+        WorkspaceColorNameResolver().effectiveEntries(
             orderedNames: palette(defaults: defaults).map(\.name),
             palette: resolvedPaletteMap(defaults: defaults),
-            labels: rawColorLabels(defaults: defaults)
+            displayNames: rawColorDisplayNames(defaults: defaults),
+            labels: rawColorLabels(defaults: defaults),
+            builtInNames: Set(defaultPalette.map(\.name))
         )
     }
 
@@ -33,16 +54,18 @@ extension WorkspaceTabColorSettings {
     ///
     /// The single resolver behind the config workspace definition, the socket/CLI
     /// `set_color` handler, and `TabManager.applyWorkspacePaletteColor`. Ordered
-    /// explicit `#RRGGBB` → exact-case raw name → folded raw name → exact unique label →
-    /// bare six-digit hex; ambiguity fails closed. Bare hex is deliberately last, so a
-    /// palette entry or label spelled from hex letters (`Decade`, `Facade`) keeps its own
-    /// colour. `workspace.group.set_color` and the Choose Custom Color… alert stay
-    /// hex-only by decision and do not call this.
+    /// explicit `#RRGGBB` → exact-case raw name → folded raw name → validated display
+    /// name or label → bare six-digit hex; ambiguity fails closed. Bare hex is
+    /// deliberately last, so a palette entry or alias spelled from hex letters
+    /// (`Decade`, `Facade`) keeps its own colour. `workspace.group.set_color` and the
+    /// Choose Custom Color… alert stay hex-only by decision and do not call this.
     static func resolvedColorHex(_ raw: String, defaults: UserDefaults = .standard) -> String? {
-        WorkspaceColorSemanticLabelResolver.resolve(
+        WorkspaceColorNameResolver().resolve(
             raw,
             palette: resolvedPaletteMap(defaults: defaults),
-            labels: rawColorLabels(defaults: defaults)
+            displayNames: rawColorDisplayNames(defaults: defaults),
+            labels: rawColorLabels(defaults: defaults),
+            builtInNames: Set(defaultPalette.map(\.name))
         )
     }
 
@@ -57,7 +80,9 @@ extension WorkspaceTabColorSettings {
         WorkspaceColorMenuModel.candidates(
             orderedNames: palette(defaults: defaults).map(\.name),
             palette: resolvedPaletteMap(defaults: defaults),
+            displayNames: rawColorDisplayNames(defaults: defaults),
             labels: rawColorLabels(defaults: defaults),
+            builtInNames: Set(defaultPalette.map(\.name)),
             targetHexes: targetHexes
         )
     }
@@ -73,6 +98,9 @@ extension WorkspaceTabColorSettings {
         let labels = effectiveColorLabels(defaults: defaults)
             .sorted { lhs, rhs in lhs.key.localizedStandardCompare(rhs.key) == .orderedAscending }
             .map { "\($0.key)→\($0.value)" }
-        return (palette + labels).joined(separator: "\n")
+        let displayNames = effectiveColorDisplayNames(defaults: defaults)
+            .sorted { lhs, rhs in lhs.key.localizedStandardCompare(rhs.key) == .orderedAscending }
+            .map { "\($0.key)⇒\($0.value)" }
+        return (palette + displayNames + labels).joined(separator: "\n")
     }
 }

@@ -51,6 +51,19 @@ struct WorkspacePaletteColorReconcileTrackerTests {
         #expect(tracker.revision(for: "Blue") == 1)
     }
 
+    @Test func rejectedPickerWriteReconcilesOnlyTheEditedEntry() {
+        var tracker = WorkspacePaletteColorReconcileTracker()
+        tracker.startTracking([
+            "Red": "#C0392B",
+            "Blue": "#1565C0",
+        ])
+
+        tracker.rejectPickerWrite(name: "Red")
+
+        #expect(tracker.revision(for: "Red") == 1)
+        #expect(tracker.revision(for: "Blue") == 0)
+    }
+
     @Test func paletteResetAdvancesTrackedAndResultingEntries() {
         var tracker = WorkspacePaletteColorReconcileTracker()
         tracker.startTracking([

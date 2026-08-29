@@ -19,6 +19,7 @@ private let hostSettingsLogger = Logger(subsystem: "com.cmuxterm.app", category:
 @MainActor
 final class HostSettingsActions: SettingsHostActions {
     private let configFileURL: URL
+    let workspacePaletteColorEditor = WorkspacePaletteColorEditCoordinator()
 
     /// Serializes font-size config writes so rapid slider saves persist in order.
     private let fontConfigWriter = FontConfigWriter()
@@ -122,6 +123,30 @@ final class HostSettingsActions: SettingsHostActions {
         // through `NSWorkspace.shared.open` would route to the default
         // `.json` handler and ignore the cmux setting.
         PreferredEditorService(defaults: .standard).open(configFileURL)
+    }
+
+    func previewWorkspacePaletteColorEdit(
+        paletteName: String,
+        expectedOldHex: String,
+        proposedHex: String
+    ) -> Result<WorkspacePaletteColorEditPreview, WorkspacePaletteColorEditRejection> {
+        workspacePaletteColorEditor.preview(
+            appDelegate: AppDelegate.shared,
+            paletteName: paletteName,
+            expectedOldHex: expectedOldHex,
+            proposedHex: proposedHex
+        )
+    }
+
+    func applyWorkspacePaletteColorEdit(
+        _ preview: WorkspacePaletteColorEditPreview,
+        decision: WorkspacePaletteColorEditDecision
+    ) -> WorkspacePaletteColorEditResult {
+        workspacePaletteColorEditor.apply(
+            preview,
+            decision: decision,
+            appDelegate: AppDelegate.shared
+        )
     }
 
     func restartAllowlistedCommandsStatus() -> RestartAllowlistedCommandsSettingsStatus {

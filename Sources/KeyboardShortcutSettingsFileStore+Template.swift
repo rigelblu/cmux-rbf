@@ -166,6 +166,9 @@ extension CmuxSettingsFileStore {
                     "colors": Dictionary(
                         uniqueKeysWithValues: WorkspaceTabColorSettings.defaultPalette.map { ($0.name, $0.hex) }
                     ),
+                    // Empty by default: custom display names are personal aliases keyed
+                    // by the stable raw palette identity.
+                    "displayNames": [String: String](),
                     // Empty by default: labels are a personal taxonomy, so cmux ships no
                     // opinion about what a color means. Keyed by raw palette name.
                     "labels": [String: String](),

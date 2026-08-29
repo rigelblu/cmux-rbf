@@ -18,6 +18,10 @@ struct WorkspacePaletteColorReconcileTracker {
         bump(name)
     }
 
+    mutating func rejectPickerWrite(name: String) {
+        bump(name)
+    }
+
     mutating func recordPaletteReset(resultingHexes: [String: String]) {
         let affectedNames = Set((trackedHexes ?? [:]).keys).union(resultingHexes.keys)
         trackedHexes = resultingHexes

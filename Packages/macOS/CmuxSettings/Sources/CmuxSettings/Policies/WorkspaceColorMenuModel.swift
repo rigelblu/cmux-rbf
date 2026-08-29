@@ -50,7 +50,9 @@ public enum WorkspaceColorMenuModel {
     public static func candidates(
         orderedNames: [String],
         palette: [String: String],
+        displayNames: [String: String] = [:],
         labels: [String: String],
+        builtInNames: Set<String> = [],
         targetHexes: [String?]
     ) -> [WorkspaceColorMenuCandidate] {
         // Targets are used un-normalized on purpose: WorkspaceColorAssignmentState
@@ -66,10 +68,12 @@ public enum WorkspaceColorMenuModel {
             )
         ]
 
-        let entries = WorkspaceColorSemanticLabelResolver.effectiveEntries(
+        let entries = WorkspaceColorNameResolver().effectiveEntries(
             orderedNames: orderedNames,
             palette: palette,
-            labels: labels
+            displayNames: displayNames,
+            labels: labels,
+            builtInNames: builtInNames
         )
         for entry in entries {
             // Every entry matching the assigned hex is checked. cmux stores a color, not
