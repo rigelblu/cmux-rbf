@@ -84,7 +84,7 @@ Give workspace colours your own meaning — such as **GOAL: Primary (Tangerine)*
 - A colour a workspace still wears after you removed it from the palette appears as a temporary **Custom (#RRGGBB)** row rather than vanishing.
 - Edit custom names and hex values in Settings. You can also set names in `~/.config/cmux/cmux.json` under `workspaceColors.displayNames`; clearing one restores the raw colour name. Labels remain under `workspaceColors.labels`.
 - Custom palette hex values must be unique. Existing imported duplicates remain visible so you can repair them, but a new duplicate is rejected.
-- When an edited custom hex is explicitly assigned to workspaces or groups, cmux asks whether to update those assignments too. Config-derived named or literal colours are never rewritten.
+- When an edited custom hex has one palette owner, matching explicit workspace and group assignments follow it automatically. If an imported duplicate makes the old value ambiguous, only the chosen palette entry changes. Config-derived named or literal colours are never rewritten.
 - Automation reads the palette with `cmux workspace-color list [--json]` and can assign by raw name, custom display name, or label: `cmux workspace-action set-color "GOAL: Primary"`.
 - **No Color** itself cannot be labelled, `workspace-group set-color` stays hex-only, and if two entries share a hex both show as assigned — cmux stores a colour, not which entry you picked.
 

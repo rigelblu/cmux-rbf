@@ -16,6 +16,23 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.23.0 (2026-08-29) — #cm-61
+*Cuts v0.23.0 for local dogfooding. Releases `#cm-61` only — `#cm-47` stays unreleased in the section above.*
+
+## 🟠⋯ Changed for End Users
+- 2026-08-29 - feat (ux) | **rename a custom palette colour and edit its exact hex after creating it.** The custom name, semantic label, swatch, and `#RRGGBB` value are now independently understandable and editable in **Settings → Workspace Colors**. Clearing a custom name restores its stable `Custom N` fallback; the raw identity used by existing configuration and commands does not change (#cm-61)
+- 2026-08-29 - feat (ux) | **keep a custom colour's existing assignments when its value changes.** If the old hex belongs to one palette entry, direct entry and the native colour picker automatically carry matching explicit workspace and group assignments to the final value without a dialog. The picker previews while open and saves its final value once when it closes (#cm-61)
+- 2026-08-29 - fix (ux) | invalid names and hex drafts stay beside the error that explains how to repair them, while the last saved palette value remains authoritative. New duplicate palette hexes are rejected because assignments store only the value and cannot preserve which of two same-valued names was chosen (#cm-61)
+
+## 🟠⋯ Known Limitations
+- An imported palette that already contains the same old hex under multiple entries is ambiguous. Editing one of those entries changes that palette entry only; cmux does not guess which existing workspace or group assignments belonged to it (#cm-61)
+- Effective colours resolved from `cmux.json` remain user-owned configuration. A palette edit does not rewrite configured literal hexes or other config text; built-in palette entries also remain non-editable (#cm-61)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-29 - feat (technical) | `workspaceColors.displayNames` adds optional custom display names keyed by stable raw palette identity. One fail-closed resolver validates raw names, display names, and semantic labels; one revisioned host mutation owns palette changes and explicit workspace/group propagation. Focused Settings, coordinator, resolver-mutation, picker-lifecycle, test-wiring, localization, tagged-build, and 5/5 human dogfood evidence cover the shipped path (#cm-61)
+
+---
+
 # 🔵⋯ v0.22.0 (2026-08-28) — #cm-60
 *Cuts v0.22.0 for local dogfooding. Releases `#cm-60` only — `#cm-47` stays unreleased, still held for one combined CM-47 delivery, and `#cm-54`/`#cm-55` remain in Review.*
 
