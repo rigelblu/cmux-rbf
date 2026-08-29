@@ -100,6 +100,12 @@ struct HexColorPickerSelectionTests {
         #expect(selection.finishPendingSelection() == nil)
     }
 
+    @Test func colorPanelFocusLossDoesNotEndThePickerInteraction() {
+        #expect(!HexColorPickerInteractionEvent.colorPanelDidResignKey.shouldCommit)
+        #expect(HexColorPickerInteractionEvent.colorPanelWillClose.shouldCommit)
+        #expect(HexColorPickerInteractionEvent.viewDisappeared.shouldCommit)
+    }
+
     @Test func externalReconcileCancelsAStalePendingSelection() {
         var selection = HexColorPickerSelection(
             state: HexColorPickerReconcileState(storedHex: "#FF0000", revision: 0),

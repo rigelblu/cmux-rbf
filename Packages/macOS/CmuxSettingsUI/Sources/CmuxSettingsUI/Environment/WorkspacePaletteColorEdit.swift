@@ -36,9 +36,12 @@ public struct WorkspacePaletteColorEditPreview: Equatable, Sendable {
         self.revisionToken = revisionToken
     }
 
-    /// Whether the user must choose between propagation and palette-only mutation.
-    public var requiresConfirmation: Bool {
-        propagationAllowed && workspaceCount + groupCount > 0
+    /// The mutation Settings applies without asking the user to choose.
+    ///
+    /// A unique old value identifies this palette entry, so its explicit assignments
+    /// follow the edit. Imported duplicate old values are ambiguous and remain untouched.
+    public var automaticDecision: WorkspacePaletteColorEditDecision {
+        propagationAllowed ? .paletteAndAssignments : .paletteOnly
     }
 }
 

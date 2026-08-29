@@ -26,7 +26,6 @@ public struct WorkspaceColorsSection: View {
     /// removed custom name becomes reusable — taking its label and command ID with it.
     @State private var customNameHighWaterMark: DefaultsValueModel<Int>
     @State private var paletteReconcileTracker = WorkspacePaletteColorReconcileTracker()
-    @State private var pendingColorEdit: WorkspacePaletteColorEditPreview?
     @State private var colorEditErrors: [String: String] = [:]
 
     /// Built-in palette order and default hexes. Mirrors
@@ -86,27 +85,6 @@ public struct WorkspaceColorsSection: View {
         .onChange(of: paletteModel.current) { _, newPalette in
             paletteReconcileTracker.reconcileExternalHexes(effectivePaletteMap(stored: newPalette))
             advanceCustomNameHighWaterMark(for: newPalette)
-        }
-        .confirmationDialog(
-            colorEditConfirmationTitle,
-            isPresented: Binding(
-                get: { pendingColorEdit != nil },
-                set: { if !$0 { pendingColorEdit = nil } }
-            ),
-            presenting: pendingColorEdit
-        ) { preview in
-            Button(String(localized: "settings.workspaceColors.edit.updateAssignments", defaultValue: "Update Assignments")) {
-                applyColorEdit(preview, decision: .paletteAndAssignments)
-            }
-            Button(String(localized: "settings.workspaceColors.edit.paletteOnly", defaultValue: "Palette Only")) {
-                applyColorEdit(preview, decision: .paletteOnly)
-            }
-            Button(String(localized: "alert.customColor.cancel", defaultValue: "Cancel"), role: .cancel) {
-                paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
-                pendingColorEdit = nil
-            }
-        } message: { preview in
-            Text(colorEditConfirmationMessage(preview))
         }
         .task {
             // Cover a palette that already contained Custom N entries before this section
@@ -291,7 +269,7 @@ public struct WorkspaceColorsSection: View {
             return String(
                 format: String(
                     localized: "settings.workspaceColors.label.error.duplicate",
-                    defaultValue: "Already used by %@. Labels must be unique."
+                    defaultValue: "Already used by %@. Names and labels must be unique."
                 ),
                 otherName
             )
@@ -448,14 +426,27 @@ public struct WorkspaceColorsSection: View {
                     reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
                     commitBehavior: .interactionEnd
                 ) { hex in
-                    requestColorEdit(name: entry.name, oldHex: entry.hex, proposedHex: hex)
+                    _ = requestColorEdit(
+                        name: entry.name,
+                        oldHex: entry.hex,
+                        proposedHex: hex,
+                        input: .picker
+                    )
                 }
                 WorkspaceColorHexField(
                     paletteName: entry.name,
                     storedHex: entry.hex,
                     reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
                     errorMessage: colorEditErrors[entry.name],
-                    commit: { requestColorEdit(name: entry.name, oldHex: entry.hex, proposedHex: $0) }
+                    clearError: { colorEditErrors.removeValue(forKey: entry.name) },
+                    commit: {
+                        requestColorEdit(
+                            name: entry.name,
+                            oldHex: entry.hex,
+                            proposedHex: $0,
+                            input: .directHex
+                        )
+                    }
                 )
                 Button(String(localized: "settings.workspaceColors.remove", defaultValue: "Remove")) {
                     var snapshot = effectivePaletteMap(stored: paletteModel.current)
@@ -471,39 +462,28 @@ public struct WorkspaceColorsSection: View {
         }
     }
 
-    private var colorEditConfirmationTitle: String {
-        String(localized: "settings.workspaceColors.edit.confirmation.title", defaultValue: "Update existing assignments?")
-    }
-
-    private func colorEditConfirmationMessage(_ preview: WorkspacePaletteColorEditPreview) -> String {
-        String(
-            format: String(
-                localized: "settings.workspaceColors.edit.confirmation.message",
-                defaultValue: "Change %@ from %@ to %@? This value is used by %lld explicit workspaces and %lld explicit groups."
-            ),
-            preview.paletteName,
-            preview.oldHex,
-            preview.newHex,
-            preview.workspaceCount,
-            preview.groupCount
-        )
-    }
-
-    private func requestColorEdit(name: String, oldHex: String, proposedHex: String) {
+    private func requestColorEdit(
+        name: String,
+        oldHex: String,
+        proposedHex: String,
+        input: WorkspaceColorEditInput
+    ) -> String? {
         colorEditErrors.removeValue(forKey: name)
-        guard WorkspaceColorHex.normalized(oldHex) != WorkspaceColorHex.normalized(proposedHex) else { return }
+        guard WorkspaceColorHex.normalized(oldHex) != WorkspaceColorHex.normalized(proposedHex) else { return nil }
         switch hostActions.previewWorkspacePaletteColorEdit(
             paletteName: name,
             expectedOldHex: oldHex,
             proposedHex: proposedHex
         ) {
-        case .success(let preview) where preview.requiresConfirmation:
-            pendingColorEdit = preview
         case .success(let preview):
-            applyColorEdit(preview, decision: .paletteOnly)
+            return applyColorEdit(preview, decision: preview.automaticDecision, input: input)
         case .failure(let rejection):
-            colorEditErrors[name] = Self.colorEditRejectionMessage(rejection)
-            paletteReconcileTracker.rejectPickerWrite(name: name)
+            let message = Self.colorEditRejectionMessage(rejection)
+            if input == .picker {
+                colorEditErrors[name] = message
+                paletteReconcileTracker.rejectPickerWrite(name: name)
+            }
+            return message
         }
     }
 
@@ -531,39 +511,56 @@ public struct WorkspaceColorsSection: View {
 
     private func applyColorEdit(
         _ preview: WorkspacePaletteColorEditPreview,
-        decision: WorkspacePaletteColorEditDecision
-    ) {
-        pendingColorEdit = nil
+        decision: WorkspacePaletteColorEditDecision,
+        input: WorkspaceColorEditInput
+    ) -> String? {
         switch hostActions.applyWorkspacePaletteColorEdit(preview, decision: decision) {
         case .applied(let palette):
             paletteModel.acceptCommittedValue(palette)
             paletteReconcileTracker.reconcileExternalHexes(palette)
             colorEditErrors.removeValue(forKey: preview.paletteName)
+            return nil
         case .stale:
-            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
-            colorEditErrors[preview.paletteName] = String(
+            let message = String(
                 localized: "settings.workspaceColors.edit.error.stale",
                 defaultValue: "This color changed elsewhere. Review the current value and try again."
             )
+            if input == .picker {
+                paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+                colorEditErrors[preview.paletteName] = message
+            }
+            return message
         case .rejected(let rejection):
-            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
-            colorEditErrors[preview.paletteName] = Self.colorEditRejectionMessage(rejection)
+            let message = Self.colorEditRejectionMessage(rejection)
+            if input == .picker {
+                paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+                colorEditErrors[preview.paletteName] = message
+            }
+            return message
         case .failedRestored(let palette):
             paletteModel.acceptCommittedValue(palette)
             paletteReconcileTracker.reconcileExternalHexes(palette)
-            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
-            colorEditErrors[preview.paletteName] = String(
+            let message = String(
                 localized: "settings.workspaceColors.edit.error.restored",
                 defaultValue: "cmux couldn’t save the complete change, so it restored the previous colors."
             )
+            if input == .picker {
+                paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+                colorEditErrors[preview.paletteName] = message
+            }
+            return message
         case .failedUnrecovered(let palette):
             paletteModel.acceptCommittedValue(palette)
             paletteReconcileTracker.reconcileExternalHexes(palette)
-            paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
-            colorEditErrors[preview.paletteName] = String(
+            let message = String(
                 localized: "settings.workspaceColors.edit.error.unrecovered",
                 defaultValue: "cmux couldn’t restore every color. Review the current values before continuing."
             )
+            if input == .picker {
+                paletteReconcileTracker.rejectPickerWrite(name: preview.paletteName)
+                colorEditErrors[preview.paletteName] = message
+            }
+            return message
         }
     }
 
@@ -642,6 +639,31 @@ public struct WorkspaceColorsSection: View {
 /// happens once per edit rather than once per keystroke. Invalid text stays visible and
 /// editable — it simply never enters the effective resolver — because silently discarding
 /// what someone typed is worse than showing why it cannot be used.
+struct WorkspaceColorAliasErrorState: Equatable {
+    private var localDraft: String?
+    private var localMessage: String?
+
+    mutating func record(_ message: String?, for draft: String) {
+        localDraft = message == nil ? nil : draft
+        localMessage = message
+    }
+
+    mutating func clear() {
+        localDraft = nil
+        localMessage = nil
+    }
+
+    func message(
+        for draft: String,
+        storedValue: String,
+        importedMessage: String?
+    ) -> String? {
+        if draft == localDraft { return localMessage }
+        if draft == storedValue { return importedMessage }
+        return nil
+    }
+}
+
 @MainActor
 private struct WorkspaceColorAliasField: View {
     let paletteName: String
@@ -660,7 +682,7 @@ private struct WorkspaceColorAliasField: View {
     /// `storedLabel` underneath an untouched draft. Comparing against what we last
     /// synced separates the two: only the user can make `draft` diverge from this.
     @State private var syncedValue: String
-    @State private var localErrorMessage: String?
+    @State private var errorState = WorkspaceColorAliasErrorState()
     @FocusState private var isFocused: Bool
 
     init(
@@ -691,8 +713,9 @@ private struct WorkspaceColorAliasField: View {
     private func commitDraft() {
         guard draft != syncedValue else { return }
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        localErrorMessage = commit(trimmed)
-        guard localErrorMessage == nil else { return }
+        let errorMessage = commit(trimmed)
+        errorState.record(errorMessage, for: draft)
+        guard errorMessage == nil else { return }
         draft = trimmed
         syncedValue = trimmed
     }
@@ -717,11 +740,8 @@ private struct WorkspaceColorAliasField: View {
                 if !isFocused {
                     draft = newValue
                     syncedValue = newValue
-                    localErrorMessage = nil
+                    errorState.clear()
                 }
-            }
-            .onChange(of: draft) { _, _ in
-                localErrorMessage = nil
             }
             // Teardown backstop. @FocusState reports focus *transitions*, and a view
             // that is destroyed never transitions — it just stops existing. Closing
@@ -745,7 +765,11 @@ private struct WorkspaceColorAliasField: View {
             .accessibilityLabel(accessibilityLabel)
             .accessibilityIdentifier(accessibilityIdentifier)
 
-            if let errorMessage = localErrorMessage ?? importedErrorMessage {
+            if let errorMessage = errorState.message(
+                for: draft,
+                storedValue: storedValue,
+                importedMessage: importedErrorMessage
+            ) {
                 Text(errorMessage)
                     .cmuxFont(size: 10, weight: .regular)
                     .foregroundStyle(.red)
@@ -756,6 +780,11 @@ private struct WorkspaceColorAliasField: View {
     }
 }
 
+private enum WorkspaceColorEditInput {
+    case picker
+    case directHex
+}
+
 /// Direct `#RRGGBB` editor that commits once on Return, blur, or teardown.
 @MainActor
 private struct WorkspaceColorHexField: View {
@@ -763,10 +792,12 @@ private struct WorkspaceColorHexField: View {
     let storedHex: String
     let reconcileRevision: Int
     let errorMessage: String?
-    let commit: (String) -> Void
+    let clearError: () -> Void
+    let commit: (String) -> String?
 
     @State private var draft: String
     @State private var syncedValue: String
+    @State private var localErrorMessage: String?
     @FocusState private var isFocused: Bool
 
     init(
@@ -774,20 +805,24 @@ private struct WorkspaceColorHexField: View {
         storedHex: String,
         reconcileRevision: Int,
         errorMessage: String?,
-        commit: @escaping (String) -> Void
+        clearError: @escaping () -> Void,
+        commit: @escaping (String) -> String?
     ) {
         self.paletteName = paletteName
         self.storedHex = storedHex
         self.reconcileRevision = reconcileRevision
         self.errorMessage = errorMessage
+        self.clearError = clearError
         self.commit = commit
         _draft = State(initialValue: storedHex)
         _syncedValue = State(initialValue: storedHex)
+        _localErrorMessage = State(initialValue: nil)
     }
 
     private func commitDraft() {
         guard draft != syncedValue else { return }
-        commit(draft)
+        localErrorMessage = commit(draft)
+        guard localErrorMessage == nil else { return }
         syncedValue = draft
     }
 
@@ -808,6 +843,14 @@ private struct WorkspaceColorHexField: View {
                         syncedValue = newValue
                     }
                 }
+                .onChange(of: draft) { oldValue, newValue in
+                    if oldValue != newValue {
+                        localErrorMessage = nil
+                        if errorMessage != nil {
+                            clearError()
+                        }
+                    }
+                }
                 .onChange(of: reconcileRevision) { _, _ in
                     draft = storedHex
                     syncedValue = storedHex
@@ -826,7 +869,7 @@ private struct WorkspaceColorHexField: View {
                 )
                 .accessibilityIdentifier("SettingsWorkspaceColorHexField.\(paletteName)")
 
-            if let errorMessage {
+            if let errorMessage = localErrorMessage ?? errorMessage {
                 Text(errorMessage)
                     .cmuxFont(size: 10, weight: .regular)
                     .foregroundStyle(.red)

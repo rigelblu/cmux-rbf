@@ -149,6 +149,19 @@ public protocol SettingsHostActions: AnyObject {
     /// Opens the user's workspace-layout action definitions for editing.
     func customizeWorkspaceLayouts()
 
+    /// Validates a custom palette edit and snapshots its explicit-assignment impact.
+    func previewWorkspacePaletteColorEdit(
+        paletteName: String,
+        expectedOldHex: String,
+        proposedHex: String
+    ) -> Result<WorkspacePaletteColorEditPreview, WorkspacePaletteColorEditRejection>
+
+    /// Applies one still-current custom palette edit through the host's shared owner.
+    func applyWorkspacePaletteColorEdit(
+        _ preview: WorkspacePaletteColorEditPreview,
+        decision: WorkspacePaletteColorEditDecision
+    ) -> WorkspacePaletteColorEditResult
+
     /// Persists an explicit menu-bar-only preference change in the host app.
     ///
     /// The host pairs the visible `app.menuBarOnly` setting with any hidden

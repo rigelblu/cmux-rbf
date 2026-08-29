@@ -6,6 +6,21 @@ enum HexColorPickerCommitBehavior: Equatable {
     case interactionEnd
 }
 
+enum HexColorPickerInteractionEvent: Equatable {
+    case colorPanelWillClose
+    case colorPanelDidResignKey
+    case viewDisappeared
+
+    var shouldCommit: Bool {
+        switch self {
+        case .colorPanelWillClose, .viewDisappeared:
+            true
+        case .colorPanelDidResignKey:
+            false
+        }
+    }
+}
+
 @MainActor
 struct HexColorPicker: View {
     private let reconcileState: HexColorPickerReconcileState
@@ -53,12 +68,20 @@ struct HexColorPicker: View {
             selection.reconcile(state: newState)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSColorPanel.willCloseNotification)) { _ in
-            finishInteraction()
+            if HexColorPickerInteractionEvent.colorPanelWillClose.shouldCommit {
+                finishInteraction()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
             guard notification.object is NSColorPanel else { return }
-            finishInteraction()
+            if HexColorPickerInteractionEvent.colorPanelDidResignKey.shouldCommit {
+                finishInteraction()
+            }
         }
-        .onDisappear { finishInteraction() }
+        .onDisappear {
+            if HexColorPickerInteractionEvent.viewDisappeared.shouldCommit {
+                finishInteraction()
+            }
+        }
     }
 }

@@ -130,24 +130,90 @@ final class HostSettingsActions: SettingsHostActions {
         expectedOldHex: String,
         proposedHex: String
     ) -> Result<WorkspacePaletteColorEditPreview, WorkspacePaletteColorEditRejection> {
-        workspacePaletteColorEditor.preview(
+        #if DEBUG
+        let currentHexBeforePreview = WorkspaceTabColorSettings.currentColorHex(named: paletteName) ?? "nil"
+        cmuxDebugLog(
+            "settings.workspaceColor.preview.begin name=\(paletteName) expected=\(expectedOldHex) proposed=\(proposedHex) current=\(currentHexBeforePreview)"
+        )
+        #endif
+        let result = workspacePaletteColorEditor.preview(
             appDelegate: AppDelegate.shared,
             paletteName: paletteName,
             expectedOldHex: expectedOldHex,
             proposedHex: proposedHex
         )
+        #if DEBUG
+        let currentHexAfterPreview = WorkspaceTabColorSettings.currentColorHex(named: paletteName) ?? "nil"
+        cmuxDebugLog(
+            "settings.workspaceColor.preview.end name=\(paletteName) result=\(Self.workspacePalettePreviewResultName(result)) current=\(currentHexAfterPreview)"
+        )
+        #endif
+        return result
     }
 
     func applyWorkspacePaletteColorEdit(
         _ preview: WorkspacePaletteColorEditPreview,
         decision: WorkspacePaletteColorEditDecision
     ) -> WorkspacePaletteColorEditResult {
-        workspacePaletteColorEditor.apply(
+        #if DEBUG
+        let currentHexBeforeApply = WorkspaceTabColorSettings.currentColorHex(named: preview.paletteName) ?? "nil"
+        cmuxDebugLog(
+            "settings.workspaceColor.apply.begin name=\(preview.paletteName) old=\(preview.oldHex) new=\(preview.newHex) decision=\(String(describing: decision)) current=\(currentHexBeforeApply)"
+        )
+        #endif
+        let result = workspacePaletteColorEditor.apply(
             preview,
             decision: decision,
             appDelegate: AppDelegate.shared
         )
+        #if DEBUG
+        let currentHexAfterApply = WorkspaceTabColorSettings.currentColorHex(named: preview.paletteName) ?? "nil"
+        cmuxDebugLog(
+            "settings.workspaceColor.apply.end name=\(preview.paletteName) result=\(Self.workspacePaletteApplyResultName(result)) current=\(currentHexAfterApply)"
+        )
+        #endif
+        return result
     }
+
+    #if DEBUG
+    private static func workspacePalettePreviewResultName(
+        _ result: Result<WorkspacePaletteColorEditPreview, WorkspacePaletteColorEditRejection>
+    ) -> String {
+        switch result {
+        case .success:
+            return "success"
+        case .failure(.invalidHex):
+            return "invalidHex"
+        case .failure(.duplicatePaletteValue):
+            return "duplicatePaletteValue"
+        case .failure(.unavailablePaletteEntry):
+            return "unavailablePaletteEntry"
+        case .failure(.staleValue):
+            return "staleValue"
+        }
+    }
+
+    private static func workspacePaletteApplyResultName(_ result: WorkspacePaletteColorEditResult) -> String {
+        switch result {
+        case .applied:
+            return "applied"
+        case .stale:
+            return "stale"
+        case .rejected(.invalidHex):
+            return "rejected.invalidHex"
+        case .rejected(.duplicatePaletteValue):
+            return "rejected.duplicatePaletteValue"
+        case .rejected(.unavailablePaletteEntry):
+            return "rejected.unavailablePaletteEntry"
+        case .rejected(.staleValue):
+            return "rejected.staleValue"
+        case .failedRestored:
+            return "failedRestored"
+        case .failedUnrecovered:
+            return "failedUnrecovered"
+        }
+    }
+    #endif
 
     func restartAllowlistedCommandsStatus() -> RestartAllowlistedCommandsSettingsStatus {
         guard let coordinator = AppDelegate.shared?.restartCommandCoordinator else {

@@ -42,7 +42,35 @@ struct WorkspacePaletteColorEditCoordinatorTests {
             ).get()
 
             #expect(!preview.propagationAllowed)
-            #expect(!preview.requiresConfirmation)
+            #expect(preview.automaticDecision == .paletteOnly)
+        }
+    }
+
+    @Test("A unique custom color automatically updates its workspace assignments")
+    func uniqueCustomColorAutomaticallyPropagates() throws {
+        try withIsolatedPalette(["Custom 11": "#FF8300"]) {
+            let appDelegate = AppDelegate()
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            appDelegate.tabManager = manager
+            let workspace = manager.addWorkspace(select: true, eagerLoadTerminal: false)
+            workspace.setCustomColor("#FF8300")
+
+            let coordinator = WorkspacePaletteColorEditCoordinator()
+            let preview = try coordinator.preview(
+                appDelegate: appDelegate,
+                paletteName: "Custom 11",
+                expectedOldHex: "#FF8300",
+                proposedHex: "#00C65E"
+            ).get()
+
+            #expect(preview.workspaceCount == 1)
+            #expect(preview.automaticDecision == .paletteAndAssignments)
+            #expect(coordinator.apply(
+                preview,
+                decision: preview.automaticDecision,
+                appDelegate: appDelegate
+            ) == .applied(palette: ["Custom 11": "#00C65E"]))
+            #expect(workspace.customColor == "#00C65E")
         }
     }
 
