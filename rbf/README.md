@@ -108,11 +108,11 @@ Right-click a group header and pick **Group Color**. It offers the same palette 
 
 ## 🟠⋯ Scan your standalone workspaces by what their colour means
 
-Workspaces that carry a colour but sit outside any group now gather under compact, collapsible colour headers, named from the label you gave that colour — **Focus (Teal)**, **Review (Amber)**. The flat run of loose rows becomes a list you can scan by meaning. Real workspace groups and uncoloured workspaces are left exactly as they were.
+Workspaces that carry a colour but sit outside any group now gather under compact, collapsible colour headers. When a colour has a semantic label, that label is the complete title — **Focus**, **Review** — because the adjacent swatch already shows the colour. Without a label, the title falls back to the custom display name or raw palette name. The flat run of loose rows becomes a list you can scan by meaning. Real workspace groups and uncoloured workspaces are left exactly as they were.
 
 - **A colour section is not a group.** It has a chevron, a swatch, and a title, and nothing else — no folder icon, no workspace number, no active state, no group actions. Membership is derived from the colour, so there is nothing to maintain.
 - **Real group membership always wins.** A coloured workspace inside a group stays in that group; only loose workspaces gather. Recolouring a group member changes its colour and moves nothing.
-- Sections are keyed by hex, so renaming a colour's label retitles the header without disturbing the section or its collapsed state. An unlisted colour reads as **Custom (#RRGGBB)**.
+- Sections are keyed by hex, so renaming or clearing a colour's label retitles the header without disturbing the section or its collapsed state. Settings, menus, commands, and CLI keep their existing combined **Label (Colour)** names. An unlisted colour reads as **Custom (#RRGGBB)**.
 - Pinned and unpinned tiers stay separate — the same colour can head a section in each, and both share one collapsed state.
 - Collapsing survives relaunch, and selecting a workspace hidden inside a collapsed section expands it first, whether you got there by sidebar history, `⌘1…9`, the CLI, or session restore.
 - Reordering works within a colour section and pin tier. Dragging into a real workspace group also works, matching what **Move to Group** does from the row's menu — the workspace joins the group and keeps its colour. Every other drop — another colour section, a standalone row, the other pin tier — is refused without changing colour, group, pin, or order.

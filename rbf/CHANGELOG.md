@@ -16,6 +16,20 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.24.0 (2026-08-30) — #cm-65
+*Cuts v0.24.0 for local dogfooding. Releases `#cm-65` only — `#cm-47` stays unreleased in the section above.*
+
+## 🟠⋯ Changed for End Users
+- 2026-08-30 - fix (ux) | **read a labeled sidebar color section by its meaning alone.** When a workspace color has a semantic label, its generated sidebar section now shows that label as the complete title instead of `Label (Color)`; the adjacent swatch keeps color identity visible. Clearing the label restores the custom display name or raw palette name. Settings, menus, commands, and CLI keep their existing combined `Label (Color)` names (#cm-65)
+
+## 🟠⋯ Known Limitations
+- VoiceOver and the installed-app behavior rerun were explicitly skipped and accepted unverified. Every visible tagged-build title scenario passed (#cm-65)
+
+## 🟠⋯ Changed for Developers
+- 2026-08-30 - fix (technical) | one sidebar-local title projection uses semantic label, then custom display name, then raw palette name, while both sidebar renderers and accessibility consume one shared header title. Focused coverage passes 9/9 and test wiring passes across 669 files. The repository-wide release run became definitively non-green in unrelated agent-resume, remote-command, and AppKit geometry tests: 95 cases started, 88 passed, 6 failed, and the run was stopped with one case active after a green verdict was no longer possible. Independent code and build-scope reviews both approved with zero findings (#cm-65)
+
+---
+
 # 🔵⋯ v0.23.0 (2026-08-29) — #cm-61
 *Cuts v0.23.0 for local dogfooding. Releases `#cm-61` only — `#cm-47` stays unreleased in the section above.*
 
