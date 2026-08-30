@@ -34,11 +34,61 @@ import Testing
             .init(normalizedHex: "#14B8A6", pinTier: .pinned),
             .init(normalizedHex: "#14B8A6", pinTier: .unpinned),
         ])
-        #expect(projection.sections.map(\.title) == ["Backend (Teal)", "Backend (Teal)"])
+        #expect(projection.sections.map(\.title) == ["Backend", "Backend"])
         #expect(projection.sections.map(\.memberWorkspaceIds) == [[tealPinned], [tealUnpinned]])
         #expect(projection.sections.allSatisfy { $0.isCollapsed })
         #expect(projection.sectionByWorkspaceId[uncolored] == nil)
         #expect(projection.sectionByWorkspaceId[realGroupMember] == nil)
+    }
+
+    @Test(arguments: [
+        (
+            entry: WorkspaceColorPaletteEntry(name: "Indigo", hex: "#4F46E5"),
+            expectedTitle: "Indigo"
+        ),
+        (
+            entry: WorkspaceColorPaletteEntry(name: "Purple", hex: "#9333EA", label: "Goal: SECONDARY"),
+            expectedTitle: "Goal: SECONDARY"
+        ),
+        (
+            entry: WorkspaceColorPaletteEntry(
+                name: "custom-1",
+                hex: "#112233",
+                customDisplayName: "Night Shift"
+            ),
+            expectedTitle: "Night Shift"
+        ),
+    ])
+    func paletteTitleUsesMeaningThenCustomNameThenRawName(
+        entry: WorkspaceColorPaletteEntry,
+        expectedTitle: String
+    ) throws {
+        let workspaceID = UUID()
+        let projection = SidebarWorkspaceColorSectionProjection.project(
+            workspaces: [
+                .init(id: workspaceID, groupId: nil, isPinned: false, customColor: entry.hex),
+            ],
+            paletteEntries: [entry],
+            collapsedHexes: []
+        )
+
+        #expect(try #require(projection.sections.first).title == expectedTitle)
+        #expect(entry.displayName == (entry.label.map { "\($0) (\(entry.customDisplayName ?? entry.name))" }
+            ?? entry.customDisplayName
+            ?? entry.name))
+    }
+
+    @Test func unlistedHexKeepsTheExistingCustomFallback() throws {
+        let workspaceID = UUID()
+        let projection = SidebarWorkspaceColorSectionProjection.project(
+            workspaces: [
+                .init(id: workspaceID, groupId: nil, isPinned: false, customColor: "#123456"),
+            ],
+            paletteEntries: [],
+            collapsedHexes: []
+        )
+
+        #expect(try #require(projection.sections.first).title == "Custom (#123456)")
     }
 
     @Test func projectsHeadersAtFirstMemberAndPreservesAllOtherRows() {
@@ -173,7 +223,7 @@ import Testing
         let member = UUID()
         let section = SidebarWorkspaceColorSection(
             id: .init(normalizedHex: "#14B8A6", pinTier: .unpinned),
-            title: "Backend (Teal)",
+            title: "Backend",
             memberWorkspaceIds: [member],
             isCollapsed: false
         )
@@ -185,7 +235,8 @@ import Testing
             colorScheme: .light,
             onToggle: {}
         )
-        #expect(header.accessibilityLabel == "Color section, Backend (Teal), 1 workspaces, expanded")
+        #expect(header.renderedTitle == section.title)
+        #expect(header.accessibilityLabel == "Color section, Backend, 1 workspaces, expanded")
         #expect(
             header.headerBand
                 == SidebarWorkspaceColorSectionHeaderBand.resolve(

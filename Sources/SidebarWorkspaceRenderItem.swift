@@ -257,7 +257,7 @@ struct SidebarWorkspaceColorSectionHeader: View, Equatable {
                 Circle()
                     .fill(sectionColor)
                     .frame(width: 8, height: 8)
-                Text(section.title)
+                Text(renderedTitle)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color(nsColor: band.primaryTextColor))
                     .lineLimit(1)
@@ -293,13 +293,18 @@ struct SidebarWorkspaceColorSectionHeader: View, Equatable {
         )
     }
 
+    /// The title consumed by both sidebar renderers and accessibility.
+    var renderedTitle: String {
+        section.title
+    }
+
     var accessibilityLabel: String {
         let state = section.isCollapsed
             ? String(localized: "sidebar.colorSection.collapsed", defaultValue: "collapsed")
             : String(localized: "sidebar.colorSection.expanded", defaultValue: "expanded")
         return String(
             localized: "sidebar.colorSection.accessibility",
-            defaultValue: "Color section, \(section.title), \(section.memberWorkspaceIds.count) workspaces, \(state)"
+            defaultValue: "Color section, \(renderedTitle), \(section.memberWorkspaceIds.count) workspaces, \(state)"
         )
     }
 }
@@ -327,7 +332,7 @@ struct SidebarWorkspaceColorSectionProjection {
             paletteEntryVisitCount += 1
             guard let hex = WorkspaceColorHex.normalized(entry.hex),
                   firstTitleByHex[hex] == nil else { continue }
-            firstTitleByHex[hex] = entry.displayName
+            firstTitleByHex[hex] = entry.label ?? entry.customDisplayName ?? entry.name
         }
 
         var order: [SidebarWorkspaceColorSectionID] = []
