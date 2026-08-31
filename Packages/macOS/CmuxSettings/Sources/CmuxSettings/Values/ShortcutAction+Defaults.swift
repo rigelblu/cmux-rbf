@@ -105,6 +105,9 @@ extension ShortcutAction {
         case .resetWorkspaceTerminalFontSize:
             return ShortcutStroke(key: "0", command: true, control: true)
         case .equalizeSplits: return ShortcutStroke(key: "=", command: true, shift: true, control: true)
+        // Unbound by default: nearby chord space is taken and all-splits
+        // equalize covers the common case; users opt into keys via Settings.
+        case .equalizeSplitWidths, .equalizeSplitHeights: return nil
         case .splitBrowserRight: return ShortcutStroke(key: "d", command: true, option: true)
         case .splitBrowserDown: return ShortcutStroke(key: "d", command: true, shift: true, option: true)
         case .toggleCanvasLayout: return ShortcutStroke(key: "c", command: true, control: true)

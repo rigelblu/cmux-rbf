@@ -120,6 +120,10 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     /// Resets every terminal font size in the selected workspace.
     case resetWorkspaceTerminalFontSize
     case equalizeSplits
+    /// Equalizes only side-by-side splits (column widths).
+    case equalizeSplitWidths
+    /// Equalizes only stacked splits (row heights).
+    case equalizeSplitHeights
     case splitBrowserRight
     case splitBrowserDown
     case toggleRightSidebar = "toggleFileExplorer"

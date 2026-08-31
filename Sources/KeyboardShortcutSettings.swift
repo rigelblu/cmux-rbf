@@ -145,6 +145,8 @@ enum KeyboardShortcutSettings {
         case decreaseWorkspaceTerminalFontSize
         case resetWorkspaceTerminalFontSize
         case equalizeSplits
+        case equalizeSplitWidths
+        case equalizeSplitHeights
         case splitBrowserRight
         case splitBrowserDown
 
@@ -311,6 +313,8 @@ enum KeyboardShortcutSettings {
                     defaultValue: "Reset Font Size for Workspace Terminals"
                 )
             case .equalizeSplits: return String(localized: "shortcut.equalizeSplits.label", defaultValue: "Equalize Splits")
+            case .equalizeSplitWidths: return String(localized: "shortcut.equalizeSplitWidths.label", defaultValue: "Equalize Split Widths")
+            case .equalizeSplitHeights: return String(localized: "shortcut.equalizeSplitHeights.label", defaultValue: "Equalize Split Heights")
             case .splitBrowserRight: return String(localized: "shortcut.splitBrowserRight.label", defaultValue: "Split Browser Right")
             case .splitBrowserDown: return String(localized: "shortcut.splitBrowserDown.label", defaultValue: "Split Browser Down")
             case .toggleCanvasLayout: return String(localized: "shortcut.toggleCanvasLayout.label", defaultValue: "Toggle Canvas Layout")
@@ -528,6 +532,12 @@ enum KeyboardShortcutSettings {
             case .resetWorkspaceTerminalFontSize:
                 return StoredShortcut(key: "0", command: true, shift: false, option: false, control: true)
             case .equalizeSplits: return StoredShortcut(key: "=", command: true, shift: true, option: false, control: true)
+            case .equalizeSplitWidths, .equalizeSplitHeights:
+                // Unbound by default: the chord space around ⌃⌘⇧= is taken, and
+                // the all-splits equalize covers the common case. Both stay
+                // visible and assignable in Settings → Keyboard Shortcuts and
+                // cmux.json, and reachable via the View menu and command palette.
+                return .unbound
             case .splitBrowserRight:
                 return StoredShortcut(key: "d", command: true, shift: false, option: true, control: false)
             case .splitBrowserDown:

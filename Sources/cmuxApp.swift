@@ -1075,6 +1075,9 @@ struct cmuxApp: App {
             }
 
             equalizeSplitsCommandButton()
+            equalizeSplitWidthsCommandButton()
+            equalizeSplitHeightsCommandButton()
+            arrangeSplitsMenu()
             Divider()
 
             splitCommandButton(title: String(localized: "menu.view.toggleCanvasLayout", defaultValue: "Toggle Canvas Layout"), shortcut: menuShortcut(for: .toggleCanvasLayout)) {

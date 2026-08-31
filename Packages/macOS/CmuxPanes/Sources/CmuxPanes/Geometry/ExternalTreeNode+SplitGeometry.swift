@@ -1,5 +1,5 @@
 public import Bonsplit
-import CoreGraphics
+public import CoreGraphics
 import Foundation
 
 /// Pure split-tree geometry over Bonsplit's external snapshot: equalize and
@@ -66,7 +66,82 @@ extension ExternalTreeNode {
         }
     }
 
-    private func spanCount(along orientation: String) -> Int {
+    /// Plans a weighted arrange pass along `orientation`: the same-orientation
+    /// leaf spans, in spatial order (left→right for "horizontal", top→bottom
+    /// for "vertical"), receive space proportional to `ratios`. Splits of the
+    /// other orientation count as one span and keep their internal dividers.
+    /// Returns `nil` when `ratios` is empty, carries a non-finite or
+    /// non-positive weight, or its count does not match the tree's span count
+    /// along `orientation` — the caller treats that as "these weights do not
+    /// fit this tree".
+    public func ratioDividerPlan(ratios: [CGFloat], orientation: String) -> SplitEqualizePlan? {
+        guard !ratios.isEmpty, ratios.allSatisfy({ $0.isFinite && $0 > 0 }) else { return nil }
+        guard spanCount(along: orientation) == ratios.count else { return nil }
+        var adjustments: [SplitDividerAdjustment] = []
+        var foundSplit = false
+        var hadInvalidSplitIds = false
+        appendRatioAdjustments(
+            orientation: orientation,
+            ratios: ratios[...],
+            adjustments: &adjustments,
+            foundSplit: &foundSplit,
+            hadInvalidSplitIds: &hadInvalidSplitIds
+        )
+        return SplitEqualizePlan(
+            adjustments: adjustments,
+            foundSplit: foundSplit,
+            hadInvalidSplitIds: hadInvalidSplitIds
+        )
+    }
+
+    private func appendRatioAdjustments(
+        orientation: String,
+        ratios: ArraySlice<CGFloat>,
+        adjustments: inout [SplitDividerAdjustment],
+        foundSplit: inout Bool,
+        hadInvalidSplitIds: inout Bool
+    ) {
+        switch self {
+        case .pane:
+            return
+        case .split(let splitNode):
+            // A cross-orientation split is a single span; its subtree keeps
+            // its own divider positions.
+            guard splitNode.orientation == orientation else { return }
+            let firstSpanCount = splitNode.first.spanCount(along: orientation)
+            let firstRatios = ratios.prefix(firstSpanCount)
+            let secondRatios = ratios.dropFirst(firstSpanCount)
+            splitNode.first.appendRatioAdjustments(
+                orientation: orientation,
+                ratios: firstRatios,
+                adjustments: &adjustments,
+                foundSplit: &foundSplit,
+                hadInvalidSplitIds: &hadInvalidSplitIds
+            )
+            splitNode.second.appendRatioAdjustments(
+                orientation: orientation,
+                ratios: secondRatios,
+                adjustments: &adjustments,
+                foundSplit: &foundSplit,
+                hadInvalidSplitIds: &hadInvalidSplitIds
+            )
+
+            foundSplit = true
+            if let splitId = UUID(uuidString: splitNode.id) {
+                let firstWeight = firstRatios.reduce(0, +)
+                let totalWeight = ratios.reduce(0, +)
+                let position = firstWeight / totalWeight
+                adjustments.append(SplitDividerAdjustment(splitId: splitId, position: position))
+            } else {
+                hadInvalidSplitIds = true
+            }
+        }
+    }
+
+    /// The number of same-orientation leaf spans along `orientation` — the
+    /// count a `ratioDividerPlan` weight vector must match. A subtree split
+    /// the other way counts as one span.
+    public func spanCount(along orientation: String) -> Int {
         switch self {
         case .pane:
             return 1

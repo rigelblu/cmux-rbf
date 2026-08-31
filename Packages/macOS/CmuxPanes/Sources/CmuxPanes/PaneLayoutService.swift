@@ -1,5 +1,5 @@
 public import Bonsplit
-import CoreGraphics
+public import CoreGraphics
 
 /// Applies pure split-geometry plans (see `ExternalTreeNode` extensions in
 /// `Geometry/`) to a live `BonsplitController`, preserving the legacy
@@ -23,6 +23,30 @@ public struct PaneLayoutService {
         orientationFilter: String? = nil
     ) -> SplitEqualizeResult {
         let plan = node.equalizeDividerPlan(orientationFilter: orientationFilter)
+        var allSucceeded = !plan.hadInvalidSplitIds
+        for adjustment in plan.adjustments {
+            if !controller.setDividerPosition(adjustment.position, forSplit: adjustment.splitId, fromExternal: true) {
+                allSucceeded = false
+            }
+        }
+        return SplitEqualizeResult(foundSplit: plan.foundSplit, allSucceeded: allSucceeded)
+    }
+
+    /// Arranges the same-orientation spans along `orientation` into the
+    /// proportions in `ratios` (see `ExternalTreeNode.ratioDividerPlan`),
+    /// applying the planned divider positions to `controller` children-first
+    /// like the equalize pass. Returns `nil` when the weights do not fit the
+    /// tree (span-count mismatch or invalid ratios).
+    @discardableResult
+    public func arrangeSplits(
+        ratios: [CGFloat],
+        in node: ExternalTreeNode,
+        controller: BonsplitController,
+        orientation: String
+    ) -> SplitEqualizeResult? {
+        guard let plan = node.ratioDividerPlan(ratios: ratios, orientation: orientation) else {
+            return nil
+        }
         var allSucceeded = !plan.hadInvalidSplitIds
         for adjustment in plan.adjustments {
             if !controller.setDividerPosition(adjustment.position, forSplit: adjustment.splitId, fromExternal: true) {

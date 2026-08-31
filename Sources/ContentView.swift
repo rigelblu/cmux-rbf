@@ -8251,6 +8251,37 @@ struct ContentView: View {
                 when: { $0.bool(CommandPaletteContextKeys.workspaceHasSplits) }
             )
         )
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.equalizeSplitWidths",
+                title: constant(String(localized: "command.equalizeSplitWidths.title", defaultValue: "Equalize Split Widths")),
+                subtitle: workspaceSubtitle,
+                keywords: ["split", "equalize", "balance", "divider", "layout", "width", "column", "horizontal"],
+                when: { $0.bool(CommandPaletteContextKeys.workspaceHasSplits) }
+            )
+        )
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.equalizeSplitHeights",
+                title: constant(String(localized: "command.equalizeSplitHeights.title", defaultValue: "Equalize Split Heights")),
+                subtitle: workspaceSubtitle,
+                keywords: ["split", "equalize", "balance", "divider", "layout", "height", "row", "vertical"],
+                when: { $0.bool(CommandPaletteContextKeys.workspaceHasSplits) }
+            )
+        )
+        for preset in SplitArrangementPreset.allCases {
+            let arrangeTitle = String(localized: "command.arrangeSplits.title", defaultValue: "Arrange Splits")
+            let presetLabel = preset.displayLabel
+            contributions.append(
+                CommandPaletteCommandContribution(
+                    commandId: preset.commandId,
+                    title: constant("\(arrangeTitle): \(presetLabel)"),
+                    subtitle: workspaceSubtitle,
+                    keywords: ["split", "arrange", "grid", "ratio", "layout", "main", "minor", preset.rawValue],
+                    when: { $0.bool(CommandPaletteContextKeys.workspaceHasSplits) }
+                )
+            )
+        }
 
         let cmuxConfigDefaultSubtitle = String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json")
         for issue in cmuxConfigStore.configurationIssues {
@@ -8956,6 +8987,32 @@ struct ContentView: View {
 #if DEBUG
                 cmuxDebugLog("palette.equalizeSplits result=noSplitOrFailed workspaceId=\(workspace.id)")
 #endif
+            }
+        }
+        registry.register(commandId: "palette.equalizeSplitWidths") {
+            if let workspace = tabManager.selectedWorkspace,
+               !tabManager.equalizeSplits(tabId: workspace.id, orientationFilter: "horizontal") {
+#if DEBUG
+                cmuxDebugLog("palette.equalizeSplitWidths result=noSplitOrFailed workspaceId=\(workspace.id)")
+#endif
+            }
+        }
+        registry.register(commandId: "palette.equalizeSplitHeights") {
+            if let workspace = tabManager.selectedWorkspace,
+               !tabManager.equalizeSplits(tabId: workspace.id, orientationFilter: "vertical") {
+#if DEBUG
+                cmuxDebugLog("palette.equalizeSplitHeights result=noSplitOrFailed workspaceId=\(workspace.id)")
+#endif
+            }
+        }
+        for preset in SplitArrangementPreset.allCases {
+            registry.register(commandId: preset.commandId) {
+                if let workspace = tabManager.selectedWorkspace,
+                   !tabManager.arrangeSplits(tabId: workspace.id, preset: preset) {
+#if DEBUG
+                    cmuxDebugLog("palette.arrangeSplits preset=\(preset.rawValue) result=noSplitOrFailed workspaceId=\(workspace.id)")
+#endif
+                }
             }
         }
 

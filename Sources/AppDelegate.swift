@@ -14963,7 +14963,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         if equalizeSplitsMatches && !matchingExplicitActionShouldPreemptEqualizeDefault {
             if performFocusedDockShortcut(
-                .equalizeSplits,
+                .equalizeSplits(orientationFilter: nil),
                 action: .equalizeSplits,
                 event: event
             ) {
@@ -14971,6 +14971,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             performEqualizeSplitsShortcut()
             return true
+        }
+        // Orientation-filtered equalize: unbound by default, so no implicit-
+        // default preemption dance is needed — a match is always explicit.
+        let filteredEqualizeActions: [(KeyboardShortcutSettings.Action, String)] = [
+            (.equalizeSplitWidths, "horizontal"),
+            (.equalizeSplitHeights, "vertical"),
+        ]
+        for (action, orientationFilter) in filteredEqualizeActions {
+            if matchConfiguredShortcut(event: event, action: action) {
+                if performFocusedDockShortcut(
+                    .equalizeSplits(orientationFilter: orientationFilter),
+                    action: action,
+                    event: event
+                ) {
+                    return true
+                }
+                performEqualizeSplitsShortcut(orientationFilter: orientationFilter)
+                return true
+            }
         }
         // Canvas layout actions share one executor with the palette, View
         // menu, and the canvas.* socket verbs.

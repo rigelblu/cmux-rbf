@@ -521,6 +521,199 @@ final class AppDelegateEqualizeSplitsShortcutTests {
     }
 
     @Test
+    func testArrangementPresetWeightRulesAdaptToSpanCount() {
+        XCTAssertEqual(SplitArrangementPreset.mainFirst.ratios(forSpanCount: 3), [2, 1, 1])
+        XCTAssertEqual(SplitArrangementPreset.mainLast.ratios(forSpanCount: 2), [1, 2])
+        XCTAssertEqual(SplitArrangementPreset.minorFirst.ratios(forSpanCount: 2), [0.5, 1])
+        // Tom's founding example: three spans, the last at half share.
+        XCTAssertEqual(SplitArrangementPreset.minorLast.ratios(forSpanCount: 3), [1, 1, 0.5])
+        // Below two spans there is nothing to arrange.
+        XCTAssertNil(SplitArrangementPreset.mainFirst.ratios(forSpanCount: 1))
+        XCTAssertNil(SplitArrangementPreset.minorLast.ratios(forSpanCount: 0))
+    }
+
+    @Test
+    func testArrangeSplitsAppliesMinorLastAlongRootOrientation() {
+        guard let appDelegate = AppDelegate.shared else {
+            XCTFail("Expected AppDelegate.shared")
+            return
+        }
+
+        let windowId = appDelegate.createMainWindow()
+        defer { closeWindow(withId: windowId) }
+
+        guard let window = window(withId: windowId),
+              let manager = appDelegate.tabManagerFor(windowId: windowId),
+              let workspace = manager.selectedWorkspace,
+              let firstPanelId = workspace.focusedPanelId,
+              let secondPanel = workspace.newTerminalSplit(from: firstPanelId, orientation: .horizontal),
+              workspace.newTerminalSplit(from: secondPanel.id, orientation: .horizontal) != nil else {
+            XCTFail("Expected three-column split setup")
+            return
+        }
+
+        window.makeKeyAndOrderFront(nil)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+
+        XCTAssertTrue(manager.arrangeSplits(tabId: workspace.id, preset: .minorLast))
+
+        // Three columns at 1:1:0.5 — the outer divider (2 spans | 1 span run
+        // in a right-leaning tree) sits at 1/2.5, the inner at 1/1.5, however
+        // the run nests; assert via pane frames instead of tree shape.
+        let snapshot = workspace.bonsplitController.layoutSnapshot()
+        let widths = snapshot.panes.map(\.frame.width).sorted()
+        XCTAssertEqual(widths.count, 3)
+        let total = widths.reduce(0, +)
+        XCTAssertEqual(Double(widths[0] / total), 0.2, accuracy: 0.02)
+        XCTAssertEqual(Double(widths[1] / total), 0.4, accuracy: 0.02)
+        XCTAssertEqual(Double(widths[2] / total), 0.4, accuracy: 0.02)
+    }
+
+    @Test
+    func testEqualizeSplitWidthsAdjustsOnlySideBySideSplits() {
+        assertOrientationFilteredEqualize(
+            orientationFilter: "horizontal",
+            expectedEqualizedOrientation: "horizontal",
+            expectedUntouchedOrientation: "vertical"
+        )
+    }
+
+    @Test
+    func testEqualizeSplitHeightsAdjustsOnlyStackedSplits() {
+        assertOrientationFilteredEqualize(
+            orientationFilter: "vertical",
+            expectedEqualizedOrientation: "vertical",
+            expectedUntouchedOrientation: "horizontal"
+        )
+    }
+
+    @Test
+    func testBoundEqualizeSplitWidthsShortcutRoutesThroughOrientationFilter() {
+        assertBoundFilteredEqualizeShortcut(
+            action: .equalizeSplitWidths,
+            expectedEqualizedOrientation: "horizontal",
+            expectedUntouchedOrientation: "vertical"
+        )
+    }
+
+    @Test
+    func testBoundEqualizeSplitHeightsShortcutRoutesThroughOrientationFilter() {
+        assertBoundFilteredEqualizeShortcut(
+            action: .equalizeSplitHeights,
+            expectedEqualizedOrientation: "vertical",
+            expectedUntouchedOrientation: "horizontal"
+        )
+    }
+
+    /// Binds a temporary chord to `action` (both ship unbound), fires it through
+    /// the same dispatch path the key monitor uses, and asserts only the expected
+    /// orientation moved. This is the test that catches the
+    /// `(action, orientationFilter)` table in `handleCustomShortcut` being
+    /// swapped or dropped — the direct `TabManager` tests above cannot.
+    private func assertBoundFilteredEqualizeShortcut(
+        action: KeyboardShortcutSettings.Action,
+        expectedEqualizedOrientation: String,
+        expectedUntouchedOrientation: String
+    ) {
+        let chord = StoredShortcut(key: "l", command: true, shift: true, option: true, control: true)
+        withIsolatedShortcutFileStore {
+            withTemporaryShortcut(action: action, shortcut: chord) {
+                assertOrientationFilteredEqualize(
+                    orientationFilter: expectedEqualizedOrientation,
+                    expectedEqualizedOrientation: expectedEqualizedOrientation,
+                    expectedUntouchedOrientation: expectedUntouchedOrientation
+                ) { appDelegate, window in
+                    guard let event = self.makeKeyDownEvent(
+                        key: "l",
+                        modifiers: [.command, .shift, .option, .control],
+                        keyCode: 37,
+                        windowNumber: window.windowNumber
+                    ) else {
+                        XCTFail("Failed to construct the bound equalize chord")
+                        return false
+                    }
+#if DEBUG
+                    return appDelegate.debugHandleCustomShortcut(event: event)
+#else
+                    XCTFail("debugHandleCustomShortcut is only available in DEBUG")
+                    return false
+#endif
+                }
+            }
+        }
+    }
+
+    /// Seeds a mixed-orientation tree ragged, applies the filtered equalize —
+    /// directly through `TabManager` by default, or through `trigger` (a bound
+    /// shortcut event) — and asserts only `expectedEqualizedOrientation` moved.
+    private func assertOrientationFilteredEqualize(
+        orientationFilter: String,
+        expectedEqualizedOrientation: String,
+        expectedUntouchedOrientation: String,
+        trigger: ((AppDelegate, NSWindow) -> Bool)? = nil
+    ) {
+        guard let appDelegate = AppDelegate.shared else {
+            XCTFail("Expected AppDelegate.shared")
+            return
+        }
+
+        let windowId = appDelegate.createMainWindow()
+        defer { closeWindow(withId: windowId) }
+
+        guard let window = window(withId: windowId),
+              let manager = appDelegate.tabManagerFor(windowId: windowId),
+              let workspace = manager.selectedWorkspace,
+              let leftPanelId = workspace.focusedPanelId,
+              let rightPanel = workspace.newTerminalSplit(from: leftPanelId, orientation: .horizontal),
+              workspace.newTerminalSplit(from: rightPanel.id, orientation: .vertical) != nil else {
+            XCTFail("Expected mixed-orientation split setup")
+            return
+        }
+
+        window.makeKeyAndOrderFront(nil)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+
+        // Seed every divider away from center so both orientations start ragged.
+        let seededPositionsByOrientation: [String: CGFloat] = [
+            "horizontal": 0.2,
+            "vertical": 0.3,
+        ]
+        let seededSplits = shortcutRoutingSplitNodes(in: workspace.bonsplitController.treeSnapshot())
+        XCTAssertEqual(seededSplits.count, 2, "Expected one side-by-side and one stacked split")
+        for split in seededSplits {
+            guard let splitId = UUID(uuidString: split.id),
+                  let targetPosition = seededPositionsByOrientation[split.orientation.lowercased()] else {
+                XCTFail("Expected UUID split ID and a known orientation")
+                return
+            }
+            XCTAssertTrue(workspace.bonsplitController.setDividerPosition(targetPosition, forSplit: splitId))
+        }
+
+        if let trigger {
+            XCTAssertTrue(trigger(appDelegate, window), "Expected the bound shortcut to be consumed")
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.35))
+        } else {
+            XCTAssertTrue(manager.equalizeSplits(tabId: workspace.id, orientationFilter: orientationFilter))
+        }
+
+        let equalizedSplits = shortcutRoutingSplitNodes(in: workspace.bonsplitController.treeSnapshot())
+        XCTAssertEqual(equalizedSplits.count, seededSplits.count)
+        for split in equalizedSplits {
+            let orientation = split.orientation.lowercased()
+            if orientation == expectedEqualizedOrientation {
+                XCTAssertEqual(split.dividerPosition, 0.5, accuracy: 0.000_1)
+            } else {
+                XCTAssertEqual(orientation, expectedUntouchedOrientation)
+                guard let seededPosition = seededPositionsByOrientation[orientation] else {
+                    XCTFail("Expected a seeded position for the untouched orientation")
+                    return
+                }
+                XCTAssertEqual(split.dividerPosition, Double(seededPosition), accuracy: 0.000_1)
+            }
+        }
+    }
+
+    @Test
     func testConfiguredWorkspaceTerminalFontSizeShortcutAdjustsEverySplit() {
         withTemporaryShortcut(action: .decreaseWorkspaceTerminalFontSize) {
             guard let appDelegate = AppDelegate.shared else {

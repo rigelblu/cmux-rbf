@@ -35,6 +35,45 @@ final class KeyboardShortcutSettingsEqualizeSplitsTests: XCTestCase {
         )
     }
 
+    func testSettingsFileStoreParsesOrientationFilteredEqualizeShortcuts() throws {
+        let directoryURL = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
+        try writeSettingsFile(
+            """
+            {
+              "shortcuts": {
+                "equalizeSplitWidths": "cmd+ctrl+h",
+                "equalizeSplitHeights": "cmd+ctrl+j"
+              }
+            }
+            """,
+            to: settingsFileURL
+        )
+
+        let store = KeyboardShortcutSettingsFileStore(
+            primaryPath: settingsFileURL.path,
+            fallbackPath: nil,
+            startWatching: false
+        )
+
+        XCTAssertEqual(
+            store.override(for: .equalizeSplitWidths),
+            StoredShortcut(key: "h", command: true, shift: false, option: false, control: true)
+        )
+        XCTAssertEqual(
+            store.override(for: .equalizeSplitHeights),
+            StoredShortcut(key: "j", command: true, shift: false, option: false, control: true)
+        )
+    }
+
+    func testOrientationFilteredEqualizeShortcutsAreUnboundByDefault() {
+        XCTAssertTrue(KeyboardShortcutSettings.Action.equalizeSplitWidths.defaultShortcut.isUnbound)
+        XCTAssertTrue(KeyboardShortcutSettings.Action.equalizeSplitHeights.defaultShortcut.isUnbound)
+        XCTAssertFalse(KeyboardShortcutSettings.Action.equalizeSplits.defaultShortcut.isUnbound)
+    }
+
     func testSettingsFileStoreParsesSystemWideHotkeyWithoutSharedStoreRecursion() throws {
         let directoryURL = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directoryURL) }

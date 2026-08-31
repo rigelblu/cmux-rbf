@@ -1685,6 +1685,8 @@
               "decreaseWorkspaceTerminalFontSize",
               "resetWorkspaceTerminalFontSize",
               "equalizeSplits",
+              "equalizeSplitWidths",
+              "equalizeSplitHeights",
               "splitBrowserRight",
               "splitBrowserDown",
               "toggleCanvasLayout",
