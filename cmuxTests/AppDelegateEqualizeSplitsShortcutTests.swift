@@ -528,6 +528,15 @@ final class AppDelegateEqualizeSplitsShortcutTests {
     func testArrangementPresetWeightRulesAdaptToSpanCount() {
         XCTAssertEqual(arrangementPattern("mainFirst")?.ratios(forSpanCount: 3), [2, 1, 1])
         XCTAssertEqual(arrangementPattern("mainLast")?.ratios(forSpanCount: 2), [1, 2])
+        // `mainLast` at 2 spans takes the s < n branch, which DROPS weights[1] —
+        // so a wrong middle weight is invisible there. Cold review 2026-09-01
+        // showed the shipped spec could be mutated to [1, 5, 2] with the whole
+        // suite still green. These pin the repeat branch, where weights[1] is
+        // what actually fills.
+        XCTAssertEqual(arrangementPattern("mainLast")?.ratios(forSpanCount: 4), [1, 1, 1, 2])
+        XCTAssertEqual(arrangementPattern("mainFirst")?.ratios(forSpanCount: 4), [2, 1, 1, 1])
+        XCTAssertEqual(arrangementPattern("minorFirst")?.ratios(forSpanCount: 4), [0.5, 1, 1, 1])
+        XCTAssertEqual(arrangementPattern("minorLast")?.ratios(forSpanCount: 4), [1, 1, 1, 0.5])
         XCTAssertEqual(arrangementPattern("minorFirst")?.ratios(forSpanCount: 2), [0.5, 1])
         // Tom's founding example: three spans, the last at half share.
         XCTAssertEqual(arrangementPattern("minorLast")?.ratios(forSpanCount: 3), [1, 1, 0.5])
@@ -567,9 +576,18 @@ final class AppDelegateEqualizeSplitsShortcutTests {
         let custom = SplitArrangementPattern.custom(defaults: defaults)
         // Two survive; the unparseable pair and the blank name drop alone.
         XCTAssertEqual(custom.map(\.id), ["custom.Reading", "custom.Triptych"])
-        // The label reads back the notation the user typed.
-        XCTAssertEqual(custom.first?.displayLabel, "Reading (2:1)")
-        XCTAssertEqual(custom.last?.displayLabel, "Triptych (1:1:0.5)")
+        // The label reads back the notation the user typed and marks it as
+        // theirs (`#cm-67.2`) — a palette contribution has no rank or group field,
+        // so custom and built-in rows interleave and the label is the only signal.
+        XCTAssertEqual(custom.first?.displayLabel, "Reading (2:1) (Custom)")
+        XCTAssertEqual(custom.last?.displayLabel, "Triptych (1:1:0.5) (Custom)")
+        // And no built-in carries the marker, so the two groups stay distinguishable.
+        for builtIn in SplitArrangementPattern.builtIns {
+            XCTAssertFalse(
+                builtIn.displayLabel.contains("(Custom)"),
+                "built-in \(builtIn.id) should not carry the custom marker"
+            )
+        }
         // And the written vector adapts by the shared rule.
         XCTAssertEqual(custom.last?.ratios(forSpanCount: 3), [1, 1, 0.5])
         XCTAssertEqual(custom.last?.ratios(forSpanCount: 5), [1, 1, 1, 1, 0.5])

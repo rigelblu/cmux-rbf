@@ -43,7 +43,7 @@ The four built-ins are the common cases, not the only ones. Add your own under `
 }
 ```
 
-- They appear in **View → Arrange Splits** and the command palette, below the four built-ins, live and with no restart.
+- They appear in **View → Arrange Splits** and the command palette, live and with no restart, reading **Editor (3:1) (Custom)** so you can tell yours from the four built-ins. In the menu they sit below a divider; in the palette they interleave with the built-ins — a built-in can land between two of yours — so the label is the only signal there.
 - **The notation is the menu's own** — the hints already read `Minor Last (1:…:0.5)`, so what you read is what you type.
 - **They adapt like the built-ins do.** The second weight repeats in place to fill: `2:1` is `2:1:1` at three spans; `1:1:0.5` is `1:1:1:1:0.5` at five. Writing exactly as many weights as you have splits always gives you exactly what you typed.
 - **A pattern you got wrong drops on its own.** Fewer than two weights, or any that is non-numeric, zero, negative, or infinite, removes that one pattern and leaves the rest — including all four built-ins — working.

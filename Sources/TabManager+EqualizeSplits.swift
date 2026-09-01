@@ -31,8 +31,15 @@ struct SplitArrangementPattern: Identifiable, Equatable {
 extension SplitArrangementPattern {
     /// The four patterns cmux ships. Main gives its span a double share; Minor
     /// gives it a half share — expressed as specs so they adapt by the same
-    /// rule a user's pattern does. `SplitRatioSpecTests` pins these vectors
-    /// against the pre-`#cm-67.1` switch across 2…12 spans.
+    /// rule a user's pattern does.
+    ///
+    /// Two tests hold this, and neither alone is enough. `SplitRatioSpecTests`
+    /// proves the *rule* reproduces the pre-`#cm-67.1` switch across 2…12 spans,
+    /// but it builds its own specs from strings — it is in another module and
+    /// cannot see these values. `testArrangementPresetWeightRulesAdaptToSpanCount`
+    /// pins *these* vectors, and must assert each at a span count above its
+    /// written length: below it the rule drops `weights[1]`, so a wrong middle
+    /// weight would not show. Cold review 2026-09-01 found exactly that hole.
     ///
     /// The force-unwraps are deliberate: these are compile-time constants that
     /// must satisfy `SplitRatioSpec`'s guard, so an edit that breaks one is a
@@ -99,12 +106,28 @@ extension SplitArrangementPattern {
 #endif
                     return nil
                 }
+                let ratios = text.trimmingCharacters(in: .whitespaces)
                 return SplitArrangementPattern(
                     id: "custom.\(trimmedName)",
-                    // The hint is the user's own written ratio, so the menu
-                    // reads back the notation they typed. Their name is not
-                    // localizable — it is theirs.
-                    displayLabel: "\(trimmedName) (\(text.trimmingCharacters(in: .whitespaces)))",
+                    // The hint is the user's own written ratio, so the label
+                    // reads back the notation they typed; their name is not
+                    // localizable, because it is theirs.
+                    //
+                    // The `(Custom)` marker is the origin signal (`#cm-67.2`).
+                    // The menu groups these under a divider, but a command
+                    // palette contribution carries no rank, order, or group
+                    // field — the fuzzy matcher owns the ordering outright, so
+                    // custom and built-in rows interleave and position tells
+                    // the reader nothing. The label is the only channel there.
+                    //
+                    // Named for what it is, not where it lives: `cmux.json`
+                    // was tried in v0.25.2 and read as too technical in
+                    // dogfood, which is also the answer to "why not say where
+                    // to edit it" — that is documentation's job, not a label's.
+                    displayLabel: String(
+                        localized: "command.arrangeSplits.customPattern.label",
+                        defaultValue: "\(trimmedName) (\(ratios)) (Custom)"
+                    ),
                     spec: spec
                 )
             }

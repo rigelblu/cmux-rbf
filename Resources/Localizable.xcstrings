@@ -60449,6 +60449,126 @@
         }
       }
     },
+    "command.arrangeSplits.customPattern.label": {
+      "comment": "Menu and palette label for a user-defined Arrange Splits pattern: its name, its written ratios, and a word marking it as the user's own rather than built in. %1$@ is the name, %2$@ the ratios. Translate the marker word; the frame and argument order may be adapted.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (مخصص)"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Prilagođeno)"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Tilpasset)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Benutzerdefiniert)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Custom)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Personalizado)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Personnalisé)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Personalizzato)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (カスタム)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (사용자 지정)"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Tilpasset)"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Niestandardowy)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Personalizado)"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Пользовательский)"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (กำหนดเอง)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Özel)"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (Користувацький)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (自定义)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$@) (自訂)"
+          }
+        }
+      }
+    },
     "command.arrangeSplits.preset.mainFirst": {
       "extractionState": "manual",
       "localizations": {
