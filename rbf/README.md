@@ -11,6 +11,25 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Even your split widths or heights in one action, instead of dragging each divider
+
+**Equalize Splits** (⌃⇧⌘=) has always evened everything at once. Often that is more than you meant: you have your columns the way you want them and only the stack inside one of them has drifted.
+
+- **Equalize Split Widths** evens only the side-by-side columns. **Equalize Split Heights** evens only the stacked panes. Whichever you don't name keeps the proportions you dragged.
+- Both live in the **View** menu and the command palette. **Equalize Splits** is unchanged and still evens both in one press.
+- **Neither claims a key by default** — the chord space around ⌃⇧⌘= is taken, and the all-splits version covers the common case. Bind them in **Settings → Keyboard Shortcuts**, or in `cmux.json`.
+- **Known limitation:** in canvas mode the menu and palette move the hidden split tree, visible only after you leave canvas, while a bound shortcut acts on the canvas. Inherited from upstream's Equalize Splits.
+
+## 🟠⋯ Arrange your splits into a common layout pattern in one action
+
+A layout you keep rebuilding by hand — one big pane with narrower companions — is four names in **View → Arrange Splits**.
+
+- **Main First (2:1:…)**, **Main Last (…:1:2)**, **Minor First (0.5:1:…)**, **Minor Last (…:1:0.5)**.
+- **The patterns adapt to however many splits you have** rather than fitting a fixed count. Minor Last lands three columns at 40/40/20; Main First lands two at 67/33; the same name means the same intent at any span count.
+- **Only dividers move.** No pane ever changes position — rearranging the panes themselves is a separate thing.
+- **A split running the other way counts as one span** and keeps its own internal proportions. Re-ratio your columns and a stack living inside one of them is left exactly as it was.
+- **Known limitation:** divider positions are clamped to 0.1–0.9, so past about five spans a Minor share lands at the clamp rather than its true ratio. You get a valid layout, just not the one the ratio names.
+
 ## 🟠⋯ Open one web link in your default browser, without changing where the next one opens
 
 Terminal links follow whatever routing you configured — usually into a cmux browser tab. Sometimes you want *this one* link in Safari or Chrome instead, and nothing about that decision should stick.

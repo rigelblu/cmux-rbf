@@ -16,6 +16,23 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.25.0 (2026-09-01) — #cm-66, #cm-67
+*Cuts v0.25.0 for local dogfooding. Releases `#cm-66` and `#cm-67` together — they share one menu, one action path, and one commit, so splitting them across two versions would number the same change twice. `#cm-47` stays unreleased in the section above.*
+
+## 🟠⋯ Changed for End Users
+- 2026-09-01 - feat | **make your split widths or heights equal in one action, instead of dragging each divider.** **Equalize Split Widths** evens only the side-by-side columns and leaves stacked heights where you put them; **Equalize Split Heights** does the inverse. Both are in the View menu and the command palette. Neither claims a key by default — the chord space around ⌃⇧⌘= is taken — so bind them yourself in Settings → Keyboard Shortcuts or in `cmux.json`. The existing **Equalize Splits** (⌃⇧⌘=) still evens everything in one press (#cm-66)
+- 2026-09-01 - feat | **arrange your splits into a common layout pattern in one action.** **View → Arrange Splits** offers four patterns — **Main First (2:1:…)**, **Main Last (…:1:2)**, **Minor First (0.5:1:…)**, **Minor Last (…:1:0.5)** — which adapt to however many splits you have rather than fitting a fixed count: Minor Last lands three columns at 40/40/20 and Main First lands two at 67/33. Only dividers move; no pane ever changes position. A split running the other way counts as one span and keeps its own internal proportions (#cm-67)
+
+## 🟠⋯ Known Limitations
+- **A pattern can degrade quietly at high span counts.** Bonsplit clamps every divider position to 0.1–0.9 and still reports success, so from six spans a Minor span's 0.5/5.5 share lands at 0.1 rather than its true ratio. You get a valid layout, just not the one the ratio names (#cm-67)
+- **In canvas mode the menu and palette do not do what the shortcut does.** The shortcut path routes through the canvas executor while the menu and palette move the hidden split tree, visible only after you leave canvas. Inherited from upstream's Equalize Splits, not introduced here; tracked as `#cm-70` (#cm-66, #cm-67)
+- **If you bind these in `cmux.json` by hand, use one shape, not two.** A flat `shortcuts.<action>: "cmd+ctrl+j"` silently outranks a `shortcuts.bindings.<action>` entry for the same action, and the Settings row keeps displaying the chord that no longer fires. Generic across every action and pre-existing; tracked as `#cm-71` (#cm-66)
+
+## 🟠⋯ Changed for Developers
+- 2026-09-01 - feat (technical) | `ExternalTreeNode.ratioDividerPlan(ratios:orientation:)` turns an arbitrary weight vector into per-split divider positions, appending children before parents and rejecting non-finite, zero, empty, or count-mismatched input; `spanCount(along:)` counts spans in one orientation, treating a cross-orientation subtree as a single span. The four patterns are named generators over that vector, so the geometry layer has no notion of a preset. Verified 36/36 in `CmuxPanes` plus focused app suites, with mutations M1–M4 each observed failing the intended assertion before the fix landed — M4 (dispatch-table orientation strings swapped) failing exactly the two bound-shortcut tests while the other 101 stayed green (#cm-66, #cm-67)
+
+---
+
 # 🔵⋯ v0.24.0 (2026-08-30) — #cm-65
 *Cuts v0.24.0 for local dogfooding. Releases `#cm-65` only — `#cm-47` stays unreleased in the section above.*
 
