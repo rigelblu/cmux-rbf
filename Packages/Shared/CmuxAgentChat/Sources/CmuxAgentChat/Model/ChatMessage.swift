@@ -32,6 +32,34 @@ public struct ChatMessage: Identifiable, Sendable, Equatable, Codable {
     /// The typed payload that decides how the message renders.
     public let kind: ChatMessageKind
 
+    /// Identity of the model response this message belongs to, when the
+    /// transcript names one.
+    ///
+    /// ``id`` is per *content block*: Claude writes one JSONL line per block,
+    /// so a single API response spans several messages that share nothing at
+    /// the ``id`` level. This is the field that groups them — every message
+    /// carrying the same value came from one response.
+    ///
+    /// Populated from `message.id` for Claude and `payload.id` for Codex, and
+    /// `nil` for any transcript that names no such id (older Codex rollouts,
+    /// terminal captures, locally synthesised messages). Consumers must treat
+    /// `nil` as "ungroupable", never as "same group".
+    public let apiMessageID: String?
+
+    /// Which part of the agent's turn this message came from, for agents that
+    /// distinguish them.
+    ///
+    /// Codex tags assistant messages `final_answer` or `commentary`, where
+    /// commentary is its running narration while it works — the structural
+    /// twin of Claude's thinking blocks. Claude does not tag its lines, so
+    /// this is `nil` there.
+    ///
+    /// Deliberately *not* folded into ``kind``: mapping commentary onto
+    /// `.thought` would hide it everywhere, changing what the existing iPhone
+    /// Agent Chat renders. Hiding is a consumer's decision, so the fact is
+    /// reported here and each surface chooses.
+    public let phase: String?
+
     /// Creates a chat message.
     ///
     /// - Parameters:
@@ -40,12 +68,24 @@ public struct ChatMessage: Identifiable, Sendable, Equatable, Codable {
     ///   - role: Who authored the message.
     ///   - timestamp: When the message was produced.
     ///   - kind: Typed payload deciding the rendering.
-    public init(id: String, seq: Int, role: ChatRole, timestamp: Date, kind: ChatMessageKind) {
+    ///   - apiMessageID: Identity of the owning model response, when named.
+    ///   - phase: The turn phase this message came from, when the agent tags one.
+    public init(
+        id: String,
+        seq: Int,
+        role: ChatRole,
+        timestamp: Date,
+        kind: ChatMessageKind,
+        apiMessageID: String? = nil,
+        phase: String? = nil
+    ) {
         self.id = id
         self.seq = seq
         self.role = role
         self.timestamp = timestamp
         self.kind = kind
+        self.apiMessageID = apiMessageID
+        self.phase = phase
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -54,6 +94,8 @@ public struct ChatMessage: Identifiable, Sendable, Equatable, Codable {
         case role
         case timestamp
         case kind
+        case apiMessageID
+        case phase
     }
 
     public init(from decoder: any Decoder) throws {
@@ -69,5 +111,7 @@ public struct ChatMessage: Identifiable, Sendable, Equatable, Codable {
             ?? Date(timeIntervalSince1970: 0)
         self.kind = (try? container.decode(ChatMessageKind.self, forKey: .kind))
             ?? .unsupported(ChatUnsupportedPayload(rawType: "undecodable"))
+        self.apiMessageID = try? container.decodeIfPresent(String.self, forKey: .apiMessageID)
+        self.phase = try? container.decodeIfPresent(String.self, forKey: .phase)
     }
 }

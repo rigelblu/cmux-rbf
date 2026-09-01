@@ -203,10 +203,15 @@ public struct ClaudeTranscriptParser: Sendable {
     ) {
         guard let content = root["message"]?["content"] else { return }
         let lineID = root["uuid"]?.string ?? "line-\(seq)"
+        // One API response is written as several lines sharing this id, so it
+        // is the only thing tying a turn's blocks together. Deliberately no
+        // fallback to `lineID`: that would mint a distinct group per block and
+        // read exactly like grouping that works.
+        let apiMessageID = root["message"]?["id"]?.string
         var emitted = 0
         if let text = content.string {
             appendAgentProse(
-                text, lineID: lineID, emitted: &emitted, seq: seq,
+                text, lineID: lineID, apiMessageID: apiMessageID, emitted: &emitted, seq: seq,
                 timestamp: timestamp, into: &assembler
             )
             return
@@ -215,18 +220,18 @@ public struct ClaudeTranscriptParser: Sendable {
             switch block["type"]?.string {
             case "text":
                 appendAgentProse(
-                    block["text"]?.string ?? "", lineID: lineID, emitted: &emitted,
-                    seq: seq, timestamp: timestamp, into: &assembler
+                    block["text"]?.string ?? "", lineID: lineID, apiMessageID: apiMessageID,
+                    emitted: &emitted, seq: seq, timestamp: timestamp, into: &assembler
                 )
             case "thinking":
                 appendThought(
-                    block["thinking"]?.string ?? "", lineID: lineID, emitted: &emitted,
-                    seq: seq, timestamp: timestamp, into: &assembler
+                    block["thinking"]?.string ?? "", lineID: lineID, apiMessageID: apiMessageID,
+                    emitted: &emitted, seq: seq, timestamp: timestamp, into: &assembler
                 )
             case "tool_use":
                 appendToolUse(
-                    block, lineID: lineID, emitted: &emitted, seq: seq,
-                    timestamp: timestamp, into: &assembler
+                    block, lineID: lineID, apiMessageID: apiMessageID, emitted: &emitted,
+                    seq: seq, timestamp: timestamp, into: &assembler
                 )
             default:
                 continue
@@ -237,6 +242,7 @@ public struct ClaudeTranscriptParser: Sendable {
     private func appendAgentProse(
         _ text: String,
         lineID: String,
+        apiMessageID: String?,
         emitted: inout Int,
         seq: Int,
         timestamp: Date,
@@ -250,7 +256,8 @@ public struct ClaudeTranscriptParser: Sendable {
                 seq: seq,
                 role: .agent,
                 timestamp: timestamp,
-                kind: .prose(ChatProse(text: budget.body(text)))
+                kind: .prose(ChatProse(text: budget.body(text))),
+                apiMessageID: apiMessageID
             )
         )
         emitted += 1
@@ -259,6 +266,7 @@ public struct ClaudeTranscriptParser: Sendable {
     private func appendThought(
         _ text: String,
         lineID: String,
+        apiMessageID: String?,
         emitted: inout Int,
         seq: Int,
         timestamp: Date,
@@ -272,7 +280,8 @@ public struct ClaudeTranscriptParser: Sendable {
                 seq: seq,
                 role: .agent,
                 timestamp: timestamp,
-                kind: .thought(ChatThought(text: budget.body(text)))
+                kind: .thought(ChatThought(text: budget.body(text))),
+                apiMessageID: apiMessageID
             )
         )
         emitted += 1
@@ -283,6 +292,7 @@ public struct ClaudeTranscriptParser: Sendable {
     private func appendToolUse(
         _ block: TranscriptJSONValue,
         lineID: String,
+        apiMessageID: String?,
         emitted: inout Int,
         seq: Int,
         timestamp: Date,
@@ -298,7 +308,8 @@ public struct ClaudeTranscriptParser: Sendable {
                 seq: seq,
                 role: .agent,
                 timestamp: timestamp,
-                kind: kind
+                kind: kind,
+                apiMessageID: apiMessageID
             )
             // Register every emitted message under the call id so the
             // result resolves all of them (a multi-question

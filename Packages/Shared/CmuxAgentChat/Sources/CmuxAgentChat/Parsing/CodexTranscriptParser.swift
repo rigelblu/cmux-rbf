@@ -196,13 +196,22 @@ public struct CodexTranscriptParser: Sendable {
             appendUserTexts(texts, seq: seq, timestamp: timestamp, into: &assembler)
             return
         }
+        // Codex needs no grouping of its own — every assistant message carries
+        // its content complete inline (measured across 393 messages in 40
+        // rollouts) — so `id` is reported for parity with Claude rather than to
+        // stitch anything back together. `phase` separates the final answer
+        // from the running commentary; consumers decide what to do with that,
+        // because folding commentary into `.thought` here would change what
+        // the existing iPhone chat renders.
         assembler.append(
             ChatMessage(
                 id: "line-\(seq)",
                 seq: seq,
                 role: role,
                 timestamp: timestamp,
-                kind: .prose(ChatProse(text: budget.body(texts.joined(separator: "\n\n"))))
+                kind: .prose(ChatProse(text: budget.body(texts.joined(separator: "\n\n")))),
+                apiMessageID: payload["id"]?.string,
+                phase: payload["phase"]?.string
             )
         )
     }
