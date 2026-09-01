@@ -30,18 +30,31 @@ extension cmuxApp {
 
     func arrangeSplitsMenu() -> some View {
         Menu(String(localized: "command.arrangeSplits.title", defaultValue: "Arrange Splits")) {
-            ForEach(SplitArrangementPreset.allCases) { preset in
-                Button(preset.displayLabel) {
-                    let manager = activeTabManager
-                    if let workspace = manager.selectedWorkspace {
-                        let didArrange = manager.arrangeSplits(tabId: workspace.id, preset: preset)
-#if DEBUG
-                        if !didArrange {
-                            cmuxDebugLog("menu.arrangeSplits preset=\(preset.rawValue) result=noSplitOrFailed workspaceId=\(workspace.id)")
-                        }
-#endif
-                    }
+            ForEach(SplitArrangementPattern.builtIns) { pattern in
+                arrangeSplitsButton(pattern)
+            }
+            // Only when the user has some: with no `panes.arrangePatterns` the
+            // menu is identical to what shipped in v0.25.0.
+            let custom = SplitArrangementPattern.custom()
+            if !custom.isEmpty {
+                Divider()
+                ForEach(custom) { pattern in
+                    arrangeSplitsButton(pattern)
                 }
+            }
+        }
+    }
+
+    private func arrangeSplitsButton(_ pattern: SplitArrangementPattern) -> some View {
+        Button(pattern.displayLabel) {
+            let manager = activeTabManager
+            if let workspace = manager.selectedWorkspace {
+                let didArrange = manager.arrangeSplits(tabId: workspace.id, pattern: pattern)
+#if DEBUG
+                if !didArrange {
+                    cmuxDebugLog("menu.arrangeSplits pattern=\(pattern.id) result=noSplitOrFailed workspaceId=\(workspace.id)")
+                }
+#endif
             }
         }
     }

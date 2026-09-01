@@ -520,16 +520,65 @@ final class AppDelegateEqualizeSplitsShortcutTests {
         shortcutRoutingAssertPaneFramesMatch(cachedEqualizedLayout, liveEqualizedLayout)
     }
 
+    private func arrangementPattern(_ id: String) -> SplitArrangementPattern? {
+        SplitArrangementPattern.builtIns.first { $0.id == id }
+    }
+
     @Test
     func testArrangementPresetWeightRulesAdaptToSpanCount() {
-        XCTAssertEqual(SplitArrangementPreset.mainFirst.ratios(forSpanCount: 3), [2, 1, 1])
-        XCTAssertEqual(SplitArrangementPreset.mainLast.ratios(forSpanCount: 2), [1, 2])
-        XCTAssertEqual(SplitArrangementPreset.minorFirst.ratios(forSpanCount: 2), [0.5, 1])
+        XCTAssertEqual(arrangementPattern("mainFirst")?.ratios(forSpanCount: 3), [2, 1, 1])
+        XCTAssertEqual(arrangementPattern("mainLast")?.ratios(forSpanCount: 2), [1, 2])
+        XCTAssertEqual(arrangementPattern("minorFirst")?.ratios(forSpanCount: 2), [0.5, 1])
         // Tom's founding example: three spans, the last at half share.
-        XCTAssertEqual(SplitArrangementPreset.minorLast.ratios(forSpanCount: 3), [1, 1, 0.5])
+        XCTAssertEqual(arrangementPattern("minorLast")?.ratios(forSpanCount: 3), [1, 1, 0.5])
         // Below two spans there is nothing to arrange.
-        XCTAssertNil(SplitArrangementPreset.mainFirst.ratios(forSpanCount: 1))
-        XCTAssertNil(SplitArrangementPreset.minorLast.ratios(forSpanCount: 0))
+        XCTAssertNil(arrangementPattern("mainFirst")?.ratios(forSpanCount: 1))
+        XCTAssertNil(arrangementPattern("minorLast")?.ratios(forSpanCount: 0))
+    }
+
+    /// `#cm-67.1`: a pattern written in `cmux.json` joins the four built-ins,
+    /// and only a parseable one does. The built-ins never depend on the key, so
+    /// a broken entry cannot take the menu down with it.
+    @Test
+    func testCustomArrangementPatternsJoinTheBuiltInsAndBadOnesDropAlone() {
+        let suiteName = "cm-67-1-custom-patterns-\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Expected an isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // No key at all: the menu is exactly what v0.25.0 shipped.
+        XCTAssertEqual(SplitArrangementPattern.custom(defaults: defaults).count, 0)
+        XCTAssertEqual(SplitArrangementPattern.all(defaults: defaults).map(\.id),
+                       SplitArrangementPattern.builtIns.map(\.id))
+
+        defaults.set(
+            [
+                "Triptych": "1:1:0.5",
+                "Reading": "2:1",
+                "Broken": "1:zero",
+                "AlsoBroken": "1",
+                "  ": "1:1",
+            ],
+            forKey: SplitArrangementPattern.customPatternsDefaultsKey
+        )
+
+        let custom = SplitArrangementPattern.custom(defaults: defaults)
+        // Two survive; the unparseable pair and the blank name drop alone.
+        XCTAssertEqual(custom.map(\.id), ["custom.Reading", "custom.Triptych"])
+        // The label reads back the notation the user typed.
+        XCTAssertEqual(custom.first?.displayLabel, "Reading (2:1)")
+        XCTAssertEqual(custom.last?.displayLabel, "Triptych (1:1:0.5)")
+        // And the written vector adapts by the shared rule.
+        XCTAssertEqual(custom.last?.ratios(forSpanCount: 3), [1, 1, 0.5])
+        XCTAssertEqual(custom.last?.ratios(forSpanCount: 5), [1, 1, 1, 1, 0.5])
+
+        // Built-ins first, custom appended — the palette and menu order.
+        XCTAssertEqual(
+            SplitArrangementPattern.all(defaults: defaults).map(\.id),
+            SplitArrangementPattern.builtIns.map(\.id) + ["custom.Reading", "custom.Triptych"]
+        )
     }
 
     @Test
@@ -555,7 +604,11 @@ final class AppDelegateEqualizeSplitsShortcutTests {
         window.makeKeyAndOrderFront(nil)
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
 
-        XCTAssertTrue(manager.arrangeSplits(tabId: workspace.id, preset: .minorLast))
+        guard let minorLast = arrangementPattern("minorLast") else {
+            XCTFail("Expected the built-in minorLast pattern")
+            return
+        }
+        XCTAssertTrue(manager.arrangeSplits(tabId: workspace.id, pattern: minorLast))
 
         // Three columns at 1:1:0.5 — the outer divider (2 spans | 1 span run
         // in a right-leaning tree) sits at 1/2.5, the inner at 1/1.5, however

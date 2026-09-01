@@ -8269,15 +8269,15 @@ struct ContentView: View {
                 when: { $0.bool(CommandPaletteContextKeys.workspaceHasSplits) }
             )
         )
-        for preset in SplitArrangementPreset.allCases {
+        for pattern in SplitArrangementPattern.all() {
             let arrangeTitle = String(localized: "command.arrangeSplits.title", defaultValue: "Arrange Splits")
-            let presetLabel = preset.displayLabel
+            let patternLabel = pattern.displayLabel
             contributions.append(
                 CommandPaletteCommandContribution(
-                    commandId: preset.commandId,
-                    title: constant("\(arrangeTitle): \(presetLabel)"),
+                    commandId: pattern.commandId,
+                    title: constant("\(arrangeTitle): \(patternLabel)"),
                     subtitle: workspaceSubtitle,
-                    keywords: ["split", "arrange", "grid", "ratio", "layout", "main", "minor", preset.rawValue],
+                    keywords: ["split", "arrange", "grid", "ratio", "layout", "main", "minor", pattern.id],
                     when: { $0.bool(CommandPaletteContextKeys.workspaceHasSplits) }
                 )
             )
@@ -9005,12 +9005,12 @@ struct ContentView: View {
 #endif
             }
         }
-        for preset in SplitArrangementPreset.allCases {
-            registry.register(commandId: preset.commandId) {
+        for pattern in SplitArrangementPattern.all() {
+            registry.register(commandId: pattern.commandId) {
                 if let workspace = tabManager.selectedWorkspace,
-                   !tabManager.arrangeSplits(tabId: workspace.id, preset: preset) {
+                   !tabManager.arrangeSplits(tabId: workspace.id, pattern: pattern) {
 #if DEBUG
-                    cmuxDebugLog("palette.arrangeSplits preset=\(preset.rawValue) result=noSplitOrFailed workspaceId=\(workspace.id)")
+                    cmuxDebugLog("palette.arrangeSplits pattern=\(pattern.id) result=noSplitOrFailed workspaceId=\(workspace.id)")
 #endif
                 }
             }

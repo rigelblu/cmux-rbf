@@ -30,6 +30,25 @@ A layout you keep rebuilding by hand — one big pane with narrower companions �
 - **A split running the other way counts as one span** and keeps its own internal proportions. Re-ratio your columns and a stack living inside one of them is left exactly as it was.
 - **Known limitation:** divider positions are clamped to 0.1–0.9, so past about five spans a Minor share lands at the clamp rather than its true ratio. You get a valid layout, just not the one the ratio names.
 
+### 🟣⋯ Write your own patterns
+
+The four built-ins are the common cases, not the only ones. Add your own under `panes.arrangePatterns` in `cmux.json`:
+
+```json
+"panes": {
+  "arrangePatterns": {
+    "Reading":  "2:1",
+    "Triptych": "1:1:0.5"
+  }
+}
+```
+
+- They appear in **View → Arrange Splits** and the command palette, below the four built-ins, live and with no restart.
+- **The notation is the menu's own** — the hints already read `Minor Last (1:…:0.5)`, so what you read is what you type.
+- **They adapt like the built-ins do.** The second weight repeats in place to fill: `2:1` is `2:1:1` at three spans; `1:1:0.5` is `1:1:1:1:0.5` at five. Writing exactly as many weights as you have splits always gives you exactly what you typed.
+- **A pattern you got wrong drops on its own.** Fewer than two weights, or any that is non-numeric, zero, negative, or infinite, removes that one pattern and leaves the rest — including all four built-ins — working.
+- **Menu and palette only.** Binding a custom pattern to a key is not supported yet; the built-ins' own keys are unaffected.
+
 ## 🟠⋯ Open one web link in your default browser, without changing where the next one opens
 
 Terminal links follow whatever routing you configured — usually into a cmux browser tab. Sometimes you want *this one* link in Safari or Chrome instead, and nothing about that decision should stick.

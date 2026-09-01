@@ -365,6 +365,9 @@ final class CmuxSettingsFileStore {
         if let workspaceColorsSection = root["workspaceColors"] as? [String: Any] {
             parseWorkspaceColorsSection(workspaceColorsSection, sourcePath: sourcePath, snapshot: &snapshot)
         }
+        if let panesSection = root["panes"] as? [String: Any] {
+            parsePanesSection(panesSection, sourcePath: sourcePath, snapshot: &snapshot)
+        }
         if let sidebarAppearanceSection = root["sidebarAppearance"] as? [String: Any] {
             parseSidebarAppearanceSection(sidebarAppearanceSection, sourcePath: sourcePath, snapshot: &snapshot)
         }
@@ -685,6 +688,49 @@ final class CmuxSettingsFileStore {
         } else if section.keys.contains(RightSidebarWidthSettings.jsonKey) {
             logInvalid(RightSidebarWidthSettings.settingsPath, sourcePath: sourcePath)
         }
+    }
+
+    /// `panes.arrangePatterns` — user-defined Arrange Splits patterns (`#cm-67.1`),
+    /// display name to the colon ratio notation the menu prints as its hints.
+    ///
+    /// Shape only. `SplitRatioSpec` owns weight validation so the menu, the
+    /// palette, and this parser cannot disagree about what a valid pattern is;
+    /// an entry that survives here but fails there is dropped at render with a
+    /// debug log rather than failing the file.
+    private func parsePanesSection(
+        _ section: [String: Any],
+        sourcePath: String,
+        snapshot: inout ResolvedSettingsSnapshot
+    ) {
+        guard section.keys.contains("arrangePatterns") else { return }
+        guard let rawPatterns = section["arrangePatterns"] as? [String: Any] else {
+            logInvalid("panes.arrangePatterns", sourcePath: sourcePath)
+            return
+        }
+        var normalized: [String: String] = [:]
+        // Sorted by raw key so a trim collision below resolves the same way on
+        // every reload. Iterating the dictionary directly would make "keep the
+        // first" mean a different entry each time.
+        for (rawName, rawValue) in rawPatterns.sorted(by: { $0.key < $1.key }) {
+            let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else {
+                cmuxSettingsFileStoreLogger.warning("ignoring empty arrange pattern name in panes.arrangePatterns in \(sourcePath, privacy: .private(mask: .hash))")
+                continue
+            }
+            guard let ratios = jsonString(rawValue) else {
+                cmuxSettingsFileStoreLogger.warning("ignoring non-string arrange pattern ratios for '\(name, privacy: .private(mask: .hash))' in \(sourcePath, privacy: .private(mask: .hash))")
+                continue
+            }
+            // Two JSON keys can trim to the same name ("Foo" and "Foo ").
+            // Iterating sorted above makes "first wins" a stable choice rather
+            // than whichever the dictionary happened to yield.
+            guard normalized[name] == nil else {
+                cmuxSettingsFileStoreLogger.warning("ignoring duplicate arrange pattern name '\(name, privacy: .private(mask: .hash))' in \(sourcePath, privacy: .private(mask: .hash))")
+                continue
+            }
+            normalized[name] = ratios
+        }
+        snapshot.managedUserDefaults[SettingCatalog().panes.arrangePatterns.userDefaultsKey] = .stringDictionary(normalized)
     }
 
     private func parseWorkspaceColorsSection(

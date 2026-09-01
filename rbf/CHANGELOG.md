@@ -16,6 +16,22 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ---
 
+# 🔵⋯ v0.25.1 (2026-09-01) — #cm-67.1
+*A slice of `#cm-67`, so a patch rather than a new minor. `#cm-47` and `#cm-60` stay unreleased above.*
+
+## 🟠⋯ Changed for End Users
+- 2026-09-01 - feat | **define your own Arrange Splits pattern once and reach it like a built-in.** Write `"panes": {"arrangePatterns": {"Triptych": "1:1:0.5"}}` in `cmux.json` and **Triptych (1:1:0.5)** appears in **View → Arrange Splits** and the command palette, below the four built-ins, live and with no restart. The notation is the one the menu already prints as its hints, so what you read is what you type. A pattern adapts to however many splits you have by the same rule the built-ins use — `1:1:0.5` lands 40/40/20 in three columns and `1:1:1:0.5` in four (#cm-67.1)
+- 2026-09-01 - feat | **a pattern you got wrong drops on its own instead of taking the menu with it.** Weights are validated when the file is read: fewer than two, or any that is non-numeric, zero, negative, or infinite, drops that one pattern with a debug log and leaves every other pattern and all four built-ins working (#cm-67.1)
+
+## 🟠⋯ Known Limitations
+- **No Settings row and no shortcut for a custom pattern.** They are reachable from the menu and the palette only. Binding one to a key needs a dynamic action-id scheme, because cmux's two `ShortcutAction` enums are compile-time and must stay in sync — deliberately left to its own slice (#cm-67.1)
+- **The 0.1–0.9 divider clamp still applies**, and custom ratios make it easier to hit on purpose: a share that would compute below 0.1 lands at the clamp. Validation rejects weights that cannot work at all; it cannot widen Bonsplit's range (#cm-67, #cm-67.1)
+
+## 🟠⋯ Changed for Developers
+- 2026-09-01 - refactor (technical) | the four built-in patterns are now `SplitRatioSpec`s rather than a `switch` of their own — `mainFirst` is literally `"2:1"`, `minorLast` is `"1:1:0.5"` — so one span-adaptation rule serves built-in and user-defined patterns alike and a future fix cannot be applied to one and forgotten on the other. `SplitRatioSpecTests.builtInPatternsMatchTheirPreUnificationVectors` pins the four against their pre-unification vectors across 2…12 spans, so the unification is provably behaviour-preserving for `#cm-67`. Span rule: `s ≥ n` → `[w₀] + [w₁]×(s−n+1) + w[2…]` (identity at `s == n`, and it preserves every written weight); `s < n` → `[w₀] + w[(n−s+1)…]`. CmuxPanes 45/45, focused app suite 104/104 (#cm-67.1)
+
+---
+
 # 🔵⋯ v0.25.0 (2026-09-01) — #cm-66, #cm-67
 *Cuts v0.25.0 for local dogfooding. Releases `#cm-66` and `#cm-67` together — they share one menu, one action path, and one commit, so splitting them across two versions would number the same change twice. `#cm-47` stays unreleased in the section above.*
 

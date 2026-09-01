@@ -74,6 +74,14 @@ Sidebar content and metadata visibility from Settings > Sidebar.
 | `sidebar.showProgress` | boolean | `true` | Show progress indicators. |
 | `sidebar.showCustomMetadata` | boolean | `true` | Show custom metadata pills. |
 
+## panes
+
+Pane layout settings that are not part of the inherited root-level pane chrome keys.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `panes.arrangePatterns` | object | `{}` | Your own Arrange Splits patterns, keyed by the name shown in the menu and command palette, valued by the colon ratio notation the menu prints as its hints (e.g. `"Triptych": "1:1:0.5"`). They appear beside the four built-ins, marked `(Custom)`. Weights are shares, not percentages; the second weight repeats to fill when a workspace has more splits than you wrote. An entry with fewer than two weights, or any weight that is non-numeric, zero, negative, or infinite, is dropped on its own and leaves the rest working. |
+
 ## workspaceColors
 
 Workspace tab and badge colors from Settings > Workspace Colors.
