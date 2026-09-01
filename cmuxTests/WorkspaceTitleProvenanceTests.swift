@@ -280,6 +280,50 @@ import Testing
         #expect(workspace.panelCustomTitleSources[panelId] == .auto)
     }
 
+    /// A rename has to be *announced*, not just stored.
+    ///
+    /// `panelCustomTitles` is `@Published`, which is enough for anything that
+    /// observes the workspace. The right sidebar's Reply panel deliberately
+    /// does not — subscribing to a publisher this size to catch one string
+    /// would re-render the panel on every unrelated workspace change — so it
+    /// listens for the broadcast instead. Without one, a rename lands in the
+    /// dictionary and the header goes on showing the previous name forever.
+    ///
+    /// Observed in dogfood on `#cm-69.1`: the tab read `cm-69` while the
+    /// Reply header still read `Claude`.
+    @Test func panelRenameIsBroadcastOnlyWhenTheNameActuallyChanges() throws {
+        let manager = TabManager()
+        let workspace = try #require(manager.selectedWorkspace)
+        let pane = try #require(workspace.bonsplitController.allPaneIds.first)
+        let panelId = try #require(workspace.newTerminalSurface(inPane: pane, focus: true)?.id)
+
+        let posts = RenameBroadcastCounter()
+        let token = NotificationCenter.default.addObserver(
+            forName: .panelCustomTitleDidChange,
+            object: nil,
+            queue: nil
+        ) { _ in posts.bump() }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        #expect(workspace.setPanelCustomTitle(panelId: panelId, title: "cm-69"))
+        #expect(posts.count == 1)
+
+        // Re-writing the same text is not a change. It still returns true, to
+        // let a higher-authority source claim the name, but there is nothing
+        // for a listener to redraw.
+        #expect(workspace.setPanelCustomTitle(panelId: panelId, title: "cm-69"))
+        #expect(posts.count == 1)
+
+        // Clearing back to the panel's own name changes what is on screen, so
+        // it announces like any other rename.
+        #expect(workspace.setPanelCustomTitle(panelId: panelId, title: nil))
+        #expect(posts.count == 2)
+
+        // A rejected write changed nothing and must stay silent.
+        #expect(!workspace.setPanelCustomTitle(panelId: panelId, title: nil))
+        #expect(posts.count == 2)
+    }
+
     /// The PTY tee hands the Codex rename handler a *terminal surface* UUID,
     /// and the handler resolves the hosting panel from it. `TerminalPanel`
     /// adopts its surface's id at init, so the resolution is identity for a
@@ -605,4 +649,11 @@ import Testing
         workspace.setCustomTitle(legacyDecoded.customTitle, source: legacyDecoded.customTitleSource ?? .user)
         #expect(workspace.effectiveCustomTitleSource == .user)
     }
+}
+
+
+/// Counts notification deliveries from an escaping observer closure.
+private final class RenameBroadcastCounter: @unchecked Sendable {
+    private(set) var count = 0
+    func bump() { count += 1 }
 }

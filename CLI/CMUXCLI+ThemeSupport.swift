@@ -430,21 +430,22 @@ extension CMUXCLI {
         return nil
     }
 
+    /// Every mode `right-sidebar set` accepts.
+    ///
+    /// The CLI binary cannot see `RightSidebarMode`, so this list is a hand
+    /// copy of it and drifts silently: both switches below end in `default`,
+    /// so a mode missing here is rejected *before* the app is ever asked —
+    /// the feature is fully visible in the UI and unreachable from `cmux`,
+    /// with no error naming the real cause. Add every new mode here.
+    static let rightSidebarCLIModes: Set<String> = [
+        "files", "find", "vault", "sessions", "feed", "dock", "reply",
+    ]
+
     func isRightSidebarCLIMode(_ value: String) -> Bool {
-        switch value.lowercased() {
-        case "files", "find", "vault", "sessions", "feed", "dock":
-            return true
-        default:
-            return false
-        }
+        Self.rightSidebarCLIModes.contains(value.lowercased())
     }
 
     func normalizedRightSidebarCLIArgument(_ value: String) -> String {
-        switch value.lowercased() {
-        case "files", "find", "vault", "sessions", "feed", "dock":
-            return value.lowercased()
-        default:
-            return value
-        }
+        isRightSidebarCLIMode(value) ? value.lowercased() : value
     }
 }

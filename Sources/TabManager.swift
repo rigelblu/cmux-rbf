@@ -6555,6 +6555,15 @@ extension Notification.Name {
     static let workspaceGroupNameDidChange = Notification.Name("cmux.workspaceGroupNameDidChange")
     /// Posted after TabManager has applied a terminal title to workspace state.
     static let workspaceTitleDidChange = Notification.Name("cmux.workspaceTitleDidChange")
+    /// Posted after a *panel's* custom title actually changed, by any route —
+    /// command palette, CLI, agent auto-name, or a tmux mirror rename.
+    ///
+    /// `Workspace.panelCustomTitles` is `@Published`, so a view that observes
+    /// the workspace needs nothing here. This exists for the ones that must
+    /// not: observing `Workspace` to catch a rename subscribes to every other
+    /// change it publishes too, which is far too much re-rendering to buy one
+    /// string. The notification's `object` is the `Workspace`.
+    static let panelCustomTitleDidChange = Notification.Name("cmux.panelCustomTitleDidChange")
     static let workspaceCurrentDirectoryDidChange = Notification.Name("cmux.workspaceCurrentDirectoryDidChange")
     static let tabManagerFocusHistoryRevisionDidChange = Notification.Name("cmux.tabManagerFocusHistoryRevisionDidChange")
 }

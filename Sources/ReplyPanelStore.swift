@@ -1,0 +1,432 @@
+import CmuxAgentChat
+import Foundation
+import Observation
+
+/// Follows one agent in the selected workspace and keeps ``model`` describing
+/// what the Reply panel should show.
+///
+/// Everything about *what shows* lives in ``ReplyPanelModel``, which is a
+/// pure value tested in the shared package. What lives here is the wiring
+/// the package cannot own: which agent to follow, opening its transcript,
+/// and turning file growth into replies.
+@MainActor
+@Observable
+final class ReplyPanelStore {
+    /// What the panel should render.
+    private(set) var model = ReplyPanelModel()
+
+    /// The name shown at the left of the panel header.
+    ///
+    /// The bound pane's tab name when it has one, the agent's name
+    /// otherwise. In a one-agent workspace "Claude" only repeats what the
+    /// user already knows; the tab name says *which work*.
+    private(set) var identity: String?
+
+    /// The bound agent's own name, whatever the header ends up showing.
+    ///
+    /// The waiting state needs it even when the header is showing a tab
+    /// name: naming the agent is what tells the user the binding worked and
+    /// the silence is the agent's, not cmux's.
+    private(set) var agentName: String?
+
+    /// How many transcript lines the initial read takes in.
+    ///
+    /// Well under the tailer's own 2000-line backfill: replies are what this
+    /// panel walks, and a few hundred lines is many more replies than anyone
+    /// steps back through in a session.
+    private static let initialHistoryLimit = 600
+
+    /// Ceiling on the mirrored transcript window.
+    ///
+    /// Matches the tailer's own cache bound, so the panel never holds more
+    /// than the thing it mirrors. Without it a long session grows this array
+    /// for as long as the panel stays open, and every batch re-groups all of
+    /// it.
+    private static let maxMirroredMessages = 4000
+
+    /// How many older transcript lines one `◄`-triggered page reads.
+    private static let historyPageLimit = 300
+
+    private var boundPanelID: UUID?
+    private var boundSessionID: String?
+    private var stickyPanelID: UUID?
+    private var tailer: AgentChatTranscriptTailer?
+
+    /// Invalidates batches from a tailer the panel has already moved off.
+    ///
+    /// Stopping a tailer does not unschedule a batch already in flight, so
+    /// without this a workspace switch can land the previous agent's replies
+    /// in the new agent's panel.
+    private var generation = 0
+
+    private var messages: [ChatMessage] = []
+
+    /// Live subscription to agent turn endings.
+    ///
+    /// `nonisolated(unsafe)` only so `deinit` can release it: a deinit is
+    /// nonisolated by language rule, and by the time it runs the last
+    /// reference is gone, so nothing else can be touching these.
+    nonisolated(unsafe) private var turnFinishedObserver: (any NSObjectProtocol)?
+
+    /// Live subscription to agents appearing and disappearing.
+    nonisolated(unsafe) private var sessionsChangedObserver: (any NSObjectProtocol)?
+
+    /// Live subscription to panel renames.
+    ///
+    /// The header names the tab, so a rename changes what this panel says.
+    /// It cannot come from observing the `Workspace`: that publisher fires on
+    /// every pane, layout, and lifecycle change it owns, and subscribing to
+    /// all of it to catch one string is the kind of over-observation that
+    /// re-renders a panel hundreds of times a second.
+    nonisolated(unsafe) private var titleChangedObserver: (any NSObjectProtocol)?
+
+    /// The workspace the panel is following.
+    ///
+    /// Held so a session appearing can re-resolve the binding on its own. The
+    /// view drives the ordinary path, but it only re-drives on a workspace or
+    /// focus change — neither of which happens when an agent starts in a pane
+    /// that is already on screen. Weak: the panel follows the workspace, it
+    /// does not keep it alive.
+    private weak var followedWorkspace: Workspace?
+
+    // MARK: - Driving
+    deinit {
+        // The sessions observer deliberately outlives `stop()` — waiting for
+        // an agent to appear is exactly the unbound state — so it is only
+        // released here.
+        if let sessionsChangedObserver {
+            NotificationCenter.default.removeObserver(sessionsChangedObserver)
+        }
+        if let turnFinishedObserver {
+            NotificationCenter.default.removeObserver(turnFinishedObserver)
+        }
+        if let titleChangedObserver {
+            NotificationCenter.default.removeObserver(titleChangedObserver)
+        }
+    }
+
+
+    /// Re-resolves which agent to follow and starts tailing it.
+    ///
+    /// Safe to call on every workspace change, focus change, and appearance:
+    /// resolving to the same session is a no-op, so the tail is not torn down
+    /// and rebuilt on unrelated churn.
+    ///
+    /// - Parameter workspace: The selected workspace, or `nil` when none is.
+    func refresh(workspace: Workspace?) async {
+        followedWorkspace = workspace
+        observeSessionChanges()
+        observeTitleChanges()
+        guard let workspace,
+              let registry = TerminalController.shared.agentChatTranscriptService?.registry,
+              let panelID = resolveAgentPanelID(in: workspace, registry: registry),
+              let record = registry.currentOrMostRecentSession(surfaceID: panelID.uuidString) else {
+            await unbind()
+            return
+        }
+        // After the guard: with no agent bound there is no turn whose ending
+        // means anything here, and subscribing first would add and remove the
+        // observer on every refresh of an agentless workspace.
+        observeTurnEndings()
+
+        identity = headerIdentity(workspace: workspace, panelID: panelID, record: record)
+        agentName = record.agentKind.displayName
+
+        guard record.sessionID != boundSessionID else {
+            // Already following this session. Only the header can have moved
+            // — a tab rename, or the pane picking up a title.
+            return
+        }
+
+        await startTail(record: record, panelID: panelID, workspace: workspace)
+    }
+
+    /// Re-opens the transcript after a read failure, for the error state's
+    /// `Try again`.
+    ///
+    /// - Parameter workspace: The selected workspace.
+    func retry(workspace: Workspace?) async {
+        boundSessionID = nil
+        await refresh(workspace: workspace)
+    }
+
+    /// Stops tailing and forgets the binding.
+    func stop() async {
+        if let turnFinishedObserver {
+            NotificationCenter.default.removeObserver(turnFinishedObserver)
+            self.turnFinishedObserver = nil
+        }
+        generation &+= 1
+        await tailer?.stop()
+        tailer = nil
+        boundSessionID = nil
+        boundPanelID = nil
+        messages = []
+    }
+
+    // MARK: - Binding
+    /// Steps to the next older reply, paging one in when none is loaded.
+    ///
+    /// The model reports whether it moved, so this asks first and only pays
+    /// for a page read when the walk actually ran out.
+    func stepBack() async {
+        if model.stepBack() { return }
+        guard await pageOlderHistory() else { return }
+        model.stepBack()
+    }
+
+    /// Steps to the next newer reply.
+    func stepForward() {
+        model.stepForward()
+    }
+
+    /// Returns to the newest reply and resumes following it.
+    func returnToNewest() {
+        model.returnToNewest()
+    }
+
+    /// Reads one page of replies older than the loaded window.
+    ///
+    /// - Returns: `true` when the window grew, so a step is now possible.
+    private func pageOlderHistory() async -> Bool {
+        guard model.hasMoreHistory,
+              let tailer,
+              let oldestSeq = messages.first?.seq else { return false }
+        let generation = generation
+        let page = await tailer.history(beforeSeq: oldestSeq, limit: Self.historyPageLimit)
+        guard generation == self.generation else { return false }
+
+        model.noteHistory(hasMore: page.hasMore)
+        guard !page.messages.isEmpty else { return false }
+
+        // No trim here. Pages come out of the tailer's own cache, which is
+        // bounded, so paging cannot grow this past the thing it mirrors —
+        // and trimming the newest to make room would drop the real newest
+        // reply, leaving an older one wearing its "still writing" treatment.
+        messages.insert(contentsOf: page.messages, at: 0)
+        model.apply(groups: ReplyMessageGroup.groups(from: messages))
+        return true
+    }
+
+    /// Starts listening for agents appearing and disappearing, once.
+    ///
+    /// Subscribed even with nothing bound — that is the case it exists for.
+    private func observeSessionChanges() {
+        guard sessionsChangedObserver == nil else { return }
+        sessionsChangedObserver = NotificationCenter.default.addObserver(
+            forName: .agentChatSessionsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.refresh(workspace: self.followedWorkspace) }
+            }
+        }
+    }
+
+    /// Starts listening for panel renames, once.
+    ///
+    /// Subscribed even with nothing bound, for the same reason the sessions
+    /// observer is: the subscription outlives any one binding, and adding and
+    /// removing it per rebind is more moving parts than leaving it up.
+    ///
+    /// It re-runs the whole refresh rather than recomputing the header alone.
+    /// `refresh` already returns early when the bound session has not changed,
+    /// so the extra cost is one dictionary lookup, and having one path that
+    /// resolves the header means the two cannot drift.
+    private func observeTitleChanges() {
+        guard titleChangedObserver == nil else { return }
+        titleChangedObserver = NotificationCenter.default.addObserver(
+            forName: .panelCustomTitleDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.refresh(workspace: self.followedWorkspace) }
+            }
+        }
+    }
+
+    /// Starts listening for agent turn endings, once.
+    ///
+    /// The panel subscribes to *every* session's turn ending and lets the
+    /// model discard the ones that are not its own. Filtering here instead
+    /// would mean re-subscribing on every rebind, and a rebind that raced a
+    /// Stop could miss it — the model already knows which session it follows,
+    /// and that check is tested.
+    private func observeTurnEndings() {
+        guard turnFinishedObserver == nil else { return }
+        turnFinishedObserver = NotificationCenter.default.addObserver(
+            forName: .agentChatSessionTurnDidFinish,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let sessionID = notification
+                .userInfo?[AgentChatTurnFinishedKeys.sessionID] as? String else { return }
+            MainActor.assumeIsolated {
+                self?.model.markTurnFinished(sessionID: sessionID)
+            }
+        }
+    }
+
+
+    private func unbind() async {
+        await stop()
+        identity = nil
+        agentName = nil
+        model.unbind()
+    }
+
+    private func startTail(
+        record: AgentChatSessionRecord,
+        panelID: UUID,
+        workspace: Workspace
+    ) async {
+        generation &+= 1
+        let generation = generation
+        await tailer?.stop()
+        tailer = nil
+        // `messages` is private and nothing renders it, so clearing it now is
+        // invisible — and it must be cleared now, or a batch arriving from
+        // the new tailer would append the new agent's lines to the previous
+        // agent's. `model` is what the panel draws, so it is deliberately
+        // left showing the outgoing agent until the replacement is ready.
+        messages = []
+
+        boundSessionID = record.sessionID
+        boundPanelID = panelID
+
+        guard let path = record.transcriptPath,
+              FileManager.default.isReadableFile(atPath: path) else {
+            // A path the hook store recorded before the file existed reads
+            // exactly like one that was deleted, and the user's move is the
+            // same either way: prompt the agent and the path re-registers.
+            //
+            // Built whole and assigned once, for the same reason as the
+            // success path below.
+            var unreadable = ReplyPanelModel()
+            unreadable.markUnreadable()
+            model = unreadable
+            return
+        }
+
+        let tailer = AgentChatTranscriptTailer(
+            sessionID: record.sessionID,
+            agentKind: record.agentKind,
+            path: path
+        ) { [weak self] batch in
+            await self?.receive(batch: batch, generation: generation)
+        }
+        self.tailer = tailer
+
+        await tailer.start()
+        let page = await tailer.history(beforeSeq: nil, limit: Self.initialHistoryLimit)
+        guard generation == self.generation else { return }
+
+        // One mutation. Reset-then-fill here is what made the panel flash its
+        // empty state on every pane switch: the three awaits above each yield
+        // the main actor, and SwiftUI renders whatever the model holds at
+        // that moment.
+        messages = page.messages
+        model.load(
+            groups: ReplyMessageGroup.groups(from: page.messages),
+            hasMoreHistory: page.hasMore,
+            sessionID: record.sessionID,
+            agentIsRunning: agentIsRunning(workspace: workspace, panelID: panelID)
+        )
+    }
+
+    private func receive(batch: AgentChatTranscriptTailer.Batch, generation: Int) {
+        guard generation == self.generation else { return }
+
+        if batch.didReset {
+            messages = []
+            model.reset()
+        }
+
+        if !batch.updated.isEmpty {
+            let replacements = Dictionary(
+                batch.updated.map { ($0.id, $0) },
+                uniquingKeysWith: { _, newer in newer }
+            )
+            messages = messages.map { replacements[$0.id] ?? $0 }
+        }
+        messages.append(contentsOf: batch.appended)
+        if messages.count > Self.maxMirroredMessages {
+            messages.removeFirst(messages.count - Self.maxMirroredMessages)
+        }
+
+        // A user message is the only thing that separates a finished turn's
+        // late tail from the next turn's opening line. Both arrive as "a new
+        // group after a Stop", so without this the model has to guess, and
+        // either guess strands a reply wearing the wrong state. Told before
+        // the groups are applied, so a batch carrying the prompt and the
+        // first reply together resolves in the right order.
+        if let boundSessionID, batch.appended.contains(where: { $0.role == .user }) {
+            model.markTurnStarted(sessionID: boundSessionID)
+        }
+
+        model.apply(groups: ReplyMessageGroup.groups(from: messages))
+    }
+
+    // MARK: - Which agent
+
+    /// Picks the agent pane the panel follows.
+    ///
+    /// Sticky to the last agent pane that held focus: focusing a browser or
+    /// an editor must not blank the panel, and later must not swap it out
+    /// from under a note being written. Recency is deliberately not a tie
+    /// break — `lastActivityAt` is bumped by every pre- and post-tool hook,
+    /// so the busier agent would keep stealing the panel.
+    ///
+    /// Before any agent pane has held focus there is nothing sticky to
+    /// honour, so a live session wins and ties fall to a stable id order.
+    /// Arbitrary, but never moving; the explicit picker is a later slice.
+    private func resolveAgentPanelID(
+        in workspace: Workspace,
+        registry: AgentChatSessionRegistry
+    ) -> UUID? {
+        let agentPanelIDs = workspace.panels.keys.filter { panelID in
+            registry.currentOrMostRecentSession(surfaceID: panelID.uuidString) != nil
+        }
+        guard !agentPanelIDs.isEmpty else {
+            stickyPanelID = nil
+            return nil
+        }
+
+        if let focused = workspace.focusedPanelId, agentPanelIDs.contains(focused) {
+            stickyPanelID = focused
+        }
+        if let sticky = stickyPanelID, agentPanelIDs.contains(sticky) {
+            return sticky
+        }
+
+        let live = agentPanelIDs.filter { panelID in
+            registry.liveSession(surfaceID: panelID.uuidString) != nil
+        }
+        let candidates = live.isEmpty ? agentPanelIDs : live
+        let resolved = candidates.min { $0.uuidString < $1.uuidString }
+        stickyPanelID = resolved
+        return resolved
+    }
+
+    private func agentIsRunning(workspace: Workspace, panelID: UUID) -> Bool {
+        (workspace.agentLifecycleStatesByPanelId[panelID] ?? [:])
+            .contains { key, state in
+                !AgentHibernationLifecycleStatusKeys.isManualKey(key) && state == .running
+            }
+    }
+
+    private func headerIdentity(
+        workspace: Workspace,
+        panelID: UUID,
+        record: AgentChatSessionRecord
+    ) -> String {
+        let custom = workspace.panelCustomTitles[panelID]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let custom, !custom.isEmpty { return custom }
+        return record.agentKind.displayName
+    }
+}

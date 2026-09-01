@@ -406,9 +406,10 @@ struct RightSidebarPanelView: View {
             case .dock:
                 dockPanel(windowAppearance: windowAppearance)
             case .reply:
-                // The bound-session message view lands in cm-69.1 step 3.
-                // Selecting Reply before then shows an empty panel.
-                EmptyView()
+                ReplyPanelView(
+                    workspace: workspaceId.flatMap { tabManager.workspacesById[$0] },
+                    windowAppearance: windowAppearance
+                )
             case .customSidebar:
                 EmptyView()
             }

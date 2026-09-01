@@ -4688,6 +4688,13 @@ final class Workspace: Identifiable, ObservableObject {
 
         applyFocusedPanelTitle(panelId: panelId)
 
+        // Announce it. Reached only when the displayed name actually changed:
+        // the same-text-higher-authority case returns above, and every
+        // rejected write returns before this. Posted ahead of the guard below
+        // so a panel whose tab id will not resolve still announces — the name
+        // changed either way, and a listener that renders it needs to know.
+        NotificationCenter.default.post(name: .panelCustomTitleDidChange, object: self)
+
         guard let panel = panels[panelId], let tabId = surfaceIdFromPanelId(panelId) else { return true }
         let baseTitle = panelTitles[panelId] ?? panel.displayTitle
         bonsplitController.updateTab(

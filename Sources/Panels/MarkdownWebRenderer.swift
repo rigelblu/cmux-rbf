@@ -19,6 +19,17 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     let fontFamily: String
     /// Maximum content column width, in CSS pixels.
     let maxContentWidth: Double
+
+    /// Horizontal padding for the rendered page, in CSS pixels, or `nil` to
+    /// leave the shell's own.
+    ///
+    /// The shell hardcodes 28px and says it does so "while still letting the
+    /// panel use full width on narrow splits" — but it is fixed at every
+    /// width, so that intent was never implemented. At a 900pt viewer 28px is
+    /// a reading margin; in a 276pt sidebar it is a fifth of the panel, and it
+    /// leaves the body text visibly out of line with the chrome above it.
+    /// Default `nil` so every existing caller renders exactly as before.
+    var horizontalPagePadding: Double?
     let session: MarkdownRendererSession
     let onRequestPanelFocus: () -> Void
 
@@ -45,6 +56,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator.setFontSize(fontSize)
             context.coordinator.setFontFamily(fontFamily)
             context.coordinator.setMaxContentWidth(maxContentWidth)
+            context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
             return webView
         }
 
@@ -89,6 +101,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         context.coordinator.setFontSize(fontSize)
         context.coordinator.setFontFamily(fontFamily)
         context.coordinator.setMaxContentWidth(maxContentWidth)
+            context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
         context.coordinator.loadShell(theme: theme, initialMarkdown: markdown)
         return webView
     }
@@ -103,6 +116,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         context.coordinator.setFontSize(fontSize)
         context.coordinator.setFontFamily(fontFamily)
         context.coordinator.setMaxContentWidth(maxContentWidth)
+            context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
         context.coordinator.update(markdown: markdown, theme: theme)
     }
 
@@ -165,6 +179,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         private var lastFontFamily: String = ""
         private var lastFontSize: Double = MarkdownFontSizeSettings.defaultPointSize
         private var lastMaxContentWidth: Double = MarkdownMaxWidthSettings.defaultCSSPixels
+        private var lastHorizontalPagePadding: Double?
         private var isLoaded = false
         private var isShellLoading = false
         private var webContentProcessRecoveryAttempts = 0
@@ -264,6 +279,31 @@ struct MarkdownWebRenderer: NSViewRepresentable {
               var content = document.getElementById('content');
               if (content) { content.style.maxWidth = width + 'px'; }
             })(\(width));
+            """
+            webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+
+        /// Overrides the shell's horizontal page padding, or restores it.
+        ///
+        /// - Parameter pixels: CSS pixels each side, or `nil` to hand the
+        ///   padding back to the stylesheet.
+        func setHorizontalPagePadding(_ pixels: Double?) {
+            guard lastHorizontalPagePadding != pixels else { return }
+            lastHorizontalPagePadding = pixels
+            applyHorizontalPagePadding()
+        }
+
+        private func applyHorizontalPagePadding() {
+            guard let webView else { return }
+            // An empty string clears an inline style and lets the stylesheet
+            // win again, so the `nil` case is a real restore rather than a
+            // guess at what the shell had.
+            let padding = lastHorizontalPagePadding.map { "\(Int($0.rounded()))px" } ?? ""
+            let js = """
+            (function(padding) {
+              document.body.style.paddingLeft = padding;
+              document.body.style.paddingRight = padding;
+            })("\(padding)");
             """
             webView.evaluateJavaScript(js, completionHandler: nil)
         }
@@ -721,6 +761,9 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             // so it MUST be re-applied after every shell (re)load.
             applyFontFamily()
             applyMaxContentWidth()
+            // An inline style on `document.body`, so like font-family it MUST
+            // be re-applied after every shell (re)load.
+            applyHorizontalPagePadding()
             applyTheme(lastTheme ?? pendingTheme)
             // Replay last known markdown after the shell finishes loading.
             // Keep the recovery budget scoped to the current markdown payload:

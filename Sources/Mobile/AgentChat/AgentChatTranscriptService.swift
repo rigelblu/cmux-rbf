@@ -304,6 +304,14 @@ final class AgentChatTranscriptService {
         switch event.hookEventName {
         case .sessionStart, .userPromptSubmit:
             failedResolutions.remove(record.sessionID)
+            // An agent that starts while a surface is already on screen is
+            // otherwise invisible to anything watching: the workspace has not
+            // changed and neither has focus, so a view keyed on those never
+            // re-resolves and keeps showing "no agent" with the session
+            // sitting right there in the store.
+            postSessionsDidChange()
+        case .sessionEnd:
+            postSessionsDidChange()
         default:
             break
         }
@@ -335,9 +343,28 @@ final class AgentChatTranscriptService {
             }
         case .stop, .sessionEnd:
             endProseTurn(sessionID: record.sessionID)
+            // Broadcast rather than another callback: `onRecordChanged` is a
+            // single closure this service already owns, and a second consumer
+            // taking it would silently unsubscribe the first. A notification
+            // costs one post per turn and admits any number of listeners.
+            NotificationCenter.default.post(
+                name: .agentChatSessionTurnDidFinish,
+                object: nil,
+                userInfo: [AgentChatTurnFinishedKeys.sessionID: record.sessionID]
+            )
         default:
             break
         }
+    }
+
+    /// Announces that the set of bindable agent sessions may have changed.
+    ///
+    /// Deliberately carries no payload: a listener re-resolves from the
+    /// registry, which is the authority. Posting only on session start, first
+    /// prompt and session end keeps this off the per-tool hot path, where
+    /// hooks fire many times a second during a tool storm.
+    private func postSessionsDidChange() {
+        NotificationCenter.default.post(name: .agentChatSessionsDidChange, object: nil)
     }
 
     /// Lists chat-capable sessions.
@@ -712,4 +739,32 @@ final class AgentChatTranscriptService {
             proseStreamer?.stopAll()
         }
     }
+}
+
+/// Keys in an `agentChatSessionTurnDidFinish` notification's `userInfo`.
+enum AgentChatTurnFinishedKeys {
+    /// The session whose turn ended, as a `String`.
+    ///
+    /// Always the registry's normalized session id, so a listener can compare
+    /// it against whatever `AgentChatSessionRegistry` handed it.
+    static let sessionID = "sessionID"
+}
+
+extension Notification.Name {
+    /// The set of bindable agent sessions may have changed — one started,
+    /// submitted its first prompt, or ended.
+    static let agentChatSessionsDidChange = Notification.Name(
+        "cmux.agentChatSessionsDidChange"
+    )
+
+    /// An agent session's turn ended — its Stop hook fired, or the session
+    /// ended outright.
+    ///
+    /// This is the turn boundary, and the only trustworthy one: a transcript
+    /// line's `stop_reason` is present from a response's *first* line, so it
+    /// can never mean "finished", and the pushed lifecycle can stay `running`
+    /// past the end of a turn when background work is pending.
+    static let agentChatSessionTurnDidFinish = Notification.Name(
+        "cmux.agentChatSessionTurnDidFinish"
+    )
 }
