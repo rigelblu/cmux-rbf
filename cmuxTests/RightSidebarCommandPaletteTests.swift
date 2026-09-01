@@ -37,7 +37,13 @@ final class RightSidebarCommandPaletteTests: XCTestCase {
                 XCTAssertTrue(contribution.enablement(context))
             }
 
-            XCTAssertEqual(contributions.count, 3)
+            // Files, Find, Vault and Reply ship on. Feed and Dock stay beta-gated,
+            // and Custom is excluded by availableModes.
+            XCTAssertEqual(contributions.count, 4)
+            XCTAssertNotNil(
+                contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.reply)],
+                "Reply is not beta-gated, so it belongs in the default palette"
+            )
             XCTAssertNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.feed)])
             XCTAssertNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.dock)])
         }

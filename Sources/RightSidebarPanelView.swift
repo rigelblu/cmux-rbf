@@ -19,6 +19,7 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
     case sessions
     case feed
     case dock
+    case reply
     case customSidebar = "custom-sidebar"
 
     var label: String {
@@ -28,6 +29,7 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return String(localized: "rightSidebar.mode.sessions", defaultValue: "Vault")
         case .feed: return String(localized: "rightSidebar.mode.feed", defaultValue: "Feed")
         case .dock: return String(localized: "rightSidebar.mode.dock", defaultValue: "Dock")
+        case .reply: return String(localized: "rightSidebar.mode.reply", defaultValue: "Reply")
         case .customSidebar: return String(localized: "rightSidebar.mode.customSidebar", defaultValue: "Custom")
         }
     }
@@ -39,6 +41,7 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return "books.vertical"
         case .feed: return "dot.radiowaves.left.and.right"
         case .dock: return "dock.rectangle"
+        case .reply: return "arrowshape.turn.up.left"
         case .customSidebar: return "wand.and.stars"
         }
     }
@@ -50,13 +53,14 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return .switchRightSidebarToSessions
         case .feed: return .switchRightSidebarToFeed
         case .dock: return .switchRightSidebarToDock
+        case .reply: return nil
         case .customSidebar: return nil
         }
     }
 }
 
 extension RightSidebarMode {
-    static let paneModes: [RightSidebarMode] = [.files, .find, .sessions]
+    static let paneModes: [RightSidebarMode] = [.files, .find, .sessions, .reply]
 
     var canOpenAsPane: Bool {
         Self.paneModes.contains(self)
@@ -75,7 +79,7 @@ enum FileExplorerRootSyncPolicy {
         switch mode {
         case .files, .find:
             return true
-        case .sessions, .feed, .dock, .customSidebar:
+        case .sessions, .feed, .dock, .reply, .customSidebar:
             return false
         }
     }
@@ -401,6 +405,10 @@ struct RightSidebarPanelView: View {
                 FeedPanelView()
             case .dock:
                 dockPanel(windowAppearance: windowAppearance)
+            case .reply:
+                // The bound-session message view lands in cm-69.1 step 3.
+                // Selecting Reply before then shows an empty panel.
+                EmptyView()
             case .customSidebar:
                 EmptyView()
             }

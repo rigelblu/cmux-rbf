@@ -127,7 +127,7 @@ final class MainWindowFocusController {
             fileExplorerHost = host
         case .find:
             fileSearchHost = host
-        case .sessions, .feed, .dock, .customSidebar:
+        case .sessions, .feed, .dock, .reply, .customSidebar:
             break
         }
         focusRegisteredRightSidebarEndpointIfNeeded(mode: mode)
@@ -705,7 +705,7 @@ final class MainWindowFocusController {
             return .outline
         case .find:
             return .searchField
-        case .sessions, .customSidebar:
+        case .sessions, .reply, .customSidebar:
             return .host
         case .feed:
             return focusFirstItem ? .firstItem : .host
@@ -725,6 +725,10 @@ final class MainWindowFocusController {
             return fileSearchHost?.focusSearchField() == true
         case .sessions, .customSidebar:
             return mode == .customSidebar ? focusFallbackRightSidebarHost() : false
+        case .reply:
+            // No panel host is registered until the message view lands
+            // in cm-69.1 step 3; report honestly that focus did not move.
+            return false
         case .feed:
             if target == .firstItem {
                 feedHost?.focusFirstItemFromCoordinator()
