@@ -40,16 +40,13 @@ import Testing
         let directory: URL
     }
 
-    /// - Parameter transcript: File contents, or `nil` for a path whose file
-    ///   does not exist — the "hook recorded it before it was written" case.
     /// - Parameters:
-    ///   - transcript: Contents to write, or `nil` to leave the file absent.
+    ///   - transcript: File contents, or `nil` for a path whose file does not
+    ///     exist — the "hook recorded it before the agent wrote it" case, and
+    ///     the ordinary state of every new Claude session.
     ///   - registersTranscriptPath: Whether the `.sessionStart` hook carries a
-    ///     transcript path. **Real Claude does not** — the record is created
-    ///     with `transcriptPath: nil` (`CLI/cmux.swift:667`) and the path
-    ///     arrives with the first prompt. This rig defaulted to sending one,
-    ///     which is why no test caught a brand-new agent rendering the
-    ///     "transcript moved" error.
+    ///     transcript path. Claude's does; the record is created with `nil`
+    ///     (`CLI/cmux.swift:667`) only for an agent whose start hook omits it.
     private static func withRig(
         transcript: String?,
         registersTranscriptPath: Bool = true,
@@ -125,14 +122,11 @@ import Testing
 
     @Test("A brand-new agent is waiting, not an error")
     func freshSessionWithNoTranscriptPathIsWaiting() async throws {
-        // Found in dogfood: open Reply, run `claude`, and the panel says
-        // "Lost track of this agent — Its transcript moved". Nothing moved.
-        // The session-start hook carries no transcript path, so the record is
-        // created with nil (`CLI/cmux.swift:667`) and the path only arrives
-        // with the first prompt. `startTail` folded "no path recorded yet"
-        // into the same branch as "the file is gone", which made a false error
-        // the first thing shown for every new agent — and left `waiting`, the
-        // state written for exactly this, unreachable in practice.
+        // A record with no path at all: an agent whose start hook omits one.
+        // Claude is *not* this case — measured in
+        // `~/.cmuxterm/claude-hook-sessions.json`, its fresh sessions carry a
+        // well-formed path whose file does not exist yet, which is the test
+        // below. Both must read as waiting; neither is a fault.
         try await Self.withRig(transcript: nil, registersTranscriptPath: false) { rig, store in
             // Premise, asserted rather than assumed: the record really carries
             // no path. Otherwise this would pass for the wrong reason.
@@ -150,9 +144,20 @@ import Testing
         }
     }
 
-    @Test("A transcript that cannot be read leaves nothing bound, so the next refresh retries")
-    func unreadableTranscriptDoesNotWedgeTheBinding() async throws {
-        // The exact path the error screen tells the user to take. It reads
+    @Test("A transcript not written yet leaves nothing bound, so the next refresh retries")
+    func absentTranscriptDoesNotWedgeTheBinding() async throws {
+        // This test used to assert `.unavailable` here, and that assertion is
+        // why the false error shipped: a recorded path with no file on disk is
+        // the ordinary state of *every* new Claude agent, and the suite pinned
+        // it as a fault. The wedge it guards against is real and still checked
+        // below; only the state it expects while waiting has changed.
+        //
+        // This is the dogfood case: open Reply, run `claude`, and the panel
+        // said "Lost track of this agent — Its transcript moved". Nothing had
+        // moved; Claude records the path at session start and creates the file
+        // on the first prompt.
+        //
+        // The wedge it also guards: the error screen reads
         // "Its transcript moved — send the agent a message and the panel
         // reconnects", and `userPromptSubmit` really does re-register the
         // path and broadcast. But `startTail` claimed `boundSessionID`
@@ -162,10 +167,16 @@ import Testing
         // nils the binding itself, recovered.
         try await Self.withRig(transcript: nil) { rig, store in
             await store.refresh(workspace: rig.workspace)
-            #expect(store.model.state == .unavailable)
+            #expect(store.model.state == .waiting)
 
-            // The agent writes its transcript; nothing else changes.
-            FileManager.default.createFile(atPath: rig.transcriptPath, contents: Data())
+            // The agent writes its transcript; nothing else changes. Real
+            // content, not an empty file: an empty one is legitimately still
+            // `.waiting`, so it could not tell a retry that bound from one
+            // that never ran.
+            FileManager.default.createFile(
+                atPath: rig.transcriptPath,
+                contents: Data(Self.replyLine(id: "msg_A", text: "Hello.", uuid: "a-1").utf8)
+            )
 
             // Premises, asserted rather than assumed: the record really does
             // carry the path, and the path really is readable now. Without
@@ -180,7 +191,47 @@ import Testing
             #expect(FileManager.default.isReadableFile(atPath: rig.transcriptPath))
 
             await store.refresh(workspace: rig.workspace)
-            #expect(store.model.state != .unavailable)
+            // The reply is on screen: the retry bound *and* read. `!=
+            // .unavailable` would also pass for the waiting state this test
+            // now starts in, and so would prove nothing about the refresh.
+            guard case let .showing(reading) = store.model.state else {
+                Issue.record("expected the reply to render, got \(store.model.state)")
+                return
+            }
+            #expect(reading.group.markdown == "Hello.")
+        }
+    }
+
+    @Test("A turn finishing while nothing is bound retries the bind")
+    func turnEndRebindsWhenTheTranscriptArrivedLate() async throws {
+        // The gap the first two fixes left. `postSessionsDidChange` fires on
+        // session start, first prompt, and session end only — so there is
+        // exactly one retry, and it races Claude creating the file. Lose that
+        // race and the panel sat on "Waiting for the first message" through a
+        // whole completed turn, which is what Tom saw at 4:50 PM: a full reply
+        // in the terminal, the panel still waiting.
+        //
+        // A turn ending is the one moment content is certain to exist, and the
+        // store already listens for it — it just never re-bound on it.
+        try await Self.withRig(transcript: nil) { rig, store in
+            await store.refresh(workspace: rig.workspace)
+            #expect(store.model.state == .waiting)
+
+            FileManager.default.createFile(
+                atPath: rig.transcriptPath,
+                contents: Data(Self.replyLine(id: "msg_A", text: "Late.", uuid: "a-1").utf8)
+            )
+            NotificationCenter.default.post(
+                name: .agentChatSessionTurnDidFinish,
+                object: nil,
+                userInfo: [AgentChatTurnFinishedKeys.sessionID: rig.sessionID]
+            )
+
+            await Self.waitUntil { Self.markdown(store)?.contains("Late.") == true }
+            #expect(
+                Self.markdown(store)?.contains("Late.") == true,
+                "the panel should re-bind when a turn ends while nothing is bound"
+            )
         }
     }
 

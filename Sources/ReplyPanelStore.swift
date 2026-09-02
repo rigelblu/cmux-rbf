@@ -316,7 +316,14 @@ final class ReplyPanelStore {
         // Both branches deliberately leave `boundSessionID` nil, so the next
         // refresh retries rather than short-circuiting on "already following
         // this session" (see the note above the claim below).
-        guard let path = record.transcriptPath else {
+        guard let path = record.transcriptPath,
+              FileManager.default.fileExists(atPath: path) else {
+            // No file yet. Claude's session-start hook records a well-formed
+            // path *before* creating anything at it — measured in
+            // `~/.cmuxterm/claude-hook-sessions.json`, where a fresh session
+            // reads `transcriptPath: <path>, exists: false` — so this is the
+            // ordinary state of every new agent, not a fault.
+            //
             // Built whole and assigned once, for the same reason as the
             // success path below.
             var waiting = ReplyPanelModel()
@@ -328,9 +335,9 @@ final class ReplyPanelStore {
             return
         }
         guard FileManager.default.isReadableFile(atPath: path) else {
-            // A path was recorded and the file will not open: it really is
-            // gone. The user's move is to prompt the agent, which re-registers
-            // the path.
+            // The file is there and will not open — a permissions or media
+            // fault, which is a real thing to report rather than silence to
+            // wait through.
             var unreadable = ReplyPanelModel()
             unreadable.markUnreadable()
             model = unreadable
