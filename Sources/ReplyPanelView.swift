@@ -15,15 +15,6 @@ struct ReplyPanelView: View {
     @State private var store = ReplyPanelStore()
     @State private var rendererSession = MarkdownRendererSession()
 
-    /// How muted an unfinished reply's body is.
-    ///
-    /// Measured, not chosen: 45% renders at 3.97:1 against the panel fill,
-    /// under WCAG AA for body text, and most replies are read *while* they
-    /// are being written. 55% measures 5.59:1 and still sits far below a
-    /// finished reply's contrast, so it stays legibly unfinished. Do not
-    /// lower it without re-measuring.
-    private static let writingBodyOpacity: Double = 0.55
-
     /// Width floor for the position counter, wide enough for `10/15` so the
     /// arrows stop moving once a session runs past nine messages.
     private static let counterMinimumWidth: CGFloat = 34
@@ -283,10 +274,15 @@ struct ReplyPanelView: View {
             return String(localized: "reply.state.waiting", defaultValue: "waiting")
         case .unavailable:
             return String(localized: "reply.state.unavailable", defaultValue: "unavailable")
-        case let .showing(reading):
-            return reading.isWriting
-                ? String(localized: "reply.state.writing", defaultValue: "writing")
-                : nil
+        case .showing:
+            // No word for a reply being written, and none for a settled one.
+            // Measured in dogfood: Claude flushes a whole content block at a
+            // time and its Stop follows within a few hundred milliseconds, so
+            // the word only ever appeared for a slow tool call mid-answer —
+            // rare enough that its cost was a flicker on every ordinary turn.
+            // The `isWriting` fact stays in the model and still gates
+            // `cm-69.2`'s annotation; nothing renders it.
+            return nil
         }
     }
 
@@ -402,7 +398,6 @@ struct ReplyPanelView: View {
             session: rendererSession,
             onRequestPanelFocus: {}
         )
-        .opacity(reading.isWriting ? Self.writingBodyOpacity : 1)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The canvas sits directly behind the web view, and it is not
         // decoration. Without it, any moment the page is not painting — a
