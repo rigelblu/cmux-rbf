@@ -275,7 +275,22 @@ final class ReplyPanelStore {
             guard let sessionID = notification
                 .userInfo?[AgentChatTurnFinishedKeys.sessionID] as? String else { return }
             MainActor.assumeIsolated {
-                self?.model.markTurnFinished(sessionID: sessionID)
+                guard let self else { return }
+                self.model.markTurnFinished(sessionID: sessionID)
+
+                // Nothing bound means `startTail` found no transcript to open
+                // — the agent had not written one yet. The only other retry is
+                // `agentChatSessionsDidChange`, which fires on session start,
+                // first prompt and session end, so it races the file's
+                // creation and does not come back. Losing that race left the
+                // panel on "Waiting for the first message" through a whole
+                // completed turn.
+                //
+                // A turn ending is the one moment content is certain to exist,
+                // so it is the honest retry point. Cheap, too: this only runs
+                // while unbound, never on the ordinary per-turn path.
+                guard self.boundSessionID == nil else { return }
+                Task { await self.refresh(workspace: self.followedWorkspace) }
             }
         }
     }
