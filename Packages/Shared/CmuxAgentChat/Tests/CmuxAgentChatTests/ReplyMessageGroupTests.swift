@@ -28,6 +28,22 @@ struct ReplyMessageGroupTests {
         )
     }
 
+    private func agentThought(
+        id: String,
+        seq: Int,
+        text: String,
+        apiMessageID: String?
+    ) -> ChatMessage {
+        ChatMessage(
+            id: id,
+            seq: seq,
+            role: .agent,
+            timestamp: Date(timeIntervalSince1970: TimeInterval(seq)),
+            kind: .thought(ChatThought(text: text)),
+            apiMessageID: apiMessageID
+        )
+    }
+
     private func agentToolUse(id: String, seq: Int, apiMessageID: String?) -> ChatMessage {
         ChatMessage(
             id: id,
@@ -189,5 +205,79 @@ struct ReplyMessageGroupTests {
     func emptyWindowYieldsNoGroups() {
         #expect(ReplyMessageGroup.groups(from: []).isEmpty)
         #expect(ReplyMessageGroup.groups(from: [userProse(id: "l1", seq: 1, text: "hi")]).isEmpty)
+    }
+
+    // MARK: - Rendering reasoning
+
+    @Test("A reply with no reasoning renders exactly its own text")
+    func renderedMarkdownWithoutThinkingIsJustTheReply() {
+        let groups = ReplyMessageGroup.groups(from: [
+            agentProse(id: "m1", seq: 1, text: "Just the answer.", apiMessageID: "msg_A"),
+        ])
+        let group = try! #require(groups.first)
+        #expect(group.renderedMarkdown(thinkingLabel: "Show thinking") == "Just the answer.")
+        #expect(group.thinking.isEmpty)
+    }
+
+    @Test("Reasoning renders behind a disclosure, above the reply")
+    func renderedMarkdownPutsThinkingBehindADisclosure() {
+        let groups = ReplyMessageGroup.groups(from: [
+            agentThought(id: "m1", seq: 1, text: "Weighing two options.", apiMessageID: "msg_A"),
+            agentProse(id: "m2", seq: 2, text: "I picked the second.", apiMessageID: "msg_A"),
+        ])
+        let group = try! #require(groups.first)
+        let rendered = group.renderedMarkdown(thinkingLabel: "Show thinking")
+
+        #expect(rendered.contains("<details class=\"cmux-reply-thinking\">"))
+        #expect(rendered.contains("<summary>Show thinking</summary>"))
+        #expect(rendered.contains("Weighing two options."))
+        #expect(rendered.contains("I picked the second."))
+        // Blank lines around the body are what make CommonMark parse the
+        // reasoning as markdown instead of literal text inside raw HTML.
+        #expect(rendered.contains("</summary>\n\nWeighing two options.\n\n</details>"))
+        // The disclosure comes first, matching transcript order.
+        let detailsAt = try! #require(rendered.range(of: "<details"))
+        let replyAt = try! #require(rendered.range(of: "I picked the second."))
+        #expect(detailsAt.lowerBound < replyAt.lowerBound)
+    }
+
+    @Test("Reasoning stays out of the text a note can quote")
+    func thinkingIsNotPartOfTheQuotableReply() {
+        // The design settled that thinking is shown but not annotatable, so
+        // `markdown` — the text `cm-69.2` quotes spans from — must not carry
+        // it. Only the rendered document does.
+        let groups = ReplyMessageGroup.groups(from: [
+            agentThought(id: "m1", seq: 1, text: "Private reasoning.", apiMessageID: "msg_A"),
+            agentProse(id: "m2", seq: 2, text: "The reply.", apiMessageID: "msg_A"),
+        ])
+        let group = try! #require(groups.first)
+        #expect(group.markdown == "The reply.")
+        #expect(!group.markdown.contains("Private reasoning."))
+    }
+
+    @Test("Several reasoning blocks in one reply share one disclosure")
+    func multipleThoughtsShareOneDisclosure() {
+        let groups = ReplyMessageGroup.groups(from: [
+            agentThought(id: "m1", seq: 1, text: "First thought.", apiMessageID: "msg_A"),
+            agentThought(id: "m2", seq: 2, text: "Second thought.", apiMessageID: "msg_A"),
+            agentProse(id: "m3", seq: 3, text: "Answer.", apiMessageID: "msg_A"),
+        ])
+        let group = try! #require(groups.first)
+        let rendered = group.renderedMarkdown(thinkingLabel: "Show thinking")
+        #expect(group.thinking == ["First thought.", "Second thought."])
+        #expect(rendered.components(separatedBy: "<details").count == 2)
+        #expect(rendered.contains("First thought.\n\nSecond thought."))
+    }
+
+    @Test("The disclosure label is escaped, not injected")
+    func thinkingLabelIsEscaped() {
+        let groups = ReplyMessageGroup.groups(from: [
+            agentThought(id: "m1", seq: 1, text: "Reasoning.", apiMessageID: "msg_A"),
+            agentProse(id: "m2", seq: 2, text: "Reply.", apiMessageID: "msg_A"),
+        ])
+        let group = try! #require(groups.first)
+        let rendered = group.renderedMarkdown(thinkingLabel: "<script>x</script>")
+        #expect(rendered.contains("&lt;script&gt;x&lt;/script&gt;"))
+        #expect(!rendered.contains("<script>"))
     }
 }

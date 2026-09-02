@@ -147225,6 +147225,256 @@
         }
       }
     },
+    "reply.thinking.disclosure": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إظهار التفكير"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prikaži razmišljanje"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis tankegang"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denkprozess anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show thinking"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar razonamiento"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le raisonnement"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra il ragionamento"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "思考を表示"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បង្ហាញការគិត"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사고 과정 표시"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis tankegang"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pokaż tok rozumowania"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar raciocínio"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показать рассуждения"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "แสดงการคิด"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşünmeyi göster"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показати міркування"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示思考过程"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示思考過程"
+          }
+        }
+      }
+    },
+    "reply.history.truncatedAtHead": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذا أقصى ما تقرأه اللوحة إلى الوراء."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ovo je najdalje unazad što panel čita."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Så langt tilbage læser panelet."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiter zurück liest das Panel nicht."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is as far back as the panel reads."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El panel no lee más atrás de aquí."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le panneau ne remonte pas plus loin."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il pannello non legge oltre questo punto."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "パネルが読み込むのはここまでです。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "នេះជាចំណុចចាស់បំផុតដែលផ្ទាំងនេះអានបាន។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "패널은 여기까지만 읽습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Så langt tilbake leser panelet."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel nie sięga dalej wstecz."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O painel não lê além deste ponto."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дальше назад панель не читает."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "แผงอ่านย้อนหลังได้ถึงเพียงเท่านี้"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel bu noktadan geriye okumaz."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Далі назад панель не читає."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "面板最多读取到这里。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "面板最多讀取到這裡。"
+          }
+        }
+      }
+    },
     "reply.nav.older": {
       "extractionState": "manual",
       "localizations": {
@@ -147280,6 +147530,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "前のメッセージ"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "សារចាស់ជាង"
           }
         },
         "ko": {
@@ -147401,6 +147657,12 @@
             "value": "最新のメッセージに戻る"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ត្រឡប់ទៅសារថ្មីបំផុត"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -147518,6 +147780,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%2$d 件中 %1$d 件目のメッセージ"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "សារទី %1$d ក្នុងចំណោម %2$d"
           }
         },
         "ko": {
@@ -147639,6 +147907,12 @@
             "value": "次のメッセージ"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "សារថ្មីជាង"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -147756,6 +148030,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "エージェントなし"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "គ្មានភ្នាក់ងារ"
           }
         },
         "ko": {
@@ -147877,6 +148157,12 @@
             "value": "待機中"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "កំពុងរង់ចាំ"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -147994,6 +148280,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "利用不可"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "មិនអាចប្រើបាន"
           }
         },
         "ko": {
@@ -148115,6 +148407,12 @@
             "value": "作成中"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "កំពុងសរសេរ"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -148232,6 +148530,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "このワークスペースにエージェントがありません"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "គ្មានភ្នាក់ងារនៅក្នុងកន្លែងធ្វើការនេះ"
           }
         },
         "ko": {
@@ -148353,6 +148657,12 @@
             "value": "ペインで Claude または Codex を起動すると、ここに表示されます。"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ចាប់ផ្តើម Claude ឬ Codex ក្នុងផ្ទាំងមួយ នោះវានឹងបង្ហាញនៅទីនេះ។"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -148421,115 +148731,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "في انتظار الرد الأول"
+            "value": "في انتظار الرسالة الأولى"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Čeka se prvi odgovor"
+            "value": "Čeka se prva poruka"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Venter på det første svar"
+            "value": "Venter på den første besked"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Warte auf die erste Antwort"
+            "value": "Warte auf die erste Nachricht"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for the first reply"
+            "value": "Waiting for the first message"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esperando la primera respuesta"
+            "value": "Esperando el primer mensaje"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "En attente de la première réponse"
+            "value": "En attente du premier message"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "In attesa della prima risposta"
+            "value": "In attesa del primo messaggio"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最初の返信を待っています"
+            "value": "最初のメッセージを待っています"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "កំពុងរង់ចាំសារដំបូង"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "첫 번째 응답을 기다리는 중"
+            "value": "첫 메시지를 기다리는 중"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Venter på det første svaret"
+            "value": "Venter på den første meldingen"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oczekiwanie na pierwszą odpowiedź"
+            "value": "Oczekiwanie na pierwszą wiadomość"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aguardando a primeira resposta"
+            "value": "Aguardando a primeira mensagem"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ожидание первого ответа"
+            "value": "Ожидание первого сообщения"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "กำลังรอการตอบกลับครั้งแรก"
+            "value": "กำลังรอข้อความแรก"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "İlk yanıt bekleniyor"
+            "value": "İlk mesaj bekleniyor"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Очікування першої відповіді"
+            "value": "Очікування першого повідомлення"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在等待第一条回复"
+            "value": "正在等待第一条消息"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在等待第一則回覆"
+            "value": "正在等待第一則訊息"
           }
         }
       }
@@ -148589,6 +148905,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ に接続しました。このセッションではまだ何も書かれていません。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ត្រូវបានភ្ជាប់។ គ្មានអ្វីត្រូវបានសរសេរក្នុងវគ្គនេះទេ។"
           }
         },
         "ko": {
@@ -148710,6 +149032,12 @@
             "value": "このエージェントを追跡できなくなりました"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បាត់ដានភ្នាក់ងារនេះ"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -148827,6 +149155,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "トランスクリプトの場所が変わりました。通常は再開・再起動・圧縮の後です。エージェントにメッセージを送るとパネルが再接続します。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ប្រតិចារឹករបស់វាបានផ្លាស់ទី — ជាធម្មតាបន្ទាប់ពីការបន្ត ការចាប់ផ្តើមឡើងវិញ ឬការបង្រួម។ ផ្ញើសារទៅភ្នាក់ងារ នោះផ្ទាំងនឹងភ្ជាប់ឡើងវិញ។"
           }
         },
         "ko": {
@@ -148948,6 +149282,12 @@
             "value": "再試行"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ព្យាយាមម្តងទៀត"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -149067,6 +149407,12 @@
             "value": "エージェント"
           }
         },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ភ្នាក់ងារ"
+          }
+        },
         "ko": {
           "stringUnit": {
             "state": "translated",
@@ -149184,6 +149530,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "返信"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ឆ្លើយតប"
           }
         },
         "ko": {

@@ -35,6 +35,9 @@ struct ReplyPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
+            if atOldestLoadedReply, store.model.historyTruncatedAtHead {
+                truncatedHistoryNote
+            }
             content
         }
         .task(id: bindingKey) {
@@ -54,6 +57,32 @@ struct ReplyPanelView: View {
             store.stepForward()
             return .handled
         }
+    }
+
+    /// Whether the reply on screen is the oldest one that can be loaded.
+    private var atOldestLoadedReply: Bool {
+        guard case let .showing(reading) = store.model.state else { return false }
+        return reading.position.index == 1
+    }
+
+    /// Says why `◄` stopped.
+    ///
+    /// A disabled arrow on its own reads as "this is where the conversation
+    /// started", which is false: the tailer backfills a bounded window and
+    /// the rest of the transcript is still on disk. Shown only at the oldest
+    /// loaded reply, so it is never a standing caption.
+    private var truncatedHistoryNote: some View {
+        Text(
+            String(
+                localized: "reply.history.truncatedAtHead",
+                defaultValue: "This is as far back as the panel reads."
+            )
+        )
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, Self.bodyGutter)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var canStepBack: Bool {
@@ -341,7 +370,16 @@ struct ReplyPanelView: View {
 
     private func replyBody(_ reading: ReplyPanelReading) -> some View {
         MarkdownWebRenderer(
-            markdown: reading.group.markdown,
+            // The reply, with its reasoning behind a disclosure above it.
+            // Not `group.markdown` — that is the reply's own text, which is
+            // what a `cm-69.2` note quotes, and reasoning is deliberately
+            // shown but not annotatable.
+            markdown: reading.group.renderedMarkdown(
+                thinkingLabel: String(
+                    localized: "reply.thinking.disclosure",
+                    defaultValue: "Show thinking"
+                )
+            ),
             theme: pageTheme,
             backgroundColor: pageCanvas,
             // The renderer keys its WebKit identity off these, so they must

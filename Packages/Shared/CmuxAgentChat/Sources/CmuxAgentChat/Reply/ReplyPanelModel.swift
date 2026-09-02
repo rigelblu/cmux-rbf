@@ -75,6 +75,17 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// is not the same as reaching the start of the conversation.
     public private(set) var hasMoreHistory: Bool = false
 
+    /// Whether the conversation continues past the oldest reply that can ever
+    /// be loaded.
+    ///
+    /// Distinct from `hasMoreHistory`, which answers "is there more to page
+    /// in". The tailer backfills a bounded window and then keeps answering
+    /// `hasMore: true` for as long as older transcript exists on disk — true,
+    /// and useless as a paging signal, because it will never serve it. Kept
+    /// apart so `◄` can stop while the panel can still say the rest is on
+    /// disk rather than pretending the conversation starts here.
+    public private(set) var historyTruncatedAtHead: Bool = false
+
     /// The session this panel is bound to, when it is bound to one.
     ///
     /// Held here rather than only in the app layer so the rule that a turn
@@ -215,6 +226,7 @@ public struct ReplyPanelModel: Sendable, Equatable {
         owesStopSettle = false
         sessionID = nil
         hasMoreHistory = false
+        historyTruncatedAtHead = false
     }
 
     /// Records that the bound session's transcript could not be read.
@@ -300,6 +312,15 @@ public struct ReplyPanelModel: Sendable, Equatable {
     ///
     /// - Parameter hasMore: Whether replies older than the loaded window
     ///   remain on disk.
+    /// Records that paging reached the head of a bounded backfill.
+    ///
+    /// Stops `◄` — there is nothing further this tailer can serve — while
+    /// remembering that the conversation did not start here.
+    public mutating func noteHistoryTruncatedAtHead() {
+        historyTruncatedAtHead = true
+        hasMoreHistory = false
+    }
+
     public mutating func noteHistory(hasMore: Bool) {
         hasMoreHistory = hasMore
     }
@@ -349,5 +370,6 @@ public struct ReplyPanelModel: Sendable, Equatable {
         // The old file's history is gone with the file. Paging back stays
         // unavailable until the panel rebinds and reads the new one.
         hasMoreHistory = false
+        historyTruncatedAtHead = false
     }
 }

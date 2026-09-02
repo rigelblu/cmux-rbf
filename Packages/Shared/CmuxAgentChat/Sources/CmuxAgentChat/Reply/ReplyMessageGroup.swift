@@ -62,6 +62,58 @@ public struct ReplyMessageGroup: Identifiable, Sendable, Equatable {
             }
             .joined(separator: "\n\n")
     }
+
+    /// The reply's reasoning, in transcript order.
+    public var thinking: [String] {
+        messages.compactMap { message in
+            guard case let .thought(thought) = message.kind else { return nil }
+            let text = thought.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : text
+        }
+    }
+
+    /// The document the panel renders: the reasoning behind a disclosure,
+    /// then the reply.
+    ///
+    /// Separate from `markdown` on purpose. `markdown` is the reply's own
+    /// text and only that — it is what a note quotes, and the design settled
+    /// that thinking is shown but *not annotatable*. Folding the disclosure
+    /// into `markdown` would put reasoning inside quoted spans.
+    ///
+    /// Emitted as raw HTML with blank lines around the body, which is what
+    /// makes CommonMark parse the reasoning inside as markdown rather than
+    /// literal text. `details` and `summary` both survive the viewer's
+    /// sanitizer, which blocks by list and names neither.
+    ///
+    /// - Parameter thinkingLabel: Localized summary text. Passed in because
+    ///   this package has no string catalog of its own.
+    /// - Returns: Markdown, ready for the viewer.
+    public func renderedMarkdown(thinkingLabel: String) -> String {
+        let thinking = thinking
+        guard !thinking.isEmpty else { return markdown }
+        let body = thinking.joined(separator: "\n\n")
+        let disclosure = """
+        <details class="cmux-reply-thinking">
+        <summary>\(Self.escapedForHTML(thinkingLabel))</summary>
+
+        \(body)
+
+        </details>
+        """
+        let reply = markdown
+        return reply.isEmpty ? disclosure : disclosure + "\n\n" + reply
+    }
+
+    /// Escapes text bound for an HTML element's content.
+    ///
+    /// Only the summary needs it: the reasoning body is deliberately parsed
+    /// as markdown, and the viewer sanitizes the result.
+    private static func escapedForHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
 }
 
 extension ReplyMessageGroup {

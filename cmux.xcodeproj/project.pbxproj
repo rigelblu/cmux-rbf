@@ -1734,6 +1734,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */; };
 		804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804100000000000000000004 /* ReorderShortcutActionTests.swift */; };
 		CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY01 /* ReplyPanelStore.swift */; };
+		69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */; };
 		CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY03 /* ReplyPanelView.swift */; };
 		C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0540000000000000000000A /* RestartAllowlistedCommandTests.swift */; };
 		C05400000000000000000007 /* RestartCommandRestoreSummaryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05400000000000000000008 /* RestartCommandRestoreSummaryRowView.swift */; };
@@ -4379,6 +4380,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReopenLastClosedTests.swift; sourceTree = "<group>"; };
 		804100000000000000000004 /* ReorderShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderShortcutActionTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY01 /* ReplyPanelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStore.swift; sourceTree = "<group>"; };
+		A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStoreTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY03 /* ReplyPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelView.swift; sourceTree = "<group>"; };
 		C0540000000000000000000A /* RestartAllowlistedCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartAllowlistedCommandTests.swift; sourceTree = "<group>"; };
 		C05400000000000000000008 /* RestartCommandRestoreSummaryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandRestoreSummaryRowView.swift; sourceTree = "<group>"; };
@@ -7691,6 +7693,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				A91C0D100000000000000001 /* CompletedRestoredAgentInputRoutingTests.swift */,
 				EF7347934AB1BD387686EE43 /* WorkspaceActionDispatcherTests.swift */,
 				E241BE1D74A7459C8D9C16BC /* WorkspaceTitleProvenanceTests.swift */,
+				A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */,
 				9566D500C0784A9BB421125A /* WorkspaceAgentOccupancyTests.swift */,
 				7037714E5486486187F947DB /* CodexRenameSubmissionKeyDownTests.swift */,
 				0C715F488C0C4B40A127FFAB /* TerminalInputLineBufferTests.swift */,
@@ -10933,6 +10936,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D36A00050000000000000001 /* RendererRealizationPlannerTests.swift in Sources */,
 				A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */,
 				804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */,
+				69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */,
 				C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */,
 					F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */,
 					F5410000A1B2C3D4E5F60718 /* RestorableAgentHookProviderResumeTests.swift in Sources */,

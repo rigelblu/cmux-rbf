@@ -47,7 +47,6 @@ final class ReplyPanelStore {
     /// How many older transcript lines one `◄`-triggered page reads.
     private static let historyPageLimit = 300
 
-    private var boundPanelID: UUID?
     private var boundSessionID: String?
     private var stickyPanelID: UUID?
     private var tailer: AgentChatTranscriptTailer?
@@ -160,7 +159,6 @@ final class ReplyPanelStore {
         await tailer?.stop()
         tailer = nil
         boundSessionID = nil
-        boundPanelID = nil
         messages = []
     }
 
@@ -196,8 +194,19 @@ final class ReplyPanelStore {
         let page = await tailer.history(beforeSeq: oldestSeq, limit: Self.historyPageLimit)
         guard generation == self.generation else { return false }
 
+        guard !page.messages.isEmpty else {
+            // An empty page still carrying `hasMore` is the tailer saying
+            // "older transcript exists, and I will never serve it" — its
+            // backfill is bounded. Re-noting `hasMore` here left `◄` lit
+            // forever, re-reading the same empty page on every press.
+            if page.hasMore {
+                model.noteHistoryTruncatedAtHead()
+            } else {
+                model.noteHistory(hasMore: false)
+            }
+            return false
+        }
         model.noteHistory(hasMore: page.hasMore)
-        guard !page.messages.isEmpty else { return false }
 
         // No trim here. Pages come out of the tailer's own cache, which is
         // bounded, so paging cannot grow this past the thing it mirrors —
@@ -295,9 +304,6 @@ final class ReplyPanelStore {
         // left showing the outgoing agent until the replacement is ready.
         messages = []
 
-        boundSessionID = record.sessionID
-        boundPanelID = panelID
-
         guard let path = record.transcriptPath,
               FileManager.default.isReadableFile(atPath: path) else {
             // A path the hook store recorded before the file existed reads
@@ -311,6 +317,14 @@ final class ReplyPanelStore {
             model = unreadable
             return
         }
+
+        // Claimed only once the transcript actually opened. Claiming it
+        // above the guard wedged the panel: `refresh` returns early on
+        // "already following this session", so a failed open was never
+        // retried and the error screen's own instruction — send the agent a
+        // message and the panel reconnects — could not work. A failed open
+        // must leave nothing bound for the next refresh to short-circuit on.
+        boundSessionID = record.sessionID
 
         let tailer = AgentChatTranscriptTailer(
             sessionID: record.sessionID,
@@ -338,12 +352,28 @@ final class ReplyPanelStore {
         )
     }
 
-    private func receive(batch: AgentChatTranscriptTailer.Batch, generation: Int) {
+    private func receive(batch: AgentChatTranscriptTailer.Batch, generation: Int) async {
         guard generation == self.generation else { return }
 
         if batch.didReset {
             messages = []
             model.reset()
+            // The reset batch is empty because nothing was *appended* — but
+            // the tailer has already re-read the replacement file into its
+            // cache before emitting it. Dropping the old messages and
+            // stopping here left the panel claiming "Nothing has been
+            // written this session" with the whole conversation sitting one
+            // call away, after every `--resume` and every compaction.
+            if let tailer {
+                let page = await tailer.history(
+                    beforeSeq: nil,
+                    limit: Self.initialHistoryLimit
+                )
+                guard generation == self.generation else { return }
+                messages = page.messages
+                model.apply(groups: ReplyMessageGroup.groups(from: messages))
+                model.noteHistory(hasMore: page.hasMore)
+            }
         }
 
         if !batch.updated.isEmpty {
