@@ -866,8 +866,16 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                     decisionHandler(.allow)
                     return
                 }
-                handleExternalLink(url)
+                // Answer WebKit first, route second. `handleExternalLink` can
+                // reach `NSWorkspace.open`, which is a LaunchServices round
+                // trip to launch or activate another app — and until this
+                // handler returns, WebKit holds the navigation decision and
+                // the window with it. Clicking a link in the Reply panel froze
+                // the app for exactly that reason: the sidebar has no pane
+                // panel, so its links miss the in-app browser path entirely
+                // (see `handleExternalLink`) and always take the slow one.
                 decisionHandler(.cancel)
+                routeExternalLinkOffDelegate(url)
                 return
             }
             decisionHandler(.allow)
@@ -880,19 +888,43 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
             // target=_blank / window.open from inside the rendered markdown.
+            // Deferred for the same reason as the policy handler above: this
+            // is a synchronous delegate callback, and WebKit is waiting on it.
             if let url = navigationAction.request.url {
-                handleExternalLink(url)
+                routeExternalLinkOffDelegate(url)
             }
             return nil
         }
 
         // MARK: - Link routing
 
+        /// Routes a clicked link *after* the current WebKit delegate callback
+        /// returns.
+        ///
+        /// The one path both delegate callbacks use, so neither can
+        /// reintroduce the stall by calling ``handleExternalLink`` directly.
+        /// A main-actor hop, not a background one: everything downstream
+        /// touches `AppDelegate`, `Workspace`, and `NSWorkspace`.
+        private func routeExternalLinkOffDelegate(_ url: URL) {
+            Task { [weak self] in
+                self?.handleExternalLink(url)
+            }
+        }
+
         /// Route a clicked link to a brand-new cmux browser tab in the same
         /// pane as this markdown panel — mirroring how Browser panels open
         /// child links via `openLinkInNewTab`. Falls back to the system
         /// browser only when the in-app browser is disabled or the panel
         /// can't be located in any workspace.
+        ///
+        /// **The Reply panel always takes that last fallback**, and silently.
+        /// It is a right-sidebar mode, not a pane, so it has no panel to pass
+        /// and hands over a synthetic `UUID` (`ReplyPanelView.rendererPanelID`)
+        /// that `workspaceContainingPanel` can never resolve. Its `.md` links
+        /// therefore do nothing at all — `openMarkdownFile` guards on the same
+        /// lookup and returns — and its http links skip the in-app browser.
+        /// Fixing that needs a workspace-based route rather than a panel one,
+        /// and is `cm-69.1a`; only the stall it caused is fixed here.
         private func handleExternalLink(_ url: URL) {
 #if DEBUG
             NSLog("MarkdownPanel.handleExternalLink url=\(url.absoluteString)")
