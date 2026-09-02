@@ -11,6 +11,17 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Read your agent's last reply without scrolling the terminal back
+
+A **Reply** mode in the right sidebar, beside Files / Find / Vault / Feed / Dock. It shows the newest thing your agent said, rendered as markdown rather than as terminal text you have to scroll past.
+
+- **`◄ n/N ►` steps back through earlier replies.** Each arrow greys at its end. A reply arriving while you are reading an older one grows the counter without moving you.
+- **A reply is one turn, not one API response.** A prompt whose answer runs a tool part-way through shows as a single reply, matching the terminal. The API ends a response wherever the agent stops to call a tool — a break you never asked for and cannot see.
+- **It follows the last agent pane you focused**, and keeps following it when you click a browser or an editor. The header names the tab, falling back to the agent's name.
+- **Reasoning sits behind a "Show thinking" disclosure**, shown but not part of the reply's text.
+- **Known limitation — mouse only for now.** Arrow keys do not reach the panel: the sidebar's focus host swallows them before any mode sees them. Use `◄ ►`.
+- **Known limitation — a link opens in your system browser, and a `.md` link does nothing.** The panel has no pane of its own to route a link through, so it misses cmux's in-app browser.
+
 ## 🟠⋯ Even your split widths or heights in one action, instead of dragging each divider
 
 **Equalize Splits** (⌃⇧⌘=) has always evened everything at once. Often that is more than you meant: you have your columns the way you want them and only the stack inside one of them has drifted.

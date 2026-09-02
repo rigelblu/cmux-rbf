@@ -5,11 +5,27 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
+
+---
+
+# 🔵⋯ v0.26.0 (2026-09-02) — #cm-69.1
+*Read your agent's replies in the sidebar, and step back through them.*
+*Also carries entries that had been sitting unreleased since v0.22.0 — `#cm-47`'s Antigravity auto-naming and two `#cm-60` corrections — which were pending before this release and ship with it.*
+
 ## 🟠⋯ Changed for End Users
+- 2026-09-02 - feat | A new **Reply** mode in the right sidebar shows the newest thing your agent said, rendered as markdown, with `◄ n/N ►` to step back through earlier replies. It binds to the last agent pane you focused, follows along as new replies arrive, and holds your place when you have stepped back. Reasoning sits behind a "Show thinking" disclosure (#cm-69.1)
+- 2026-09-02 - feat | **A reply is one turn, not one API response.** A prompt whose answer runs a tool part-way through shows as a single reply, matching what the terminal shows. It used to split into two, because the API ends a response wherever the agent stops to call a tool — a break you never asked for and cannot see (#cm-69.1)
+- 2026-09-02 - fix | Clicking a link in a rendered reply no longer freezes the app. The link routing ran before the web view was told what to do with the click, so the window waited on it (#cm-69.1)
+- 2026-09-02 - fix | Starting a fresh agent with Reply open no longer says "Lost track of this agent". It says it is waiting, then shows the reply when the turn ends. The panel had treated "this agent has not written anything yet" as a fault (#cm-69.1)
+- **Known limitation — the panel is mouse-driven for now.** Arrow keys do not reach it: the sidebar's focus host swallows them before any mode sees them. Use `◄ ►`. Keyboard navigation is `#cm-69.1b` (#cm-69.1)
+- **Known limitation — links open in your system browser, and `.md` links do nothing.** The panel has no pane of its own to route a link through, so it misses cmux's in-app browser. `#cm-69.1a` (#cm-69.1)
 - 2026-08-23 - feat | Antigravity CLI sessions can now automatically name their cmux workspace and tab through a supported Naming Agent you explicitly select. Run `cmux hooks agy install --yes`, enable Workspace Auto-Naming, and choose an installed supported Naming Agent; manual names still always win (#cm-47)
 - **Known limitation — Naming Agent → Automatic does not run Antigravity itself yet.** cmux reads Antigravity's bounded current-conversation transcript, but it will not invoke `agy` as a summarizer until that can be proven isolated from the real Antigravity home and useful tools. Select Claude Code, Codex, Grok, OpenCode, Pi, or OMP for now (#cm-47)
 
 ## 🟠⋯ Changed for Developers
+- 2026-09-02 - feat (technical) | The shared `CmuxAgentChat` transcript parser now surfaces `apiMessageID` (Claude `message.id`, Codex `payload.id`) and `phase` (Codex `final_answer`/`commentary`). Both are additive optional fields the iPhone Agent Chat ignores (#cm-69.1)
+- 2026-09-02 - fix (technical) | `ReplyPanelModel` pins its reading position by message `seq` rather than by reply id. A reply is delimited by the prompt in front of it, so the oldest loaded one is often partial and gets renamed when older history pages in — which threw the reader to the newest reply for pressing `◄` (#cm-69.1)
+- 2026-09-02 - chore | Removed the `writing` state word and the muted body. Measured in dogfood: the transcript is written a whole content block at a time and Stop follows within a few hundred milliseconds, so the state only ever surfaced for a slow tool call mid-answer and cost a flicker on every ordinary turn. `isWriting` remains in the model for `#cm-69.2`'s annotation gate (#cm-69.1)
 - 2026-08-29 - fix (docs) | **v0.22.0's release notes and README said the SwiftUI sidebar was unreachable in a shipped build because the Feature Flags window is DEBUG-only. That was wrong.** `cmux __internal_flags` ships in Release (`CLI/cmux.swift:3892`) and opens the same window through `TerminalController.swift:2058`, outside any `#if DEBUG` — only the Help-menu entry is fenced. What actually keeps the renderer flag from flipping is `Sources/FeatureFlags.swift:576`: a local override is discarded while a remote value is cached, and upstream's control plane pins this one on. The practical effect is unchanged — you will not see the SwiftUI list — but *effectively* unreachable is not unreachable, so the group colour menu there remains unwatched by anyone rather than retired as dead code (#cm-60)
 - 2026-08-29 - fix (technical) | a `#cm-60` test named `theGroupsOwnColorIsTheOnlyTickedRow` asserted `count <= 1` on the ticked rows, which zero satisfies — so a build that ticked nothing passed it. Found by a cold scope review, not by the six-mutation campaign, which missed it because the neighbouring negative test caught the mutation that would have exposed it. Now resolves the expected row from the shared candidate model and asserts equality (#cm-60)
 - 2026-08-23 - feat (technical) | the `antigravity` hook adapter now accepts only explicit `fullyIdle: true` completion boundaries, validates the current conversation's fixed transcript path with descriptor-relative no-follow opens, reads at most the final 512 KiB from the verified regular-file descriptor, and feeds only completed human user/model text into the existing locked auto-naming and `workspace.set_auto_title` path (#cm-47)
