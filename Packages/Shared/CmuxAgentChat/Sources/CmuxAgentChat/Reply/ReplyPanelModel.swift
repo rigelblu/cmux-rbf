@@ -25,23 +25,71 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// The session's replies, oldest first.
     public private(set) var groups: [ReplyMessageGroup]
 
+    /// Transcript position of a message inside the reply the user stepped to,
+    /// or `nil` while following the newest.
+    ///
+    /// **A `seq`, not a group id, and that is load-bearing.** A turn is
+    /// delimited by the prompt in front of it, and the window is bounded
+    /// (600 / 300 / 4000) with nothing aligning it to turn boundaries — so
+    /// the oldest loaded turn routinely starts mid-answer and is named after
+    /// whichever response was visible. Paging the prompt in completes the
+    /// turn and renames it. Pinning by id then failed to resolve and fell
+    /// back to the newest, so pressing `◄` at the oldest reply threw the
+    /// reader to the front of the conversation. A message's `seq` is fixed
+    /// for the life of the transcript, and prepending, appending and
+    /// trimming all leave the anchor inside the same turn.
+    private var viewedAnchorSeq: Int?
+
+    /// Transcript position of a message inside the newest reply known to be
+    /// finished. Same anchoring rule, and for the same reason: pinned by id,
+    /// a settled reply flipped back to `writing` when older history arrived.
+    private var finishedAnchorSeq: Int?
+
     /// Which reply the user stepped to, or `nil` while following the newest.
     ///
     /// `nil` is not "none selected" — it is the *following* state, and it is
     /// what makes a newly arrived reply appear without asking. Stepping back
-    /// pins an id here and stops the following; stepping forward to the
-    /// newest clears it and resumes.
-    public private(set) var viewedGroupID: String?
+    /// pins a reply and stops the following; stepping forward to the newest
+    /// clears it and resumes.
+    public var viewedGroupID: String? { groupID(holding: viewedAnchorSeq) }
 
     /// Id of the newest reply known to be finished.
     ///
     /// One field rather than two, because the two ways a reply can be known
     /// finished answer the same question. At bind time the agent's lifecycle
     /// answers it (nothing running means nothing left to write); afterwards
-    /// the session's Stop event does. Either way the answer is "this id is
-    /// done", and a newer id arriving makes it stale — which is exactly the
-    /// behaviour wanted, since a new reply is by definition unfinished.
-    public private(set) var finishedGroupID: String?
+    /// the session's Stop event does. Either way the answer is "this reply is
+    /// done", and a newer reply arriving makes it stale — which is exactly
+    /// the behaviour wanted, since a new reply is by definition unfinished.
+    public var finishedGroupID: String? { groupID(holding: finishedAnchorSeq) }
+
+    /// Resolves an anchor to whichever loaded reply currently holds it.
+    ///
+    /// `nil` when nothing is anchored, and also when the anchored message has
+    /// been evicted — a pin that no longer names a loaded reply is exactly a
+    /// pin that should stop holding.
+    private func groupID(holding seq: Int?) -> String? {
+        group(holding: seq)?.id
+    }
+
+    /// Resolves an anchor to the loaded reply that currently holds it.
+    ///
+    /// Searched from the newest end. A `seq` belongs to exactly one reply, so
+    /// direction cannot change the answer — but the anchors in play are the
+    /// reply being read and the newest settled one, both near the end of a
+    /// window holding up to 4000 messages.
+    private func group(holding seq: Int?) -> ReplyMessageGroup? {
+        guard let seq else { return nil }
+        return groups.last { $0.messages.contains { $0.seq == seq } }
+    }
+
+    /// The anchor to remember a reply by.
+    ///
+    /// Its *last* message: the window trims from the front, so the last
+    /// message is the last of a reply to be evicted.
+    private static func anchor(of group: ReplyMessageGroup?) -> Int? {
+        group?.messages.last?.seq
+    }
 
     /// Whether a cold-open settle is still owed to the first replies to load.
     ///
@@ -97,8 +145,8 @@ public struct ReplyPanelModel: Sendable, Equatable {
     public init() {
         self.binding = .noAgent
         self.groups = []
-        self.viewedGroupID = nil
-        self.finishedGroupID = nil
+        self.viewedAnchorSeq = nil
+        self.finishedAnchorSeq = nil
         self.owesBindSettle = false
         self.sessionID = nil
     }
@@ -115,8 +163,8 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// back rather than showing nothing: the reply it named is gone, and an
     /// empty panel would be a worse answer than the newest reply.
     public var viewedGroup: ReplyMessageGroup? {
-        guard let viewedGroupID else { return newestGroup }
-        return groups.first { $0.id == viewedGroupID } ?? newestGroup
+        guard viewedAnchorSeq != nil else { return newestGroup }
+        return group(holding: viewedAnchorSeq) ?? newestGroup
     }
 
     /// What the panel should render.
@@ -182,7 +230,7 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// Applies the cold-open lifecycle answer to the newest reply, once.
     private mutating func settleFromBindIfOwed() {
         guard owesBindSettle, let newest = newestGroup else { return }
-        finishedGroupID = newest.id
+        finishedAnchorSeq = Self.anchor(of: newest)
         owesBindSettle = false
     }
 
@@ -220,8 +268,8 @@ public struct ReplyPanelModel: Sendable, Equatable {
     public mutating func unbind() {
         binding = .noAgent
         groups = []
-        viewedGroupID = nil
-        finishedGroupID = nil
+        viewedAnchorSeq = nil
+        finishedAnchorSeq = nil
         owesBindSettle = false
         owesStopSettle = false
         sessionID = nil
@@ -250,7 +298,7 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// Moves the Stop's answer onto the newest reply while the window is open.
     private mutating func settleFromStopIfOwed() {
         guard owesStopSettle, let newest = newestGroup else { return }
-        finishedGroupID = newest.id
+        finishedAnchorSeq = Self.anchor(of: newest)
     }
 
     /// Pins the panel to one reply, or resumes following the newest.
@@ -261,7 +309,11 @@ public struct ReplyPanelModel: Sendable, Equatable {
     ///   arriving there by stepping forward must behave exactly like never
     ///   having left.
     public mutating func view(groupID: String?) {
-        viewedGroupID = (groupID == nil || groupID == newestGroup?.id) ? nil : groupID
+        guard let groupID, groupID != newestGroup?.id else {
+            viewedAnchorSeq = nil
+            return
+        }
+        viewedAnchorSeq = Self.anchor(of: groups.first { $0.id == groupID })
     }
 
     /// Steps to the next older reply.
@@ -277,7 +329,7 @@ public struct ReplyPanelModel: Sendable, Equatable {
         guard let current = viewedGroup,
               let index = groups.firstIndex(where: { $0.id == current.id }),
               index > 0 else { return false }
-        viewedGroupID = groups[index - 1].id
+        viewedAnchorSeq = Self.anchor(of: groups[index - 1])
         return true
     }
 
@@ -303,8 +355,8 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// - Returns: `true` when the view moved.
     @discardableResult
     public mutating func returnToNewest() -> Bool {
-        guard viewedGroupID != nil else { return false }
-        viewedGroupID = nil
+        guard viewedAnchorSeq != nil else { return false }
+        viewedAnchorSeq = nil
         return true
     }
 
@@ -337,7 +389,7 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// - Parameter sessionID: The session whose turn ended.
     public mutating func markTurnFinished(sessionID: String) {
         guard sessionID == self.sessionID else { return }
-        finishedGroupID = newestGroup?.id
+        finishedAnchorSeq = Self.anchor(of: newestGroup)
         owesBindSettle = false
         owesStopSettle = true
     }
@@ -363,8 +415,8 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// reply happens to land in the same position.
     public mutating func reset() {
         groups = []
-        viewedGroupID = nil
-        finishedGroupID = nil
+        viewedAnchorSeq = nil
+        finishedAnchorSeq = nil
         owesBindSettle = false
         owesStopSettle = false
         // The old file's history is gone with the file. Paging back stays

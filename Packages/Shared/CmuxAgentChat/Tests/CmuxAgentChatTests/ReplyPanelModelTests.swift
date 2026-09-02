@@ -29,6 +29,17 @@ struct ReplyPanelModelTests {
         )
     }
 
+    private func message(seq: Int, text: String, apiMessageID: String) -> ChatMessage {
+        ChatMessage(
+            id: "line-\(seq)",
+            seq: seq,
+            role: .agent,
+            timestamp: Date(timeIntervalSince1970: TimeInterval(seq)),
+            kind: .prose(ChatProse(text: text)),
+            apiMessageID: apiMessageID
+        )
+    }
+
     private func reading(_ state: ReplyPanelState) -> ReplyPanelReading? {
         guard case let .showing(reading) = state else { return nil }
         return reading
@@ -263,6 +274,66 @@ struct ReplyPanelModelTests {
 
         #expect(reading(model.state)?.group.id == "msg_A")
         #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 3))
+    }
+
+    @Test("Paging older history keeps you on the reply you were reading")
+    func pagingKeepsPositionWhenTheHeadTurnGrows() {
+        // The oldest loaded turn routinely starts mid-answer: the window is
+        // bounded (600 / 300 / 4000) and nothing aligns it to turn
+        // boundaries. Paging completes that turn, which moves its first
+        // message and so its id. Pinning by id sent you to the newest reply
+        // for pressing `◄` at the oldest one.
+        var model = ReplyPanelModel()
+        model.bind(sessionID: "s1", agentIsRunning: false)
+        model.apply(groups: [
+            group("msg_B", seq: 5, text: "…the rest of it."),
+            group("msg_C", seq: 6, text: "Second."),
+        ])
+        model.view(groupID: "msg_B")
+
+        // The page lands: the head turn now starts at seq 4 and is named
+        // after `msg_A`, while still holding the seq-5 message being read.
+        model.apply(groups: [
+            ReplyMessageGroup(
+                id: "msg_A",
+                seq: 4,
+                timestamp: Date(timeIntervalSince1970: 4),
+                messages: [
+                    message(seq: 4, text: "Let me check.", apiMessageID: "msg_A"),
+                    message(seq: 5, text: "…the rest of it.", apiMessageID: "msg_B"),
+                ]
+            ),
+            group("msg_C", seq: 6, text: "Second."),
+        ])
+
+        #expect(reading(model.state)?.group.id == "msg_A")
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 2))
+    }
+
+    @Test("A settled reply stays settled when its turn grows by paging")
+    func settleSurvivesTheHeadTurnGrowing() {
+        // `finishedGroupID` is the same kind of pin, so it fails the same
+        // way: a settled reply would flip back to `writing` for the sole
+        // reason that older history arrived.
+        var model = ReplyPanelModel()
+        model.bind(sessionID: "s1", agentIsRunning: false)
+        model.apply(groups: [group("msg_B", seq: 5, text: "Done.")])
+
+        #expect(reading(model.state)?.isWriting == false)
+
+        model.apply(groups: [
+            ReplyMessageGroup(
+                id: "msg_A",
+                seq: 4,
+                timestamp: Date(timeIntervalSince1970: 4),
+                messages: [
+                    message(seq: 4, text: "Let me check.", apiMessageID: "msg_A"),
+                    message(seq: 5, text: "Done.", apiMessageID: "msg_B"),
+                ]
+            )
+        ])
+
+        #expect(reading(model.state)?.isWriting == false)
     }
 
     @Test("Landing on the newest resumes following")

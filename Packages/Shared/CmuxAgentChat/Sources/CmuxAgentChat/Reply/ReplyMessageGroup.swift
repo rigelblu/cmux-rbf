@@ -1,23 +1,30 @@
 import Foundation
 
-/// One agent response: the transcript messages that came from a single
-/// model reply.
+/// One agent **turn**: everything the agent wrote in answer to one prompt.
 ///
-/// A transcript writes one line per *content block*, so one reply arrives
-/// as several ``ChatMessage`` values that share nothing at the
-/// ``ChatMessage/id`` level. ``ChatMessage/apiMessageID`` is what ties them
-/// together, and this type is that tie made explicit.
+/// A transcript writes one line per *content block*, and the API ends a
+/// response wherever the agent stopped to call a tool — so one answer
+/// arrives as several ``ChatMessage`` values spanning several
+/// ``ChatMessage/apiMessageID`` values. Neither break is one the user asked
+/// for or can see: the terminal shows one continuous answer with the tool
+/// run in the middle.
 ///
-/// It is the unit the Reply panel navigates: `◄ n/N ►` steps one response,
-/// never one block. Concatenating across response ids would fuse two
-/// replies into one and make a quoted span ambiguous about which reply it
-/// belongs to.
+/// It is the unit the Reply panel navigates: `◄ n/N ►` steps one answer,
+/// never one block and never one API response. Grouping by response id
+/// instead showed a single answer as two panel messages, and left
+/// `cm-69.2` unable to anchor a span running from one paragraph to the
+/// next.
 public struct ReplyMessageGroup: Identifiable, Sendable, Equatable {
-    /// Stable identity for the group.
+    /// Identity for the group among the currently loaded window.
     ///
-    /// The shared ``ChatMessage/apiMessageID`` when the transcript names
-    /// one; otherwise the lone constituent message's own id, because a
-    /// message the transcript cannot group is a group of one.
+    /// The first constituent's ``ChatMessage/apiMessageID`` when the
+    /// transcript names one; otherwise that message's own id.
+    ///
+    /// **Unique, but not stable across windows.** A turn is delimited by the
+    /// prompt in front of it, so a window that starts mid-answer names the
+    /// turn after whichever response it could see — and paging the prompt in
+    /// renames it. Nothing may pin a reading position to this;
+    /// ``ReplyPanelModel`` anchors by message `seq`, which never moves.
     public let id: String
 
     /// Transcript position of the group's first message.
@@ -130,28 +137,32 @@ extension ReplyMessageGroup {
     ///
     /// Four rules, each of which changes what the user sees:
     ///
-    /// - **Agent messages only.** A user prompt is not a reply, and neither
-    ///   is the `tool_result` line the harness writes back as a user turn.
+    /// - **The user's prompt is the only boundary.** Everything the agent
+    ///   writes between two prompts is one reply, however many API responses
+    ///   it took. A `tool_result` is *not* a boundary and cannot reach here
+    ///   as one: `ClaudeTranscriptParser.parseUser` routes those blocks to
+    ///   `resolveToolResult`, which emits no ``ChatMessage``.
+    /// - **The prompt itself is not part of any reply.** It ends the run and
+    ///   is dropped; a `.system` line is neither and is skipped.
     /// - **Codex `commentary` is dropped.** Codex writes each narration
     ///   entry as its own line with its own id, so keeping them would put a
     ///   dozen entries into one turn's counter and make `◄` walk through
     ///   narration. Claude's equivalent — a thinking block — rides inside
     ///   its reply's group and is dropped by the prose rule below instead.
-    /// - **Consecutive runs, not a dictionary.** Order comes free, and two
-    ///   replies that somehow reuse an id stay separate rather than fusing.
-    ///   A `nil` id never continues a run: the model contract says treat it
-    ///   as ungroupable, never as "same group".
     /// - **A group needs prose to exist.** A reply that only called a tool
     ///   has nothing to read and nothing to quote, so stepping to it would
     ///   show an empty panel.
     ///
+    /// A window that starts mid-answer — the common case, since the window is
+    /// bounded and nothing aligns it to turn boundaries — still yields that
+    /// partial turn as a group, because it is a real reply and dropping it
+    /// would lose the oldest one the panel can show. What it does *not* yield
+    /// is a stable id for it: see ``ReplyPanelModel``, which is why that type
+    /// pins its reading position by message `seq` rather than by group id.
+    ///
     /// - Parameter messages: A transcript window in ascending `seq` order.
     /// - Returns: Navigable groups, oldest first.
     public static func groups(from messages: [ChatMessage]) -> [ReplyMessageGroup] {
-        let candidates = messages.filter { message in
-            message.role == .agent && message.phase != commentaryPhase
-        }
-
         var groups: [ReplyMessageGroup] = []
         var run: [ChatMessage] = []
 
@@ -174,13 +185,16 @@ extension ReplyMessageGroup {
             run = []
         }
 
-        for message in candidates {
-            let continuesRun = message.apiMessageID != nil
-                && message.apiMessageID == run.last?.apiMessageID
-            if !continuesRun {
+        for message in messages {
+            switch message.role {
+            case .user:
                 closeRun()
+            case .agent:
+                guard message.phase != commentaryPhase else { continue }
+                run.append(message)
+            case .system:
+                continue
             }
-            run.append(message)
         }
         closeRun()
 
