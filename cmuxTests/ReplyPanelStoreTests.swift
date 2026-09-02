@@ -42,8 +42,17 @@ import Testing
 
     /// - Parameter transcript: File contents, or `nil` for a path whose file
     ///   does not exist — the "hook recorded it before it was written" case.
+    /// - Parameters:
+    ///   - transcript: Contents to write, or `nil` to leave the file absent.
+    ///   - registersTranscriptPath: Whether the `.sessionStart` hook carries a
+    ///     transcript path. **Real Claude does not** — the record is created
+    ///     with `transcriptPath: nil` (`CLI/cmux.swift:667`) and the path
+    ///     arrives with the first prompt. This rig defaulted to sending one,
+    ///     which is why no test caught a brand-new agent rendering the
+    ///     "transcript moved" error.
     private static func withRig(
         transcript: String?,
+        registersTranscriptPath: Bool = true,
         _ body: (Rig, ReplyPanelStore) async throws -> Void
     ) async throws {
         let previousAppDelegate = AppDelegate.shared
@@ -96,7 +105,7 @@ import Testing
             source: "claude",
             workspaceId: workspace.id.uuidString,
             surfaceId: panelID.uuidString,
-            transcriptPath: transcriptPath,
+            transcriptPath: registersTranscriptPath ? transcriptPath : nil,
             cwd: directory.path,
             ppid: nil,
             receivedAt: Date()
@@ -113,6 +122,33 @@ import Testing
     }
 
     // MARK: - Binding
+
+    @Test("A brand-new agent is waiting, not an error")
+    func freshSessionWithNoTranscriptPathIsWaiting() async throws {
+        // Found in dogfood: open Reply, run `claude`, and the panel says
+        // "Lost track of this agent — Its transcript moved". Nothing moved.
+        // The session-start hook carries no transcript path, so the record is
+        // created with nil (`CLI/cmux.swift:667`) and the path only arrives
+        // with the first prompt. `startTail` folded "no path recorded yet"
+        // into the same branch as "the file is gone", which made a false error
+        // the first thing shown for every new agent — and left `waiting`, the
+        // state written for exactly this, unreachable in practice.
+        try await Self.withRig(transcript: nil, registersTranscriptPath: false) { rig, store in
+            // Premise, asserted rather than assumed: the record really carries
+            // no path. Otherwise this would pass for the wrong reason.
+            let registry = try #require(
+                TerminalController.shared.agentChatTranscriptService?.registry
+            )
+            let record = try #require(
+                registry.currentOrMostRecentSession(surfaceID: rig.panelID.uuidString)
+            )
+            #expect(record.transcriptPath == nil)
+
+            await store.refresh(workspace: rig.workspace)
+
+            #expect(store.model.state == .waiting)
+        }
+    }
 
     @Test("A transcript that cannot be read leaves nothing bound, so the next refresh retries")
     func unreadableTranscriptDoesNotWedgeTheBinding() async throws {

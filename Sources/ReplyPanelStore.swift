@@ -304,14 +304,33 @@ final class ReplyPanelStore {
         // left showing the outgoing agent until the replacement is ready.
         messages = []
 
-        guard let path = record.transcriptPath,
-              FileManager.default.isReadableFile(atPath: path) else {
-            // A path the hook store recorded before the file existed reads
-            // exactly like one that was deleted, and the user's move is the
-            // same either way: prompt the agent and the path re-registers.
-            //
+        // No path recorded yet is a different fact from a path that will not
+        // open, and folding them together put a false sentence on the most
+        // common path in the feature. The session-start hook carries no
+        // transcript path — the record is created with `nil`
+        // (`CLI/cmux.swift:667`) and the path arrives with the first prompt —
+        // so every brand-new agent read as "Its transcript moved". Nothing had
+        // moved, and `waiting` was left unreachable in practice despite being
+        // written for exactly this.
+        //
+        // Both branches deliberately leave `boundSessionID` nil, so the next
+        // refresh retries rather than short-circuiting on "already following
+        // this session" (see the note above the claim below).
+        guard let path = record.transcriptPath else {
             // Built whole and assigned once, for the same reason as the
             // success path below.
+            var waiting = ReplyPanelModel()
+            waiting.bind(
+                sessionID: record.sessionID,
+                agentIsRunning: agentIsRunning(workspace: workspace, panelID: panelID)
+            )
+            model = waiting
+            return
+        }
+        guard FileManager.default.isReadableFile(atPath: path) else {
+            // A path was recorded and the file will not open: it really is
+            // gone. The user's move is to prompt the agent, which re-registers
+            // the path.
             var unreadable = ReplyPanelModel()
             unreadable.markUnreadable()
             model = unreadable
