@@ -29,6 +29,14 @@ final class ReplyPanelStore {
     /// the silence is the agent's, not cmux's.
     private(set) var agentName: String?
 
+    /// The surface the panel is following, when one is bound.
+    ///
+    /// Delivery needs it twice over: to find the `TerminalSurface` to type
+    /// into, and to read that pane's own lifecycle. Both must be the *bound*
+    /// pane rather than the focused one — the binding is sticky, so the user
+    /// can be looking elsewhere while the reply they annotated belongs here.
+    private(set) var boundPanelID: UUID?
+
     /// How many transcript lines the initial read takes in.
     ///
     /// Well under the tailer's own 2000-line backfill: replies are what this
@@ -130,6 +138,7 @@ final class ReplyPanelStore {
 
         identity = headerIdentity(workspace: workspace, panelID: panelID, record: record)
         agentName = record.agentKind.displayName
+        boundPanelID = panelID
 
         guard record.sessionID != boundSessionID else {
             // Already following this session. Only the header can have moved
@@ -300,6 +309,7 @@ final class ReplyPanelStore {
         await stop()
         identity = nil
         agentName = nil
+        boundPanelID = nil
         model.unbind()
     }
 
@@ -481,6 +491,74 @@ final class ReplyPanelStore {
         let resolved = candidates.min { $0.uuidString < $1.uuidString }
         stickyPanelID = resolved
         return resolved
+    }
+
+    /// Whether feedback may be typed into the bound pane right now.
+    ///
+    /// **The two buttons gate differently, and that asymmetry is the safety
+    /// mechanism.** Found in dogfood 2026-09-03, and it reverses the original
+    /// single-gate decision, which was built on a claim about `needsInput`
+    /// that the code does not support.
+    ///
+    /// `needsInput` is not "a prompt is blocking the agent". It is also — and
+    /// mostly — Claude sitting at its own prompt having finished, which is
+    /// exactly when pasting is the point. Both meanings arrive through
+    /// `setAgentLifecycle(key: claudeCodeStatusKey, lifecycle: .needsInput)`:
+    /// the Notification hook at `CLI/cmux.swift:25252` and the
+    /// `AskUserQuestion`/`ExitPlanMode` PreToolUse at `:25524`. **Same key,
+    /// same value** — they differ only in `lastBody`, which goes to the JSON
+    /// session store, the source this gate was deliberately built *not* to
+    /// read. So the app-side lifecycle map is structurally incapable of
+    /// telling them apart, and a gate that blocks `needsInput` blocks the
+    /// agent's resting state: the feature is dead whenever it is usable.
+    ///
+    /// - Parameter submit: `false` for Paste, which types into the composer
+    ///   and stops. Nothing fires, so the worst case is text sitting visibly
+    ///   where the user clears it — a papercut, not a misdelivery. Only
+    ///   `.running` is refused, because typing into a turn in progress
+    ///   interleaves with the agent's own output.
+    ///
+    ///   `true` for Paste & Send, which is the one that actually submits, so
+    ///   it keeps refusing `needsInput`: if a permission prompt or an
+    ///   `AskUserQuestion` *is* what is waiting, a send answers it.
+    func canDeliver(workspace: Workspace?, submit: Bool) -> Bool {
+        guard let workspace, let panelID = boundPanelID else { return false }
+        return !(workspace.agentLifecycleStatesByPanelId[panelID] ?? [:])
+            .contains { key, state in
+                guard !AgentHibernationLifecycleStatusKeys.isManualKey(key) else { return false }
+                return state == .running || (submit && state == .needsInput)
+            }
+    }
+
+    /// Types the serialized feedback into the bound pane's composer.
+    ///
+    /// - Parameter submit: `false` leaves it unsent so the user can read it
+    ///   where it will run. `true` appends the agent's own submit key.
+    /// - Returns: whether anything was dispatched. `false` means the gate
+    ///   refused or the bound pane could not be resolved — the draft is kept
+    ///   either way, since losing a written note is worse than a failed send.
+    @discardableResult
+    func deliver(
+        _ annotations: ReplyAnnotationSet,
+        workspace: Workspace?,
+        submit: Bool
+    ) -> Bool {
+        guard annotations.isDeliverable,
+              canDeliver(workspace: workspace, submit: submit),
+              let workspace,
+              let panelID = boundPanelID,
+              let panel = workspace.panels[panelID] as? TerminalPanel else { return false }
+
+        let events = TextBoxSubmit.dispatchEvents(
+            for: [.text(annotations.serialized())],
+            terminalAgentContext: WorkspaceContentView.terminalAgentContext(
+                panel: panel,
+                workspace: workspace
+            ),
+            submit: submit
+        )
+        TextBoxSubmit.sendEvents(events, via: panel.surface)
+        return true
     }
 
     private func agentIsRunning(workspace: Workspace, panelID: UUID) -> Bool {

@@ -1212,10 +1212,15 @@ enum TextBoxSubmit {
 
     static func dispatchEvents(
         for parts: [TextBoxSubmissionPart],
-        terminalAgentContext: String
+        terminalAgentContext: String,
+        submit: Bool = true
     ) -> [DispatchEvent] {
         guard let inputParts = submittedParts(parts) else {
-            return [.namedKey(TextBoxTerminalKey.returnKey.rawValue)]
+            // An empty submission is a bare Return today. With nothing to
+            // paste and nothing to submit, a paste-only call must send
+            // nothing at all — otherwise Paste on an empty draft submits the
+            // composer's existing contents.
+            return submit ? [.namedKey(TextBoxTerminalKey.returnKey.rawValue)] : []
         }
 
         let isClaude = TextBoxAgentDetection.isClaudeCode(context: terminalAgentContext)
@@ -1232,12 +1237,18 @@ enum TextBoxSubmit {
             }
         }
 
-        let submitKey = TextBoxAgentDetection.composedPromptSubmitKey(containsNewline: containsNewline, context: terminalAgentContext)
+        // `nil` is "paste and stop", not "no key was resolved" — the Reply
+        // panel's Paste leaves the anchored list in the composer so it can be
+        // read where it will run, and cleared rather than recalled.
+        let submitKey = submit
+            ? TextBoxAgentDetection.composedPromptSubmitKey(containsNewline: containsNewline, context: terminalAgentContext)
+            : nil
         if isClaude, containsImageAttachment(inputParts) {
             return claudeSequentialImageDispatchEvents(from: inputParts, submitKey: submitKey)
         }
 
         let pastePayload = TextBoxSubmissionFormatter.formattedText(from: inputParts)
+        guard let submitKey else { return [.pasteText(pastePayload)] }
         return [.pasteText(pastePayload), .namedKey(submitKey)]
     }
 
@@ -1309,7 +1320,7 @@ enum TextBoxSubmit {
 
     private static func claudeSequentialImageDispatchEvents(
         from parts: [TextBoxSubmissionPart],
-        submitKey: String
+        submitKey: String?
     ) -> [DispatchEvent] {
         var events: [DispatchEvent] = []
         var attachmentNeedsBoundarySpace = false
@@ -1365,7 +1376,7 @@ enum TextBoxSubmit {
         if attachmentNeedsBoundarySpace {
             appendPastedText(" ")
         }
-        events.append(.namedKey(submitKey))
+        if let submitKey { events.append(.namedKey(submitKey)) }
         return events
     }
 

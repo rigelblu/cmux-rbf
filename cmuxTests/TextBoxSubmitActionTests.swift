@@ -21,6 +21,43 @@ private func XCTAssertFalse(_ condition: Bool) {
     #expect(!condition)
 }
 
+@MainActor
+@Suite("TextBoxSubmit paste without submitting")
+struct TextBoxSubmitPasteOnlyTests {
+    /// The Reply panel's Paste types feedback into the composer and stops.
+    ///
+    /// Every existing caller submits, so the submit key was unconditional
+    /// (`return [.pasteText(payload), .namedKey(submitKey)]`). Pasting without
+    /// it is what lets the user read the anchored list where it will actually
+    /// run, and clear it instead of having fired it.
+    @Test("submit: false pastes and sends no key")
+    func pasteOnlyEmitsNoSubmitKey() {
+        let events = TextBoxSubmit.dispatchEvents(
+            for: [.text("1. > \"a span\"\n   fix it")],
+            terminalAgentContext: "claude",
+            submit: false
+        )
+        #expect(events.count == 1)
+        #expect(events.first == .pasteText("1. > \"a span\"\n   fix it"))
+    }
+
+    /// The default has to stay exactly what it was: every other call site in
+    /// the app relies on it, and a silent change here submits nothing or
+    /// submits twice.
+    @Test("The default still appends the submit key")
+    func defaultStillSubmits() {
+        let events = TextBoxSubmit.dispatchEvents(
+            for: [.text("hello")],
+            terminalAgentContext: "claude"
+        )
+        #expect(events.count == 2)
+        #expect(events.first == .pasteText("hello"))
+        if case .namedKey = events[1] {} else {
+            Issue.record("expected a submit key as the second event")
+        }
+    }
+}
+
 private func XCTFail(_ message: String) {
     Issue.record(Comment(rawValue: message))
 }

@@ -33,6 +33,19 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     let session: MarkdownRendererSession
     let onRequestPanelFocus: () -> Void
 
+    /// Reports the page's current text selection, or `nil` when it collapses.
+    ///
+    /// Opt-in, and `nil` for every existing caller so the markdown file panel
+    /// renders exactly as before — the same shape `horizontalPagePadding`
+    /// uses above. The Reply panel owns its own ``MarkdownRendererSession``,
+    /// so the observing script cannot reach any other renderer's page.
+    ///
+    /// **Installed at first creation only.** `addUserScript` applies from the
+    /// next document load, and the coordinator is cached per session, so a
+    /// caller that starts `nil` and becomes non-`nil` later gets no script.
+    /// Every caller today is one or the other for its whole life.
+    var onSelectionChanged: ((String?) -> Void)?
+
     func makeCoordinator() -> Coordinator {
         session.coordinator(panelId: panelId, workspaceId: workspaceId, filePath: filePath)
     }
@@ -57,6 +70,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator.setFontFamily(fontFamily)
             context.coordinator.setMaxContentWidth(maxContentWidth)
             context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
+            context.coordinator.setSelectionObserver(onSelectionChanged)
             return webView
         }
 
@@ -74,7 +88,11 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator,
             forURLScheme: Self.remoteImageURLScheme
         )
+        if onSelectionChanged != nil {
+            config.userContentController.addUserScript(Self.selectionObserverScript)
+        }
         let webView = MarkdownWebView(frame: .zero, configuration: config)
+        context.coordinator.setSelectionObserver(onSelectionChanged)
         webView.onPointerDown = onRequestPanelFocus
         webView.onLeaveWindow = { [weak coordinator = context.coordinator] in
             coordinator?.handleViewLeftWindow()
@@ -117,8 +135,47 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         context.coordinator.setFontFamily(fontFamily)
         context.coordinator.setMaxContentWidth(maxContentWidth)
             context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
+        context.coordinator.setSelectionObserver(onSelectionChanged)
         context.coordinator.update(markdown: markdown, theme: theme)
     }
+
+    /// Watches the page's selection and reports it over the existing
+    /// `cmuxLib` channel.
+    ///
+    /// Injected rather than added to `shell.html`: that file is shared with
+    /// every markdown viewer in the app and re-opens `#cm-15`'s two human
+    /// checks whenever it is touched, so the Reply panel earns its selection
+    /// without editing it. `installEditableFocusTracking` in
+    /// `MarkdownWebSupport` is the same move for the same reason.
+    ///
+    /// `selectionchange` is the event that actually covers every path —
+    /// dragging, double-click, keyboard extension, and select-all — while
+    /// `mouseup` alone misses the last three. It fires continuously during a
+    /// drag, so the last published value is held and duplicates dropped:
+    /// without that, one drag across a paragraph posts a message per frame.
+    private static let selectionObserverScript = WKUserScript(
+        source: """
+        (() => {
+          const handler = window.webkit?.messageHandlers?.cmuxLib;
+          if (!handler) return;
+          let last = null;
+          const publish = () => {
+            const selection = window.getSelection();
+            const text = selection && !selection.isCollapsed ? selection.toString() : "";
+            // Whitespace-only is a collapse for our purposes: clicking once
+            // inside a paragraph can leave a selection of a single newline,
+            // and offering that as a quotable span reads as a bug.
+            const quote = text.trim() ? text : "";
+            if (quote === last) return;
+            last = quote;
+            handler.postMessage({ action: "replySelectionChanged", quote });
+          };
+          document.addEventListener("selectionchange", () => requestAnimationFrame(publish), true);
+        })();
+        """,
+        injectionTime: .atDocumentEnd,
+        forMainFrameOnly: true
+    )
 
     static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
         if let retainedWebView = coordinator.webView, retainedWebView === nsView {
@@ -153,6 +210,9 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKURLSchemeHandler {
         var webView: MarkdownWebView?
+        /// Set fresh on every SwiftUI update, because the coordinator
+        /// outlives the wrapper struct that carries the closure.
+        private var onSelectionChanged: ((String?) -> Void)?
         var panelId: UUID = UUID()
         var workspaceId: UUID = UUID()
         var filePath: String = ""
@@ -287,6 +347,16 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         ///
         /// - Parameter pixels: CSS pixels each side, or `nil` to hand the
         ///   padding back to the stylesheet.
+        /// Re-points the selection observer at the current SwiftUI closure.
+        ///
+        /// Unconditional, unlike the other setters, which compare against a
+        /// last-applied value first. A closure has no equality to compare, and
+        /// a stale one captures the previous view's state — so the cheap
+        /// assignment is the correct one here.
+        func setSelectionObserver(_ observer: ((String?) -> Void)?) {
+            onSelectionChanged = observer
+        }
+
         func setHorizontalPagePadding(_ pixels: Double?) {
             guard lastHorizontalPagePadding != pixels else { return }
             lastHorizontalPagePadding = pixels
@@ -499,6 +569,11 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 return
             }
             if let action = body["action"] as? String {
+                if action == "replySelectionChanged" {
+                    let quote = body["quote"] as? String ?? ""
+                    onSelectionChanged?(quote.isEmpty ? nil : quote)
+                    return
+                }
 #if DEBUG
                 NSLog("MarkdownPanel.bridge action=\(action) body=\(body)")
 #endif

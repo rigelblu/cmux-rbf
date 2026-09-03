@@ -18,6 +18,57 @@ import Testing
 /// binding, paging, and transcript lifecycle are where the panel meets the
 /// real world, and none of it was covered.
 @MainActor
+@Suite("Reply delivery submit key")
+struct ReplyDeliverySubmitKeyTests {
+    /// The submit-key upgrade is what keeps a multi-line anchored list one
+    /// prompt, and it turns entirely on the agent context being a **metadata
+    /// block** rather than a name.
+    ///
+    /// Written after getting this wrong: `ReplyPanelStore.deliver` first
+    /// passed the bare string `"claude"`, which matches nothing —
+    /// `matches(metadataLine:)` only reads `restoredAgent:`, `agentPIDKey:`,
+    /// `initialCommand:` and `tmuxStartCommand:` prefixes. The store now uses
+    /// `WorkspaceContentView.terminalAgentContext(panel:workspace:)`, the same
+    /// source every other caller uses.
+    ///
+    /// The failure it prevents is silent: an unmatched context resolves
+    /// `return`, and `cmux send` rewrites `\n` to CR and splits N lines into N
+    /// submissions — so one feedback list arrives as several truncated
+    /// prompts, each answered separately.
+    @Test("A metadata line naming claude upgrades a multi-line submit to ctrl+enter")
+    func metadataContextUpgradesTheSubmitKey() {
+        let context = "restoredAgent:claude"
+
+        #expect(TextBoxAgentDetection.isClaudeCode(context: context))
+        #expect(TextBoxAgentDetection.composedPromptSubmitKey(
+            containsNewline: true, context: context
+        ) == "ctrl+enter")
+    }
+
+    /// The trap, pinned so it is not re-entered: an agent *name* on its own is
+    /// not a context, and reads as "not Claude" rather than as an error.
+    @Test("A bare agent name matches nothing and silently falls back to return")
+    func bareNameIsNotAContext() {
+        #expect(!TextBoxAgentDetection.isClaudeCode(context: "claude"))
+        #expect(TextBoxAgentDetection.composedPromptSubmitKey(
+            containsNewline: true, context: "claude"
+        ) == "return")
+    }
+
+    /// Single-line payloads and non-Claude panes keep `return`, so the
+    /// upgrade cannot quietly become unconditional.
+    @Test("Single-line and non-Claude payloads still submit with return")
+    func returnRemainsTheDefault() {
+        #expect(TextBoxAgentDetection.composedPromptSubmitKey(
+            containsNewline: false, context: "restoredAgent:claude"
+        ) == "return")
+        #expect(TextBoxAgentDetection.composedPromptSubmitKey(
+            containsNewline: true, context: "restoredAgent:codex"
+        ) == "return")
+    }
+}
+
+@MainActor
 // Serialized deliberately. The rig swaps `AppDelegate.shared` and
 // `TerminalController.shared.agentChatTranscriptService` — process-wide
 // singletons — and Swift Testing runs tests in parallel by default, so two
@@ -373,6 +424,112 @@ import Testing
 
             #expect(store.model.state != .waiting)
             #expect(Self.markdown(store)?.contains("After the resume.") == true)
+        }
+    }
+
+    // MARK: - The send gate
+
+    /// Sets one lifecycle state on the bound pane, the way the hook CLI's
+    /// push does.
+    private static func setLifecycle(
+        _ state: AgentHibernationLifecycleState,
+        rig: Rig
+    ) {
+        rig.workspace.agentLifecycleStatesByPanelId[rig.panelID] = ["test": state]
+    }
+
+    private static let draft = ReplyAnnotationSet(
+        annotations: [ReplyAnnotation(quote: "a span", note: "make this a question")]
+    )
+
+    @Test("Nothing is typed into a turn that is still in progress")
+    func bothButtonsRefuseWhileRunning() async throws {
+        try await Self.withRig(transcript: "") { rig, store in
+            await store.refresh(workspace: rig.workspace)
+            Self.setLifecycle(.running, rig: rig)
+
+            #expect(!store.canDeliver(workspace: rig.workspace, submit: false))
+            #expect(!store.canDeliver(workspace: rig.workspace, submit: true))
+            #expect(!store.deliver(Self.draft, workspace: rig.workspace, submit: false))
+            #expect(!store.deliver(Self.draft, workspace: rig.workspace, submit: true))
+        }
+    }
+
+    /// The case dogfood found on 2026-09-03, and the reason the gate is split.
+    ///
+    /// `needsInput` is Claude's **resting** state — the Notification hook
+    /// reports it whenever the agent is waiting at its own prompt, through the
+    /// same key and value as a genuinely blocking `AskUserQuestion`
+    /// (`CLI/cmux.swift:25252` vs `:25524`). Refusing it on both buttons made
+    /// the feature dead exactly when it was usable.
+    ///
+    /// Paste is allowed because it submits nothing: the text sits visibly in
+    /// the composer. Paste & Send still stands down, because if a prompt *is*
+    /// what is waiting, a send answers it.
+    @Test("A waiting agent takes a paste but not a send")
+    func needsInputAllowsPasteAndRefusesSend() async throws {
+        try await Self.withRig(transcript: "") { rig, store in
+            await store.refresh(workspace: rig.workspace)
+            Self.setLifecycle(.needsInput, rig: rig)
+
+            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
+            #expect(!store.canDeliver(workspace: rig.workspace, submit: true))
+            #expect(!store.deliver(Self.draft, workspace: rig.workspace, submit: true))
+        }
+    }
+
+    @Test("An idle agent takes both")
+    func idleAllowsBoth() async throws {
+        try await Self.withRig(transcript: "") { rig, store in
+            await store.refresh(workspace: rig.workspace)
+            Self.setLifecycle(.idle, rig: rig)
+
+            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
+            #expect(store.canDeliver(workspace: rig.workspace, submit: true))
+        }
+    }
+
+    /// A pane that has pushed no hook event yet reports `unknown`. Refusing
+    /// there would make Paste dead on exactly the pane the user just came
+    /// back to, and the settle rule already reads `unknown` as not-running.
+    @Test("An unknown lifecycle is not treated as busy by either button")
+    func unknownAllowsBoth() async throws {
+        try await Self.withRig(transcript: "") { rig, store in
+            await store.refresh(workspace: rig.workspace)
+            Self.setLifecycle(.unknown, rig: rig)
+
+            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
+            #expect(store.canDeliver(workspace: rig.workspace, submit: true))
+        }
+    }
+
+    /// The gate passing is not enough: an empty draft must not paste an empty
+    /// string, which reads as cmux having malfunctioned rather than as nothing
+    /// having been written.
+    @Test("An empty draft is refused even when the agent is idle")
+    func emptyDraftIsRefusedWhenIdle() async throws {
+        try await Self.withRig(transcript: "") { rig, store in
+            await store.refresh(workspace: rig.workspace)
+            Self.setLifecycle(.idle, rig: rig)
+
+            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
+            #expect(!store.deliver(ReplyAnnotationSet(), workspace: rig.workspace, submit: false))
+            #expect(!store.deliver(
+                ReplyAnnotationSet(annotations: [ReplyAnnotation(quote: "a span", note: "  ")]),
+                workspace: rig.workspace,
+                submit: false
+            ))
+        }
+    }
+
+    /// With nothing bound there is no pane to type into, and the gate must say
+    /// so rather than resolving some other pane.
+    @Test("Nothing bound means nothing can be delivered")
+    func gateRefusesWhenUnbound() async throws {
+        try await Self.withRig(transcript: "") { _, store in
+            #expect(!store.canDeliver(workspace: nil, submit: false))
+            #expect(!store.canDeliver(workspace: nil, submit: true))
+            #expect(!store.deliver(Self.draft, workspace: nil, submit: false))
         }
     }
 

@@ -15,6 +15,20 @@ struct ReplyPanelView: View {
     @State private var store = ReplyPanelStore()
     @State private var rendererSession = MarkdownRendererSession()
 
+    /// The span the note is attached to, or `nil` when nothing is marked up.
+    ///
+    /// Survives the selection collapsing. Clicking away to reach the note
+    /// field clears the page's selection, so a footer that keyed on the live
+    /// selection would vanish the moment the user went to write in it.
+    @State private var quote: String?
+
+    /// What the user wants done to that span.
+    @State private var note: String = ""
+
+    /// The live page selection, kept only to decide whether a *new* span
+    /// should replace the one being annotated.
+    @State private var liveSelection: String?
+
     /// Width floor for the position counter, wide enough for `10/15` so the
     /// arrows stop moving once a session runs past nine messages.
     private static let counterMinimumWidth: CGFloat = 34
@@ -30,6 +44,10 @@ struct ReplyPanelView: View {
                 truncatedHistoryNote
             }
             content
+            if quote != nil {
+                Divider()
+                annotationFooter
+            }
         }
         .task(id: bindingKey) {
             await store.refresh(workspace: workspace)
@@ -396,7 +414,19 @@ struct ReplyPanelView: View {
             // already the named risk.
             horizontalPagePadding: Self.bodyGutter,
             session: rendererSession,
-            onRequestPanelFocus: {}
+            onRequestPanelFocus: {},
+            onSelectionChanged: { selection in
+                liveSelection = selection
+                guard let selection else { return }
+                // A new span replaces the target only while nothing has been
+                // written about the old one. Once there is a note, moving the
+                // target under it would silently re-aim an instruction the
+                // user already composed — the same defect the follow-vs-hold
+                // rule refuses for the reply itself.
+                if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    quote = selection
+                }
+            }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The canvas sits directly behind the web view, and it is not
@@ -406,6 +436,121 @@ struct ReplyPanelView: View {
         // dogfood as the body turning the sidebar's own lavender and staying
         // there. `MarkdownPanelView` paints the same layer for the same reason.
         .background(Color(nsColor: pageCanvas))
+    }
+
+    /// The marked-up span, the instruction, and the two ways to deliver it.
+    ///
+    /// Only mounted once a span exists. `cm-69.1` deliberately shipped no
+    /// footer at all: with nothing annotated it would have been two
+    /// permanently-disabled buttons for the whole life of the read-only
+    /// slice.
+    @ViewBuilder
+    private var annotationFooter: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let quote {
+                Text(quote)
+                    .font(.system(size: 11))
+                    .italic()
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 6)
+                    .overlay(alignment: .leading) {
+                        // A quote bar rather than quotation marks: the span is
+                        // shown verbatim, and added punctuation would be the
+                        // one thing on screen the agent is not sent.
+                        Rectangle().frame(width: 2).foregroundStyle(.tertiary)
+                    }
+            }
+
+            TextField(
+                String(
+                    localized: "reply.annotation.notePlaceholder",
+                    defaultValue: "What should change?"
+                ),
+                text: $note,
+                axis: .vertical
+            )
+            .textFieldStyle(.roundedBorder)
+            .lineLimit(1...4)
+            .font(.system(size: 11))
+
+            // Stacked full-width, not side by side: at 256pt a row forced the
+            // label "P&Send", which reads as a typo and makes the user decode
+            // it. Stacking costs 26pt and buys both full labels.
+            Button {
+                send(submit: false)
+            } label: {
+                Text(String(localized: "reply.annotation.paste", defaultValue: "Paste"))
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderedProminent)
+            .disabled(!canPaste)
+
+            Button {
+                send(submit: true)
+            } label: {
+                Text(String(localized: "reply.annotation.pasteAndSend", defaultValue: "Paste & Send"))
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.small)
+            .disabled(!canPasteAndSend)
+
+            // Two different refusals need two different sentences. One
+            // line reading "waiting for the agent to finish" beside an
+            // *enabled* Paste button is the panel contradicting itself.
+            if !store.canDeliver(workspace: workspace, submit: false) {
+                footerNote(String(
+                    localized: "reply.annotation.busy",
+                    defaultValue: "Waiting for the agent to finish"
+                ))
+            } else if !store.canDeliver(workspace: workspace, submit: true) {
+                footerNote(String(
+                    localized: "reply.annotation.sendCouldAnswer",
+                    defaultValue: "Sending could answer the agent"
+                ))
+            }
+        }
+        .padding(.horizontal, Self.bodyGutter)
+        .padding(.vertical, 8)
+    }
+
+    private func footerNote(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Paste types into the composer and stops, so it is refused only while a
+    /// turn is in progress.
+    private var canPaste: Bool {
+        draft.isDeliverable && store.canDeliver(workspace: workspace, submit: false)
+    }
+
+    /// Paste & Send is the one that fires, so it also stands down whenever
+    /// the agent is waiting on an answer — that answer might be what it gets.
+    private var canPasteAndSend: Bool {
+        draft.isDeliverable && store.canDeliver(workspace: workspace, submit: true)
+    }
+
+    /// The annotation set as it currently stands.
+    ///
+    /// `cm-69.2a` carries exactly one span; the set is still the shape that
+    /// leaves, so `cm-69.2b` adds entries rather than changing the contract.
+    private var draft: ReplyAnnotationSet {
+        guard let quote else { return ReplyAnnotationSet() }
+        return ReplyAnnotationSet(annotations: [ReplyAnnotation(quote: quote, note: note)])
+    }
+
+    private func send(submit: Bool) {
+        guard store.deliver(draft, workspace: workspace, submit: submit) else { return }
+        // Cleared only on a dispatch that actually happened. A refused send
+        // that wiped the note would lose writing the user cannot get back.
+        quote = nil
+        note = ""
+        liveSelection = nil
     }
 
     /// A stable id for the renderer's WebKit session, distinct from any real
