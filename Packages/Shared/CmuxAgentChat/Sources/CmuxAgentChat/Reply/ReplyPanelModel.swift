@@ -197,6 +197,28 @@ public struct ReplyPanelModel: Sendable, Equatable {
         )
     }
 
+    /// Whether the **newest** turn is still being written — the turn gate.
+    ///
+    /// This is what `Paste & Send` reads, and it is deliberately about the
+    /// newest turn rather than the one on screen: an older reply is a
+    /// deliberate target, and annotating it says nothing about whether the
+    /// agent is free to receive a submit right now.
+    ///
+    /// **Never the lifecycle map.** `needsInput` is both Claude's resting
+    /// state and its blocking state, pushed through the same key with the
+    /// same value (`CLI/cmux.swift:25252` and `:25524`), so no lifecycle read
+    /// can separate "finished" from "waiting on a permission prompt". A gate
+    /// that refused `needsInput` would refuse the agent's resting state —
+    /// the feature would be dead exactly when it is usable.
+    ///
+    /// It gates **only** the button that submits. `Paste` types at any point
+    /// in a turn, because it submits nothing; a wrong *target* is a
+    /// different rule and refuses both.
+    public var isNewestTurnWriting: Bool {
+        guard let newest = newestGroup else { return false }
+        return isWriting(newest)
+    }
+
     /// Whether the agent is still adding to a reply.
     ///
     /// Only the newest reply can be unfinished. A reply the user stepped
@@ -394,17 +416,33 @@ public struct ReplyPanelModel: Sendable, Equatable {
         owesStopSettle = true
     }
 
-    /// Records that a new turn began, closing the finished turn's window.
+    /// Records that a new turn began — closing the finished turn's window,
+    /// **and settling the turn it followed.**
     ///
     /// The signal is a user message arriving in the transcript: nothing else
     /// separates a finished turn's late tail from the next turn's opening
     /// line, and without it a Stop would settle the *next* reply mid-write.
+    ///
+    /// **This is the third settle path, and it is the only one that cannot
+    /// fail to arrive.** `.stop` is a hook: a crash, an uninstalled hook or
+    /// a killed process means it never fires, and there is no timeout
+    /// anywhere in `Reply/` to fall back on — so the turn gate would hold
+    /// `Paste & Send` shut for the life of that session, while the panel
+    /// captioned it "returns when this turn ends". A user message is
+    /// self-evidently the end of whatever came before it, and the parser
+    /// already closes a run on one, so this reads a signal that was present
+    /// and merely unused.
+    ///
+    /// Called before the batch is applied, so `newestGroup` is still the
+    /// turn that just ended rather than the one beginning.
     ///
     /// - Parameter sessionID: The session that started a turn. A different
     ///   session's turn says nothing about this panel's.
     public mutating func markTurnStarted(sessionID: String) {
         guard sessionID == self.sessionID else { return }
         owesStopSettle = false
+        owesBindSettle = false
+        finishedAnchorSeq = Self.anchor(of: newestGroup)
     }
 
     /// Drops everything derived from a transcript that has been rewritten.

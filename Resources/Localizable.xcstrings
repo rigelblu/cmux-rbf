@@ -147975,6 +147975,256 @@
         }
       }
     },
+    "reply.preview.collapse": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "طي"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sažmi"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fold sammen"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einklappen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contraer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réduire"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comprimi"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "折りたたむ"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បង្រួម"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "접기"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skjul"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zwiń"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recolher"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Свернуть"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ย่อ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daralt"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Згорнути"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收合"
+          }
+        }
+      }
+    },
+    "reply.preview.discard": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تجاهل التعديلات"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odbaci izmjene"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kassér ændringer"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Änderungen verwerfen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard edits"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar cambios"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abandonner les modifications"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignora le modifiche"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "編集を破棄"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បោះបង់ការកែសម្រួល"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "편집 취소"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forkast endringer"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odrzuć zmiany"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar edições"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отменить правки"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ทิ้งการแก้ไข"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzenlemeleri at"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відхилити зміни"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "放弃编辑"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捨棄編輯"
+          }
+        }
+      }
+    },
     "reply.state.noAgent": {
       "extractionState": "manual",
       "localizations": {
@@ -148475,127 +148725,422 @@
         }
       }
     },
-    "reply.annotation.busy": {
+    "reply.annotation.copied": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "تم النسخ إلى الحافظة" } },
+        "bs": { "stringUnit": { "state": "translated", "value": "Kopirano u međuspremnik" } },
+        "da": { "stringUnit": { "state": "translated", "value": "Kopieret til udklipsholder" } },
+        "de": { "stringUnit": { "state": "translated", "value": "In die Zwischenablage kopiert" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Copied to clipboard" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Copiado al portapapeles" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Copié dans le presse-papiers" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Copiato negli appunti" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "クリップボードにコピーしました" } },
+        "km": { "stringUnit": { "state": "translated", "value": "បានចម្លងទៅឃ្លីបបត" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "클립보드에 복사됨" } },
+        "nb": { "stringUnit": { "state": "translated", "value": "Kopiert til utklippstavlen" } },
+        "pl": { "stringUnit": { "state": "translated", "value": "Skopiowano do schowka" } },
+        "pt-BR": { "stringUnit": { "state": "translated", "value": "Copiado para a área de transferência" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Скопировано в буфер обмена" } },
+        "th": { "stringUnit": { "state": "translated", "value": "คัดลอกไปยังคลิปบอร์ดแล้ว" } },
+        "tr": { "stringUnit": { "state": "translated", "value": "Panoya kopyalandı" } },
+        "uk": { "stringUnit": { "state": "translated", "value": "Скопійовано в буфер обміну" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已复制到剪贴板" } },
+        "zh-Hant": { "stringUnit": { "state": "translated", "value": "已複製到剪貼簿" } }
+      }
+    },
+    "reply.annotation.count": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "في انتظار انتهاء الوكيل"
+          "variations": {
+            "plural": {
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا تمييزات"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تمييز واحد"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تمييزان"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld تمييزات"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld تمييزًا"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld تمييز"
+                }
+              }
+            }
           }
         },
         "bs": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Čeka se da agent završi"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld istaknuti dio"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld istaknuta dijela"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld istaknutih dijelova"
+                }
+              }
+            }
           }
         },
         "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Venter på, at agenten bliver færdig"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld markering"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld markeringer"
+                }
+              }
+            }
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Warten, bis der Agent fertig ist"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Markierung"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Markierungen"
+                }
+              }
+            }
           }
         },
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for the agent to finish"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld highlight"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld highlights"
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esperando a que el agente termine"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld resaltado"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld resaltados"
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "En attente de la fin de l'agent"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld surlignage"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld surlignages"
+                }
+              }
+            }
           }
         },
         "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In attesa che l'agente finisca"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld evidenziazione"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld evidenziazioni"
+                }
+              }
+            }
           }
         },
         "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "エージェントの完了を待っています"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld 件のハイライト"
+                }
+              }
+            }
           }
         },
         "km": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "កំពុងរង់ចាំភ្នាក់ងារបញ្ចប់"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ការបន្លិច %lld"
+                }
+              }
+            }
           }
         },
         "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "에이전트가 끝나기를 기다리는 중"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "하이라이트 %lld개"
+                }
+              }
+            }
           }
         },
         "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Venter på at agenten skal bli ferdig"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld markering"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld markeringer"
+                }
+              }
+            }
           }
         },
         "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Czekanie na zakończenie pracy agenta"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld zaznaczenie"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld zaznaczenia"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld zaznaczeń"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld zaznaczenia"
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aguardando o agente terminar"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld destaque"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld destaques"
+                }
+              }
+            }
           }
         },
         "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ожидание завершения работы агента"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld выделение"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld выделения"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld выделений"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld выделения"
+                }
+              }
+            }
           }
         },
         "th": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "กำลังรอให้เอเจนต์ทำงานเสร็จ"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld ไฮไลต์"
+                }
+              }
+            }
           }
         },
         "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aracının bitirmesi bekleniyor"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld vurgu"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld vurgu"
+                }
+              }
+            }
           }
         },
         "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Очікування завершення роботи агента"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld виділення"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld виділення"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld виділень"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld виділення"
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在等待代理完成"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld 处高亮"
+                }
+              }
+            }
           }
         },
         "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在等待代理完成"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld 處標示"
+                }
+              }
+            }
           }
         }
       }
@@ -148975,127 +149520,377 @@
         }
       }
     },
-    "reply.annotation.sendCouldAnswer": {
+    "reply.annotation.preview": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "قد يؤدي الإرسال إلى الرد على الوكيل"
+            "value": "عرض ما سيتم لصقه"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Slanje bi moglo odgovoriti agentu"
+            "value": "Prikaži šta će biti zalijepljeno"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Send kan komme til at svare agenten"
+            "value": "Vis hvad der indsættes"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Senden könnte dem Agenten antworten"
+            "value": "Anzeigen, was eingefügt wird"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sending could answer the agent"
+            "value": "Show what will be pasted"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enviar podría responder al agente"
+            "value": "Mostrar lo que se pegará"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Envoyer pourrait répondre à l'agent"
+            "value": "Afficher ce qui sera collé"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inviare potrebbe rispondere all'agente"
+            "value": "Mostra cosa verrà incollato"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "送信するとエージェントへの返答になる可能性があります"
+            "value": "ペーストされる内容を表示"
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "ការផ្ញើអាចឆ្លើយតបទៅភ្នាក់ងារ"
+            "value": "បង្ហាញអ្វីដែលនឹងបិទភ្ជាប់"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "보내면 에이전트에 대한 답변이 될 수 있습니다"
+            "value": "붙여넣을 내용 보기"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Å sende kan svare agenten"
+            "value": "Vis hva som limes inn"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wysłanie może odpowiedzieć agentowi"
+            "value": "Pokaż, co zostanie wklejone"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enviar pode responder ao agente"
+            "value": "Mostrar o que será colado"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Отправка может стать ответом агенту"
+            "value": "Показать, что будет вставлено"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "การส่งอาจกลายเป็นคำตอบให้เอเจนต์"
+            "value": "แสดงสิ่งที่จะวาง"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Göndermek aracıya yanıt olabilir"
+            "value": "Yapıştırılacakları göster"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Надсилання може стати відповіддю агентові"
+            "value": "Показати, що буде вставлено"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送可能会成为对代理的回复"
+            "value": "查看将粘贴的内容"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "傳送可能會成為對代理的回覆"
+            "value": "查看將貼上的內容"
+          }
+        }
+      }
+    },
+    "reply.annotation.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إزالة التمييز"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukloni istaknuti dio"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern markering"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markierung entfernen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove highlight"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar resaltado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le surlignage"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi evidenziazione"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ハイライトを削除"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លុបការបន្លិច"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "하이라이트 삭제"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern markering"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usuń zaznaczenie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover destaque"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить выделение"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบไฮไลต์"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vurguyu kaldır"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити виділення"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除高亮"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除標示"
+          }
+        }
+      }
+    },
+    "reply.annotation.turnInFlight": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يعود «لصق وإرسال» عند انتهاء هذا الدور"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„Zalijepi i pošalji“ se vraća kad ovaj potez završi"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Indsæt og send” vender tilbage, når denne tur slutter"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„Einfügen und senden“ kehrt zurück, wenn dieser Zug endet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste & Send returns when this turn ends"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«Pegar y enviar» vuelve cuando termine este turno"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "« Coller et envoyer » revient à la fin de ce tour"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«Incolla e invia» torna al termine di questo turno"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このターンが終わると「ペーストして送信」が戻ります"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«បិទភ្ជាប់ និងផ្ញើ» នឹងត្រឡប់មកវិញនៅពេលវេននេះបញ្ចប់"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 턴이 끝나면 ‘붙여넣고 보내기’가 다시 켜집니다"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«Lim inn og send» kommer tilbake når denne turen er ferdig"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„Wklej i wyślij” wróci po zakończeniu tej tury"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Colar e enviar” volta quando este turno terminar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«Вставить и отправить» вернётся, когда закончится этот ход"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“วางและส่ง” จะกลับมาเมื่อเทิร์นนี้จบ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu tur bitince “Yapıştır ve gönder” geri gelir"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«Вставити й надіслати» повернеться, коли завершиться цей хід"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本轮结束后“粘贴并发送”会恢复"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本輪結束後「貼上並傳送」會恢復"
           }
         }
       }

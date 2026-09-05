@@ -118,6 +118,75 @@ struct MarkdownBackgroundStyleTests {
         )
     }
 
+    /// The hovered mark has to be one colour, whichever side draws it.
+    ///
+    /// A hovered note in the Reply footer and the hovered mark in the page
+    /// are the same object — one `hoveredID` lights both — but the page gets
+    /// a CSS string and the footer gets an `NSColor`. Two spellings of one
+    /// colour drift silently, because neither is wrong on its own: the
+    /// footer shipped in a neutral grey while the mark was violet, and every
+    /// check was green (Tom, dogfood 2026-09-06).
+    ///
+    /// So assert they still describe the same colour. This fails the moment
+    /// someone changes one derivation and not the other — which is the only
+    /// way this defect comes back.
+    @Test
+    func theHoveredMarksTwoSpellingsStayOneColour() {
+        for terminal in [Self.lightTerminal, Self.darkTerminal] {
+            let theme = MarkdownWebTheme.resolve(backgroundColor: terminal, style: .solid)
+            #expect(theme.activeMarkColor.markdownCSSColor == theme.accentHover)
+        }
+    }
+
+    /// And it is a *wash*, not an opaque fill.
+    ///
+    /// The footer draws it over its own ground, so an accidental alpha of 1
+    /// would hide the row's text under a solid block rather than tint it.
+    @Test
+    func theHoveredMarkStaysAWash() {
+        let theme = MarkdownWebTheme.resolve(backgroundColor: Self.lightTerminal, style: .solid)
+        let alpha = theme.activeMarkColor.usingColorSpace(.sRGB)?.alphaComponent ?? 1
+        #expect(alpha > 0.1)
+        #expect(alpha < 0.5)
+    }
+
+    /// The rule between the reply and its footer is the page's own hairline.
+    ///
+    /// It used to be SwiftUI's `Divider()` — the *system* separator, a
+    /// sidebar colour drawn against a page that follows Ghostty, and visibly
+    /// darker than anything the page draws for itself (Tom, dogfood
+    /// 2026-09-06).
+    ///
+    /// Three properties, and the first is the one that bites: it must be
+    /// **opaque**, because it is handed to SwiftUI rather than to CSS. The
+    /// same translucent-overlay mistake shipped once already as the footer's
+    /// violet ground.
+    @Test
+    func theFooterRuleIsThePagesOwnHairlineAndNotTheSystems() throws {
+        for terminal in [Self.lightTerminal, Self.darkTerminal] {
+            let theme = MarkdownWebTheme.resolve(backgroundColor: terminal, style: .solid)
+            let hairline = try #require(theme.hairlineColor?.usingColorSpace(.sRGB))
+            let canvas = try #require(theme.canvasColor?.usingColorSpace(.sRGB))
+
+            // Opaque: composited already, not handed to `.background` raw.
+            #expect(abs(hairline.alphaComponent - 1) < 0.001)
+            // Visible against the page...
+            #expect(abs(hairline.brightnessComponent - canvas.brightnessComponent) > 0.02)
+            // ...and lighter than the page's full-strength border, which is
+            // what "lighter gray" means here.
+            let border = canvas.blended(withFraction: 1, of: hairline) ?? hairline
+            #expect(hairline.brightnessComponent >= border.brightnessComponent - 0.001)
+        }
+    }
+
+    /// `terminal` style keeps `Divider()`, because there is no page palette
+    /// to borrow from — the canvas is the terminal's own backdrop.
+    @Test
+    func terminalStyleHasNoHairlineOfItsOwn() {
+        let theme = MarkdownWebTheme.resolve(backgroundColor: Self.lightTerminal, style: .terminal)
+        #expect(theme.hairlineColor == nil)
+    }
+
     @Test
     func unknownRawValuesFallBackToTerminalRatherThanSolid() {
         // A typo in cmux.json must leave the panel as it was, not repaint it.

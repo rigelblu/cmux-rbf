@@ -427,10 +427,15 @@ struct ReplyDeliverySubmitKeyTests {
         }
     }
 
-    // MARK: - The send gate
+    // MARK: - The turn gate
 
     /// Sets one lifecycle state on the bound pane, the way the hook CLI's
     /// push does.
+    ///
+    /// Still used, but no longer as the gate's *input*. On a cold open the
+    /// lifecycle is the only thing that can say whether the newest reply is
+    /// still growing, so it decides the model's opening settle — and then
+    /// stops mattering.
     private static func setLifecycle(
         _ state: AgentHibernationLifecycleState,
         rig: Rig
@@ -439,98 +444,126 @@ struct ReplyDeliverySubmitKeyTests {
     }
 
     private static let draft = ReplyAnnotationSet(
-        annotations: [ReplyAnnotation(quote: "a span", note: "make this a question")]
+        annotations: [ReplyAnnotation(quote: "a span", note: "make this a question", range: 0..<6)]
     )
 
-    @Test("Nothing is typed into a turn that is still in progress")
-    func bothButtonsRefuseWhileRunning() async throws {
-        try await Self.withRig(transcript: "") { rig, store in
-            await store.refresh(workspace: rig.workspace)
+    /// **Paste is never refused.** It types into a composer the user is
+    /// looking at and submits nothing, so what goes in there is their call —
+    /// including notes about a reply ten turns back, and notes written before
+    /// the agent restarted. Carrying feedback forward is a thing to want, not
+    /// a mistake to prevent.
+    ///
+    /// This reverses the rule six tests here used to pin. They were correct
+    /// encodings of a design that has been replaced, so they are deleted with
+    /// it rather than after it (Tom, 2026-09-05).
+    @Test("A paste is taken while the turn is still in progress")
+    func pasteIsTakenWhileWriting() async throws {
+        try await Self.withRig(transcript: Self.oneReply()) { rig, store in
             Self.setLifecycle(.running, rig: rig)
+            await store.refresh(workspace: rig.workspace)
 
-            #expect(!store.canDeliver(workspace: rig.workspace, submit: false))
-            #expect(!store.canDeliver(workspace: rig.workspace, submit: true))
-            #expect(!store.deliver(Self.draft, workspace: rig.workspace, submit: false))
+            #expect(store.model.isNewestTurnWriting)
+            #expect(store.deliver(Self.draft, workspace: rig.workspace, submit: false))
+        }
+    }
+
+    /// The turn gate: it stops the button that submits, and only that one.
+    @Test("A send is refused while the turn is still in progress")
+    func sendIsRefusedWhileWriting() async throws {
+        try await Self.withRig(transcript: Self.oneReply()) { rig, store in
+            Self.setLifecycle(.running, rig: rig)
+            await store.refresh(workspace: rig.workspace)
+
+            #expect(!store.canSubmit)
             #expect(!store.deliver(Self.draft, workspace: rig.workspace, submit: true))
         }
     }
 
-    /// The case dogfood found on 2026-09-03, and the reason the gate is split.
+    /// The reversal that matters most, pinned so it cannot come back.
     ///
-    /// `needsInput` is Claude's **resting** state — the Notification hook
-    /// reports it whenever the agent is waiting at its own prompt, through the
-    /// same key and value as a genuinely blocking `AskUserQuestion`
-    /// (`CLI/cmux.swift:25252` vs `:25524`). Refusing it on both buttons made
-    /// the feature dead exactly when it was usable.
+    /// `needsInput` is Claude's **resting** state as often as its blocking
+    /// one — the Notification hook and the `AskUserQuestion` PreToolUse push
+    /// the same key with the same value (`CLI/cmux.swift:25252` vs `:25524`),
+    /// so nothing downstream can separate "finished" from "waiting on a
+    /// prompt". The old gate read it and stood Send down, which meant the
+    /// feature was dead whenever it was most usable.
     ///
-    /// Paste is allowed because it submits nothing: the text sits visibly in
-    /// the composer. Paste & Send still stands down, because if a prompt *is*
-    /// what is waiting, a send answers it.
-    @Test("A waiting agent takes a paste but not a send")
-    func needsInputAllowsPasteAndRefusesSend() async throws {
-        try await Self.withRig(transcript: "") { rig, store in
-            await store.refresh(workspace: rig.workspace)
+    /// The gate now asks whether the newest **turn** has ended, which
+    /// `needsInput` says nothing about either way.
+    @Test("A waiting agent gates nothing, because the lifecycle is no longer the gate")
+    func needsInputGatesNothing() async throws {
+        try await Self.withRig(transcript: Self.oneReply()) { rig, store in
             Self.setLifecycle(.needsInput, rig: rig)
+            await store.refresh(workspace: rig.workspace)
 
-            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
-            #expect(!store.canDeliver(workspace: rig.workspace, submit: true))
-            #expect(!store.deliver(Self.draft, workspace: rig.workspace, submit: true))
+            #expect(!store.model.isNewestTurnWriting)
+            #expect(store.canSubmit)
+            #expect(store.deliver(Self.draft, workspace: rig.workspace, submit: true))
         }
     }
 
-    @Test("An idle agent takes both")
-    func idleAllowsBoth() async throws {
-        try await Self.withRig(transcript: "") { rig, store in
-            await store.refresh(workspace: rig.workspace)
-            Self.setLifecycle(.idle, rig: rig)
-
-            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
-            #expect(store.canDeliver(workspace: rig.workspace, submit: true))
-        }
-    }
-
-    /// A pane that has pushed no hook event yet reports `unknown`. Refusing
-    /// there would make Paste dead on exactly the pane the user just came
-    /// back to, and the settle rule already reads `unknown` as not-running.
-    @Test("An unknown lifecycle is not treated as busy by either button")
-    func unknownAllowsBoth() async throws {
-        try await Self.withRig(transcript: "") { rig, store in
-            await store.refresh(workspace: rig.workspace)
+    /// A pane that has pushed no hook event yet reports `unknown`, and the
+    /// settle rule already reads that as not-running.
+    @Test("An unknown lifecycle settles the opening turn rather than holding it")
+    func unknownSettlesTheOpeningTurn() async throws {
+        try await Self.withRig(transcript: Self.oneReply()) { rig, store in
             Self.setLifecycle(.unknown, rig: rig)
+            await store.refresh(workspace: rig.workspace)
 
-            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
-            #expect(store.canDeliver(workspace: rig.workspace, submit: true))
+            #expect(store.canSubmit)
         }
     }
 
     /// The gate passing is not enough: an empty draft must not paste an empty
     /// string, which reads as cmux having malfunctioned rather than as nothing
     /// having been written.
-    @Test("An empty draft is refused even when the agent is idle")
-    func emptyDraftIsRefusedWhenIdle() async throws {
-        try await Self.withRig(transcript: "") { rig, store in
-            await store.refresh(workspace: rig.workspace)
+    ///
+    /// **A marked span with no note is not that case, and this test used to
+    /// say it was.** It asserted the refusal as intended behaviour, which is
+    /// how `deliver`'s guard survived being fixed at the button — pressing an
+    /// enabled `Paste` typed nothing and left the clipboard untouched (Tom,
+    /// dogfood 2026-09-06). `Paste` lands in a composer, so an unwritten note
+    /// is a sentence the user finishes there. Only `Paste & Send`, which has
+    /// no composer step, still wants an instruction.
+    @Test("Only a genuinely empty draft is refused; an unwritten note still pastes")
+    func emptyDraftIsRefused() async throws {
+        try await Self.withRig(transcript: Self.oneReply()) { rig, store in
             Self.setLifecycle(.idle, rig: rig)
+            await store.refresh(workspace: rig.workspace)
 
-            #expect(store.canDeliver(workspace: rig.workspace, submit: false))
+            let markedOnly = ReplyAnnotationSet(annotations: [
+                ReplyAnnotation(quote: "a span", note: "  ", range: 0..<6)
+            ])
+
+            #expect(store.canSubmit)
+            // Nothing marked at all: still refused, both ways.
             #expect(!store.deliver(ReplyAnnotationSet(), workspace: rig.workspace, submit: false))
-            #expect(!store.deliver(
-                ReplyAnnotationSet(annotations: [ReplyAnnotation(quote: "a span", note: "  ")]),
-                workspace: rig.workspace,
-                submit: false
-            ))
+            #expect(!store.deliver(ReplyAnnotationSet(), workspace: rig.workspace, submit: true))
+
+            // Marked, unwritten: pastes...
+            #expect(store.deliver(markedOnly, workspace: rig.workspace, submit: false))
+            // ...and the payload is the quote, so it is not an empty string.
+            #expect(markedOnly.serialized().contains("a span"))
+            // ...but does not send, because nothing has been asked.
+            #expect(!store.deliver(markedOnly, workspace: rig.workspace, submit: true))
         }
     }
 
-    /// With nothing bound there is no pane to type into, and the gate must say
-    /// so rather than resolving some other pane.
+    /// With nothing bound there is no pane to type into. Not a refusal — an
+    /// impossibility, and `deliver` reports it by resolving nothing.
     @Test("Nothing bound means nothing can be delivered")
-    func gateRefusesWhenUnbound() async throws {
+    func unboundDeliversNothing() async throws {
         try await Self.withRig(transcript: "") { _, store in
-            #expect(!store.canDeliver(workspace: nil, submit: false))
-            #expect(!store.canDeliver(workspace: nil, submit: true))
             #expect(!store.deliver(Self.draft, workspace: nil, submit: false))
+            #expect(!store.deliver(Self.draft, workspace: nil, submit: true))
         }
+    }
+
+    /// One assistant line, so the model has a newest turn the gate can be
+    /// asked about. An empty transcript has none, and `isNewestTurnWriting`
+    /// is then false for a reason that says nothing about the gate.
+    private static func oneReply() -> String {
+        longTranscript(lines: 1)
     }
 
     private static func markdown(_ store: ReplyPanelStore) -> String? {

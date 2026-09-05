@@ -15,19 +15,90 @@ struct ReplyPanelView: View {
     @State private var store = ReplyPanelStore()
     @State private var rendererSession = MarkdownRendererSession()
 
-    /// The span the note is attached to, or `nil` when nothing is marked up.
+    /// Every message's marks, keyed by the message they are about.
     ///
-    /// Survives the selection collapsing. Clicking away to reach the note
-    /// field clears the page's selection, so a footer that keyed on the live
-    /// selection would vanish the moment the user went to write in it.
-    @State private var quote: String?
+    /// **Held per message, and never cleared on a rebind.** Stepping to
+    /// another reply takes the footer with it and brings it back on return;
+    /// losing a written note is worse than a failed send, so nothing here is
+    /// discarded because the panel re-resolved its agent. A transcript
+    /// rewrite is the one thing that clears it, because the ids in hand then
+    /// address a conversation that no longer exists.
+    @State private var draftsByMessageID: [String: ReplyAnnotationSet] = [:]
 
-    /// What the user wants done to that span.
-    @State private var note: String = ""
+    /// The row whose note is open for writing, if any.
+    ///
+    /// Writing and editing are one surface: the list stays the list and one
+    /// row becomes a field, so nothing opens and nothing moves and the other
+    /// notes stay readable.
+    @State private var editingID: UUID?
 
-    /// The live page selection, kept only to decide whether a *new* span
-    /// should replace the one being annotated.
-    @State private var liveSelection: String?
+    /// Text in the open field, written through to the annotation as it is
+    /// typed.
+    ///
+    /// Live rather than committed on Enter or blur. A deferred commit has to
+    /// answer "which row does this text belong to" at the moment the field
+    /// goes away, and the answer is wrong exactly when the user clicks
+    /// straight from one row to another — the outgoing text lands on the
+    /// incoming note. Writing through leaves no such moment.
+    @State private var editingText: String = ""
+
+    /// What the note said when the field opened, for Escape to restore.
+    ///
+    /// Escape is the only path that discards text, so it is the only thing
+    /// that needs the old value.
+    @State private var editingOriginal: String = ""
+
+    /// Drives the caret into the field the moment a row opens.
+    ///
+    /// Without it a mark appears, its field appears, and typing goes
+    /// nowhere: the sidebar's focus host swallows every key carrying
+    /// characters (`RightSidebarPanelView.swift:527`) unless something
+    /// inside it is first responder. Found in dogfood — every note stayed
+    /// empty, so nothing was deliverable and both buttons stayed off.
+    ///
+    /// **On its own it is not enough, which is the second half of that same
+    /// defect.** `@FocusState` moves focus *within* SwiftUI's focus system;
+    /// it cannot take first responder from an AppKit terminal surface. Set
+    /// alone it changed nothing visible and the caret stayed in the agent.
+    /// `focusNoteField` is the pair: move the window's first responder into
+    /// the sidebar first, then place the caret.
+    @FocusState private var noteFieldFocused: Bool
+
+    /// The mark the pointer is over, from either half.
+    ///
+    /// Hovering the phrase or its footer row colours **both**, which is what
+    /// says the two are one thing.
+    @State private var hoveredID: UUID?
+
+    /// The paste preview's editable text, or `nil` while it is collapsed.
+    @State private var previewText: String?
+
+    /// Whether the preview has been typed in.
+    ///
+    /// Once it has, `Collapse` becomes `Discard edits` — honest about what
+    /// returning costs, since nothing ever parses the text back.
+    @State private var previewIsEdited = false
+
+    /// Whether the "copied" confirmation is showing.
+    ///
+    /// **The clipboard write is the one effect with no evidence.** `Paste`
+    /// types into the terminal *and* copies, because Claude Code collapses a
+    /// long paste to `[Pasted text #1 +4 lines]` and the composer stops being
+    /// readable. The copy is what makes that recoverable — and it is
+    /// completely invisible, so nobody knows to reach for it (Tom's
+    /// suggestion, dogfood 2026-09-06).
+    @State private var showCopiedNote = false
+
+    /// Dismisses the confirmation, cancellable so a second `Paste` restarts
+    /// the clock instead of inheriting the first one's remaining time.
+    @State private var copiedNoteDismissal: Task<Void, Never>?
+
+    /// The panel's own height, for the footer's ceiling.
+    @State private var panelHeight: CGFloat = 0
+
+    /// How tall the note rows actually are, so the list can size to its
+    /// content and stop at the ceiling.
+    @State private var noteListHeight: CGFloat = 0
 
     /// Width floor for the position counter, wide enough for `10/15` so the
     /// arrows stop moving once a session runs past nine messages.
@@ -38,17 +109,32 @@ struct ReplyPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider()
-            if atOldestLoadedReply, store.model.historyTruncatedAtHead {
-                truncatedHistoryNote
-            }
-            content
-            if quote != nil {
+            if let previewText {
+                // The preview is a *mode*, not a footer state: the reply is
+                // not on screen at all, so the footer's ceiling and the
+                // reply's floor have nothing left to govern.
+                header
                 Divider()
-                annotationFooter
+                pastePreview(previewText)
+            } else {
+                header
+                Divider()
+                if atOldestLoadedReply, store.model.historyTruncatedAtHead {
+                    truncatedHistoryNote
+                }
+                content
+                if !draft.annotations.isEmpty {
+                    footerRule
+                    annotationFooter
+                }
             }
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.onAppear { panelHeight = proxy.size.height }
+                    .onChange(of: proxy.size.height) { panelHeight = $0 }
+            }
+        )
         .task(id: bindingKey) {
             await store.refresh(workspace: workspace)
         }
@@ -133,6 +219,8 @@ struct ReplyPanelView: View {
                     .lineLimit(1)
                     .fixedSize()
             }
+
+            copiedNote
 
             Spacer(minLength: 8)
 
@@ -375,6 +463,34 @@ struct ReplyPanelView: View {
         )
     }
 
+    /// The footer's ground: one step off the page it sits under.
+    ///
+    /// Derived from Ghostty through the same theme the body uses, so both
+    /// sides of that edge come from one source. Unpainted it showed the
+    /// sidebar's own chrome, which put a Ghostty surface and a sidebar
+    /// surface against each other.
+    private var footerGround: Color {
+        Color(nsColor: pageTheme.adjacentChromeColor ?? pageCanvas)
+    }
+
+    /// The rule between the reply and the footer.
+    ///
+    /// The page's own hairline, not `Divider()`. `Divider()` paints the
+    /// system separator — a sidebar colour drawn against a page that follows
+    /// Ghostty, and darker than anything the page draws for itself.
+    ///
+    /// The frames draw no rule here (`N10 138:1475` is an unfilled 1pt
+    /// spacer); the boundary they intend is `footerGround`'s tone step. This
+    /// is that boundary with a hairline on top, in the page's own palette.
+    @ViewBuilder
+    private var footerRule: some View {
+        if let hairline = pageTheme.hairlineColor {
+            Color(nsColor: hairline).frame(height: 1)
+        } else {
+            Divider()
+        }
+    }
+
     private var pageCanvas: NSColor {
         MarkdownBackgroundStyle.colourBehindPage(
             theme: pageTheme,
@@ -416,17 +532,25 @@ struct ReplyPanelView: View {
             session: rendererSession,
             onRequestPanelFocus: {},
             onSelectionChanged: { selection in
-                liveSelection = selection
+                // Each selection *adds* a mark now rather than re-aiming the
+                // one being written. That is the whole of multi-span: the
+                // question "what happens to the note already open" stops
+                // existing once a second mark is a thing the set can hold.
                 guard let selection else { return }
-                // A new span replaces the target only while nothing has been
-                // written about the old one. Once there is a note, moving the
-                // target under it would silently re-aim an instruction the
-                // user already composed — the same defect the follow-vs-hold
-                // rule refuses for the reply itself.
-                if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    quote = selection
-                }
-            }
+                takeSelection(selection)
+            },
+            onMarkHoverChanged: { hoveredID = $0 },
+            marks: pageMarks,
+            // **Tone marks the one in focus, from either direction.**
+            // Hover is the transient reading — pointer over the mark, or over
+            // its row in the footer. The open field is the persistent one:
+            // while you are typing, this is the only thing in the page saying
+            // which span you are writing about, and it replaces the outline
+            // that used to do that job.
+            //
+            // Hover wins while it lasts, so moving the pointer still answers
+            // "which one is that?" without losing where you were.
+            activeMarkID: hoveredID ?? editingID
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The canvas sits directly behind the web view, and it is not
@@ -438,42 +562,123 @@ struct ReplyPanelView: View {
         .background(Color(nsColor: pageCanvas))
     }
 
-    /// The marked-up span, the instruction, and the two ways to deliver it.
+    // MARK: - The draft, and the message it belongs to
+
+    /// The reply the panel is showing, if any.
+    private var viewedMessageID: String? { store.model.viewedGroup?.id }
+
+    /// The marks on the reply currently on screen.
+    private var draft: ReplyAnnotationSet {
+        guard let viewedMessageID else { return ReplyAnnotationSet() }
+        return draftsByMessageID[viewedMessageID] ?? ReplyAnnotationSet()
+    }
+
+    private func updateDraft(_ change: (inout ReplyAnnotationSet) -> Void) {
+        guard let viewedMessageID else { return }
+        var set = draftsByMessageID[viewedMessageID] ?? ReplyAnnotationSet()
+        change(&set)
+        draftsByMessageID[viewedMessageID] = set
+    }
+
+    /// What the page should be painting.
     ///
-    /// Only mounted once a span exists. `cm-69.1` deliberately shipped no
-    /// footer at all: with nothing annotated it would have been two
-    /// permanently-disabled buttons for the whole life of the read-only
-    /// slice.
+    /// Derived from the same `numbered` the footer rows use, so a marker and
+    /// its row cannot show different numbers in one snapshot.
+    private var pageMarks: [MarkdownPageMark] {
+        draft.numbered.map { entry in
+            MarkdownPageMark(
+                id: entry.id.uuidString,
+                start: entry.range.lowerBound,
+                end: entry.range.upperBound,
+                number: entry.number,
+                // No state — see `MarkdownPageMark`. A mark carries its wash
+                // and its numeral, and the only thing that varies is tone.
+            )
+        }
+    }
+
+    // MARK: - The footer: the notes, in paste order
+
+    /// The manifest — what Paste will send, in the order it will send it.
+    ///
+    /// The body scrolls, so a note that lived only beside its span would be
+    /// invisible at the moment you press Paste.
     @ViewBuilder
     private var annotationFooter: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let quote {
-                Text(quote)
-                    .font(.system(size: 11))
-                    .italic()
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 6)
-                    .overlay(alignment: .leading) {
-                        // A quote bar rather than quotation marks: the span is
-                        // shown verbatim, and added punctuation would be the
-                        // one thing on screen the agent is not sent.
-                        Rectangle().frame(width: 2).foregroundStyle(.tertiary)
-                    }
-            }
-
-            TextField(
-                String(
-                    localized: "reply.annotation.notePlaceholder",
-                    defaultValue: "What should change?"
-                ),
-                text: $note,
-                axis: .vertical
+        VStack(alignment: .leading, spacing: 0) {
+            ReplyAnnotationManifest(
+                entries: draft.numbered,
+                editingID: editingID,
+                hoveredID: $hoveredID,
+                placeholder: placeholderText,
+                gutter: Self.bodyGutter,
+                fieldFill: Color(nsColor: pageCanvas),
+                // The mark's own hovered colour. `hoveredID` is one value
+                // driving both surfaces — hover a row and its mark lights in
+                // the page — so drawing them in two palettes made one object
+                // look like two.
+                hoverFill: Color(nsColor: pageTheme.activeMarkColor),
+                ceiling: footerCeiling,
+                measuredHeight: $noteListHeight,
+                onBeginEditing: { beginEditing($0) },
+                onRemove: { id in
+                    if editingID == id { closeEditing() }
+                    updateDraft { $0.remove(id: id) }
+                },
+                onPreview: {
+                    previewText = draft.serialized()
+                    previewIsEdited = false
+                },
+                field: { noteField($0) }
             )
-            .textFieldStyle(.roundedBorder)
-            .lineLimit(1...4)
+
+            // Outside the scroll region, pinned below the list, so they are
+            // reachable at any note count. A footer that scrolled as one
+            // block would hide its own primary action exactly when the user
+            // has done the most work.
+            deliveryButtons
+        }
+        .padding(.vertical, ReplyFooterMetrics.topInset)
+        .background(footerGround)
+    }
+
+    /// How tall the note list may grow before it scrolls.
+    private var footerCeiling: CGFloat {
+        guard panelHeight > 0 else { return 281 }
+        return max(120, min(panelHeight * 0.40, panelHeight - Self.replyFloor))
+    }
+
+    /// The height the reply keeps whatever the footer does.
+    private static let replyFloor: CGFloat = 394
+
+    private var placeholderText: String {
+        String(localized: "reply.annotation.notePlaceholder", defaultValue: "What should change?")
+    }
+
+    private func noteField(_ entry: NumberedAnnotation) -> some View {
+        TextField(placeholderText, text: $editingText, axis: .vertical)
+            .textFieldStyle(.plain)
             .font(.system(size: 11))
+            // Grows as you type rather than scrolling sideways; growth is
+            // bounded by the footer's own ceiling above.
+            .lineLimit(1...8)
+            .focused($noteFieldFocused)
+            .onAppear { placeCaretInNoteField() }
+            .onChange(of: editingText) { text in
+                updateDraft { $0.updateNote(id: entry.id, note: text) }
+            }
+            .onSubmit { closeEditing() }
+
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onExitCommand {
+                // Escape is the only path that discards text.
+                updateDraft { $0.updateNote(id: entry.id, note: editingOriginal) }
+                closeEditing()
+            }
+    }
+
+    private var deliveryButtons: some View {
+        VStack(alignment: .leading, spacing: 6) {
 
             // Stacked full-width, not side by side: at 256pt a row forced the
             // label "P&Send", which reads as a typo and makes the user decode
@@ -486,7 +691,15 @@ struct ReplyPanelView: View {
             }
             .controlSize(.small)
             .buttonStyle(.borderedProminent)
-            .disabled(!canPaste)
+            // **Paste is never gated** — and now the code says so too. It
+            // typed into a composer the user is looking at and submitted
+            // nothing, so what goes in there is their call; then it gated on
+            // `isDeliverable` anyway, five lines under a comment promising it
+            // did not. An unwritten note is not an unfinished action, it is
+            // an action the user intends to finish in the terminal.
+            //
+            // Off only when there is genuinely nothing to put anywhere.
+            .disabled(draft.isEmpty)
 
             Button {
                 send(submit: true)
@@ -495,25 +708,83 @@ struct ReplyPanelView: View {
                     .frame(maxWidth: .infinity)
             }
             .controlSize(.small)
-            .disabled(!canPasteAndSend)
+            .disabled(!draft.isDeliverable || !store.canSubmit)
 
-            // Two different refusals need two different sentences. One
-            // line reading "waiting for the agent to finish" beside an
-            // *enabled* Paste button is the panel contradicting itself.
-            if !store.canDeliver(workspace: workspace, submit: false) {
+            // One refusal, one sentence, and only for the button that is off.
+            if draft.isDeliverable, !store.canSubmit {
                 footerNote(String(
-                    localized: "reply.annotation.busy",
-                    defaultValue: "Waiting for the agent to finish"
-                ))
-            } else if !store.canDeliver(workspace: workspace, submit: true) {
-                footerNote(String(
-                    localized: "reply.annotation.sendCouldAnswer",
-                    defaultValue: "Sending could answer the agent"
+                    localized: "reply.annotation.turnInFlight",
+                    defaultValue: "Paste & Send returns when this turn ends"
                 ))
             }
         }
         .padding(.horizontal, Self.bodyGutter)
+        .padding(.top, 6)
+    }
+
+    // MARK: - The paste preview
+
+    /// Exactly what Paste will send, editable, at the panel's own width.
+    private func pastePreview(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                // One-way: nothing parses the edited text back, so returning
+                // discards it. Annotations flow out and never return, which
+                // is why a mangled preview costs the agent's input and
+                // nothing else.
+                previewText = nil
+                previewIsEdited = false
+            } label: {
+                Label(
+                    previewIsEdited
+                        ? String(localized: "reply.preview.discard", defaultValue: "Discard edits")
+                        : String(localized: "reply.preview.collapse", defaultValue: "Collapse"),
+                    systemImage: "arrow.down.right.and.arrow.up.left"
+                )
+                .font(.system(size: 11))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            // **Top-right, where the `⤢` that opened this lives.** You leave
+            // a mode by reaching for the corner you entered it from; a toggle
+            // whose halves sit in opposite corners makes you hunt for the
+            // second one. It is also the platform's answer — dismissal is
+            // top-right on macOS sheets and popovers, while top-left is
+            // *back* in a navigation stack, and this is not a stack: the
+            // header stays and only the body swaps.
+            //
+            // The label stays. The expand side gets away with a bare glyph
+            // because its header line gives it context; the preview has no
+            // other chrome, so the word removes a guess for one line's cost.
+            .frame(maxWidth: .infinity, alignment: .trailing)
+
+            TextEditor(text: Binding(
+                get: { text },
+                set: { previewText = $0; previewIsEdited = true }
+            ))
+            // Monospace is not decoration: a wire format shown in the body
+            // face is indistinguishable from badly-wrapped prose, which is
+            // the whole thing the fence exists to signal.
+            .font(.system(size: 11, design: .monospaced))
+            // `TextEditor` paints its own opaque ground, which came out stark
+            // white over the panel. The reading surface follows Ghostty
+            // through `pageTheme`, and this box has to sit on the same one.
+            .scrollContentBackground(.hidden)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(nsColor: pageCanvas))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(Color.primary.opacity(0.12))
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            deliveryButtons
+        }
+        .padding(.horizontal, Self.bodyGutter)
         .padding(.vertical, 8)
+        .background(footerGround)
     }
 
     private func footerNote(_ text: String) -> some View {
@@ -523,34 +794,111 @@ struct ReplyPanelView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Paste types into the composer and stops, so it is refused only while a
-    /// turn is in progress.
-    private var canPaste: Bool {
-        draft.isDeliverable && store.canDeliver(workspace: workspace, submit: false)
+    // MARK: - Editing and delivery
+
+    private func beginEditing(_ entry: NumberedAnnotation) {
+        editingID = entry.id
+        editingText = entry.note
+        editingOriginal = entry.note
+        placeCaretInNoteField()
     }
 
-    /// Paste & Send is the one that fires, so it also stands down whenever
-    /// the agent is waiting on an answer — that answer might be what it gets.
-    private var canPasteAndSend: Bool {
-        draft.isDeliverable && store.canDeliver(workspace: workspace, submit: true)
-    }
-
-    /// The annotation set as it currently stands.
+    /// Puts the caret in the open note field, from a cold start.
     ///
-    /// `cm-69.2a` carries exactly one span; the set is still the shape that
-    /// leaves, so `cm-69.2b` adds entries rather than changing the contract.
-    private var draft: ReplyAnnotationSet {
-        guard let quote else { return ReplyAnnotationSet() }
-        return ReplyAnnotationSet(annotations: [ReplyAnnotation(quote: quote, note: note)])
+    /// Two steps, because they answer different questions. AppKit decides
+    /// which *view* has the keyboard, and until the sidebar wins that the
+    /// terminal keeps every keystroke. SwiftUI then decides which *field*
+    /// inside it holds the caret. Doing only the second left the focus in
+    /// the agent, which is what dogfood found.
+    ///
+    /// The caret is placed a runloop turn later: the field may not be in the
+    /// hierarchy yet on the pass that creates its row, and `@FocusState` set
+    /// against a field that does not exist is dropped silently.
+    private func placeCaretInNoteField() {
+        _ = AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
+            mode: .reply,
+            focusFirstItem: false
+        )
+        DispatchQueue.main.async { noteFieldFocused = true }
+    }
+
+    private func closeEditing() {
+        editingID = nil
+        editingText = ""
+        editingOriginal = ""
+    }
+
+    /// Takes a new selection as a mark, refusing one that overlaps another.
+    private func takeSelection(_ selection: MarkdownPageSelection) {
+        let annotation = ReplyAnnotation(quote: selection.quote, note: "", range: selection.range)
+        var accepted = false
+        updateDraft { accepted = $0.insert(annotation) }
+        // A refused overlap leaves the standing mark alone: an ambiguous
+        // quote is fixed by selecting more, never by cmux widening one.
+        guard accepted else { return }
+        editingID = annotation.id
+        editingText = ""
+        editingOriginal = ""
+        placeCaretInNoteField()
+    }
+
+    /// Says the clipboard now holds what was pasted, then goes away.
+    ///
+    /// **In the header, immediately after the agent's name** — the exact slot
+    /// the state word used to occupy, which is where this panel already says
+    /// transient things about itself (Tom's placement, dogfood 2026-09-06).
+    /// It reads left-to-right with the thing it is about; parked on the right
+    /// it sat against the `‹ 4/4 ›` arrows, which are navigation and have
+    /// nothing to do with a paste. A floating capsule over the body was the
+    /// first attempt and was worse still: it covered the reply to report
+    /// something that had already finished.
+    ///
+    /// The header is also the only place it *can* live. A successful `Paste`
+    /// clears the draft, which takes the whole footer off screen — a note
+    /// hosted there would be removed in the same frame it appeared.
+    ///
+    /// Transient and non-blocking on purpose: it reports something that has
+    /// already happened and needs no answer, so it takes no click to dismiss
+    /// and moves nothing.
+    @ViewBuilder
+    private var copiedNote: some View {
+        if showCopiedNote {
+            Text(String(
+                localized: "reply.annotation.copied",
+                defaultValue: "Copied to clipboard"
+            ))
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            // Never squeezed by the identity beside it: this is on screen for
+            // two seconds and half of it says nothing.
+            .fixedSize()
+            .transition(.opacity)
+        }
     }
 
     private func send(submit: Bool) {
+        closeEditing()
+        // Sends the annotations, never the preview's text: the preview is
+        // one-way, and a paste that shipped what was typed into it would
+        // make the box a parser after all.
         guard store.deliver(draft, workspace: workspace, submit: submit) else { return }
         // Cleared only on a dispatch that actually happened. A refused send
-        // that wiped the note would lose writing the user cannot get back.
-        quote = nil
-        note = ""
-        liveSelection = nil
+        // that wiped the notes would lose writing the user cannot get back.
+        if let viewedMessageID { draftsByMessageID[viewedMessageID] = nil }
+        previewText = nil
+        previewIsEdited = false
+
+        // Only on a dispatch that happened — `deliver` returning false means
+        // nothing reached the terminal and nothing reached the clipboard, so
+        // saying otherwise would be the one thing worse than saying nothing.
+        copiedNoteDismissal?.cancel()
+        withAnimation(.easeOut(duration: 0.15)) { showCopiedNote = true }
+        copiedNoteDismissal = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.25)) { showCopiedNote = false }
+        }
     }
 
     /// A stable id for the renderer's WebKit session, distinct from any real

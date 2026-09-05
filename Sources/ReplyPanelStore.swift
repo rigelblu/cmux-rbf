@@ -1,3 +1,4 @@
+import AppKit
 import CmuxAgentChat
 import Foundation
 import Observation
@@ -493,41 +494,27 @@ final class ReplyPanelStore {
         return resolved
     }
 
-    /// Whether feedback may be typed into the bound pane right now.
+    /// Whether `Paste & Send` may fire right now — **the turn gate**.
     ///
-    /// **The two buttons gate differently, and that asymmetry is the safety
-    /// mechanism.** Found in dogfood 2026-09-03, and it reverses the original
-    /// single-gate decision, which was built on a claim about `needsInput`
-    /// that the code does not support.
+    /// It is the only gate in this feature. `Paste` has none: it types into
+    /// a composer the user is looking at and submits nothing, so what goes
+    /// in there is the user's call, not cmux's. That includes notes about a
+    /// reply ten turns back, and notes written before the agent restarted —
+    /// carrying feedback forward is a thing to want, not a mistake to
+    /// prevent (Tom, 2026-09-05, superseding the "target guard refuses both
+    /// buttons" rule).
     ///
-    /// `needsInput` is not "a prompt is blocking the agent". It is also — and
-    /// mostly — Claude sitting at its own prompt having finished, which is
-    /// exactly when pasting is the point. Both meanings arrive through
-    /// `setAgentLifecycle(key: claudeCodeStatusKey, lifecycle: .needsInput)`:
-    /// the Notification hook at `CLI/cmux.swift:25252` and the
-    /// `AskUserQuestion`/`ExitPlanMode` PreToolUse at `:25524`. **Same key,
-    /// same value** — they differ only in `lastBody`, which goes to the JSON
-    /// session store, the source this gate was deliberately built *not* to
-    /// read. So the app-side lifecycle map is structurally incapable of
-    /// telling them apart, and a gate that blocks `needsInput` blocks the
-    /// agent's resting state: the feature is dead whenever it is usable.
+    /// **Reads `isNewestTurnWriting`, never the lifecycle map.** `needsInput`
+    /// is both Claude's resting state and its blocking state, arriving
+    /// through the same key with the same value (`CLI/cmux.swift:25252` and
+    /// `:25524`), so a lifecycle gate refuses the agent's resting state —
+    /// exactly when pasting is the point.
     ///
-    /// - Parameter submit: `false` for Paste, which types into the composer
-    ///   and stops. Nothing fires, so the worst case is text sitting visibly
-    ///   where the user clears it — a papercut, not a misdelivery. Only
-    ///   `.running` is refused, because typing into a turn in progress
-    ///   interleaves with the agent's own output.
-    ///
-    ///   `true` for Paste & Send, which is the one that actually submits, so
-    ///   it keeps refusing `needsInput`: if a permission prompt or an
-    ///   `AskUserQuestion` *is* what is waiting, a send answers it.
-    func canDeliver(workspace: Workspace?, submit: Bool) -> Bool {
-        guard let workspace, let panelID = boundPanelID else { return false }
-        return !(workspace.agentLifecycleStatesByPanelId[panelID] ?? [:])
-            .contains { key, state in
-                guard !AgentHibernationLifecycleStatusKeys.isManualKey(key) else { return false }
-                return state == .running || (submit && state == .needsInput)
-            }
+    /// Asked of the **newest** turn, whatever reply is on screen: an older
+    /// reply is a deliberate target, and annotating it says nothing about
+    /// whether the agent is free to receive a submit.
+    var canSubmit: Bool {
+        !model.isNewestTurnWriting
     }
 
     /// Types the serialized feedback into the bound pane's composer.
@@ -543,14 +530,41 @@ final class ReplyPanelStore {
         workspace: Workspace?,
         submit: Bool
     ) -> Bool {
-        guard annotations.isDeliverable,
-              canDeliver(workspace: workspace, submit: submit),
+        // **The second half of "Paste is never gated", and it was still
+        // gating.** The button's `.disabled` was fixed 2026-09-06; this guard
+        // sat three lines above a comment saying a paste is never refused and
+        // refused it anyway, so pressing an enabled `Paste` with no note
+        // typed nothing and left the clipboard untouched (Tom, dogfood).
+        //
+        // Two entrypoints, one rule, stated twice — which is the shape the
+        // repo's shared-behaviour policy exists to prevent. `isEmpty` is now
+        // the only thing that can refuse a paste.
+        guard !annotations.isEmpty,
+              // Only the submit is gated, and now that is true in the code.
+              !(submit && (!canSubmit || !annotations.isDeliverable)),
               let workspace,
               let panelID = boundPanelID,
               let panel = workspace.panels[panelID] as? TerminalPanel else { return false }
 
+        let payload = annotations.serialized()
+
+        // **Also on the clipboard, every time.** Claude Code collapses a long
+        // paste to `[Pasted text #1 +4 lines]`, so the composer stops being a
+        // place you can read what is about to run — which is the entire
+        // reason `Paste` does not submit. We cannot detect that: cmux types
+        // into a PTY and how the TUI renders those bytes is invisible from
+        // here. The clipboard is the one channel that does not depend on
+        // knowing.
+        //
+        // **The cost, accepted:** this replaces whatever was on the
+        // clipboard. Paste is a deliberate click on a list the user just
+        // wrote, so the surprise is small and the recovery — seeing what was
+        // actually sent — is the thing they came for.
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(payload, forType: .string)
+
         let events = TextBoxSubmit.dispatchEvents(
-            for: [.text(annotations.serialized())],
+            for: [.text(payload)],
             terminalAgentContext: WorkspaceContentView.terminalAgentContext(
                 panel: panel,
                 workspace: workspace

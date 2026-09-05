@@ -44,7 +44,23 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// next document load, and the coordinator is cached per session, so a
     /// caller that starts `nil` and becomes non-`nil` later gets no script.
     /// Every caller today is one or the other for its whole life.
-    var onSelectionChanged: ((String?) -> Void)?
+    var onSelectionChanged: ((MarkdownPageSelection?) -> Void)?
+
+    /// Reports which mark the pointer is over, or `nil` when it leaves them.
+    ///
+    /// Hover has to colour the phrase *and* its footer row together, and only
+    /// the page knows the pointer is over a phrase.
+    var onMarkHoverChanged: ((UUID?) -> Void)?
+
+    /// The marks the page should be painting right now.
+    ///
+    /// Pushed rather than pulled: the annotation set is the source of truth
+    /// and the page is a rendering of it, so there is no page-side list that
+    /// could drift from the footer's.
+    var marks: [MarkdownPageMark] = []
+
+    /// The mark to colour as active, from hovering its footer row.
+    var activeMarkID: UUID?
 
     func makeCoordinator() -> Coordinator {
         session.coordinator(panelId: panelId, workspaceId: workspaceId, filePath: filePath)
@@ -71,6 +87,9 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator.setMaxContentWidth(maxContentWidth)
             context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
             context.coordinator.setSelectionObserver(onSelectionChanged)
+            context.coordinator.setMarkHoverObserver(onMarkHoverChanged)
+            context.coordinator.setMarks(marks)
+            context.coordinator.setActiveMark(activeMarkID)
             return webView
         }
 
@@ -136,11 +155,16 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         context.coordinator.setMaxContentWidth(maxContentWidth)
             context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
         context.coordinator.setSelectionObserver(onSelectionChanged)
+        context.coordinator.setMarkHoverObserver(onMarkHoverChanged)
+        // After the markdown, never before: a repaint wraps spans around
+        // text the render is about to replace.
         context.coordinator.update(markdown: markdown, theme: theme)
+        context.coordinator.setMarks(marks)
+        context.coordinator.setActiveMark(activeMarkID)
     }
 
-    /// Watches the page's selection and reports it over the existing
-    /// `cmuxLib` channel.
+    /// Watches the page's selection, paints the marks, and reports hover —
+    /// all over the existing `cmuxLib` channel.
     ///
     /// Injected rather than added to `shell.html`: that file is shared with
     /// every markdown viewer in the app and re-opens `#cm-15`'s two human
@@ -153,24 +177,328 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// `mouseup` alone misses the last three. It fires continuously during a
     /// drag, so the last published value is held and duplicates dropped:
     /// without that, one drag across a paragraph posts a message per frame.
+    ///
+    /// **Offsets are into the concatenated text nodes, and the quote is
+    /// `selection.toString()` — deliberately two different strings.** The
+    /// quote is what the user saw, block breaks and all; the offsets only
+    /// have to order marks and detect overlap, and they do that in their own
+    /// coordinate space. Wrapping a mark in a `<span>` adds no characters, so
+    /// painting never moves an offset.
+    ///
+    /// **The numeral is CSS-generated content, and that is load-bearing.**
+    /// `content: attr(data-cmux-num)` keeps it out of `textContent`, so a
+    /// numeral cannot shift the offsets of everything after it. It also
+    /// cannot be forged: the shell strips every `data-cmux-*` attribute from
+    /// markdown-sourced HTML (`shell.html:973`), and this script runs after
+    /// that, so only cmux can put a number on the page.
     private static let selectionObserverScript = WKUserScript(
         source: """
         (() => {
           const handler = window.webkit?.messageHandlers?.cmuxLib;
           if (!handler) return;
+          const MARK = "cmux-reply-mark";
+          const root = () => document.getElementById("content");
+
+          const style = document.createElement("style");
+          style.textContent = `
+            .${MARK} {
+              background: color-mix(in srgb, var(--cmuxAccent, #0a84ff) 20%, transparent);
+              border-radius: 2px;
+              padding: 0 1px;
+            }
+            .${MARK}[data-cmux-num]::after {
+              content: attr(data-cmux-num);
+              font-size: 8px;
+              font-weight: 600;
+              vertical-align: super;
+              margin-left: 1px;
+              color: var(--cmuxAccent, #0a84ff);
+            }
+            /* **The only distinction a mark carries, now that the outline
+               and the underline are gone.** Tone alone says *this is the one
+               in focus* — hovered, or open in the footer's field. A border
+               made every unwritten span read as an error, and there were
+               usually several at once. */
+            .${MARK}[data-cmux-active="1"] {
+              background: var(--cmuxAccentHover, rgba(139, 92, 246, 0.28));
+            }
+            /* One hue at a time: the numeral follows the wash it sits in. */
+            .${MARK}[data-cmux-active="1"][data-cmux-num]::after { color: inherit; }
+          `;
+          document.head.appendChild(style);
+
+          // Every text node a mark may cover. The reasoning disclosure is
+          // excluded: it is shown and deliberately not annotatable, so a
+          // selection inside it must not become an anchor.
+          const textNodes = () => {
+            const container = root();
+            if (!container) return [];
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+              acceptNode(node) {
+                if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+                let el = node.parentElement;
+                while (el && el !== container) {
+                  if (el.classList && el.classList.contains("cmux-reply-thinking")) {
+                    return NodeFilter.FILTER_REJECT;
+                  }
+                  // Page chrome, not message text. The code block's `Copy`
+                  // button lives inside the block, so its label was landing
+                  // in the middle of a quoted snippet *and* consuming
+                  // offsets, which shifts every mark after it.
+                  if (el.nodeName === "BUTTON" || el.getAttribute("aria-hidden") === "true") {
+                    return NodeFilter.FILTER_REJECT;
+                  }
+                  el = el.parentElement;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+              }
+            });
+            const out = [];
+            let total = 0;
+            while (walker.nextNode()) {
+              out.push({ node: walker.currentNode, start: total });
+              total += walker.currentNode.nodeValue.length;
+            }
+            return out;
+          };
+
+          const unpaint = () => {
+            const container = root();
+            if (!container) return;
+            container.querySelectorAll("." + MARK).forEach((span) => {
+              const parent = span.parentNode;
+              if (!parent) return;
+              while (span.firstChild) parent.insertBefore(span.firstChild, span);
+              parent.removeChild(span);
+            });
+            // Merges the text nodes a previous paint split, so the next
+            // offset walk sees the same character sequence it did the first
+            // time.
+            container.normalize();
+          };
+
+          const wrap = (mark) => {
+            // The node list is rebuilt per mark because splitting a text node
+            // invalidates the entries after it. At the note counts this
+            // panel holds, correctness beats the walk it saves.
+            const pieces = [];
+            for (const entry of textNodes()) {
+              const length = entry.node.nodeValue.length;
+              const from = Math.max(mark.start, entry.start);
+              const to = Math.min(mark.end, entry.start + length);
+              if (from >= to) continue;
+              pieces.push({ node: entry.node, from: from - entry.start, to: to - entry.start });
+            }
+            pieces.forEach((piece, index) => {
+              let target = piece.node;
+              if (piece.to < target.nodeValue.length) target.splitText(piece.to);
+              if (piece.from > 0) target = target.splitText(piece.from);
+              const span = document.createElement("span");
+              span.className = MARK;
+              span.setAttribute("data-cmux-id", mark.id);
+              // The numeral sits immediately after the phrase, so only the
+              // last piece of a mark spanning several nodes carries it.
+              if (index === pieces.length - 1) span.setAttribute("data-cmux-num", mark.number);
+              const parent = target.parentNode;
+              if (!parent) return;
+              parent.replaceChild(span, target);
+              span.appendChild(target);
+            });
+          };
+
+          window.__cmuxReplyPaint = (marks) => {
+            unpaint();
+            // Applied newest offset first so an earlier mark's coordinates
+            // are still the ones the walk just measured.
+            [...marks].sort((a, b) => b.start - a.start).forEach(wrap);
+            // The transient selection has done its job; the mark is the
+            // durable thing now. Dropping it deliberately is also what the
+            // design asks for — the caret moves to the note field, the
+            // browser selection collapses, and the highlight must not go
+            // with it. Leaving it live instead lets the next frame re-report
+            // a selection whose nodes this paint just replaced.
+            if (marks.length) {
+              last = null;
+              const selection = window.getSelection();
+              if (selection) selection.removeAllRanges();
+            }
+          };
+
+          window.__cmuxReplyActivate = (id) => {
+            const container = root();
+            if (!container) return;
+            container.querySelectorAll("." + MARK).forEach((span) => {
+              if (id && span.getAttribute("data-cmux-id") === id) {
+                span.setAttribute("data-cmux-active", "1");
+              } else {
+                span.removeAttribute("data-cmux-active");
+              }
+            });
+          };
+
           let last = null;
+          // **The quote is markdown, re-emitted from the DOM.**
+          //
+          // `selection.toString()` returns what the page *shows*, so
+          // `**highlight**` arrived as `highlight`, `` `inline code` `` lost
+          // its ticks, a link lost its href, and a fenced block arrived as
+          // bare lines the agent cannot tell from prose — with the `Copy`
+          // button's label sitting in the middle of it (Tom, dogfood
+          // 2026-09-06). The agent wrote markdown; quoting anything else asks
+          // it to re-derive its own source.
+          //
+          // Offsets stay in the rendered coordinate space — they only order
+          // marks and detect overlap, and the doc comment above says so.
+          // Only the quote changes.
+          const PLAIN_SKIP = { BUTTON: 1 };
+          const plain = (n) => {
+            if (n.nodeType === 3) return n.nodeValue;
+            if (n.nodeType !== 1 || PLAIN_SKIP[n.nodeName]) return "";
+            return Array.from(n.childNodes).map(plain).join("");
+          };
+          const longestRun = (body) => (body.match(/`+/g) || [])
+            .reduce((m, r) => Math.max(m, r.length), 0);
+
+          const emit = (node) => {
+            if (node.nodeType === 3) return node.nodeValue;
+            if (node.nodeType !== 1) return "";
+            const tag = node.nodeName.toLowerCase();
+            if (node.nodeName === "BUTTON" || node.getAttribute("aria-hidden") === "true") return "";
+            if (node.classList && node.classList.contains("cmux-reply-thinking")) return "";
+            const kids = () => Array.from(node.childNodes).map(emit).join("");
+            switch (tag) {
+              case "strong": case "b": return "**" + kids() + "**";
+              case "em": case "i": return "*" + kids() + "*";
+              case "del": case "s": return "~~" + kids() + "~~";
+              case "br": return "\\n";
+              case "a": {
+                const href = node.getAttribute("href");
+                const label = kids();
+                return href ? "[" + label + "](" + href + ")" : label;
+              }
+              case "code": {
+                // Inside a fence the ticks belong to the fence, not the span.
+                if (node.parentElement && node.parentElement.nodeName === "PRE") return kids();
+                const body = kids();
+                const tick = "`".repeat(longestRun(body) + 1);
+                return tick + body + tick;
+              }
+              case "pre": {
+                const code = node.querySelector("code");
+                const cls = (code && code.className) || "";
+                const lang = (cls.match(/language-([\\w-]+)/) || [])[1] || "";
+                const body = plain(code || node).replace(/\\n+$/, "");
+                const fence = "`".repeat(Math.max(3, longestRun(body) + 1));
+                return "\\n\\n" + fence + lang + "\\n" + body + "\\n" + fence + "\\n\\n";
+              }
+              case "li": return "\\n- " + kids().trim();
+              case "blockquote":
+                return "\\n\\n" + kids().trim().split("\\n").map((l) => "> " + l).join("\\n") + "\\n\\n";
+              case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
+                return "\\n\\n" + "#".repeat(Number(tag[1])) + " " + kids().trim() + "\\n\\n";
+              case "p": case "div": case "ul": case "ol": case "table": case "tr":
+                return "\\n\\n" + kids() + "\\n\\n";
+              default: return kids();
+            }
+          };
+
+          // `cloneContents` drops the ancestors the selection started inside,
+          // so a drag that begins mid-`<strong>` would lose its markers. Put
+          // the inline ones back before serializing.
+          const INLINE_WRAP = { STRONG: 1, B: 1, EM: 1, I: 1, CODE: 1, A: 1, DEL: 1, S: 1 };
+          const markdownOf = (range) => {
+            let frag = range.cloneContents();
+            let node = range.commonAncestorContainer;
+            if (node.nodeType === 3) node = node.parentElement;
+            const container = root();
+            while (node && node !== container) {
+              if (INLINE_WRAP[node.nodeName]) {
+                const wrap = node.cloneNode(false);
+                wrap.appendChild(frag);
+                frag = document.createDocumentFragment();
+                frag.appendChild(wrap);
+              }
+              node = node.parentElement;
+            }
+            const holder = document.createElement("div");
+            holder.appendChild(frag);
+            return emit(holder).replace(/[ \\t]+\\n/g, "\\n").replace(/\\n{3,}/g, "\\n\\n").trim();
+          };
+
           const publish = () => {
+            const container = root();
             const selection = window.getSelection();
-            const text = selection && !selection.isCollapsed ? selection.toString() : "";
+            if (!container || !selection || selection.isCollapsed || !selection.rangeCount) {
+              if (last !== null) { last = null; handler.postMessage({ action: "replySelectionChanged" }); }
+              return;
+            }
+            const range = selection.getRangeAt(0);
+            const text = selection.toString();
             // Whitespace-only is a collapse for our purposes: clicking once
             // inside a paragraph can leave a selection of a single newline,
             // and offering that as a quotable span reads as a bug.
-            const quote = text.trim() ? text : "";
-            if (quote === last) return;
-            last = quote;
-            handler.postMessage({ action: "replySelectionChanged", quote });
+            if (!text.trim()) {
+              if (last !== null) { last = null; handler.postMessage({ action: "replySelectionChanged" }); }
+              return;
+            }
+            let start = null;
+            let end = null;
+            for (const entry of textNodes()) {
+              const node = entry.node;
+              if (!range.intersectsNode(node)) continue;
+              const from = node === range.startContainer ? range.startOffset : 0;
+              const to = node === range.endContainer ? range.endOffset : node.nodeValue.length;
+              if (start === null) start = entry.start + from;
+              end = entry.start + to;
+            }
+            if (start === null || end === null || start >= end) return;
+            // `text` still decides *whether* there is a selection — cheap,
+            // and whitespace-only is the same answer either way. What gets
+            // quoted is the markdown.
+            const quote = markdownOf(range) || text;
+            const key = start + ":" + end + ":" + quote;
+            if (key === last) return;
+            last = key;
+            handler.postMessage({ action: "replySelectionChanged", quote, start, end });
           };
-          document.addEventListener("selectionchange", () => requestAnimationFrame(publish), true);
+          // **A mark is committed when the selection settles, never while it
+          // is moving.** `selectionchange` fires on every frame of a drag,
+          // and painting a mark rewraps the text nodes *under the live
+          // selection*, which re-anchors it — so a single drag produced a
+          // mark, lost its anchor, and produced a second one from wherever
+          // the selection landed. Observed in dogfood 2026-09-05: one drag
+          // across "It turned" left marks on "It turn" and on "e".
+          //
+          // Two settle signals, because neither covers the other: `mouseup`
+          // ends a drag exactly, and a debounce catches the paths that have
+          // no mouseup at all — shift-arrow, double-click extension, and
+          // select-all.
+          let dragging = false;
+          let settleTimer = null;
+          const settle = (delay) => {
+            if (settleTimer) clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => { settleTimer = null; publish(); }, delay);
+          };
+          document.addEventListener("mousedown", () => {
+            dragging = true;
+            if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+          }, true);
+          document.addEventListener("mouseup", () => {
+            dragging = false;
+            settle(0);
+          }, true);
+          document.addEventListener("selectionchange", () => {
+            if (dragging) return;
+            settle(250);
+          }, true);
+
+          document.addEventListener("mouseover", (event) => {
+            const target = event.target instanceof Element ? event.target.closest("." + MARK) : null;
+            handler.postMessage({
+              action: "replyMarkHover",
+              id: target ? target.getAttribute("data-cmux-id") : null
+            });
+          }, true);
         })();
         """,
         injectionTime: .atDocumentEnd,
@@ -212,7 +540,13 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         var webView: MarkdownWebView?
         /// Set fresh on every SwiftUI update, because the coordinator
         /// outlives the wrapper struct that carries the closure.
-        private var onSelectionChanged: ((String?) -> Void)?
+        private var onSelectionChanged: ((MarkdownPageSelection?) -> Void)?
+        private var onMarkHoverChanged: ((UUID?) -> Void)?
+        /// The marks last pushed to the page, so a repaint is skipped when
+        /// nothing changed — `updateNSView` runs on every SwiftUI pass, and
+        /// repainting unwraps and rewraps every span each time.
+        private var paintedMarks: [MarkdownPageMark] = []
+        private var activeMarkID: UUID??
         var panelId: UUID = UUID()
         var workspaceId: UUID = UUID()
         var filePath: String = ""
@@ -353,7 +687,41 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         /// last-applied value first. A closure has no equality to compare, and
         /// a stale one captures the previous view's state — so the cheap
         /// assignment is the correct one here.
-        func setSelectionObserver(_ observer: ((String?) -> Void)?) {
+        func setMarkHoverObserver(_ observer: ((UUID?) -> Void)?) {
+            onMarkHoverChanged = observer
+        }
+
+        /// Repaints the page's marks, skipping the work when nothing moved.
+        ///
+        /// `updateNSView` runs on every SwiftUI pass and a repaint unwraps
+        /// and rewraps every span, so an unconditional call would rebuild the
+        /// marks on each keystroke in the note field.
+        func setMarks(_ marks: [MarkdownPageMark]) {
+            guard marks != paintedMarks else { return }
+            paintedMarks = marks
+            guard let data = try? JSONEncoder().encode(marks),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            evaluate("window.__cmuxReplyPaint && window.__cmuxReplyPaint(\(json));")
+        }
+
+        /// Colours one mark as hovered, or clears every one.
+        ///
+        /// Double optional: the outer says "never set", the inner says "set
+        /// to nothing". Without the distinction the first pass would clear
+        /// marks the page has not painted yet.
+        func setActiveMark(_ id: UUID?) {
+            guard activeMarkID != .some(id) else { return }
+            activeMarkID = .some(id)
+            let argument = id.map { "\"\($0.uuidString)\"" } ?? "null"
+            evaluate("window.__cmuxReplyActivate && window.__cmuxReplyActivate(\(argument));")
+        }
+
+        private func evaluate(_ script: String) {
+            guard let webView else { return }
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        }
+
+        func setSelectionObserver(_ observer: ((MarkdownPageSelection?) -> Void)?) {
             onSelectionChanged = observer
         }
 
@@ -483,7 +851,14 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 "--bgColor-neutral-muted": theme.neutralMutedBackground,
                 "--borderColor-default": theme.border,
                 "--borderColor-muted": theme.mutedBorder,
-                "--borderColor-neutral-muted": theme.mutedBorder
+                "--borderColor-neutral-muted": theme.mutedBorder,
+                // Named for what they are rather than borrowed from
+                // github-markdown's palette: nothing in that stylesheet
+                // paints an accent, and these exist for marks cmux draws
+                // itself.
+                "--cmuxAccent": theme.accent,
+                "--cmuxOnAccent": theme.onAccent,
+                "--cmuxAccentHover": theme.accentHover
             ]
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
                   let json = String(data: data, encoding: .utf8) else { return }
@@ -569,9 +944,21 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 return
             }
             if let action = body["action"] as? String {
+                if action == "replyMarkHover" {
+                    let raw = body["id"] as? String
+                    onMarkHoverChanged?(raw.flatMap(UUID.init(uuidString:)))
+                    return
+                }
                 if action == "replySelectionChanged" {
-                    let quote = body["quote"] as? String ?? ""
-                    onSelectionChanged?(quote.isEmpty ? nil : quote)
+                    guard let quote = body["quote"] as? String, !quote.isEmpty,
+                          let start = body["start"] as? Int,
+                          let end = body["end"] as? Int, start < end else {
+                        onSelectionChanged?(nil)
+                        return
+                    }
+                    onSelectionChanged?(
+                        MarkdownPageSelection(quote: quote, range: start..<end)
+                    )
                     return
                 }
 #if DEBUG

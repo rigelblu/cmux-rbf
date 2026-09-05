@@ -1733,6 +1733,8 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		D36A00080000000000000001 /* RendererRealizationSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36A00080000000000000002 /* RendererRealizationSurface.swift */; };
 		A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */; };
 		804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804100000000000000000004 /* ReorderShortcutActionTests.swift */; };
+		A5009001 /* ReplyAnnotationManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5009000 /* ReplyAnnotationManifest.swift */; };
+		69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */; };
 		CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY01 /* ReplyPanelStore.swift */; };
 		69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */; };
 		CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY03 /* ReplyPanelView.swift */; };
@@ -4379,6 +4381,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		D36A00080000000000000002 /* RendererRealizationSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/RendererRealizationSurface.swift; sourceTree = "<group>"; };
 		A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReopenLastClosedTests.swift; sourceTree = "<group>"; };
 		804100000000000000000004 /* ReorderShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderShortcutActionTests.swift; sourceTree = "<group>"; };
+		A5009000 /* ReplyAnnotationManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyAnnotationManifest.swift; sourceTree = "<group>"; };
+		A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyAnnotationManifestRenderTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY01 /* ReplyPanelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStore.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStoreTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY03 /* ReplyPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelView.swift; sourceTree = "<group>"; };
@@ -6869,6 +6873,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				F5168A020000000000000002 /* MarkdownTypographyControl.swift */,
 				A5001419 /* MarkdownPanelView.swift */,
 				A50014F4 /* MarkdownWebRenderer.swift */,
+				A5009000 /* ReplyAnnotationManifest.swift */,
 				A50014F6 /* MarkdownRemoteImageLoader.swift */,
 				A50014F8 /* MarkdownWebSupport.swift */,
 				A50014F1 /* MarkdownViewerAssets.swift */,
@@ -7694,6 +7699,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				EF7347934AB1BD387686EE43 /* WorkspaceActionDispatcherTests.swift */,
 				E241BE1D74A7459C8D9C16BC /* WorkspaceTitleProvenanceTests.swift */,
 				A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */,
+				A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */,
 				9566D500C0784A9BB421125A /* WorkspaceAgentOccupancyTests.swift */,
 				7037714E5486486187F947DB /* CodexRenameSubmissionKeyDownTests.swift */,
 				0C715F488C0C4B40A127FFAB /* TerminalInputLineBufferTests.swift */,
@@ -9597,6 +9603,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D36A00060000000000000001 /* RendererRealizationPlanner.swift in Sources */,
 				D36A00070000000000000001 /* RendererRealizationReclaimTrigger.swift in Sources */,
 				D36A00080000000000000001 /* RendererRealizationSurface.swift in Sources */,
+				A5009001 /* ReplyAnnotationManifest.swift in Sources */,
 				CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */,
 				CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */,
 				C05400000000000000000007 /* RestartCommandRestoreSummaryRowView.swift in Sources */,
@@ -10936,6 +10943,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D36A00050000000000000001 /* RendererRealizationPlannerTests.swift in Sources */,
 				A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */,
 				804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */,
+				69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */,
 				69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */,
 				C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */,
 					F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */,
