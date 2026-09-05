@@ -712,6 +712,7 @@ extension Workspace {
                 pageZoom: Double(browserPanel.currentPageZoomFactor()),
                 developerToolsVisible: browserPanel.isDeveloperToolsVisible(),
                 isMuted: browserPanel.isMuted,
+                keepLoaded: browserPanel.keepLoaded,
                 omnibarVisible: browserPanel.isOmnibarVisible,
                 backHistoryURLStrings: historySnapshot.backHistoryURLStrings,
                 forwardHistoryURLStrings: historySnapshot.forwardHistoryURLStrings,

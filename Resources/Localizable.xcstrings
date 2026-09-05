@@ -30965,6 +30965,40 @@
         }
       }
     },
+    "browser.keepLoaded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Page Loaded"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ページの読み込みを維持"
+          }
+        }
+      }
+    },
+    "browser.keepLoaded.accessibilityLabel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Page Loaded: On"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ページの読み込みを維持: オン"
+          }
+        }
+      }
+    },
     "browser.moreActions": {
       "extractionState": "manual",
       "localizations": {

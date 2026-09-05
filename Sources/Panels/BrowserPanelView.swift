@@ -307,6 +307,13 @@ struct BrowserPanelView: View {
     /// omnibar, so the plain-action buttons collapse into an overflow menu.
     private static let compactChromeWidthThreshold: CGFloat = 420
 
+    /// Menu rows size an SF Symbol from the menu font, so the SF-backed items
+    /// need no size at all. A `BrowserIcons/*` asset has no such relationship and
+    /// falls back to its artboard size, so the one custom icon in the overflow
+    /// menu carries this explicitly.
+    private let overflowMenuIconPointSize: CGFloat = 14
+
+
     private var isChromeCompact: Bool {
         addressBarWidth > 0 && addressBarWidth < Self.compactChromeWidthThreshold
     }
@@ -1152,6 +1159,7 @@ struct BrowserPanelView: View {
                     browserProfileButton
                     browserThemeModeButton
                     developerToolsButton
+                    keepLoadedToolbarButton
                 }
             }
         }
@@ -1400,6 +1408,30 @@ struct BrowserPanelView: View {
         .accessibilityIdentifier("BrowserToggleDevToolsButton")
     }
 
+    private var keepLoadedToolbarButtonAccessibilityLabel: String {
+        panel.keepLoaded
+            ? String(localized: "browser.keepLoaded.accessibilityLabel", defaultValue: "Keep Page Loaded: On")
+            : String(localized: "browser.keepLoaded", defaultValue: "Keep Page Loaded")
+    }
+
+    private var keepLoadedToolbarButton: some View {
+        Button(action: {
+            panel.keepLoaded.toggle()
+        }) {
+            CmuxAssetSymbolImage(
+                assetName: panel.keepLoaded ? "BrowserIcons/MugSteam" : "BrowserIcons/Mug",
+                pointSize: devToolsButtonIconSize
+            )
+            .foregroundStyle(panel.keepLoaded ? Color.accentColor : devToolsColorOption.color)
+            .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
+        }
+        .buttonStyle(OmnibarAddressButtonStyle())
+        .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
+        .safeHelp(keepLoadedToolbarButtonAccessibilityLabel)
+        .accessibilityIdentifier("BrowserKeepLoadedButton")
+        .accessibilityLabel(keepLoadedToolbarButtonAccessibilityLabel)
+    }
+
     private var browserProfileButton: some View {
         Button(action: {
             isBrowserProfileMenuPresented.toggle()
@@ -1468,6 +1500,32 @@ struct BrowserPanelView: View {
 
             Button(action: { openDevTools() }) {
                 Label(developerToolsButtonHelp, systemImage: devToolsIconOption.rawValue)
+            }
+
+            Divider()
+
+            Button {
+                panel.keepLoaded.toggle()
+            } label: {
+                if panel.keepLoaded {
+                    Label(
+                        String(localized: "browser.keepLoaded", defaultValue: "Keep Page Loaded"),
+                        systemImage: "checkmark"
+                    )
+                } else {
+                    Label {
+                        Text(String(localized: "browser.keepLoaded", defaultValue: "Keep Page Loaded"))
+                    } icon: {
+                        // An SF Symbol in a menu row sizes itself from the menu's
+                        // font; an asset image does not, and this one's intrinsic
+                        // size is its 320pt artboard. Constrain it, or the row
+                        // renders a 320pt mug.
+                        CmuxAssetSymbolImage(
+                            assetName: "BrowserIcons/Mug",
+                            pointSize: overflowMenuIconPointSize
+                        )
+                    }
+                }
             }
         } label: {
             CmuxSystemSymbolImage(systemName: "ellipsis", pointSize: devToolsButtonIconSize, weight: .medium)

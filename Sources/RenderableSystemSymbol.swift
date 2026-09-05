@@ -291,3 +291,40 @@ struct CmuxSystemSymbolImage: View {
         }
     }
 }
+
+/// Asset-catalog twin of `CmuxSystemSymbolImage`, for the few marks cmux draws
+/// itself instead of taking from SF Symbols (`BrowserIcons/*`).
+///
+/// It exists to keep those marks at the same optical weight as the SF Symbols
+/// they sit beside: a bare `Image("name")` renders at its own intrinsic size and
+/// ignores `cmuxGlobalFontMagnificationPercent`, so a custom icon in a toolbar
+/// row drifts out of step with its neighbours as soon as the user changes the
+/// global font size. Sizing here is resolved through the same
+/// `resolvedRasterPointSize` its sibling uses.
+struct CmuxAssetSymbolImage: View {
+    @Environment(\.cmuxGlobalFontMagnificationPercent) private var globalFontPercent
+
+    let assetName: String
+    let pointSize: CGFloat
+    var alignment: Alignment = .center
+    var appliesGlobalFontMagnification = false
+
+    var body: some View {
+        let rasterSize = RenderableSystemSymbol.resolvedRasterPointSize(
+            pointSize,
+            globalFontPercent: globalFontPercent,
+            appliesGlobalFontMagnification: appliesGlobalFontMagnification
+        )
+        if let image = NSImage(named: assetName) {
+            Image(nsImage: image)
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: rasterSize, height: rasterSize, alignment: alignment)
+        } else {
+            Color.clear
+                .frame(width: rasterSize, height: rasterSize, alignment: alignment)
+                .accessibilityHidden(true)
+        }
+    }
+}

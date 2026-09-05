@@ -6,6 +6,7 @@ protocol BrowserHiddenWebViewDiscardManagerDelegate: AnyObject {
     var hiddenWebViewDiscardSnapshot: BrowserHiddenWebViewDiscardManager.BlockerSnapshot { get }
     var hiddenWebViewDiscardHiddenAt: Date? { get }
     var hiddenWebViewDiscardWebViewInstanceID: UUID { get }
+    var hiddenWebViewDiscardKeepLoaded: Bool { get }
 
     func hiddenWebViewDiscardManagerDidRequestDiscard(
         _ manager: BrowserHiddenWebViewDiscardManager,
@@ -110,6 +111,8 @@ final class BrowserHiddenWebViewDiscardManager {
 
         guard let delegate else { return }
         guard blockers(for: delegate.hiddenWebViewDiscardSnapshot).isEmpty else { return }
+
+        guard !delegate.hiddenWebViewDiscardKeepLoaded else { return }
 
         let observedWebViewInstanceID = delegate.hiddenWebViewDiscardWebViewInstanceID
         let generation = scheduleGeneration

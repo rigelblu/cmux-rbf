@@ -190,6 +190,7 @@ private final class BrowserHiddenWebViewDiscardTestDelegate: BrowserHiddenWebVie
     var snapshot: BrowserHiddenWebViewDiscardManager.BlockerSnapshot
     var hiddenAt: Date?
     var webViewInstanceID = UUID()
+    var hiddenWebViewDiscardKeepLoaded = false
     var discardRequestCount = 0
 
     init(snapshot: BrowserHiddenWebViewDiscardManager.BlockerSnapshot, hiddenAt: Date?) {

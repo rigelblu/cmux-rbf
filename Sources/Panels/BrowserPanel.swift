@@ -3074,6 +3074,12 @@ final class BrowserPanel: Panel, ObservableObject {
             reevaluateHiddenWebViewDiscardScheduling(reason: "react_grab_changed")
         }
     }
+    @Published var keepLoaded: Bool = false {
+        didSet {
+            guard oldValue != keepLoaded else { return }
+            reevaluateHiddenWebViewDiscardScheduling(reason: "keep_loaded_changed")
+        }
+    }
     lazy var designModeController = BrowserDesignModeController(
         surfaceID: id,
         script: BrowserDesignModeScript(),
@@ -5052,6 +5058,7 @@ final class BrowserPanel: Panel, ObservableObject {
     }
 
     func restoreSessionSnapshot(_ snapshot: SessionBrowserPanelSnapshot) {
+        keepLoaded = snapshot.keepLoaded
         // Diff viewer surfaces re-register their token from the on-disk manifest
         // and navigate via the app-owned custom scheme, so they restore even
         // though the local HTTP server that originally served them is gone.
@@ -6519,6 +6526,10 @@ extension BrowserPanel: BrowserHiddenWebViewDiscardManagerDelegate {
 
     var hiddenWebViewDiscardWebViewInstanceID: UUID {
         webViewInstanceID
+    }
+
+    var hiddenWebViewDiscardKeepLoaded: Bool {
+        keepLoaded
     }
 
     func hiddenWebViewDiscardManagerDidRequestDiscard(

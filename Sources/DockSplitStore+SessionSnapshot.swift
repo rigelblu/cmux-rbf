@@ -337,6 +337,7 @@ extension DockSplitStore {
                 pageZoom: Double(browser.currentPageZoomFactor()),
                 developerToolsVisible: browser.isDeveloperToolsVisible(),
                 isMuted: browser.isMuted,
+                keepLoaded: browser.keepLoaded,
                 omnibarVisible: browser.isOmnibarVisible,
                 backHistoryURLStrings: history.backHistoryURLStrings,
                 forwardHistoryURLStrings: history.forwardHistoryURLStrings,
