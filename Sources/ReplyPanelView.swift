@@ -23,7 +23,7 @@ struct ReplyPanelView: View {
     /// discarded because the panel re-resolved its agent. A transcript
     /// rewrite is the one thing that clears it, because the ids in hand then
     /// address a conversation that no longer exists.
-    @State private var draftsByMessageID: [String: ReplyAnnotationSet] = [:]
+    @State private var drafts = ReplyDrafts()
 
     /// The row whose note is open for writing, if any.
     ///
@@ -562,22 +562,22 @@ struct ReplyPanelView: View {
         .background(Color(nsColor: pageCanvas))
     }
 
-    // MARK: - The draft, and the message it belongs to
-
-    /// The reply the panel is showing, if any.
-    private var viewedMessageID: String? { store.model.viewedGroup?.id }
+    // MARK: - The draft, and the reply it belongs to
 
     /// The marks on the reply currently on screen.
+    ///
+    /// Addressed by the reply itself rather than by a key taken off it:
+    /// ``ReplyDrafts`` anchors on a message `seq`, because both handles a
+    /// ``ReplyMessageGroup`` offers are rewritten when paging completes a
+    /// turn the window started mid-answer.
     private var draft: ReplyAnnotationSet {
-        guard let viewedMessageID else { return ReplyAnnotationSet() }
-        return draftsByMessageID[viewedMessageID] ?? ReplyAnnotationSet()
+        guard let group = store.model.viewedGroup else { return ReplyAnnotationSet() }
+        return drafts.draft(for: group)
     }
 
     private func updateDraft(_ change: (inout ReplyAnnotationSet) -> Void) {
-        guard let viewedMessageID else { return }
-        var set = draftsByMessageID[viewedMessageID] ?? ReplyAnnotationSet()
-        change(&set)
-        draftsByMessageID[viewedMessageID] = set
+        guard let group = store.model.viewedGroup else { return }
+        drafts.update(for: group, change)
     }
 
     /// What the page should be painting.
@@ -886,7 +886,7 @@ struct ReplyPanelView: View {
         guard store.deliver(draft, workspace: workspace, submit: submit) else { return }
         // Cleared only on a dispatch that actually happened. A refused send
         // that wiped the notes would lose writing the user cannot get back.
-        if let viewedMessageID { draftsByMessageID[viewedMessageID] = nil }
+        if let group = store.model.viewedGroup { drafts.clear(for: group) }
         previewText = nil
         previewIsEdited = false
 

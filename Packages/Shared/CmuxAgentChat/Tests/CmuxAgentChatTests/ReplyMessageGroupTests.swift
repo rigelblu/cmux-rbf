@@ -323,4 +323,48 @@ struct ReplyMessageGroupTests {
         #expect(rendered.contains("&lt;script&gt;x&lt;/script&gt;"))
         #expect(!rendered.contains("<script>"))
     }
+
+    // MARK: - Paging a window that starts mid-answer
+
+    /// Neither handle on a group survives paging, and the second one is the
+    /// surprise: `seq` reads like a transcript position but is only ever
+    /// *the current first message's* position, so it moves with `id`.
+    ///
+    /// Observed 2026-09-07 while fixing `cm-69.2b`'s draft key, which had
+    /// been about to move from `id` to this field on the belief that it
+    /// "never moves": `(partial.seq -> 3) == (completed.seq -> 1)`.
+    /// Anything pinning to a reply must anchor on a **message** `seq` and
+    /// resolve it through membership, the way ``ReplyPanelModel`` does.
+    @Test("Paging the prompt in moves both the group's id and its seq")
+    func pagingMovesGroupIdentityAndPosition() {
+        // A window that starts mid-answer: the turn's tail, then its prompt.
+        let windowed = ReplyMessageGroup.groups(from: [
+            agentProse(id: "m3", seq: 3, text: "Third part.", apiMessageID: "msg_A"),
+            agentProse(id: "m4", seq: 4, text: "Fourth part.", apiMessageID: "msg_A"),
+            userProse(id: "m5", seq: 5, text: "Next prompt."),
+            agentProse(id: "m6", seq: 6, text: "Later reply.", apiMessageID: "msg_B"),
+        ])
+        let partial = try! #require(windowed.first)
+
+        // Paging older history in completes that same turn.
+        let paged = ReplyMessageGroup.groups(from: [
+            userProse(id: "m0", seq: 0, text: "The prompt."),
+            agentProse(id: "m1", seq: 1, text: "First part.", apiMessageID: "msg_Z"),
+            agentProse(id: "m2", seq: 2, text: "Second part.", apiMessageID: "msg_Z"),
+            agentProse(id: "m3", seq: 3, text: "Third part.", apiMessageID: "msg_A"),
+            agentProse(id: "m4", seq: 4, text: "Fourth part.", apiMessageID: "msg_A"),
+            userProse(id: "m5", seq: 5, text: "Next prompt."),
+            agentProse(id: "m6", seq: 6, text: "Later reply.", apiMessageID: "msg_B"),
+        ])
+        let completed = try! #require(paged.first)
+
+        // It is the same reply: the tail the window could see is still in it.
+        #expect(completed.messages.contains { $0.seq == 3 })
+        #expect(completed.messages.contains { $0.seq == 4 })
+
+        // And neither handle on it survived.
+        #expect(partial.id != completed.id)
+        #expect(partial.seq == 3)
+        #expect(completed.seq == 1)
+    }
 }
