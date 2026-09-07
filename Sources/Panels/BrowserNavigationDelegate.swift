@@ -594,7 +594,12 @@ import WebKit
 #endif
             clearAttemptedRequest(discardPendingBypasses: true)
             let reportTerminalCancellation = terminalPolicyCancellationReporter?(navigationAction, webView) ?? {}
-            openRequestInNewTab(navigationAction.request)
+            if let requestNavigation, owner?.shouldKeepNewTabRequestInPane(to: requestURL) == true {
+                // cmux-rbf `#cm-73`: Figma's read view: stay in the pane. See `FigmaStayInPane`.
+                requestNavigation(navigationAction.request, .currentTab, nil)
+            } else {
+                openRequestInNewTab(navigationAction.request)
+            }
             reportTerminalCancellation()
             decisionHandler(.cancel)
             return

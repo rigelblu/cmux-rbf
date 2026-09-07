@@ -279,6 +279,15 @@ object with:
 | `stores` | Per-agent hook store files that were read: `agent`, `path`, `exists`, `session_count`. |
 | `sessions` | The limited result set of session records. |
 
+Figma subcommands:
+
+| Command | Contract |
+| --- | --- |
+| `figma open <file-url>` | Open a Figma design as a chrome-free pane. Put the link in quotes: the shell reads the `?` and `&` in a Share link. Refuses a link that is not a Figma file: it must be `https`, on `figma.com`, `www.figma.com` or `embed.figma.com`, under `/design/`, `/file/`, `/board/` or `/slides/`, with no `..` or backslash in the path and no port, user name or password. **The surface depends on whether the URL names a node.** No `node-id` loads Figma's editor as given, so the pane is browsable. So does `node-id=0-1` (or `0:1`), the file's first page: it is the link Figma's Share button copies with nothing selected. Any other `node-id` loads cmux's wrapper page holding a framed, read-only embed of that node, in the pane's own light or dark. There is no `--theme` flag, and the address sent carries no theme. Prints `OK surface=<h> pane=<h> placement=split\|reuse`. The design lands beside the pane the command ran in (`CMUX_SURFACE_ID`); only if the app answers that the pane is not found does it fall back to the workspace in `CMUX_WORKSPACE_ID`. Supports `--workspace <handle>` and `--json`. An option it does not take (`--`-prefixed), a second word, or a blank option value is refused by name, and nothing is sent. |
+| `figma goto <node-id>` | Point the open Figma pane at a node in the read view, accepting `12-2` or `12:2` as they arrive. `goto 0-1` names the id on purpose and opens the read view, unlike a pasted link. Prints `OK` and nothing else — anything more lands in the transcript the user is reading. **`goto` counts a browser pane only when it shows a Figma file and has no address bar** (`browser.url.get` reports `show_omnibar: false`), which is the pane `figma open` makes. It looks in the workspace that holds the pane the command ran in (`CMUX_SURFACE_ID`), so it still finds the pane after the terminal's tab was moved; if that pane has closed it uses `CMUX_WORKSPACE_ID`. A reply without `show_omnibar` counts as an ordinary pane. A Figma file open in a browser pane with an address bar does not count, and `--surface <handle>` still moves it, or any other browser pane that shows a Figma file. With no counted pane and an ordinary browser pane on a Figma file, `goto` fails, moves nothing and names those panes. With two or more counted panes it fails and lists them. A blank frame id fails like a missing one. Supports `--surface` and `--json`; a `--`-prefixed option it does not take, a second word, or a blank option value is refused by name; a single-dash word such as `-12` is taken as the frame id. |
+
+**The pane's URL is the binding, and there is no other state.** In editor mode that URL is the Figma document. In embed mode it is the wrapper page carrying the embed URL in its `embed` query parameter, so `goto` and a restart both recover the file from it. Verified across a real app restart on the September build (2026-09-08), not re-run on this one.
+
 Auth subcommands:
 
 | Command | Contract |
@@ -755,6 +764,7 @@ the expected text without connecting to a cmux socket.
 - `cmux --help` -> `open <path-or-url>...`
 - `cmux --help` -> `sessions [list] [options]`
 - `cmux help` -> `cmux - control cmux via Unix socket`
+- `cmux figma --help` -> `Usage: cmux figma`
 - `cmux --help` -> `cmux guide | cmux --skill`
 - `cmux cloud --help` -> `guide | --skill`
 - `cmux guide` -> `# cmux guide`

@@ -488,13 +488,20 @@ extension TerminalController {
         let outcome = await v2MainAsync {
             let mainParams = request.params.mapValues(\.foundationObject)
             let mainID = request.id?.foundationObject
-            return self.v2MainActorResponse(
+            let outcome = self.v2MainActorResponse(
                 request: request,
                 id: mainID,
                 method: method,
                 params: mainParams,
                 diffViewerRegistration: diffViewerRegistration
             )
+            // cmux-rbf `#cm-73`: `surface.list` is served from the published
+            // snapshot, and the refresh below is scheduled after this reply,
+            // so `figma goto` right after `figma open` read a stale list and missed
+            // the new pane. Publish before replying. Reject on upstream sync only if
+            // upstream publishes before it replies.
+            if method == "browser.open_split" { self.publishSocketReadSnapshot() }
+            return outcome
         }
         Task { @MainActor [weak self] in
             self?.scheduleSocketReadSnapshotRefresh()
