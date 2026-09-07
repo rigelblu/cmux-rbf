@@ -56,7 +56,10 @@ final class ReplyPanelStore {
     /// How many older transcript lines one `◄`-triggered page reads.
     private static let historyPageLimit = 300
 
-    private var boundSessionID: String?
+    /// Readable so the view can scope per-session state to it — `ReplyDrafts`
+    /// keys on it, because a `seq` alone is a transcript line index that every
+    /// session has. Still store-written only.
+    private(set) var boundSessionID: String?
     private var stickyPanelID: UUID?
     private var tailer: AgentChatTranscriptTailer?
 

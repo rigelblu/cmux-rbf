@@ -571,13 +571,15 @@ struct ReplyPanelView: View {
     /// ``ReplyMessageGroup`` offers are rewritten when paging completes a
     /// turn the window started mid-answer.
     private var draft: ReplyAnnotationSet {
-        guard let group = store.model.viewedGroup else { return ReplyAnnotationSet() }
-        return drafts.draft(for: group)
+        guard let group = store.model.viewedGroup,
+              let sessionID = store.boundSessionID else { return ReplyAnnotationSet() }
+        return drafts.draft(for: group, in: sessionID)
     }
 
     private func updateDraft(_ change: (inout ReplyAnnotationSet) -> Void) {
-        guard let group = store.model.viewedGroup else { return }
-        drafts.update(for: group, change)
+        guard let group = store.model.viewedGroup,
+              let sessionID = store.boundSessionID else { return }
+        drafts.update(for: group, in: sessionID, change)
     }
 
     /// What the page should be painting.
@@ -886,7 +888,9 @@ struct ReplyPanelView: View {
         guard store.deliver(draft, workspace: workspace, submit: submit) else { return }
         // Cleared only on a dispatch that actually happened. A refused send
         // that wiped the notes would lose writing the user cannot get back.
-        if let group = store.model.viewedGroup { drafts.clear(for: group) }
+        if let group = store.model.viewedGroup, let sessionID = store.boundSessionID {
+            drafts.clear(for: group, in: sessionID)
+        }
         previewText = nil
         previewIsEdited = false
 

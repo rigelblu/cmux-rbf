@@ -9,6 +9,9 @@ import Testing
 /// leave the footer, nothing says so, and there is no copy of them anywhere.
 @Suite("ReplyDrafts")
 struct ReplyDraftsTests {
+    /// The bound session, for every test that is not about two of them.
+    private static let session = "session-one"
+
     private func agentProse(seq: Int, text: String, apiMessageID: String?) -> ChatMessage {
         ChatMessage(
             id: "m\(seq)",
@@ -61,8 +64,8 @@ struct ReplyDraftsTests {
         let partial = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
 
         var drafts = ReplyDrafts()
-        drafts.update(for: partial) { $0.insert(note("Say why here.")) }
-        #expect(drafts.draft(for: partial).annotations.count == 1)
+        drafts.update(for: partial, in: Self.session) { $0.insert(note("Say why here.")) }
+        #expect(drafts.draft(for: partial, in: Self.session).annotations.count == 1)
 
         // Press `◄` far enough back that the panel pages in older history.
         let completed = try! #require(ReplyMessageGroup.groups(from: pagedWindow).first)
@@ -73,22 +76,22 @@ struct ReplyDraftsTests {
         #expect(completed.seq != partial.seq)
 
         // The notes are still there, on the reply they were written on.
-        #expect(drafts.draft(for: completed).annotations.count == 1)
-        #expect(drafts.draft(for: completed).annotations.first?.note == "Say why here.")
+        #expect(drafts.draft(for: completed, in: Self.session).annotations.count == 1)
+        #expect(drafts.draft(for: completed, in: Self.session).annotations.first?.note == "Say why here.")
     }
 
     @Test("Editing after a paging event updates the draft rather than starting a second")
     func editAfterPagingKeepsOneDraft() {
         let partial = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
         var drafts = ReplyDrafts()
-        drafts.update(for: partial) { $0.insert(note("First.")) }
+        drafts.update(for: partial, in: Self.session) { $0.insert(note("First.")) }
 
         let completed = try! #require(ReplyMessageGroup.groups(from: pagedWindow).first)
-        drafts.update(for: completed) { $0.insert(note("Second.", at: 20..<30)) }
+        drafts.update(for: completed, in: Self.session) { $0.insert(note("Second.", at: 20..<30)) }
 
-        #expect(drafts.draft(for: completed).annotations.count == 2)
+        #expect(drafts.draft(for: completed, in: Self.session).annotations.count == 2)
         // And the reply is still one draft, not two halves under two keys.
-        #expect(drafts.draft(for: partial).annotations.count == 2)
+        #expect(drafts.draft(for: partial, in: Self.session).annotations.count == 2)
     }
 
     @Test("A draft belongs to its own reply and no other")
@@ -99,10 +102,10 @@ struct ReplyDraftsTests {
         let newer = groups[1]
 
         var drafts = ReplyDrafts()
-        drafts.update(for: older) { $0.insert(note("On the older one.")) }
+        drafts.update(for: older, in: Self.session) { $0.insert(note("On the older one.")) }
 
-        #expect(drafts.draft(for: older).annotations.count == 1)
-        #expect(drafts.draft(for: newer).annotations.isEmpty)
+        #expect(drafts.draft(for: older, in: Self.session).annotations.count == 1)
+        #expect(drafts.draft(for: newer, in: Self.session).annotations.isEmpty)
     }
 
     @Test("Clearing a delivered reply leaves every other reply's notes alone")
@@ -112,13 +115,13 @@ struct ReplyDraftsTests {
         let newer = groups[1]
 
         var drafts = ReplyDrafts()
-        drafts.update(for: older) { $0.insert(note("Older.")) }
-        drafts.update(for: newer) { $0.insert(note("Newer.")) }
+        drafts.update(for: older, in: Self.session) { $0.insert(note("Older.")) }
+        drafts.update(for: newer, in: Self.session) { $0.insert(note("Newer.")) }
 
-        drafts.clear(for: newer)
+        drafts.clear(for: newer, in: Self.session)
 
-        #expect(drafts.draft(for: newer).annotations.isEmpty)
-        #expect(drafts.draft(for: older).annotations.count == 1)
+        #expect(drafts.draft(for: newer, in: Self.session).annotations.isEmpty)
+        #expect(drafts.draft(for: older, in: Self.session).annotations.count == 1)
     }
 
     /// Clearing resolves through the same anchor a write used, so a delivery
@@ -127,23 +130,23 @@ struct ReplyDraftsTests {
     func clearAfterPagingDropsTheDraft() {
         let partial = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
         var drafts = ReplyDrafts()
-        drafts.update(for: partial) { $0.insert(note("Send this.")) }
+        drafts.update(for: partial, in: Self.session) { $0.insert(note("Send this.")) }
 
         let completed = try! #require(ReplyMessageGroup.groups(from: pagedWindow).first)
-        drafts.clear(for: completed)
+        drafts.clear(for: completed, in: Self.session)
 
-        #expect(drafts.draft(for: completed).annotations.isEmpty)
-        #expect(drafts.draft(for: partial).annotations.isEmpty)
+        #expect(drafts.draft(for: completed, in: Self.session).annotations.isEmpty)
+        #expect(drafts.draft(for: partial, in: Self.session).annotations.isEmpty)
     }
 
     @Test("A reply nobody marked up reads as empty rather than as somebody else's draft")
     func unmarkedReplyIsEmpty() {
         let groups = ReplyMessageGroup.groups(from: pagedWindow)
         var drafts = ReplyDrafts()
-        drafts.update(for: groups[0]) { $0.insert(note("Only here.")) }
+        drafts.update(for: groups[0], in: Self.session) { $0.insert(note("Only here.")) }
 
-        #expect(drafts.draft(for: groups[1]).isEmpty)
-        #expect(!drafts.draft(for: groups[0]).isEmpty)
+        #expect(drafts.draft(for: groups[1], in: Self.session).isEmpty)
+        #expect(!drafts.draft(for: groups[0], in: Self.session).isEmpty)
     }
 
     // MARK: - The two other ways the window moves
@@ -160,7 +163,7 @@ struct ReplyDraftsTests {
         ]).first)
 
         var drafts = ReplyDrafts()
-        drafts.update(for: streaming) { $0.insert(note("On the first part.")) }
+        drafts.update(for: streaming, in: Self.session) { $0.insert(note("On the first part.")) }
 
         // The agent writes more of the same reply.
         let grown = try! #require(ReplyMessageGroup.groups(from: [
@@ -168,14 +171,14 @@ struct ReplyDraftsTests {
             agentProse(seq: 1, text: "First part.", apiMessageID: "msg_Z"),
             agentProse(seq: 2, text: "Second part.", apiMessageID: "msg_Z"),
         ]).first)
-        drafts.update(for: grown) { $0.insert(note("On the second.", at: 20..<30)) }
+        drafts.update(for: grown, in: Self.session) { $0.insert(note("On the second.", at: 20..<30)) }
 
         // One draft holding both, not two halves under two keys.
-        #expect(drafts.draft(for: grown).annotations.count == 2)
+        #expect(drafts.draft(for: grown, in: Self.session).annotations.count == 2)
 
         // And delivering it clears both.
-        drafts.clear(for: grown)
-        #expect(drafts.draft(for: grown).isEmpty)
+        drafts.clear(for: grown, in: Self.session)
+        #expect(drafts.draft(for: grown, in: Self.session).isEmpty)
     }
 
     /// The window is bounded, so its oldest messages are dropped. A reply
@@ -186,13 +189,41 @@ struct ReplyDraftsTests {
     func draftSurvivesTrimmingTheReplysHead() {
         let whole = try! #require(ReplyMessageGroup.groups(from: pagedWindow).first)
         var drafts = ReplyDrafts()
-        drafts.update(for: whole) { $0.insert(note("Written before the trim.")) }
+        drafts.update(for: whole, in: Self.session) { $0.insert(note("Written before the trim.")) }
 
         // The window slides: the prompt and the reply's first blocks go.
         let trimmed = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
         #expect(!trimmed.messages.contains { $0.seq == 1 })
 
-        #expect(drafts.draft(for: trimmed).annotations.count == 1)
-        #expect(drafts.draft(for: trimmed).annotations.first?.note == "Written before the trim.")
+        #expect(drafts.draft(for: trimmed, in: Self.session).annotations.count == 1)
+        #expect(drafts.draft(for: trimmed, in: Self.session).annotations.first?.note == "Written before the trim.")
+    }
+
+    // MARK: - Two sessions, one pane
+
+    /// A `seq` is a transcript **line index**, so every session has one.
+    /// `ReplyPanelView` holds a single `@State ReplyDrafts` that `refresh()`
+    /// never resets — it short-circuits on an unchanged session and otherwise
+    /// re-binds the store, leaving the view's own state alone. So two
+    /// transcripts with a message at the same line share a draft.
+    @Test("A draft on one session's reply does not show on another session's")
+    func draftsAreScopedToTheirSession() {
+        let sessionA = try! #require(ReplyMessageGroup.groups(from: [
+            userProse(seq: 39, text: "Prompt in session A."),
+            agentProse(seq: 40, text: "Answer in session A.", apiMessageID: "msg_A"),
+        ]).first)
+        let sessionB = try! #require(ReplyMessageGroup.groups(from: [
+            userProse(seq: 39, text: "Prompt in session B."),
+            agentProse(seq: 40, text: "Answer in session B.", apiMessageID: "msg_B"),
+        ]).first)
+
+        var drafts = ReplyDrafts()
+        drafts.update(for: sessionA, in: "session-A") { $0.insert(note("Meant for session A.")) }
+
+        #expect(drafts.draft(for: sessionB, in: "session-B").isEmpty)
+        // And session A still has its own — scoping the key must not drop the
+        // draft, only stop it leaking. A note written before a session change
+        // is still what the user wanted to say (Tom, 2026-09-07).
+        #expect(drafts.draft(for: sessionA, in: "session-A").annotations.count == 1)
     }
 }
