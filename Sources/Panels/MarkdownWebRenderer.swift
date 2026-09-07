@@ -221,6 +221,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                usually several at once. */
             .${MARK}[data-cmux-active="1"] {
               background: var(--cmuxAccentHover, rgba(139, 92, 246, 0.28));
+              color: var(--cmuxOnAccentHover, #fff);
             }
             /* One hue at a time: the numeral follows the wash it sits in. */
             .${MARK}[data-cmux-active="1"][data-cmux-num]::after { color: inherit; }
@@ -287,6 +288,18 @@ struct MarkdownWebRenderer: NSViewRepresentable {
               const from = Math.max(mark.start, entry.start);
               const to = Math.min(mark.end, entry.start + length);
               if (from >= to) continue;
+              // Whitespace between blocks is in the offset space but must
+              // not be painted. A selection spanning two paragraphs covers
+              // the newline nodes between them, and wrapping those drew a
+              // thin coloured sliver on an otherwise empty line — invisible
+              // while the mark was a 28% wash, obvious the moment the fill
+              // went opaque (Tom, dogfood 2026-09-07).
+              //
+              // Skipped at *paint* time, deliberately not excluded from
+              // `textNodes()`: the walk defines the offset coordinate space,
+              // and dropping nodes from it would move every offset after
+              // them and invalidate marks already recorded.
+              if (!entry.node.nodeValue.slice(from - entry.start, to - entry.start).trim()) continue;
               pieces.push({ node: entry.node, from: from - entry.start, to: to - entry.start });
             }
             pieces.forEach((piece, index) => {
@@ -858,7 +871,8 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 // itself.
                 "--cmuxAccent": theme.accent,
                 "--cmuxOnAccent": theme.onAccent,
-                "--cmuxAccentHover": theme.accentHover
+                "--cmuxAccentHover": theme.accentHover,
+                "--cmuxOnAccentHover": theme.onAccentHover
             ]
             guard let data = try? JSONSerialization.data(withJSONObject: payload),
                   let json = String(data: data, encoding: .utf8) else { return }

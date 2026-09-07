@@ -101,6 +101,14 @@ struct ReplyAnnotationManifest<Field: View>: View {
     /// about themes.
     let hoverFill: Color
 
+    /// What text sits on `hoverFill`.
+    ///
+    /// Needed only since the fill went opaque. While it was a wash the row's
+    /// own colours kept reading through it; a solid fill has no ground
+    /// showing through, so the row has to say what goes on top — the same
+    /// reason the page's mark gained `onAccentHover` in the same change.
+    let hoverTextFill: Color
+
     /// How tall the list may grow before it scrolls.
     let ceiling: CGFloat
 
@@ -175,24 +183,34 @@ struct ReplyAnnotationManifest<Field: View>: View {
     /// It used to be one unconditionally, which forced the explicit measured
     /// height: a `ScrollView` is greedy, so `maxHeight` alone made the footer
     /// full-height at one note, and `fixedSize` then ignored the ceiling and
-    /// drew the footer over the reply. A plain `VStack` is not greedy, so
-    /// under the ceiling `maxHeight` does exactly the right thing and the
-    /// measurement only has to decide *which* container.
+    /// drew the footer over the reply.
     ///
-    /// It also makes the list renderable: `ImageRenderer` lays out no
+    /// **`maxHeight` was the second version of that same bug, and it lasted
+    /// longer because it looked right in a render.** `.frame(maxHeight:)`
+    /// does not cap a view — it makes it *flexible up to* that height, so in
+    /// a space-distributing parent it takes everything offered. With one
+    /// highlight the footer filled the panel and squeezed the reply to a
+    /// couple of lines (Tom, dogfood 2026-09-07). The comment here used to
+    /// claim "a plain `VStack` is not greedy, so `maxHeight` does exactly the
+    /// right thing"; the greed belongs to the modifier, not the content.
+    ///
+    /// So the height is stated, not bounded: natural under the ceiling,
+    /// exactly the ceiling above it. The measurement only decides *which*.
+    ///
+    /// It also keeps the list renderable: `ImageRenderer` lays out no
     /// `ScrollView` content at all, so the first render of this view came back
     /// as a blank 276×301 with only the count line and the `⤢` on it.
     private var list: some View {
         Group {
             if atCeiling {
+                // A proportion, not a row count: the panel is as tall as the
+                // window, so "nine rows" would be right at exactly one height.
                 ScrollView { rows }
+                    .frame(height: ceiling)
             } else {
                 rows
             }
         }
-        // A proportion, not a row count: the panel is as tall as the window,
-        // so "nine rows" would be right at exactly one height.
-        .frame(maxHeight: ceiling, alignment: .top)
     }
 
     private var rows: some View {
@@ -223,7 +241,16 @@ struct ReplyAnnotationManifest<Field: View>: View {
                 // sat beside the box instead of above it.
                 Text(verbatim: "\u{201C}\(displayQuote(entry.quote))\u{201D}")
                     .font(.system(size: ReplyFooterMetrics.rowFontSize))
-                    .foregroundStyle(.secondary)
+                    // On the band it takes the band's ink, like everything
+                    // else in the row. Missed when the row's other text was
+                    // converted, because the quote only exists while editing
+                    // — so it is invisible in every state the render tests
+                    // cover except one (Tom, dogfood 2026-09-07).
+                    .foregroundStyle(
+                        hoveredID == entry.id
+                            ? AnyShapeStyle(hoverTextFill)
+                            : AnyShapeStyle(.secondary)
+                    )
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -263,9 +290,13 @@ struct ReplyAnnotationManifest<Field: View>: View {
                     // Never truncated. The list is a manifest of what Paste
                     // will send, and a row showing less than it sends defeats
                     // the footer's one job.
-                    Text(text(for: entry))
+                    Text(text(for: entry, hovered: hoveredID == entry.id))
                         .font(.system(size: ReplyFooterMetrics.rowFontSize))
-                        .foregroundStyle(entry.note.isEmpty ? .tertiary : .primary)
+                        .foregroundStyle(
+                            hoveredID == entry.id
+                                ? AnyShapeStyle(hoverTextFill)
+                                : AnyShapeStyle(entry.note.isEmpty ? .tertiary : .primary)
+                        )
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
@@ -310,9 +341,11 @@ struct ReplyAnnotationManifest<Field: View>: View {
     /// `n.  note` as one run, so a wrapped line returns to the gutter.
     /// `N9 138:1311` draws a four-line note as a single 256-wide text, not a
     /// hanging indent under a separate number column.
-    private func text(for entry: NumberedAnnotation) -> AttributedString {
+    private func text(for entry: NumberedAnnotation, hovered: Bool) -> AttributedString {
         var marker = AttributedString("\(entry.number).  ")
-        marker.foregroundColor = .secondary
+        // The numeral tracks the fill it sits on, not the page — the same
+        // rule the page's numeral follows inside an active mark.
+        marker.foregroundColor = hovered ? hoverTextFill : .secondary
         return marker + AttributedString(entry.note.isEmpty ? placeholder : entry.note)
     }
 
@@ -325,7 +358,11 @@ struct ReplyAnnotationManifest<Field: View>: View {
         } label: {
             Image(systemName: "xmark")
                 .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(
+                    hoveredID == entry.id
+                        ? AnyShapeStyle(hoverTextFill)
+                        : AnyShapeStyle(.secondary)
+                )
         }
         .buttonStyle(.plain)
         // Centred on the row's first line, not pinned to its top.

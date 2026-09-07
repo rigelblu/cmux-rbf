@@ -33,7 +33,7 @@ public struct ReplyAnnotation: Identifiable, Sendable, Equatable {
     /// into its text content.
     ///
     /// This is the DOM Range flattened to the two facts anything outside the
-    /// page needs: **document order** (marks are numbered by position, and
+    /// page needs: **selection order** (marks are numbered as they are made,
     /// the agent reads the list against a message it still holds) and
     /// **overlap** (a phrase already inside an annotation cannot start a
     /// second one). Keeping it here rather than page-side is what lets both
@@ -72,12 +72,23 @@ public struct ReplyAnnotation: Identifiable, Sendable, Equatable {
 /// the trailing block would have to be reshaped for `cm-69.2b`, and every
 /// call site with it.
 public struct ReplyAnnotationSet: Sendable, Equatable {
-    /// Anchored instructions, in **document order** — the order the spans
-    /// appear in the message, never the order they were written.
+    /// Anchored instructions, in **selection order** — the order the user
+    /// made them, never where the spans sit in the message.
     ///
-    /// The agent reads the list top to bottom against a message it still
-    /// holds; presentation order that disagreed with reading order would
-    /// make it hunt.
+    /// **Reversed 2026-09-07 (Tom): document order was non-obvious.** Marking
+    /// a span and watching it appear *above* the one marked before it,
+    /// wearing a number you did not expect, reads as the panel rearranging
+    /// your work. Selection order means a new mark is always the last row,
+    /// which is where you are already looking.
+    ///
+    /// **The cost, accepted:** the numerals in the message no longer read
+    /// 1, 2, 3 top to bottom. Scanning the reply they appear in whatever
+    /// order the spans were marked. What it buys back is that the *list* is a
+    /// history of what you did, which is the surface you actually work in.
+    ///
+    /// **What does not change, and is why this is safe:** the footer, the
+    /// message markers and the payload all derive from this one array, so
+    /// they cannot disagree. Paste order is still list order.
     ///
     /// Read-only from outside: order is an invariant of the set, not a
     /// convention its callers agree to keep. As a rule in a view it would be
@@ -93,7 +104,7 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
     public var messageNotes: [String]
 
     public init(annotations: [ReplyAnnotation] = [], messageNotes: [String] = []) {
-        self.annotations = Self.inDocumentOrder(annotations)
+        self.annotations = annotations
         self.messageNotes = messageNotes
     }
 
@@ -114,7 +125,7 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
         guard !annotations.contains(where: { $0.range.overlaps(annotation.range) }) else {
             return false
         }
-        annotations = Self.inDocumentOrder(annotations + [annotation])
+        annotations.append(annotation)
         return true
     }
 
@@ -122,7 +133,7 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
     ///
     /// The only way in from outside, because `annotations` is read-only: a
     /// caller that could assign the array could also reorder it, and
-    /// document order is what every number on screen is derived from.
+    /// selection order is what every number on screen is derived from.
     public mutating func updateNote(id: UUID, note: String) {
         guard let index = annotations.firstIndex(where: { $0.id == id }) else { return }
         annotations[index].note = note
@@ -143,11 +154,10 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
     /// The marks with the numbers they carry — **one derivation for the
     /// message markers and the footer rows both.**
     ///
-    /// The number is a **position**, not an identity: the moment it stops
-    /// matching position it stops doing its only job, and the footer stops
-    /// matching paste order. So nothing persists a number, and there is no
-    /// second place for the markers and the rows to disagree within one
-    /// snapshot.
+    /// The number is a **position in this array**, not an identity: nothing
+    /// persists a number, so there is no second place for the markers and
+    /// the rows to disagree within one snapshot. Removing a mark renumbers
+    /// the rest, which renames positions and deletes nothing.
     ///
     /// Every mark is numbered, including one with no note yet: the number
     /// appears the moment the **mark** exists, not when text is typed into
@@ -156,21 +166,6 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
     /// the footer is the number the agent reads — see ``serialized()``.
     public var numbered: [NumberedAnnotation] {
         annotations.enumerated().map { NumberedAnnotation(number: $0.offset + 1, annotation: $0.element) }
-    }
-
-    /// Sorts by where the span sits, keeping insertion order among ties.
-    ///
-    /// Stable on purpose: ties are fixtures that carry no real position, and
-    /// a sort that reshuffled them would make the format tests depend on
-    /// which sort Swift happened to use.
-    private static func inDocumentOrder(_ annotations: [ReplyAnnotation]) -> [ReplyAnnotation] {
-        annotations.enumerated()
-            .sorted { lhs, rhs in
-                lhs.element.range.lowerBound == rhs.element.range.lowerBound
-                    ? lhs.offset < rhs.offset
-                    : lhs.element.range.lowerBound < rhs.element.range.lowerBound
-            }
-            .map(\.element)
     }
 
     /// The longest quote that still takes a one-line `> "…"` blockquote.
@@ -328,7 +323,7 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
 /// not to the annotation, and an annotation carrying its own number is the
 /// bug this shape exists to make unreachable.
 public struct NumberedAnnotation: Identifiable, Sendable, Equatable {
-    /// Position in document order, 1-based — what the marker prints and what
+    /// Position in selection order, 1-based — what the marker prints and what
     /// the footer row prints.
     public let number: Int
 

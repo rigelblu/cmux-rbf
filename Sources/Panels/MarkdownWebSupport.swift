@@ -261,6 +261,18 @@ struct MarkdownWebTheme: Equatable {
     /// Ships as a raw violet only if the accent has no hue to rotate.
     let accentHover: String
 
+    /// What sits legibly **on** the hovered mark.
+    ///
+    /// Same role `onAccent` plays for the accent, and it exists for the same
+    /// reason: text inside a wash has to track the wash, not the page. Now
+    /// that the fill is opaque there is no ground showing through to keep the
+    /// body colour readable, so the mark owns its own text colour.
+    let onAccentHover: String
+
+    /// `onAccentHover` as a colour, for the footer row that names the same
+    /// mark — bound from one value, exactly as `activeMarkColor` is.
+    let onActiveMarkColor: NSColor
+
     /// `accentHover` as a colour, for native chrome that names the same mark.
     ///
     /// **Why both, from one expression.** A hovered note in the Reply footer
@@ -327,33 +339,48 @@ struct MarkdownWebTheme: Equatable {
     /// exactly that way.
     let adjacentChromeColor: NSColor?
 
-    /// The hovered mark's wash — Rosé Pine's `iris`, at 28%.
+    /// The focused mark's fill — `#6A1B9A`, opaque, the same on both canvases.
     ///
-    /// **A fixed hue, and that is a deliberate reversal.** Until 2026-09-06
-    /// this was `NSColor.controlAccentColor` rotated 0.16 in hue, chosen so
-    /// the mark belonged to the colour the user had picked for their own
-    /// machine. Tom chose iris from seven candidates rendered side by side in
-    /// both appearances.
+    /// **Chosen by Tom on 2026-09-06/07 after ten candidates were tried live**
+    /// — Rosé Pine Dawn's seven accents, iris's dark variant, and two light
+    /// lavenders. The decision that actually settled it was not a hue but a
+    /// *shape*: a focused mark can **tint** the agent's words (a pale fill
+    /// with dark text, the words stay primary) or **block** them (a strong
+    /// fill with white text, the mark dominates). Everything tried was a
+    /// variation inside one of those two. Tom took the block.
     ///
-    /// **What the reversal costs:** the mark no longer follows the system
-    /// accent, so it stops feeling native on a machine set to anything else.
-    /// **What it buys:** one known hue in both appearances. The derived
-    /// version was a different colour on every machine, which made "does the
-    /// wash read against this theme?" unanswerable — a rendered check could
-    /// only ever speak for the machine it ran on.
+    /// **Why there is no alpha.** The mark used to be
+    /// `NSColor.controlAccentColor` weakened with alpha, and that was never a
+    /// choice about how a highlight should look. `controlAccentColor` is a
+    /// *foreground* colour — what macOS fills buttons with, built to carry
+    /// white text — so painting it behind the agent's dark body text needed
+    /// it weakened or the text was unreadable. The alpha manufactured a
+    /// background out of a colour that was not one, and it is what made every
+    /// candidate arrive pale: `#6A1B9A` reached the screen as `#D7C0E4`.
+    /// Choosing the hue directly removes the constraint, and the page always
+    /// has an opaque canvas under the mark (`pageTheme` resolves `.solid`).
+    /// Nothing else needed the translucency — overlapping marks are refused
+    /// at the model level, and a code span inside a mark paints over its
+    /// parent regardless.
     ///
-    /// Legibility is not what chose it. All seven candidates cleared WCAG AA
-    /// against the row's own text by a wide margin (iris: 15.7:1 light,
-    /// 11.9:1 dark, against a 4.5 floor), so the pick was a look decision and
-    /// is recorded as one.
+    /// **One hex for both appearances, and it is the only candidate that
+    /// managed it.** Every Rosé Pine hue needed a separate dark partner,
+    /// because Dawn is a *light-theme* palette: at full opacity six of its
+    /// seven clear AA against black text and only one clears it against
+    /// white. This fill is dark enough that its own ink (white, chosen by
+    /// `hoveredMarkInk` from the fill's luminance) clears AA on either canvas
+    /// at **9.4:1**, against Pine's 6.1.
     ///
-    /// **One hue for both appearances, for now.** Rosé Pine ships a lighter
-    /// iris for dark grounds (`#c4a7e7`); if 28% of this one reads muddy over
-    /// a dark Ghostty theme, that is the dial to turn, and `isDark` is
-    /// already in hand here.
-    static let irisWash = NSColor(
-        srgbRed: 0x90 / 255, green: 0x7a / 255, blue: 0xa9 / 255, alpha: 0.28
-    )
+    /// **Not the highest-contrast candidate, and that was the point.**
+    /// `#283593` scored 10.4:1 and was rejected: indigo sits beside the blue
+    /// the *resting* mark already uses, so focused-vs-resting became one hue
+    /// at two depths. Separating those two is the only job this colour has
+    /// left since the outline was deleted, so a hue that also shifts beats a
+    /// hue that only darkens.
+    static func hoveredMarkFill(isDark: Bool) -> NSColor {
+        _ = isDark
+        return NSColor(srgbRed: 0x6a / 255, green: 0x1b / 255, blue: 0x9a / 255, alpha: 1)
+    }
 
     static func resolve(
         backgroundColor: NSColor,
@@ -385,7 +412,11 @@ struct MarkdownWebTheme: Equatable {
             .usingColorSpace(.sRGB) ?? NSColor(srgbRed: 0, green: 0.48, blue: 1, alpha: 1)
         // Bound once so the CSS string and the `NSColor` cannot drift — see
         // `activeMarkColor`.
-        let hoveredMark = MarkdownWebTheme.irisWash
+        let hoveredMark = MarkdownWebTheme.hoveredMarkFill(isDark: isDark)
+        // Near-black rather than pure black, matching `onAccent`'s own pair.
+        let hoveredMarkInk: NSColor = hoveredMark.isLightColor
+            ? NSColor(srgbRed: 0.05, green: 0.06, blue: 0.09, alpha: 1)
+            : .white
         return MarkdownWebTheme(
             isDark: isDark,
             background: style == .solid ? base.markdownCSSColor : "transparent",
@@ -395,6 +426,13 @@ struct MarkdownWebTheme: Equatable {
             mutedBorder: border.withAlphaComponent(border.alphaComponent * 0.70).markdownCSSColor,
             accent: systemAccent.markdownCSSColor,
             accentHover: hoveredMark.markdownCSSColor,
+            // **Follows the fill, not the page.** Held fixed at white while
+            // the hues were trialled, so only one variable moved — but a
+            // light fill cannot carry white text (`#C4A7E7` gives 2.1:1),
+            // and a dark one cannot carry black. Same rule `onAccent`
+            // already applies for the same reason, one role up.
+            onAccentHover: hoveredMarkInk.markdownCSSColor,
+            onActiveMarkColor: hoveredMarkInk,
             activeMarkColor: hoveredMark,
             // White on every accent macOS ships except yellow, where it goes
             // near-black. Chosen by the accent's own luminance rather than by

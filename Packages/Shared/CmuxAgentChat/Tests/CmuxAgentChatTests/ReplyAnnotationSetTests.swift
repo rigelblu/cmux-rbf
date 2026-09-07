@@ -218,16 +218,33 @@ struct ReplyAnnotationOverlapTests {
         #expect(set.annotations.count == 2)
     }
 
-    @Test("An accepted selection lands in document order, wherever it was written")
-    func insertKeepsDocumentOrder() {
+    /// A new mark is always the last row, wherever its span sits.
+    ///
+    /// **This test asserted the opposite until 2026-09-07**, when Tom found
+    /// document order non-obvious in dogfood: marking a span and watching it
+    /// appear *above* the previous one, wearing a number he did not expect,
+    /// reads as the panel rearranging his work.
+    ///
+    /// The old rationale — "the agent reads the list against a message it
+    /// still holds, so presentation order disagreeing with reading order
+    /// would make it hunt" — was about the agent. The list is a surface the
+    /// *user* works in, and the agent has the quote on every entry, so it
+    /// never has to hunt for anything.
+    @Test("An accepted selection lands last, wherever its span sits")
+    func insertKeepsSelectionOrder() {
         var set = existing()
 
+        // Earlier in the message, marked second.
         #expect(set.insert(ReplyAnnotation(quote: "earlier", note: "", range: 0..<7)) == true)
 
-        // Written second, read first. The agent reads the list against a
-        // message it still holds; presentation order that disagreed with
-        // reading order would make it hunt.
-        #expect(set.annotations.map(\.quote) == ["earlier", "one answer is one reply"])
+        #expect(set.annotations.map(\.quote) == ["one answer is one reply", "earlier"])
         #expect(set.numbered.map(\.number) == [1, 2])
+        // The payload follows the same array, so the footer cannot show one
+        // order and send another — the property that made the old ordering
+        // safe still holds under the new one.
+        #expect(set.serialized().contains("""
+        2.
+        > "earlier"
+        """))
     }
 }

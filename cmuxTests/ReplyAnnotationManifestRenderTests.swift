@@ -40,11 +40,18 @@ struct ReplyAnnotationManifestRenderTests {
     /// line sits at y=0 here and at y=9 once the footer adds its top inset.
     static let firstLineHeight: CGFloat = 12
 
-    /// The shipped hovered-mark wash, at the shipped alpha, in a fixed hue.
-    /// Light enough that the ink scans below still read the glyph and not the
-    /// band — which is the property that lets the geometry tests run against
-    /// a hovered row at all.
-    static let hoverWash = NSColor(srgbRed: 0.55, green: 0.36, blue: 0.96, alpha: 0.28)
+    /// The shipped wash itself, no longer a stand-in.
+    ///
+    /// This was a hard-coded violet because the real colour was derived from
+    /// `NSColor.controlAccentColor` and therefore differed per machine — a
+    /// render check that varied with the tester's System Settings would have
+    /// been no check at all. Fixing the hue (2026-09-06) removed the reason
+    /// for the stand-in, so the render now draws what ships.
+    ///
+    /// Still light enough at 28% that the ink scans below read the glyph and
+    /// not the band, which is what lets the geometry tests run on a hovered
+    /// row at all.
+    static var hoverWash: NSColor { MarkdownWebTheme.hoveredMarkFill(isDark: false) }
 
     /// Where the note list starts, below the header.
     ///
@@ -130,12 +137,12 @@ struct ReplyAnnotationManifestRenderTests {
         // both puts the text's centre a whole line lower — which read as the
         // glyph being 6.5pt out when the real error was 2.5. The render is
         // what showed that; the arithmetic looked fine.
-        let block = scan(image, band: row, xs: 0..<150)
+        let block = scan(image, band: row, xs: 0..<150, on: Self.hoverWash)
         #expect(block.hasInk, "no note text found on row 2")
         let firstLine = block.minY..<(block.minY + ReplyFooterMetrics.rowLineHeight)
 
         let glyph = try removeInk(in: image, band: firstLine)
-        let note = scan(image, band: firstLine, xs: 0..<150)
+        let note = scan(image, band: firstLine, xs: 0..<150, on: Self.hoverWash)
 
         print(
             "row 2 first line \(firstLine) — ✕ centre \(glyph.centreY), "
@@ -180,7 +187,11 @@ struct ReplyAnnotationManifestRenderTests {
             ..< (boxTop + ReplyFooterMetrics.fieldInset.vertical + ReplyFooterMetrics.rowLineHeight)
         let expected = (firstLine.lowerBound + firstLine.upperBound) / 2
 
-        let glyph = try removeInk(in: image, band: 0..<CGFloat(image.pixelsHigh))
+        // Bounded to the hovered row, found from the band's own left strip —
+        // not from the glyph, and not from where I expect the glyph to be.
+        // Scanning the whole image made every white pixel on the page count
+        // as ink the moment "ink" started meaning *differs from the fill*.
+        let glyph = try removeInk(in: image, band: try #require(hoveredRowRows(in: image)))
 
         print("field \(lines)-line — box top \(boxTop), first line \(firstLine), "
             + "✕ centre \(glyph.centreY), expected \(expected)")
@@ -207,31 +218,7 @@ struct ReplyAnnotationManifestRenderTests {
         #expect(quote.maxX > Self.panelWidth / 3)
     }
 
-    // MARK: - Hover wash candidates
-
-    /// Candidates for the hovered wash, to be picked by looking.
-    ///
-    /// Rosé Pine Dawn's accents. The shipped colour is derived from the
-    /// user's own system accent (rotated 0.16 in hue), so anything chosen
-    /// here is a *fixed* hue and gives that up — worth knowing before
-    /// picking, not after.
-    static let hoverCandidates: [(name: String, hex: UInt32)] = [
-        ("Subtle", 0x797593), ("Love", 0xb4637a), ("Gold", 0xea9d34),
-        ("Rose", 0xd7827e), ("Pine", 0x286983), ("Foam", 0x56949f),
-        ("Iris", 0x907aa9),
-    ]
-
-    /// The alpha the wash actually ships at, so the preview is the product.
-    static let washAlpha: CGFloat = 0.28
-
-    static func rgb(_ hex: UInt32, alpha: CGFloat = 1) -> NSColor {
-        NSColor(
-            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
-            green: CGFloat((hex >> 8) & 0xFF) / 255,
-            blue: CGFloat(hex & 0xFF) / 255,
-            alpha: alpha
-        )
-    }
+    // MARK: - The hovered wash
 
     /// Relative luminance, WCAG's definition.
     private static func luminance(_ colour: NSColor) -> CGFloat {
@@ -249,70 +236,59 @@ struct ReplyAnnotationManifestRenderTests {
         return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
     }
 
-    /// One sheet per appearance, plus the number that decides the shortlist.
+    /// The wash sits *under* a row's own text, in both appearances.
     ///
-    /// **The picture is for choosing; the assertion is for ruling out.** A
-    /// wash sits *under the row's own text*, so a candidate that reads well
-    /// as a swatch can still swallow the note on it. Contrast is computed
-    /// from the composite — ground, then wash at the shipped alpha, then the
-    /// text — rather than from the raw hex, which is the number that would
-    /// mislead.
-    @Test("Hover wash candidates, both appearances", arguments: [false, true])
-    func hoverWashCandidates(dark: Bool) throws {
-        let ground = dark ? Self.rgb(0x0d1117) : NSColor.white
-        let text = dark ? NSColor.white : NSColor.black
+    /// **Why this is a standing test and not a one-off.** The hue used to be
+    /// derived from `NSColor.controlAccentColor`, so it was a different
+    /// colour on every machine and no rendered check could speak for anyone
+    /// else's. Since 2026-09-06 it is a fixed iris, which makes the question
+    /// answerable once — and worth answering, because the next person to
+    /// change the hue or the alpha has no other way to find out they made the
+    /// note unreadable.
+    ///
+    /// Measured on the composite (canvas, then wash, then text), never on the
+    /// raw hex — the hex is the number that would mislead.
+    @Test("The hovered wash keeps a row's text legible on both canvases", arguments: [false, true])
+    func hoveredWashKeepsTheRowLegible(dark: Bool) throws {
+        // **The mark's own ink against the mark's own fill** — not the page's
+        // body colour, which stopped applying the moment the fill went
+        // opaque and the mark started carrying its own text colour.
+        // Measuring against the page's text was the check that would have
+        // passed `#C4A7E7` with white on it at 2.1:1.
+        let theme = MarkdownWebTheme.resolve(
+            backgroundColor: MarkdownBackgroundStyle.solidCanvas(isDark: dark),
+            style: .solid
+        )
+        let fill = try #require(theme.activeMarkColor.usingColorSpace(.sRGB))
+        let ink = try #require(theme.onActiveMarkColor.usingColorSpace(.sRGB))
+        // Opaque, so the fill *is* the composite — nothing left to blend
+        // against, which is the point: the hex named is the hex on screen.
+        #expect(abs(fill.alphaComponent - 1) < 0.001)
+        let ratio = Self.contrast(fill, ink)
 
-        var report: [String] = []
-        let sheet = VStack(alignment: .leading, spacing: 0) {
-            ForEach(Self.hoverCandidates, id: \.name) { candidate in
-                Self.candidateRow(candidate, dark: dark)
-            }
-        }
-        .frame(width: Self.panelWidth)
-        .background(Color(nsColor: ground))
-        .environment(\.colorScheme, dark ? .dark : .light)
-
-        let renderer = ImageRenderer(content: sheet)
-        renderer.scale = 2                        // for looking at, not measuring
-        let image = try #require(renderer.nsImage)
-        let data = try #require(image.tiffRepresentation)
-        try write(try #require(NSBitmapImageRep(data: data)),
-                  named: "hover-candidates-\(dark ? "dark" : "light")")
-
-        for candidate in Self.hoverCandidates {
-            let wash = Self.rgb(candidate.hex, alpha: Self.washAlpha)
-            let composite = ground.blended(withFraction: Self.washAlpha, of: wash) ?? ground
-            let ratio = Self.contrast(composite, text)
-            report.append(String(format: "%@ %.2f:1", candidate.name, Double(ratio)))
-            // 4.5:1 is WCAG AA for body text. A wash that fails it is out
-            // whatever it looks like as a swatch.
-            #expect(ratio >= 4.5, "\(candidate.name) leaves the note unreadable on \(dark ? "dark" : "light")")
-        }
-        print("hover candidates (\(dark ? "dark" : "light")): " + report.joined(separator: "  |  "))
+        print(String(format: "mark ink on fill (%@): %.1f:1", dark ? "dark" : "light", Double(ratio)))
+        // WCAG AA for body text. `#6A1B9A` with white gives 9.4:1 — the
+        // widest margin of the ten candidates tried, though the hue was
+        // chosen on looks and not on this number.
+        #expect(ratio >= 4.5)
     }
 
-    @MainActor
-    private static func candidateRow(
-        _ candidate: (name: String, hex: UInt32),
-        dark: Bool
-    ) -> some View {
-        HStack(spacing: 8) {
-            Text(candidate.name)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 46, alignment: .leading)
-            Text(verbatim: "1.  Does this hold when the tool call is last?")
-                .font(.system(size: ReplyFooterMetrics.rowFontSize))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 3)
-                .padding(.horizontal, ReplyFooterMetrics.hoverInset)
-                .background(
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(nsColor: rgb(candidate.hex, alpha: washAlpha)))
-                )
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+    /// The pick is the pick: a fixed hue, not the old machine-dependent one.
+    @Test("The wash is the chosen colour, and both spellings still agree")
+    func theWashIsTheChosenColour() throws {
+        let theme = MarkdownWebTheme.resolve(backgroundColor: .white, style: .solid)
+        let chosen = try #require(MarkdownWebTheme.hoveredMarkFill(isDark: false).usingColorSpace(.sRGB))
+        let shipped = try #require(theme.activeMarkColor.usingColorSpace(.sRGB))
+
+        #expect(abs(shipped.redComponent - chosen.redComponent) < 0.001)
+        #expect(abs(shipped.greenComponent - chosen.greenComponent) < 0.001)
+        #expect(abs(shipped.blueComponent - chosen.blueComponent) < 0.001)
+        #expect(abs(shipped.alphaComponent - 1) < 0.001)
+        // And the ink pairs with it in both spellings, same as the fill does.
+        #expect(theme.onAccentHover == theme.onActiveMarkColor.markdownCSSColor)
+        // And the page gets the same colour it does — see the drift guard in
+        // `MarkdownBackgroundStyleTests`.
+        #expect(theme.accentHover == theme.activeMarkColor.markdownCSSColor)
     }
 
     // MARK: - Rendering
@@ -337,14 +313,8 @@ struct ReplyAnnotationManifestRenderTests {
             placeholder: "What should change?",
             gutter: 10,
             fieldFill: .white,
-            // A fixed wash, not the machine's own accent. What ships is the
-            // *page's* hovered-mark colour, which is derived from
-            // `NSColor.controlAccentColor` and therefore differs per machine
-            // — a render check that varied with the tester's System Settings
-            // would be no check at all. That the two are the same colour is
-            // settled in `MarkdownBackgroundStyleTests`, where it can be
-            // asserted exactly; here the hue only has to be there.
             hoverFill: Color(nsColor: Self.hoverWash),
+            hoverTextFill: .white,
             ceiling: 281,
             measuredHeight: Binding(get: { height }, set: { height = $0 }),
             onBeginEditing: { _ in },
@@ -412,25 +382,58 @@ struct ReplyAnnotationManifestRenderTests {
     /// 258, so a `✕` that has drifted under the glyph reads as absent here
     /// rather than being counted as the glyph's own ink.
     private func removeInk(in image: NSBitmapImageRep, band: Range<CGFloat>) throws -> Ink {
-        let ink = scan(image, band: band, xs: 236..<256)
+        // The `✕` only ever shows on a hovered row, so the fill is its
+        // ground — never the page.
+        let ink = scan(image, band: band, xs: 236..<256, on: Self.hoverWash)
         #expect(ink.hasInk, "no ✕ ink in its column on this row")
         return ink
     }
 
-    /// The top edge of the open field's box, found by its accent border.
+    /// The vertical extent of the hovered row, from the band's left strip.
     ///
-    /// Saturation separates it from everything else on the page: the text is
-    /// grey or black (saturation ~0), and the hover wash is a 28% tint that
-    /// lands near 0.17. A full-strength accent stroke clears 0.35 whatever
-    /// hue the machine's accent happens to be.
-    private func accentBorderTop(in image: NSBitmapImageRep) -> CGFloat? {
+    /// The band reaches `hoverInset` past the row's content, so x=7 sits
+    /// inside it and outside everything the row draws — which makes it the
+    /// one column that answers "is this row hovered?" and nothing else.
+    private func hoveredRowRows(in image: NSBitmapImageRep) -> Range<CGFloat>? {
+        var rows: [Int] = []
         for y in 0..<image.pixelsHigh {
-            for x in 20..<60 where x < image.pixelsWide {
-                guard let colour = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
-                if colour.saturationComponent > 0.35, colour.alphaComponent > 0.5 {
-                    return CGFloat(y)
-                }
-            }
+            guard let c = image.colorAt(x: 7, y: y)?.usingColorSpace(.sRGB) else { continue }
+            if c.saturationComponent > 0.25, c.brightnessComponent < 0.95 { rows.append(y) }
+        }
+        guard let first = rows.first, let last = rows.last else { return nil }
+        return CGFloat(first)..<CGFloat(last + 1)
+    }
+
+    /// The top edge of the open field's box.
+    ///
+    /// **Found by the box's own white fill sitting inside the hovered band,
+    /// not by saturation.** Saturation worked while the hover was a 28% tint
+    /// that landed near 0.17 — well under the accent stroke's 0.35. The fill
+    /// became opaque `#6A1B9A` on 2026-09-07 and the band started clearing
+    /// that threshold itself, so the finder locked onto the row instead of
+    /// the field and the centring test went 14pt out. The test caught a real
+    /// change; the anchor was the thing that had to move.
+    ///
+    /// Two columns settle it together: one inside the box (white) and one in
+    /// the band beside it (the fill). Neither alone is enough — the sheet
+    /// above the band is white too, and "not white" is satisfied by any dark
+    /// glyph, which put the first attempt at y=3 on the header's own text.
+    ///
+    /// The band-only column is narrow by construction: it runs from the
+    /// gutter less `hoverInset` (x=6) to the gutter itself (x=10), because
+    /// the band reaches exactly that far past the row's content. x=7 is
+    /// inside it and outside the box.
+    private func accentBorderTop(in image: NSBitmapImageRep) -> CGFloat? {
+        func white(_ x: Int, _ y: Int) -> Bool {
+            guard let c = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { return false }
+            return c.brightnessComponent > 0.95 && c.saturationComponent < 0.1
+        }
+        func band(_ x: Int, _ y: Int) -> Bool {
+            guard let c = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { return false }
+            return c.saturationComponent > 0.25 && c.brightnessComponent < 0.95
+        }
+        for y in 0..<image.pixelsHigh where band(7, y) && white(45, y) {
+            return CGFloat(y)
         }
         return nil
     }
@@ -440,19 +443,36 @@ struct ReplyAnnotationManifestRenderTests {
         scan(image, band: band, xs: 0..<Int(Self.panelWidth * 2 / 3))
     }
 
-    private func scan(_ image: NSBitmapImageRep, band: Range<CGFloat>, xs: Range<Int>) -> Ink {
+    /// Ink is what differs from the surface it sits on — not what is dark.
+    ///
+    /// **This measured darkness until 2026-09-07, and the opaque fill broke
+    /// it silently.** With a `#6A1B9A` band the `✕` is *white on purple*, so
+    /// a "darker than 0.85" test finds the band and misses the glyph. The
+    /// centring test failed loudly; `removeGlyphDoesNotMoveBetweenRows` and
+    /// `removeGlyphCentresOnItsRow` kept **passing while measuring the band**,
+    /// because the scan is capped at x=256 and a full band gives the same
+    /// `maxX` on every row. A test that cannot fail is worse than one that
+    /// does.
+    private func scan(
+        _ image: NSBitmapImageRep,
+        band: Range<CGFloat>,
+        xs: Range<Int>,
+        on surface: NSColor = .white
+    ) -> Ink {
         var ink = Ink()
         let top = max(0, Int(band.lowerBound))
         let bottom = min(Int(band.upperBound), image.pixelsHigh)
-        guard top < bottom else { return ink }
-        let ys = top..<bottom
-        for y in ys {
+        guard top < bottom, let ground = surface.usingColorSpace(.sRGB) else { return ink }
+        for y in top..<bottom {
             for x in xs where x < image.pixelsWide {
-                guard let colour = image.colorAt(x: x, y: y) else { continue }
-                // Anything meaningfully darker than the white ground. The
-                // glyph is drawn in `.secondary`, so a strict black test
-                // would find nothing.
-                guard colour.brightnessComponent < 0.85, colour.alphaComponent > 0.1 else { continue }
+                guard let raw = image.colorAt(x: x, y: y),
+                      let colour = raw.usingColorSpace(.sRGB),
+                      colour.alphaComponent > 0.1 else { continue }
+                let distance = abs(colour.redComponent - ground.redComponent)
+                    + abs(colour.greenComponent - ground.greenComponent)
+                    + abs(colour.blueComponent - ground.blueComponent)
+                // Comfortably past antialiasing, comfortably under a glyph.
+                guard distance > 0.45 else { continue }
                 ink.hasInk = true
                 ink.minX = min(ink.minX, CGFloat(x))
                 ink.maxX = max(ink.maxX, CGFloat(x) + 1)

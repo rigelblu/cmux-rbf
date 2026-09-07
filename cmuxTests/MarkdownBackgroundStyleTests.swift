@@ -138,16 +138,27 @@ struct MarkdownBackgroundStyleTests {
         }
     }
 
-    /// And it is a *wash*, not an opaque fill.
+    /// It is an opaque fill, and it carries its own ink.
     ///
-    /// The footer draws it over its own ground, so an accidental alpha of 1
-    /// would hide the row's text under a solid block rather than tint it.
+    /// **This test used to assert the opposite** — that the mark stayed a
+    /// translucent wash — because the colour was `controlAccentColor`
+    /// weakened with alpha, which was the only way to make a background out
+    /// of a foreground colour. Choosing the hue directly (2026-09-07) removed
+    /// that need, and the alpha was what made every candidate arrive pale.
+    ///
+    /// Opaque means nothing shows through, so the pair is what matters: a
+    /// fill with no ink of its own would leave the page's body colour on a
+    /// surface it was never measured against.
     @Test
-    func theHoveredMarkStaysAWash() {
-        let theme = MarkdownWebTheme.resolve(backgroundColor: Self.lightTerminal, style: .solid)
-        let alpha = theme.activeMarkColor.usingColorSpace(.sRGB)?.alphaComponent ?? 1
-        #expect(alpha > 0.1)
-        #expect(alpha < 0.5)
+    func theFocusedMarkIsAnOpaqueFillWithItsOwnInk() throws {
+        for terminal in [Self.lightTerminal, Self.darkTerminal] {
+            let theme = MarkdownWebTheme.resolve(backgroundColor: terminal, style: .solid)
+            let fill = try #require(theme.activeMarkColor.usingColorSpace(.sRGB))
+            #expect(abs(fill.alphaComponent - 1) < 0.001)
+            #expect(abs(theme.onActiveMarkColor.alphaComponent - 1) < 0.001)
+            // Both spellings of the ink agree, exactly as the fill's do.
+            #expect(theme.onAccentHover == theme.onActiveMarkColor.markdownCSSColor)
+        }
     }
 
     /// The rule between the reply and its footer is the page's own hairline.

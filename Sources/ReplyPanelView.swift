@@ -618,6 +618,7 @@ struct ReplyPanelView: View {
                 // the page — so drawing them in two palettes made one object
                 // look like two.
                 hoverFill: Color(nsColor: pageTheme.activeMarkColor),
+                hoverTextFill: Color(nsColor: pageTheme.onActiveMarkColor),
                 ceiling: footerCeiling,
                 measuredHeight: $noteListHeight,
                 onBeginEditing: { beginEditing($0) },
