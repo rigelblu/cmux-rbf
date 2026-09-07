@@ -550,7 +550,7 @@ struct ReplyPanelView: View {
             //
             // Hover wins while it lasts, so moving the pointer still answers
             // "which one is that?" without losing where you were.
-            activeMarkID: hoveredID ?? editingID
+            activeMarkID: ReplyMarkFocus.id(hovered: hoveredID, editing: editingID)
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The canvas sits directly behind the web view, and it is not

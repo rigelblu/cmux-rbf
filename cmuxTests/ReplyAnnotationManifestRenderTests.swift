@@ -198,6 +198,33 @@ struct ReplyAnnotationManifestRenderTests {
         #expect(abs(glyph.centreY - expected) <= 1.5)
     }
 
+    /// The rule the brief states and the code implements on only one of the
+    /// two surfaces it names: *"a different tone marks the one in focus —
+    /// hovered, **or open in the footer's field**"*. The message's mark
+    /// resolves `hoveredID ?? editingID`; the footer row resolved `hoveredID`
+    /// alone, so opening a note lit the span and left its own row plain.
+    @Test("The row whose note is open wears the band, with no pointer on it")
+    func openRowWearsTheBandWithoutHover() throws {
+        let set = Self.sample()
+        let first = try #require(set.annotations.first)
+        let image = try render(set, editing: first.id, hovering: nil)
+        try write(image, named: "manifest-editing-unhovered")
+
+        let band = try #require(
+            hoveredRowRows(in: image),
+            "the open row drew no band at all"
+        )
+        // It is the open row that is banded, not some other one.
+        #expect(band.lowerBound < Self.rowBand(0).upperBound + 8)
+
+        // And the band does **not** drag the `✕` along with it. Removal is a
+        // control on the *hovered* row (settled 2026-09-04); a delete button
+        // appearing under a cursor that is somewhere else is a different
+        // promise, so the two states stay distinguishable.
+        let cross = scan(image, band: band, xs: 236..<256, on: Self.hoverWash)
+        #expect(!cross.hasInk, "the ✕ showed on a row with no pointer on it")
+    }
+
     @Test("Editing an entry puts its quote above the field, not beside it")
     func quotePrecedesTheField() throws {
         let set = Self.sample()

@@ -13,6 +13,22 @@ import SwiftUI
 /// These lived as a sentence in a companion brief (*"aligned to the first
 /// content row's line"*) and got built twice from arithmetic on it, wrong
 /// both times. A paraphrase of geometry drops what only the numbers carry.
+/// Which mark the panel is treating as in focus.
+///
+/// One rule, named once, because **two** surfaces draw it — the highlight in
+/// the message and the row in the footer — and the brief states it for both
+/// at once: *"a different tone marks the one in focus — hovered, or open in
+/// the footer's field"*. Written out at each call site it drifted: the page
+/// resolved `hoveredID ?? editingID` and the row resolved `hoveredID` alone,
+/// so opening a note lit the span and left its own row plain (Tom, dogfood
+/// 2026-09-07).
+///
+/// Hover wins while it lasts, so moving the pointer still answers *"which one
+/// is that?"* without losing where you were.
+enum ReplyMarkFocus {
+    static func id(hovered: UUID?, editing: UUID?) -> UUID? { hovered ?? editing }
+}
+
 enum ReplyFooterMetrics {
     static let topInset: CGFloat = 9
     static let rowGap: CGFloat = 7
@@ -84,6 +100,21 @@ struct ReplyAnnotationManifest<Field: View>: View {
     let entries: [NumberedAnnotation]
     let editingID: UUID?
     @Binding var hoveredID: UUID?
+
+    /// The row in focus: under the pointer, or with its note open.
+    ///
+    /// **One value, because the message's mark resolves the same way.** The
+    /// brief states the rule once for both surfaces — *"a different tone
+    /// marks the one in focus — hovered, or open in the footer's field"* —
+    /// and the panel passes `hoveredID ?? editingID` to the page. The row
+    /// resolved `hoveredID` alone, so opening a note lit the span in the
+    /// message and left its own row plain, and moving the pointer away
+    /// mid-note took the row's state with it (Tom, dogfood 2026-09-07).
+    ///
+    /// The `✕` deliberately does **not** follow this: removal is a control on
+    /// the *hovered* row (settled 2026-09-04), and a delete button appearing
+    /// under a cursor that is elsewhere is a different promise.
+    private var focusedID: UUID? { ReplyMarkFocus.id(hovered: hoveredID, editing: editingID) }
     let placeholder: String
     let gutter: CGFloat
 
@@ -247,7 +278,7 @@ struct ReplyAnnotationManifest<Field: View>: View {
                     // — so it is invisible in every state the render tests
                     // cover except one (Tom, dogfood 2026-09-07).
                     .foregroundStyle(
-                        hoveredID == entry.id
+                        focusedID == entry.id
                             ? AnyShapeStyle(hoverTextFill)
                             : AnyShapeStyle(.secondary)
                     )
@@ -290,10 +321,10 @@ struct ReplyAnnotationManifest<Field: View>: View {
                     // Never truncated. The list is a manifest of what Paste
                     // will send, and a row showing less than it sends defeats
                     // the footer's one job.
-                    Text(text(for: entry, hovered: hoveredID == entry.id))
+                    Text(text(for: entry, hovered: focusedID == entry.id))
                         .font(.system(size: ReplyFooterMetrics.rowFontSize))
                         .foregroundStyle(
-                            hoveredID == entry.id
+                            focusedID == entry.id
                                 ? AnyShapeStyle(hoverTextFill)
                                 : AnyShapeStyle(entry.note.isEmpty ? .tertiary : .primary)
                         )
@@ -313,7 +344,7 @@ struct ReplyAnnotationManifest<Field: View>: View {
             // to 18 and pushes everything below it down by six; rows that move
             // under the pointer cost more than the band is worth.
             RoundedRectangle(cornerRadius: 3)
-                .fill(hoveredID == entry.id ? hoverFill : .clear)
+                .fill(focusedID == entry.id ? hoverFill : .clear)
                 .padding(.vertical, -ReplyFooterMetrics.hoverPadding)
                 .padding(.horizontal, -ReplyFooterMetrics.hoverInset)
         )
@@ -359,7 +390,7 @@ struct ReplyAnnotationManifest<Field: View>: View {
             Image(systemName: "xmark")
                 .font(.system(size: 8, weight: .semibold))
                 .foregroundStyle(
-                    hoveredID == entry.id
+                    focusedID == entry.id
                         ? AnyShapeStyle(hoverTextFill)
                         : AnyShapeStyle(.secondary)
                 )
