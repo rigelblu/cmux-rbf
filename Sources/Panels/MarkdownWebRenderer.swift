@@ -178,12 +178,16 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// drag, so the last published value is held and duplicates dropped:
     /// without that, one drag across a paragraph posts a message per frame.
     ///
-    /// **Offsets are into the concatenated text nodes, and the quote is
-    /// `selection.toString()` — deliberately two different strings.** The
-    /// quote is what the user saw, block breaks and all; the offsets only
-    /// have to order marks and detect overlap, and they do that in their own
-    /// coordinate space. Wrapping a mark in a `<span>` adds no characters, so
-    /// painting never moves an offset.
+    /// **Offsets are into the concatenated rendered text nodes, and the quote
+    /// is `markdownOf(range)` — deliberately two different strings.** The
+    /// quote is the markdown behind what the user saw, so it carries marks
+    /// the offsets never counted; the offsets only have to order marks and
+    /// detect overlap, and they do that in their own coordinate space.
+    /// Wrapping a mark in a `<span>` adds no characters, so painting never
+    /// moves an offset.
+    ///
+    /// `selection.toString()` still decides *whether* there is a selection at
+    /// all — it is cheap, and whitespace-only reads the same either way.
     ///
     /// **The numeral is CSS-generated content, and that is load-bearing.**
     /// `content: attr(data-cmux-num)` keeps it out of `textContent`, so a

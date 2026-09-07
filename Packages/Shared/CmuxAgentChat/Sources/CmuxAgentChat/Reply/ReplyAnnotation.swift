@@ -3,10 +3,17 @@ import Foundation
 /// One anchored instruction: a span the user selected, and what they want
 /// done to it.
 ///
-/// The quote is the **rendered** text of the selection, verbatim — what the
-/// user actually saw, not the markdown behind it. That is settled and
-/// load-bearing: the agent is told `bold`, never `**bold**`, and changing it
-/// later retrains every agent that learned the shape.
+/// The quote is the **markdown** of the selection — the source behind what
+/// the user saw, so a span inside a bold run arrives as `**bold**` and a
+/// selected code block keeps its fence. Reversed 2026-09-06 (dogfood): the
+/// rendered text dropped every emphasis the user could see and swallowed the
+/// `Copy` button's label out of code blocks, so the agent was quoted words
+/// that did not appear anywhere in its own output.
+///
+/// This comment is the only record of that rule. The extraction runs in the
+/// page's injected script (`MarkdownWebRenderer`'s `markdownOf`), so no Swift
+/// test can hold it — which is exactly how the previous version survived a
+/// day after the code stopped agreeing with it.
 ///
 /// No context words are ever added around the span. If a quote is ambiguous
 /// on its own, the answer is for the user to select more, not for cmux to
@@ -18,12 +25,16 @@ public struct ReplyAnnotation: Identifiable, Sendable, Equatable {
     /// the list, not ids.
     public let id: UUID
 
-    /// The selection's rendered text, exactly as it appeared on screen.
+    /// The selection's markdown source, re-wrapped in whatever inline marks
+    /// enclosed it.
     ///
     /// May contain newlines. A selection running from the tail of one
     /// paragraph into the head of the next is **one** annotation — the case
-    /// `Range.surroundContents()` throws on — and its quote is the joined
-    /// rendered text with the block break preserved.
+    /// `Range.surroundContents()` throws on — and its quote keeps the block
+    /// break between them.
+    ///
+    /// Falls back to the rendered text only when the markdown emitter returns
+    /// nothing for the range.
     public let quote: String
 
     /// What the user wants done to that span.
@@ -192,6 +203,12 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
     /// **Which way to be wrong:** a fence where a blockquote would have fit
     /// costs two lines. A blockquote where a fence was needed reproduces the
     /// defect above. So this errs low on purpose.
+    ///
+    /// **It counts markdown, and that is right.** Since 2026-09-06 the quote
+    /// is the selection's source, so `**bold**` spends four characters the
+    /// reader never sees. That is not drift: the budget asks whether the line
+    /// wraps in the preview, and the preview renders the payload — the
+    /// markdown — not the span as it looked in the message.
     public static let inlineQuoteCharacterBudget = 36
 
     /// Whether there is nothing at all — no mark, no note.

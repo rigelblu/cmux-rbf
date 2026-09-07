@@ -32,6 +32,26 @@ struct ReplyAnnotationManifestRenderTests {
     /// The sidebar's width, and the width every frame is drawn at.
     static let panelWidth: CGFloat = 276
 
+    /// The ceiling handed to the manifest. **Inert — measured, not assumed.**
+    ///
+    /// It used to be a bare `281`, copied from the product's own pre-measure
+    /// fallback, which read as though the two had to agree. They do not, and
+    /// in this harness *nothing* here has to agree with it: `atCeiling` is
+    /// `measuredHeight > ceiling`, `measuredHeight` is deliberately left at 0
+    /// (see `render`), so the comparison is `0 > ceiling` and the plain
+    /// `VStack` branch is taken whatever this says.
+    ///
+    /// **Proven, not reasoned:** dropped to 40 — below every fixture — all
+    /// eight tests still passed. The first version of this comment claimed the
+    /// opposite, that lowering it would send the render down the `ScrollView`
+    /// branch and blank every assertion. The mutation refuted it.
+    ///
+    /// **So the ceiling is this suite's named coverage gap.** The `ScrollView`
+    /// branch, and therefore the whole ceiling behaviour, is not rendered by
+    /// anything here and cannot be while `ImageRenderer` lays out no
+    /// `ScrollView` content. A change that breaks it passes this suite.
+    static let inertCeiling: CGFloat = 281
+
     /// `N1 154:1404`, `N2 154:1403`, `N3 284:902`, `N9 284:906`,
     /// `N10 284:907`, `N11 274:918`, `L5 284:901` — all seven agree.
     static let glyphBox = (minX: CGFloat(258), maxX: CGFloat(266), height: CGFloat(12))
@@ -342,7 +362,7 @@ struct ReplyAnnotationManifestRenderTests {
             fieldFill: .white,
             hoverFill: Color(nsColor: Self.hoverWash),
             hoverTextFill: .white,
-            ceiling: 281,
+            ceiling: Self.inertCeiling,
             measuredHeight: Binding(get: { height }, set: { height = $0 }),
             onBeginEditing: { _ in },
             onRemove: { _ in },

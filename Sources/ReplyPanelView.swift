@@ -671,13 +671,40 @@ struct ReplyPanelView: View {
     }
 
     /// How tall the note list may grow before it scrolls.
+    ///
+    /// Three terms, and which one binds depends on the panel: above ~657pt
+    /// the 40% proportion is tightest, below ~514pt the 120pt minimum is, and
+    /// `minimumHeightAboveList` only decides the band between them.
     private var footerCeiling: CGFloat {
-        guard panelHeight > 0 else { return 281 }
-        return max(120, min(panelHeight * 0.40, panelHeight - Self.replyFloor))
+        guard panelHeight > 0 else { return Self.unmeasuredFooterCeiling }
+        return max(120, min(panelHeight * 0.40, panelHeight - Self.minimumHeightAboveList))
     }
 
-    /// The height the reply keeps whatever the footer does.
-    private static let replyFloor: CGFloat = 394
+    /// The ceiling used for the one layout pass before the panel has measured
+    /// itself.
+    ///
+    /// 40% of 702 — the reference panel the design's proportion was written
+    /// against (*"it stops growing at 40% of the panel — 281pt of 702"*). Not
+    /// shared with `ReplyAnnotationManifestRenderTests`, which needs a ceiling
+    /// its fixtures stay under and picks its own for that reason.
+    private static let unmeasuredFooterCeiling: CGFloat = 281
+
+    /// How close to the top of the panel the note list may grow.
+    ///
+    /// **This bounds the list, not the footer.** The count header, the two
+    /// delivery buttons and the footer's own vertical padding all sit outside
+    /// the ceiling — about 90pt — so the reply body keeps roughly 90pt less
+    /// than this number, not the number itself.
+    ///
+    /// It was `replyFloor = 394`, documented as *"the height the reply keeps
+    /// whatever the footer does"*, and that was false three ways: the term is
+    /// dead above ~657pt, overridden below ~514pt, and short by the chrome in
+    /// between. **What the reply actually keeps is ~304pt** through the whole
+    /// range above 514pt — an accepted cost, not a solved problem. The brief's
+    /// 394 was typed into a design sentence and never measured against a
+    /// render; `cm-69.9` — size the split between the reply and my highlights
+    /// myself — is where the size becomes the user's rather than a constant's.
+    private static let minimumHeightAboveList: CGFloat = 394
 
     private var placeholderText: String {
         String(localized: "reply.annotation.notePlaceholder", defaultValue: "What should change?")

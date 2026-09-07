@@ -568,14 +568,16 @@ extension NSColor {
     }
 }
 
-/// A selection the rendered page reported: what the user saw, and where it sits.
+/// A selection the rendered page reported: what the user marked, and where it
+/// sits.
 ///
-/// **Two coordinate systems on purpose.** `quote` is `selection.toString()` —
-/// the rendered text with its block breaks, which is what the agent is sent
-/// and what the user actually read. `range` counts characters across the
-/// page's text nodes, which has no block breaks in it at all. They never have
-/// to agree: the quote is the payload, and the range only has to order marks
-/// and answer whether two of them share a character.
+/// **Two coordinate systems on purpose.** `quote` is the selection's
+/// **markdown** — `markdownOf(range)`, the source behind what the user saw,
+/// which is what the agent is sent. `range` counts characters across the
+/// page's *rendered* text nodes. They never have to agree, and after the
+/// 2026-09-06 move to markdown they routinely do not: the quote is the
+/// payload, and the range only has to order marks and answer whether two of
+/// them share a character.
 struct MarkdownPageSelection: Equatable {
     let quote: String
     let range: Range<Int>
