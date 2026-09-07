@@ -1103,6 +1103,7 @@
 		B9000035A1B2C3D4E5F60719 /* CMUXCLI+DocsSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000031A1B2C3D4E5F60719 /* CMUXCLI+DocsSettings.swift */; };
 		B9000064A1B2C3D4E5F60719 /* CMUXCLI+Events.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000065A1B2C3D4E5F60719 /* CMUXCLI+Events.swift */; };
 		B9000046A1B2C3D4E5F60719 /* CMUXCLI+ExecutableResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000047A1B2C3D4E5F60719 /* CMUXCLI+ExecutableResolution.swift */; };
+		80730000000000000000000E /* CMUXCLI+Figma.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000D /* CMUXCLI+Figma.swift */; };
 		112950000000000000000008 /* CMUXCLI+Fork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112950000000000000000007 /* CMUXCLI+Fork.swift */; };
 		11295000000000000000000A /* CMUXCLI+ForkExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112950000000000000000009 /* CMUXCLI+ForkExecution.swift */; };
 		E8A71B06D1AC4C14AB090101 /* CMUXCLI+Guide.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8A71B06D1AC4C14AB090102 /* CMUXCLI+Guide.swift */; };
@@ -1691,6 +1692,25 @@
 		FEED0000000000000000F00B /* FeedPreviewWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F00A /* FeedPreviewWindowController.swift */; };
 		FEED0000000000000000F009 /* FeedSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F008 /* FeedSidebarUITests.swift */; };
 		FEED0000000000000000F00F /* FeedTextEditorDebugWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F00E /* FeedTextEditorDebugWindowController.swift */; };
+		80730000000000000000000A /* FigmaEditorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000009 /* FigmaEditorChrome.swift */; };
+		80730000000000000000000C /* FigmaEditorChromeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000B /* FigmaEditorChromeTests.swift */; };
+		807300000000000000000002 /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
+		807300000000000000000010 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
+		807300000000000000000011 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
+		807300000000000000000012 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
+		807300000000000000000003 /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
+		807300000000000000000005 /* FigmaPaneURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000004 /* FigmaPaneURLTests.swift */; };
+		807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000013 /* FigmaFileLinkTests.swift */; };
+		807300000000000000000022 /* FigmaCLIOutputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000021 /* FigmaCLIOutputTests.swift */; };
+		807300000000000000000016 /* FigmaWrapperPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000015 /* FigmaWrapperPageTests.swift */; };
+		807300000000000000000018 /* FigmaCLIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000017 /* FigmaCLIRules.swift */; };
+		80730000000000000000001C /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
+		80730000000000000000001E /* FigmaStayInPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001D /* FigmaStayInPane.swift */; };
+		807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001F /* FigmaStayInPaneTests.swift */; };
+		807300000000000000000019 /* FigmaCLIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000017 /* FigmaCLIRules.swift */; };
+		80730000000000000000001B /* FigmaCLIRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001A /* FigmaCLIRulesTests.swift */; };
+		807300000000000000000007 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
+		807300000000000000000008 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
 		4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29BA503AF85868C6325335B /* FeedWaiterRegistry.swift */; };
 		330A15CE33CDB525DE207F7F /* FeedWaiterRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B74E6D94323FE9C5804E0B4 /* FeedWaiterRegistryTests.swift */; };
 		10200F1E0000000000000007 /* FileContentChangeCoordinator+Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10200F1E0000000000000008 /* FileContentChangeCoordinator+Entry.swift */; };
@@ -5092,6 +5112,7 @@
 		B9000031A1B2C3D4E5F60719 /* CMUXCLI+DocsSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+DocsSettings.swift"; sourceTree = "<group>"; };
 		B9000065A1B2C3D4E5F60719 /* CMUXCLI+Events.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+Events.swift"; sourceTree = "<group>"; };
 		B9000047A1B2C3D4E5F60719 /* CMUXCLI+ExecutableResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+ExecutableResolution.swift"; sourceTree = "<group>"; };
+		80730000000000000000000D /* CMUXCLI+Figma.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+Figma.swift"; sourceTree = "<group>"; };
 		112950000000000000000007 /* CMUXCLI+Fork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+Fork.swift"; sourceTree = "<group>"; };
 		112950000000000000000009 /* CMUXCLI+ForkExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+ForkExecution.swift"; sourceTree = "<group>"; };
 		E8A71B06D1AC4C14AB090102 /* CMUXCLI+Guide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+Guide.swift"; sourceTree = "<group>"; };
@@ -5596,6 +5617,19 @@
 		FEED0000000000000000F00A /* FeedPreviewWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedPreviewWindowController.swift; sourceTree = "<group>"; };
 		FEED0000000000000000F008 /* FeedSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedSidebarUITests.swift; sourceTree = "<group>"; };
 		FEED0000000000000000F00E /* FeedTextEditorDebugWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedTextEditorDebugWindowController.swift; sourceTree = "<group>"; };
+		807300000000000000000009 /* FigmaEditorChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaEditorChrome.swift; sourceTree = "<group>"; };
+		80730000000000000000000B /* FigmaEditorChromeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeTests.swift; sourceTree = "<group>"; };
+		807300000000000000000001 /* FigmaPaneURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneURL.swift; sourceTree = "<group>"; };
+		80730000000000000000000F /* FigmaFileLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLink.swift; sourceTree = "<group>"; };
+		807300000000000000000004 /* FigmaPaneURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneURLTests.swift; sourceTree = "<group>"; };
+		807300000000000000000013 /* FigmaFileLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLinkTests.swift; sourceTree = "<group>"; };
+		807300000000000000000021 /* FigmaCLIOutputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIOutputTests.swift; sourceTree = "<group>"; };
+		807300000000000000000015 /* FigmaWrapperPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPageTests.swift; sourceTree = "<group>"; };
+		807300000000000000000017 /* FigmaCLIRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIRules.swift; sourceTree = "<group>"; };
+		80730000000000000000001A /* FigmaCLIRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIRulesTests.swift; sourceTree = "<group>"; };
+		80730000000000000000001D /* FigmaStayInPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaStayInPane.swift; sourceTree = "<group>"; };
+		80730000000000000000001F /* FigmaStayInPaneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaStayInPaneTests.swift; sourceTree = "<group>"; };
+		807300000000000000000006 /* FigmaWrapperPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPage.swift; sourceTree = "<group>"; };
 		B29BA503AF85868C6325335B /* FeedWaiterRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FeedWaiterRegistry.swift"; sourceTree = "<group>"; };
 		7B74E6D94323FE9C5804E0B4 /* FeedWaiterRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedWaiterRegistryTests.swift; sourceTree = "<group>"; };
 		10200F1E0000000000000008 /* FileContentChangeCoordinator+Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Panels/FileContentChangeCoordinator+Entry.swift"; sourceTree = "<group>"; };
@@ -9923,6 +9957,8 @@
 				8054A0060000000000000006 /* BrowserAutomationProbeChannel.swift */,
 				8054A0080000000000000008 /* BrowserAutomationSnapshotResult.swift */,
 				8054A00A000000000000000A /* BrowserJavaScriptEvaluationResult.swift */,
+				807300000000000000000009 /* FigmaEditorChrome.swift */,
+				80730000000000000000001D /* FigmaStayInPane.swift */,
 				D7C0DE00000000000000A108 /* BrowserJavaScriptCompletionBridge.swift */,
 				D7C0DE00000000000000A106 /* BrowserOmnibarPageFocusAdapter.swift */,
 				A5001412 /* BrowserPanel.swift */,
@@ -10577,6 +10613,11 @@
 		B9000003A1B2C3D4E5F60719 /* CLI */ = {
 			isa = PBXGroup;
 			children = (
+				807300000000000000000006 /* FigmaWrapperPage.swift */,
+				80730000000000000000000D /* CMUXCLI+Figma.swift */,
+				807300000000000000000001 /* FigmaPaneURL.swift */,
+				80730000000000000000000F /* FigmaFileLink.swift */,
+				807300000000000000000017 /* FigmaCLIRules.swift */,
 				805500000000000000000003 /* BrowserValueTextFormatter.swift */,
 				B9000001A1B2C3D4E5F60719 /* cmux.swift */,
 				D7AB12048000000000000002 /* CMUXCLI+RemoteWorkingDirectory.swift */,
@@ -11242,6 +11283,13 @@
 				846600000000000000000004 /* CLIWorkspaceGroupSafetyTests.swift */,
 				799100000000000000000002 /* CLIWorkspaceStableIDMockServer.swift */,
 				799100000000000000000004 /* CLIWorkspaceStableIDTests.swift */,
+				80730000000000000000000B /* FigmaEditorChromeTests.swift */,
+				807300000000000000000004 /* FigmaPaneURLTests.swift */,
+				807300000000000000000013 /* FigmaFileLinkTests.swift */,
+				807300000000000000000021 /* FigmaCLIOutputTests.swift */,
+				807300000000000000000015 /* FigmaWrapperPageTests.swift */,
+				80730000000000000000001A /* FigmaCLIRulesTests.swift */,
+				80730000000000000000001F /* FigmaStayInPaneTests.swift */,
 				AC61257DCDCA431A908C55CC /* CLIChildEnvironmentTests.swift */,
 				95C00A2330C34E7DA7630E4D /* CLIChildEnvironment.swift */,
 				805500000000000000000002 /* CLIBrowserEvalOutputTests.swift */,
@@ -13423,6 +13471,10 @@
 				FEED0000000000000000F013 /* FeedPermissionActionPolicy.swift in Sources */,
 				FEED0000000000000000F00B /* FeedPreviewWindowController.swift in Sources */,
 				FEED0000000000000000F00F /* FeedTextEditorDebugWindowController.swift in Sources */,
+				80730000000000000000000A /* FigmaEditorChrome.swift in Sources */,
+				807300000000000000000011 /* FigmaFileLink.swift in Sources */,
+				80730000000000000000001C /* FigmaPaneURL.swift in Sources */,
+				80730000000000000000001E /* FigmaStayInPane.swift in Sources */,
 				4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */,
 				10200F1E0000000000000007 /* FileContentChangeCoordinator+Entry.swift in Sources */,
 				10200F1E0000000000000001 /* FileContentChangeCoordinator.swift in Sources */,
@@ -15041,6 +15093,7 @@
 				B9000035A1B2C3D4E5F60719 /* CMUXCLI+DocsSettings.swift in Sources */,
 				B9000064A1B2C3D4E5F60719 /* CMUXCLI+Events.swift in Sources */,
 				B9000046A1B2C3D4E5F60719 /* CMUXCLI+ExecutableResolution.swift in Sources */,
+				80730000000000000000000E /* CMUXCLI+Figma.swift in Sources */,
 				112950000000000000000008 /* CMUXCLI+Fork.swift in Sources */,
 				11295000000000000000000A /* CMUXCLI+ForkExecution.swift in Sources */,
 				E8A71B06D1AC4C14AB090101 /* CMUXCLI+Guide.swift in Sources */,
@@ -15140,6 +15193,10 @@
 				7520C0DF0000000000000007 /* CodexTurnLedgerPersistence.swift in Sources */,
 				7520C0DF0000000000000009 /* CodexTurnLifecycleCoordinator.swift in Sources */,
 				FEEDC1A50000000000000001 /* FeedEventClassifier.swift in Sources */,
+				807300000000000000000002 /* FigmaPaneURL.swift in Sources */,
+				807300000000000000000010 /* FigmaFileLink.swift in Sources */,
+				807300000000000000000018 /* FigmaCLIRules.swift in Sources */,
+				807300000000000000000007 /* FigmaWrapperPage.swift in Sources */,
 				F97300010000000000000002 /* FreestyleInteractiveShellScript.swift in Sources */,
 				C51A73B20000000000000002 /* IOSScreenshotCommandResultBox.swift in Sources */,
 				A5FB1308 /* JSONCObjectEditor+Remove.swift in Sources */,
@@ -15687,6 +15744,17 @@
 				FEEDC0DEC0DEC0DEC0DE0001 /* FeedCoordinatorTests.swift in Sources */,
 				FEED49850000000000000001 /* FeedEventClassificationTests.swift in Sources */,
 				FEEDC1A50000000000000003 /* FeedEventClassifier.swift in Sources */,
+				80730000000000000000000C /* FigmaEditorChromeTests.swift in Sources */,
+				807300000000000000000003 /* FigmaPaneURL.swift in Sources */,
+				807300000000000000000012 /* FigmaFileLink.swift in Sources */,
+				807300000000000000000005 /* FigmaPaneURLTests.swift in Sources */,
+				807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */,
+				807300000000000000000022 /* FigmaCLIOutputTests.swift in Sources */,
+				807300000000000000000016 /* FigmaWrapperPageTests.swift in Sources */,
+				807300000000000000000019 /* FigmaCLIRules.swift in Sources */,
+				80730000000000000000001B /* FigmaCLIRulesTests.swift in Sources */,
+				807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */,
+				807300000000000000000008 /* FigmaWrapperPage.swift in Sources */,
 				FEEDC0DEC0DEC0DEC0DE0003 /* FeedJumpResolverTests.swift in Sources */,
 				330A15CE33CDB525DE207F7F /* FeedWaiterRegistryTests.swift in Sources */,
 				10200F1E0000000000000003 /* FileContentObserverTransferTests.swift in Sources */,

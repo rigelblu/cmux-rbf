@@ -3308,6 +3308,11 @@ final class BrowserPanel: Panel, ObservableObject {
                 self.applyCurrentAppWebTheme(to: webView)
                 // Keep find-in-page open through load completion and refresh matches for the new DOM.
                 self.restoreFindStateAfterNavigation(replaySearch: true)
+                // cmux-rbf `#cm-73`: Figma's editor is mostly fixed-width panels, so a cmux Figma
+                // pane has to collapse them or the design is not visible. The
+                // collapsed state is page state and dies with the document, so
+                // this runs on every load rather than once at open.
+                self.collapseFigmaEditorChromeIfNeeded(in: webView)
             }
         }
         navigationDelegate.didFailNavigation = { [weak self] failedWebView, failedURL, failureMessage, failedNavigation in
@@ -4838,6 +4843,32 @@ final class BrowserPanel: Panel, ObservableObject {
             return
         }
         webView.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    /// cmux-rbf `#cm-73`: whether a link asking for a new tab loads in this pane instead.
+    ///
+    /// Figma's *Open in Figma* mark, clicked in the read view, must not eject
+    /// you from the Figma pane — see ``FigmaStayInPane``.
+    func shouldKeepNewTabRequestInPane(to url: URL) -> Bool {
+        FigmaStayInPane.shouldLoadInThisPane(
+            paneURL: webView.url,
+            isOmnibarVisible: isOmnibarVisible,
+            target: url
+        )
+    }
+
+    /// cmux-rbf `#cm-73`: collapse Figma's editor panels when this pane is a cmux Figma pane.
+    ///
+    /// Gated so an ordinary browser pane the user navigated to Figma keeps its
+    /// panels — see ``FigmaEditorChrome/shouldMinimizeUI(paneURL:isOmnibarVisible:)``.
+    /// The script polls, because Figma's control does not exist until its app
+    /// has booted and navigation-finished is well before that.
+    private func collapseFigmaEditorChromeIfNeeded(in webView: WKWebView) {
+        guard FigmaEditorChrome.shouldMinimizeUI(
+            paneURL: webView.url,
+            isOmnibarVisible: isOmnibarVisible
+        ) else { return }
+        webView.evaluateJavaScript(FigmaEditorChrome.minimizeUIScript(), completionHandler: nil)
     }
 
     /// Configures the live webview's background for the current Ghostty theme.
@@ -8789,10 +8820,19 @@ final class BrowserUIDelegate: BrowserPDFPreviewActionUIDelegate {
         // Fallback: open in new tab (no opener linkage)
         if let url = navigationAction.request.url {
             if let requestNavigation {
-                let intent: BrowserInsecureHTTPNavigationIntent = .newTab
+                // cmux-rbf `#cm-73`: a person asking for a new tab gets one. From
+                // Figma's read view only a Figma file link stays in the pane; a
+                // sign-in or help link opens a new tab, as it did.
+                let staysInPane = !browserNavigationShouldOpenInNewTab(
+                    navigationType: navigationAction.navigationType,
+                    modifierFlags: navigationAction.modifierFlags,
+                    buttonNumber: navigationAction.buttonNumber,
+                    hasRecentMiddleClickIntent: hasRecentMiddleClickIntent
+                ) && owner?.shouldKeepNewTabRequestInPane(to: url) == true
+                let intent: BrowserInsecureHTTPNavigationIntent = staysInPane ? .currentTab : .newTab
 #if DEBUG
                 cmuxDebugLog(
-                    "browser.nav.createWebView.action kind=requestNavigation intent=newTab " +
+                    "browser.nav.createWebView.action kind=requestNavigation intent=\(staysInPane ? "currentTab" : "newTab") " +
                     "url=\(browserNavigationDebugURL(url))"
                 )
 #endif
