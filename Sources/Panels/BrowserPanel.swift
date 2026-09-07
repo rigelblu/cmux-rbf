@@ -3910,6 +3910,11 @@ final class BrowserPanel: Panel, ObservableObject {
                 self.applyCurrentAppWebTheme(to: webView)
                 // Keep find-in-page open through load completion and refresh matches for the new DOM.
                 self.restoreFindStateAfterNavigation(replaySearch: true)
+                // Figma's editor is mostly fixed-width panels, so a cmux Figma
+                // pane has to collapse them or the design is not visible. The
+                // collapsed state is page state and dies with the document, so
+                // this runs on every load rather than once at open.
+                self.collapseFigmaEditorChromeIfNeeded(in: webView)
             }
         }
         navigationDelegate.didFailNavigation = { [weak self] failedWebView, failedURL, failureMessage, failedNavigation in
@@ -5366,6 +5371,20 @@ final class BrowserPanel: Panel, ObservableObject {
             return
         }
         webView.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    /// Collapse Figma's editor panels when this pane is a cmux Figma pane.
+    ///
+    /// Gated so an ordinary browser pane the user navigated to Figma keeps its
+    /// panels — see ``FigmaEditorChrome/shouldMinimizeUI(paneURL:isOmnibarVisible:)``.
+    /// The script polls, because Figma's control does not exist until its app
+    /// has booted and navigation-finished is well before that.
+    private func collapseFigmaEditorChromeIfNeeded(in webView: WKWebView) {
+        guard FigmaEditorChrome.shouldMinimizeUI(
+            paneURL: webView.url,
+            isOmnibarVisible: isOmnibarVisible
+        ) else { return }
+        webView.evaluateJavaScript(FigmaEditorChrome.minimizeUIScript(), completionHandler: nil)
     }
 
     /// Configures the live webview's background for the current Ghostty theme.

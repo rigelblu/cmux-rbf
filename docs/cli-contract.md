@@ -181,6 +181,15 @@ Environment:
 
 ## Command Families
 
+Figma subcommands:
+
+| Command | Contract |
+| --- | --- |
+| `figma open <file-url>` | Open a Figma design as a chrome-free pane. **The surface depends on whether the URL names a node.** No `node-id` loads Figma's editor as given, so the pane is browsable. A `node-id` loads cmux's wrapper page holding a framed, read-only embed of that node. Prints `OK surface=<h> pane=<h> placement=split\|reuse`. Supports `--theme light\|dark` (default `dark`), `--workspace <handle>`, and `--json`. Refuses a URL that is not a Figma document. |
+| `figma goto <node-id>` | Point the open Figma pane at a node, accepting `12-2` or `12:2` as they arrive. Prints `OK` and nothing else — an agent calls this mid-sentence in a loop, and anything printed lands in the transcript the user is reading. Resolves the bound pane from its own URL, which works on both surfaces. `--surface <handle>` when more than one Figma pane is open. Supports `--theme` and `--json`. |
+
+**The pane's URL is the binding, and there is no other state.** In editor mode that URL is the Figma document. In embed mode it is the wrapper page carrying the embed URL in its `embed` query parameter, so `goto` and a restart both recover the file from it. Verified across a real app restart 2026-09-08.
+
 Auth subcommands:
 
 | Command | Contract |
@@ -567,6 +576,7 @@ the expected text without connecting to a cmux socket.
 - `cmux --help` -> `cmux - control cmux via Unix socket`
 - `cmux --help` -> `open <path-or-url>...`
 - `cmux help` -> `cmux - control cmux via Unix socket`
+- `cmux figma --help` -> `Usage: cmux figma`
 - `cmux ping --help` -> `Usage: cmux ping`
 - `cmux capabilities --help` -> `Usage: cmux capabilities`
 - `cmux events --help` -> `Usage: cmux events [options]`
