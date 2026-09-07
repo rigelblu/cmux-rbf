@@ -6,6 +6,20 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+## 🟠⋯ Changed for End Users
+- 2026-09-06 - feat | **Mark up several passages in one reply and send your notes back as a single prompt.** Select a span in a rendered reply and it becomes a tinted phrase with its own number; the note you write on it joins a numbered list in the footer, in the order you marked them. `✕` on a hovered row removes it and renumbers the rest at once. `⤢` opens a preview of exactly what will be sent. **Paste** types the composed instruction into the agent's composer without submitting, at any point in the turn; **Paste & Send** also submits, and waits until the turn has ended.
+- 2026-09-07 - fix | **The highlight you are working on is a solid colour, not a pale wash.** It had been an accent colour built to carry white text, made translucent to sit behind body text — which is why every candidate arrived looking washed out. The footer also lists your notes in the order you *selected* them rather than reordering them by position in the message.
+- 2026-09-07 - fix | **Paging `◄` back far enough to pull in older history no longer erases unsent notes.** They had been pinned to an identifier that older messages arriving could rename, which took them out of the footer with no way back.
+- 2026-09-07 - fix | **Opening a note keeps its highlight lit in the message, not only while the pointer is over the row.** The row and the span had disagreed about which highlight counted as in focus.
+- 2026-09-07 - fix | **Notes no longer appear on a different session's reply, or on a reply that replaced theirs after a compaction.** They had been keyed by a transcript line number, and every session — and every rewritten transcript — has its own line 40.
+- 2026-09-07 - fix | **The preview shows the reply you are on.** Stepping to another reply while it was open left the box showing one reply's notes while **Paste** sent another's.
+- **Known limitation — a note is not checked against the message it was written on.** If the session rebinds or the transcript is rewritten between writing a note and sending it, the note is still pasteable and still says what you meant; nothing verifies it is being sent to the reply it was about. This is a deliberate call — a note you wrote is what you wanted to say, and refusing it would lose writing — but it means the panel cannot promise a delivery lands on its original target.
+- **Known limitation — stepping away from a reply and back leaves its highlights unpainted.** The notes are still listed in the footer; the tinted spans in the message are not redrawn, because re-finding a span in a re-rendered message needs a way to tell two identical quotes apart that does not exist yet.
+
+## 🟠⋯ Changed for Developers
+- 2026-09-07 - feat (technical) | Multi-span annotation lives on `ReplyAnnotationSet`, numbered in selection order and serialized as one anchored list. Unsent drafts live in `ReplyDrafts`, keyed by `(session, transcript generation, message seq)` — a `seq` is a transcript line index and is unique inside neither a session nor a rewrite, so both coordinates are load-bearing.
+- 2026-09-07 - feat (technical) | `ReplyDeliveryGate` holds the paste/send rule in one place. It had been written out at the button and again in the store, and the copies disagreed.
+
 ---
 
 # 🔵⋯ v0.26.0 (2026-09-02) — #cm-69.1
