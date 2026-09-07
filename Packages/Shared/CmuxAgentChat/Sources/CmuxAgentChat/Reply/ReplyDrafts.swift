@@ -32,6 +32,17 @@ import Foundation
 /// ``ReplyMessageGroup/id``, which had been globally unique by way of
 /// `apiMessageID`; found by a cold review the same day.
 ///
+/// **A transcript rewrite retires an anchor without deleting the draft.**
+/// `--resume` and compaction replace the file: `ReplyPanelStore.receive(batch:)`
+/// clears `messages` and calls `ReplyPanelModel.reset()`, which drops that
+/// model's own anchors and records why — *"Keeping the pin … would point them
+/// at whatever reply happens to land in the same position."* The session id is
+/// unchanged and `seq` starts over, so a draft keyed on the session alone
+/// followed a **line number** into a conversation that no longer exists.
+/// Bumping ``Scope/generation`` makes the old anchor stop matching. The draft
+/// is still held — it is orphaned and invisible, not destroyed, which is the
+/// side of the trade Tom's rule below points to.
+///
 /// **Drafts deliberately outlive a session change.** Scoping the key is not
 /// dropping the draft: a note written before a compaction is still what the
 /// user wanted to say (Tom, 2026-09-07, closing the target guard — *"Even if
@@ -42,8 +53,23 @@ import Foundation
 public struct ReplyDrafts: Sendable, Equatable {
     /// A reply, addressed so that neither paging nor a session change can
     /// point it at someone else's marks.
+    /// Which transcript a draft belongs to.
+    ///
+    /// Two coordinates, because a `seq` is unique inside neither. The session
+    /// separates two agents whose transcripts both have a line 40; the
+    /// generation separates the same session before and after its file is
+    /// rewritten, which `--resume` and compaction both do.
+    public struct Scope: Hashable, Sendable {
+        public let session: String
+        public let generation: Int
+        public init(session: String, generation: Int) {
+            self.session = session
+            self.generation = generation
+        }
+    }
+
     private struct Anchor: Hashable, Sendable {
-        let session: String
+        let scope: Scope
         /// A message `seq` from inside the reply — never the group's own.
         let seq: Int
     }
@@ -53,8 +79,8 @@ public struct ReplyDrafts: Sendable, Equatable {
     public init() {}
 
     /// The marks written on `group` in `sessionID`, or an empty set.
-    public func draft(for group: ReplyMessageGroup, in sessionID: String) -> ReplyAnnotationSet {
-        guard let anchor = anchor(held: group, in: sessionID) else { return ReplyAnnotationSet() }
+    public func draft(for group: ReplyMessageGroup, in scope: Scope) -> ReplyAnnotationSet {
+        guard let anchor = anchor(held: group, in: scope) else { return ReplyAnnotationSet() }
         return byAnchor[anchor] ?? ReplyAnnotationSet()
     }
 
@@ -65,11 +91,11 @@ public struct ReplyDrafts: Sendable, Equatable {
     /// drift with the window.
     public mutating func update(
         for group: ReplyMessageGroup,
-        in sessionID: String,
+        in scope: Scope,
         _ change: (inout ReplyAnnotationSet) -> Void
     ) {
-        let anchor = anchor(held: group, in: sessionID)
-            ?? Anchor(session: sessionID, seq: Self.newAnchorSeq(for: group))
+        let anchor = anchor(held: group, in: scope)
+            ?? Anchor(scope: scope, seq: Self.newAnchorSeq(for: group))
         var set = byAnchor[anchor] ?? ReplyAnnotationSet()
         change(&set)
         byAnchor[anchor] = set
@@ -79,8 +105,8 @@ public struct ReplyDrafts: Sendable, Equatable {
     ///
     /// Called only after a delivery that actually happened — a refused send
     /// that wiped the notes would lose writing the user cannot get back.
-    public mutating func clear(for group: ReplyMessageGroup, in sessionID: String) {
-        guard let anchor = anchor(held: group, in: sessionID) else { return }
+    public mutating func clear(for group: ReplyMessageGroup, in scope: Scope) {
+        guard let anchor = anchor(held: group, in: scope) else { return }
         byAnchor[anchor] = nil
     }
 
@@ -91,10 +117,10 @@ public struct ReplyDrafts: Sendable, Equatable {
     /// replies to disappear, which paging cannot do — it only prepends — so
     /// the `min` is unreachable in practice and is here to keep the reading of
     /// a draft from depending on hash order if that ever stops being true.
-    private func anchor(held group: ReplyMessageGroup, in sessionID: String) -> Anchor? {
+    private func anchor(held group: ReplyMessageGroup, in scope: Scope) -> Anchor? {
         let seqs = Set(group.messages.map(\.seq))
         return byAnchor.keys
-            .filter { $0.session == sessionID && seqs.contains($0.seq) }
+            .filter { $0.scope == scope && seqs.contains($0.seq) }
             .min { $0.seq < $1.seq }
     }
 

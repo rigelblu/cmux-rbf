@@ -15,14 +15,24 @@ struct ReplyPanelView: View {
     @State private var store = ReplyPanelStore()
     @State private var rendererSession = MarkdownRendererSession()
 
-    /// Every message's marks, keyed by the message they are about.
+    /// Every reply's marks, keyed by `(session, generation, message seq)`.
     ///
-    /// **Held per message, and never cleared on a rebind.** Stepping to
-    /// another reply takes the footer with it and brings it back on return;
-    /// losing a written note is worse than a failed send, so nothing here is
-    /// discarded because the panel re-resolved its agent. A transcript
-    /// rewrite is the one thing that clears it, because the ids in hand then
-    /// address a conversation that no longer exists.
+    /// **Nothing here is ever cleared except by a delivery that happened.**
+    /// Stepping to another reply takes the footer with it and brings it back
+    /// on return; losing a written note is worse than a failed send, so no
+    /// draft is discarded because the panel re-resolved its agent, changed
+    /// session, or had its transcript replaced.
+    ///
+    /// What those events change is which drafts still *match*. A session
+    /// change and a transcript rewrite each mint a new ``ReplyDrafts/Scope``,
+    /// so earlier drafts stop resolving rather than reattaching to whichever
+    /// reply now occupies their line — a `seq` is a transcript line index and
+    /// is unique inside neither. Orphaned and invisible, not destroyed.
+    ///
+    /// *(This comment previously claimed a rewrite cleared the drafts and
+    /// that they were keyed "by the message they are about". Neither was
+    /// true: nothing cleared on a rewrite, and the key had moved twice. Found
+    /// by a cold review 2026-09-07.)*
     @State private var drafts = ReplyDrafts()
 
     /// The row whose note is open for writing, if any.
@@ -135,6 +145,21 @@ struct ReplyPanelView: View {
                     .onChange(of: proxy.size.height) { panelHeight = $0 }
             }
         )
+        // The preview's whole claim is "exactly what Paste will send", and it
+        // is written once, from the reply that was on screen when it opened.
+        // The nav arrows and the arrow keys both stay live in preview mode,
+        // and `draft` resolves through `viewedGroup` — so a single step left
+        // the box showing one reply's manifest while Paste sent another's.
+        //
+        // Closing on the *outcome* rather than guarding each way to step:
+        // buttons, keys, and a newer reply arriving while following all move
+        // the viewed reply, and enumerating them is how one gets missed.
+        // `viewedGroup?.id`, not `viewedGroupID` — the latter is nil while
+        // following the newest, so newest → older → newest would not fire.
+        .onChange(of: store.model.viewedGroup?.id) { _ in
+            previewText = nil
+            previewIsEdited = false
+        }
         .task(id: bindingKey) {
             await store.refresh(workspace: workspace)
         }
@@ -572,14 +597,14 @@ struct ReplyPanelView: View {
     /// turn the window started mid-answer.
     private var draft: ReplyAnnotationSet {
         guard let group = store.model.viewedGroup,
-              let sessionID = store.boundSessionID else { return ReplyAnnotationSet() }
-        return drafts.draft(for: group, in: sessionID)
+              let scope = store.draftScope else { return ReplyAnnotationSet() }
+        return drafts.draft(for: group, in: scope)
     }
 
     private func updateDraft(_ change: (inout ReplyAnnotationSet) -> Void) {
         guard let group = store.model.viewedGroup,
-              let sessionID = store.boundSessionID else { return }
-        drafts.update(for: group, in: sessionID, change)
+              let scope = store.draftScope else { return }
+        drafts.update(for: group, in: scope, change)
     }
 
     /// What the page should be painting.
@@ -888,8 +913,8 @@ struct ReplyPanelView: View {
         guard store.deliver(draft, workspace: workspace, submit: submit) else { return }
         // Cleared only on a dispatch that actually happened. A refused send
         // that wiped the notes would lose writing the user cannot get back.
-        if let group = store.model.viewedGroup, let sessionID = store.boundSessionID {
-            drafts.clear(for: group, in: sessionID)
+        if let group = store.model.viewedGroup, let scope = store.draftScope {
+            drafts.clear(for: group, in: scope)
         }
         previewText = nil
         previewIsEdited = false

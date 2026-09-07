@@ -60,6 +60,21 @@ final class ReplyPanelStore {
     /// keys on it, because a `seq` alone is a transcript line index that every
     /// session has. Still store-written only.
     private(set) var boundSessionID: String?
+
+    /// How many times the bound transcript has been replaced under us.
+    ///
+    /// `--resume` and compaction rewrite the file, and `seq` starts over while
+    /// the session id does not — so this is the second half of what makes a
+    /// draft anchor unambiguous. `ReplyPanelModel.reset()` drops its own
+    /// anchors for the same reason; this lets view-side state do the same
+    /// without deleting anything.
+    private(set) var transcriptGeneration = 0
+
+    /// Where view-side per-reply state belongs right now, or `nil` when
+    /// nothing is bound.
+    var draftScope: ReplyDrafts.Scope? {
+        boundSessionID.map { ReplyDrafts.Scope(session: $0, generation: transcriptGeneration) }
+    }
     private var stickyPanelID: UUID?
     private var tailer: AgentChatTranscriptTailer?
 
@@ -413,6 +428,11 @@ final class ReplyPanelStore {
         if batch.didReset {
             messages = []
             model.reset()
+            // The file was replaced, so `seq` starts over. Anything keyed by
+            // it has to stop matching or it follows a line number into a
+            // different conversation — the same hazard `model.reset()` guards
+            // for its own anchors, one layer up in the view.
+            transcriptGeneration += 1
             // The reset batch is empty because nothing was *appended* — but
             // the tailer has already re-read the replacement file into its
             // cache before emitting it. Dropping the old messages and
