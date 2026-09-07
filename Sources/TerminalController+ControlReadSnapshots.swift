@@ -23,7 +23,8 @@ extension TerminalController {
         controlCommandCoordinator.invalidateHandleTopologyRefresh()
     }
 
-    private func publishSocketReadSnapshot() {
+    // cmux-rbf `#cm-73`: not private, so the `browser.open_split` reply can publish before it is sent.
+    func publishSocketReadSnapshot() {
         let requests: [ControlRequest] = [
             ControlRequest(id: nil, method: "window.list", params: [:]),
             ControlRequest(id: nil, method: "window.current", params: [:]),
