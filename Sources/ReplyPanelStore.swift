@@ -559,12 +559,14 @@ final class ReplyPanelStore {
         // refused it anyway, so pressing an enabled `Paste` with no note
         // typed nothing and left the clipboard untouched (Tom, dogfood).
         //
-        // Two entrypoints, one rule, stated twice — which is the shape the
-        // repo's shared-behaviour policy exists to prevent. `isEmpty` is now
-        // the only thing that can refuse a paste.
-        guard !annotations.isEmpty,
-              // Only the submit is gated, and now that is true in the code.
-              !(submit && (!canSubmit || !annotations.isDeliverable)),
+        // Two entrypoints, one rule — and it now lives in one place rather
+        // than being restated here. The previous fix realigned the two copies
+        // and deleted the predicate they shared, so the shape that caused the
+        // defect outlived the fix for it and a cold review found the rule
+        // written twice again a day later (2026-09-07).
+        guard ReplyDeliveryGate.canDeliver(
+                  annotations, submit: submit, turnEnded: canSubmit
+              ),
               let workspace,
               let panelID = boundPanelID,
               let panel = workspace.panels[panelID] as? TerminalPanel else { return false }

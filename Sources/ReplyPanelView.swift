@@ -727,7 +727,7 @@ struct ReplyPanelView: View {
             // an action the user intends to finish in the terminal.
             //
             // Off only when there is genuinely nothing to put anywhere.
-            .disabled(draft.isEmpty)
+            .disabled(!ReplyDeliveryGate.canPaste(draft))
 
             Button {
                 send(submit: true)
@@ -736,10 +736,10 @@ struct ReplyPanelView: View {
                     .frame(maxWidth: .infinity)
             }
             .controlSize(.small)
-            .disabled(!draft.isDeliverable || !store.canSubmit)
+            .disabled(!ReplyDeliveryGate.canSend(draft, turnEnded: store.canSubmit))
 
             // One refusal, one sentence, and only for the button that is off.
-            if draft.isDeliverable, !store.canSubmit {
+            if ReplyDeliveryGate.canSend(draft, turnEnded: true), !store.canSubmit {
                 footerNote(String(
                     localized: "reply.annotation.turnInFlight",
                     defaultValue: "Paste & Send returns when this turn ends"
