@@ -9609,7 +9609,9 @@ class TerminalController {
             return .ok([
                 "workspace_id": workspaceId.uuidString,
                 "surface_id": resolvedSurfaceId.uuidString,
-                "url": urlString
+                "url": urlString,
+                // cmux-rbf `#cm-73`: `cmux figma goto` counts only a pane with no address bar.
+                "show_omnibar": browserPanel.isOmnibarVisible
             ])
         }
     }

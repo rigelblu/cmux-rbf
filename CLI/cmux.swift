@@ -8029,6 +8029,10 @@ struct CMUXCLI {
         case "help":
             print(usage())
 
+        // cmux-rbf `#cm-73`: Figma design pane
+        case "figma":
+            try runFigmaCommand(commandArgs: commandArgs, client: client, jsonOutput: jsonOutput, idFormat: idFormat)
+
         // Browser commands
         case "browser":
             try runBrowserCommand(commandArgs: commandArgs, client: client, jsonOutput: jsonOutput, idFormat: idFormat)
@@ -20383,6 +20387,9 @@ struct CMUXCLI {
               install-hooks     Install cmux hooks into ~/.codex/hooks.json
               uninstall-hooks   Remove cmux hooks from ~/.codex/hooks.json
             """
+        // cmux-rbf `#cm-73`: the help for `cmux figma`
+        case "figma":
+            return figmaUsage
         case "browser":
             return """
             Usage: cmux browser [--surface <id|ref|index> | <surface>] <subcommand> [args]
