@@ -223,27 +223,34 @@ public struct ReplyPanelModel: Sendable, Equatable {
 
     /// Whether the walk may step from `k` back from the newest to `k + 1`.
     ///
-    /// Three clauses, and the middle one is the one that is easy to leave out:
+    /// **Derived from ``reachableCount`` rather than restating its rule.**
+    /// The three clauses that decide reachability live in exactly one place;
+    /// a second copy here would be two predicates that must agree, and the
+    /// failure when they stopped agreeing would be invisible — the arrow and
+    /// the counter would simply describe different sets.
     ///
-    /// 1. the next reply is annotated — an annotated reply is always reachable;
-    /// 2. an annotated reply sits **older** than the next one;
-    /// 3. the un-annotated replies through the next one fit the budget.
+    /// The one case `reachableCount` cannot answer is the step *past* the
+    /// loaded window, which is how `cm-69.1`'s paging survives the cap.
     ///
-    /// **Clause 2 is what makes the guarantee true by walking rather than by
-    /// teleporting.** Without it the reachable set is non-contiguous: a mark
-    /// seven back stays "reachable" while the un-annotated sixth is not, so
-    /// `◄` would have to skip a reply to get there — or the anti-strand
-    /// promise silently fails and a note ages out of reach, which this feature
-    /// ranks as the worst outcome it can produce.
-    ///
-    /// Nothing here consults ``hasMoreHistory``: the budget outranks it, which
-    /// is the whole point of the cap. `cm-69.1` offered `◄` whenever an older
+    /// Nothing here consults ``hasMoreHistory``: the budget outranks it,
+    /// which is the whole point. `cm-69.1` offered `◄` whenever an older
     /// reply was loaded *or* still on disk, and that rule would otherwise win
     /// by default and page history in at the cap.
     private func mayStepBack(from k: Int) -> Bool {
         let next = k + 1
-        if isAnnotated(reverseIndex: next) { return true }
-        if let oldest = oldestAnnotatedReverseIndex, oldest > next { return true }
+        if next < groups.count { return next < reachableCount }
+        // Past the loaded window. An unloaded reply cannot hold a draft, so it
+        // is un-annotated by construction and spends budget like any other.
+        //
+        // **A `reachableCount == groups.count` guard stood here and was
+        // removed as provably dead — do not add it back.** A mutation that
+        // deleted it was caught by no test, which sent me looking for the
+        // missing test and found instead that the clause below already
+        // implies it: `unannotatedCount` is monotonic, so if the tally
+        // through `next` fits the budget then it fits through every smaller
+        // index too, every loaded reply is therefore reachable, and
+        // `reachableCount == groups.count` follows. The guard could only ever
+        // have refused a step the line below was about to refuse anyway.
         return unannotatedCount(through: next) <= maxMessagesBack
     }
 
@@ -258,9 +265,35 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// arrives.
     public var reachableCount: Int {
         guard !groups.isEmpty else { return 0 }
+        // One incremental pass, carrying the un-annotated tally forward.
+        //
+        // **Written this way for cost, not for style.** The obvious form —
+        // `while mayStepBack(from: k) { k += 1 }` — is quadratic, because
+        // `mayStepBack` re-counts from the newest reply on every step. This
+        // property is read from `state`, which SwiftUI evaluates on every
+        // render of the panel, and the loaded window holds up to 4000
+        // messages; at a raised cap (the manual scenarios set 100000) that is
+        // a five-figure inner loop per frame. `cmux` has already shipped one
+        // 100% CPU spin loop out of work on a render path, and `CLAUDE.md`
+        // carries a section about it.
+        let oldestAnnotated = oldestAnnotatedReverseIndex
+        var unannotated = 0
         var k = 0
-        while k + 1 < groups.count, mayStepBack(from: k) { k += 1 }
-        return k + 1
+        while k < groups.count {
+            let annotated = isAnnotated(reverseIndex: k)
+            if !annotated { unannotated += 1 }
+            // The newest reply is reachable by definition; every later index
+            // has to be *stepped to*, so it answers the same three clauses
+            // `mayStepBack` does.
+            if k > 0 {
+                let reachable = annotated
+                    || (oldestAnnotated.map { $0 > k } ?? false)
+                    || unannotated <= maxMessagesBack
+                if !reachable { break }
+            }
+            k += 1
+        }
+        return k
     }
 
     /// Whether `◄` is offered at all.
@@ -273,6 +306,68 @@ public struct ReplyPanelModel: Sendable, Equatable {
     public var canStepBack: Bool {
         guard case let .showing(reading) = state else { return false }
         return reading.canStepBack
+    }
+
+    /// The `n of N` the header renders, for the reply `k` back from the newest.
+    ///
+    /// **`N` never exceeds `reply.maxMessagesBack`** (Tom, 2026-09-08). The
+    /// number is the one the user configured, so a counter reading past it
+    /// would contradict their own setting — which is what ruled out letting
+    /// `N` grow to cover an exempt reply.
+    ///
+    /// **`n` counts *up* toward the newest**, so the newest reply reads
+    /// `5 of 5` and the oldest in the window reads `1 of 5`. This reverses
+    /// the 2026-09-07 decision, which had the newest at `1 of 5`; it was
+    /// reversed on 2026-09-08 by Tom looking at it rendered, which is how
+    /// most of this feature's calls have been settled.
+    ///
+    /// **`n` clamps at 1, and the cost of that is accepted, not overlooked.**
+    /// Two replies can both read `1 of 5` — the genuinely-oldest one in the
+    /// window, and one reachable outside it (an annotated reply the exemption
+    /// keeps alive, or one you are standing on that aged past the cap). The
+    /// alternative was a counter reading `-1 of 5`, and the number's job here
+    /// is orientation rather than identity: which reply you are on is
+    /// answered by the reply itself, on screen above it.
+    private func position(atReverseIndex k: Int) -> ReplyPanelPosition {
+        // **`N` is what `◄` will actually reach, not the configured number**
+        // (Tom, 2026-09-08, after clicking back three times and reading
+        // `of 2`). The two reconcile: with nothing marked the reachable count
+        // *is* the configured value, so the setting is respected; it exceeds
+        // the cap only when the user's own mark is holding an older reply
+        // alive, and the number moving is then the signal that something is
+        // marked back there.
+        //
+        // *(This was `min(reachableCount, maxMessagesBack)` for about an hour
+        // on 2026-09-08 — clamped, so three different replies all read
+        // `1 of 2`. Accepted in the abstract, rejected on sight.)*
+        let total = reachableCount
+        // The floor survives for one narrow case the reachable count cannot
+        // cover: a reply you stepped back to *without* marking, which newer
+        // replies then push outside the window. You keep it — moving the
+        // reader is what this feature refuses to do — but `k` then exceeds
+        // the set, and `-2 of 5` is worse than a repeated `1 of 5`.
+        return ReplyPanelPosition(index: Swift.max(1, total - k), total: total)
+    }
+
+    /// Whether the reply on screen is the oldest one currently loaded.
+    ///
+    /// Gates the "the conversation did not start here" caption, together with
+    /// ``historyTruncatedAtHead``.
+    ///
+    /// **Lives here rather than in the view because inverting the counter
+    /// nearly shipped a regression through it.** It read `position.index == 1`
+    /// in `ReplyPanelView`, which was the oldest loaded reply while the
+    /// counter counted up from the oldest — and `cm-69.6` re-based the counter
+    /// so that `1` became the *newest*. The truncated-history note would have
+    /// claimed the transcript continues above a reply written seconds ago.
+    ///
+    /// Stated against the replies themselves, so no future re-basing of the
+    /// rendered number can move it again — and stated *here*, so it is a
+    /// function call a test can make rather than view state that only a human
+    /// with a 2000-line transcript can reach.
+    public var isAtOldestLoadedReply: Bool {
+        guard case .showing = state, let viewed = viewedGroup else { return false }
+        return viewed.id == groups.first?.id
     }
 
     /// Records which replies currently carry unsent marks.
@@ -314,21 +409,12 @@ public struct ReplyPanelModel: Sendable, Equatable {
               let index = groups.firstIndex(where: { $0.id == group.id }) else {
             return .waiting
         }
-        // Counted back from the newest, so the newest reply reads `1 of N`.
-        // `cm-69.1` counted from the oldest *loaded*, which was meaningful
-        // only while the oldest loaded reply was the conversation's start —
-        // a place the user can point at. The cap replaces that anchor with
-        // "wherever five back happens to be", which nobody can point at, so
-        // the number is re-based onto the question the panel actually raises.
         let reverseIndex = groups.count - 1 - index
         return .showing(
             ReplyPanelReading(
                 group: group,
                 isWriting: isWriting(group),
-                // `n > N` is a real state, not a bug to renormalise: a reply
-                // ages past the cap while you stand on it, and moving the
-                // reader would destroy the note being written on it.
-                position: ReplyPanelPosition(index: reverseIndex + 1, total: reachableCount),
+                position: position(atReverseIndex: reverseIndex),
                 canStepBack: (index > 0 || hasMoreHistory) && mayStepBack(from: reverseIndex),
                 canStepForward: index + 1 < groups.count
             )
@@ -457,8 +543,25 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// Replaces the loaded replies.
     ///
     /// - Parameter groups: Replies in ascending transcript order.
-    public mutating func apply(groups: [ReplyMessageGroup]) {
-        self.groups = groups
+    public mutating func apply(groups newGroups: [ReplyMessageGroup]) {
+        // **Hold rather than follow when the reply on screen carries marks.**
+        // The 2026-09-01 decision says so — *"follow the newest only while you
+        // are already on it and carry no note on it … a saved note counts:
+        // following would walk the view off the message you just annotated at
+        // the exact moment you would Paste"* — and the draft half of it was
+        // never built. Nothing consulted the drafts, because until `cm-69.6`
+        // the model could not see them.
+        //
+        // Pinning here rather than refusing to move later: once `groups` is
+        // replaced the previous newest is just another reply, and the fact
+        // that it *was* the followed one is gone.
+        if viewedAnchorSeq == nil,
+           let currentNewest = newestGroup,
+           isAnnotated(reverseIndex: 0),
+           newGroups.last?.id != currentNewest.id {
+            viewedAnchorSeq = Self.anchor(of: currentNewest)
+        }
+        self.groups = newGroups
         settleFromBindIfOwed()
         settleFromStopIfOwed()
     }

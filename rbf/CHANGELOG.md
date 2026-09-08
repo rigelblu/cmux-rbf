@@ -6,6 +6,19 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+## 🟠⋯ Changed for End Users
+- 2026-09-08 - feat | **`◄` stops after the last five replies instead of walking a history you were never going to read.** The Reply panel is for the messages you would actually correct, and a real session's loaded window holds roughly eleven to twenty-five replies — nobody reviews the twenty-fifth. When the walk stops, the header says **`Showing last`** beside the counter, so a greyed `◄` reads as "this is the limit" rather than as "the conversation started here", which would be false. **A reply carrying unsent notes never counts against the limit and always stays reachable**, so the cap can never strand something you wrote.
+- 2026-09-08 - feat | **The position counter counts back from the newest: the reply you land on is `1 of 5`.** It used to count up from the oldest message loaded, which was meaningful only while that was the start of the conversation — a place you could point at. With a limit it becomes "wherever five back happens to be", so the number now answers the question the panel actually raises: how far back am I. The counter also reads `3 of 5` rather than `3/5`.
+- 2026-09-08 - feat | **Set how far `◄` walks with `reply.maxMessagesBack` in `~/.config/cmux/cmux.json`.** Defaults to 5; there is no Settings row, because the default is right unless you go looking. An absent, zero, negative or non-numeric value falls back to 5 rather than being quietly corrected to something you did not ask for.
+- **Known limitation — the `Showing last` caption is unverified in every language but English.** cmux's string catalog has no translated "showing" verb to derive from, so the nineteen translations carry only the "newest/last" adjective. In German, Polish, Japanese, Korean and Chinese that can read as naming the single newest reply rather than the recent set. The English is settled; the translations need a native pass.
+
+## 🟠⋯ Changed for Developers
+- 2026-09-08 - feat (technical) | `ReplyPanelModel` owns how far `◄` reaches, as one predicate with three clauses. The middle one — *an annotated reply exists older than the next step* — is what keeps the reachable set **contiguous**: without it a mark seven back stays reachable while the un-annotated sixth does not, so the arrow would have to skip a reply or the anti-strand guarantee fails silently.
+- 2026-09-08 - feat (technical) | `ReplyDrafts` moved from `ReplyPanelView`'s `@State` into `ReplyPanelStore`, which pushes the annotated message `seq`s into the model. It stays out of `ReplyPanelModel` because `load()` resets that type on every session change, and unsent writing must not die with a rebind.
+- 2026-09-08 - fix (technical) | `ReplyPanelStore.stepBack()` asks `canStepBack` before acting. It had read *any* refusal from the model as licence to page older history, so a press at the limit would still have read 300 lines off disk — the model being right was not enough.
+- 2026-09-08 - fix (technical) | `atOldestLoadedReply` is stated against the replies themselves rather than against the rendered counter. It read `position.index == 1`, which the re-based counter turns into the *newest* reply — the truncated-history note would have claimed the transcript continues above a message written seconds ago.
+- 2026-09-08 - feat (technical) | `reply.*` is a top-level section in `cmux.json`, not nested under `rightSidebar`, which the settings validator skips structurally — a typo beneath it is never reported. Verified with a control: `reply.maxMessagesBack` validates and `reply.maxMessagesBackk` is flagged.
+
 ---
 
 # 🔵⋯ v0.27.0 (2026-09-07) — #cm-69.2a, #cm-69.2b

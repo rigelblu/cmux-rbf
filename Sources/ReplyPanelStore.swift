@@ -193,6 +193,17 @@ final class ReplyPanelStore {
         agentName = record.agentKind.displayName
         boundPanelID = panelID
 
+        // Before the early return, not after it. `applyConfiguredCap` used to
+        // sit only in the bind path below, which made the setting reachable
+        // ONLY by binding a *different* session — so editing
+        // `reply.maxMessagesBack` and switching workspaces back and forth did
+        // nothing, and an app relaunch was the only way to pick it up. The
+        // comment on that call claimed the opposite. Found while staging a
+        // dogfood scenario, not by any test: `ReplyMaxMessagesBackConfigTests`
+        // exercises the parser, and a parser that works is not a panel that
+        // reads it.
+        applyConfiguredCap()
+
         guard record.sessionID != boundSessionID else {
             // Already following this session. Only the header can have moved
             // — a tab rename, or the pane picking up a title.
@@ -286,9 +297,14 @@ final class ReplyPanelStore {
     /// setting that had every one of those and no consumer, under 149 passing
     /// assertions.
     ///
-    /// Read on every bind rather than once at construction, so editing
+    /// Read on every **refresh** rather than once at construction, so editing
     /// `cmux.json` takes effect on the next workspace switch instead of
-    /// needing a relaunch. The file store publishes into `UserDefaults`, and
+    /// needing a relaunch. *(It was on every bind until 2026-09-08, which is
+    /// not the same thing: `refresh` returns early when the session is
+    /// unchanged, so the only way to pick up an edited value was to bind a
+    /// different session — an app relaunch, in practice. The doc comment said
+    /// "workspace switch" the whole time.)* The file store publishes into
+    /// `UserDefaults`, and
     /// `UserDefaultsSettingsClient` falls back to the catalog default for an
     /// absent or unusable value — which is where `0`, a negative and
     /// `"five"` all land, because the parser refuses to store them at all.
@@ -518,9 +534,9 @@ final class ReplyPanelStore {
             sessionID: record.sessionID,
             agentIsRunning: agentIsRunning(workspace: workspace, panelID: panelID)
         )
-        // Before the annotation sync and after `load`, which resets the model:
-        // the cap is carried across that reset by `load` itself, but a cap
-        // edited in `cmux.json` since the last bind arrives only here.
+        // Also here, because `load` resets the model — `load` carries the cap
+        // across its own reset, but this keeps the two paths from depending on
+        // that subtlety to agree.
         applyConfiguredCap()
         // `load` clears the model's exemption set, and `boundSessionID` has
         // only just become this session — so the scope resolves here and not

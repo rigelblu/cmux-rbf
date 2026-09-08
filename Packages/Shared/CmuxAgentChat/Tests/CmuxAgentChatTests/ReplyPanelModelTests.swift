@@ -104,9 +104,10 @@ struct ReplyPanelModelTests {
         ])
 
         #expect(reading(model.state)?.group.id == "msg_B")
-        // `cm-69.6` counts back from the newest, so the newest is always `1`.
-        // `cm-69.1` shipped this as `2 of 2`, counting up from the oldest.
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 2))
+        // The newest reply reads `N of N` (Tom, 2026-09-08). `N` is
+        // `reply.maxMessagesBack` capped by what exists — two replies loaded,
+        // so `2 of 2` rather than `2 of 5` with three places that do not.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 2, total: 2))
     }
 
     @Test("A new reply grows the counter and moves the view while following")
@@ -268,9 +269,7 @@ struct ReplyPanelModelTests {
             group("msg_B", seq: 2, text: "Second."),
         ])
         model.view(groupID: "msg_A")
-        // Asserted before as well as after: "the counter grows" is this test's
-        // own claim, and asserting only the end state proves nothing moved.
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 2, total: 2))
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 2))
 
         model.apply(groups: [
             group("msg_A", seq: 1, text: "First."),
@@ -279,11 +278,10 @@ struct ReplyPanelModelTests {
         ])
 
         #expect(reading(model.state)?.group.id == "msg_A")
-        // Counting back from the newest, BOTH numbers move when a reply lands:
-        // the reply on screen really is one further back than it was. That is
-        // the state `cm-69.6` stopped promising against — the *content* is what
-        // holds, never the number.
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 3, total: 3))
+        // `n` holds at 1 — this reply is still the oldest shown — while `N`
+        // grows 2 → 3 as the window fills. The *content* is what this test
+        // protects; the number moving is expected and not promised against.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 3))
     }
 
     @Test("Paging older history keeps you on the reply you were reading")
@@ -317,8 +315,8 @@ struct ReplyPanelModelTests {
         ])
 
         #expect(reading(model.state)?.group.id == "msg_A")
-        // `1 of 2` under `cm-69.1`'s from-the-oldest count; `2 of 2` now.
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 2, total: 2))
+        // The older of two loaded replies, so `1 of 2`.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 2))
     }
 
     @Test("A settled reply stays settled when its turn grows by paging")
@@ -780,7 +778,8 @@ struct ReplyPanelModelTests {
         // and the store pages older history in. A test asserting only the
         // return value passes on the broken design.
         #expect(reading(model.state)?.canStepBack == false)
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 5, total: 5))
+        // Four steps back from `5 of 5`, so the oldest reply in the window.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 5))
     }
 
     @Test("B: an annotated reply does not spend budget and stays reachable")
@@ -803,7 +802,10 @@ struct ReplyPanelModelTests {
         // Standing on the 9th newest — the older mark — with both behind.
         #expect(reading(model.state)?.canStepBack == false)
         #expect(model.stepBack() == false)
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 9, total: 9))
+        // `N` is what `◄` reaches, so the exemption shows in the number:
+        // nine reachable against a configured five. The clamp that hid this
+        // lasted about an hour on 2026-09-08 and was rejected on sight.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 9))
     }
 
     @Test("B2: the walk crosses un-annotated replies to reach a mark behind them")
@@ -847,9 +849,87 @@ struct ReplyPanelModelTests {
         model.apply(groups: groups)
 
         #expect(reading(model.state)?.group.id == "r0")
-        // `n > N` is the tolerated state, never renormalised: eight back, five
-        // reachable. The content is what holds; the number is not promised.
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 8, total: 5))
+        // Eight back with a cap of five, so `n` clamps to 1. The counter says
+        // the same thing here as on the oldest in-window reply; the `group.id`
+        // assertion above is the one that proves nothing moved.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 5))
+    }
+
+    @Test("The oldest-loaded flag names the oldest reply, not the newest")
+    func oldestLoadedFlagSurvivesTheCounterInversion() {
+        // The regression `cm-69.6` nearly shipped. This gated the "the
+        // conversation did not start here" caption via `position.index == 1`,
+        // which was the oldest reply while the counter counted up from the
+        // oldest — and this slice re-based the counter so `1` is the *newest*.
+        // The caption would have appeared over a reply written seconds ago.
+        let groups = walk(6)
+        var model = loaded(groups)
+        #expect(model.isAtOldestLoadedReply == false, "starts on the newest")
+
+        // **The cap must bite, and getting this wrong made the first version
+        // of this test worthless.** It raised the cap to 100 so the walk could
+        // reach the oldest reply — which makes "oldest reachable" and "oldest
+        // loaded" the same reply, the one condition under which the buggy form
+        // and the correct one agree. A mutation restoring `index == 1` passed
+        // all 493 tests against that fixture.
+        model.setMaxMessagesBack(2)
+        while model.stepBack() {}
+
+        // At the cap: the oldest *reachable* reply, with four more loaded
+        // behind it. The counter reads `1` here — and that is precisely the
+        // value the old `position.index == 1` form mistook for "the oldest
+        // loaded", which would fire the "the conversation did not start here"
+        // caption at the cap, stacked on top of `Showing last`.
+        #expect(reading(model.state)?.group.id == "r4")
+        #expect(reading(model.state)?.position.index == 1)
+        #expect(model.isAtOldestLoadedReply == false, "four replies are still loaded behind this one")
+
+        // Now genuinely at the oldest loaded reply.
+        model.setMaxMessagesBack(100)
+        while model.stepBack() {}
+        #expect(reading(model.state)?.group.id == "r0")
+        #expect(model.isAtOldestLoadedReply == true)
+    }
+
+    @Test("The oldest-loaded flag is false with nothing bound")
+    func oldestLoadedFlagIsFalseWhenNothingShows() {
+        // `.waiting` and `.noAgent` must not satisfy it — the caption would
+        // otherwise render over an empty panel.
+        var model = ReplyPanelModel()
+        #expect(model.isAtOldestLoadedReply == false)
+        model.bind(sessionID: "s1", agentIsRunning: false)
+        #expect(model.isAtOldestLoadedReply == false, "bound but no replies yet")
+    }
+
+    @Test("A reply you have marked keeps you when a newer one arrives")
+    func markedReplyHoldsPositionAgainstTheNewest() {
+        // The 2026-09-01 rule — "follow the newest only while you are already
+        // on it and carry no note on it" — whose draft half went unbuilt until
+        // 2026-09-08, because nothing in the model could see the drafts.
+        // Following would walk the view off the reply you just annotated at
+        // the exact moment you would press Paste.
+        var groups = walk(3)
+        var model = loaded(groups)
+        #expect(reading(model.state)?.group.id == "r2", "following the newest")
+
+        model.noteAnnotated(seqs: [seq(reverseIndex: 0, of: groups)])
+        groups.append(group("r3", seq: 4, text: "Reply 4."))
+        model.apply(groups: groups)
+
+        #expect(reading(model.state)?.group.id == "r2", "held, not followed")
+        #expect(reading(model.state)?.canStepForward == true, "the newer reply is still reachable forward")
+    }
+
+    @Test("Following resumes for an unmarked reply, which is the control")
+    func unmarkedReplyStillFollows() {
+        // Without this the test above passes on a model that never follows at
+        // all, which would break the panel's whole default behaviour.
+        var groups = walk(3)
+        var model = loaded(groups)
+        groups.append(group("r3", seq: 4, text: "Reply 4."))
+        model.apply(groups: groups)
+
+        #expect(reading(model.state)?.group.id == "r3", "no marks, so it follows")
     }
 
     @Test("C2: removing your last mark shrinks the reachable set under you")
@@ -861,16 +941,18 @@ struct ReplyPanelModelTests {
         model.noteAnnotated(seqs: [seq(reverseIndex: 6, of: groups)])
         for _ in 1...6 { model.stepBack() }
         #expect(reading(model.state)?.group.id == "r5")
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 7, total: 7))
+        // Seven reachable — five of budget plus the two the mark carries.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 7))
 
         model.noteAnnotated(seqs: [])
 
         #expect(reading(model.state)?.group.id == "r5", "the reader must not move")
-        // The mark was the only thing holding the set open, so `N` collapses
-        // from 7 to 5 while `n` stays at 7 — `n > N` reached by unmarking
-        // rather than by a reply arriving. A fixture that only ever appends
-        // never produces this one.
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 7, total: 5))
+        // **The counter is identical before and after**, because clamping
+        // hides the shrink: `1 of 5` either way. Recorded rather than papered
+        // over — the assertion carrying this test is `canStepBack` flipping to
+        // false below, and a fixture that only appends never produces this
+        // shrink cause at all.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 5))
         #expect(reading(model.state)?.canStepBack == false)
     }
 

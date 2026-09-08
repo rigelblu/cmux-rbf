@@ -468,6 +468,11 @@ extension CmuxSettingsFileStore {
         "sidebar.showProgress",
         "sidebar.showAgentActivity",
         "sidebar.loadingSpinnerPosition",
+        // `cm-69.6`. Documentation and validation only — this file holds a
+        // `Set<String>` whose sole consumer in the tree is a test, so listing
+        // a path here makes nothing work. The branch in
+        // `KeyboardShortcutSettingsFileStore.parseReplySection` is what does.
+        "reply.maxMessagesBack",
         "sidebar.notificationBadgePosition",
         "sidebar.showCustomMetadata",
         RightSidebarWidthSettings.settingsPath,

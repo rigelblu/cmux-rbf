@@ -1598,6 +1598,23 @@
         }
       }
     },
+    "reply": {
+      "title": "reply",
+      "description": "Reply panel settings.",
+      "descriptionKey": "schemaDescriptions.reply.description",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxMessagesBack": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 5,
+          "description": "How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable.",
+          "descriptionKey": "schemaDescriptions.reply.maxMessagesBack"
+        }
+      }
+    },
     "shortcuts": {
       "title": "shortcuts",
       "description": "Keyboard shortcut settings from Settings > Keyboard Shortcuts.",

@@ -172,11 +172,11 @@ struct ReplyPanelView: View {
     /// Stated against the replies themselves rather than against the number
     /// the header happens to render, so a future re-basing of the counter
     /// cannot move it again.
-    private var atOldestLoadedReply: Bool {
-        guard case .showing = store.model.state,
-              let viewed = store.model.viewedGroup else { return false }
-        return viewed.id == store.model.groups.first?.id
-    }
+    /// *Moved into `ReplyPanelModel` on 2026-09-08 so it can be tested.* The
+    /// only human check that ever covered it needs a transcript past 2000
+    /// lines, which made it the least-run assertion guarding the change most
+    /// able to break it.
+    private var atOldestLoadedReply: Bool { store.model.isAtOldestLoadedReply }
 
     /// Says why `◄` stopped.
     ///
@@ -407,6 +407,22 @@ struct ReplyPanelView: View {
     /// `reply.nav.position` ("Message 3 of 5"), which replaces that view's
     /// label rather than appending to it, so VoiceOver reads two elements and
     /// never concatenates them into "showing the last 3 of 5".
+    /// **Both clauses of the visibility test earn their place**, and the
+    /// second is not redundant with the first:
+    ///
+    /// - `total < groups.count` catches the ordinary case — the cap stopped
+    ///   the walk with reachable replies still loaded behind it.
+    /// - `hasMoreHistory` catches the case where the budget and the loaded
+    ///   window happen to end together: five loaded, a cap of five, more on
+    ///   disk. Then `total == groups.count` and the first clause is false,
+    ///   while `◄` is dead and the conversation demonstrably continues.
+    ///
+    /// Both false means the walk really did reach the start of what exists,
+    /// and the arrow greying is then the truth rather than the lie this
+    /// caption is here to prevent. The truncated-backfill note above handles
+    /// its own case and cannot collide with this one: it is gated on
+    /// `historyTruncatedAtHead`, which is only ever set inside
+    /// `pageOlderHistory()` — a path the cap suppresses.
     @ViewBuilder
     private func capCaption(_ reading: ReplyPanelReading) -> some View {
         if !reading.canStepBack, store.model.hasMoreHistory || reading.position.total < store.model.groups.count {

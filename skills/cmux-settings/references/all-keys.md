@@ -138,6 +138,14 @@ Embedded browser settings from Settings > Browser.
 | `browser.showImportHintOnBlankTabs` | boolean | `true` | Show the browser import hint on blank tabs. |
 | `browser.reactGrabVersion` | string | `"0.1.29"` | Pinned react-grab version for the browser toolbar helper. |
 
+## reply
+
+Reply panel settings — the right sidebar's Reply mode. Top-level rather than under `rightSidebar`, which the validator skips structurally.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `reply.maxMessagesBack` | integer | `5` | How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable. |
+
 ## shortcuts
 
 Keyboard shortcut settings from Settings > Keyboard Shortcuts.
