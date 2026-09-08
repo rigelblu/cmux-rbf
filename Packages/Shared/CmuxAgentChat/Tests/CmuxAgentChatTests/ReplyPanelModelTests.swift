@@ -104,7 +104,9 @@ struct ReplyPanelModelTests {
         ])
 
         #expect(reading(model.state)?.group.id == "msg_B")
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 2, total: 2))
+        // `cm-69.6` counts back from the newest, so the newest is always `1`.
+        // `cm-69.1` shipped this as `2 of 2`, counting up from the oldest.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 2))
     }
 
     @Test("A new reply grows the counter and moves the view while following")
@@ -266,6 +268,10 @@ struct ReplyPanelModelTests {
             group("msg_B", seq: 2, text: "Second."),
         ])
         model.view(groupID: "msg_A")
+        // Asserted before as well as after: "the counter grows" is this test's
+        // own claim, and asserting only the end state proves nothing moved.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 2, total: 2))
+
         model.apply(groups: [
             group("msg_A", seq: 1, text: "First."),
             group("msg_B", seq: 2, text: "Second."),
@@ -273,7 +279,11 @@ struct ReplyPanelModelTests {
         ])
 
         #expect(reading(model.state)?.group.id == "msg_A")
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 3))
+        // Counting back from the newest, BOTH numbers move when a reply lands:
+        // the reply on screen really is one further back than it was. That is
+        // the state `cm-69.6` stopped promising against — the *content* is what
+        // holds, never the number.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 3, total: 3))
     }
 
     @Test("Paging older history keeps you on the reply you were reading")
@@ -307,7 +317,8 @@ struct ReplyPanelModelTests {
         ])
 
         #expect(reading(model.state)?.group.id == "msg_A")
-        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 2))
+        // `1 of 2` under `cm-69.1`'s from-the-oldest count; `2 of 2` now.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 2, total: 2))
     }
 
     @Test("A settled reply stays settled when its turn grows by paging")
@@ -723,5 +734,212 @@ struct ReplyPanelModelTests {
         ])
 
         #expect(reading(model.state)?.isWriting == false)
+    }
+
+    // MARK: - `cm-69.6` — how far `◄` walks
+
+    /// `count` replies, oldest first, ids `r0`…`r{count-1}` and `seq` `1…count`.
+    private func walk(_ count: Int) -> [ReplyMessageGroup] {
+        (1...count).map { group("r\($0 - 1)", seq: $0, text: "Reply \($0).") }
+    }
+
+    /// The `seq` of the reply `k` back from the newest, for marking it.
+    private func seq(reverseIndex k: Int, of groups: [ReplyMessageGroup]) -> Int {
+        groups[groups.count - 1 - k].seq
+    }
+
+    private func loaded(_ groups: [ReplyMessageGroup], hasMoreHistory: Bool = false) -> ReplyPanelModel {
+        var model = ReplyPanelModel()
+        model.load(
+            groups: groups,
+            hasMoreHistory: hasMoreHistory,
+            sessionID: "s1",
+            agentIsRunning: false
+        )
+        return model
+    }
+
+    @Test("A: `◄` stops after `maxMessagesBack` un-annotated replies")
+    func capStopsTheWalk() {
+        // Five reachable, four steps between them — with replies still loaded
+        // behind, so this is the cap stopping the walk and not the data
+        // running out.
+        let groups = walk(10)
+        var model = loaded(groups)
+
+        for step in 1...4 {
+            #expect(model.stepBack() == true, "step \(step) of 4 should move")
+        }
+        #expect(model.stepBack() == false)
+
+        // Asserted alongside the return value, and this is the assertion that
+        // would have caught the design defect a cold review found: a cap
+        // expressed as a `stepBack(skipping:)` parameter cannot reach
+        // `canStepBack`, which derives inside the parameterless `state`. The
+        // two then disagree — the arrow stays lit, the press returns false,
+        // and the store pages older history in. A test asserting only the
+        // return value passes on the broken design.
+        #expect(reading(model.state)?.canStepBack == false)
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 5, total: 5))
+    }
+
+    @Test("B: an annotated reply does not spend budget and stays reachable")
+    func annotatedRepliesStayReachable() {
+        // Marks on the 7th and 9th newest, well past a cap of 5. Losing them
+        // is the outcome this feature ranks worst, so the exemption is what
+        // the whole rule is built around.
+        let groups = walk(12)
+        var model = loaded(groups)
+        model.noteAnnotated(seqs: [
+            seq(reverseIndex: 6, of: groups),
+            seq(reverseIndex: 8, of: groups),
+        ])
+
+        for step in 1...8 {
+            #expect(model.stepBack() == true, "step \(step) of 8 should move")
+            #expect(reading(model.state)?.group.id == "r\(11 - step)")
+        }
+
+        // Standing on the 9th newest — the older mark — with both behind.
+        #expect(reading(model.state)?.canStepBack == false)
+        #expect(model.stepBack() == false)
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 9, total: 9))
+    }
+
+    @Test("B2: the walk crosses un-annotated replies to reach a mark behind them")
+    func theWalkIsContiguousPastAMark() {
+        // The clause that is easy to leave out. With only the "annotated
+        // replies are reachable" half, the 6th newest is out of budget while
+        // the 7th is reachable — a set `◄` cannot walk to without skipping.
+        let groups = walk(12)
+        var model = loaded(groups)
+        model.noteAnnotated(seqs: [seq(reverseIndex: 6, of: groups)])
+
+        for _ in 1...5 { #expect(model.stepBack() == true) }
+        // Reverse index 5 — the 6th newest, un-annotated and past a budget of
+        // 5. Reachable only because the mark at reverse 6 sits behind it, and
+        // that is clause 2 doing the only work it ever does.
+        #expect(reading(model.state)?.group.id == "r6")
+        #expect(reading(model.state)?.canStepBack == true)
+
+        #expect(model.stepBack() == true)
+        #expect(reading(model.state)?.group.id == "r5", "the marked reply itself")
+        // Nothing is marked behind it, and the budget ran out five replies
+        // ago, so the walk ends here rather than continuing on the mark's
+        // momentum.
+        #expect(model.stepBack() == false)
+    }
+
+    @Test("C: a reply that ages past the cap while you stand on it keeps you")
+    func agingPastTheCapDoesNotMoveTheReader() {
+        // Moving the reader would destroy unsent writing, which this feature
+        // ranks above a failed send.
+        var groups = walk(5)
+        var model = loaded(groups)
+        for _ in 1...4 { model.stepBack() }
+        #expect(reading(model.state)?.group.id == "r0")
+
+        groups += [
+            group("r5", seq: 6, text: "Reply 6."),
+            group("r6", seq: 7, text: "Reply 7."),
+            group("r7", seq: 8, text: "Reply 8."),
+        ]
+        model.apply(groups: groups)
+
+        #expect(reading(model.state)?.group.id == "r0")
+        // `n > N` is the tolerated state, never renormalised: eight back, five
+        // reachable. The content is what holds; the number is not promised.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 8, total: 5))
+    }
+
+    @Test("C2: removing your last mark shrinks the reachable set under you")
+    func unmarkingShrinksTheReachableSet() {
+        // The second shrink cause, and the one a fixture that only appends
+        // never reaches.
+        let groups = walk(12)
+        var model = loaded(groups)
+        model.noteAnnotated(seqs: [seq(reverseIndex: 6, of: groups)])
+        for _ in 1...6 { model.stepBack() }
+        #expect(reading(model.state)?.group.id == "r5")
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 7, total: 7))
+
+        model.noteAnnotated(seqs: [])
+
+        #expect(reading(model.state)?.group.id == "r5", "the reader must not move")
+        // The mark was the only thing holding the set open, so `N` collapses
+        // from 7 to 5 while `n` stays at 7 — `n > N` reached by unmarking
+        // rather than by a reply arriving. A fixture that only ever appends
+        // never produces this one.
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 7, total: 5))
+        #expect(reading(model.state)?.canStepBack == false)
+    }
+
+    @Test("D: a spent budget stops `◄` even with history still on disk")
+    func capOutranksHistoryOnDisk() {
+        // `cm-69.1` offers `◄` when an older reply is loaded *or* still on
+        // disk. That rule wins by default unless the cap explicitly outranks
+        // it — and if it does not, the store pages history in at the cap,
+        // which is the one thing this slice forbids.
+        var model = loaded(walk(10), hasMoreHistory: true)
+        for _ in 1...4 { model.stepBack() }
+
+        #expect(model.hasMoreHistory == true)
+        #expect(reading(model.state)?.canStepBack == false)
+        #expect(model.stepBack() == false)
+    }
+
+    @Test("D2: `◄` still pages when the budget outlasts the loaded replies")
+    func budgetLeftOverStillPages() {
+        // The other side of D, and the one that breaks `cm-69.1` if the cap is
+        // written as "stop at the loaded frontier": three loaded, budget 5, so
+        // the walk must reach the oldest loaded reply and still offer `◄` for
+        // the store to page against.
+        var model = loaded(walk(3), hasMoreHistory: true)
+        for _ in 1...2 { #expect(model.stepBack() == true) }
+
+        #expect(reading(model.state)?.group.id == "r0")
+        #expect(reading(model.state)?.canStepBack == true)
+    }
+
+    @Test("The configured cap survives a session change")
+    func capOutlivesLoad() {
+        // `load` does `self = ReplyPanelModel()`, so a cap held here reverts
+        // to the default on every session change unless it is carried across —
+        // silently, with nothing on screen saying the user's setting is gone.
+        var model = ReplyPanelModel()
+        model.setMaxMessagesBack(8)
+        model.load(groups: walk(12), hasMoreHistory: false, sessionID: "s2", agentIsRunning: false)
+
+        #expect(model.maxMessagesBack == 8)
+        for _ in 1...7 { #expect(model.stepBack() == true) }
+        #expect(model.stepBack() == false)
+    }
+
+    @Test("A cap below 1 is clamped rather than trusted")
+    func capIsClamped() {
+        // `0` would leave `◄` permanently dead, which reads as a broken panel
+        // rather than a configured one.
+        var model = ReplyPanelModel()
+        model.setMaxMessagesBack(0)
+        #expect(model.maxMessagesBack == 1)
+
+        model.load(groups: walk(5), hasMoreHistory: false, sessionID: "s1", agentIsRunning: false)
+        #expect(model.stepBack() == false)
+        #expect(reading(model.state)?.position == ReplyPanelPosition(index: 1, total: 1))
+    }
+
+    @Test("A rewritten transcript drops the annotated seqs it carried")
+    func resetClearsAnnotations() {
+        // A `seq` is a line index, so the new file has one at every old
+        // number. Left behind, these exempt replies nobody marked.
+        let groups = walk(12)
+        var model = loaded(groups)
+        model.noteAnnotated(seqs: [seq(reverseIndex: 8, of: groups)])
+        #expect(model.reachableCount == 9)
+
+        model.reset()
+        model.apply(groups: groups)
+
+        #expect(model.reachableCount == 5)
     }
 }

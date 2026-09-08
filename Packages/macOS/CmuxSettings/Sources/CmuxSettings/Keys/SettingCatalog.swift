@@ -46,6 +46,8 @@ public struct SettingCatalog: SettingCatalogSection {
     public let betaFeatures = BetaFeaturesCatalogSection()
     /// Settings for custom (user/agent-authored) sidebars (the `customSidebars.*` keys).
     public let customSidebars = CustomSidebarsCatalogSection()
+    /// Settings for the right sidebar's Reply mode (the `reply.*` keys).
+    public let reply = ReplyCatalogSection()
     public let shortcuts = KeyboardShortcutsCatalogSection()
     public let integrations = IntegrationsCatalogSection()
     public let account = AccountCatalogSection()

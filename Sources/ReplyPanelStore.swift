@@ -1,5 +1,6 @@
 import AppKit
 import CmuxAgentChat
+import CmuxSettings
 import Foundation
 import Observation
 
@@ -70,11 +71,44 @@ final class ReplyPanelStore {
     /// without deleting anything.
     private(set) var transcriptGeneration = 0
 
-    /// Where view-side per-reply state belongs right now, or `nil` when
-    /// nothing is bound.
+    /// Where per-reply state belongs right now, or `nil` when nothing is bound.
     var draftScope: ReplyDrafts.Scope? {
         boundSessionID.map { ReplyDrafts.Scope(session: $0, generation: transcriptGeneration) }
     }
+
+    /// Every reply's unsent marks, keyed by `(session, generation, message seq)`.
+    ///
+    /// **Moved here from `ReplyPanelView`'s `@State` by `cm-69.6`**, because
+    /// the cap has to know which replies carry marks and the view cannot tell
+    /// the model anything the model reads while deriving `state`. Held by the
+    /// store rather than by ``ReplyPanelModel`` for the reason that type's own
+    /// documentation gives: `load()` resets it on every session change, and a
+    /// user's unsent writing must not die with a rebind.
+    ///
+    /// Written only through ``updateDraft(for:_:)`` and ``clearDraft(for:)``,
+    /// so that the model's exemption set cannot drift from the drafts it is
+    /// derived from — the failure would be invisible, since both look right on
+    /// their own.
+    ///
+    /// **Nothing here is ever cleared except by a delivery that happened.**
+    /// Stepping to another reply takes the footer with it and brings it back
+    /// on return; losing a written note is worse than a failed send, so no
+    /// draft is discarded because the panel re-resolved its agent, changed
+    /// session, or had its transcript replaced.
+    ///
+    /// What those events change is which drafts still *match*. A session
+    /// change and a transcript rewrite each mint a new ``ReplyDrafts/Scope``,
+    /// so earlier drafts stop resolving rather than reattaching to whichever
+    /// reply now occupies their line — a `seq` is a transcript line index and
+    /// is unique inside neither. Orphaned and invisible, not destroyed.
+    ///
+    /// **`cm-69.6` gives that rule a second consequence worth naming:** an
+    /// orphaned draft stops exempting its reply from the cap too, because the
+    /// exemption is derived from the drafts that resolve in the *current*
+    /// scope. That is the right answer — the reply it was written on is no
+    /// longer reachable in this conversation — but it means a rewrite can
+    /// shorten the walk, which nothing on screen explains.
+    private(set) var drafts = ReplyDrafts()
     private var stickyPanelID: UUID?
     private var tailer: AgentChatTranscriptTailer?
 
@@ -196,9 +230,73 @@ final class ReplyPanelStore {
     /// The model reports whether it moved, so this asks first and only pays
     /// for a page read when the walk actually ran out.
     func stepBack() async {
+        // Asked before anything else, and this guard is the slice's whole
+        // point at this layer. `model.stepBack()` returns false for two
+        // different reasons — nothing older is loaded, or the cap is spent —
+        // and the line below reads the first as licence to page. Without this
+        // guard a press at the cap reads a 300-line page off disk, which is
+        // exactly the behaviour the cap exists to prevent.
+        guard model.canStepBack else { return }
         if model.stepBack() { return }
         guard await pageOlderHistory() else { return }
         model.stepBack()
+    }
+
+    /// Edits the marks on `group`, then re-derives the model's exemption set.
+    ///
+    /// One path in and out, so *which replies are annotated* is answered by
+    /// the drafts themselves rather than by a second copy that can fall behind.
+    func updateDraft(
+        for group: ReplyMessageGroup,
+        _ change: (inout ReplyAnnotationSet) -> Void
+    ) {
+        guard let scope = draftScope else { return }
+        drafts.update(for: group, in: scope, change)
+        syncAnnotatedReplies()
+    }
+
+    /// Drops the marks on `group` after a delivery that actually happened.
+    func clearDraft(for group: ReplyMessageGroup) {
+        guard let scope = draftScope else { return }
+        drafts.clear(for: group, in: scope)
+        syncAnnotatedReplies()
+    }
+
+    /// The marks written on `group`, or an empty set.
+    func draft(for group: ReplyMessageGroup) -> ReplyAnnotationSet {
+        guard let scope = draftScope else { return ReplyAnnotationSet() }
+        return drafts.draft(for: group, in: scope)
+    }
+
+    /// Pushes the annotated replies into the model.
+    ///
+    /// Called after every draft edit and after every path that resets the
+    /// model — `load` and `reset` both clear the set deliberately, so a reply
+    /// keeps its exemption only while a draft in the *current* scope still
+    /// resolves to it.
+    private func syncAnnotatedReplies() {
+        model.noteAnnotated(seqs: draftScope.map { drafts.annotatedSeqs(in: $0) } ?? [])
+    }
+
+    /// Reads `reply.maxMessagesBack` into the model.
+    ///
+    /// **This is the surface that makes the setting exist.** The catalog
+    /// entry, the schema, the template and twenty locales all describe a key;
+    /// only a consumer makes it do anything, and `#cm-67`'s v0.25.1 shipped a
+    /// setting that had every one of those and no consumer, under 149 passing
+    /// assertions.
+    ///
+    /// Read on every bind rather than once at construction, so editing
+    /// `cmux.json` takes effect on the next workspace switch instead of
+    /// needing a relaunch. The file store publishes into `UserDefaults`, and
+    /// `UserDefaultsSettingsClient` falls back to the catalog default for an
+    /// absent or unusable value — which is where `0`, a negative and
+    /// `"five"` all land, because the parser refuses to store them at all.
+    private func applyConfiguredCap() {
+        model.setMaxMessagesBack(
+            UserDefaultsSettingsClient(defaults: .standard)
+                .value(for: SettingCatalog().reply.maxMessagesBack)
+        )
     }
 
     /// Steps to the next newer reply.
@@ -420,6 +518,15 @@ final class ReplyPanelStore {
             sessionID: record.sessionID,
             agentIsRunning: agentIsRunning(workspace: workspace, panelID: panelID)
         )
+        // Before the annotation sync and after `load`, which resets the model:
+        // the cap is carried across that reset by `load` itself, but a cap
+        // edited in `cmux.json` since the last bind arrives only here.
+        applyConfiguredCap()
+        // `load` clears the model's exemption set, and `boundSessionID` has
+        // only just become this session — so the scope resolves here and not
+        // a line earlier. Drafts written against a different session or an
+        // earlier generation simply do not match, which is the intent.
+        syncAnnotatedReplies()
     }
 
     private func receive(batch: AgentChatTranscriptTailer.Batch, generation: Int) async {
@@ -431,8 +538,14 @@ final class ReplyPanelStore {
             // The file was replaced, so `seq` starts over. Anything keyed by
             // it has to stop matching or it follows a line number into a
             // different conversation — the same hazard `model.reset()` guards
-            // for its own anchors, one layer up in the view.
+            // for its own anchors. *(Said "one layer up in the view" until
+            // `cm-69.6`; the drafts live in this type now.)*
             transcriptGeneration += 1
+            // A no-op today, since the new generation resolves no drafts. Kept
+            // so "the model's exemption set equals the drafts in the current
+            // scope" holds by construction on every path, rather than holding
+            // here by coincidence and breaking the first time it does not.
+            syncAnnotatedReplies()
             // The reset batch is empty because nothing was *appended* — but
             // the tailer has already re-read the replacement file into its
             // cache before emitting it. Dropping the old messages and

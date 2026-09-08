@@ -116,6 +116,34 @@ public struct ReplyPanelModel: Sendable, Equatable {
     /// several replies late.
     private var owesStopSettle: Bool = false
 
+    /// How many **un-annotated** replies `◄` may walk back through.
+    ///
+    /// Read from `reply.maxMessagesBack` in `cmux.json`, defaulting to
+    /// ``defaultMaxMessagesBack``. The panel is for the replies you would
+    /// actually correct, and the newest 600 transcript lines group into
+    /// roughly 11–25 of them — nobody reviews the 25th.
+    ///
+    /// **A setting, not session state**, which is why ``load(groups:hasMoreHistory:sessionID:agentIsRunning:)``
+    /// carries it across the reset it performs. Letting it fall back to the
+    /// default there would silently revert a configured cap on every session
+    /// change, and nothing on screen would say so.
+    public private(set) var maxMessagesBack: Int = ReplyPanelModel.defaultMaxMessagesBack
+
+    /// The cap applied when `cmux.json` names none, or names an unusable one.
+    public static let defaultMaxMessagesBack = 5
+
+    /// Transcript positions of messages inside replies carrying unsent marks.
+    ///
+    /// Pushed in by the store, because the drafts themselves deliberately live
+    /// outside this type: ``load(groups:hasMoreHistory:sessionID:agentIsRunning:)``
+    /// resets the model on every session change, and holding a user's unsent
+    /// writing behind that would destroy it.
+    ///
+    /// Message `seq`s rather than group ids, for the reason every other anchor
+    /// here is: a group's id and `seq` are both its *first message's*, and
+    /// paging a prompt in renames the group without moving any message.
+    private var annotatedSeqs: Set<Int> = []
+
     /// Whether older replies exist on disk beyond the ones loaded.
     ///
     /// Answered by the transcript's own paging, which is honest about a
@@ -167,6 +195,106 @@ public struct ReplyPanelModel: Sendable, Equatable {
         return group(holding: viewedAnchorSeq) ?? newestGroup
     }
 
+    // MARK: - How far `◄` reaches
+
+    /// Whether the reply `k` back from the newest carries unsent marks.
+    ///
+    /// An index outside the loaded window answers `false`: an unloaded reply
+    /// cannot hold a draft, so it spends budget like any other.
+    private func isAnnotated(reverseIndex k: Int) -> Bool {
+        guard k >= 0, k < groups.count else { return false }
+        return groups[groups.count - 1 - k].messages.contains { annotatedSeqs.contains($0.seq) }
+    }
+
+    /// How far back the oldest loaded annotated reply sits, or `nil`.
+    private var oldestAnnotatedReverseIndex: Int? {
+        guard !groups.isEmpty else { return nil }
+        for k in stride(from: groups.count - 1, through: 0, by: -1) where isAnnotated(reverseIndex: k) {
+            return k
+        }
+        return nil
+    }
+
+    /// Un-annotated replies among the newest `k + 1`, counting unloaded ones.
+    private func unannotatedCount(through k: Int) -> Int {
+        guard k >= 0 else { return 0 }
+        return (0...k).reduce(0) { $0 + (isAnnotated(reverseIndex: $1) ? 0 : 1) }
+    }
+
+    /// Whether the walk may step from `k` back from the newest to `k + 1`.
+    ///
+    /// Three clauses, and the middle one is the one that is easy to leave out:
+    ///
+    /// 1. the next reply is annotated — an annotated reply is always reachable;
+    /// 2. an annotated reply sits **older** than the next one;
+    /// 3. the un-annotated replies through the next one fit the budget.
+    ///
+    /// **Clause 2 is what makes the guarantee true by walking rather than by
+    /// teleporting.** Without it the reachable set is non-contiguous: a mark
+    /// seven back stays "reachable" while the un-annotated sixth is not, so
+    /// `◄` would have to skip a reply to get there — or the anti-strand
+    /// promise silently fails and a note ages out of reach, which this feature
+    /// ranks as the worst outcome it can produce.
+    ///
+    /// Nothing here consults ``hasMoreHistory``: the budget outranks it, which
+    /// is the whole point of the cap. `cm-69.1` offered `◄` whenever an older
+    /// reply was loaded *or* still on disk, and that rule would otherwise win
+    /// by default and page history in at the cap.
+    private func mayStepBack(from k: Int) -> Bool {
+        let next = k + 1
+        if isAnnotated(reverseIndex: next) { return true }
+        if let oldest = oldestAnnotatedReverseIndex, oldest > next { return true }
+        return unannotatedCount(through: next) <= maxMessagesBack
+    }
+
+    /// How many replies `◄` can reach, counting the one on screen.
+    ///
+    /// The `N` of `n of N`, and it is the **reachable** count rather than the
+    /// loaded one — so the exemption lets it exceed ``maxMessagesBack``, and
+    /// the configured number is only what shows when nothing is marked.
+    ///
+    /// Counts loaded replies only. A reply still on disk is reachable in the
+    /// sense that `◄` will page it in, but it cannot be numbered before it
+    /// arrives.
+    public var reachableCount: Int {
+        guard !groups.isEmpty else { return 0 }
+        var k = 0
+        while k + 1 < groups.count, mayStepBack(from: k) { k += 1 }
+        return k + 1
+    }
+
+    /// Whether `◄` is offered at all.
+    ///
+    /// The same answer ``state`` publishes, reachable without unwrapping the
+    /// enum — because a caller that has to destructure `.showing` to ask will
+    /// eventually just not ask. `ReplyPanelStore.stepBack` is that caller: it
+    /// pages older history whenever a step is refused, and at the cap that is
+    /// precisely the behaviour the cap exists to prevent.
+    public var canStepBack: Bool {
+        guard case let .showing(reading) = state else { return false }
+        return reading.canStepBack
+    }
+
+    /// Records which replies currently carry unsent marks.
+    ///
+    /// - Parameter seqs: Message `seq`s from inside every annotated reply.
+    public mutating func noteAnnotated(seqs: Set<Int>) {
+        annotatedSeqs = seqs
+    }
+
+    /// Sets how many un-annotated replies `◄` may walk back through.
+    ///
+    /// Clamped at 1 rather than trusted: `0` would leave the newest reply as
+    /// the only reachable one and `◄` permanently dead, which reads as a
+    /// broken panel rather than as a configured one. A caller with a bad value
+    /// should fall back to ``defaultMaxMessagesBack`` before reaching here;
+    /// this clamp is the second line, not the first.
+    ///
+    /// - Parameter limit: The configured cap.
+    public mutating func setMaxMessagesBack(_ limit: Int) {
+        maxMessagesBack = max(1, limit)
+    }
+
     /// What the panel should render.
     ///
     /// Order matters. Nothing bound outranks everything, because there is
@@ -186,12 +314,22 @@ public struct ReplyPanelModel: Sendable, Equatable {
               let index = groups.firstIndex(where: { $0.id == group.id }) else {
             return .waiting
         }
+        // Counted back from the newest, so the newest reply reads `1 of N`.
+        // `cm-69.1` counted from the oldest *loaded*, which was meaningful
+        // only while the oldest loaded reply was the conversation's start —
+        // a place the user can point at. The cap replaces that anchor with
+        // "wherever five back happens to be", which nobody can point at, so
+        // the number is re-based onto the question the panel actually raises.
+        let reverseIndex = groups.count - 1 - index
         return .showing(
             ReplyPanelReading(
                 group: group,
                 isWriting: isWriting(group),
-                position: ReplyPanelPosition(index: index + 1, total: groups.count),
-                canStepBack: index > 0 || hasMoreHistory,
+                // `n > N` is a real state, not a bug to renormalise: a reply
+                // ages past the cap while you stand on it, and moving the
+                // reader would destroy the note being written on it.
+                position: ReplyPanelPosition(index: reverseIndex + 1, total: reachableCount),
+                canStepBack: (index > 0 || hasMoreHistory) && mayStepBack(from: reverseIndex),
                 canStepForward: index + 1 < groups.count
             )
         )
@@ -280,7 +418,12 @@ public struct ReplyPanelModel: Sendable, Equatable {
         sessionID: String,
         agentIsRunning: Bool
     ) {
+        // The cap is configuration, not session state. `self = ReplyPanelModel()`
+        // would silently revert a user's `reply.maxMessagesBack` to the default
+        // on every session change, with nothing on screen saying so.
+        let configuredCap = maxMessagesBack
         self = ReplyPanelModel()
+        maxMessagesBack = configuredCap
         apply(groups: groups)
         noteHistory(hasMore: hasMoreHistory)
         bind(sessionID: sessionID, agentIsRunning: agentIsRunning)
@@ -292,6 +435,9 @@ public struct ReplyPanelModel: Sendable, Equatable {
         groups = []
         viewedAnchorSeq = nil
         finishedAnchorSeq = nil
+        // A `seq` is a line index, so every transcript has one at 40. Left
+        // behind, these would mark whichever replies land on the same lines.
+        annotatedSeqs = []
         owesBindSettle = false
         owesStopSettle = false
         sessionID = nil
@@ -351,6 +497,12 @@ public struct ReplyPanelModel: Sendable, Equatable {
         guard let current = viewedGroup,
               let index = groups.firstIndex(where: { $0.id == current.id }),
               index > 0 else { return false }
+        // The same predicate `state` derives `canStepBack` from, deliberately
+        // not a parameter. `canStepBack` is read off `state`, a parameterless
+        // computed property, so a `skipping:` argument here could never reach
+        // it: the arrow would stay lit, the press would return false, and the
+        // store would page older history in — the one thing the cap forbids.
+        guard mayStepBack(from: groups.count - 1 - index) else { return false }
         viewedAnchorSeq = Self.anchor(of: groups[index - 1])
         return true
     }
@@ -455,6 +607,10 @@ public struct ReplyPanelModel: Sendable, Equatable {
         groups = []
         viewedAnchorSeq = nil
         finishedAnchorSeq = nil
+        // Same reason as `unbind`: the rewritten file restarts `seq` at zero,
+        // so these would exempt replies nobody has marked. The store re-pushes
+        // whatever still resolves against the new generation.
+        annotatedSeqs = []
         owesBindSettle = false
         owesStopSettle = false
         // The old file's history is gone with the file. Paging back stays

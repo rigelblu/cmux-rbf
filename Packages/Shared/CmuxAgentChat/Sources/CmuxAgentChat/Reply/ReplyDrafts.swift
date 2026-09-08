@@ -110,6 +110,26 @@ public struct ReplyDrafts: Sendable, Equatable {
         byAnchor[anchor] = nil
     }
 
+    /// The `seq` anchoring every reply in `scope` that carries marks.
+    ///
+    /// What ``ReplyPanelModel`` needs to exempt a reply from `cm-69.6`'s cap,
+    /// and it is derived here rather than in the store so that *annotated*
+    /// has one definition. **A mark counts with or without a note**, because
+    /// `Paste` is deliberately ungated on notes — so the test is
+    /// ``ReplyAnnotationSet/isEmpty`` and never "has text".
+    ///
+    /// Anchors from another scope are left out rather than filtered later: a
+    /// `seq` is a transcript line index, so a previous session's anchor would
+    /// otherwise exempt whichever reply happens to sit on the same line.
+    ///
+    /// - Parameter scope: The session and generation to read.
+    /// - Returns: One `seq` per annotated reply.
+    public func annotatedSeqs(in scope: Scope) -> Set<Int> {
+        Set(byAnchor.compactMap { anchor, set in
+            anchor.scope == scope && !set.isEmpty ? anchor.seq : nil
+        })
+    }
+
     /// The stored anchor `group` currently holds in `sessionID`, if any.
     ///
     /// Deterministic rather than "whichever the dictionary yields first". Two

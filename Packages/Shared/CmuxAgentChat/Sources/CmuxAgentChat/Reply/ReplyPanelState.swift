@@ -4,19 +4,33 @@ import Foundation
 /// the walk has been reached.
 ///
 /// `index` is 1-based because it is read by a person: the panel renders it
-/// as `4/6`.
+/// as `3 of 5`.
+///
+/// **Both fields changed meaning in `cm-69.6`, and neither reads like it.**
+/// `cm-69.1` shipped `index` counting up from the oldest *loaded* reply and
+/// `total` as the loaded count — so the newest reply read `34/34` and `◄`
+/// walked it down. Under the cap the oldest loaded reply is no longer a place
+/// anyone can point at, so the count is re-based onto the question the panel
+/// actually raises: how far back am I.
 public struct ReplyPanelPosition: Sendable, Equatable {
-    /// Position of the reply on screen, counting from the oldest loaded.
+    /// Position of the reply on screen, counting **back from the newest**.
+    ///
+    /// `1` is the newest reply. Can exceed ``total``: a reply ages past the
+    /// cap while you stand on it, and the reader is deliberately not moved.
     public let index: Int
 
-    /// How many replies are loaded.
+    /// How many replies `◄` can reach, **not** how many are loaded.
+    ///
+    /// Exceeds `reply.maxMessagesBack` whenever a reply carries unsent marks,
+    /// since those stay reachable without spending budget. The configured
+    /// number is what shows when nothing is marked.
     public let total: Int
 
     /// Creates a position.
     ///
     /// - Parameters:
-    ///   - index: 1-based position of the reply on screen.
-    ///   - total: Count of loaded replies.
+    ///   - index: 1-based position of the reply on screen, newest first.
+    ///   - total: Count of reachable replies.
     public init(index: Int, total: Int) {
         self.index = index
         self.total = total
@@ -34,7 +48,7 @@ public struct ReplyPanelReading: Sendable, Equatable {
     /// can be annotated at all — an unfinished reply is a moving target.
     public let isWriting: Bool
 
-    /// Where this reply sits among the loaded ones — the `4/6` the header
+    /// Where this reply sits in the reachable set — the `3 of 5` the header
     /// shows, and nothing more.
     public let position: ReplyPanelPosition
 
@@ -44,6 +58,11 @@ public struct ReplyPanelReading: Sendable, Equatable {
     /// still be on disk, unread. Folded in here so the control and the action
     /// answer one question, instead of the view composing two facts and the
     /// store composing them differently.
+    ///
+    /// **Since `cm-69.6` this is also false at the cap**, with replies both
+    /// loaded and on disk behind it. The header's `Showing last` caption is
+    /// the only thing separating that from "the conversation starts here",
+    /// which is why the caption is not decoration.
     public let canStepBack: Bool
 
     /// Whether a newer reply can be reached.

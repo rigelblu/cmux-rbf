@@ -362,6 +362,9 @@ final class CmuxSettingsFileStore {
         if let sidebarSection = root["sidebar"] as? [String: Any] {
             parseSidebarSection(sidebarSection, sourcePath: sourcePath, snapshot: &snapshot)
         }
+        if let replySection = root["reply"] as? [String: Any] {
+            parseReplySection(replySection, sourcePath: sourcePath, snapshot: &snapshot)
+        }
         if let workspaceColorsSection = root["workspaceColors"] as? [String: Any] {
             parseWorkspaceColorsSection(workspaceColorsSection, sourcePath: sourcePath, snapshot: &snapshot)
         }
@@ -687,6 +690,29 @@ final class CmuxSettingsFileStore {
             )
         } else if section.keys.contains(RightSidebarWidthSettings.jsonKey) {
             logInvalid(RightSidebarWidthSettings.settingsPath, sourcePath: sourcePath)
+        }
+    }
+
+    /// `reply.*` — the right sidebar's Reply mode (`#cm-69.6`).
+    ///
+    /// **Sections dispatch by hand in `parseSettingsRoot`, so a catalog entry
+    /// alone does nothing.** `#cm-67`'s v0.25.1 shipped 149 passing assertions
+    /// over a wholly non-functional setting for exactly this reason: the key
+    /// existed everywhere except in a branch that reads it.
+    private func parseReplySection(
+        _ section: [String: Any],
+        sourcePath: String,
+        snapshot: inout ResolvedSettingsSnapshot
+    ) {
+        // Absent, zero, negative, or non-integer all fall back to the catalog
+        // default rather than being clamped into something the user did not
+        // ask for — and the fallback is logged, because a silently corrected
+        // value is indistinguishable from one that was never read.
+        if let value = jsonInt(section["maxMessagesBack"]),
+           ReplyCatalogSection.maxMessagesBackRange.contains(value) {
+            snapshot.managedUserDefaults[ReplyCatalogSection().maxMessagesBack.userDefaultsKey] = .int(value)
+        } else if section.keys.contains("maxMessagesBack") {
+            logInvalid("reply.maxMessagesBack", sourcePath: sourcePath)
         }
     }
 

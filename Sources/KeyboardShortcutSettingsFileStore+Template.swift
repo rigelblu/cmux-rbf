@@ -160,6 +160,14 @@ extension CmuxSettingsFileStore {
                 ],
             ],
             [
+                // `reply.*` is top-level rather than nested under
+                // `rightSidebar`, which the settings validator skips
+                // structurally — a typo there is silently ignored forever.
+                "reply": [
+                    "maxMessagesBack": SettingCatalog().reply.maxMessagesBack.defaultValue,
+                ],
+            ],
+            [
                 "workspaceColors": [
                     "selectionColor": NSNull(),
                     "notificationBadgeColor": NSNull(),

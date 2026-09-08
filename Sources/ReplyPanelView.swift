@@ -15,26 +15,6 @@ struct ReplyPanelView: View {
     @State private var store = ReplyPanelStore()
     @State private var rendererSession = MarkdownRendererSession()
 
-    /// Every reply's marks, keyed by `(session, generation, message seq)`.
-    ///
-    /// **Nothing here is ever cleared except by a delivery that happened.**
-    /// Stepping to another reply takes the footer with it and brings it back
-    /// on return; losing a written note is worse than a failed send, so no
-    /// draft is discarded because the panel re-resolved its agent, changed
-    /// session, or had its transcript replaced.
-    ///
-    /// What those events change is which drafts still *match*. A session
-    /// change and a transcript rewrite each mint a new ``ReplyDrafts/Scope``,
-    /// so earlier drafts stop resolving rather than reattaching to whichever
-    /// reply now occupies their line — a `seq` is a transcript line index and
-    /// is unique inside neither. Orphaned and invisible, not destroyed.
-    ///
-    /// *(This comment previously claimed a rewrite cleared the drafts and
-    /// that they were keyed "by the message they are about". Neither was
-    /// true: nothing cleared on a rewrite, and the key had moved twice. Found
-    /// by a cold review 2026-09-07.)*
-    @State private var drafts = ReplyDrafts()
-
     /// The row whose note is open for writing, if any.
     ///
     /// Writing and editing are one surface: the list stays the list and one
@@ -180,9 +160,22 @@ struct ReplyPanelView: View {
     }
 
     /// Whether the reply on screen is the oldest one that can be loaded.
+    ///
+    /// **Re-expressed by `cm-69.6`, and leaving it alone would have been a
+    /// silent regression.** It read `position.index == 1`, which was the
+    /// oldest loaded reply while the counter counted up from the oldest.
+    /// Under the inverted counter `index == 1` is the *newest* reply — so the
+    /// truncated-history note would have moved to the top of the
+    /// conversation and told the user the transcript continues above the
+    /// reply that was written five seconds ago.
+    ///
+    /// Stated against the replies themselves rather than against the number
+    /// the header happens to render, so a future re-basing of the counter
+    /// cannot move it again.
     private var atOldestLoadedReply: Bool {
-        guard case let .showing(reading) = store.model.state else { return false }
-        return reading.position.index == 1
+        guard case .showing = store.model.state,
+              let viewed = store.model.viewedGroup else { return false }
+        return viewed.id == store.model.groups.first?.id
     }
 
     /// Says why `◄` stopped.
@@ -250,6 +243,7 @@ struct ReplyPanelView: View {
             Spacer(minLength: 8)
 
             if case let .showing(reading) = store.model.state {
+                capCaption(reading)
                 navigation(reading)
             }
         }
@@ -362,7 +356,16 @@ struct ReplyPanelView: View {
     /// design settles it — "a message = one `message.id` group of assistant
     /// lines" — and the counter counts exactly those.
     private func positionLabel(_ reading: ReplyPanelReading) -> some View {
-        Text("\(reading.position.index)/\(reading.position.total)")
+        Text(
+            String(
+                format: String(
+                    localized: "reply.nav.positionShort",
+                    defaultValue: "%1$d of %2$d"
+                ),
+                reading.position.index,
+                reading.position.total
+            )
+        )
             .font(.system(size: 11).monospacedDigit())
             .foregroundStyle(.secondary)
             .fixedSize()
@@ -381,6 +384,41 @@ struct ReplyPanelView: View {
                     reading.position.total
                 )
             )
+    }
+
+    /// Why `◄` has stopped, when the cap is the reason.
+    ///
+    /// **Not decoration, and not optional.** The code beside it already
+    /// records that *"a disabled arrow on its own reads as 'this is where the
+    /// conversation started', which is false"* — and the cap invents a second
+    /// reason for the arrow to stop that looks identical to the first. This
+    /// caption is the only thing separating them.
+    ///
+    /// Shown only at the cap rather than standing permanently: it costs
+    /// 69.7pt of a 256pt header, which takes the title from ~148pt to 66.3pt,
+    /// and the existing caption in this row follows the same rule.
+    ///
+    /// **Holds its width while `copiedNote` gives way.** It takes the
+    /// `.fixedSize()` that one drops — the persistent element is the one that
+    /// must survive the squeeze, and without this the row would truncate the
+    /// explanation and keep the toast.
+    ///
+    /// No accessibility label of its own: the counter beside it carries
+    /// `reply.nav.position` ("Message 3 of 5"), which replaces that view's
+    /// label rather than appending to it, so VoiceOver reads two elements and
+    /// never concatenates them into "showing the last 3 of 5".
+    @ViewBuilder
+    private func capCaption(_ reading: ReplyPanelReading) -> some View {
+        if !reading.canStepBack, store.model.hasMoreHistory || reading.position.total < store.model.groups.count {
+            Text(String(
+                localized: "reply.nav.showingLast",
+                defaultValue: "Showing last"
+            ))
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize()
+        }
     }
 
     private var returnToNewestLabel: String {
@@ -596,15 +634,13 @@ struct ReplyPanelView: View {
     /// ``ReplyMessageGroup`` offers are rewritten when paging completes a
     /// turn the window started mid-answer.
     private var draft: ReplyAnnotationSet {
-        guard let group = store.model.viewedGroup,
-              let scope = store.draftScope else { return ReplyAnnotationSet() }
-        return drafts.draft(for: group, in: scope)
+        guard let group = store.model.viewedGroup else { return ReplyAnnotationSet() }
+        return store.draft(for: group)
     }
 
     private func updateDraft(_ change: (inout ReplyAnnotationSet) -> Void) {
-        guard let group = store.model.viewedGroup,
-              let scope = store.draftScope else { return }
-        drafts.update(for: group, in: scope, change)
+        guard let group = store.model.viewedGroup else { return }
+        store.updateDraft(for: group, change)
     }
 
     /// What the page should be painting.
@@ -923,11 +959,21 @@ struct ReplyPanelView: View {
                 defaultValue: "Copied to clipboard"
             ))
             .font(.system(size: 10))
-            .foregroundStyle(.secondary)
+            // `.tertiary`, not `.secondary`, since `cm-69.6` put a second
+            // caption in this row. `Showing last` is the only thing on screen
+            // explaining why a control is dead; this vanishes after two
+            // seconds. Identical grey made a permanent explanation and a toast
+            // read the same, and every other way to separate them — weight, a
+            // background chip — costs width a 28.6pt-over-budget row does not
+            // have, paid for by the title. Demoting the transient one is free.
+            .foregroundStyle(.tertiary)
             .lineLimit(1)
-            // Never squeezed by the identity beside it: this is on screen for
-            // two seconds and half of it says nothing.
-            .fixedSize()
+            // Truncates rather than holding its width (Tom, 2026-09-07: "if
+            // they fight, just truncate"). This carried `.fixedSize()` with
+            // the note "on screen for two seconds and half of it says
+            // nothing" — right while the header held one caption, wrong once
+            // a second one made nineteen characters expensive.
+            .truncationMode(.tail)
             .transition(.opacity)
         }
     }
@@ -940,8 +986,8 @@ struct ReplyPanelView: View {
         guard store.deliver(draft, workspace: workspace, submit: submit) else { return }
         // Cleared only on a dispatch that actually happened. A refused send
         // that wiped the notes would lose writing the user cannot get back.
-        if let group = store.model.viewedGroup, let scope = store.draftScope {
-            drafts.clear(for: group, in: scope)
+        if let group = store.model.viewedGroup {
+            store.clearDraft(for: group)
         }
         previewText = nil
         previewIsEdited = false
