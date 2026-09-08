@@ -27,11 +27,14 @@ Select a passage in a rendered reply and it becomes a tinted, numbered phrase. W
 
 A **Reply** mode in the right sidebar, beside Files / Find / Vault / Feed / Dock. It shows the newest thing your agent said, rendered as markdown rather than as terminal text you have to scroll past.
 
-- **`◄ n/N ►` steps back through earlier replies.** Each arrow greys at its end. A reply arriving while you are reading an older one grows the counter without moving you.
+- **`◄ n of N ►` steps back through earlier replies, and stops after the last five.** The panel is for the messages you would actually correct, not for walking a whole session — so the walk has a limit, and when it reaches it the header says **`Showing last`** beside the counter. Without that, a greyed `◄` would read as *"the conversation started here"*, which is false with replies still behind it.
+- **A reply carrying notes you have not sent never counts against the limit, and always stays reachable.** The worst thing this panel could do is lose something you wrote, so the cap is not allowed to strand it. A marked reply also **holds you there** when a newer one lands — only an unmarked one follows the newest.
+- **The counter is re-based on what you can reach: the newest reply reads `5 of 5`, and the oldest you can step back to reads `1 of 5`.** `N` is the number you configured, and grows past it only while one of your own marks is holding an older reply alive.
+- **Set how far `◄` walks with `reply.maxMessagesBack` in `~/.config/cmux/cmux.json`.** It defaults to 5, and there is no Settings row — the default is right unless you go looking. A missing, zero, negative or non-numeric value falls back to 5 rather than being quietly corrected to something you did not ask for.
 - **A reply is one turn, not one API response.** A prompt whose answer runs a tool part-way through shows as a single reply, matching the terminal. The API ends a response wherever the agent stops to call a tool — a break you never asked for and cannot see.
 - **It follows the last agent pane you focused**, and keeps following it when you click a browser or an editor. The header names the tab, falling back to the agent's name.
 - **Reasoning sits behind a "Show thinking" disclosure**, shown but not part of the reply's text.
-- **Known limitation — mouse only for now.** Arrow keys do not reach the panel: the sidebar's focus host swallows them before any mode sees them. Use `◄ ►`.
+- **Known limitation — the panel has no way to focus it, so start with the mouse.** `◄ ►` always work. The arrow keys work too, but only once the keyboard is already inside the panel — which today happens as a side effect of marking a span, and nothing else puts it there. Until a click can focus the panel, an arrow pressed while you are only reading goes to the agent's terminal instead.
 - **Known limitation — a link opens in your system browser, and a `.md` link does nothing.** The panel has no pane of its own to route a link through, so it misses cmux's in-app browser.
 
 ## 🟠⋯ Even your split widths or heights in one action, instead of dragging each divider
