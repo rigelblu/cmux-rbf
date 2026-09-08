@@ -6,6 +6,12 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+---
+
+# 🔵⋯ v0.27.0 (2026-09-07) — #cm-69.2a, #cm-69.2b
+*Mark up passages in your agent's reply and send your notes back as one prompt.*
+*`#cm-69.2a` (one span per reply) was built 2026-09-03 and never released on its own — its wire format was superseded the day after it was built, so it ships here in the format `#cm-69.2b` settled.*
+
 ## 🟠⋯ Changed for End Users
 - 2026-09-06 - feat | **Mark up several passages in one reply and send your notes back as a single prompt.** Select a span in a rendered reply and it becomes a tinted phrase with its own number; the note you write on it joins a numbered list in the footer, in the order you marked them. `✕` on a hovered row removes it and renumbers the rest at once. `⤢` opens a preview of exactly what will be sent. **Paste** types the composed instruction into the agent's composer without submitting, at any point in the turn; **Paste & Send** also submits, and waits until the turn has ended.
 - 2026-09-07 - fix | **The highlight you are working on is a solid colour, not a pale wash.** It had been an accent colour built to carry white text, made translucent to sit behind body text — which is why every candidate arrived looking washed out. The footer also lists your notes in the order you *selected* them rather than reordering them by position in the message.

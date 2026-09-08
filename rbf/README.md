@@ -11,6 +11,18 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Mark up what your agent said and send the notes back as one prompt
+
+Select a passage in a rendered reply and it becomes a tinted, numbered phrase. Write what should change about it, mark another, and the notes collect into a numbered list under the reply — in the order you marked them, not the order they appear in the message.
+
+- **`Paste` types the whole thing into the agent's composer without submitting**, at any point in a turn, so you can add a sentence before you send it. It also copies the payload to your clipboard, because Claude Code collapses a long paste to `[Pasted text #1 +4 lines]` and nothing can detect that from outside.
+- **`Paste & Send` submits it, and waits for the turn to end first.** One prompt, not several — a multi-line payload is submitted with the agent's own multi-line key rather than a bare `return`.
+- **`⤢` opens a preview of exactly what will be sent**, editable, at the panel's real width. It is one-way: nothing parses your edits back, so collapsing after an edit discards them.
+- **The quote is the markdown you selected, not the words as drawn** — a span inside a bold run arrives as `**bold**` and a selected code block keeps its fence, so the agent sees text it can find in its own output.
+- **`✕` on a hovered row removes that note and renumbers the rest at once.**
+- **Known limitation — a note is not checked against the message it was written on.** If the session rebinds or the transcript is rewritten in between, the note is still pasteable and still says what you meant. A deliberate call: what you wrote is what you wanted to say, and refusing it would lose writing.
+- **Known limitation — stepping away from a reply and back leaves its highlights unpainted.** The notes are still listed; the tinted spans are not redrawn, because telling two identical quotes apart needs something that does not exist yet.
+
 ## 🟠⋯ Read your agent's last reply without scrolling the terminal back
 
 A **Reply** mode in the right sidebar, beside Files / Find / Vault / Feed / Dock. It shows the newest thing your agent said, rendered as markdown rather than as terminal text you have to scroll past.
