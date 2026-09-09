@@ -589,7 +589,15 @@ export const shortcutCategories: ShortcutCategory[] = [
     id: "find",
     titleKey: "find",
     shortcuts: [
-      { id: "find", combos: [["⌘", "F"]], description: { en: "Find", ja: "検索" } },
+      {
+        id: "find",
+        combos: [["⌘", "F"]],
+        description: { en: "Find", ja: "検索" },
+        // The Reply panel takes the keyboard as of #cm-69.1b, and find is not
+        // wired for it — the key does nothing there. Finding within a reply is
+        // #cm-69.10.
+        note: { en: "not in the Reply panel", ja: "返信パネルでは無効" },
+      },
       { id: "findInDirectory", combos: [["⌘", "⇧", "F"]], description: { en: "Find in directory", ja: "ディレクトリ内を検索" } },
       { id: "findNext", combos: [["⌘", "G"]], description: { en: "Find next", ja: "次を検索" } },
       { id: "findPrevious", combos: [["⌥", "⌘", "G"]], description: { en: "Find previous", ja: "前を検索" } },

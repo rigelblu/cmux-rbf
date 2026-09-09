@@ -145,6 +145,8 @@ Values for `shortcuts.bindings.<action>`:
 
 ## Find
 
+**`find` does nothing while the Reply panel holds the keyboard**, whatever it is bound to. The Reply panel became a place the keyboard lives in `#cm-69.1b`, and find was never wired for it — `findShortcutTarget(forRightSidebarMode:)` answers `.rightSidebarFileSearch` for Files and `.none` for every other sidebar mode, and `.none` returns early. Measured 2026-09-09: 30 of 30 presses in the reply body did nothing, against 2 of 2 working in the terminal in the same session. Rebinding cannot fix it; finding within a reply is `#cm-69.10`.
+
 - `shortcuts.bindings.find`
 - `shortcuts.bindings.findInDirectory`
 - `shortcuts.bindings.findNext`
