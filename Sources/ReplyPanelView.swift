@@ -147,16 +147,30 @@ struct ReplyPanelView: View {
         // Arrow keys drive the same two actions the buttons do. `cm-69.1` has
         // no text field to compete with; once notes exist, an editing field
         // takes the keys first.
-        .backport.onKeyPress(.leftArrow) { _ in
-            guard canStepBack else { return .ignored }
+        .backport.onKeyPress(.leftArrow) { modifiers in
+            guard Self.isUnmodifiedStep(modifiers), canStepBack else { return .ignored }
             Task { await store.stepBack() }
             return .handled
         }
-        .backport.onKeyPress(.rightArrow) { _ in
-            guard canStepForward else { return .ignored }
+        .backport.onKeyPress(.rightArrow) { modifiers in
+            guard Self.isUnmodifiedStep(modifiers), canStepForward else { return .ignored }
             store.stepForward()
             return .handled
         }
+    }
+
+    /// Whether an arrow press is the bare stroke that steps the reply.
+    ///
+    /// The two handlers above matched the key and ignored every modifier, so
+    /// `⌘←`, `⌥←` and `⇧←` all stepped. `⇧`+arrow is the worst of the three:
+    /// it is the extend-selection stroke, in a panel whose whole job is
+    /// selecting spans. Nobody saw this until `cm-69.1b` made the handlers
+    /// reachable — before that the sidebar host swallowed the keys first.
+    ///
+    /// Caps lock and the function/numeric-pad bits ride along on stray
+    /// hardware and are not somebody pressing a chord, so they are ignored.
+    private static func isUnmodifiedStep(_ modifiers: EventModifiers) -> Bool {
+        modifiers.subtracting([.capsLock, .numericPad, .function]).isEmpty
     }
 
     /// Whether the reply on screen is the oldest one that can be loaded.
@@ -629,7 +643,45 @@ struct ReplyPanelView: View {
             //
             // Hover wins while it lasts, so moving the pointer still answers
             // "which one is that?" without losing where you were.
-            activeMarkID: ReplyMarkFocus.id(hovered: hoveredID, editing: editingID)
+            activeMarkID: ReplyMarkFocus.id(hovered: hoveredID, editing: editingID),
+            // Registers the page as the responder that owns the keyboard while
+            // the panel is mounted, so cmux's terminal key-routing repair
+            // leaves it alone. Registered against the web view's own window,
+            // not "the active main window" — with two windows open those are
+            // not the same, and a wrong registration is invisible: the keys
+            // simply keep going to the terminal, which is today's bug.
+            onWebViewAttachmentChanged: { webView in
+                guard let webView, let window = webView.window else { return }
+                AppDelegate.shared?
+                    .keyboardFocusCoordinator(for: window)?
+                    .registerReplyHost(webView)
+            },
+            // Escape gives the keyboard back, which is `#cm-76`. `cm-69.1b`
+            // made this view the sidebar's focus owner, and that stopped
+            // `repairFocusedTerminalKeyboardRoutingIfNeeded` firing for Reply
+            // — the only route out of the panel today. Without this the panel
+            // is a keyboard trap: click in and the mouse is the way out.
+            //
+            // Only the no-note-field case reaches here. With a field open the
+            // field editor is first responder, so `.onExitCommand` below takes
+            // the first Escape and focus then parks on the 1x1 sidebar host,
+            // whose own `keyDown` already routes Escape to `focusTerminal()`
+            // (`Sources/RightSidebarPanelView.swift:519-525`). That is what
+            // makes "one level per press" work without a second arm here.
+            //
+            // Mirrors that host's two steps exactly, fallback included: with
+            // no terminal to hand back to, dropping first responder still
+            // opens the trap, and returning `false` there would leave Escape
+            // doing nothing at all.
+            onEscape: { window in
+                if AppDelegate.shared?
+                    .keyboardFocusCoordinator(for: window)?
+                    .focusTerminal() == true {
+                    return true
+                }
+                window.makeFirstResponder(nil)
+                return true
+            }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The canvas sits directly behind the web view, and it is not
@@ -929,7 +981,40 @@ struct ReplyPanelView: View {
         DispatchQueue.main.async { noteFieldFocused = true }
     }
 
+    /// Closes the note field and hands the keyboard back to the reply body.
+    ///
+    /// **`#cm-77`.** The field editor takes first responder *after*
+    /// ``placeCaretInNoteField()`` sets it, and AppKit does not restore the
+    /// previous responder when a view is removed — so without this the keys
+    /// after a note go nowhere. Returning the keyboard to the body is the
+    /// intended behaviour and must not depend on responder-chain fallback.
+    ///
+    /// Deferred a runloop turn for the same reason ``placeCaretInNoteField()``
+    /// defers the opposite move: the field editor is still first responder
+    /// while this runs, and SwiftUI tears it down after the state change.
+    ///
+    /// It also makes Escape's two presses read the same way. Escape closes the
+    /// field and lands here; the next Escape reaches the body's own arm
+    /// (`#cm-76`) and hands off to the terminal. Before this, the in-between
+    /// state was the 1x1 host, which swallowed anything typed there.
     private func closeEditing() {
+        clearEditingState()
+        DispatchQueue.main.async {
+            _ = AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
+                mode: .reply,
+                focusFirstItem: false
+            )
+        }
+    }
+
+    /// Drops the note-editing state without touching focus.
+    ///
+    /// Split out for ``send(submit:)``, which is not a user closing a note:
+    /// it pastes into the terminal and deliberately moves no focus. Folding
+    /// the hand-back into it would put the keyboard in the reply body right
+    /// after the user sent something to the terminal — a behaviour change
+    /// outside `#cm-77`, and one no scenario asks for.
+    private func clearEditingState() {
         editingID = nil
         editingText = ""
         editingOriginal = ""
@@ -995,7 +1080,7 @@ struct ReplyPanelView: View {
     }
 
     private func send(submit: Bool) {
-        closeEditing()
+        clearEditingState()
         // Sends the annotations, never the preview's text: the preview is
         // one-way, and a paste that shipped what was typed into it would
         // make the box a parser after all.

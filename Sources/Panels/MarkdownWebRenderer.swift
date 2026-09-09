@@ -62,8 +62,60 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// The mark to colour as active, from hovering its footer row.
     var activeMarkID: UUID?
 
+    /// Hands the page's web view to the caller when it attaches to a window,
+    /// and `nil` when it leaves — so a sidebar mode can register it as the
+    /// responder that owns the keyboard while the panel is focused.
+    ///
+    /// Opt-in and `nil` for the markdown panel and the diff viewer, the same
+    /// shape ``onSelectionChanged`` and ``horizontalPagePadding`` use. Those
+    /// callers keep no reference and behave exactly as before.
+    ///
+    /// **Why the web view rather than a view placed near it.** `cm-69.1b`
+    /// first tried a zero-size anchor in the SwiftUI content that resolved its
+    /// owner by walking to the nearest hosting view. Measured, that walk found
+    /// only the anchor's own 0x0 wrapper or `MainWindowHostingView`, which is
+    /// the whole window — too narrow or far too wide, and nothing in between.
+    /// The deeper problem was that an anchor can only ever *recognise* focus:
+    /// `focusRightSidebarEndpoint` has to **make** its owner first responder,
+    /// and the thing that should hold the keyboard here is the web view.
+    ///
+    /// **Called on attach and on detach, not once.** `makeNSView` reuses a
+    /// cached web view and re-parents it, so a registration made once would
+    /// outlive the mount and answer from a detached view.
+    var onWebViewAttachmentChanged: ((MarkdownWebView?) -> Void)?
+
+    /// Handles a plain Escape while the page owns the keyboard, returning
+    /// whether it consumed the key. Opt-in and `nil` for the markdown panel,
+    /// which keeps AppKit's Escape untouched. See
+    /// ``MarkdownWebView/onEscape`` for why it cannot be unconditional.
+    var onEscape: ((NSWindow) -> Bool)?
+
     func makeCoordinator() -> Coordinator {
         session.coordinator(panelId: panelId, workspaceId: workspaceId, filePath: filePath)
+    }
+
+    /// Installs the window-lifecycle closures, including the optional hand-off
+    /// that lets a caller hold the web view while it is mounted.
+    ///
+    /// One helper because `makeNSView` has two paths — reusing a cached view
+    /// and creating one — and a callback installed on only one of them fires
+    /// for a fresh panel and not for a re-mounted one. That failure is silent:
+    /// the panel renders correctly and only the keyboard stops working.
+    private func installWindowCallbacks(on webView: MarkdownWebView, coordinator: Coordinator) {
+        let handOff = onWebViewAttachmentChanged
+        webView.onEscape = onEscape
+        webView.onLeaveWindow = { [weak coordinator] in
+            coordinator?.handleViewLeftWindow()
+            handOff?(nil)
+        }
+        webView.onReenterWindow = { [weak coordinator, weak webView] in
+            coordinator?.handleViewReenteredWindow()
+            handOff?(webView)
+        }
+        // `viewDidMoveToWindow` fires on attach, which for a view already in a
+        // window has happened before this runs — so the current state is
+        // announced here rather than waiting for a re-entry that may not come.
+        handOff?(webView.window == nil ? nil : webView)
     }
 
     func makeNSView(context: Context) -> WKWebView {
@@ -72,12 +124,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 webView.removeFromSuperview()
             }
             webView.onPointerDown = onRequestPanelFocus
-            webView.onLeaveWindow = { [weak coordinator = context.coordinator] in
-                coordinator?.handleViewLeftWindow()
-            }
-            webView.onReenterWindow = { [weak coordinator = context.coordinator] in
-                coordinator?.handleViewReenteredWindow()
-            }
+            installWindowCallbacks(on: webView, coordinator: context.coordinator)
             webView.navigationDelegate = context.coordinator
             webView.uiDelegate = context.coordinator
             applyBackground(to: webView)
@@ -113,12 +160,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         let webView = MarkdownWebView(frame: .zero, configuration: config)
         context.coordinator.setSelectionObserver(onSelectionChanged)
         webView.onPointerDown = onRequestPanelFocus
-        webView.onLeaveWindow = { [weak coordinator = context.coordinator] in
-            coordinator?.handleViewLeftWindow()
-        }
-        webView.onReenterWindow = { [weak coordinator = context.coordinator] in
-            coordinator?.handleViewReenteredWindow()
-        }
+        installWindowCallbacks(on: webView, coordinator: context.coordinator)
         webView.setValue(false, forKey: "drawsBackground")
         applyBackground(to: webView)
         webView.allowsBackForwardNavigationGestures = false

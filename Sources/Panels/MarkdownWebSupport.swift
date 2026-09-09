@@ -30,6 +30,19 @@ final class MarkdownWebView: WKWebView {
     /// renderer coordinator recover content WebKit dropped while the view was
     /// out of the window (e.g. a pane drag re-parented the hosting views).
     var onReenterWindow: (() -> Void)?
+    /// Handles a plain Escape while this view owns the keyboard, returning
+    /// whether it consumed the key.
+    ///
+    /// **Opt-in per mount, and that is the point.** `MarkdownWebRenderer` has
+    /// two mounts — the Reply panel and the markdown panel — and both get this
+    /// same class. Only Reply wants Escape to mean *give the keyboard back*,
+    /// so the markdown panel leaves this `nil` and keeps AppKit's behaviour
+    /// untouched. An unconditional `keyCode == 53` arm here would change both.
+    ///
+    /// Reply needs it because `cm-69.1b` made this view the sidebar's focus
+    /// owner, which stopped `repairFocusedTerminalKeyboardRoutingIfNeeded`
+    /// firing for Reply — and that repair was the only route out of the panel.
+    var onEscape: ((NSWindow) -> Bool)?
 
     private var needsRenderingReattach = false
     private var editableFocusStateConfirmed = false
@@ -116,7 +129,32 @@ final class MarkdownWebView: WKWebView {
         if handleViewerNavigationKey(event) {
             return
         }
+        if handleEscapeHandoff(event) {
+            return
+        }
         super.keyDown(with: event)
+    }
+
+    /// Gives the keyboard back on a plain Escape, when a mount asked for it.
+    ///
+    /// Deliberately *not* gated on `editableFocusStateConfirmed` the way
+    /// ``handleViewerNavigationKey`` is. That flag only turns true once the
+    /// injected script posts its first message, so gating on it would leave
+    /// Escape silently dead on a page that has not finished loading — the
+    /// exact failure this arm exists to remove.
+    private func handleEscapeHandoff(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 53, let onEscape else { return false }
+        // Plain Escape only. `⌥⎋` and friends belong to whoever binds them;
+        // caps lock and the function/numeric-pad bits ride along on stray
+        // hardware and are not a chord.
+        let modifiers = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.function, .numericPad, .capsLock])
+        guard modifiers.isEmpty else { return false }
+        // Same ownership question the viewer-navigation path asks: is this
+        // view, or something inside it, first responder in this window.
+        guard cmuxOwnsKeyEvent(event), let window else { return false }
+        return onEscape(window)
     }
 
     func handleViewerNavigationKey(_ event: NSEvent) -> Bool {

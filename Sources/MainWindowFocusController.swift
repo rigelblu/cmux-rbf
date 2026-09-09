@@ -57,6 +57,14 @@ final class MainWindowFocusController {
     private weak var fileSearchHost: FileExplorerContainerView?
     private weak var feedHost: FeedKeyboardFocusView?
     private weak var dockHost: DockKeyboardFocusView?
+    /// Reply's owner is the page's own web view, handed over by
+    /// `MarkdownWebRenderer` while it is mounted.
+    ///
+    /// Unlike the four hosts above it is not a container that *finds* the
+    /// focused view — it **is** the view that takes the keyboard, which is what
+    /// lets `focusRightSidebarEndpoint` make it first responder rather than
+    /// only recognise it.
+    private weak var replyHost: MarkdownWebView?
 
     private(set) var intent: MainWindowKeyboardFocusIntent? {
         didSet {
@@ -144,6 +152,34 @@ final class MainWindowFocusController {
         focusRegisteredRightSidebarEndpointIfNeeded(mode: .dock)
     }
 
+    func registerReplyHost(_ host: MarkdownWebView?) {
+        replyHost = host
+        guard host != nil else { return }
+        focusRegisteredRightSidebarEndpointIfNeeded(mode: .reply)
+    }
+
+    /// Whether `responder` is Reply's web view or something inside it.
+    ///
+    /// The descendant arm is not defensive: a note field's editor is an
+    /// `NSTextView` living under the page, so an identity check alone would
+    /// hand the keyboard back to the terminal the moment a note is open.
+    private func replyOwns(_ responder: NSResponder) -> Bool {
+        // `replyHost` is weak, but detaching a web view does not deallocate it
+        // — `MarkdownWebRenderer` caches and re-parents the same instance. So
+        // a registration outlives its mount, and the staleness guard lives
+        // here rather than in an unregister path that would have to find a
+        // window it no longer has. Requiring *this* window also settles the
+        // two-window case: each coordinator answers only for its own.
+        guard let host = replyHost, let hostWindow = host.window, hostWindow === window else {
+            return false
+        }
+        if responder === host { return true }
+        guard let view = responder as? NSView ?? (responder as? NSTextView)?.delegate as? NSView else {
+            return false
+        }
+        return view === host || view.isDescendant(of: host)
+    }
+
     func noteRightSidebarInteraction(mode: RightSidebarMode) {
         rememberedRightSidebarMode = mode
         rightSidebarFocusState = .focused(mode: mode, target: .host)
@@ -212,6 +248,9 @@ final class MainWindowFocusController {
             return true
         }
         if dockHost?.ownsKeyboardFocus(responder) == true {
+            return true
+        }
+        if replyOwns(responder) {
             return true
         }
         return false
@@ -726,9 +765,27 @@ final class MainWindowFocusController {
         case .sessions, .customSidebar:
             return mode == .customSidebar ? focusFallbackRightSidebarHost() : false
         case .reply:
-            // No panel host is registered until the message view lands
-            // in cm-69.1 step 3; report honestly that focus did not move.
-            return false
+            // `#cm-77`. This returned `false` from `cm-69.1` until 2026-09-09,
+            // because no Reply-owned responder existed to hand the keyboard
+            // to. `cm-69.1b` supplied one — `replyHost`, the page's own web
+            // view — and the stale `false` was doing active harm: it is what
+            // made `focusRightSidebar` fall through to
+            // `focusFallbackRightSidebarHost()`, parking the keyboard on the
+            // 1x1 `RightSidebarKeyboardFocusView`, whose `keyDown` drops every
+            // character-bearing key. Measured: the last six `←` of Scenario 4e
+            // read `fr=RightSidebarKeyboardFocusView`.
+            //
+            // This is the single choke point for **every** route into Reply
+            // focus — the mode shortcut and the palette, not just the note
+            // field that got measured.
+            //
+            // Still honest when there is nothing to focus: an unregistered or
+            // detached host returns `false` and the old fallback runs, which
+            // is the pre-`cm-69.1b` behaviour rather than a new failure.
+            guard let window, let host = replyHost, host.window === window else {
+                return false
+            }
+            return window.makeFirstResponder(host)
         case .feed:
             if target == .firstItem {
                 feedHost?.focusFirstItemFromCoordinator()
@@ -802,6 +859,9 @@ final class MainWindowFocusController {
         }
         if dockHost?.ownsKeyboardFocus(responder) == true {
             return .dock
+        }
+        if replyOwns(responder) {
+            return .reply
         }
         return nil
     }
