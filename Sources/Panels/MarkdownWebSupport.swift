@@ -646,5 +646,15 @@ struct MarkdownPageMark: Codable, Equatable {
     // a border, which is what made every unwritten span read as an error.
 }
 
+/// One request to scroll a mark into view — `#cm-82`.
+///
+/// `seq` makes each request distinct, so stepping back to the same note
+/// twice still scrolls, while an unrelated SwiftUI pass that re-sends the
+/// same request does not.
+struct MarkdownPageReveal: Equatable {
+    let id: String
+    let seq: Int
+}
+
 extension NSColor {
     }

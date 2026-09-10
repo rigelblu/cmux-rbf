@@ -1299,6 +1299,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		F5168A030000000000000001 /* MarkdownFontSizeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A030000000000000002 /* MarkdownFontSizeSettings.swift */; };
 		D7470002D7470002D7470002 /* MarkdownLinkBoundaryRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7470001D7470001D7470001 /* MarkdownLinkBoundaryRegressionTests.swift */; };
 		D7750002D7750002D7750002 /* MarkdownReplyLineBreakTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */; };
+		D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */; };
 		F5168A050000000000000001 /* MarkdownMaxWidthSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A050000000000000002 /* MarkdownMaxWidthSettings.swift */; };
 		D6069002D6069002D6069002 /* MarkdownMermaidZoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6069001D6069001D6069001 /* MarkdownMermaidZoomTests.swift */; };
 		A5001420 /* MarkdownPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001418 /* MarkdownPanel.swift */; };
@@ -3954,6 +3955,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		F5168A030000000000000002 /* MarkdownFontSizeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownFontSizeSettings.swift; sourceTree = "<group>"; };
 		D7470001D7470001D7470001 /* MarkdownLinkBoundaryRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLinkBoundaryRegressionTests.swift; sourceTree = "<group>"; };
 		D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownReplyLineBreakTests.swift; sourceTree = "<group>"; };
+		D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteStepTests.swift; sourceTree = "<group>"; };
 		F5168A050000000000000002 /* MarkdownMaxWidthSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownMaxWidthSettings.swift; sourceTree = "<group>"; };
 		D6069001D6069001D6069001 /* MarkdownMermaidZoomTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMermaidZoomTests.swift; sourceTree = "<group>"; };
 		A5001418 /* MarkdownPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownPanel.swift; sourceTree = "<group>"; };
@@ -7798,6 +7800,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D9154001D9154001D9154001 /* MarkdownCodespanRenderingTests.swift */,
 				D7470001D7470001D7470001 /* MarkdownLinkBoundaryRegressionTests.swift */,
 				D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */,
+				D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */,
 				D7470011D7470011D7470011 /* MarkdownYMDShellTests.swift */,
 				F5168A0C0000000000000002 /* MarkdownBackgroundStyleTests.swift */,
 				D8072A01D8072A01D8072A01 /* BrowserViewportRuntimeLoadDelegate.swift */,
@@ -10830,6 +10833,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D9154002D9154002D9154002 /* MarkdownCodespanRenderingTests.swift in Sources */,
 				D7470002D7470002D7470002 /* MarkdownLinkBoundaryRegressionTests.swift in Sources */,
 				D7750002D7750002D7750002 /* MarkdownReplyLineBreakTests.swift in Sources */,
+				D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */,
 				D6069002D6069002D6069002 /* MarkdownMermaidZoomTests.swift in Sources */,
 				D3664002D3664002D3664002 /* MarkdownPanelTests.swift in Sources */,
 				D7470012D7470012D7470012 /* MarkdownYMDShellTests.swift in Sources */,

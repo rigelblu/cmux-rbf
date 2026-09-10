@@ -1,4 +1,5 @@
 import AppKit
+import Bonsplit
 import CmuxAgentChat
 import CmuxAppKitSupportUI
 import SwiftUI
@@ -53,6 +54,28 @@ struct ReplyPanelView: View {
     /// `focusNoteField` is the pair: move the window's first responder into
     /// the sidebar first, then place the caret.
     @FocusState private var noteFieldFocused: Bool
+
+    /// The note an ↑/↓ step opened, until something else opens one — `#cm-82`.
+    ///
+    /// **Keyed on the row, not consumed once.** A step that changes the
+    /// list's height across its ceiling flips `ReplyAnnotationManifest`'s
+    /// `ScrollView` branch, which rebuilds every row — so the stepped-to field
+    /// appears a *second* time, after a one-shot flag would already be spent.
+    /// That second appearance would take the cold path: the AppKit hop, and
+    /// the select-all a focused field applies (cold review, 2026-09-10).
+    ///
+    /// **It keys on what caused the change, not on who holds focus.** A step
+    /// tears down one row's field and builds the next, and by the time the
+    /// new field's `.onAppear` runs the old field editor is detached and
+    /// AppKit has restored nothing. A "focus is already in the sidebar" check
+    /// there reads false and runs the AppKit hop — which makes the reply's web
+    /// view first responder for a runloop turn and drops a key typed straight
+    /// after the step.
+    @State private var stepArrivalID: UUID?
+
+    /// The note a keyboard step last asked both surfaces to bring into view.
+    @State private var revealRequest: ReplyRevealRequest?
+    @State private var revealSeq = 0
 
     /// The mark the pointer is over, from either half.
     ///
@@ -650,6 +673,8 @@ struct ReplyPanelView: View {
             // Hover wins while it lasts, so moving the pointer still answers
             // "which one is that?" without losing where you were.
             activeMarkID: ReplyMarkFocus.id(hovered: hoveredID, editing: editingID),
+            // Keyboard steps only — hover never scrolls the page (`#cm-82`).
+            revealRequest: revealRequest.map { MarkdownPageReveal(id: $0.id.uuidString, seq: $0.seq) },
             // Registers the page as the responder that owns the keyboard while
             // the panel is mounted, so cmux's terminal key-routing repair
             // leaves it alone. Registered against the web view's own window,
@@ -757,6 +782,7 @@ struct ReplyPanelView: View {
                 hoverFill: Color(nsColor: pageTheme.activeMarkColor),
                 hoverTextFill: Color(nsColor: pageTheme.onActiveMarkColor),
                 ceiling: footerCeiling,
+                revealRequest: revealRequest,
                 measuredHeight: $noteListHeight,
                 onBeginEditing: { beginEditing($0) },
                 onRemove: { id in
@@ -835,7 +861,25 @@ struct ReplyPanelView: View {
             // bounded by the footer's own ceiling above.
             .lineLimit(1...8)
             .focused($noteFieldFocused)
-            .onAppear { placeCaretInNoteField() }
+            .onAppear {
+                // A step already holds the keyboard in the sidebar; only a
+                // cold open needs AppKit to move it there (`#cm-82`).
+                let byStep = stepArrivalID == entry.id
+                placeCaretInNoteField(hop: !byStep, caretAtEnd: byStep)
+            }
+            // `#cm-82`: at the field's first or last visual line, ↑/↓ move to
+            // the neighbouring note instead of doing nothing. Inside the note
+            // they still move the caret — the handler returns `.ignored`.
+            .backport.onKeyPress(.upArrow) { modifiers, isRepeat in
+                guard Self.isUnmodifiedStep(modifiers),
+                      ReplyNoteCaret.isOnEdgeLine(.first) else { return .ignored }
+                return stepNote(.previous, isRepeat: isRepeat)
+            }
+            .backport.onKeyPress(.downArrow) { modifiers, isRepeat in
+                guard Self.isUnmodifiedStep(modifiers),
+                      ReplyNoteCaret.isOnEdgeLine(.last) else { return .ignored }
+                return stepNote(.next, isRepeat: isRepeat)
+            }
             .onChange(of: editingText) { text in
                 updateDraft { $0.updateNote(id: entry.id, note: text) }
             }
@@ -969,13 +1013,15 @@ struct ReplyPanelView: View {
     // MARK: - Editing and delivery
 
     private func beginEditing(_ entry: NumberedAnnotation) {
+        stepArrivalID = nil
         editingID = entry.id
         editingText = entry.note
         editingOriginal = entry.note
         placeCaretInNoteField()
     }
 
-    /// Puts the caret in the open note field, from a cold start.
+    /// Puts the caret in the open note field — from a cold start, or, with
+    /// `hop: false`, after a `#cm-82` step.
     ///
     /// Two steps, because they answer different questions. AppKit decides
     /// which *view* has the keyboard, and until the sidebar wins that the
@@ -986,12 +1032,64 @@ struct ReplyPanelView: View {
     /// The caret is placed a runloop turn later: the field may not be in the
     /// hierarchy yet on the pass that creates its row, and `@FocusState` set
     /// against a field that does not exist is dropped silently.
-    private func placeCaretInNoteField() {
-        _ = AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
-            mode: .reply,
-            focusFirstItem: false
-        )
-        DispatchQueue.main.async { noteFieldFocused = true }
+    ///
+    /// - Parameters:
+    ///   - hop: Whether to move AppKit's first responder into the sidebar
+    ///     first. `false` only for a `#cm-82` step, where the keyboard is
+    ///     already there and the hop would park it on the reply's web view.
+    ///   - caretAtEnd: Put the caret after the note's text. Focusing a field
+    ///     selects all of it — measured, `{0, 71}` of 71 — so without this a
+    ///     step into a written note would replace it with the next keystroke.
+    private func placeCaretInNoteField(hop: Bool = true, caretAtEnd: Bool = false) {
+        if hop {
+            _ = AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
+                mode: .reply,
+                focusFirstItem: false
+            )
+        }
+        DispatchQueue.main.async {
+            noteFieldFocused = true
+            guard caretAtEnd else { return }
+            // The field editor takes first responder on this pass; the
+            // selection it applies on focus lands after, so move it a turn on.
+            DispatchQueue.main.async {
+                ReplyNoteCaret.moveToEnd()
+                #if DEBUG
+                // `#cm-82`'s one open question: after a step, the keyboard
+                // must be in the new note, never on the reply's web view.
+                dlog("reply.step landed fr=\(ReplyNoteCaret.firstResponderName)")
+                #endif
+            }
+        }
+    }
+
+    /// Moves the one open note field to the neighbouring note — `#cm-82`.
+    ///
+    /// Not `beginEditing`: that places the caret through the AppKit hop, and
+    /// not `closeEditing`, which hands the keyboard to the reply body between
+    /// two notes. Returns `.ignored` when there is nowhere to go, so the key
+    /// falls through to the text field's own caret move.
+    private func stepNote(_ direction: ReplyNoteStep.Direction, isRepeat: Bool) -> BackportKeyPressResult {
+        let entries = draft.numbered
+        guard let current = editingID,
+              let index = entries.firstIndex(where: { $0.id == current }),
+              let target = ReplyNoteStep.target(
+                  from: index, count: entries.count, direction, isRepeat: isRepeat
+              ) else { return .ignored }
+        let next = entries[target]
+        // Saved here, not left to `.onChange(of: editingText)`: that runs on
+        // the next update, and the field it belongs to is gone by then.
+        updateDraft { $0.updateNote(id: current, note: editingText) }
+        // A key press means the keyboard is in charge of what is lit; hover
+        // returns when the pointer next enters a mark or a row.
+        hoveredID = nil
+        stepArrivalID = next.id
+        editingID = next.id
+        editingText = next.note
+        editingOriginal = next.note
+        revealSeq += 1
+        revealRequest = ReplyRevealRequest(id: next.id, seq: revealSeq)
+        return .handled
     }
 
     /// Closes the note field and hands the keyboard back to the reply body.
@@ -1028,6 +1126,7 @@ struct ReplyPanelView: View {
     /// after the user sent something to the terminal — a behaviour change
     /// outside `#cm-77`, and one no scenario asks for.
     private func clearEditingState() {
+        stepArrivalID = nil
         editingID = nil
         editingText = ""
         editingOriginal = ""
@@ -1041,6 +1140,7 @@ struct ReplyPanelView: View {
         // A refused overlap leaves the standing mark alone: an ambiguous
         // quote is fixed by selecting more, never by cmux widening one.
         guard accepted else { return }
+        stepArrivalID = nil
         editingID = annotation.id
         editingText = ""
         editingOriginal = ""
@@ -1145,5 +1245,70 @@ struct ReplyPanelView: View {
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// The open note field's caret, read from AppKit — `#cm-82`.
+///
+/// SwiftUI exposes neither the caret nor line layout, so this reads the
+/// field editor directly. It measures through `NSTextInputClient`'s
+/// `firstRect(forCharacterRange:actualRange:)` and **never touches
+/// `layoutManager`**: reading that on a TextKit 2 view switches it to
+/// TextKit 1 for good, which the `#cm-82` spike very likely did to itself.
+@MainActor
+enum ReplyNoteCaret {
+    enum Edge { case first, last }
+
+    /// The note field's editor, when a note field is what has the keyboard.
+    private static var editor: NSTextView? {
+        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView,
+              editor.isFieldEditor else { return nil }
+        return editor
+    }
+
+    /// Whether the caret sits on the field's first or last **visual** line.
+    ///
+    /// Visual, so a note that wraps without a newline still has lines the
+    /// arrows move between before they leave it. `false` — let the text field
+    /// have the key — while an input method is composing, or while text is
+    /// selected: the first arrow then collapses the selection as it always
+    /// has, and the next one steps.
+    static func isOnEdgeLine(_ edge: Edge) -> Bool {
+        guard let editor, !editor.hasMarkedText() else { return false }
+        let selection = editor.selectedRange()
+        guard selection.length == 0 else { return false }
+        let length = (editor.string as NSString).length
+        // At a soft wrap the caret index is where the next line starts, but
+        // with upstream affinity it is *drawn* at the end of the line above.
+        // Measure the character before it, or ↓ there would step instead of
+        // moving down to the line the caret is really on.
+        let measured = editor.selectionAffinity == .upstream && selection.location > 0
+            ? selection.location - 1
+            : selection.location
+        guard let caret = lineRect(editor, at: measured),
+              let boundary = lineRect(editor, at: edge == .first ? 0 : length)
+        else { return false }
+        // Same line when the two rects share a vertical centre; half a line
+        // of slack absorbs sub-point rounding without admitting a neighbour.
+        return abs(caret.midY - boundary.midY) < max(caret.height, 1) / 2
+    }
+
+    /// Puts the caret after the note's text, replacing the select-all that
+    /// focusing a field applies.
+    static func moveToEnd() {
+        guard let editor else { return }
+        let end = (editor.string as NSString).length
+        editor.setSelectedRange(NSRange(location: end, length: 0))
+    }
+
+    #if DEBUG
+    static var firstResponderName: String {
+        NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+    }
+    #endif
+
+    private static func lineRect(_ editor: NSTextView, at location: Int) -> NSRect? {
+        let rect = editor.firstRect(forCharacterRange: NSRange(location: location, length: 0), actualRange: nil)
+        return rect.isEmpty && rect.origin == .zero ? nil : rect
     }
 }

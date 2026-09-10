@@ -100,6 +100,13 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// The mark to colour as active, from hovering its footer row.
     var activeMarkID: UUID?
 
+    /// A request to scroll one mark into view, sent once per `seq`.
+    ///
+    /// `#cm-82`. Separate from `activeMarkID` on purpose: that one also moves
+    /// on **hover**, and a page that scrolled whenever the pointer crossed a
+    /// footer row would be unusable. Only a keyboard step sets this.
+    var revealRequest: MarkdownPageReveal?
+
     /// Hands the page's web view to the caller when it attaches to a window,
     /// and `nil` when it leaves — so a sidebar mode can register it as the
     /// responder that owns the keyboard while the panel is focused.
@@ -175,6 +182,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator.setMarkHoverObserver(onMarkHoverChanged)
             context.coordinator.setMarks(marks)
             context.coordinator.setActiveMark(activeMarkID)
+            context.coordinator.reveal(revealRequest)
             return webView
         }
 
@@ -244,6 +252,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         context.coordinator.update(markdown: markdown, theme: theme)
         context.coordinator.setMarks(marks)
         context.coordinator.setActiveMark(activeMarkID)
+        context.coordinator.reveal(revealRequest)
     }
 
     /// Watches the page's selection, paints the marks, and reports hover —
@@ -433,6 +442,16 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             }
           };
 
+          // `#cm-82`: scroll one mark into view, and only if it is not
+          // already fully visible — `block: "nearest"` is a no-op then, so
+          // stepping between two on-screen notes does not move the page.
+          window.__cmuxReplyReveal = (id) => {
+            const container = root();
+            if (!container || !id) return;
+            const span = container.querySelector("." + MARK + '[data-cmux-id="' + id + '"]');
+            if (span) span.scrollIntoView({ block: "nearest", inline: "nearest" });
+          };
+
           window.__cmuxReplyActivate = (id) => {
             const container = root();
             if (!container) return;
@@ -601,7 +620,18 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             settle(250);
           }, true);
 
+          // A scroll slides content under a pointer that did not move, and
+          // WebKit reports that as a `mouseover`. `#cm-82` scrolls the page
+          // on a keyboard step and clears hover for it; re-reporting hover
+          // here would light whichever mark slid under the resting pointer.
+          // So only a pointer that actually moved can claim hover.
+          let lastPointer = null;
+          document.addEventListener("mousemove", (event) => {
+            lastPointer = { x: event.clientX, y: event.clientY };
+          }, true);
+
           document.addEventListener("mouseover", (event) => {
+            if (lastPointer && lastPointer.x === event.clientX && lastPointer.y === event.clientY) return;
             const target = event.target instanceof Element ? event.target.closest("." + MARK) : null;
             handler.postMessage({
               action: "replyMarkHover",
@@ -856,6 +886,21 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                   let json = String(data: data, encoding: .utf8) else { return }
             evaluate("window.__cmuxReplyPaint && window.__cmuxReplyPaint(\(json));")
         }
+
+        /// Scrolls the requested mark into view, once per request.
+        ///
+        /// `updateNSView` runs on every SwiftUI pass, so without the `seq`
+        /// check one step would re-scroll the page each time anything else
+        /// in the panel changed.
+        func reveal(_ request: MarkdownPageReveal?) {
+            guard let request, request.seq != lastRevealSeq else { return }
+            lastRevealSeq = request.seq
+            let data = (try? JSONSerialization.data(withJSONObject: [request.id])) ?? Data("[\"\"]".utf8)
+            let literal = String(data: data, encoding: .utf8) ?? "[\"\"]"
+            evaluate("window.__cmuxReplyReveal && window.__cmuxReplyReveal(\(literal)[0]);")
+        }
+
+        private var lastRevealSeq: Int?
 
         /// Colours one mark as hovered, or clears every one.
         ///

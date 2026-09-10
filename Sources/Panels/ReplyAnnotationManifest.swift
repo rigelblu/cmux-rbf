@@ -29,6 +29,37 @@ enum ReplyMarkFocus {
     static func id(hovered: UUID?, editing: UUID?) -> UUID? { hovered ?? editing }
 }
 
+/// Which note an ↑/↓ step lands on — `#cm-82`.
+///
+/// Wraps at both ends, because Tom chose it (2026-09-10) — but **not on a
+/// held key**. At normal repeat rate a held ↓ laps a nine-note list about
+/// once a second, so wherever it was released would be random. Held, it
+/// walks to the end and stops; one fresh press wraps.
+///
+/// `nil` means "there is nowhere to go": one note (wrap would land on
+/// itself), none, or an index the list has re-numbered out from under. The
+/// caller then lets the key fall through to the text field's own caret move.
+enum ReplyNoteStep {
+    enum Direction { case previous, next }
+
+    static func target(from index: Int, count: Int, _ direction: Direction, isRepeat: Bool = false) -> Int? {
+        guard count > 1, (0..<count).contains(index) else { return nil }
+        let raw = direction == .next ? index + 1 : index - 1
+        let wraps = raw < 0 || raw >= count
+        if wraps && isRepeat { return nil }
+        return (raw + count) % count
+    }
+}
+
+/// One keyboard step's request to bring a note into view — `#cm-82`.
+///
+/// `seq` bumps on every step, so stepping back to the same note still
+/// scrolls, while re-sending the same request on an unrelated pass does not.
+struct ReplyRevealRequest: Equatable {
+    let id: UUID
+    let seq: Int
+}
+
 enum ReplyFooterMetrics {
     static let topInset: CGFloat = 9
     static let rowGap: CGFloat = 7
@@ -142,6 +173,9 @@ struct ReplyAnnotationManifest<Field: View>: View {
 
     /// How tall the list may grow before it scrolls.
     let ceiling: CGFloat
+    /// Scroll this note's row into view, once per `seq` — `#cm-82`. Only a
+    /// keyboard step sets it; clicks and new selections leave it alone.
+    var revealRequest: ReplyRevealRequest? = nil
 
     /// How tall the rows actually are. Written back so the list can size to
     /// its content *and* stop at the ceiling, and so the count line knows
@@ -232,21 +266,39 @@ struct ReplyAnnotationManifest<Field: View>: View {
     /// `ScrollView` content at all, so the first render of this view came back
     /// as a blank 276×301 with only the count line and the `⤢` on it.
     private var list: some View {
-        Group {
-            if atCeiling {
-                // A proportion, not a row count: the panel is as tall as the
-                // window, so "nine rows" would be right at exactly one height.
-                ScrollView { rows }
-                    .frame(height: ceiling)
-            } else {
-                rows
+        // Wraps the whole group, not just the `ScrollView`: the scroll view
+        // exists only at the ceiling. Below it every row is already on
+        // screen, so `scrollTo` finding nothing to scroll is correct.
+        ScrollViewReader { proxy in
+            Group {
+                if atCeiling {
+                    // A proportion, not a row count: the panel is as tall as the
+                    // window, so "nine rows" would be right at exactly one height.
+                    ScrollView { rows }
+                        .frame(height: ceiling)
+                } else {
+                    rows
+                }
+            }
+            .onChange(of: revealRequest) { request in
+                // No anchor: SwiftUI then scrolls only as far as needed, and
+                // not at all when the row is already visible.
+                guard let request else { return }
+                proxy.scrollTo(request.id, anchor: nil)
+            }
+            // A step can change the list's height across the ceiling, which
+            // swaps in a fresh `ScrollView` scrolled to the top — after the
+            // reveal above already ran. Repeat it for the note still open.
+            .onChange(of: atCeiling) { _ in
+                guard let request = revealRequest, request.id == editingID else { return }
+                proxy.scrollTo(request.id, anchor: nil)
             }
         }
     }
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: ReplyFooterMetrics.rowGap) {
-            ForEach(entries) { row($0) }
+            ForEach(entries) { row($0).id($0.id) }
         }
         .padding(.horizontal, gutter)
         .background(

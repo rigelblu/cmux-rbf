@@ -58,6 +58,32 @@ extension Backport where Content: View {
         return content
         #endif
     }
+
+    /// The same, telling the handler whether this press is a key-repeat.
+    ///
+    /// `#cm-82` wraps at the ends of the note list on a fresh press but not on
+    /// a held key, and the overload above subscribes to `.repeat` without
+    /// passing on which phase fired. A separate overload rather than a new
+    /// parameter, so the existing callers stay exactly as they are.
+    func onKeyPress(
+        _ key: KeyEquivalent,
+        action: @escaping (_ modifiers: EventModifiers, _ isRepeat: Bool) -> BackportKeyPressResult
+    ) -> some View {
+        #if canImport(AppKit)
+        if #available(macOS 14, *) {
+            return content.onKeyPress(key, phases: [.down, .repeat], action: { keyPress in
+                switch action(keyPress.modifiers, keyPress.phase == .repeat) {
+                case .handled: return .handled
+                case .ignored: return .ignored
+                }
+            })
+        } else {
+            return content
+        }
+        #else
+        return content
+        #endif
+    }
 }
 
 enum BackportPointerStyle {
