@@ -73,6 +73,38 @@ struct ReplyAnnotationManifestRenderTests {
     /// row at all.
     static var hoverWash: NSColor { MarkdownWebTheme.hoveredMarkFill(isDark: false) }
 
+    /// The ink the shipped theme puts **on** that wash.
+    ///
+    /// **Derived, because the ink follows the fill.** A light fill takes
+    /// near-black and a dark one takes white (`MarkdownWebTheme.resolve`), so
+    /// the `.white` this used to hard-code was right only while the fill was
+    /// `#6A1B9A`. Under iris the render drew a white `✕` that production
+    /// draws near-black, and the glyph scans locked onto the wrong pixels —
+    /// the centring test went 15.5pt out (2026-09-10).
+    static var hoverInk: NSColor {
+        MarkdownWebTheme.resolve(backgroundColor: .white, style: .solid).onActiveMarkColor
+    }
+
+    /// How saturated a pixel must be to count as band rather than page.
+    ///
+    /// **Derived from the shipped fill, never typed.** The scans below used a
+    /// literal `0.25`, which was chosen while the fill was `#6A1B9A` and
+    /// quietly became a threshold only that hue could pass: the render is a
+    /// `NSCalibratedRGB` bitmap, and converting it to sRGB *lowers*
+    /// saturation — iris `#C4A7E7` measures 0.277 as a colour and **0.218**
+    /// as a rendered pixel. So changing the hue (2026-09-10) made two
+    /// geometry tests report "the open row drew no band at all" while the
+    /// band was plainly in the PNG, 7315 pixels of it.
+    ///
+    /// Half the fill's own saturation clears the conversion loss and still
+    /// rejects everything else the row draws — the page (0), the grey note
+    /// text (0), the accent border (1.0). The floor keeps a future near-grey
+    /// fill from turning this into "match anything".
+    static var bandSaturationFloor: CGFloat {
+        let sat = (hoverWash.usingColorSpace(.sRGB) ?? hoverWash).saturationComponent
+        return max(0.08, sat * 0.5)
+    }
+
     /// Where the note list starts, below the header.
     ///
     /// The count-plus-`⤢` header is on **every** footer now, not just `N10`,
@@ -314,9 +346,11 @@ struct ReplyAnnotationManifestRenderTests {
         let ratio = Self.contrast(fill, ink)
 
         print(String(format: "mark ink on fill (%@): %.1f:1", dark ? "dark" : "light", Double(ratio)))
-        // WCAG AA for body text. `#6A1B9A` with white gives 9.4:1 — the
-        // widest margin of the ten candidates tried, though the hue was
-        // chosen on looks and not on this number.
+        // WCAG AA for body text. Iris `#C4A7E7` with the near-black ink a
+        // light fill selects gives 9.1:1 (it was 9.4:1 while the fill was
+        // `#6A1B9A` with white). The ink follows the fill, so this holds
+        // through a hue change — which is why it asserts the ratio and not
+        // a colour.
         #expect(ratio >= 4.5)
     }
 
@@ -361,7 +395,7 @@ struct ReplyAnnotationManifestRenderTests {
             gutter: 10,
             fieldFill: .white,
             hoverFill: Color(nsColor: Self.hoverWash),
-            hoverTextFill: .white,
+            hoverTextFill: Color(nsColor: Self.hoverInk),
             ceiling: Self.inertCeiling,
             measuredHeight: Binding(get: { height }, set: { height = $0 }),
             onBeginEditing: { _ in },
@@ -445,7 +479,7 @@ struct ReplyAnnotationManifestRenderTests {
         var rows: [Int] = []
         for y in 0..<image.pixelsHigh {
             guard let c = image.colorAt(x: 7, y: y)?.usingColorSpace(.sRGB) else { continue }
-            if c.saturationComponent > 0.25, c.brightnessComponent < 0.95 { rows.append(y) }
+            if c.saturationComponent > Self.bandSaturationFloor, c.brightnessComponent < 0.95 { rows.append(y) }
         }
         guard let first = rows.first, let last = rows.last else { return nil }
         return CGFloat(first)..<CGFloat(last + 1)
@@ -477,7 +511,7 @@ struct ReplyAnnotationManifestRenderTests {
         }
         func band(_ x: Int, _ y: Int) -> Bool {
             guard let c = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { return false }
-            return c.saturationComponent > 0.25 && c.brightnessComponent < 0.95
+            return c.saturationComponent > Self.bandSaturationFloor && c.brightnessComponent < 0.95
         }
         for y in 0..<image.pixelsHigh where band(7, y) && white(45, y) {
             return CGFloat(y)
@@ -493,8 +527,11 @@ struct ReplyAnnotationManifestRenderTests {
     /// Ink is what differs from the surface it sits on — not what is dark.
     ///
     /// **This measured darkness until 2026-09-07, and the opaque fill broke
-    /// it silently.** With a `#6A1B9A` band the `✕` is *white on purple*, so
-    /// a "darker than 0.85" test finds the band and misses the glyph. The
+    /// it silently.** With the `#6A1B9A` band of the day the `✕` was *white
+    /// on purple*, so a "darker than 0.85" test found the band and missed the
+    /// glyph. (Under iris the ink flipped back to near-black — which is
+    /// exactly why this measures difference from the surface and not
+    /// darkness: it survived the hue change without an edit.) The
     /// centring test failed loudly; `removeGlyphDoesNotMoveBetweenRows` and
     /// `removeGlyphCentresOnItsRow` kept **passing while measuring the band**,
     /// because the scan is capped at x=256 and a full band gives the same

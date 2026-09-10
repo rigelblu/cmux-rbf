@@ -377,8 +377,18 @@ struct MarkdownWebTheme: Equatable {
     /// exactly that way.
     let adjacentChromeColor: NSColor?
 
-    /// The focused mark's fill — `#6A1B9A`, opaque, the same on both canvases.
+    /// The focused mark's fill — iris `#C4A7E7`, opaque, the same on both
+    /// canvases.
     ///
+    /// **Changed 2026-09-10 (Tom), from `#6A1B9A` to the tint shape.** Iris
+    /// was one of the original ten and lost then; tried again live, it won.
+    /// The ink follows the fill by itself — a light fill takes the near-black
+    /// on-colour — so the words stay readable at 9.1:1, where the old block
+    /// gave 9.4:1 with white. What changed is which reads as primary: the
+    /// agent's words now do, and the mark tints them.
+    ///
+    /// **The first choice, kept because its reasoning still holds** — the
+    /// decision was a shape, not a hue, and this is the other shape.
     /// **Chosen by Tom on 2026-09-06/07 after ten candidates were tried live**
     /// — Rosé Pine Dawn's seven accents, iris's dark variant, and two light
     /// lavenders. The decision that actually settled it was not a hue but a
@@ -394,7 +404,7 @@ struct MarkdownWebTheme: Equatable {
     /// white text — so painting it behind the agent's dark body text needed
     /// it weakened or the text was unreadable. The alpha manufactured a
     /// background out of a colour that was not one, and it is what made every
-    /// candidate arrive pale: `#6A1B9A` reached the screen as `#D7C0E4`.
+    /// candidate arrive pale: the chosen hue reached the screen as `#D7C0E4`.
     /// Choosing the hue directly removes the constraint, and the page always
     /// has an opaque canvas under the mark (`pageTheme` resolves `.solid`).
     /// Nothing else needed the translucency — overlapping marks are refused
@@ -417,7 +427,10 @@ struct MarkdownWebTheme: Equatable {
     /// hue that only darkens.
     static func hoveredMarkFill(isDark: Bool) -> NSColor {
         _ = isDark
-        return NSColor(srgbRed: 0x6a / 255, green: 0x1b / 255, blue: 0x9a / 255, alpha: 1)
+        // TRIAL 2026-09-10 (Tom): iris `#C4A7E7` — the tint shape rather
+        // than the block. Ink follows automatically: a light fill takes the
+        // near-black on-colour, so the words stay readable.
+        return NSColor(srgbRed: 0xc4 / 255, green: 0xa7 / 255, blue: 0xe7 / 255, alpha: 1)
     }
 
     static func resolve(
