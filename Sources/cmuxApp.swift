@@ -932,6 +932,12 @@ struct cmuxApp: App {
                 }
             }
 
+            splitCommandButton(title: String(localized: "menu.view.focusRightSidebarInReply", defaultValue: "Toggle Reply Focus"), shortcut: menuShortcut(for: .focusRightSidebarInReply)) {
+                if AppDelegate.shared?.toggleRightSidebarModeKeyboardFocusInActiveMainWindow(mode: .reply) != true {
+                    NSSound.beep()
+                }
+            }
+
             splitCommandButton(title: String(localized: "menu.view.focusRightSidebar", defaultValue: "Toggle Right Sidebar Focus"), shortcut: menuShortcut(for: .focusRightSidebar)) {
                 if AppDelegate.shared?.toggleRightSidebarKeyboardFocusInActiveMainWindow() != true {
                     if AppDelegate.shared?.focusRightSidebarInActiveMainWindow(

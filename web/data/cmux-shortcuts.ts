@@ -143,6 +143,7 @@ export const shortcutCategories: ShortcutCategory[] = [
         description: { en: "Collapse or expand focused workspace group", ja: "フォーカス中のワークスペースグループを折りたたみ/展開" },
       },
       { id: "focusRightSidebar", combos: [["⌘", "⇧", "E"]], description: { en: "Toggle right-sidebar focus", ja: "右サイドバーのフォーカスを切り替え" } },
+      { id: "focusRightSidebarInReply", combos: [["⌘", "⇧", "Y"]], description: { en: "Toggle focus into the Reply panel", ja: "返信パネルへのフォーカスを切り替え" } },
       {
         id: "navigateRightSidebarRows",
         combos: [["J / K"], ["⌃", "N / P"], ["H / L"]],

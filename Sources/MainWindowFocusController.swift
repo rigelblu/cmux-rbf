@@ -564,6 +564,71 @@ final class MainWindowFocusController {
         }
     }
 
+    /// Toggles the keyboard between the terminal and one *specific* sidebar mode.
+    ///
+    /// `toggleRightSidebarOrTerminalFocus()` is mode-blind: it yields to the
+    /// terminal whenever the sidebar owns focus, whichever panel is showing. That
+    /// is wrong for a per-mode key — pressing "go to Reply" while Files holds
+    /// focus should switch to Reply, not leave the sidebar.
+    ///
+    /// The showing-mode test reads `fileExplorerState.mode`, the panel actually on
+    /// screen, deliberately *not* `activeRightSidebarMode`: that resolves through
+    /// `RightSidebarFocusState.mode`, which answers for `.requested` as well as
+    /// `.focused`, so it reports a mode whose focus was only ever asked for.
+    func toggleRightSidebarModeOrTerminalFocus(
+        mode: RightSidebarMode,
+        focusFirstItem: Bool = true
+    ) -> Bool {
+        let isShowingRequestedMode = fileExplorerState?.mode == mode
+        if isShowingRequestedMode, focusToggleDestination() == .terminal {
+            return restoreFocusedPanelFocusFromRightSidebarIfNeeded(currentResponder: window?.firstResponder)
+        }
+        guard modeHasFocusableHost(mode) else {
+            return revealRightSidebarWithoutTakingKeyboard(mode: mode)
+        }
+        return focusRightSidebar(mode: mode, focusFirstItem: focusFirstItem)
+    }
+
+    /// Whether `mode` currently owns a responder that can actually hold the
+    /// keyboard.
+    ///
+    /// Only `.reply` is answered, because it is the only mode whose panel can be
+    /// on screen with **no** host registered: `MarkdownWebRenderer` registers
+    /// `replyHost` when it mounts a reply, so a workspace whose agent session has
+    /// not been opened yet renders no web view at all. Measured 2026-09-09 —
+    /// `←` at `fr=RightSidebarKeyboardFocusView` produced no
+    /// `consumed by original performKeyEquivalent`, against a control 23s earlier
+    /// at `fr=MarkdownWebView` that did. Every other mode keeps its existing
+    /// behaviour rather than being guessed at.
+    private func modeHasFocusableHost(_ mode: RightSidebarMode) -> Bool {
+        guard mode == .reply else { return true }
+        guard let window, let host = replyHost, host.window === window else { return false }
+        return true
+    }
+
+    /// Shows `mode` in the sidebar but leaves the keyboard where it was.
+    ///
+    /// The alternative is what shipped first: `focusRightSidebar` yields the
+    /// terminal's focus *before* asking the endpoint, so when the endpoint has
+    /// nothing to focus the keyboard lands on the 1x1 fallback host. Asking to
+    /// read a reply that does not exist should not cost the keyboard.
+    ///
+    /// This type does no logging, so read the case off `AppDelegate`'s wrapper:
+    /// `rs.focus.modeToggle.begin fr=GhosttyNSView` followed by
+    /// `.end result=1 fr=GhosttyNSView` is a reveal-without-focus. The
+    /// toggle-back-to-terminal case ends the same way but *begins* at
+    /// `fr=MarkdownWebView`, so the pair disambiguates — the end line alone
+    /// does not.
+    private func revealRightSidebarWithoutTakingKeyboard(mode: RightSidebarMode) -> Bool {
+        guard let state = fileExplorerState, mode.isAvailable() else { return false }
+        rememberedRightSidebarMode = mode
+        state.setVisible(true)
+        if state.mode != mode {
+            state.mode = mode
+        }
+        return true
+    }
+
     func focusToggleDestination(currentResponder: NSResponder? = nil) -> MainWindowFocusToggleDestination {
         switch effectiveFocusOwner(currentResponder: currentResponder) {
         case .rightSidebar:

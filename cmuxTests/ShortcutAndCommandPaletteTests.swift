@@ -2171,3 +2171,93 @@ private final class UpdateChoiceRecorder: @unchecked Sendable {
         return choices
     }
 }
+
+/// `cm-78.1` — jump straight to the Reply panel with a key, from wherever I am.
+///
+/// Three of these pin decisions that are true **by absence**: the action's
+/// routing family is expressed by *not* appearing in two `switch` statements
+/// that both end in `default`, so adding it to either would change behaviour
+/// with no compiler complaint. The fourth pins the state Tom chose on
+/// 2026-09-09 after dogfood.
+final class FocusRightSidebarInReplyShortcutTests: XCTestCase {
+    /// The whole design decision: this action belongs to the **focus** family
+    /// (`focusRightSidebar`), not the sidebar **mode** family.
+    ///
+    /// Mode shortcuts carry `hasPriorityShortcutRouting == true` and a
+    /// `.rightSidebarFocus` context, which together mean they only fire while
+    /// the sidebar already holds focus — `shouldRouteRightSidebarModeShortcut`
+    /// returns false for a focused terminal. Binding Reply that way produced a
+    /// key that did nothing at the exact moment a user would press it, which is
+    /// why the first design of this slice was thrown away before it was built.
+    @MainActor
+    func testActionIsInTheFocusFamilyNotTheModeFamily() {
+        XCTAssertFalse(
+            KeyboardShortcutSettings.Action.focusRightSidebarInReply.hasPriorityShortcutRouting,
+            "Priority routing is what context-gates the mode family to an already-focused sidebar. "
+            + "Reply's key must fire from the terminal."
+        )
+        XCTAssertEqual(
+            KeyboardShortcutSettings.Action.focusRightSidebarInReply.shortcutContext,
+            KeyboardShortcutSettings.Action.focusRightSidebar.shortcutContext,
+            "It must resolve in the same context as the family it joined."
+        )
+        XCTAssertNotEqual(
+            KeyboardShortcutSettings.Action.focusRightSidebarInReply.shortcutContext,
+            KeyboardShortcutSettings.Action.switchRightSidebarToFiles.shortcutContext,
+            "…and NOT in the mode family's .rightSidebarFocus context."
+        )
+    }
+
+    /// Reply deliberately has no *mode* shortcut. Adding one would put a second,
+    /// context-gated entrance beside this one that silently does nothing from a
+    /// focused terminal.
+    @MainActor
+    func testReplyStillHasNoModeShortcut() {
+        XCTAssertNil(
+            RightSidebarMode.reply.shortcutAction,
+            "Reply is reached through the focus family. See cm-78.1."
+        )
+    }
+
+    @MainActor
+    func testDefaultStrokeIsCommandShiftY() {
+        let stroke = KeyboardShortcutSettings.Action.focusRightSidebarInReply.defaultShortcut
+        XCTAssertEqual(stroke.key, "y")
+        XCTAssertTrue(stroke.command)
+        XCTAssertTrue(stroke.shift)
+        XCTAssertFalse(stroke.option)
+        XCTAssertFalse(stroke.control)
+    }
+
+    /// Dogfood, 2026-09-09: on a workspace whose agent session has not been
+    /// opened, no reply renders, so no `replyHost` is registered and the old
+    /// path handed the keyboard to the 1x1 fallback host — measured as
+    /// `fr=RightSidebarKeyboardFocusView`.
+    ///
+    /// Tom's call: reveal the panel, leave the keyboard where it was useful.
+    /// A controller with no window has no focusable reply host by construction,
+    /// which is the same branch.
+    @MainActor
+    func testRevealsPanelWithoutTakingTheKeyboardWhenThereIsNoReplyToFocus() {
+        let state = FileExplorerState()
+        let controller = MainWindowFocusController(
+            windowId: UUID(),
+            window: nil,
+            tabManager: TabManager(),
+            fileExplorerState: state
+        )
+        let workspaceId = UUID()
+        let panelId = UUID()
+        XCTAssertTrue(controller.allowsTerminalFocus(workspaceId: workspaceId, panelId: panelId))
+
+        XCTAssertTrue(controller.toggleRightSidebarModeOrTerminalFocus(mode: .reply))
+
+        XCTAssertTrue(state.isVisible, "The panel should still open — the user asked to see Reply.")
+        XCTAssertEqual(state.mode, .reply)
+        XCTAssertTrue(
+            controller.allowsTerminalFocus(workspaceId: workspaceId, panelId: panelId),
+            "The terminal must keep the keyboard: there is no reply to focus, so taking it "
+            + "buys the user nothing and costs them the terminal."
+        )
+    }
+}

@@ -12,6 +12,7 @@ private extension ShortcutAction {
     static func orderedSettingsVisibleActions(from actions: [ShortcutAction]) -> [ShortcutAction] {
         let colocatedSidebarActions = [
             .focusRightSidebar,
+            .focusRightSidebarInReply,
             .toggleRightSidebar,
             .findInDirectory,
             .fileExplorerOpenSelection,

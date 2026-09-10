@@ -7632,6 +7632,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return result
     }
 
+    /// Single action path behind every entrypoint that toggles the keyboard into
+    /// one specific right-sidebar mode — today the shortcut and the View menu.
+    /// `01_foundation/04_known_unknowns.md` requires one shared action per
+    /// behavior across keyboard/menu/CLI, so neither caller reimplements this.
+    @discardableResult
+    func toggleRightSidebarModeKeyboardFocusInActiveMainWindow(
+        mode: RightSidebarMode,
+        preferredWindow: NSWindow? = nil
+    ) -> Bool {
+        guard let context = preferredRegisteredMainWindowContext(preferredWindow: preferredWindow) else {
+#if DEBUG
+            dlog("rs.focus.modeToggle.abort reason=noContext mode=\(mode.rawValue)")
+#endif
+            return false
+        }
+        let window = context.window ?? windowForMainWindowId(context.windowId)
+#if DEBUG
+        let beforeResponder = window?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        dlog("rs.focus.modeToggle.begin mode=\(mode.rawValue) fr=\(beforeResponder)")
+#endif
+        if let window {
+            mainWindowVisibilityController.focusForInWindowCommand(window, reason: .rightSidebarToggle)
+        }
+        let result = context.keyboardFocusCoordinator.toggleRightSidebarModeOrTerminalFocus(mode: mode)
+#if DEBUG
+        let afterResponder = window?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        dlog("rs.focus.modeToggle.end mode=\(mode.rawValue) result=\(result ? 1 : 0) fr=\(afterResponder)")
+#endif
+        return result
+    }
+
     @discardableResult
     func toggleRightSidebarKeyboardFocusInActiveMainWindow(preferredWindow: NSWindow? = nil) -> Bool {
         let context = preferredRegisteredMainWindowContext(preferredWindow: preferredWindow)
@@ -14384,6 +14415,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             DispatchQueue.main.async { [weak self, weak preferredWindow] in
                 _ = self?.toggleRightSidebarInActiveMainWindow(preferredWindow: preferredWindow)
             }
+            return true
+        }
+
+        if matchConfiguredShortcut(event: event, action: .focusRightSidebarInReply) {
+            let preferredWindow = mainWindowForShortcutEvent(event)
+            _ = toggleRightSidebarModeKeyboardFocusInActiveMainWindow(
+                mode: .reply,
+                preferredWindow: preferredWindow
+            )
             return true
         }
 

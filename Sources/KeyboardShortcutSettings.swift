@@ -30,6 +30,7 @@ enum KeyboardShortcutSettings {
     private static func orderedSettingsVisibleActions(from actions: [Action]) -> [Action] {
         let colocatedSidebarActions = [
             .focusRightSidebar,
+            .focusRightSidebarInReply,
             .toggleRightSidebar,
             .findInDirectory,
             .fileExplorerOpenSelection,
@@ -89,6 +90,7 @@ enum KeyboardShortcutSettings {
         case toggleUnread
         case markOldestUnreadAndJumpNext
         case focusRightSidebar
+        case focusRightSidebarInReply
         case switchRightSidebarToFiles
         case switchRightSidebarToFind
         case switchRightSidebarToSessions
@@ -241,6 +243,7 @@ enum KeyboardShortcutSettings {
             case .markOldestUnreadAndJumpNext:
                 return String(localized: "shortcut.markOldestUnreadAndJumpNext.label", defaultValue: "Mark as Oldest Unread and Jump to Next Latest Unread")
             case .focusRightSidebar: return String(localized: "shortcut.focusRightSidebar.label", defaultValue: "Toggle Right Sidebar Focus")
+            case .focusRightSidebarInReply: return String(localized: "shortcut.focusRightSidebarInReply.label", defaultValue: "Toggle Reply Focus")
             case .switchRightSidebarToFiles: return String(localized: "shortcut.switchRightSidebarToFiles.label", defaultValue: "Show Sidebar Files")
             case .switchRightSidebarToFind: return String(localized: "shortcut.switchRightSidebarToFind.label", defaultValue: "Show Sidebar Find")
             case .switchRightSidebarToSessions: return String(localized: "shortcut.switchRightSidebarToSessions.label", defaultValue: "Show Sidebar Vault")
@@ -439,6 +442,8 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "u", command: true, shift: false, option: false, control: true)
             case .focusRightSidebar:
                 return StoredShortcut(key: "e", command: true, shift: true, option: false, control: false)
+            case .focusRightSidebarInReply:
+                return StoredShortcut(key: "y", command: true, shift: true, option: false, control: false)
             case .switchRightSidebarToFiles:
                 return StoredShortcut(key: "1", command: false, shift: false, option: false, control: true)
             case .switchRightSidebarToFind:

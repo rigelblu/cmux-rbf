@@ -133676,6 +133676,29 @@
         }
       }
     },
+    "menu.view.focusRightSidebarInReply": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Reply Focus"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返信のフォーカスを切替"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답장 포커스 전환"
+          }
+        }
+      }
+    },
     "menu.view.forward": {
       "extractionState": "manual",
       "localizations": {
@@ -214096,6 +214119,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "오른쪽 사이드바 포커스 전환"
+          }
+        }
+      }
+    },
+    "shortcut.focusRightSidebarInReply.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Reply Focus"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返信のフォーカスを切替"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답장 포커스 전환"
           }
         }
       }

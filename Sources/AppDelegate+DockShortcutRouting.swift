@@ -78,6 +78,7 @@ extension KeyboardShortcutSettings.Action {
              .showNotifications, .jumpToUnread, .toggleUnread,
              .markOldestUnreadAndJumpNext,
              .focusRightSidebar,
+             .focusRightSidebarInReply,
              .switchRightSidebarToFiles,
              .switchRightSidebarToFind,
              .switchRightSidebarToSessions,

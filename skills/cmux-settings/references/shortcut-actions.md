@@ -120,6 +120,7 @@ Values for `shortcuts.bindings.<action>`:
 
 - `shortcuts.bindings.toggleSidebar`
 - `shortcuts.bindings.focusRightSidebar`
+- `shortcuts.bindings.focusRightSidebarInReply`
 - `shortcuts.bindings.switchRightSidebarToFiles`
 - `shortcuts.bindings.switchRightSidebarToFind`
 - `shortcuts.bindings.switchRightSidebarToSessions`

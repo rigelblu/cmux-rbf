@@ -9,7 +9,8 @@ extension ShortcutAction {
         case .toggleSidebar, .newTab, .newBrowserWorkspace, .saveLayoutTemplate, .openFolder, .reopenPreviousSession, .goToWorkspace,
              .commandPalette, .commandPaletteNext, .commandPalettePrevious, .sendFeedback,
              .showNotifications, .jumpToUnread, .toggleUnread, .markOldestUnreadAndJumpNext,
-             .focusRightSidebar, .switchRightSidebarToFiles, .switchRightSidebarToFind,
+             .focusRightSidebar, .focusRightSidebarInReply,
+             .switchRightSidebarToFiles, .switchRightSidebarToFind,
              .switchRightSidebarToSessions, .switchRightSidebarToFeed,
              .switchRightSidebarToDock, .triggerFlash, .reopenClosedWorkspace:
             return .workspace

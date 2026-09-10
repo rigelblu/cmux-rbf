@@ -34,6 +34,7 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case toggleUnread
     case markOldestUnreadAndJumpNext
     case focusRightSidebar
+    case focusRightSidebarInReply
     case switchRightSidebarToFiles
     case switchRightSidebarToFind
     case switchRightSidebarToSessions

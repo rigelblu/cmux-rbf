@@ -30,6 +30,7 @@ extension ShortcutAction {
         case .toggleUnread: return "Toggle Unread"
         case .markOldestUnreadAndJumpNext: return "Mark as Oldest Unread and Jump to Next Latest Unread"
         case .focusRightSidebar: return "Toggle Right Sidebar Focus"
+        case .focusRightSidebarInReply: return "Toggle Reply Focus"
         case .switchRightSidebarToFiles: return "Show Sidebar Files"
         case .switchRightSidebarToFind: return "Show Sidebar Find"
         case .switchRightSidebarToSessions: return "Show Sidebar Vault"
