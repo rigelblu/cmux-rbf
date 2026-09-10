@@ -782,22 +782,27 @@ struct ReplyPanelView: View {
 
     /// How tall the note list may grow before it scrolls.
     ///
-    /// Three terms, and which one binds depends on the panel: above ~657pt
-    /// the 40% proportion is tightest, below ~514pt the 120pt minimum is, and
-    /// `minimumHeightAboveList` only decides the band between them.
+    /// Three terms, and which one binds depends on the panel: above ~525pt
+    /// the 25% proportion is tightest, below ~514pt the 120pt minimum is, and
+    /// `minimumHeightAboveList` only decides the ~11pt band between them.
+    ///
+    /// **25%, lowered from 40% on 2026-09-10 by Tom's dogfood** — at 40% the
+    /// list took ~257pt of a 651pt panel and the reply read cramped above it.
+    /// A stopgap constant: `cm-69.9` makes the split the user's to size.
     private var footerCeiling: CGFloat {
         guard panelHeight > 0 else { return Self.unmeasuredFooterCeiling }
-        return max(120, min(panelHeight * 0.40, panelHeight - Self.minimumHeightAboveList))
+        return max(120, min(panelHeight * 0.25, panelHeight - Self.minimumHeightAboveList))
     }
 
     /// The ceiling used for the one layout pass before the panel has measured
     /// itself.
     ///
-    /// 40% of 702 — the reference panel the design's proportion was written
-    /// against (*"it stops growing at 40% of the panel — 281pt of 702"*). Not
-    /// shared with `ReplyAnnotationManifestRenderTests`, which needs a ceiling
-    /// its fixtures stay under and picks its own for that reason.
-    private static let unmeasuredFooterCeiling: CGFloat = 281
+    /// 25% of 702 — the reference panel the design's proportion was written
+    /// against. It was 281, 40% of that same panel, until the proportion was
+    /// lowered. Not shared with `ReplyAnnotationManifestRenderTests`, which
+    /// needs a ceiling its fixtures stay under and picks its own for that
+    /// reason.
+    private static let unmeasuredFooterCeiling: CGFloat = 176
 
     /// How close to the top of the panel the note list may grow.
     ///
@@ -808,9 +813,11 @@ struct ReplyPanelView: View {
     ///
     /// It was `replyFloor = 394`, documented as *"the height the reply keeps
     /// whatever the footer does"*, and that was false three ways: the term is
-    /// dead above ~657pt, overridden below ~514pt, and short by the chrome in
-    /// between. **What the reply actually keeps is ~304pt** through the whole
-    /// range above 514pt — an accepted cost, not a solved problem. The brief's
+    /// dead above the proportion's crossover, overridden below ~514pt, and
+    /// short by the chrome in between. Since the proportion dropped to 25%
+    /// the crossover is ~525pt, so this term binds only in an ~11pt band;
+    /// above it the reply keeps roughly `0.75 × panel − 90pt` — ~398pt of a
+    /// 651pt panel, where 40% left it ~304pt. The brief's
     /// 394 was typed into a design sentence and never measured against a
     /// render; `cm-69.9` — size the split between the reply and my highlights
     /// myself — is where the size becomes the user's rather than a constant's.
