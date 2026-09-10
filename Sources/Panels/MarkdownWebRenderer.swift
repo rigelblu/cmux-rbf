@@ -30,6 +30,44 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// leaves the body text visibly out of line with the chrome above it.
     /// Default `nil` so every existing caller renders exactly as before.
     var horizontalPagePadding: Double?
+
+    /// Renders a single newline inside a paragraph as a line break.
+    ///
+    /// Opt-in, and `false` for every existing caller so the markdown file
+    /// panel renders exactly as before — the same shape
+    /// `horizontalPagePadding` uses above.
+    ///
+    /// The shell configures `marked` with `breaks: false`
+    /// (`shell.html:1109-1117`), which is right for a markdown *file*: an
+    /// author hard-wraps a paragraph at 80 columns and does not mean a break
+    /// at each wrap. It is wrong for an agent's reply, where every newline
+    /// was typed deliberately — and it is the only agent-message surface in
+    /// cmux still doing it. The three sibling renderers
+    /// (`agent-session-solid`, `agent-session-react`,
+    /// `agentSessionSurface.mjs`) all already parse with `breaks: !0`. The
+    /// Reply panel inherited `false` only because it borrowed the file
+    /// viewer's shell.
+    ///
+    /// **Set per instance rather than in `shell.html`.** Each
+    /// ``MarkdownRendererSession`` owns one coordinator owns one `WKWebView`
+    /// owns one JS context, so a page global like `marked` cannot leak
+    /// between renderers — and editing the shared shell re-opens `#cm-15`'s
+    /// two human checks. `onSelectionChanged` is the precedent for earning a
+    /// behaviour this way.
+    ///
+    /// **Read at first creation only — it is not a live toggle.** The script
+    /// is installed into the `WKWebViewConfiguration` in ``makeNSView``, and
+    /// the cached-coordinator branch above that returns before the line, so a
+    /// caller starting `false` and later becoming `true` gets nothing and is
+    /// told nothing. Every caller today is one or the other for its whole
+    /// life — the same caveat `onSelectionChanged` carries below.
+    ///
+    /// The reverse direction is safe, for a reason that caveat does *not*
+    /// give: the script lives in the web view's own copy of the
+    /// configuration, so it survives every later `loadShell` — crash
+    /// recovery, detach and reattach, close and rebuild. Once installed it
+    /// never needs reinstalling.
+    var rendersLineBreaks = false
     let session: MarkdownRendererSession
     let onRequestPanelFocus: () -> Void
 
@@ -157,6 +195,9 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         if onSelectionChanged != nil {
             config.userContentController.addUserScript(Self.selectionObserverScript)
         }
+        if rendersLineBreaks {
+            config.userContentController.addUserScript(Self.lineBreakScript)
+        }
         let webView = MarkdownWebView(frame: .zero, configuration: config)
         context.coordinator.setSelectionObserver(onSelectionChanged)
         webView.onPointerDown = onRequestPanelFocus
@@ -227,6 +268,15 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// detect overlap, and they do that in their own coordinate space.
     /// Wrapping a mark in a `<span>` adds no characters, so painting never
     /// moves an offset.
+    ///
+    /// **Do not generalize that to every element cmux adds.** `#cm-75`'s
+    /// `<br>` adds no characters either, and it still moves the coordinate
+    /// space — because it *replaces a `\n` that counted*. `textNodes()`
+    /// below sums `nodeValue.length`, so `<p>1\n2\n3</p>` is one node of
+    /// length 5 before the break and three nodes totalling 3 after. A span
+    /// is safe because it wraps existing text; a `<br>` is not because it
+    /// consumes some. Nothing breaks today only because no annotation type
+    /// is `Codable`, so no offset outlives the process that made it.
     ///
     /// `selection.toString()` still decides *whether* there is a selection at
     /// all — it is cheap, and whitespace-only reads the same either way.
@@ -558,6 +608,50 @@ struct MarkdownWebRenderer: NSViewRepresentable {
               id: target ? target.getAttribute("data-cmux-id") : null
             });
           }, true);
+        })();
+        """,
+        injectionTime: .atDocumentEnd,
+        forMainFrameOnly: true
+    )
+
+    /// Reconfigures the page's `marked` to break on a single newline.
+    ///
+    /// Injected rather than added to `shell.html` for the same reason
+    /// `selectionObserverScript` above is: that file is shared with every
+    /// markdown viewer in the app and re-opens `#cm-15`'s two human checks
+    /// whenever it is touched.
+    ///
+    /// **`internal`, deliberately — `selectionObserverScript` above is
+    /// `private` and this one must not be.** `MarkdownReplyLineBreakTests`
+    /// installs *this constant* into its own `WKWebViewConfiguration`; made
+    /// `private`, it could not name it and would have to hand-copy the JS,
+    /// at which point the test proves a duplicate works rather than the
+    /// shipped script. `@testable` lifts `internal` and never `private`, so
+    /// the modifier is the whole of the test's reach.
+    ///
+    /// The bare-`WKWebView`-with-its-own-configuration *shape* that makes
+    /// this possible is established by `MarkdownLinkBoundaryRegressionTests`,
+    /// `MarkdownCodespanRenderingTests` and `MarkdownYMDShellTests` — none of
+    /// which reference this script. Do not grep those three for a consumer
+    /// and conclude `internal` is unnecessary; the consumer is the line-break
+    /// suite.
+    ///
+    /// **`.atDocumentEnd` is what makes the ordering work.** The shell's own
+    /// `marked.use({gfm: true, breaks: false, ...})` runs at parse time
+    /// (`shell.html:1109-1117`); this runs after it, and both run before
+    /// Swift pushes the first `window.__cmuxRenderMarkdown(md)` on
+    /// `didFinish`. So the first render already breaks.
+    ///
+    /// **A second `marked.use` merges rather than replaces.** It overrides
+    /// `breaks` while leaving the shell's `processAllTokens` hook and its
+    /// custom `codespan`/`code` renderers registered — verified against the
+    /// bundled `marked.min.js`, with fence, table and list output
+    /// byte-identical either way and `<br>` count going 0 to 2.
+    static let lineBreakScript = WKUserScript(
+        source: """
+        (() => {
+          if (!window.marked) return;
+          window.marked.use({ breaks: true });
         })();
         """,
         injectionTime: .atDocumentEnd,

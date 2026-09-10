@@ -622,6 +622,12 @@ struct ReplyPanelView: View {
             // has at its narrowest — the width where "code feels cramped" is
             // already the named risk.
             horizontalPagePadding: Self.bodyGutter,
+            // Read the agent's reply with the line breaks it actually wrote.
+            // The shell's `breaks: false` is the markdown *file* viewer's
+            // setting — right for a hard-wrapped document, wrong here, where
+            // every newline was typed deliberately. Every other
+            // agent-message renderer in cmux already parses with breaks on.
+            rendersLineBreaks: true,
             session: rendererSession,
             onRequestPanelFocus: {},
             onSelectionChanged: { selection in
