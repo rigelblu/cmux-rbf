@@ -179,6 +179,8 @@ struct SettingsRowAnchorResolutionTests {
         "setting:settingsJSON:open-file",
         "setting:settingsJSON:documentation",
         "setting:reset:reset-all",
+        // `cm-69.3`: the Reply section's Reset row carries this anchor.
+        "setting:reply:quick-labels",
     ]
 
     @Test(arguments: rowConfigPaths)

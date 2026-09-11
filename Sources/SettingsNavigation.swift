@@ -9,6 +9,7 @@ enum SettingsNavigationTarget: String, CaseIterable, Identifiable {
     case mobile
     case networking
     case sidebarAppearance
+    case reply
     case customSidebars
     case betaFeatures
     case automation
@@ -42,6 +43,8 @@ enum SettingsNavigationTarget: String, CaseIterable, Identifiable {
             return String(localized: "settings.section.workspaceColors", defaultValue: "Workspace Colors")
         case .sidebarAppearance:
             return String(localized: "settings.section.sidebarAppearance", defaultValue: "Sidebar")
+        case .reply:
+            return String(localized: "settings.section.reply", defaultValue: "Reply")
         case .customSidebars:
             return String(localized: "settings.section.customSidebars", defaultValue: "Custom Sidebars")
         case .betaFeatures:
@@ -83,6 +86,8 @@ enum SettingsNavigationTarget: String, CaseIterable, Identifiable {
             return "paintpalette"
         case .sidebarAppearance:
             return "sidebar.left"
+        case .reply:
+            return "arrowshape.turn.up.left"
         case .customSidebars:
             return "sidebar.squares.left"
         case .betaFeatures:
@@ -124,6 +129,8 @@ enum SettingsNavigationTarget: String, CaseIterable, Identifiable {
             return "\(title) palette tabs"
         case .sidebarAppearance:
             return "\(title) sidebar details branches badges material terminal background"
+        case .reply:
+            return "\(title) quick labels notes chips redline lgtm highlights"
         case .customSidebars:
             return "\(title) custom sidebars vibe swift json interpreted renderer in-process remote worker isolated"
         case .betaFeatures:

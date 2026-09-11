@@ -185,6 +185,14 @@ struct ReplyAnnotationManifest<Field: View>: View {
     let onBeginEditing: (NumberedAnnotation) -> Void
     let onRemove: (UUID) -> Void
     let onPreview: () -> Void
+    /// `cm-69.3`'s quick labels, in order. Handed in rather than read here:
+    /// no view below the list's `ForEach` may hold a settings or store
+    /// reference (the `#2586` spin-loop rule).
+    var labels: [String] = []
+    /// Puts a label's text into the open note.
+    var onApplyLabel: (NumberedAnnotation, String) -> Void = { _, _ in }
+    /// Opens Settings on the Reply section.
+    var onEditLabels: () -> Void = {}
     @ViewBuilder let field: (NumberedAnnotation) -> Field
 
     var body: some View {
@@ -337,6 +345,8 @@ struct ReplyAnnotationManifest<Field: View>: View {
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
+
+                labelRow(entry)
             }
 
             HStack(alignment: .top, spacing: 6) {
@@ -432,6 +442,86 @@ struct ReplyAnnotationManifest<Field: View>: View {
         return marker + AttributedString(entry.note.isEmpty ? placeholder : entry.note)
     }
 
+    /// The quick labels above an open note — `cm-69.3`, `N5`.
+    ///
+    /// As many chips as fit the row, in order; the rest, and the way into
+    /// editing them, sit behind `⌄`, which is always present because it holds
+    /// that way in. The count follows the panel's width (Tom, 2026-09-11:
+    /// *"we should just fit as many that fit horizontally"*) — it was a fixed
+    /// three, which wasted a wide panel and forced Settings to explain which
+    /// labels were chips. One row that never wraps: the list is the user's,
+    /// so wrapping would grow the footer with every label they add.
+    ///
+    /// `ViewThatFits` tries the row with every label as a chip, then one
+    /// fewer, down to none, and shows the first that fits — no measuring, and
+    /// the menu always holds exactly the labels the chips left out.
+    ///
+    /// **Never focusable.** A chip that took focus on click would pull the
+    /// keyboard out of the note field it is writing into — the one thing a
+    /// label must not do (Full Keyboard Access lets plain buttons take focus).
+    private func labelRow(_ entry: NumberedAnnotation) -> some View {
+        ViewThatFits(in: .horizontal) {
+            ForEach((0...labels.count).reversed(), id: \.self) { shown in
+                labelLine(entry, chips: shown)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// One candidate row: the first `chips` labels as chips, the rest in `⌄`.
+    private func labelLine(_ entry: NumberedAnnotation, chips: Int) -> some View {
+        HStack(spacing: 4) {
+            ForEach(Array(labels.prefix(chips).enumerated()), id: \.offset) { _, label in
+                Button {
+                    onApplyLabel(entry, label)
+                } label: {
+                    Text(verbatim: label)
+                        .font(.system(size: ReplyFooterMetrics.rowFontSize))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(chipFill))
+                        .replyHoverHighlight(cornerRadius: 4)
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .help(Text(verbatim: label))
+            }
+            Menu {
+                ForEach(Array(labels.dropFirst(chips).enumerated()), id: \.offset) { _, label in
+                    Button(label) { onApplyLabel(entry, label) }
+                }
+                if labels.count > chips { Divider() }
+                Button(String(localized: "reply.labels.editLabels", defaultValue: "Edit labels…")) {
+                    onEditLabels()
+                }
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .focusable(false)
+            .fixedSize()
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
+            .background(RoundedRectangle(cornerRadius: 4).fill(chipFill))
+            .replyHoverHighlight(cornerRadius: 4)
+            .accessibilityLabel(String(localized: "reply.labels.more", defaultValue: "More labels"))
+        }
+    }
+
+    /// The chips' ground — the note field's own fill, lightened.
+    ///
+    /// The chips only ever appear in the open row, which carries the focused
+    /// band (`#cm-86`'s iris). A neutral grey tint disappeared into it (Tom,
+    /// dogfood 2026-09-10: *"they blend in too much"*); the field's material
+    /// at partial alpha reads as a small light button on the band, and as the
+    /// same family as the field right below it, in either appearance.
+    private var chipFill: Color { fieldFill.opacity(0.6) }
+
     private func removeButton(_ entry: NumberedAnnotation, isEditing: Bool) -> some View {
         Button {
             // Takes its note and its mark and nothing else — no cascade, no
@@ -486,5 +576,35 @@ struct ReplyAnnotationManifest<Field: View>: View {
         .accessibilityLabel(
             String(localized: "reply.annotation.preview", defaultValue: "Show what will be pasted")
         )
+    }
+}
+
+/// A pointer-over tint for the Reply panel's own buttons — the label chips and
+/// Paste / Paste & Send.
+///
+/// macOS buttons do not change on hover, and on the chips' light ground that
+/// left nothing saying *this is clickable* until the press (Tom, dogfood
+/// 2026-09-11). One primary-colour wash reads in both appearances and on any
+/// fill: it darkens a light chip or the blue Paste, and lightens in Dark Mode.
+/// Off while the button is disabled, so a greyed Paste & Send stays inert.
+private struct ReplyHoverHighlight: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.primary.opacity(hovered && isEnabled ? 0.1 : 0))
+                    .allowsHitTesting(false)
+            )
+            .onHover { hovered = $0 }
+    }
+}
+
+extension View {
+    func replyHoverHighlight(cornerRadius: CGFloat) -> some View {
+        modifier(ReplyHoverHighlight(cornerRadius: cornerRadius))
     }
 }

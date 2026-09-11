@@ -37,5 +37,36 @@ public struct ReplyCatalogSection: SettingCatalogSection {
         userDefaultsKey: "replyMaxMessagesBack"
     )
 
+    /// The labels shipped when neither Settings nor `cmux.json` has set any.
+    ///
+    /// Three, most-used first, since a narrow panel keeps only the first few
+    /// as chips (Tom, 2026-09-11). Not localized: the agent receives the label's
+    /// text verbatim as the note.
+    public static let defaultLabels = ["lgtm", "why?", "redline"]
+
+    /// The quick labels offered above an open note, in order — `cm-69.3`.
+    ///
+    /// As many as fit the panel are chips; the rest sit in the `⌄` menu. **An empty
+    /// array means no labels**, not the defaults: Settings can remove every
+    /// row, and falling back would bring the defaults back. The defaults live here and
+    /// nowhere else — the `cmux.json` parser writes nothing when the key is
+    /// absent, so an unset key reaches this value only when Settings has
+    /// stored nothing either.
+    public let labels = DefaultsKey<[String]>(
+        id: "reply.labels",
+        defaultValue: ReplyCatalogSection.defaultLabels,
+        userDefaultsKey: "replyLabels"
+    )
+
+    /// Cleans a raw label list from `cmux.json` or the Settings editor.
+    ///
+    /// Trims whitespace, drops blank entries, and skips anything that is not a
+    /// string **while keeping the rest** — unlike the file store's shared
+    /// `jsonStringArray`, which rejects the whole list on the first bad entry.
+    public static func normalizedLabels(_ raw: [Any]) -> [String] {
+        raw.compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     public init() {}
 }

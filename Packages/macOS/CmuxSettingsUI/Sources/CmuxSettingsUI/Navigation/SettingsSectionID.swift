@@ -21,6 +21,8 @@ public enum SettingsSectionID: String, CaseIterable, Identifiable, Sendable, Has
     /// Iroh relay policy, custom relays, and private-network routes.
     case networking
     case sidebarAppearance
+    /// The Reply panel's quick labels — `cm-69.3`.
+    case reply
     /// User/agent-authored custom sidebars: enable gate and renderer choice.
     case customSidebars
     case betaFeatures
@@ -46,6 +48,7 @@ public enum SettingsSectionID: String, CaseIterable, Identifiable, Sendable, Has
         case .mobile: return String(localized: "settings.section.mobile", defaultValue: "Mobile")
         case .networking: return String(localized: "settings.section.networking", defaultValue: "Networking")
         case .sidebarAppearance: return "Sidebar"
+        case .reply: return String(localized: "settings.section.reply", defaultValue: "Reply")
         case .customSidebars: return String(localized: "settings.section.customSidebars", defaultValue: "Custom Sidebars")
         case .betaFeatures: return "Beta Features"
         case .automation: return "Automation"
@@ -70,6 +73,7 @@ public enum SettingsSectionID: String, CaseIterable, Identifiable, Sendable, Has
         case .mobile: return "iphone"
         case .networking: return "network"
         case .sidebarAppearance: return "sidebar.left"
+        case .reply: return "arrowshape.turn.up.left"
         case .customSidebars: return "sidebar.squares.left"
         case .betaFeatures: return "exclamationmark.triangle"
         case .automation: return "wand.and.sparkles"
@@ -96,6 +100,7 @@ public enum SettingsSectionID: String, CaseIterable, Identifiable, Sendable, Has
         case .mobile: return "ios iphone ipad mobile pairing local network sync push notifications alerts forwarding"
         case .networking: return "iroh relay server private network tailscale vpn direct peer custom provider region"
         case .sidebarAppearance: return "sidebar details branches material terminal background"
+        case .reply: return "reply quick labels notes chips redline lgtm"
         case .customSidebars: return "custom sidebars vibe swift json interpreted renderer in-process remote worker isolated"
         case .betaFeatures: return "beta experimental unstable feed dock right sidebar"
         case .automation: return "socket integrations hooks ports claude cursor gemini naming auto naming workspace tabs"

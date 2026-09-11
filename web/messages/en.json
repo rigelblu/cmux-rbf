@@ -1891,7 +1891,8 @@
         },
         "reply": {
           "description": "Reply panel",
-          "maxMessagesBack": "How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable."
+          "maxMessagesBack": "How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable.",
+          "labels": "Quick labels offered above an open note, in order. As many as fit are chips; the rest are in the ⌄ menu. Clicking one puts its text in the note. An empty list means no labels."
         },
         "shortcuts": {
           "when": "Optional per-action context predicates (VS Code-style `when` clauses), keyed by cmux action id. Each value is a boolean expression over context keys combined with !, &&, ||, and parentheses. Boolean keys: sidebarFocus, browserFocus, markdownFocus, filePreviewTextEditorFocus, simulatorFocus, terminalFocus, commandPaletteVisible, terminalFindVisible, workspaceCanvasLayout. Typed keys support comparisons: the string sidebarMode (files, find, sessions, feed, dock, or reply) and the integers paneCount and workspaceCount. Comparison operators are ==, !=, =~ (regex), <, <=, >, >=, and `in [a, b]`; an unknown or absent key reads as false. The boolean literals true and false are also accepted; `key == false` is the same as `!key`. The action's shortcut only fires (and only conflicts with other shortcuts) when the clause holds. Examples: { \"selectWorkspaceByNumber\": \"!sidebarFocus\" } selects workspaces with Ctrl+1–9 everywhere except when the right sidebar is focused; { \"selectSurfaceByNumber\": \"sidebarMode == 'find' && paneCount > 1\" } scopes a binding to the Find sidebar when the workspace has multiple panes.",

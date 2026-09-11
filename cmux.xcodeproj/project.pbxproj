@@ -2546,6 +2546,8 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		C061D15A0000000000000002 /* WorkspaceColorDisplayNamesConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C061D15A0000000000000001 /* WorkspaceColorDisplayNamesConfigTests.swift */; };
 		B6BF3DC98DB1495E57900212 /* WorkspaceColorLabelsConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */; };
 		7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */; };
+		285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */; };
+		DC4962C67B1F47C0A3EF5B4F /* SettingsFileKeyRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF5AE1662DC4221A71224F9 /* SettingsFileKeyRemovalTests.swift */; };
 		B6BF3DC98DB1495E57900211 /* WorkspaceColorMonotonicMintingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */; };
 		B6BF3DC98DB1495E57900213 /* WorkspaceColorResolverParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */; };
 		A5FB1203 /* WorkspaceConfigActionCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FB1204 /* WorkspaceConfigActionCapture.swift */; };
@@ -5187,6 +5189,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		C061D15A0000000000000001 /* WorkspaceColorDisplayNamesConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorDisplayNamesConfigTests.swift; sourceTree = "<group>"; };
 		42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorLabelsConfigTests.swift; sourceTree = "<group>"; };
 		6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMaxMessagesBackConfigTests.swift; sourceTree = "<group>"; };
+		D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelsFileParserTests.swift; sourceTree = "<group>"; };
+		4CF5AE1662DC4221A71224F9 /* SettingsFileKeyRemovalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsFileKeyRemovalTests.swift; sourceTree = "<group>"; };
 		42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorMonotonicMintingTests.swift; sourceTree = "<group>"; };
 		42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorResolverParityTests.swift; sourceTree = "<group>"; };
 		A5FB1204 /* WorkspaceConfigActionCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceConfigActionCapture.swift; sourceTree = "<group>"; };
@@ -7855,6 +7859,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */,
 				42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */,
 				6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */,
+				D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */,
+				4CF5AE1662DC4221A71224F9 /* SettingsFileKeyRemovalTests.swift */,
 				C061D15A0000000000000001 /* WorkspaceColorDisplayNamesConfigTests.swift */,
 				C061ED170000000000000001 /* WorkspacePaletteColorEditCoordinatorTests.swift */,
 				42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */,
@@ -11137,6 +11143,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				C061D15A0000000000000002 /* WorkspaceColorDisplayNamesConfigTests.swift in Sources */,
 				B6BF3DC98DB1495E57900212 /* WorkspaceColorLabelsConfigTests.swift in Sources */,
 				7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */,
+				285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */,
+				DC4962C67B1F47C0A3EF5B4F /* SettingsFileKeyRemovalTests.swift in Sources */,
 				B6BF3DC98DB1495E57900211 /* WorkspaceColorMonotonicMintingTests.swift in Sources */,
 				B6BF3DC98DB1495E57900213 /* WorkspaceColorResolverParityTests.swift in Sources */,
 				F7000000A1B2C3D4E5F60718 /* WorkspaceContentViewVisibilityTests.swift in Sources */,

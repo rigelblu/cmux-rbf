@@ -165,6 +165,7 @@ extension CmuxSettingsFileStore {
                 // structurally — a typo there is silently ignored forever.
                 "reply": [
                     "maxMessagesBack": SettingCatalog().reply.maxMessagesBack.defaultValue,
+                    "labels": SettingCatalog().reply.labels.defaultValue,
                 ],
             ],
             [

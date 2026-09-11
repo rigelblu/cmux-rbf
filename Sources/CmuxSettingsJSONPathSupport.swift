@@ -473,6 +473,8 @@ extension CmuxSettingsFileStore {
         // a path here makes nothing work. The branch in
         // `KeyboardShortcutSettingsFileStore.parseReplySection` is what does.
         "reply.maxMessagesBack",
+        // `cm-69.3` — same caveat: the parse branch is what makes it work.
+        "reply.labels",
         "sidebar.notificationBadgePosition",
         "sidebar.showCustomMetadata",
         RightSidebarWidthSettings.settingsPath,

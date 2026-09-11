@@ -90,6 +90,14 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// the page knows the pointer is over a phrase.
     var onMarkHoverChanged: ((UUID?) -> Void)?
 
+    /// Reports a plain click on a mark, with that mark's id.
+    ///
+    /// The phrase and its footer row are one object, and the row opens its
+    /// note on click; the phrase does the same (Tom, dogfood 2026-09-11).
+    /// Only a single click that selected nothing counts — a drag or a
+    /// double-click is making a selection, not asking for a note.
+    var onMarkClicked: ((UUID) -> Void)?
+
     /// The marks the page should be painting right now.
     ///
     /// Pushed rather than pulled: the annotation set is the source of truth
@@ -180,6 +188,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
             context.coordinator.setSelectionObserver(onSelectionChanged)
             context.coordinator.setMarkHoverObserver(onMarkHoverChanged)
+            context.coordinator.setMarkClickObserver(onMarkClicked)
             context.coordinator.setMarks(marks)
             context.coordinator.setActiveMark(activeMarkID)
             context.coordinator.reveal(revealRequest)
@@ -247,6 +256,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator.setHorizontalPagePadding(horizontalPagePadding)
         context.coordinator.setSelectionObserver(onSelectionChanged)
         context.coordinator.setMarkHoverObserver(onMarkHoverChanged)
+        context.coordinator.setMarkClickObserver(onMarkClicked)
         // After the markdown, never before: a repaint wraps spans around
         // text the render is about to replace.
         context.coordinator.update(markdown: markdown, theme: theme)
@@ -630,6 +640,20 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             lastPointer = { x: event.clientX, y: event.clientY };
           }, true);
 
+          // A plain click on a mark opens its note. `detail === 1` leaves a
+          // double-click to select a word as it always has, and a collapsed
+          // selection rules out the end of a drag that happened to finish
+          // on a mark.
+          document.addEventListener("click", (event) => {
+            if (event.detail !== 1 || event.button !== 0) return;
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed) return;
+            const target = event.target instanceof Element ? event.target.closest("." + MARK) : null;
+            if (!target) return;
+            const id = target.getAttribute("data-cmux-id");
+            if (id) handler.postMessage({ action: "replyMarkClick", id });
+          }, true);
+
           document.addEventListener("mouseover", (event) => {
             if (lastPointer && lastPointer.x === event.clientX && lastPointer.y === event.clientY) return;
             const target = event.target instanceof Element ? event.target.closest("." + MARK) : null;
@@ -725,6 +749,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         /// outlives the wrapper struct that carries the closure.
         private var onSelectionChanged: ((MarkdownPageSelection?) -> Void)?
         private var onMarkHoverChanged: ((UUID?) -> Void)?
+        private var onMarkClicked: ((UUID) -> Void)?
         /// The marks last pushed to the page, so a repaint is skipped when
         /// nothing changed — `updateNSView` runs on every SwiftUI pass, and
         /// repainting unwraps and rewraps every span each time.
@@ -872,6 +897,12 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         /// assignment is the correct one here.
         func setMarkHoverObserver(_ observer: ((UUID?) -> Void)?) {
             onMarkHoverChanged = observer
+        }
+
+        /// Re-points the mark-click observer; unconditional for the same
+        /// reason as ``setMarkHoverObserver(_:)``.
+        func setMarkClickObserver(_ observer: ((UUID) -> Void)?) {
+            onMarkClicked = observer
         }
 
         /// Repaints the page's marks, skipping the work when nothing moved.
@@ -1146,6 +1177,12 @@ struct MarkdownWebRenderer: NSViewRepresentable {
                 if action == "replyMarkHover" {
                     let raw = body["id"] as? String
                     onMarkHoverChanged?(raw.flatMap(UUID.init(uuidString:)))
+                    return
+                }
+                if action == "replyMarkClick" {
+                    if let raw = body["id"] as? String, let id = UUID(uuidString: raw) {
+                        onMarkClicked?(id)
+                    }
                     return
                 }
                 if action == "replySelectionChanged" {

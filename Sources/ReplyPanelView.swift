@@ -2,6 +2,8 @@ import AppKit
 import Bonsplit
 import CmuxAgentChat
 import CmuxAppKitSupportUI
+import CmuxSettings
+import Combine
 import SwiftUI
 
 /// The right sidebar's Reply mode: the bound agent's newest reply, rendered.
@@ -72,6 +74,31 @@ struct ReplyPanelView: View {
     /// view first responder for a runloop turn and drops a key typed straight
     /// after the step.
     @State private var stepArrivalID: UUID?
+
+    /// The open note whose field has already appeared once — `cm-69.3`.
+    ///
+    /// A second `.onAppear` for the same note is a **rebuild**, not an open:
+    /// a chip or plain typing wrapped the field past the list's ceiling, and
+    /// `ReplyAnnotationManifest` swapped in its `ScrollView`, rebuilding every
+    /// row. The cold path there — the AppKit hop, then the select-all a
+    /// focused field applies — would make the next keystroke replace the
+    /// note. A rebuild restores ``lastNoteCaret`` instead. Generalises what
+    /// ``stepArrivalID`` does for steps; cleared wherever a note opens or
+    /// closes, so every first appearance keeps its existing path.
+    @State private var fieldAppearedForID: UUID?
+
+    /// Where the open note's caret last was — recorded on every text **and**
+    /// selection change, never at one moment, so it cannot go stale.
+    ///
+    /// A chip click takes the keyboard before its action runs: SwiftUI moves
+    /// focus to the panel's focusable root on mouse-down (measured, Tom's
+    /// dogfood 2026-09-11: `fr=KeyViewProxy` at the click). So a label is
+    /// inserted here, not at wherever the caret is by then (`cm-69.3` 3.1).
+    @State private var lastNoteCaret: NSRange?
+
+    /// `reply.labels`, kept live: Settings and `cmux.json` both write
+    /// `UserDefaults`, and the chips follow without a relaunch.
+    @State private var quickLabels: [String] = ReplyCatalogSection.defaultLabels
 
     /// The note a keyboard step last asked both surfaces to bring into view.
     @State private var revealRequest: ReplyRevealRequest?
@@ -165,6 +192,27 @@ struct ReplyPanelView: View {
         }
         .task(id: bindingKey) {
             await store.refresh(workspace: workspace)
+        }
+        .onAppear { refreshQuickLabels() }
+        // `UserDefaults` posts this on whichever thread wrote, and for every
+        // key; hop to main, and assign only on a real change so an unrelated
+        // write never re-renders the panel.
+        .onReceive(
+            NotificationCenter.default
+                .publisher(for: UserDefaults.didChangeNotification)
+                .receive(on: DispatchQueue.main)
+        ) { _ in refreshQuickLabels() }
+        // Every caret move in the open note, so a label can land where the
+        // caret was even after a click has taken the keyboard. The
+        // notification fires for every text view in the app; only the
+        // field editor serving this panel's focused note field counts.
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSTextView.didChangeSelectionNotification)
+        ) { notification in
+            guard noteFieldFocused, editingID != nil,
+                  let editor = notification.object as? NSTextView, editor.isFieldEditor,
+                  editor === NSApp.keyWindow?.firstResponder else { return }
+            lastNoteCaret = editor.selectedRange()
         }
         .focusable()
         // Arrow keys drive the same two actions the buttons do. `cm-69.1` has
@@ -662,6 +710,13 @@ struct ReplyPanelView: View {
                 takeSelection(selection)
             },
             onMarkHoverChanged: { hoveredID = $0 },
+            // Clicking the phrase opens its note, the same as clicking its
+            // row below (Tom, dogfood 2026-09-11).
+            onMarkClicked: { id in
+                guard let entry = draft.numbered.first(where: { $0.id == id }) else { return }
+                if editingID == id { placeCaretInNoteField(caret: lastNoteCaret.map { .at($0) } ?? .end); return }
+                beginEditing(entry)
+            },
             marks: pageMarks,
             // **Tone marks the one in focus, from either direction.**
             // Hover is the transient reading — pointer over the mark, or over
@@ -793,6 +848,11 @@ struct ReplyPanelView: View {
                     previewText = draft.serialized()
                     previewIsEdited = false
                 },
+                labels: quickLabels,
+                onApplyLabel: { applyLabel($1, to: $0) },
+                onEditLabels: {
+                    AppDelegate.presentPreferencesWindow(navigationTarget: .reply)
+                },
                 field: { noteField($0) }
             )
 
@@ -862,10 +922,18 @@ struct ReplyPanelView: View {
             .lineLimit(1...8)
             .focused($noteFieldFocused)
             .onAppear {
+                // A rebuild of a note that is already open: the keyboard is
+                // in the sidebar, and the caret goes back where it was
+                // (`cm-69.3`).
+                if fieldAppearedForID == entry.id {
+                    placeCaretInNoteField(hop: false, caret: lastNoteCaret.map { .at($0) } ?? .end)
+                    return
+                }
+                fieldAppearedForID = entry.id
                 // A step already holds the keyboard in the sidebar; only a
                 // cold open needs AppKit to move it there (`#cm-82`).
                 let byStep = stepArrivalID == entry.id
-                placeCaretInNoteField(hop: !byStep, caretAtEnd: byStep)
+                placeCaretInNoteField(hop: !byStep, caret: byStep ? .end : .asFocused)
             }
             // `#cm-82`: at the field's first or last visual line, ↑/↓ move to
             // the neighbouring note instead of doing nothing. Inside the note
@@ -880,8 +948,22 @@ struct ReplyPanelView: View {
                       ReplyNoteCaret.isOnEdgeLine(.last) else { return .ignored }
                 return stepNote(.next, isRepeat: isRepeat)
             }
+            // Tab / ⇧Tab step too (Tom, dogfood 2026-09-11), anywhere in the
+            // note: unlike ↑/↓, Tab has no job inside a one-line field. With
+            // nowhere to go they fall through to the normal focus move.
+            // ⇧Tab can arrive as backtab (U+0019) rather than shift + tab.
+            .backport.onKeyPress(.tab) { modifiers, isRepeat in
+                let rest = modifiers.subtracting([.capsLock, .numericPad, .function])
+                if rest.isEmpty { return stepNote(.next, isRepeat: isRepeat) }
+                if rest == .shift { return stepNote(.previous, isRepeat: isRepeat) }
+                return .ignored
+            }
+            .backport.onKeyPress(KeyEquivalent("\u{19}")) { _, isRepeat in
+                stepNote(.previous, isRepeat: isRepeat)
+            }
             .onChange(of: editingText) { text in
                 updateDraft { $0.updateNote(id: entry.id, note: text) }
+                if let caret = ReplyNoteCaret.selection { lastNoteCaret = caret }
             }
             .onSubmit { closeEditing() }
 
@@ -907,6 +989,7 @@ struct ReplyPanelView: View {
             }
             .controlSize(.small)
             .buttonStyle(.borderedProminent)
+            .replyHoverHighlight(cornerRadius: 5)
             // **Paste is never gated** — and now the code says so too. It
             // typed into a composer the user is looking at and submitted
             // nothing, so what goes in there is their call; then it gated on
@@ -924,6 +1007,7 @@ struct ReplyPanelView: View {
                     .frame(maxWidth: .infinity)
             }
             .controlSize(.small)
+            .replyHoverHighlight(cornerRadius: 5)
             .disabled(!ReplyDeliveryGate.canSend(draft, turnEnded: store.canSubmit))
 
             // One refusal, one sentence, and only for the button that is off.
@@ -1014,6 +1098,8 @@ struct ReplyPanelView: View {
 
     private func beginEditing(_ entry: NumberedAnnotation) {
         stepArrivalID = nil
+        fieldAppearedForID = nil
+        lastNoteCaret = nil
         editingID = entry.id
         editingText = entry.note
         editingOriginal = entry.note
@@ -1037,10 +1123,12 @@ struct ReplyPanelView: View {
     ///   - hop: Whether to move AppKit's first responder into the sidebar
     ///     first. `false` only for a `#cm-82` step, where the keyboard is
     ///     already there and the hop would park it on the reply's web view.
-    ///   - caretAtEnd: Put the caret after the note's text. Focusing a field
-    ///     selects all of it — measured, `{0, 71}` of 71 — so without this a
-    ///     step into a written note would replace it with the next keystroke.
-    private func placeCaretInNoteField(hop: Bool = true, caretAtEnd: Bool = false) {
+    ///   - caret: Where the caret goes once the field has the keyboard.
+    ///     Focusing a field selects all of it — measured, `{0, 71}` of 71 —
+    ///     so anything but `.asFocused` replaces that selection, or the next
+    ///     keystroke would replace a written note.
+    private func placeCaretInNoteField(hop: Bool = true, caret: NoteCaretPlacement = .asFocused) {
+        confirmNoteFieldFocus(for: editingID, caret: caret, retriesLeft: 2)
         if hop {
             _ = AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
                 mode: .reply,
@@ -1049,16 +1137,59 @@ struct ReplyPanelView: View {
         }
         DispatchQueue.main.async {
             noteFieldFocused = true
-            guard caretAtEnd else { return }
+            if case .asFocused = caret { return }
             // The field editor takes first responder on this pass; the
             // selection it applies on focus lands after, so move it a turn on.
             DispatchQueue.main.async {
-                ReplyNoteCaret.moveToEnd()
+                switch caret {
+                case .asFocused: break
+                case .end: ReplyNoteCaret.moveToEnd()
+                case .at(let range): ReplyNoteCaret.select(range)
+                }
                 #if DEBUG
                 // `#cm-82`'s one open question: after a step, the keyboard
                 // must be in the new note, never on the reply's web view.
                 dlog("reply.step landed fr=\(ReplyNoteCaret.firstResponderName)")
                 #endif
+            }
+        }
+    }
+
+    /// Checks, after the fact, that the open note's field really took the
+    /// keyboard, and asks again if it did not.
+    ///
+    /// Focus set on a field SwiftUI is in the middle of replacing is dropped
+    /// without a word. A highlight that pushes the list past its ceiling
+    /// rebuilds the field inside a scroll view, and three placements land
+    /// within 30 ms of each other — the keyboard stayed on the reply (Tom,
+    /// dogfood 2026-09-11, the fourth highlight made by double-click). No one
+    /// ordering fixes that race, so the outcome is measured instead: 50 ms
+    /// on, if a note is still open and no text field has the keyboard, drop
+    /// focus and set it again. Bounded, so a field that can never take focus
+    /// cannot loop.
+    private func confirmNoteFieldFocus(for id: UUID?, caret: NoteCaretPlacement, retriesLeft: Int) {
+        guard let id else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard editingID == id else { return }
+            let held = ReplyNoteCaret.fieldEditorIsKey
+            #if DEBUG
+            dlog("reply.focus confirm held=\(held ? 1 : 0) retriesLeft=\(retriesLeft) fr=\(ReplyNoteCaret.firstResponderName)")
+            #endif
+            guard !held, retriesLeft > 0 else { return }
+            noteFieldFocused = false
+            DispatchQueue.main.async {
+                guard editingID == id else { return }
+                noteFieldFocused = true
+                if case .asFocused = caret {} else {
+                    DispatchQueue.main.async {
+                        switch caret {
+                        case .asFocused: break
+                        case .end: ReplyNoteCaret.moveToEnd()
+                        case .at(let range): ReplyNoteCaret.select(range)
+                        }
+                    }
+                }
+                confirmNoteFieldFocus(for: id, caret: caret, retriesLeft: retriesLeft - 1)
             }
         }
     }
@@ -1084,12 +1215,55 @@ struct ReplyPanelView: View {
         // returns when the pointer next enters a mark or a row.
         hoveredID = nil
         stepArrivalID = next.id
+        fieldAppearedForID = nil
+        lastNoteCaret = nil
         editingID = next.id
         editingText = next.note
         editingOriginal = next.note
         revealSeq += 1
         revealRequest = ReplyRevealRequest(id: next.id, seq: revealSeq)
         return .handled
+    }
+
+    /// Puts a quick label's text into the open note — `cm-69.3`.
+    ///
+    /// Through the field editor when the note field has the keyboard, so the
+    /// label lands at the caret and undo takes it back. Otherwise — the click
+    /// took the keyboard, or an input method is composing — the same rule
+    /// applied to the note's end. `noteFieldFocused` is checked as well as the
+    /// field editor, because the window's field editor serves every text
+    /// field in it and the label must never land in another one.
+    private func applyLabel(_ label: String, to entry: NumberedAnnotation) {
+        guard editingID == entry.id else { return }
+        #if DEBUG
+        // Logged before anything moves focus, so it says where the keyboard
+        // was at the click — the question 3.1 asks.
+        dlog("reply.label click focused=\(noteFieldFocused ? 1 : 0) fr=\(ReplyNoteCaret.firstResponderName) lastCaret=\(lastNoteCaret.map { NSStringFromRange($0) } ?? "nil")")
+        #endif
+        if noteFieldFocused, ReplyNoteCaret.insert(label) {
+            #if DEBUG
+            dlog("reply.label route=editor caret=\(ReplyNoteCaret.selection.map { NSStringFromRange($0) } ?? "nil")")
+            #endif
+            return
+        }
+        // Where the caret was, recorded before the click took the keyboard;
+        // the end only when nothing was recorded (a note never focused).
+        let end = NSRange(location: (editingText as NSString).length, length: 0)
+        let insertion = ReplyLabelInsertion.apply(label: label, to: editingText, selection: lastNoteCaret ?? end)
+        editingText = insertion.applied(to: editingText)
+        let caret = NSRange(location: insertion.caretLocation, length: 0)
+        lastNoteCaret = caret
+        placeCaretInNoteField(caret: .at(caret))
+        #if DEBUG
+        dlog("reply.label route=recorded at=\(NSStringFromRange(insertion.range))")
+        #endif
+    }
+
+    /// Reads `reply.labels`, assigning only when it changed.
+    private func refreshQuickLabels() {
+        let labels = UserDefaultsSettingsClient(defaults: .standard)
+            .value(for: SettingCatalog().reply.labels)
+        if labels != quickLabels { quickLabels = labels }
     }
 
     /// Closes the note field and hands the keyboard back to the reply body.
@@ -1127,6 +1301,8 @@ struct ReplyPanelView: View {
     /// outside `#cm-77`, and one no scenario asks for.
     private func clearEditingState() {
         stepArrivalID = nil
+        fieldAppearedForID = nil
+        lastNoteCaret = nil
         editingID = nil
         editingText = ""
         editingOriginal = ""
@@ -1141,6 +1317,8 @@ struct ReplyPanelView: View {
         // quote is fixed by selecting more, never by cmux widening one.
         guard accepted else { return }
         stepArrivalID = nil
+        fieldAppearedForID = nil
+        lastNoteCaret = nil
         editingID = annotation.id
         editingText = ""
         editingOriginal = ""
@@ -1248,6 +1426,17 @@ struct ReplyPanelView: View {
     }
 }
 
+/// Where ``ReplyPanelView``'s note field puts the caret once it has the
+/// keyboard.
+enum NoteCaretPlacement {
+    /// Leave whatever focusing applied — select-all on a written note.
+    case asFocused
+    /// After the note's text.
+    case end
+    /// A recorded position — a rebuild, or an inserted label (`cm-69.3`).
+    case at(NSRange)
+}
+
 /// The open note field's caret, read from AppKit — `#cm-82`.
 ///
 /// SwiftUI exposes neither the caret nor line layout, so this reads the
@@ -1291,6 +1480,37 @@ enum ReplyNoteCaret {
         // Same line when the two rects share a vertical centre; half a line
         // of slack absorbs sub-point rounding without admitting a neighbour.
         return abs(caret.midY - boundary.midY) < max(caret.height, 1) / 2
+    }
+
+    /// The open note's selection, when a note field has the keyboard.
+    static var selection: NSRange? { editor?.selectedRange() }
+
+    /// Whether a text field actually holds AppKit's keyboard — what SwiftUI's
+    /// `@FocusState` claims can be stale after a click in a web view.
+    static var fieldEditorIsKey: Bool { editor != nil }
+
+    /// Puts the caret (or a selection) at `range`, clamped to the note.
+    static func select(_ range: NSRange) {
+        guard let editor else { return }
+        let length = (editor.string as NSString).length
+        let start = min(max(range.location, 0), length)
+        editor.setSelectedRange(NSRange(location: start, length: min(range.length, length - start)))
+    }
+
+    /// Inserts a quick label at the caret through the field editor —
+    /// `cm-69.3`. Returns `false`, inserting nothing, when no note field has
+    /// the keyboard or an input method is mid-composition.
+    ///
+    /// `insertText(_:replacementRange:)` rather than editing the bound
+    /// string, so the edit is the user's own as far as AppKit knows: undo
+    /// takes it back, and the field's binding follows through its delegate.
+    static func insert(_ label: String) -> Bool {
+        guard let editor, !editor.hasMarkedText() else { return false }
+        let insertion = ReplyLabelInsertion.apply(
+            label: label, to: editor.string, selection: editor.selectedRange()
+        )
+        editor.insertText(insertion.text, replacementRange: insertion.range)
+        return true
     }
 
     /// Puts the caret after the note's text, replacing the select-all that

@@ -454,6 +454,9 @@ public struct SettingsWindowRoot: View {
         SidebarSection(defaultsStore: defaultsStore, catalog: catalog, hostActions: hostActions)
             .id(anchorID(for: .sidebarAppearance))
 
+        ReplySection(defaultsStore: defaultsStore, catalog: catalog)
+            .id(anchorID(for: .reply))
+
         CustomSidebarsSection(
             defaultsStore: defaultsStore,
             jsonStore: jsonStore,

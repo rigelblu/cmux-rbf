@@ -714,6 +714,18 @@ final class CmuxSettingsFileStore {
         } else if section.keys.contains("maxMessagesBack") {
             logInvalid("reply.maxMessagesBack", sourcePath: sourcePath)
         }
+
+        // `cm-69.3`. **Writes nothing when the key is absent**, and never the
+        // defaults: the store ranks a Settings edit over this file, so a
+        // parser that filled in the defaults would overwrite the
+        // user's list. The defaults live only in the catalog. Not
+        // `jsonStringArray`, which drops the whole list on one bad entry.
+        if let values = section["labels"] as? [Any] {
+            snapshot.managedUserDefaults[ReplyCatalogSection().labels.userDefaultsKey] =
+                .stringArray(ReplyCatalogSection.normalizedLabels(values))
+        } else if section.keys.contains("labels") {
+            logInvalid("reply.labels", sourcePath: sourcePath)
+        }
     }
 
     /// `panes.arrangePatterns` — user-defined Arrange Splits patterns (`#cm-67.1`),
@@ -1269,6 +1281,16 @@ final class CmuxSettingsFileStore {
 
         for identifier in currentManagedIdentifiers.subtracting(nextManagedIdentifiers) {
             guard let backup = backups[identifier] else { continue }
+            // Same precedence as applying a value: a user's choice outranks the
+            // file. Restore the pre-file value only while the setting still
+            // holds what the file put there; if it was changed since, removing
+            // the key must not undo that change (Tom, dogfood 2026-09-11 — a
+            // Reset reverted to labels from before the file ever set them).
+            if let imported = importedManagedDefaults[identifier],
+               !settingStillHoldsImportedValue(identifier, imported: imported, defaults: .standard) {
+                backups.removeValue(forKey: identifier)
+                continue
+            }
             sideEffects.merge(
                 restoreBackup(
                     backup,
@@ -1607,6 +1629,30 @@ final class CmuxSettingsFileStore {
         default:
             return true
         }
+    }
+
+    /// Whether a setting still holds what `cmux.json` last put there.
+    ///
+    /// A file `null` stores nothing, so an absent value *is* the file's
+    /// `.nullableString(nil)` — the same equivalence the apply path makes in
+    /// ``shouldApplyManagedUserDefaultsValueWhenCurrentIsMissing``. For every
+    /// other kind, absent means the setting was reset since, which counts as
+    /// a change. Missing that equivalence dropped the pre-file value of any
+    /// colour the file had set to `null` (cold code review, 2026-09-11).
+    private func settingStillHoldsImportedValue(
+        _ defaultsKey: String,
+        imported: ManagedSettingsValue,
+        defaults: UserDefaults
+    ) -> Bool {
+        guard let current = currentManagedUserDefaultsValue(
+            for: defaultsKey,
+            matching: imported,
+            defaults: defaults
+        ) else {
+            if case .nullableString(nil) = imported { return true }
+            return false
+        }
+        return current == imported
     }
 
     private func currentManagedUserDefaultsValue(
