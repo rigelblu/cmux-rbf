@@ -193,6 +193,9 @@ struct ReplyAnnotationManifest<Field: View>: View {
     var onApplyLabel: (NumberedAnnotation, String) -> Void = { _, _ in }
     /// Opens Settings on the Reply section.
     var onEditLabels: () -> Void = {}
+    /// A click on the open row's band, outside its controls: close the note,
+    /// keeping its text (Tom, dogfood 2026-09-11).
+    var onCloseEditing: () -> Void = {}
     @ViewBuilder let field: (NumberedAnnotation) -> Field
 
     var body: some View {
@@ -345,6 +348,9 @@ struct ReplyAnnotationManifest<Field: View>: View {
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // Clicks go through to the band behind it, which closes
+                    // the note — the quote is part of the band, not a control.
+                    .allowsHitTesting(false)
 
                 labelRow(entry)
             }
@@ -409,6 +415,13 @@ struct ReplyAnnotationManifest<Field: View>: View {
                 .fill(focusedID == entry.id ? hoverFill : .clear)
                 .padding(.vertical, -ReplyFooterMetrics.hoverPadding)
                 .padding(.horizontal, -ReplyFooterMetrics.hoverInset)
+                // While the note is open, a click on the band itself — the
+                // quote, the padding, the gaps between chips — closes it. The
+                // chips, `⌄`, field and `✕` sit above the band and take their
+                // own clicks first.
+                .contentShape(RoundedRectangle(cornerRadius: 3))
+                .onTapGesture { if editingID == entry.id { onCloseEditing() } }
+                .allowsHitTesting(editingID == entry.id)
         )
         .onHover { hoveredID = $0 ? entry.id : (hoveredID == entry.id ? nil : hoveredID) }
     }

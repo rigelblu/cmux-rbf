@@ -218,13 +218,19 @@ struct ReplyPanelView: View {
         // Arrow keys drive the same two actions the buttons do. `cm-69.1` has
         // no text field to compete with; once notes exist, an editing field
         // takes the keys first.
+        // Never while a note field has the keyboard, even with its caret at
+        // an edge: a text field ignores ← at its start and → at its end, the
+        // key bubbles up here, and stepping the reply then closes the note
+        // mid-sentence (Tom, dogfood 2026-09-11).
         .backport.onKeyPress(.leftArrow) { modifiers in
-            guard Self.isUnmodifiedStep(modifiers), canStepBack else { return .ignored }
+            guard Self.isUnmodifiedStep(modifiers), canStepBack,
+                  !ReplyNoteCaret.fieldEditorIsKey else { return .ignored }
             Task { await store.stepBack() }
             return .handled
         }
         .backport.onKeyPress(.rightArrow) { modifiers in
-            guard Self.isUnmodifiedStep(modifiers), canStepForward else { return .ignored }
+            guard Self.isUnmodifiedStep(modifiers), canStepForward,
+                  !ReplyNoteCaret.fieldEditorIsKey else { return .ignored }
             store.stepForward()
             return .handled
         }
@@ -711,11 +717,19 @@ struct ReplyPanelView: View {
             },
             onMarkHoverChanged: { hoveredID = $0 },
             // Clicking the phrase opens its note, the same as clicking its
-            // row below (Tom, dogfood 2026-09-11).
+            // row below, and scrolls the list to it (`#cm-84`; Tom, dogfood
+            // 2026-09-11) — with enough notes the row sits out of view.
+            // Clicking the phrase of the note already open closes it again,
+            // **keeping the text** like Return, not discarding it like
+            // Escape (Tom, dogfood 2026-09-11).
             onMarkClicked: { id in
                 guard let entry = draft.numbered.first(where: { $0.id == id }) else { return }
-                if editingID == id { placeCaretInNoteField(caret: lastNoteCaret.map { .at($0) } ?? .end); return }
+                if editingID == id {
+                    closeNoteKeepingText()
+                    return
+                }
                 beginEditing(entry)
+                revealNote(id)
             },
             marks: pageMarks,
             // **Tone marks the one in focus, from either direction.**
@@ -853,6 +867,7 @@ struct ReplyPanelView: View {
                 onEditLabels: {
                     AppDelegate.presentPreferencesWindow(navigationTarget: .reply)
                 },
+                onCloseEditing: { closeNoteKeepingText() },
                 field: { noteField($0) }
             )
 
@@ -977,38 +992,22 @@ struct ReplyPanelView: View {
 
     private var deliveryButtons: some View {
         VStack(alignment: .leading, spacing: 6) {
-
-            // Stacked full-width, not side by side: at 256pt a row forced the
-            // label "P&Send", which reads as a typo and makes the user decode
-            // it. Stacking costs 26pt and buys both full labels.
-            Button {
-                send(submit: false)
-            } label: {
-                Text(String(localized: "reply.annotation.paste", defaultValue: "Paste"))
-                    .frame(maxWidth: .infinity)
+            // Side by side when both full labels fit, stacked when they do
+            // not (Tom, dogfood 2026-09-11). Never squeezed: at 256pt a row
+            // forced the label "P&Send", which reads as a typo — so the row
+            // is offered only at a width where neither label truncates.
+            ViewThatFits(in: .horizontal) {
+                // `Paste & Send` first, `Paste` after it (Tom, dogfood
+                // 2026-09-11) — the same order stacked as side by side.
+                HStack(spacing: 6) {
+                    pasteAndSendButton
+                    pasteButton
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    pasteAndSendButton
+                    pasteButton
+                }
             }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
-            .replyHoverHighlight(cornerRadius: 5)
-            // **Paste is never gated** — and now the code says so too. It
-            // typed into a composer the user is looking at and submitted
-            // nothing, so what goes in there is their call; then it gated on
-            // `isDeliverable` anyway, five lines under a comment promising it
-            // did not. An unwritten note is not an unfinished action, it is
-            // an action the user intends to finish in the terminal.
-            //
-            // Off only when there is genuinely nothing to put anywhere.
-            .disabled(!ReplyDeliveryGate.canPaste(draft))
-
-            Button {
-                send(submit: true)
-            } label: {
-                Text(String(localized: "reply.annotation.pasteAndSend", defaultValue: "Paste & Send"))
-                    .frame(maxWidth: .infinity)
-            }
-            .controlSize(.small)
-            .replyHoverHighlight(cornerRadius: 5)
-            .disabled(!ReplyDeliveryGate.canSend(draft, turnEnded: store.canSubmit))
 
             // One refusal, one sentence, and only for the button that is off.
             if ReplyDeliveryGate.canSend(draft, turnEnded: true), !store.canSubmit {
@@ -1020,6 +1019,51 @@ struct ReplyPanelView: View {
         }
         .padding(.horizontal, Self.bodyGutter)
         .padding(.top, 6)
+    }
+
+    /// Whether `Paste & Send` is the primary button — once every highlight
+    /// has a note and the turn has ended, i.e. exactly when it can be
+    /// pressed (Tom, dogfood 2026-09-11). Until then `Paste` is primary: a
+    /// prominent button that is greyed out would point at the one action
+    /// that is not available.
+    private var sendIsPrimary: Bool {
+        ReplyDeliveryGate.canSend(draft, turnEnded: store.canSubmit)
+    }
+
+    private var pasteButton: some View {
+        Button {
+            send(submit: false)
+        } label: {
+            Text(String(localized: "reply.annotation.paste", defaultValue: "Paste"))
+                .lineLimit(1)
+                .fixedSize()
+                .frame(maxWidth: .infinity)
+        }
+        .controlSize(.small)
+        .modifier(ReplyDeliveryButtonStyle(prominent: !sendIsPrimary))
+        .replyHoverHighlight(cornerRadius: 5)
+        // **Paste is never gated** — it types into a composer the user is
+        // looking at and submits nothing, so what goes in there is their
+        // call. An unwritten note is not an unfinished action, it is an
+        // action the user intends to finish in the terminal.
+        //
+        // Off only when there is genuinely nothing to put anywhere.
+        .disabled(!ReplyDeliveryGate.canPaste(draft))
+    }
+
+    private var pasteAndSendButton: some View {
+        Button {
+            send(submit: true)
+        } label: {
+            Text(String(localized: "reply.annotation.pasteAndSend", defaultValue: "Paste & Send"))
+                .lineLimit(1)
+                .fixedSize()
+                .frame(maxWidth: .infinity)
+        }
+        .controlSize(.small)
+        .modifier(ReplyDeliveryButtonStyle(prominent: sendIsPrimary))
+        .replyHoverHighlight(cornerRadius: 5)
+        .disabled(!ReplyDeliveryGate.canSend(draft, turnEnded: store.canSubmit))
     }
 
     // MARK: - The paste preview
@@ -1220,19 +1264,26 @@ struct ReplyPanelView: View {
         editingID = next.id
         editingText = next.note
         editingOriginal = next.note
-        revealSeq += 1
-        revealRequest = ReplyRevealRequest(id: next.id, seq: revealSeq)
+        revealNote(next.id)
         return .handled
+    }
+
+    /// Scrolls the list — and the reply — to a note, only as far as needed
+    /// and not at all when it is already in view. Shared by a keyboard step
+    /// (`#cm-82`) and a click on the note's phrase (`#cm-84`), so both reach
+    /// a note that sits below the list's ceiling.
+    private func revealNote(_ id: UUID) {
+        revealSeq += 1
+        revealRequest = ReplyRevealRequest(id: id, seq: revealSeq)
     }
 
     /// Puts a quick label's text into the open note — `cm-69.3`.
     ///
-    /// Through the field editor when the note field has the keyboard, so the
-    /// label lands at the caret and undo takes it back. Otherwise — the click
-    /// took the keyboard, or an input method is composing — the same rule
-    /// applied to the note's end. `noteFieldFocused` is checked as well as the
-    /// field editor, because the window's field editor serves every text
-    /// field in it and the label must never land in another one.
+    /// Inserted at the caret by `ReplyLabelInsertion`, then the note closes,
+    /// keeping its text. The note's text is edited directly rather than
+    /// through the field editor: with the field closing there is no undo to
+    /// preserve. `noteFieldFocused` gates reading the live selection, because
+    /// the window's field editor serves every text field in it.
     private func applyLabel(_ label: String, to entry: NumberedAnnotation) {
         guard editingID == entry.id else { return }
         #if DEBUG
@@ -1240,23 +1291,19 @@ struct ReplyPanelView: View {
         // was at the click — the question 3.1 asks.
         dlog("reply.label click focused=\(noteFieldFocused ? 1 : 0) fr=\(ReplyNoteCaret.firstResponderName) lastCaret=\(lastNoteCaret.map { NSStringFromRange($0) } ?? "nil")")
         #endif
-        if noteFieldFocused, ReplyNoteCaret.insert(label) {
-            #if DEBUG
-            dlog("reply.label route=editor caret=\(ReplyNoteCaret.selection.map { NSStringFromRange($0) } ?? "nil")")
-            #endif
-            return
-        }
-        // Where the caret was, recorded before the click took the keyboard;
-        // the end only when nothing was recorded (a note never focused).
+        // A label finishes the note: it goes in where the caret was and the
+        // note closes, keeping its text (Tom, dogfood 2026-09-11 — *"clicking
+        // on the canned response should collapse"*). The caret is the live
+        // one if the field still has the keyboard, else the one recorded
+        // before the click took it, else the end.
         let end = NSRange(location: (editingText as NSString).length, length: 0)
-        let insertion = ReplyLabelInsertion.apply(label: label, to: editingText, selection: lastNoteCaret ?? end)
+        let selection = (noteFieldFocused ? ReplyNoteCaret.selection : nil) ?? lastNoteCaret ?? end
+        let insertion = ReplyLabelInsertion.apply(label: label, to: editingText, selection: selection)
         editingText = insertion.applied(to: editingText)
-        let caret = NSRange(location: insertion.caretLocation, length: 0)
-        lastNoteCaret = caret
-        placeCaretInNoteField(caret: .at(caret))
         #if DEBUG
-        dlog("reply.label route=recorded at=\(NSStringFromRange(insertion.range))")
+        dlog("reply.label inserted at=\(NSStringFromRange(insertion.range)) closing=1")
         #endif
+        closeNoteKeepingText()
     }
 
     /// Reads `reply.labels`, assigning only when it changed.
@@ -1282,6 +1329,16 @@ struct ReplyPanelView: View {
     /// field and lands here; the next Escape reaches the body's own arm
     /// (`#cm-76`) and hands off to the terminal. Before this, the in-between
     /// state was the 1x1 host, which swallowed anything typed there.
+    /// Closes the open note by a click — on its phrase or its band — keeping
+    /// what was typed, like Return and unlike Escape (Tom, dogfood
+    /// 2026-09-11). Saved here first: the field's own onChange is deferred,
+    /// and a click can land before the last keystroke's update runs.
+    private func closeNoteKeepingText() {
+        guard let id = editingID else { return }
+        updateDraft { $0.updateNote(id: id, note: editingText) }
+        closeEditing()
+    }
+
     private func closeEditing() {
         clearEditingState()
         DispatchQueue.main.async {
@@ -1497,22 +1554,6 @@ enum ReplyNoteCaret {
         editor.setSelectedRange(NSRange(location: start, length: min(range.length, length - start)))
     }
 
-    /// Inserts a quick label at the caret through the field editor —
-    /// `cm-69.3`. Returns `false`, inserting nothing, when no note field has
-    /// the keyboard or an input method is mid-composition.
-    ///
-    /// `insertText(_:replacementRange:)` rather than editing the bound
-    /// string, so the edit is the user's own as far as AppKit knows: undo
-    /// takes it back, and the field's binding follows through its delegate.
-    static func insert(_ label: String) -> Bool {
-        guard let editor, !editor.hasMarkedText() else { return false }
-        let insertion = ReplyLabelInsertion.apply(
-            label: label, to: editor.string, selection: editor.selectedRange()
-        )
-        editor.insertText(insertion.text, replacementRange: insertion.range)
-        return true
-    }
-
     /// Puts the caret after the note's text, replacing the select-all that
     /// focusing a field applies.
     static func moveToEnd() {
@@ -1530,5 +1571,19 @@ enum ReplyNoteCaret {
     private static func lineRect(_ editor: NSTextView, at location: Int) -> NSRect? {
         let rect = editor.firstRect(forCharacterRange: NSRange(location: location, length: 0), actualRange: nil)
         return rect.isEmpty && rect.origin == .zero ? nil : rect
+    }
+}
+
+/// The primary / secondary look for the two delivery buttons, switched by
+/// which one is the next thing to press.
+private struct ReplyDeliveryButtonStyle: ViewModifier {
+    let prominent: Bool
+
+    func body(content: Content) -> some View {
+        if prominent {
+            content.buttonStyle(.borderedProminent)
+        } else {
+            content.buttonStyle(.bordered)
+        }
     }
 }
