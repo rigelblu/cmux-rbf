@@ -51,6 +51,167 @@ enum ReplyNoteStep {
     }
 }
 
+/// The `⌄` menu, as AppKit — `#cm-83.3`.
+///
+/// An `NSMenu` rather than SwiftUI's `Menu` because a key has to open it and
+/// SwiftUI offers no way to do that — nothing in this codebase opens a SwiftUI
+/// menu from code. One menu serves both the click and `⌥0`, so the two
+/// entrances cannot drift apart.
+///
+/// Anchoring in an `NSView` is a **choice**, not a constraint, and an earlier
+/// version of this comment claimed otherwise. Of the eight pre-existing
+/// `popUp(positioning:at:in:)` call sites, seven pass a view and one
+/// (`FilePreviewPanel.swift:344`) passes `nil` and opens at the mouse. The
+/// view is used here so the menu opens at the chevron rather than wherever
+/// the pointer happens to be — which matters precisely because `⌥0` opens it
+/// with no pointer involved at all.
+///
+/// It also carries the key equivalents `#cm-83.2` owes: macOS draws `⌥1`…`⌥9`
+/// in the menu's own right-hand column, from the **configured** binding, so
+/// rebinding in Settings changes what the menu shows. Labels past the ninth
+/// appear without one — the digits run out.
+@MainActor
+enum ReplyLabelMenu {
+    /// How far below the anchor's centre the menu's top-left should land.
+    /// The anchor is centred on the chevron chip: an 8pt glyph with 3pt of
+    /// padding above and below, so 7pt clears its bottom edge and 4pt is the
+    /// gap. Written out because the value it replaced was `bounds.height + 4`
+    /// on a zero-size view — always 4, and in the wrong direction.
+    static let dropBelowChevron: CGFloat = 11
+
+    static func make(
+        labels: [String],
+        shortcut: StoredShortcut,
+        apply: @escaping (String) -> Void,
+        edit: @escaping () -> Void
+    ) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        // `#cm-83.3`, added 2026-09-12 on Tom's dogfood: the menu listed every
+        // label's key and never the key that opens it, so `⌥0` had **no
+        // discoverability surface anywhere in the product** — the changelog was
+        // the only place it existed. A cold review found the same gap.
+        //
+        // It is a dimmed, unselectable caption rather than a key equivalent on
+        // `Edit labels…`, which is what a first reading suggests: that column
+        // means "press this to run this row", and the opening key does not run
+        // any row. Drawn from the **configured** modifiers, so a rebind moves it
+        // — and omitted entirely when the binding is unbound or a chord, because
+        // then no digit dispatches and `⌥0` does not work either. A caption for a
+        // key that does nothing is worse than no caption.
+        if let caption = openingKeyRow(shortcut) {
+            menu.addItem(caption)
+            menu.addItem(.separator())
+        }
+        for (index, label) in labels.enumerated() {
+            let item = NSMenuItem(
+                title: label,
+                action: #selector(ReplyLabelMenuTarget.fire(_:)),
+                keyEquivalent: ""
+            )
+            // Derived per row from one stored binding, the way
+            // `cmuxApp.swift:1106-1138` does for `selectWorkspaceByNumber`.
+            // An unbound or chord binding draws nothing rather than a wrong key.
+            if index < 9, !shortcut.isUnbound, !shortcut.hasChord {
+                item.keyEquivalent = String(index + 1)
+                item.keyEquivalentModifierMask = shortcut.firstStroke.modifierFlags
+            }
+            item.target = ReplyLabelMenuTarget.shared
+            item.representedObject = ReplyLabelMenuAction { apply(label) }
+            item.isEnabled = true
+            menu.addItem(item)
+        }
+        if !labels.isEmpty { menu.addItem(.separator()) }
+        let editItem = NSMenuItem(
+            title: String(localized: "reply.labels.editLabels", defaultValue: "Edit labels…"),
+            action: #selector(ReplyLabelMenuTarget.fire(_:)),
+            keyEquivalent: ""
+        )
+        editItem.target = ReplyLabelMenuTarget.shared
+        editItem.representedObject = ReplyLabelMenuAction(edit)
+        editItem.isEnabled = true
+        menu.addItem(editItem)
+        return menu
+    }
+
+    /// The row above the labels naming the key that opens this menu, or `nil`
+    /// when that key is dead.
+    ///
+    /// **Laid out like every other row** — text left, key right (Tom, dogfood
+    /// 2026-09-12) — rather than folding the glyph into the title. The digit
+    /// and modifiers go in the item's own key-equivalent column, so macOS
+    /// aligns it with the labels' `⌥1`…`⌥9` instead of it reading as prose.
+    ///
+    /// **Inert by three separate means**, because a key equivalent on a menu
+    /// item is normally live while the menu tracks: `action` is `nil` so there
+    /// is nothing to send, `isEnabled` is false, and the menu sets
+    /// `autoenablesItems = false` so nothing re-enables it. It is a legend,
+    /// not a command.
+    ///
+    /// Mirrors the `"0"` handler's own guard in `ReplyPanelView` — same two
+    /// refusals, so the row cannot advertise a key the handler will decline.
+    static func openingKeyRow(_ shortcut: StoredShortcut) -> NSMenuItem? {
+        guard !shortcut.isUnbound, !shortcut.hasChord else { return nil }
+        let modifiers = shortcut.firstStroke.modifierFlags
+        guard !modifiers.isEmpty else { return nil }
+        let item = NSMenuItem(
+            title: String(
+                localized: "reply.labels.openThisMenu",
+                defaultValue: "Open this menu"
+            ),
+            action: nil,
+            keyEquivalent: "0"
+        )
+        item.keyEquivalentModifierMask = modifiers
+        item.isEnabled = false
+        return item
+    }
+}
+
+/// Carries a menu item's closure, since `NSMenuItem` takes a selector.
+final class ReplyLabelMenuAction: NSObject {
+    let run: () -> Void
+    init(_ run: @escaping () -> Void) { self.run = run }
+}
+
+@MainActor
+final class ReplyLabelMenuTarget: NSObject {
+    static let shared = ReplyLabelMenuTarget()
+    @objc func fire(_ sender: NSMenuItem) {
+        (sender.representedObject as? ReplyLabelMenuAction)?.run()
+    }
+}
+
+/// A zero-size AppKit view the menu anchors to, co-located with the chevron.
+/// Anchoring at the chevron needs an `NSView`, and SwiftUI has none to give.
+/// (`popUp` itself accepts `nil` — that opens at the mouse, which is wrong for
+/// a menu a key press opens.)
+///
+/// The view is handed back through a **reference box, not `@State`**: writing
+/// SwiftUI state from `makeNSView`/`updateNSView` happens during a view update,
+/// where it is deferred or dropped — which is why the first version of this
+/// left the anchor nil and the menu never opened.
+@MainActor
+final class ReplyMenuAnchorBox {
+    weak var view: NSView?
+}
+
+struct ReplyMenuAnchor: NSViewRepresentable {
+    /// Flipped so `popUp`'s `y` grows downward, the way the call site reads.
+    /// An unflipped `NSView` put the menu 4pt *above* the chevron's centre,
+    /// covering the control it belongs to.
+    final class Anchor: NSView {
+        override var isFlipped: Bool { true }
+    }
+    let box: ReplyMenuAnchorBox
+    func makeNSView(context: Context) -> Anchor {
+        let v = Anchor(frame: .zero)
+        box.view = v
+        return v
+    }
+    func updateNSView(_ nsView: Anchor, context: Context) { box.view = nsView }
+}
+
 /// Which note Tab opens when the keyboard is in the reply body — `#cm-83.1`.
 ///
 /// Deliberately **not** part of ``ReplyNoteStep``, which answers a different
@@ -213,8 +374,11 @@ struct ReplyAnnotationManifest<Field: View>: View {
     var labels: [String] = []
     /// Puts a label's text into the open note.
     var onApplyLabel: (NumberedAnnotation, String) -> Void = { _, _ in }
-    /// Opens Settings on the Reply section.
-    var onEditLabels: () -> Void = {}
+    /// `#cm-83.3` — the owner pops the AppKit label menu; the manifest only
+    /// says when, because the menu needs the panel's state to build itself.
+    var onOpenLabelMenu: (NumberedAnnotation) -> Void = { _ in }
+    /// Holds the zero-size view the menu anchors to.
+    var labelMenuAnchorBox: ReplyMenuAnchorBox = ReplyMenuAnchorBox()
     /// A click on the open row's band, outside its controls: close the note,
     /// keeping its text (Tom, dogfood 2026-09-11).
     var onCloseEditing: () -> Void = {}
@@ -479,17 +643,20 @@ struct ReplyAnnotationManifest<Field: View>: View {
 
     /// The quick labels above an open note — `cm-69.3`, `N5`.
     ///
-    /// As many chips as fit the row, in order; the rest, and the way into
-    /// editing them, sit behind `⌄`, which is always present because it holds
-    /// that way in. The count follows the panel's width (Tom, 2026-09-11:
+    /// As many chips as fit the row, in order. The `⌄` beside them is always
+    /// present, and since `cm-83.3` it holds **every** label rather than only
+    /// the ones the chips left out — so the chips are a shortcut to a subset,
+    /// not a partition. The way into editing them is in there too.
+    /// The count follows the panel's width (Tom, 2026-09-11:
     /// *"we should just fit as many that fit horizontally"*) — it was a fixed
     /// three, which wasted a wide panel and forced Settings to explain which
     /// labels were chips. One row that never wraps: the list is the user's,
     /// so wrapping would grow the footer with every label they add.
     ///
     /// `ViewThatFits` tries the row with every label as a chip, then one
-    /// fewer, down to none, and shows the first that fits — no measuring, and
-    /// the menu always holds exactly the labels the chips left out.
+    /// fewer, down to none, and shows the first that fits — no measuring.
+    /// It instantiates this row once per candidate, so anything captured in
+    /// here is captured `labels.count + 1` times; see `ReplyMenuAnchorBox`.
     ///
     /// **Never focusable.** A chip that took focus on click would pull the
     /// keyboard out of the note field it is writing into — the one thing a
@@ -523,27 +690,30 @@ struct ReplyAnnotationManifest<Field: View>: View {
                 .focusable(false)
                 .help(Text(verbatim: label))
             }
-            Menu {
-                ForEach(Array(labels.dropFirst(chips).enumerated()), id: \.offset) { _, label in
-                    Button(label) { onApplyLabel(entry, label) }
-                }
-                if labels.count > chips { Divider() }
-                Button(String(localized: "reply.labels.editLabels", defaultValue: "Edit labels…")) {
-                    onEditLabels()
-                }
+            // `#cm-83.3`: one AppKit menu, opened by this click and by `⌥0`.
+            // A SwiftUI `Menu` cannot be opened from code, and two menus would
+            // drift apart — so the click loses its SwiftUI menu rather than the
+            // keyboard gaining a second one.
+            Button {
+                onOpenLabelMenu(entry)
             } label: {
+                // Padding and fill live INSIDE the label, exactly as the chips
+                // above do. Outside `.buttonStyle(.plain)` they are not part of
+                // the control, so the button would listen only on the 8pt glyph
+                // while painting a chip-sized target — `#cm-85`'s defect, in a
+                // control that never had it until this rework.
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(chipFill))
+                    .replyHoverHighlight(cornerRadius: 4)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .background(ReplyMenuAnchor(box: labelMenuAnchorBox).frame(width: 0, height: 0))
             .focusable(false)
-            .fixedSize()
-            .padding(.horizontal, 5)
-            .padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 4).fill(chipFill))
-            .replyHoverHighlight(cornerRadius: 4)
             .accessibilityLabel(String(localized: "reply.labels.more", defaultValue: "More labels"))
         }
     }

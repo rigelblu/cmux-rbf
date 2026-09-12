@@ -99,6 +99,8 @@ struct ReplyPanelView: View {
     /// `reply.labels`, kept live: Settings and `cmux.json` both write
     /// `UserDefaults`, and the chips follow without a relaunch.
     @State private var quickLabels: [String] = ReplyCatalogSection.defaultLabels
+    /// `#cm-83.3` — holds the zero-size AppKit view the label menu anchors to.
+    @State private var labelMenuAnchorBox = ReplyMenuAnchorBox()
 
     /// The note a keyboard step last asked both surfaces to bring into view.
     @State private var revealRequest: ReplyRevealRequest?
@@ -931,9 +933,8 @@ struct ReplyPanelView: View {
                 },
                 labels: quickLabels,
                 onApplyLabel: { applyLabel($1, to: $0) },
-                onEditLabels: {
-                    AppDelegate.presentPreferencesWindow(navigationTarget: .reply)
-                },
+                onOpenLabelMenu: { openLabelMenu(for: $0, via: "click") },
+                labelMenuAnchorBox: labelMenuAnchorBox,
                 onCloseEditing: { closeNoteKeepingText() },
                 field: { noteField($0) }
             )
@@ -1056,6 +1057,22 @@ struct ReplyPanelView: View {
             .backport.onKeyPress(KeyEquivalent("7")) { m in insertLabel(7, m, entry) }
             .backport.onKeyPress(KeyEquivalent("8")) { m in insertLabel(8, m, entry) }
             .backport.onKeyPress(KeyEquivalent("9")) { m in insertLabel(9, m, entry) }
+            // `#cm-83.3`: the digit after the nine label slots opens the menu,
+            // so the labels the digits cannot reach are still reachable.
+            .backport.onKeyPress(KeyEquivalent("0")) { m in
+                let configured = KeyboardShortcutSettings.shortcut(for: .insertReplyLabelByNumber)
+                // `keyEquivalent != nil` matches `insertLabel` five lines
+                // down. Without it, a binding that resolves by key code rather
+                // than key equivalent leaves ⌥1–⌥9 dead while ⌥0 still opens
+                // the menu — a menu you can reach whose rows you cannot.
+                guard !configured.isUnbound, !configured.hasChord,
+                      configured.keyEquivalent != nil,
+                      m.subtracting([.capsLock, .numericPad, .function])
+                          == configured.eventModifiers,
+                      ReplyNoteCaret.fieldEditorIsKey else { return .ignored }
+                // Hand the key back when nothing opened, rather than eating it.
+                return openLabelMenu(for: entry, via: "key") ? .handled : .ignored
+            }
             .onChange(of: editingText) { text in
                 updateDraft { $0.updateNote(id: entry.id, note: text) }
                 if let caret = ReplyNoteCaret.selection { lastNoteCaret = caret }
@@ -1357,6 +1374,54 @@ struct ReplyPanelView: View {
         revealRequest = ReplyRevealRequest(id: id, seq: revealSeq)
     }
 
+    /// Pops the `⌄` label menu — `#cm-83.3`.
+    ///
+    /// One menu for both entrances: the chevron's click and `⌥0`. It anchors
+    /// to the zero-size view the chip row hands back, so it opens where the
+    /// chevron is rather than at the pointer.
+    /// Returns whether a menu actually opened, so the caller can hand the key
+    /// back when it did not. Every bail-out below is silent, and a key press
+    /// that is swallowed by a control which then does nothing is the least
+    /// debuggable failure this panel can produce.
+    /// `via` is `"click"` or `"key"`. The two entrances differ by construction
+    /// — a chevron click moves SwiftUI focus on mouse-down, `⌥0` never touches
+    /// it — so one `route=menu` in the log cannot tell you which you are
+    /// reading. They must be separable or the measurement is worthless.
+    @discardableResult
+    private func openLabelMenu(for entry: NumberedAnnotation, via: String) -> Bool {
+        // Probe BEFORE the guard: with it after, "no log line" could mean the
+        // click never fired OR the guard refused, and those need different
+        // fixes. Same mistake this file already made once tonight.
+        #if DEBUG
+        dlog(
+            "cm-83.3 labelMenu.request via=\(via) anchor=\(labelMenuAnchorBox.view != nil ? 1 : 0) "
+                + "inWindow=\(labelMenuAnchorBox.view?.window != nil ? 1 : 0) labels=\(quickLabels.count)"
+        )
+        #endif
+        guard let anchor = labelMenuAnchorBox.view, anchor.window != nil else { return false }
+        let menu = ReplyLabelMenu.make(
+            labels: quickLabels,
+            shortcut: KeyboardShortcutSettings.shortcut(for: .insertReplyLabelByNumber),
+            apply: { applyLabel($0, to: entry, route: "menu.\(via)") },
+            edit: { AppDelegate.presentPreferencesWindow(navigationTarget: .reply) }
+        )
+        #if DEBUG
+        dlog("cm-83.3 labelMenu.open items=\(menu.items.count) entry=\(entry.id.uuidString.prefix(5))")
+        #endif
+        // The anchor is forced to zero size, so `bounds.height` is 0 and the
+        // old `bounds.height + 4` was dead arithmetic reading as "below the
+        // control". `Anchor` is flipped (see its definition), so +y is down.
+        // `.background` centres the anchor on the chevron chip, which is the
+        // 8pt glyph plus 3pt padding each side — so half of it, plus a 4pt
+        // gap, clears the chip's bottom edge.
+        menu.popUp(
+            positioning: nil as NSMenuItem?,
+            at: NSPoint(x: 0, y: ReplyLabelMenu.dropBelowChevron),
+            in: anchor
+        )
+        return true
+    }
+
     /// Inserts the Nth quick label from the keyboard — `#cm-83.2`.
     ///
     /// Matches the **configured** binding rather than a hardcoded chord, so
@@ -1384,7 +1449,7 @@ struct ReplyPanelView: View {
         #if DEBUG
         dlog("cm-83.2 label.key n=\(n) label=\(quickLabels[n - 1]) fieldKey=1")
         #endif
-        applyLabel(quickLabels[n - 1], to: entry)
+        applyLabel(quickLabels[n - 1], to: entry, route: "key")
         return .handled
     }
 
@@ -1395,12 +1460,21 @@ struct ReplyPanelView: View {
     /// through the field editor: with the field closing there is no undo to
     /// preserve. `noteFieldFocused` gates reading the live selection, because
     /// the window's field editor serves every text field in it.
-    private func applyLabel(_ label: String, to entry: NumberedAnnotation) {
+    /// `route` is why this exists as a parameter rather than a literal: the
+    /// probe below logged `click` for every insert, keyed ones included, and
+    /// a cold review found `#cm-83.2`'s closing evidence leaning on that word
+    /// to tell the two paths apart. An instrument that cannot distinguish the
+    /// thing it is cited for is worse than none.
+    private func applyLabel(
+        _ label: String,
+        to entry: NumberedAnnotation,
+        route: String = "click"
+    ) {
         guard editingID == entry.id else { return }
         #if DEBUG
         // Logged before anything moves focus, so it says where the keyboard
         // was at the click — the question 3.1 asks.
-        dlog("reply.label click focused=\(noteFieldFocused ? 1 : 0) fr=\(ReplyNoteCaret.firstResponderName) lastCaret=\(lastNoteCaret.map { NSStringFromRange($0) } ?? "nil")")
+        dlog("reply.label \(route) focused=\(noteFieldFocused ? 1 : 0) fr=\(ReplyNoteCaret.firstResponderName) lastCaret=\(lastNoteCaret.map { NSStringFromRange($0) } ?? "nil")")
         #endif
         // A label finishes the note: it goes in where the caret was and the
         // note closes, keeping its text (Tom, dogfood 2026-09-11 — *"clicking

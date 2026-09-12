@@ -147623,6 +147623,29 @@
         }
       }
     },
+    "reply.labels.openThisMenu" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open this menu"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このメニューを開く"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 메뉴 열기"
+          }
+        }
+      }
+    },
     "reply.labels.more": {
       "extractionState": "manual",
       "localizations": {

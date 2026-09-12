@@ -39,7 +39,9 @@ fi
 - Single stroke: `"cmd+b"`.
 - Chord: `["ctrl+b","c"]`. The first stroke needs a modifier unless the key is Space. The second stroke can be bare.
 - Unbind: prefer `null` for explicit unbinds. `""`, `"none"`, `"clear"`, `"unbound"`, and `"disabled"` are accepted aliases, but `null` is the clearest JSON value and matches the templates below.
-- `selectSurfaceByNumber` and `selectWorkspaceByNumber` must use a digit from 1 to 9. `cmd+1` means the full `cmd+1` through `cmd+9` family.
+- `selectSurfaceByNumber`, `selectWorkspaceByNumber` and `insertReplyLabelByNumber` must use a digit from 1 to 9. `cmd+1` means the full `cmd+1` through `cmd+9` family — one stored binding, the digit substituted.
+- `insertReplyLabelByNumber` (Settings: **Insert Reply Label 1…9**, default `opt+1`) inserts the Nth quick label into the Reply panel's open note. It is live **only while the caret is in a note field**, so it shadows the characters `opt`+digit would otherwise type there and nowhere else. Labels past the ninth stay click-only — the digits run out.
+  - **The same modifiers plus `0` open the label menu**, and that key has **no action of its own**: it is derived from this binding at the keypress (`Sources/ReplyPanelView.swift`, the `"0"` handler), because the numbered family rejects any digit outside 1–9. So rebinding this action to `opt+cmd+1` silently moves the menu key to `opt+cmd+0`, it cannot be unbound separately, it has no Settings row, and **conflict detection cannot see it** — binding another action to that chord raises no warning while the panel swallows the key. Tracked as `#cm-88`.
 - `showHideAllWindows` is the only system-wide shortcut. It cannot be a chord, requires modifiers, and may be rejected by macOS if reserved.
 - `globalSearch` is application-scoped and only fires while cmux is active.
 - `showHideAllWindows` also requires Settings > Global Hotkey > Enable System-Wide Hotkey. The binding can validate in `cmux.json` while the feature is disabled, so warn the user to enable that setting before reporting the shortcut as usable.

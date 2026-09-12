@@ -1736,6 +1736,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804100000000000000000004 /* ReorderShortcutActionTests.swift */; };
 		A5009001 /* ReplyAnnotationManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5009000 /* ReplyAnnotationManifest.swift */; };
 		69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */; };
+		D8850002D8850002D8850002 /* ReplyLabelMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */; };
 		285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */; };
 		D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */; };
 		7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */; };
@@ -4391,6 +4392,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		804100000000000000000004 /* ReorderShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderShortcutActionTests.swift; sourceTree = "<group>"; };
 		A5009000 /* ReplyAnnotationManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyAnnotationManifest.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyAnnotationManifestRenderTests.swift; sourceTree = "<group>"; };
+		D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelMenuTests.swift; sourceTree = "<group>"; };
 		D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelsFileParserTests.swift; sourceTree = "<group>"; };
 		D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelShortcutActionTests.swift; sourceTree = "<group>"; };
 		6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMaxMessagesBackConfigTests.swift; sourceTree = "<group>"; };
@@ -7811,6 +7813,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */,
 				D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */,
 				D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */,
+				D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */,
 				D7470011D7470011D7470011 /* MarkdownYMDShellTests.swift */,
 				F5168A0C0000000000000002 /* MarkdownBackgroundStyleTests.swift */,
 				D8072A01D8072A01D8072A01 /* BrowserViewportRuntimeLoadDelegate.swift */,
@@ -10966,6 +10969,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */,
 				804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */,
 				69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */,
+				D8850002D8850002D8850002 /* ReplyLabelMenuTests.swift in Sources */,
 				285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */,
 				D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */,
 				7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */,
