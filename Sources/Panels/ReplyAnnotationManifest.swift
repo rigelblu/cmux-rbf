@@ -51,6 +51,28 @@ enum ReplyNoteStep {
     }
 }
 
+/// Which note Tab opens when the keyboard is in the reply body — `#cm-83.1`.
+///
+/// Deliberately **not** part of ``ReplyNoteStep``, which answers a different
+/// question and answers it differently: the step refuses a single note
+/// (`count > 1`, so a lone note has nowhere to go) where the entrance must
+/// open it, since the single note is exactly what has no keyboard route
+/// today. Folding the two together would make one of them wrong.
+///
+/// `editingIndex` is the note already open, if any. It is a **target, not a
+/// refusal**: a note can be open while the keyboard sits in the reply body
+/// (click any unmarked text and `onMarkClicked` leaves it open), and in that
+/// state the field's own Tab handler never fires because the field is not
+/// focused. Refusing there would ship a key that does nothing with a note
+/// visibly on screen.
+enum ReplyNoteEntrance {
+    static func target(count: Int, editingIndex: Int?, backwards: Bool) -> Int? {
+        guard count > 0 else { return nil }
+        if let editingIndex, (0..<count).contains(editingIndex) { return editingIndex }
+        return backwards ? count - 1 : 0
+    }
+}
+
 /// One keyboard step's request to bring a note into view — `#cm-82`.
 ///
 /// `seq` bumps on every step, so stepping back to the same note still

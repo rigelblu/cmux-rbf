@@ -40,6 +40,7 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case switchRightSidebarToSessions
     case switchRightSidebarToFeed
     case switchRightSidebarToDock
+    case insertReplyLabelByNumber
     case triggerFlash
 
     // MARK: Navigation
@@ -230,7 +231,7 @@ extension ShortcutAction {
     /// range. All other actions match a single concrete keystroke.
     public var usesNumberedDigitMatching: Bool {
         switch self {
-        case .selectSurfaceByNumber, .selectWorkspaceByNumber:
+        case .selectSurfaceByNumber, .selectWorkspaceByNumber, .insertReplyLabelByNumber:
             return true
         default:
             return false

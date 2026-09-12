@@ -64,6 +64,9 @@ extension ShortcutAction {
         case .switchRightSidebarToSessions: return ShortcutStroke(key: "3", control: true)
         case .switchRightSidebarToFeed: return ShortcutStroke(key: "4", control: true)
         case .switchRightSidebarToDock: return ShortcutStroke(key: "5", control: true)
+        // `#cm-83.2` — must match `KeyboardShortcutSettings`'s StoredShortcut
+        // default exactly; the two tables are checked against each other.
+        case .insertReplyLabelByNumber: return ShortcutStroke(key: "1", option: true)
         case .triggerFlash: return ShortcutStroke(key: "h", command: true, shift: true)
         case .nextSidebarTab: return ShortcutStroke(key: "]", command: true, control: true)
         case .prevSidebarTab: return ShortcutStroke(key: "[", command: true, control: true)

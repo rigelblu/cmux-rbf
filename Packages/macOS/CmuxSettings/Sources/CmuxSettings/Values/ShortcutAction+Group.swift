@@ -12,7 +12,7 @@ extension ShortcutAction {
              .focusRightSidebar, .focusRightSidebarInReply,
              .switchRightSidebarToFiles, .switchRightSidebarToFind,
              .switchRightSidebarToSessions, .switchRightSidebarToFeed,
-             .switchRightSidebarToDock, .triggerFlash, .reopenClosedWorkspace:
+             .switchRightSidebarToDock, .insertReplyLabelByNumber, .triggerFlash, .reopenClosedWorkspace:
             return .workspace
         case .nextSurface, .prevSurface, .moveSurfaceLeft, .moveSurfaceRight,
              .moveSurfaceToPreviousPane, .moveSurfaceToNextPane,

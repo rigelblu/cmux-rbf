@@ -222,6 +222,22 @@ struct ReplyPanelView: View {
         // an edge: a text field ignores ← at its start and → at its end, the
         // key bubbles up here, and stepping the reply then closes the note
         // mid-sentence (Tom, dogfood 2026-09-11).
+        // `#cm-83.1`: Tab from the reply body opens a note, so the keyboard
+        // can reach the list without a click. Measured before it was written —
+        // Tab arrives here with the body focused (`fr=MarkdownWebView`), so
+        // this handler is enough and `MarkdownWebView` needs no opt-in hook
+        // the way Escape did (`#cm-76`).
+        //
+        // Never while a note field has the keyboard: there Tab is `cm-69.3`'s
+        // step between notes, and this must not shadow it.
+        .backport.onKeyPress(.tab) { modifiers in
+            enterNoteList(backwards: modifiers.contains(.shift))
+        }
+        // ⇧Tab can arrive as backtab (U+0019) rather than shift + tab, the
+        // same way it does inside the note field.
+        .backport.onKeyPress(KeyEquivalent("\u{19}")) { _ in
+            enterNoteList(backwards: true)
+        }
         .backport.onKeyPress(.leftArrow) { modifiers in
             guard Self.isUnmodifiedStep(modifiers), canStepBack,
                   !ReplyNoteCaret.fieldEditorIsKey else { return .ignored }
@@ -234,6 +250,57 @@ struct ReplyPanelView: View {
             store.stepForward()
             return .handled
         }
+    }
+
+    /// Opens a note from the reply body — `#cm-83.1`.
+    ///
+    /// Returns `.ignored` for every case it does not own, so the key falls
+    /// through to AppKit's normal focus move rather than being swallowed: no
+    /// annotations, or the keyboard already inside a note field.
+    ///
+    /// The caret is placed **explicitly**. `beginEditing` ends in
+    /// `placeCaretInNoteField()` whose default is `.asFocused` — select-all
+    /// (measured `{0, 71}` of 71, see that function's doc) — so an entrance
+    /// that left it alone would hand the user a fully selected note and
+    /// destroy it on the first keystroke.
+    private func enterNoteList(backwards: Bool) -> BackportKeyPressResult {
+        let entries = draft.numbered
+        let openIndex = editingID.flatMap { id in entries.firstIndex(where: { $0.id == id }) }
+        #if DEBUG
+        // Every branch logs, so "nothing happened" says WHICH refusal it was.
+        // A change like this ships with a probe on the branch it adds, or its
+        // failure is indistinguishable from the key never arriving.
+        dlog(
+            "cm-83.1 tab.entrance back=\(backwards ? 1 : 0) fieldKey=\(ReplyNoteCaret.fieldEditorIsKey ? 1 : 0) "
+                + "count=\(entries.count) openIndex=\(openIndex.map(String.init) ?? "nil") "
+                + "fr=\(ReplyNoteCaret.firstResponderName)"
+        )
+        #endif
+        guard !ReplyNoteCaret.fieldEditorIsKey else { return .ignored }
+        guard let target = ReplyNoteEntrance.target(
+            count: entries.count,
+            editingIndex: openIndex,
+            backwards: backwards
+        ) else { return .ignored }
+        let entry = entries[target]
+
+        // Re-entering the note that is already open: the keyboard is in this
+        // window's sidebar already, so no AppKit hop — and the caret goes back
+        // where it was before the click away, when that was recorded.
+        if openIndex == target {
+            let caret = lastNoteCaret
+            placeCaretInNoteField(hop: false, caret: caret.map { .at($0) } ?? .end)
+            revealNote(entry.id)
+            return .handled
+        }
+
+        #if DEBUG
+        dlog("cm-83.1 tab.entrance.open target=\(target) id=\(entry.id.uuidString.prefix(5))")
+        #endif
+        beginEditing(entry)
+        placeCaretInNoteField(hop: false, caret: .end)
+        revealNote(entry.id)
+        return .handled
     }
 
     /// Whether an arrow press is the bare stroke that steps the reply.
@@ -976,6 +1043,19 @@ struct ReplyPanelView: View {
             .backport.onKeyPress(KeyEquivalent("\u{19}")) { _, isRepeat in
                 stepNote(.previous, isRepeat: isRepeat)
             }
+            // `#cm-83.2`: the configured label key inserts the Nth label.
+            // Nine handlers rather than one, because `.backport.onKeyPress`
+            // binds a single `KeyEquivalent` — which is also what tells us the
+            // digit, since the closure is handed modifiers and nothing else.
+            .backport.onKeyPress(KeyEquivalent("1")) { m in insertLabel(1, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("2")) { m in insertLabel(2, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("3")) { m in insertLabel(3, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("4")) { m in insertLabel(4, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("5")) { m in insertLabel(5, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("6")) { m in insertLabel(6, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("7")) { m in insertLabel(7, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("8")) { m in insertLabel(8, m, entry) }
+            .backport.onKeyPress(KeyEquivalent("9")) { m in insertLabel(9, m, entry) }
             .onChange(of: editingText) { text in
                 updateDraft { $0.updateNote(id: entry.id, note: text) }
                 if let caret = ReplyNoteCaret.selection { lastNoteCaret = caret }
@@ -1275,6 +1355,37 @@ struct ReplyPanelView: View {
     private func revealNote(_ id: UUID) {
         revealSeq += 1
         revealRequest = ReplyRevealRequest(id: id, seq: revealSeq)
+    }
+
+    /// Inserts the Nth quick label from the keyboard — `#cm-83.2`.
+    ///
+    /// Matches the **configured** binding rather than a hardcoded chord, so
+    /// the Settings row and `cmux.json` mean something. It cannot use
+    /// `StoredShortcut.matches(event:)` — that takes an `NSEvent` and this
+    /// closure is handed `EventModifiers` and nothing else
+    /// (`Sources/Backport.swift:45-58`) — so it compares the two halves it can
+    /// see: the modifiers, and the digit this handler is bound to.
+    ///
+    /// A **chord** binding cannot be expressed here (`keyEquivalent` is nil
+    /// when `hasChord`), so it falls back to click-only rather than firing on
+    /// the chord's first stroke. Stated, not silent.
+    private func insertLabel(
+        _ n: Int,
+        _ modifiers: EventModifiers,
+        _ entry: NumberedAnnotation
+    ) -> BackportKeyPressResult {
+        let configured = KeyboardShortcutSettings.shortcut(for: .insertReplyLabelByNumber)
+        guard !configured.isUnbound, !configured.hasChord,
+              configured.keyEquivalent != nil,
+              modifiers.subtracting([.capsLock, .numericPad, .function])
+                  == configured.eventModifiers,
+              ReplyNoteCaret.fieldEditorIsKey,
+              n <= quickLabels.count else { return .ignored }
+        #if DEBUG
+        dlog("cm-83.2 label.key n=\(n) label=\(quickLabels[n - 1]) fieldKey=1")
+        #endif
+        applyLabel(quickLabels[n - 1], to: entry)
+        return .handled
     }
 
     /// Puts a quick label's text into the open note — `cm-69.3`.

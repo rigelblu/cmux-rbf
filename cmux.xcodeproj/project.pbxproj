@@ -1298,8 +1298,6 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		F5168A070000000000000001 /* MarkdownFontFamilyCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A070000000000000002 /* MarkdownFontFamilyCache.swift */; };
 		F5168A030000000000000001 /* MarkdownFontSizeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A030000000000000002 /* MarkdownFontSizeSettings.swift */; };
 		D7470002D7470002D7470002 /* MarkdownLinkBoundaryRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7470001D7470001D7470001 /* MarkdownLinkBoundaryRegressionTests.swift */; };
-		D7750002D7750002D7750002 /* MarkdownReplyLineBreakTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */; };
-		D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */; };
 		F5168A050000000000000001 /* MarkdownMaxWidthSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A050000000000000002 /* MarkdownMaxWidthSettings.swift */; };
 		D6069002D6069002D6069002 /* MarkdownMermaidZoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6069001D6069001D6069001 /* MarkdownMermaidZoomTests.swift */; };
 		A5001420 /* MarkdownPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001418 /* MarkdownPanel.swift */; };
@@ -1307,6 +1305,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		D3664002D3664002D3664002 /* MarkdownPanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3664001D3664001D3664001 /* MarkdownPanelTests.swift */; };
 		A5001421 /* MarkdownPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001419 /* MarkdownPanelView.swift */; };
 		A50014F7 /* MarkdownRemoteImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50014F6 /* MarkdownRemoteImageLoader.swift */; };
+		D7750002D7750002D7750002 /* MarkdownReplyLineBreakTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */; };
 		F5168A020000000000000001 /* MarkdownTypographyControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A020000000000000002 /* MarkdownTypographyControl.swift */; };
 		F5168A060000000000000001 /* MarkdownTypographyDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5168A060000000000000002 /* MarkdownTypographyDefaults.swift */; };
 		A5001290 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = A5001291 /* MarkdownUI */; };
@@ -1737,6 +1736,11 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804100000000000000000004 /* ReorderShortcutActionTests.swift */; };
 		A5009001 /* ReplyAnnotationManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5009000 /* ReplyAnnotationManifest.swift */; };
 		69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */; };
+		285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */; };
+		D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */; };
+		7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */; };
+		D8830002D8830002D8830002 /* ReplyNoteEntranceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */; };
+		D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */; };
 		CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY01 /* ReplyPanelStore.swift */; };
 		69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */; };
 		CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY03 /* ReplyPanelView.swift */; };
@@ -1851,6 +1855,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		D10000000000000000A00012 /* SettingsAppBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00013 /* SettingsAppBehaviorUITests.swift */; };
 		D10000000000000000A00018 /* SettingsAutomationBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00019 /* SettingsAutomationBehaviorUITests.swift */; };
 		D10000000000000000A0001A /* SettingsBrowserBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A0001B /* SettingsBrowserBehaviorUITests.swift */; };
+		DC4962C67B1F47C0A3EF5B4F /* SettingsFileKeyRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF5AE1662DC4221A71224F9 /* SettingsFileKeyRemovalTests.swift */; };
 		D9CCF002D9CCF002D9CCF002 /* SettingsLazyLoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CCF001D9CCF001D9CCF001 /* SettingsLazyLoadHelpers.swift */; };
 		D5671401D5671401D5671401 /* SettingsNavigation+TerminalScrollSpeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671402D5671402D5671402 /* SettingsNavigation+TerminalScrollSpeed.swift */; };
 		A50019A0 /* SettingsNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50019A1 /* SettingsNavigation.swift */; };
@@ -2545,9 +2550,6 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		D7AB3605C10DEF0000000001 /* WorkspaceCloseTabsContextMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AB3605C10DEF0000000002 /* WorkspaceCloseTabsContextMenuTests.swift */; };
 		C061D15A0000000000000002 /* WorkspaceColorDisplayNamesConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C061D15A0000000000000001 /* WorkspaceColorDisplayNamesConfigTests.swift */; };
 		B6BF3DC98DB1495E57900212 /* WorkspaceColorLabelsConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */; };
-		7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */; };
-		285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */; };
-		DC4962C67B1F47C0A3EF5B4F /* SettingsFileKeyRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF5AE1662DC4221A71224F9 /* SettingsFileKeyRemovalTests.swift */; };
 		B6BF3DC98DB1495E57900211 /* WorkspaceColorMonotonicMintingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */; };
 		B6BF3DC98DB1495E57900213 /* WorkspaceColorResolverParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */; };
 		A5FB1203 /* WorkspaceConfigActionCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FB1204 /* WorkspaceConfigActionCapture.swift */; };
@@ -3956,8 +3958,6 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		F5168A070000000000000002 /* MarkdownFontFamilyCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownFontFamilyCache.swift; sourceTree = "<group>"; };
 		F5168A030000000000000002 /* MarkdownFontSizeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownFontSizeSettings.swift; sourceTree = "<group>"; };
 		D7470001D7470001D7470001 /* MarkdownLinkBoundaryRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLinkBoundaryRegressionTests.swift; sourceTree = "<group>"; };
-		D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownReplyLineBreakTests.swift; sourceTree = "<group>"; };
-		D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteStepTests.swift; sourceTree = "<group>"; };
 		F5168A050000000000000002 /* MarkdownMaxWidthSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownMaxWidthSettings.swift; sourceTree = "<group>"; };
 		D6069001D6069001D6069001 /* MarkdownMermaidZoomTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMermaidZoomTests.swift; sourceTree = "<group>"; };
 		A5001418 /* MarkdownPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownPanel.swift; sourceTree = "<group>"; };
@@ -3965,6 +3965,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		D3664001D3664001D3664001 /* MarkdownPanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPanelTests.swift; sourceTree = "<group>"; };
 		A5001419 /* MarkdownPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownPanelView.swift; sourceTree = "<group>"; };
 		A50014F6 /* MarkdownRemoteImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownRemoteImageLoader.swift; sourceTree = "<group>"; };
+		D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownReplyLineBreakTests.swift; sourceTree = "<group>"; };
 		F5168A020000000000000002 /* MarkdownTypographyControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownTypographyControl.swift; sourceTree = "<group>"; };
 		F5168A060000000000000002 /* MarkdownTypographyDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownTypographyDefaults.swift; sourceTree = "<group>"; };
 		A50014F1 /* MarkdownViewerAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownViewerAssets.swift; sourceTree = "<group>"; };
@@ -4390,6 +4391,11 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		804100000000000000000004 /* ReorderShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderShortcutActionTests.swift; sourceTree = "<group>"; };
 		A5009000 /* ReplyAnnotationManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyAnnotationManifest.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyAnnotationManifestRenderTests.swift; sourceTree = "<group>"; };
+		D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelsFileParserTests.swift; sourceTree = "<group>"; };
+		D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelShortcutActionTests.swift; sourceTree = "<group>"; };
+		6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMaxMessagesBackConfigTests.swift; sourceTree = "<group>"; };
+		D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteEntranceTests.swift; sourceTree = "<group>"; };
+		D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteStepTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY01 /* ReplyPanelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStore.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStoreTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY03 /* ReplyPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelView.swift; sourceTree = "<group>"; };
@@ -4501,6 +4507,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		D10000000000000000A00013 /* SettingsAppBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAppBehaviorUITests.swift; sourceTree = "<group>"; };
 		D10000000000000000A00019 /* SettingsAutomationBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAutomationBehaviorUITests.swift; sourceTree = "<group>"; };
 		D10000000000000000A0001B /* SettingsBrowserBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBrowserBehaviorUITests.swift; sourceTree = "<group>"; };
+		4CF5AE1662DC4221A71224F9 /* SettingsFileKeyRemovalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsFileKeyRemovalTests.swift; sourceTree = "<group>"; };
 		D9CCF001D9CCF001D9CCF001 /* SettingsLazyLoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsLazyLoadHelpers.swift; sourceTree = "<group>"; };
 		D5671402D5671402D5671402 /* SettingsNavigation+TerminalScrollSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsNavigation+TerminalScrollSpeed.swift"; sourceTree = "<group>"; };
 		A50019A1 /* SettingsNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsNavigation.swift; sourceTree = "<group>"; };
@@ -5188,9 +5195,6 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		D7AB3605C10DEF0000000002 /* WorkspaceCloseTabsContextMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCloseTabsContextMenuTests.swift; sourceTree = "<group>"; };
 		C061D15A0000000000000001 /* WorkspaceColorDisplayNamesConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorDisplayNamesConfigTests.swift; sourceTree = "<group>"; };
 		42092CDB2109E250F7F2A712 /* WorkspaceColorLabelsConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorLabelsConfigTests.swift; sourceTree = "<group>"; };
-		6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMaxMessagesBackConfigTests.swift; sourceTree = "<group>"; };
-		D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelsFileParserTests.swift; sourceTree = "<group>"; };
-		4CF5AE1662DC4221A71224F9 /* SettingsFileKeyRemovalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsFileKeyRemovalTests.swift; sourceTree = "<group>"; };
 		42092CDB2109E250F7F2A711 /* WorkspaceColorMonotonicMintingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorMonotonicMintingTests.swift; sourceTree = "<group>"; };
 		42092CDB2109E250F7F2A713 /* WorkspaceColorResolverParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorResolverParityTests.swift; sourceTree = "<group>"; };
 		A5FB1204 /* WorkspaceConfigActionCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceConfigActionCapture.swift; sourceTree = "<group>"; };
@@ -7805,6 +7809,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D7470001D7470001D7470001 /* MarkdownLinkBoundaryRegressionTests.swift */,
 				D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */,
 				D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */,
+				D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */,
+				D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */,
 				D7470011D7470011D7470011 /* MarkdownYMDShellTests.swift */,
 				F5168A0C0000000000000002 /* MarkdownBackgroundStyleTests.swift */,
 				D8072A01D8072A01D8072A01 /* BrowserViewportRuntimeLoadDelegate.swift */,
@@ -10838,10 +10844,9 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				F5168A0C0000000000000001 /* MarkdownBackgroundStyleTests.swift in Sources */,
 				D9154002D9154002D9154002 /* MarkdownCodespanRenderingTests.swift in Sources */,
 				D7470002D7470002D7470002 /* MarkdownLinkBoundaryRegressionTests.swift in Sources */,
-				D7750002D7750002D7750002 /* MarkdownReplyLineBreakTests.swift in Sources */,
-				D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */,
 				D6069002D6069002D6069002 /* MarkdownMermaidZoomTests.swift in Sources */,
 				D3664002D3664002D3664002 /* MarkdownPanelTests.swift in Sources */,
+				D7750002D7750002D7750002 /* MarkdownReplyLineBreakTests.swift in Sources */,
 				D7470012D7470012D7470012 /* MarkdownYMDShellTests.swift in Sources */,
 					7490A0017490A0017490A001 /* MemoryPressureMonitorTests.swift in Sources */,
 				606500010000000000000001 /* MenuBarOnlyActivationPolicyTests.swift in Sources */,
@@ -10961,6 +10966,11 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */,
 				804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */,
 				69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */,
+				285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */,
+				D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */,
+				7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */,
+				D8830002D8830002D8830002 /* ReplyNoteEntranceTests.swift in Sources */,
+				D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */,
 				69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */,
 				C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */,
 					F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */,
@@ -10994,6 +11004,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				812600000000000000000003 /* SessionRemoteWorkspaceMoshRestoreTests.swift in Sources */,
 				806600000000000000000002 /* SessionRestorableAgentSnapshotPermissionModeTests.swift in Sources */,
 				583A675AA1224E8D82A44883 /* SetAutoTitleSocketTests.swift in Sources */,
+				DC4962C67B1F47C0A3EF5B4F /* SettingsFileKeyRemovalTests.swift in Sources */,
 				A50019B2 /* SettingsSearchIndexTests.swift in Sources */,
 				D80100010000000000000001 /* SettingsWindowChromeTests.swift in Sources */,
 				D37777020000000000000001 /* SettingsWindowNavigationRoutingTests.swift in Sources */,
@@ -11142,9 +11153,6 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D7AB3605C10DEF0000000001 /* WorkspaceCloseTabsContextMenuTests.swift in Sources */,
 				C061D15A0000000000000002 /* WorkspaceColorDisplayNamesConfigTests.swift in Sources */,
 				B6BF3DC98DB1495E57900212 /* WorkspaceColorLabelsConfigTests.swift in Sources */,
-				7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */,
-				285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */,
-				DC4962C67B1F47C0A3EF5B4F /* SettingsFileKeyRemovalTests.swift in Sources */,
 				B6BF3DC98DB1495E57900211 /* WorkspaceColorMonotonicMintingTests.swift in Sources */,
 				B6BF3DC98DB1495E57900213 /* WorkspaceColorResolverParityTests.swift in Sources */,
 				F7000000A1B2C3D4E5F60718 /* WorkspaceContentViewVisibilityTests.swift in Sources */,

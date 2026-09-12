@@ -216413,6 +216413,29 @@
         }
       }
     },
+    "shortcut.insertReplyLabelByNumber.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insert Reply Label 1\u20269"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\u8fd4\u4fe1\u30e9\u30d9\u30eb 1\u20269 \u3092\u633f\u5165"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\ub2f5\uc7a5 \ub77c\ubca8 1\u20269 \uc0bd\uc785"
+          }
+        }
+      }
+    },
     "shortcut.jumpToUnread.label": {
       "extractionState": "manual",
       "localizations": {

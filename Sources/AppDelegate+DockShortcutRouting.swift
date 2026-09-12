@@ -84,6 +84,10 @@ extension KeyboardShortcutSettings.Action {
              .switchRightSidebarToSessions,
              .switchRightSidebarToFeed,
              .switchRightSidebarToDock,
+             // `#cm-83.2` — a Reply-panel action, deliberately NOT dock-scoped:
+             // it is live only while the caret sits in a note field, which the
+             // Dock's surfaces never contain.
+             .insertReplyLabelByNumber,
              .nextSidebarTab, .prevSidebarTab,
              .moveWorkspaceUp, .moveWorkspaceDown,
              .selectWorkspaceByNumber,

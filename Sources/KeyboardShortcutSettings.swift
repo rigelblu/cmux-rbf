@@ -96,6 +96,7 @@ enum KeyboardShortcutSettings {
         case switchRightSidebarToSessions
         case switchRightSidebarToFeed
         case switchRightSidebarToDock
+        case insertReplyLabelByNumber
         case triggerFlash
 
         // Navigation
@@ -249,6 +250,7 @@ enum KeyboardShortcutSettings {
             case .switchRightSidebarToSessions: return String(localized: "shortcut.switchRightSidebarToSessions.label", defaultValue: "Show Sidebar Vault")
             case .switchRightSidebarToFeed: return String(localized: "shortcut.switchRightSidebarToFeed.label", defaultValue: "Show Sidebar Feed")
             case .switchRightSidebarToDock: return String(localized: "shortcut.switchRightSidebarToDock.label", defaultValue: "Show Sidebar Dock")
+            case .insertReplyLabelByNumber: return String(localized: "shortcut.insertReplyLabelByNumber.label", defaultValue: "Insert Reply Label 1…9")
             case .triggerFlash: return String(localized: "shortcut.flashFocusedPanel.label", defaultValue: "Flash Focused Panel")
             case .nextSurface: return String(localized: "shortcut.nextSurface.label", defaultValue: "Next Surface")
             case .prevSurface: return String(localized: "shortcut.previousSurface.label", defaultValue: "Previous Surface")
@@ -454,6 +456,12 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "4", command: false, shift: false, option: false, control: true)
             case .switchRightSidebarToDock:
                 return StoredShortcut(key: "5", command: false, shift: false, option: false, control: true)
+            // `#cm-83.2`. Bare Option, measured free across both default tables:
+            // the twelve digit-keyed defaults are ⌃1–⌃5, ⌃1, ⌘1 and six zoom
+            // resets on `0`, and none carries Option. Live only while the caret
+            // is in a note field, so it shadows ⌥-typed characters there alone.
+            case .insertReplyLabelByNumber:
+                return StoredShortcut(key: "1", command: false, shift: false, option: true, control: false)
             case .triggerFlash:
                 return StoredShortcut(key: "h", command: true, shift: true, option: false, control: false)
             case .nextSidebarTab:
@@ -807,7 +815,7 @@ enum KeyboardShortcutSettings {
                 )
             case .globalSearch:
                 return .accepted(shortcut)
-            case .selectSurfaceByNumber, .selectWorkspaceByNumber:
+            case .selectSurfaceByNumber, .selectWorkspaceByNumber, .insertReplyLabelByNumber:
                 return resolvedNumberedDigitShortcut(shortcut)
             default:
                 return .accepted(shortcut)
