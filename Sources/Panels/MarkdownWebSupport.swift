@@ -669,5 +669,11 @@ struct MarkdownPageReveal: Equatable {
     let seq: Int
 }
 
+/// `#cm-89` — text to find and select in the page, once per `seq`.
+struct MarkdownPageFind: Equatable {
+    let text: String
+    let seq: Int
+}
+
 extension NSColor {
     }

@@ -36,6 +36,13 @@ final class FileExplorerState: ObservableObject {
     /// persisted).
     @Published var rightSidebarOwnsInputFocus: Bool = false
 
+    /// `#cm-89` — a reply started from this window's terminal, waiting for the
+    /// Reply view to take it. Window-scoped because the gesture and the
+    /// sidebar that answers it belong to one window. Cleared by the view once
+    /// consumed, so a view rebuilt later never re-reads an old request.
+    /// Runtime-only (not persisted).
+    @Published var terminalReplyRequest: TerminalReplyRequest?
+
     /// Active mode for the right sidebar (file tree, search, sessions, or enabled beta modes).
     var mode: RightSidebarMode {
         get { storedMode }

@@ -408,7 +408,12 @@ struct RightSidebarPanelView: View {
             case .reply:
                 ReplyPanelView(
                     workspace: workspaceId.flatMap { tabManager.workspacesById[$0] },
-                    windowAppearance: windowAppearance
+                    windowAppearance: windowAppearance,
+                    terminalReplyRequest: fileExplorerState.terminalReplyRequest,
+                    onTerminalReplyConsumed: { seq in
+                        guard fileExplorerState.terminalReplyRequest?.seq == seq else { return }
+                        fileExplorerState.terminalReplyRequest = nil
+                    }
                 )
             case .customSidebar:
                 EmptyView()

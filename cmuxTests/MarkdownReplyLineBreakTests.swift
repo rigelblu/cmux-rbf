@@ -19,7 +19,7 @@ import WebKit
 /// `MarkdownWebRenderer.lineBreakScript` is what makes the assertions cover
 /// the source that actually ships — a hand-copied literal would keep passing
 /// after the real script drifted. It is also the whole reason that script is
-/// `internal` where its neighbour `selectionObserverScript` is `private`.
+/// `internal` — and, since `#cm-89`, why `selectionObserverScript` is too.
 ///
 /// ``theOptInIsOffForCallSitesThatDoNotAskForIt()`` is the one exception to
 /// that sentence: it installs nothing and touches no WebKit. It guards the

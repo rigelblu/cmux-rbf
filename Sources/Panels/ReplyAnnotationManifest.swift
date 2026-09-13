@@ -813,3 +813,123 @@ extension View {
         modifier(ReplyHoverHighlight(cornerRadius: cornerRadius))
     }
 }
+
+// MARK: - Starting a reply from the terminal (`#cm-89`)
+
+/// What the terminal knows when a mouse button comes up, for `#cm-89`'s
+/// `⌘⇧`-drag. Gathered by the release hook, judged by ``TerminalReplyStart``.
+struct TerminalReplyStartInput: Equatable {
+    /// Device-independent flags as the event reported them. The decision
+    /// ignores Caps Lock, the numeric pad and the function key itself.
+    let modifiers: NSEvent.ModifierFlags
+    /// The pane has a **live** agent session — deliberately narrower than the
+    /// Reply panel's own live-or-most-recent rule, because sending into a pane
+    /// whose agent has exited types into whatever owns it now.
+    let isAgentPane: Bool
+    /// Ghostty's selection text, `nil` when there is no selection.
+    let selectionText: String?
+    /// The pointer moved between press and release. `⇧`-click *extends* a
+    /// selection already on screen (`ghostty/src/Surface.zig:5578-5606`), and
+    /// the gesture leaves its selection visible, so without this a later
+    /// `⌘⇧`-click would read that selection and fire again.
+    let didDrag: Bool
+    /// The sidebar is visible **and** showing Reply. Hidden, or showing Files,
+    /// counts as closed.
+    let sidebarShowingReply: Bool
+    let sourcePanelID: UUID
+}
+
+/// A request the Reply view consumes once. `seq` makes a second request for
+/// the same text still arrive.
+struct TerminalReplyRequest: Equatable {
+    let seq: Int
+    /// The selection, trimmed of surrounding whitespace.
+    let text: String
+    /// The trimmed text contains a line break. Claude Code writes a real
+    /// newline where its text wraps (measured 2026-09-13), so this is the
+    /// visible "more than one row" there. Multi-row still opens the panel —
+    /// with a line saying why nothing was highlighted — so it rides in the
+    /// request rather than refusing here.
+    let isMultiRow: Bool
+    let sourcePanelID: UUID
+}
+
+enum TerminalReplyStartDecision: Equatable {
+    enum Reason: Equatable {
+        case wrongModifiers
+        case noDrag
+        case notAgentPane
+        case noSelection
+        case blankSelection
+        case panelShowing
+    }
+
+    case ignore(Reason)
+    case open(TerminalReplyRequest)
+}
+
+/// Whether a mouse release in a terminal starts a reply.
+///
+/// Ordered cheapest and most common first, because the release hook runs this
+/// only after its own flags check: an exact-modifier test, then whether the
+/// pointer moved, then the pane, then the selection, then the panel. Every
+/// other release in every pane leaves as `.wrongModifiers`.
+enum TerminalReplyStart {
+    static func decide(_ input: TerminalReplyStartInput, seq: Int) -> TerminalReplyStartDecision {
+        let relevant = input.modifiers
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        guard relevant == [.command, .shift] else { return .ignore(.wrongModifiers) }
+        guard input.didDrag else { return .ignore(.noDrag) }
+        guard input.isAgentPane else { return .ignore(.notAgentPane) }
+        guard let raw = input.selectionText else { return .ignore(.noSelection) }
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return .ignore(.blankSelection) }
+        guard !input.sidebarShowingReply else { return .ignore(.panelShowing) }
+        return .open(TerminalReplyRequest(
+            seq: seq,
+            text: text,
+            isMultiRow: text.contains(where: \.isNewline),
+            sourcePanelID: input.sourcePanelID
+        ))
+    }
+}
+
+/// Why a terminal request opened the panel but highlighted nothing. Each one
+/// stands in for the header title until the user acts.
+enum TerminalReplyNotice: Equatable {
+    case notFound
+    case multiRow
+    case writing
+}
+
+enum TerminalReplyConsumeDecision: Equatable {
+    /// Open, add nothing, say nothing: the reader is on an older reply, or the
+    /// newest already carries highlights. Both are a reply in progress.
+    case silent
+    case notice(TerminalReplyNotice)
+    case find(String)
+}
+
+/// What the Reply view does with a request, once the panel is showing.
+///
+/// **Nothing here moves the reader.** A panel held on an older reply stays
+/// there (`#cm-69`: moving the reader off a reply they are working on is what
+/// the panel refuses to do), so that check runs first — before highlights,
+/// and before the two notices, which would otherwise describe a message the
+/// reader is not looking at.
+enum TerminalReplyConsume {
+    static func decide(
+        viewingOlderReply: Bool,
+        newestHasHighlights: Bool,
+        newestTurnWriting: Bool,
+        isMultiRow: Bool,
+        text: String
+    ) -> TerminalReplyConsumeDecision {
+        if viewingOlderReply { return .silent }
+        if newestHasHighlights { return .silent }
+        if newestTurnWriting { return .notice(.writing) }
+        if isMultiRow { return .notice(.multiRow) }
+        return .find(text)
+    }
+}

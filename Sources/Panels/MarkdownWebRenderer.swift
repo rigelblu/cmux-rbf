@@ -115,6 +115,16 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// footer row would be unusable. Only a keyboard step sets this.
     var revealRequest: MarkdownPageReveal?
 
+    /// A request to find text in the page and select it, sent once per `seq`.
+    ///
+    /// `#cm-89`. Held until the page has loaded and rendered, because a panel
+    /// opened by the terminal gesture may not have a page yet.
+    var findRequest: MarkdownPageFind?
+
+    /// Reports a find's outcome with its `seq`: `true` only if the page
+    /// selected the text **and** `publish` posted it.
+    var onFindResult: ((Int, Bool) -> Void)?
+
     /// Hands the page's web view to the caller when it attaches to a window,
     /// and `nil` when it leaves — so a sidebar mode can register it as the
     /// responder that owns the keyboard while the panel is focused.
@@ -192,6 +202,8 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             context.coordinator.setMarks(marks)
             context.coordinator.setActiveMark(activeMarkID)
             context.coordinator.reveal(revealRequest)
+            context.coordinator.setFindResultObserver(onFindResult)
+            context.coordinator.find(findRequest)
             return webView
         }
 
@@ -217,6 +229,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         }
         let webView = MarkdownWebView(frame: .zero, configuration: config)
         context.coordinator.setSelectionObserver(onSelectionChanged)
+        context.coordinator.setFindResultObserver(onFindResult)
         webView.onPointerDown = onRequestPanelFocus
         installWindowCallbacks(on: webView, coordinator: context.coordinator)
         webView.setValue(false, forKey: "drawsBackground")
@@ -263,6 +276,10 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         context.coordinator.setMarks(marks)
         context.coordinator.setActiveMark(activeMarkID)
         context.coordinator.reveal(revealRequest)
+        context.coordinator.setFindResultObserver(onFindResult)
+        // After the markdown, for the same reason as the marks: the find
+        // searches what the page is showing.
+        context.coordinator.find(findRequest)
     }
 
     /// Watches the page's selection, paints the marks, and reports hover —
@@ -306,7 +323,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// cannot be forged: the shell strips every `data-cmux-*` attribute from
     /// markdown-sourced HTML (`shell.html:973`), and this script runs after
     /// that, so only cmux can put a number on the page.
-    private static let selectionObserverScript = WKUserScript(
+    static let selectionObserverScript = WKUserScript(
         source: """
         (() => {
           const handler = window.webkit?.messageHandlers?.cmuxLib;
@@ -563,12 +580,15 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             return emit(holder).replace(/[ \\t]+\\n/g, "\\n").replace(/\\n{3,}/g, "\\n\\n").trim();
           };
 
+          // Returns whether it posted a selection. Only `#cm-89`'s find reads
+          // the answer: it can match text that `publish` then declines, and
+          // that case must still read as "not found" to the user.
           const publish = () => {
             const container = root();
             const selection = window.getSelection();
             if (!container || !selection || selection.isCollapsed || !selection.rangeCount) {
               if (last !== null) { last = null; handler.postMessage({ action: "replySelectionChanged" }); }
-              return;
+              return false;
             }
             const range = selection.getRangeAt(0);
             const text = selection.toString();
@@ -577,7 +597,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             // and offering that as a quotable span reads as a bug.
             if (!text.trim()) {
               if (last !== null) { last = null; handler.postMessage({ action: "replySelectionChanged" }); }
-              return;
+              return false;
             }
             let start = null;
             let end = null;
@@ -589,15 +609,63 @@ struct MarkdownWebRenderer: NSViewRepresentable {
               if (start === null) start = entry.start + from;
               end = entry.start + to;
             }
-            if (start === null || end === null || start >= end) return;
+            if (start === null || end === null || start >= end) return false;
             // `text` still decides *whether* there is a selection — cheap,
             // and whitespace-only is the same answer either way. What gets
             // quoted is the markdown.
             const quote = markdownOf(range) || text;
             const key = start + ":" + end + ":" + quote;
-            if (key === last) return;
+            if (key === last) return false;
             last = key;
             handler.postMessage({ action: "replySelectionChanged", quote, start, end });
+            return true;
+          };
+
+          // `#cm-89`: find a phrase the user selected in the agent's terminal
+          // pane, and select it here, so the ordinary `publish` path makes the
+          // highlight — same offsets, same markdown quote, same overlap rule
+          // as a hand drag. Nothing here constructs a mark.
+          //
+          // The terminal and this page lay out the same words differently
+          // (wraps, indents, a newline where Claude Code wrapped), so every
+          // whitespace run collapses to one space on both sides. `map[i]` is
+          // where haystack character `i` came from, which is what turns a
+          // match back into a DOM range. First match only; case exact.
+          window.__cmuxReplyFind = (needle) => {
+            const wanted = String(needle || "").replace(/\\s+/g, " ").trim();
+            if (!wanted) return "notFound";
+            const entries = textNodes();
+            let hay = "";
+            const map = [];
+            entries.forEach((entry, index) => {
+              const value = entry.node.nodeValue;
+              for (let offset = 0; offset < value.length; offset++) {
+                const ch = value[offset];
+                if (/\\s/.test(ch)) {
+                  if (!hay.length || hay[hay.length - 1] === " ") continue;
+                  hay += " ";
+                } else {
+                  hay += ch;
+                }
+                map.push({ index, offset });
+              }
+            });
+            const at = hay.indexOf(wanted);
+            if (at < 0) return "notFound";
+            const from = map[at];
+            const to = map[at + wanted.length - 1];
+            const range = document.createRange();
+            range.setStart(entries[from.index].node, from.offset);
+            range.setEnd(entries[to.index].node, to.offset + 1);
+            const selection = window.getSelection();
+            if (!selection) return "notFound";
+            selection.removeAllRanges();
+            selection.addRange(range);
+            const holder = range.startContainer.parentElement;
+            if (holder) holder.scrollIntoView({ block: "nearest", inline: "nearest" });
+            // A request is a new intent even for a span published before.
+            last = null;
+            return publish() ? "published" : "notFound";
           };
           // **A mark is committed when the selection settles, never while it
           // is moving.** `selectionchange` fires on every frame of a drag,
@@ -675,8 +743,9 @@ struct MarkdownWebRenderer: NSViewRepresentable {
     /// markdown viewer in the app and re-opens `#cm-15`'s two human checks
     /// whenever it is touched.
     ///
-    /// **`internal`, deliberately — `selectionObserverScript` above is
-    /// `private` and this one must not be.** `MarkdownReplyLineBreakTests`
+    /// **`internal`, deliberately.** `selectionObserverScript` above is
+    /// `internal` too since `#cm-89`, for `ReplyTerminalFindTests`, and for
+    /// the same reason. `MarkdownReplyLineBreakTests`
     /// installs *this constant* into its own `WKWebViewConfiguration`; made
     /// `private`, it could not name it and would have to hand-copy the JS,
     /// at which point the test proves a duplicate works rather than the
@@ -932,6 +1001,40 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         }
 
         private var lastRevealSeq: Int?
+
+        /// Runs a find once per request, and not before the page exists.
+        ///
+        /// `seq`-gated like ``reveal(_:)``. A request that arrives before the
+        /// shell has loaded waits in `pendingFind` and runs from
+        /// `webView(_:didFinish:)`, after the markdown push, so it searches
+        /// the reply rather than an empty page. Evaluations on one web view
+        /// run in order, so a find issued after a push sees that push.
+        func find(_ request: MarkdownPageFind?) {
+            guard let request, request.seq != lastFindSeq else { return }
+            lastFindSeq = request.seq
+            pendingFind = request
+            runPendingFindIfLoaded()
+        }
+
+        func setFindResultObserver(_ observer: ((Int, Bool) -> Void)?) {
+            onFindResult = observer
+        }
+
+        private var lastFindSeq: Int?
+        private var pendingFind: MarkdownPageFind?
+        private var onFindResult: ((Int, Bool) -> Void)?
+
+        private func runPendingFindIfLoaded() {
+            guard isLoaded, let webView, let request = pendingFind else { return }
+            pendingFind = nil
+            let data = (try? JSONSerialization.data(withJSONObject: [request.text])) ?? Data("[\"\"]".utf8)
+            let literal = String(data: data, encoding: .utf8) ?? "[\"\"]"
+            webView.evaluateJavaScript(
+                "window.__cmuxReplyFind ? window.__cmuxReplyFind(\(literal)[0]) : \"notFound\";"
+            ) { [weak self] result, _ in
+                self?.onFindResult?(request.seq, (result as? String) == "published")
+            }
+        }
 
         /// Colours one mark as hovered, or clears every one.
         ///
@@ -1470,6 +1573,7 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             let md = lastMarkdown ?? pendingMarkdown
             lastMarkdown = md
             pushMarkdown(md)
+            runPendingFindIfLoaded()
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

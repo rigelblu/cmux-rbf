@@ -1741,6 +1741,8 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */; };
 		7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */; };
 		D8830002D8830002D8830002 /* ReplyNoteEntranceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */; };
+		D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */; };
+		D8890004D8890004D8890004 /* ReplyTerminalFindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */; };
 		D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */; };
 		CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY01 /* ReplyPanelStore.swift */; };
 		69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */; };
@@ -4397,6 +4399,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelShortcutActionTests.swift; sourceTree = "<group>"; };
 		6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMaxMessagesBackConfigTests.swift; sourceTree = "<group>"; };
 		D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteEntranceTests.swift; sourceTree = "<group>"; };
+		D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReplyStartTests.swift; sourceTree = "<group>"; };
+		D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyTerminalFindTests.swift; sourceTree = "<group>"; };
 		D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteStepTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY01 /* ReplyPanelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStore.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStoreTests.swift; sourceTree = "<group>"; };
@@ -7812,6 +7816,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D7750001D7750001D7750001 /* MarkdownReplyLineBreakTests.swift */,
 				D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */,
 				D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */,
+				D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */,
+				D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */,
 				D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */,
 				D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */,
 				D7470011D7470011D7470011 /* MarkdownYMDShellTests.swift */,
@@ -10974,6 +10980,8 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */,
 				7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */,
 				D8830002D8830002D8830002 /* ReplyNoteEntranceTests.swift in Sources */,
+				D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */,
+				D8890004D8890004D8890004 /* ReplyTerminalFindTests.swift in Sources */,
 				D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */,
 				69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */,
 				C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */,

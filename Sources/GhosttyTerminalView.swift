@@ -4004,6 +4004,11 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     private var lastDrawableSize: CGSize = .zero
     private var isFindEscapeSuppressionArmed = false
     private var hasPendingLeftMouseRelease = false
+    /// `#cm-89` — the pointer moved while the left button was down. A `⇧`-click
+    /// extends a selection already on screen, so only a real drag may start a
+    /// reply.
+    private var pendingLeftMouseDidDrag = false
+    private static var terminalReplySeq = 0
 #if DEBUG
     private var lastSizeSkipSignature: String?
 #endif
@@ -6744,6 +6749,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             ghostty_surface_mouse_pos(surface, eventPoint.x, bounds.height - eventPoint.y, mouseModsFromEvent(event))
         }
         _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, mouseModsFromEvent(event))
+        pendingLeftMouseDidDrag = false
         hasPendingLeftMouseRelease = true
     }
 
@@ -6757,6 +6763,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     @discardableResult
     func forwardPendingLeftMouseDrag(with event: NSEvent) -> Bool {
         guard hasPendingLeftMouseRelease, let surface else { return false }
+        pendingLeftMouseDidDrag = true
         let eventPoint = convert(event.locationInWindow, from: nil)
         trackMousePointIfUsable(eventPoint)
         ghostty_surface_mouse_pos(surface, eventPoint.x, bounds.height - eventPoint.y, mouseModsFromEvent(event))
@@ -6771,7 +6778,74 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         let point = convert(event.locationInWindow, from: nil)
         let consumed = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, mouseModsFromEvent(event))
         _ = handleCommandClickRelease(at: point, modifierFlags: event.modifierFlags, ghosttyConsumed: consumed)
+        startReplyFromTerminalIfRequested(with: event, didDrag: pendingLeftMouseDidDrag, surface: surface)
         return true
+    }
+
+    /// `#cm-89` — a `⌘⇧`-drag over an agent's words opens Reply on that phrase.
+    ///
+    /// Runs after Ghostty has finalized the selection on release. The flags
+    /// check is the first statement, so every other release in every pane
+    /// costs one comparison. The decision itself is ``TerminalReplyStart``;
+    /// this only gathers its facts and acts on `.open`.
+    private func startReplyFromTerminalIfRequested(with event: NSEvent, didDrag: Bool, surface: ghostty_surface_t) {
+        guard event.modifierFlags.contains([.command, .shift]) else { return }
+        guard let terminalSurface, let window,
+              let context = AppDelegate.shared?.preferredRegisteredMainWindowContext(preferredWindow: window),
+              context.window === window,
+              let sidebar = context.fileExplorerState else { return }
+        let panelID = terminalSurface.id
+        let input = TerminalReplyStartInput(
+            modifiers: event.modifierFlags,
+            // Live only — deliberately narrower than the panel's own rule.
+            isAgentPane: TerminalController.shared.agentChatTranscriptService?
+                .registry.liveSession(surfaceID: panelID.uuidString) != nil,
+            selectionText: readSelectionSnapshot(surface: surface)?.string,
+            didDrag: didDrag,
+            sidebarShowingReply: sidebar.isVisible && sidebar.mode == .reply,
+            sourcePanelID: panelID
+        )
+        Self.terminalReplySeq += 1
+        let decision = TerminalReplyStart.decide(input, seq: Self.terminalReplySeq)
+        #if DEBUG
+        switch decision {
+        case .ignore(let reason):
+            cmuxDebugLog("reply.terminalStart ignore reason=\(reason) surface=\(panelID.uuidString.prefix(5))")
+        case .open(let request):
+            cmuxDebugLog("reply.terminalStart open seq=\(request.seq) multiRow=\(request.isMultiRow ? 1 : 0) chars=\(request.text.count) surface=\(panelID.uuidString.prefix(5))")
+        }
+        #endif
+        guard case .open(let request) = decision else { return }
+        sidebar.terminalReplyRequest = request
+        // A request the panel cannot take soon is dropped, never kept: left in
+        // place it fires whenever Reply next appears — minutes later, on a
+        // highlight nobody asked for (cold code review 2026-09-13, Required
+        // 1). A cold open took 430 ms in dogfood; 5 s leaves room for a long
+        // transcript to load.
+        let expiringSeq = request.seq
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak sidebar] in
+            guard let sidebar, sidebar.terminalReplyRequest?.seq == expiringSeq else { return }
+            #if DEBUG
+            cmuxDebugLog("reply.terminalStart expired seq=\(expiringSeq)")
+            #endif
+            sidebar.terminalReplyRequest = nil
+        }
+        _ = AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
+            mode: .reply,
+            focusFirstItem: false,
+            preferredWindow: window
+        )
+        // The call returns `true` while focus is merely *requested*
+        // (`MainWindowFocusController.focusRightSidebar`), so test where the
+        // keyboard actually is. On a cold open neither the page nor the
+        // sidebar host may be able to take it yet; keys typed before the note
+        // field has the caret must go nowhere, never to the agent.
+        if window.firstResponder === self {
+            window.makeFirstResponder(nil)
+        }
+        #if DEBUG
+        cmuxDebugLog("reply.terminalStart focus fr=\(window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")")
+        #endif
     }
 
     /// Attempt to open the word under the mouse cursor as a file path, resolved
@@ -7818,6 +7892,11 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
 
     override func mouseDragged(with event: NSEvent) {
         guard let surface = surface else { return }
+        // `#cm-89`: the ordinary drag path. `forwardPendingLeftMouseDrag` sets
+        // this too, but only the find overlay calls it — marking the flag
+        // there alone made every real `⌘⇧`-drag read as a click (dogfood
+        // 2026-09-13, `reason=noDrag`).
+        if hasPendingLeftMouseRelease { pendingLeftMouseDidDrag = true }
         let eventPoint = convert(event.locationInWindow, from: nil)
         trackMousePointIfUsable(eventPoint)
         // Forward the raw drag coordinates, including out-of-bounds positions.

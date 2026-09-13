@@ -14,6 +14,10 @@ import SwiftUI
 struct ReplyPanelView: View {
     let workspace: Workspace?
     let windowAppearance: WindowAppearanceSnapshot
+    /// `#cm-89` — a reply started by `⌘⇧`-dragging in this window's terminal.
+    var terminalReplyRequest: TerminalReplyRequest? = nil
+    /// Called with the request's `seq` once it is taken, so its owner clears it.
+    var onTerminalReplyConsumed: (Int) -> Void = { _ in }
 
     @State private var store = ReplyPanelStore()
     @State private var rendererSession = MarkdownRendererSession()
@@ -106,6 +110,19 @@ struct ReplyPanelView: View {
     @State private var revealRequest: ReplyRevealRequest?
     @State private var revealSeq = 0
 
+    /// `#cm-89` — why a terminal request highlighted nothing. While set it
+    /// stands in for the header title: the paste notice's slot beside the
+    /// name truncates and times out, and a reason has to stay readable until
+    /// the user acts.
+    @State private var terminalNotice: TerminalReplyNotice?
+    /// `#cm-89` — the page search for a terminal request, once per `seq`.
+    @State private var terminalFind: MarkdownPageFind?
+    @State private var terminalFindSeq = 0
+    /// The last request taken. Clearing the request is a round trip through
+    /// `FileExplorerState`, and two triggers can fire inside it — dogfood
+    /// 2026-09-13 logged `consume seq=1` twice, 22 ms apart, two finds.
+    @State private var consumedTerminalReplySeq: Int?
+
     /// The mark the pointer is over, from either half.
     ///
     /// Hovering the phrase or its footer row colours **both**, which is what
@@ -192,8 +209,40 @@ struct ReplyPanelView: View {
             previewText = nil
             previewIsEdited = false
         }
+        // `#cm-89`: a step is acting in the panel, so the notice gives the
+        // title back. `viewedGroupID`, not `viewedGroup?.id` — the latter also
+        // moves when the newest reply grows while following it, which wiped
+        // the not-found line ~100 ms after it appeared (Tom, dogfood
+        // 2026-09-13). `viewedGroupID` stays `nil` while following.
+        .onChange(of: store.model.viewedGroupID) { _ in
+            clearTerminalNotice(reason: "step")
+        }
         .task(id: bindingKey) {
             await store.refresh(workspace: workspace)
+        }
+        // `#cm-89`. Five triggers — appear, request, bind, session, newest — because
+        // the request can arrive before the panel can answer it: the view may
+        // be mounting cold, the store still binding, or the transcript still
+        // loading.
+        .onAppear { consumeTerminalReplyIfReady(trigger: "appear") }
+        // The new value is passed in, never re-read: dogfood 2026-09-13
+        // logged this path consuming seq 1 while the sidebar already held
+        // seq 4, and seq 4 was never taken.
+        .onChange(of: terminalReplyRequest) { request in
+            consumeTerminalReplyIfReady(request, trigger: "request")
+        }
+        .onChange(of: store.model.newestGroup?.id) { _ in consumeTerminalReplyIfReady(trigger: "newest") }
+        .onChange(of: store.model.sessionID) { _ in consumeTerminalReplyIfReady(trigger: "session") }
+        .onChange(of: store.boundPanelID) { _ in
+            // Following another agent: whatever the notice said was about the
+            // old one, and a find still running would answer for it too.
+            clearTerminalNotice(reason: "bind")
+            terminalFind = nil
+            consumeTerminalReplyIfReady(trigger: "bind")
+        }
+        .onChange(of: store.model.isNewestTurnWriting) { writing in
+            // `Still writing` would be false within seconds of the turn ending.
+            if !writing, terminalNotice == .writing { clearTerminalNotice(reason: "turnEnded") }
         }
         .onAppear { refreshQuickLabels() }
         // `UserDefaults` posts this on whichever thread wrote, and for every
@@ -385,10 +434,43 @@ struct ReplyPanelView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Text(store.identity ?? String(localized: "rightSidebar.mode.reply", defaultValue: "Reply"))
-                .font(.system(size: 11, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.tail)
+            if let terminalNotice {
+                // In the title's place, so it reads as an explanation rather
+                // than a name. Severity is Tom's (dogfood 2026-09-13): a miss
+                // is red with an error icon, a selection over two lines is an
+                // orange warning, and `Still writing` stays grey — it clears
+                // by itself within seconds, and an alarm for that would make
+                // the real misses read as routine. The icon carries the
+                // meaning too, so it never rests on colour alone. The
+                // multi-row and writing lines fit the title's ~148pt with the
+                // icon (measured at 11pt); the not-found line is Tom's wording
+                // and truncates at the usual sidebar width, by his choice.
+                HStack(spacing: 4) {
+                    if let symbol = terminalNoticeSymbol(terminalNotice) {
+                        Image(systemName: symbol)
+                            .font(.system(size: 11))
+                            .accessibilityHidden(true)
+                    }
+                    Text(terminalNoticeText(terminalNotice))
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .foregroundStyle(terminalNoticeStyle(terminalNotice))
+                // The not-found line is longer than the title's room at the
+                // sidebar's usual width and truncates (Tom's copy, 2026-09-13),
+                // so hovering shows it whole. Set on every notice rather than
+                // measured: a tooltip repeating a line that already fits costs
+                // nothing, and measuring truncation adds a layout pass here.
+                // **Does not show yet** — no SwiftUI tooltip shows anywhere in
+                // this header, the nav buttons' included; that is `#cm-92`.
+                .help(terminalNoticeText(terminalNotice))
+            } else {
+                Text(store.identity ?? String(localized: "rightSidebar.mode.reply", defaultValue: "Reply"))
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
 
             if let stateWord {
                 Text(stateWord)
@@ -403,7 +485,11 @@ struct ReplyPanelView: View {
             Spacer(minLength: 8)
 
             if case let .showing(reading) = store.model.state {
-                capCaption(reading)
+                // Hidden while a terminal notice holds the title: shown, it
+                // leaves the title 66.3pt and the notice truncates.
+                if terminalNotice == nil {
+                    capCaption(reading)
+                }
                 navigation(reading)
             }
         }
@@ -813,6 +899,19 @@ struct ReplyPanelView: View {
             activeMarkID: ReplyMarkFocus.id(hovered: hoveredID, editing: editingID),
             // Keyboard steps only — hover never scrolls the page (`#cm-82`).
             revealRequest: revealRequest.map { MarkdownPageReveal(id: $0.id.uuidString, seq: $0.seq) },
+            // `#cm-89`: a match publishes through `onSelectionChanged` above,
+            // exactly like a hand drag; only a miss needs an answer here.
+            findRequest: terminalFind,
+            onFindResult: { seq, published in
+                #if DEBUG
+                dlog("reply.terminalStart find seq=\(seq) published=\(published ? 1 : 0)")
+                #endif
+                guard seq == terminalFind?.seq, !published else { return }
+                terminalNotice = .notFound
+                #if DEBUG
+                dlog("reply.terminalStart notice set notFound seq=\(seq)")
+                #endif
+            },
             // Registers the page as the responder that owns the keyboard while
             // the panel is mounted, so cmux's terminal key-routing repair
             // leaves it alone. Registered against the web view's own window,
@@ -1550,6 +1649,99 @@ struct ReplyPanelView: View {
         editingOriginal = ""
     }
 
+    /// `#cm-89` — takes a terminal request once the panel can answer it.
+    ///
+    /// Waits until the store follows the pane the drag came from **and** a
+    /// reply has loaded: the store binds before its transcript arrives, and
+    /// judging an empty model would call every cold open "not found". A
+    /// request that never meets both is left alone rather than guessed at.
+    ///
+    /// Nothing here moves the reader — ``TerminalReplyConsume`` checks an
+    /// older reply first, and the find only ever runs on the newest.
+    private func consumeTerminalReplyIfReady(_ incoming: TerminalReplyRequest?? = nil, trigger: String) {
+        let request = incoming ?? terminalReplyRequest
+        guard let request, request.seq != consumedTerminalReplySeq else { return }
+        guard store.boundPanelID == request.sourcePanelID else {
+            #if DEBUG
+            dlog("reply.terminalStart wait seq=\(request.seq) trigger=\(trigger) reason=notBound bound=\(store.boundPanelID?.uuidString.prefix(5) ?? "nil") source=\(request.sourcePanelID.uuidString.prefix(5))")
+            #endif
+            return
+        }
+        // The store sets `boundPanelID` before its new tail loads, and keeps
+        // drawing the *previous* agent's model until the replacement is ready
+        // (`ReplyPanelStore.startTail`). Judging that model would answer for
+        // the wrong agent — cold code review 2026-09-13, Required 2.
+        guard store.boundSessionID != nil, store.model.sessionID == store.boundSessionID else {
+            #if DEBUG
+            dlog("reply.terminalStart wait seq=\(request.seq) trigger=\(trigger) reason=staleModel")
+            #endif
+            return
+        }
+        guard let newest = store.model.newestGroup else {
+            #if DEBUG
+            dlog("reply.terminalStart wait seq=\(request.seq) trigger=\(trigger) reason=noReply")
+            #endif
+            return
+        }
+        consumedTerminalReplySeq = request.seq
+        onTerminalReplyConsumed(request.seq)
+        let decision = TerminalReplyConsume.decide(
+            viewingOlderReply: store.model.viewedGroupID != nil,
+            newestHasHighlights: !store.draft(for: newest).annotations.isEmpty,
+            newestTurnWriting: store.model.isNewestTurnWriting,
+            isMultiRow: request.isMultiRow,
+            text: request.text
+        )
+        #if DEBUG
+        dlog("reply.terminalStart consume seq=\(request.seq) trigger=\(trigger) decision=\(decision) writing=\(store.model.isNewestTurnWriting ? 1 : 0) newest=\(newest.id.prefix(8)) groups=\(store.model.groups.count) following=\(store.model.viewedGroupID == nil ? 1 : 0)")
+        #endif
+        switch decision {
+        case .silent:
+            terminalNotice = nil
+        case .notice(let notice):
+            terminalNotice = notice
+        case .find(let text):
+            terminalNotice = nil
+            terminalFindSeq += 1
+            terminalFind = MarkdownPageFind(text: text, seq: terminalFindSeq)
+        }
+    }
+
+    private func clearTerminalNotice(reason: String) {
+        guard terminalNotice != nil else { return }
+        #if DEBUG
+        dlog("reply.terminalStart notice cleared reason=\(reason) was=\(String(describing: terminalNotice!))")
+        #endif
+        terminalNotice = nil
+    }
+
+    private func terminalNoticeSymbol(_ notice: TerminalReplyNotice) -> String? {
+        switch notice {
+        case .notFound: return "exclamationmark.circle.fill"
+        case .multiRow: return "exclamationmark.triangle.fill"
+        case .writing: return nil
+        }
+    }
+
+    private func terminalNoticeStyle(_ notice: TerminalReplyNotice) -> AnyShapeStyle {
+        switch notice {
+        case .notFound: return AnyShapeStyle(Color(nsColor: .systemRed))
+        case .multiRow: return AnyShapeStyle(Color(nsColor: .systemOrange))
+        case .writing: return AnyShapeStyle(.secondary)
+        }
+    }
+
+    private func terminalNoticeText(_ notice: TerminalReplyNotice) -> String {
+        switch notice {
+        case .notFound:
+            return String(localized: "reply.terminalStart.notFound", defaultValue: "Couldn't highlight selection, select below instead")
+        case .multiRow:
+            return String(localized: "reply.terminalStart.multiRow", defaultValue: "Select within one line")
+        case .writing:
+            return String(localized: "reply.terminalStart.writing", defaultValue: "Still writing")
+        }
+    }
+
     /// Takes a new selection as a mark, refusing one that overlaps another.
     private func takeSelection(_ selection: MarkdownPageSelection) {
         let annotation = ReplyAnnotation(quote: selection.quote, note: "", range: selection.range)
@@ -1558,6 +1750,7 @@ struct ReplyPanelView: View {
         // A refused overlap leaves the standing mark alone: an ambiguous
         // quote is fixed by selecting more, never by cmux widening one.
         guard accepted else { return }
+        clearTerminalNotice(reason: "highlight")
         stepArrivalID = nil
         fieldAppearedForID = nil
         lastNoteCaret = nil
