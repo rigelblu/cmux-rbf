@@ -1063,7 +1063,12 @@ struct ReplyPanelView: View {
                 ceiling: footerCeiling,
                 revealRequest: revealRequest,
                 measuredHeight: $noteListHeight,
-                onBeginEditing: { beginEditing($0) },
+                onBeginEditing: { entry in
+                    #if DEBUG
+                    dlog("reply.note.open n=\(entry.number) via=row")
+                    #endif
+                    beginEditing(entry)
+                },
                 onRemove: { id in
                     if editingID == id { closeEditing() }
                     updateDraft { $0.remove(id: id) }
@@ -1076,7 +1081,12 @@ struct ReplyPanelView: View {
                 onApplyLabel: { applyLabel($1, to: $0) },
                 onOpenLabelMenu: { openLabelMenu(for: $0, via: "click") },
                 labelMenuAnchorBox: labelMenuAnchorBox,
-                onCloseEditing: { closeNoteKeepingText() },
+                onCloseEditing: {
+                    #if DEBUG
+                    dlog("reply.note.close via=band kept=1")
+                    #endif
+                    closeNoteKeepingText()
+                },
                 field: { noteField($0) }
             )
 
@@ -1088,6 +1098,18 @@ struct ReplyPanelView: View {
         }
         .padding(.vertical, ReplyFooterMetrics.topInset)
         .background(footerGround)
+        // `#cm-85`: the resolved hover, so a pass over the rows can be read
+        // back as `1, 2, 3` with or without a `nil` between. A mark hovered
+        // in the reply body sets the same value, so a line can come from
+        // the page as well as the footer.
+        .onChange(of: hoveredID) { id in logHover(id) }
+    }
+
+    private func logHover(_ id: UUID?) {
+        #if DEBUG
+        let number = id.flatMap { id in draft.numbered.first { $0.id == id }?.number }
+        dlog("reply.hover n=\(number.map(String.init) ?? "nil")")
+        #endif
     }
 
     /// How tall the note list may grow before it scrolls.

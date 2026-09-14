@@ -276,6 +276,15 @@ enum ReplyFooterMetrics {
     /// as clipped rather than highlighted (Tom, dogfood 2026-09-06).
     static let hoverInset: CGFloat = 4
 
+    /// How far a row's hover and click area reaches above and below it:
+    /// halfway across the gap, so two rows' areas meet and every point between
+    /// them belongs to exactly one (`#cm-85`, Tom 2026-09-14).
+    ///
+    /// **Derived from the gap, never typed.** The band paints `hoverPadding`,
+    /// half a point short of this, so a click on anything purple always lands;
+    /// the half point beyond is the part of the gap nothing painted.
+    static let hitPadding: CGFloat = rowGap / 2
+
     /// The open note field's box, inside its border.
     ///
     /// Named so the `✕` beside it can read the same numbers: the box's text
@@ -329,6 +338,10 @@ struct ReplyAnnotationManifest<Field: View>: View {
     /// the *hovered* row (settled 2026-09-04), and a delete button appearing
     /// under a cursor that is elsewhere is a different promise.
     private var focusedID: UUID? { ReplyMarkFocus.id(hovered: hoveredID, editing: editingID) }
+
+    /// Rows entered so far — lets a row's deferred hover clear tell whether
+    /// the pointer has entered any row since it left (`#cm-85`).
+    @State private var hoverEnters = 0
     let placeholder: String
     let gutter: CGFloat
 
@@ -591,6 +604,11 @@ struct ReplyAnnotationManifest<Field: View>: View {
                 removeButton(entry, isEditing: editingID == entry.id)
             }
         }
+        // `#cm-85`: padded out to the row's hit area, so hover and the band's
+        // click answer from the row's own frame instead of a shape reaching
+        // past it. Cancelled again below, so no row, glyph or band moves.
+        .padding(.vertical, ReplyFooterMetrics.hitPadding)
+        .padding(.horizontal, ReplyFooterMetrics.hoverInset)
         // No row-1 special case: the `✕` column is held on every row, and it
         // already stops the text short of the glyph.
         .background(
@@ -599,17 +617,44 @@ struct ReplyAnnotationManifest<Field: View>: View {
             // under the pointer cost more than the band is worth.
             RoundedRectangle(cornerRadius: 3)
                 .fill(focusedID == entry.id ? hoverFill : .clear)
-                .padding(.vertical, -ReplyFooterMetrics.hoverPadding)
-                .padding(.horizontal, -ReplyFooterMetrics.hoverInset)
-                // While the note is open, a click on the band itself — the
-                // quote, the padding, the gaps between chips — closes it. The
-                // chips, `⌄`, field and `✕` sit above the band and take their
-                // own clicks first.
-                .contentShape(RoundedRectangle(cornerRadius: 3))
-                .onTapGesture { if editingID == entry.id { onCloseEditing() } }
-                .allowsHitTesting(editingID == entry.id)
+                // Back in from the hit area to the designed band.
+                .padding(.vertical, ReplyFooterMetrics.hitPadding - ReplyFooterMetrics.hoverPadding)
+                .allowsHitTesting(false)
         )
-        .onHover { hoveredID = $0 ? entry.id : (hoveredID == entry.id ? nil : hoveredID) }
+        .background(
+            // A click anywhere on the hit area outside the row's controls —
+            // the band, its padding, half the gap — acts on this row: a closed
+            // note opens (`#cm-85`, Tom 2026-09-14), the open one closes
+            // keeping its text (`#cm-69.3`, Tom, dogfood 2026-09-11). The
+            // chips, `⌄`, field and `✕` sit above and take their own clicks
+            // first.
+            Rectangle()
+                .fill(Color.clear)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if editingID == entry.id { onCloseEditing() } else { onBeginEditing(entry) }
+                }
+        )
+        .onHover { hovering in
+            if hovering {
+                hoverEnters &+= 1
+                hoveredID = entry.id
+                return
+            }
+            // Cleared a turn later, and only if no row was entered since.
+            // Two rows' areas touch now, and an exit landing before the
+            // neighbour's enter would drop `hoveredID` to nil for a moment —
+            // `focusedID` then falls back to the open note, which flashes.
+            // Counting enters, not comparing ids, also keeps a row the
+            // pointer left and re-entered within the turn.
+            let entersAtExit = hoverEnters
+            DispatchQueue.main.async {
+                guard hoverEnters == entersAtExit, hoveredID == entry.id else { return }
+                hoveredID = nil
+            }
+        }
+        .padding(.vertical, -ReplyFooterMetrics.hitPadding)
+        .padding(.horizontal, -ReplyFooterMetrics.hoverInset)
     }
 
     /// The quote as one flowing run, so truncation can say it was truncated.

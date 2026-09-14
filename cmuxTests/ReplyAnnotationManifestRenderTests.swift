@@ -120,6 +120,15 @@ struct ReplyAnnotationManifestRenderTests {
         return top..<(top + firstLineHeight)
     }
 
+    /// `#cm-85`: each row's click area reaches `hitPadding` past it and its
+    /// band paints `hoverPadding`. If the paint ever reaches further than the
+    /// area, a click on a band's outer edge opens the neighbouring note — and
+    /// no render can see that, because nothing new is painted.
+    @Test("A row's click area covers every point its band paints")
+    func clickAreaCoversThePaintedBand() {
+        #expect(ReplyFooterMetrics.hitPadding >= ReplyFooterMetrics.hoverPadding)
+    }
+
     @Test("The ⤢ lands in the column all seven frames draw it in")
     func expandGlyphSitsInItsColumn() throws {
         let image = try render(Self.sample(), editing: nil, hovering: nil)
