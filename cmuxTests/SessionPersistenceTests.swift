@@ -1883,6 +1883,43 @@ final class SessionPersistenceTests: XCTestCase {
     }
 }
 
+private struct ResumeShellTimeout: Error, CustomStringConvertible {
+    let shellDescription: String
+    let timeout: TimeInterval
+    let processIdentifier: Int32
+    let stillRunning: Bool
+
+    var description: String {
+        "Resume shell (\(shellDescription)) did not exit within \(Int(timeout))s; treating as hung. "
+            + "pid \(processIdentifier) \(stillRunning ? "survived SIGTERM" : "exited after SIGTERM")."
+    }
+}
+
+/// Launches `process` and waits with a deadline so a stalled shell (missing
+/// shebang interpreter, prompting profile, a real agent CLI) throws instead of
+/// hanging the whole test run: within `timeout` plus a 2 s grace after SIGTERM.
+/// Throwing also skips any later read of the process's pipes, which a surviving
+/// child could hold open. A normal exit is not bounded past this point.
+private func runWithBoundedWait(
+    _ process: Process,
+    shellDescription: String,
+    timeout: TimeInterval = 30
+) throws {
+    let exited = DispatchSemaphore(value: 0)
+    process.terminationHandler = { _ in exited.signal() }
+    try process.run()
+    if exited.wait(timeout: .now() + timeout) == .timedOut {
+        process.terminate()
+        _ = exited.wait(timeout: .now() + 2)
+        throw ResumeShellTimeout(
+            shellDescription: shellDescription,
+            timeout: timeout,
+            processIdentifier: process.processIdentifier,
+            stillRunning: process.isRunning
+        )
+    }
+}
+
 final class SocketListenerAcceptPolicyTests: XCTestCase {
     func testClaudeResumeCommandRoutesThroughWrapperInsteadOfCapturedRealBinary() {
         // The captured launch executable is the real claude binary
@@ -2350,23 +2387,6 @@ final class SocketListenerAcceptPolicyTests: XCTestCase {
         process.standardError = FileHandle.nullDevice
         try runWithBoundedWait(process, shellDescription: shellURL.path)
         return (try? String(contentsOf: sandbox.recordURL, encoding: .utf8)) ?? ""
-    }
-
-    /// Launches `process` and waits with a deadline so a stalled shell (missing
-    /// shebang interpreter, prompting profile) fails the test with a clear message
-    /// instead of hanging until the CI harness kills the job.
-    private func runWithBoundedWait(
-        _ process: Process,
-        shellDescription: String,
-        timeout: TimeInterval = 30
-    ) throws {
-        let exited = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in exited.signal() }
-        try process.run()
-        if exited.wait(timeout: .now() + timeout) == .timedOut {
-            process.terminate()
-            XCTFail("Resume shell (\(shellDescription)) did not exit within \(Int(timeout))s; treating as hung.")
-        }
     }
 
     func testRestorableAgentResumeStartupInputEscapesNonAsciiWorkingDirectoryAsAsciiShellInput() throws {
@@ -4473,16 +4493,30 @@ extension SessionPersistenceTests {
         let startupInput = try XCTUnwrap(binding.startupInput)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", startupInput]
-        var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = "\(bin.path):\(environment["PATH"] ?? "/usr/bin:/bin")"
-        environment["CMUX_FAKE_CODEX_OUTPUT"] = outputURL.path
-        process.environment = environment
+        // The binding's `environment` makes startupInput run its command through a
+        // nested `/bin/zsh -lc`. That login shell runs /etc/zprofile, whose path_helper
+        // moves /usr/local/bin, /opt/homebrew/bin and the rest ahead of the fake, and
+        // then $HOME/.zprofile. A real `codex` found first starts an interactive session
+        // and never exits. So HOME is a sandbox whose own .zprofile, read last, puts the
+        // fake first again; the outer `-fc` shell reads no profile at all.
+        let sandboxHome = root.appendingPathComponent("home", isDirectory: true)
+        try fileManager.createDirectory(at: sandboxHome, withIntermediateDirectories: true)
+        let quotedBin = "'" + bin.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        try "path=(\(quotedBin) $path)\n".write(
+            to: sandboxHome.appendingPathComponent(".zprofile", isDirectory: false),
+            atomically: true,
+            encoding: .utf8
+        )
+        process.arguments = ["-fc", startupInput]
+        process.environment = [
+            "HOME": sandboxHome.path,
+            "PATH": "\(bin.path):/usr/bin:/bin",
+            "CMUX_FAKE_CODEX_OUTPUT": outputURL.path,
+        ]
         let stderr = Pipe()
         process.standardError = stderr
 
-        try process.run()
-        process.waitUntilExit()
+        try runWithBoundedWait(process, shellDescription: "zsh -fc")
 
         let errorText = String(
             data: stderr.fileHandleForReading.readDataToEndOfFile(),
