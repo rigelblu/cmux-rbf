@@ -19,7 +19,10 @@ struct ReplyPanelView: View {
     /// Called with the request's `seq` once it is taken, so its owner clears it.
     var onTerminalReplyConsumed: (Int) -> Void = { _ in }
 
-    @State private var store = ReplyPanelStore()
+    /// The window's store, handed in — `#cm-90`. This view is rebuilt on every
+    /// sidebar mode switch, so a store it owned took the unsent marks, notes
+    /// and typed preview text with it.
+    let store: ReplyPanelStore
     @State private var rendererSession = MarkdownRendererSession()
 
     /// The row whose note is open for writing, if any.
@@ -205,10 +208,19 @@ struct ReplyPanelView: View {
         // the viewed reply, and enumerating them is how one gets missed.
         // `viewedGroup?.id`, not `viewedGroupID` — the latter is nil while
         // following the newest, so newest → older → newest would not fire.
-        .onChange(of: store.model.viewedGroup?.id) { _ in
-            previewText = nil
-            previewIsEdited = false
-        }
+        // `#cm-90`: closing is still right, but what was *typed* into the
+        // box belongs to its reply, so arriving on a reply that holds some
+        // reopens it rather than leaving the text stranded.
+        .onChange(of: store.model.viewedGroup?.id) { _ in restoreTypedPreview() }
+        // A sidebar mode switch rebuilds this view with `previewText` at nil,
+        // and a one-argument `onChange` never fires on first appearance — so
+        // the reopen has to run here too, or Files → Reply loses the box.
+        // Only when the box is closed: `onAppear` can also fire on a view that
+        // was not rebuilt, and an open, untyped preview holds nothing to restore.
+        // Accepted: after Files → another workspace → Reply, this can reopen the
+        // previous workspace's box for the moment before `.task(id:)` rebinds;
+        // the rebind changes `viewedGroup` and the handler above closes it.
+        .onAppear { if previewText == nil { restoreTypedPreview() } }
         // `#cm-89`: a step is acting in the panel, so the notice gives the
         // title back. `viewedGroupID`, not `viewedGroup?.id` — the latter also
         // moves when the newest reply grows while following it, which wiped
@@ -1272,6 +1284,18 @@ struct ReplyPanelView: View {
 
     // MARK: - The paste preview
 
+    /// Shows the box with what was typed into it on the reply now on screen,
+    /// or closes it when nothing was — `#cm-90`.
+    ///
+    /// An unedited preview is not kept: it is only the marks' serialization,
+    /// which `⤢` rebuilds exactly, so reopening it would open a mode nobody
+    /// asked for.
+    private func restoreTypedPreview() {
+        let typed = store.model.viewedGroup.flatMap { store.typedPreview(for: $0) }
+        previewText = typed
+        previewIsEdited = typed != nil
+    }
+
     /// Exactly what Paste will send, editable, at the panel's own width.
     private func pastePreview(_ text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1280,6 +1304,9 @@ struct ReplyPanelView: View {
                 // discards it. Annotations flow out and never return, which
                 // is why a mangled preview costs the agent's input and
                 // nothing else.
+                if let group = store.model.viewedGroup {
+                    store.setTypedPreview(nil, for: group)
+                }
                 previewText = nil
                 previewIsEdited = false
             } label: {
@@ -1308,7 +1335,15 @@ struct ReplyPanelView: View {
 
             TextEditor(text: Binding(
                 get: { text },
-                set: { previewText = $0; previewIsEdited = true }
+                set: { typed in
+                    previewText = typed
+                    previewIsEdited = true
+                    // Written through as typed, like the note fields, so a
+                    // step or a mode switch has no moment to lose it — `#cm-90`.
+                    if let group = store.model.viewedGroup {
+                        store.setTypedPreview(typed, for: group)
+                    }
+                }
             ))
             // Monospace is not decoration: a wire format shown in the body
             // face is indistinguishable from badly-wrapped prose, which is

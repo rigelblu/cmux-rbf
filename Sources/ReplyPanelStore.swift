@@ -85,10 +85,12 @@ final class ReplyPanelStore {
     /// documentation gives: `load()` resets it on every session change, and a
     /// user's unsent writing must not die with a rebind.
     ///
-    /// Written only through ``updateDraft(for:_:)`` and ``clearDraft(for:)``,
-    /// so that the model's exemption set cannot drift from the drafts it is
-    /// derived from — the failure would be invisible, since both look right on
-    /// their own.
+    /// Written only through ``updateDraft(for:_:)``, ``clearDraft(for:)`` and
+    /// ``setTypedPreview(_:for:)``, so that the model's exemption set cannot
+    /// drift from the drafts it is derived from — the failure would be
+    /// invisible, since both look right on their own. The third skips
+    /// ``syncAnnotatedReplies()`` because typed preview text is display-only:
+    /// it changes neither the marks nor which replies are annotated (`#cm-90`).
     ///
     /// **Nothing here is ever cleared except by a delivery that happened.**
     /// Stepping to another reply takes the footer with it and brings it back
@@ -277,6 +279,28 @@ final class ReplyPanelStore {
     func draft(for group: ReplyMessageGroup) -> ReplyAnnotationSet {
         guard let scope = draftScope else { return ReplyAnnotationSet() }
         return drafts.draft(for: group, in: scope)
+    }
+
+    /// Text typed into `group`'s paste preview, if any — `#cm-90`.
+    ///
+    /// `nil` while the model still shows the previous session: `startTail`
+    /// sets `boundSessionID` before the new transcript loads, so for those
+    /// awaits the scope is the new session's while `group` is the old one's
+    /// (cold code review, 2026-09-13).
+    func typedPreview(for group: ReplyMessageGroup) -> String? {
+        guard let scope = draftScope, model.sessionID == boundSessionID else { return nil }
+        return drafts.typedPreview(for: group, in: scope)
+    }
+
+    /// Keeps what was typed into `group`'s paste preview; `nil` drops it.
+    ///
+    /// No `syncAnnotatedReplies()`: typed text is display-only and changes
+    /// neither the marks nor which replies are exempt from the cap.
+    func setTypedPreview(_ text: String?, for group: ReplyMessageGroup) {
+        // Same gap as ``typedPreview(for:)``: a keystroke there would file the
+        // old reply's text under the new session's scope.
+        guard let scope = draftScope, model.sessionID == boundSessionID else { return }
+        drafts.setTypedPreview(text, for: group, in: scope)
     }
 
     /// Pushes the annotated replies into the model.

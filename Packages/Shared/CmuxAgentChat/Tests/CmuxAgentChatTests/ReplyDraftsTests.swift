@@ -203,10 +203,10 @@ struct ReplyDraftsTests {
     // MARK: - Two sessions, one pane
 
     /// A `seq` is a transcript **line index**, so every session has one.
-    /// `ReplyPanelView` holds a single `@State ReplyDrafts` that `refresh()`
-    /// never resets — it short-circuits on an unchanged session and otherwise
-    /// re-binds the store, leaving the view's own state alone. So two
-    /// transcripts with a message at the same line share a draft.
+    /// One `ReplyDrafts` lives for the whole window, held by `ReplyPanelStore`,
+    /// and `refresh()` never resets it — it short-circuits on an unchanged
+    /// session and otherwise re-binds the store without touching the drafts.
+    /// So two transcripts with a message at the same line share a draft.
     @Test("A draft on one session's reply does not show on another session's")
     func draftsAreScopedToTheirSession() {
         let sessionA = try! #require(ReplyMessageGroup.groups(from: [
@@ -258,5 +258,121 @@ struct ReplyDraftsTests {
 
         // Same session, new transcript.
         #expect(drafts.draft(for: after, in: .init(session: Self.session, generation: 1)).isEmpty)
+    }
+
+    // MARK: - Text typed into the paste preview (`#cm-90`)
+
+    /// A `‹` step closes the preview, and the view that held the typed text
+    /// is rebuilt by a sidebar mode switch — so the text lives here, beside
+    /// the marks it was written over, or it is lost with no warning.
+    @Test("Typed preview text reads back on its reply and survives paging its prompt in")
+    func typedPreviewReadsBackOnItsReply() {
+        let partial = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
+        let paged = try! #require(ReplyMessageGroup.groups(from: pagedWindow).first)
+        #expect(paged.id != partial.id)
+
+        var drafts = ReplyDrafts()
+        drafts.update(for: partial, in: Self.scope) { $0.insert(note("Say why here.")) }
+        drafts.setTypedPreview("edited wire text", for: partial, in: Self.scope)
+
+        #expect(drafts.typedPreview(for: partial, in: Self.scope) == "edited wire text")
+        // Same anchor rule as the marks: paging renames the group, not the reply.
+        #expect(drafts.typedPreview(for: paged, in: Self.scope) == "edited wire text")
+    }
+
+    @Test("Typed preview text stays on its own reply when another reply has its own")
+    func typedPreviewIsPerReply() {
+        let groups = ReplyMessageGroup.groups(from: partialWindow)
+        let first = try! #require(groups.first)
+        let second = try! #require(groups.last)
+        #expect(first.id != second.id)
+
+        var drafts = ReplyDrafts()
+        drafts.update(for: first, in: Self.scope) { $0.insert(note("On the first.")) }
+        drafts.update(for: second, in: Self.scope) { $0.insert(note("On the second.")) }
+        drafts.setTypedPreview("first text", for: first, in: Self.scope)
+        drafts.setTypedPreview("second text", for: second, in: Self.scope)
+
+        #expect(drafts.typedPreview(for: first, in: Self.scope) == "first text")
+        #expect(drafts.typedPreview(for: second, in: Self.scope) == "second text")
+    }
+
+    /// The preview opens only on a reply with marks, and a first mark creates
+    /// the anchor — so a write with no anchor is a caller bug, and minting an
+    /// anchor for it would pin text to a line with nothing written on it.
+    @Test("Typed preview text is not kept for a reply that has no marks")
+    func typedPreviewNeedsAnAnchor() {
+        let reply = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
+
+        var drafts = ReplyDrafts()
+        drafts.setTypedPreview("orphan", for: reply, in: Self.scope)
+
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == nil)
+        #expect(drafts.annotatedSeqs(in: Self.scope).isEmpty)
+
+        // The reply's first mark takes the same `seq` an orphan write would
+        // have minted, so text stashed under a private anchor would surface
+        // now. Both assertions above pass for that mutant (cold code review,
+        // 2026-09-13); only this one sees it.
+        drafts.update(for: reply, in: Self.scope) { $0.insert(note("First mark.")) }
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == nil)
+    }
+
+    @Test("Typed preview text does not resolve in another session or after a rewrite")
+    func typedPreviewIsScoped() {
+        let reply = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
+        let rewritten = ReplyDrafts.Scope(session: Self.session, generation: 1)
+        let otherSession = ReplyDrafts.Scope(session: "session-two", generation: 0)
+
+        var drafts = ReplyDrafts()
+        drafts.update(for: reply, in: Self.scope) { $0.insert(note("Say why here.")) }
+        drafts.setTypedPreview("scoped text", for: reply, in: Self.scope)
+
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == "scoped text")
+        #expect(drafts.typedPreview(for: reply, in: rewritten) == nil)
+        #expect(drafts.typedPreview(for: reply, in: otherSession) == nil)
+    }
+
+    /// `Discard edits` passes `nil`; a delivery calls `clear(for:in:)`.
+    @Test("Typed preview text is dropped by nil and by clearing the reply")
+    func typedPreviewClears() {
+        let reply = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
+
+        var drafts = ReplyDrafts()
+        drafts.update(for: reply, in: Self.scope) { $0.insert(note("Say why here.")) }
+        drafts.setTypedPreview("discard me", for: reply, in: Self.scope)
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == "discard me")
+        drafts.setTypedPreview(nil, for: reply, in: Self.scope)
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == nil)
+
+        drafts.setTypedPreview("sent with the marks", for: reply, in: Self.scope)
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == "sent with the marks")
+        drafts.clear(for: reply, in: Self.scope)
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == nil)
+
+        // The reply's next first mark re-creates the same anchor — it pins to
+        // the reply's last message — so text left behind by a delivery would
+        // come back in the box as if never sent. Mutation M2 (clear keeping
+        // the text) passed every assertion above; only this one sees it.
+        drafts.update(for: reply, in: Self.scope) { $0.insert(note("A new mark after sending.")) }
+        #expect(drafts.typedPreview(for: reply, in: Self.scope) == nil)
+    }
+
+    /// `isEmpty` gates `Paste` and `annotatedSeqs` exempts a reply from the
+    /// history cap. Typed text is display-only, so it must move neither.
+    @Test("Typed preview text changes neither the marks nor which replies count as annotated")
+    func typedPreviewLeavesMarksAlone() {
+        let reply = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)
+
+        var drafts = ReplyDrafts()
+        drafts.update(for: reply, in: Self.scope) { $0.insert(note("Say why here.")) }
+        let marksBefore = drafts.draft(for: reply, in: Self.scope)
+        let annotatedBefore = drafts.annotatedSeqs(in: Self.scope)
+
+        drafts.setTypedPreview("display only", for: reply, in: Self.scope)
+
+        #expect(drafts.draft(for: reply, in: Self.scope) == marksBefore)
+        #expect(drafts.draft(for: reply, in: Self.scope).serialized() == marksBefore.serialized())
+        #expect(drafts.annotatedSeqs(in: Self.scope) == annotatedBefore)
     }
 }

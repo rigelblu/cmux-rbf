@@ -67,6 +67,7 @@ struct HiddenRightSidebarContentMountingTests {
             fileExplorerStore: FileExplorerStore(),
             fileExplorerState: fileExplorerState,
             sessionIndexStore: SessionIndexStore(),
+            replyPanelStore: ReplyPanelStore(),
             titlebarHeight: 36,
             windowAppearance: .rightSidebarPanelViewTestDefault,
             workspaceId: nil,

@@ -114,6 +114,10 @@ struct RightSidebarPanelView: View {
     @ObservedObject var fileExplorerStore: FileExplorerStore
     @ObservedObject var fileExplorerState: FileExplorerState
     @ObservedObject var sessionIndexStore: SessionIndexStore
+    /// Owned by the window, not by the Reply view: the mode `switch` below
+    /// destroys that view on every switch, and with it any unsent writing it
+    /// held — `#cm-90`.
+    let replyPanelStore: ReplyPanelStore
     let titlebarHeight: CGFloat
     let windowAppearance: WindowAppearanceSnapshot
     let workspaceId: UUID?
@@ -413,7 +417,8 @@ struct RightSidebarPanelView: View {
                     onTerminalReplyConsumed: { seq in
                         guard fileExplorerState.terminalReplyRequest?.seq == seq else { return }
                         fileExplorerState.terminalReplyRequest = nil
-                    }
+                    },
+                    store: replyPanelStore
                 )
             case .customSidebar:
                 EmptyView()

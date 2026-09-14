@@ -24,10 +24,11 @@ import Foundation
 ///
 /// **The session is the other half of the key, and leaving it out was a real
 /// defect.** A `seq` is a transcript *line index*, so every session has a
-/// message at 40. `ReplyPanelView` holds one `ReplyDrafts` in `@State` that
-/// nothing resets — `ReplyPanelStore.refresh` returns early when the session
-/// is unchanged, and otherwise re-binds the *store*, leaving view state alone.
-/// So a bare `seq` showed one session's notes on another session's reply.
+/// message at 40. One `ReplyDrafts` lives for the whole window and nothing
+/// resets it — `ReplyPanelStore` holds it (since `cm-69.6`), `ContentView`
+/// owns that store (since `#cm-90`), and `ReplyPanelStore.refresh` re-binds
+/// the store without touching the drafts. So a bare `seq` showed one session's
+/// notes on another session's reply.
 /// Introduced 2026-09-07 by the change that moved this key off
 /// ``ReplyMessageGroup/id``, which had been globally unique by way of
 /// `apiMessageID`; found by a cold review the same day.
@@ -76,6 +77,11 @@ public struct ReplyDrafts: Sendable, Equatable {
 
     private var byAnchor: [Anchor: ReplyAnnotationSet] = [:]
 
+    /// Text typed into a reply's paste preview, under the same anchor as its
+    /// marks — `#cm-90`. Never inside ``ReplyAnnotationSet``; see
+    /// ``typedPreview(for:in:)``.
+    private var typedPreviewByAnchor: [Anchor: String] = [:]
+
     public init() {}
 
     /// The marks written on `group` in `sessionID`, or an empty set.
@@ -108,6 +114,28 @@ public struct ReplyDrafts: Sendable, Equatable {
     public mutating func clear(for group: ReplyMessageGroup, in scope: Scope) {
         guard let anchor = anchor(held: group, in: scope) else { return }
         byAnchor[anchor] = nil
+        typedPreviewByAnchor[anchor] = nil
+    }
+
+    /// Text typed into `group`'s paste preview, if any — `#cm-90`.
+    ///
+    /// Held beside the marks rather than inside ``ReplyAnnotationSet``: that
+    /// set's `isEmpty` gates `Paste` and feeds ``annotatedSeqs(in:)``, and the
+    /// typed text is display-only — `Paste` sends the marks, never this.
+    public func typedPreview(for group: ReplyMessageGroup, in scope: Scope) -> String? {
+        guard let anchor = anchor(held: group, in: scope) else { return nil }
+        return typedPreviewByAnchor[anchor]
+    }
+
+    /// Keeps what was typed into `group`'s paste preview; `nil` drops it.
+    ///
+    /// Writes only under the anchor the reply's marks already hold. The
+    /// preview opens only on a reply with marks, so a write with no anchor is
+    /// a caller bug — and minting one for it would pin text to a line nothing
+    /// was written on.
+    public mutating func setTypedPreview(_ text: String?, for group: ReplyMessageGroup, in scope: Scope) {
+        guard let anchor = anchor(held: group, in: scope) else { return }
+        typedPreviewByAnchor[anchor] = text
     }
 
     /// The `seq` anchoring every reply in `scope` that carries marks.
