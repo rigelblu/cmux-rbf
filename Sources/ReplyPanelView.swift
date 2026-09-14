@@ -232,7 +232,15 @@ struct ReplyPanelView: View {
             consumeTerminalReplyIfReady(request, trigger: "request")
         }
         .onChange(of: store.model.newestGroup?.id) { _ in consumeTerminalReplyIfReady(trigger: "newest") }
-        .onChange(of: store.model.sessionID) { _ in consumeTerminalReplyIfReady(trigger: "session") }
+        .onChange(of: store.model.sessionID) { _ in
+            // A new agent in the *same* pane keeps `boundPanelID`, so the
+            // pane-change clear below never fires for it — the old line and a
+            // find still running would carry over to the new agent (brief
+            // cold read 2026-09-13).
+            clearTerminalNotice(reason: "session")
+            terminalFind = nil
+            consumeTerminalReplyIfReady(trigger: "session")
+        }
         .onChange(of: store.boundPanelID) { _ in
             // Following another agent: whatever the notice said was about the
             // old one, and a find still running would answer for it too.
