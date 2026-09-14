@@ -664,11 +664,24 @@ final class MainWindowFocusController {
 
     @discardableResult
     func focusTerminal() -> Bool {
+        guard let focusedPanelId = tabManager?.selectedWorkspace?.focusedPanelId else { return false }
+        return focusTerminal(panelID: focusedPanelId)
+    }
+
+    /// Gives `panelID`'s terminal the keyboard in the selected workspace.
+    ///
+    /// The body of ``focusTerminal()``, which passes the focused pane — one
+    /// path for both. `#cm-91` passes the pane a Reply was sent to, which in a
+    /// split need not be the focused one. The lookup is
+    /// `terminalInputTarget(forPanelID:)`, the call `focusedTerminalInputTarget()`
+    /// wraps, so a remote-tmux container still maps to its inner pane.
+    @discardableResult
+    func focusTerminal(panelID: UUID) -> Bool {
         guard let tabManager,
               let workspace = tabManager.selectedWorkspace else {
             return false
         }
-        guard let terminalPanel = workspace.focusedTerminalInputTarget()?.panel else { return false }
+        guard let terminalPanel = workspace.terminalInputTarget(forPanelID: panelID)?.panel else { return false }
         rightSidebarFocusState = .inactive
         intent = .mainPanel(workspaceId: workspace.id, panelId: terminalPanel.id)
         publishFeedFocusSnapshot()

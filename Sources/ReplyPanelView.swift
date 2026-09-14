@@ -482,8 +482,8 @@ struct ReplyPanelView: View {
                 // so hovering shows it whole. Set on every notice rather than
                 // measured: a tooltip repeating a line that already fits costs
                 // nothing, and measuring truncation adds a layout pass here.
-                // **Does not show yet** — no SwiftUI tooltip shows anywhere in
-                // this header, the nav buttons' included; that is `#cm-92`.
+                // Shows — Tom hovered it on 2026-09-14 (`#cm-92`, parked as not
+                // reproduced after an earlier report that it never did).
                 .help(terminalNoticeText(terminalNotice))
             } else {
                 Text(store.identity ?? String(localized: "rightSidebar.mode.reply", defaultValue: "Reply"))
@@ -511,10 +511,32 @@ struct ReplyPanelView: View {
                     capCaption(reading)
                 }
                 navigation(reading)
+                pinButton
             }
         }
         .padding(.horizontal, Self.bodyGutter)
         .frame(height: 26)
+    }
+
+    /// `#cm-91` — whether a send hides the right sidebar.
+    ///
+    /// Sized and styled like the step buttons beside it. One tooltip in both
+    /// states, naming what the pin does when on (Tom, 2026-09-14); the icon
+    /// shows the state. VoiceOver gets the same label, and the *selected*
+    /// trait while pinned, so the state is still announced without a string.
+    private var pinButton: some View {
+        let label = String(localized: "reply.pin.help", defaultValue: "Keeps the sidebar open after sending")
+        return Button { store.isPinned.toggle() } label: {
+            Image(systemName: store.isPinned ? "pin.fill" : "pin")
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 14, height: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(store.isPinned ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+        .help(label)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(store.isPinned ? [.isToggle, .isSelected] : .isToggle)
     }
 
     /// `◄ 4/6 ►` as one control: two hit targets with the counter as the dead
@@ -1853,7 +1875,11 @@ struct ReplyPanelView: View {
         // Sends the annotations, never the preview's text: the preview is
         // one-way, and a paste that shipped what was typed into it would
         // make the box a parser after all.
-        guard store.deliver(draft, workspace: workspace, submit: submit) else { return }
+        let delivered = store.deliver(draft, workspace: workspace, submit: submit)
+        // `#cm-91`: on every exit, with the real result, so the store's rule
+        // (a refused send never closes) holds wherever this line ends up.
+        defer { closeSidebarAfterSendIfUnpinned(delivered: delivered) }
+        guard delivered else { return }
         // Cleared only on a dispatch that actually happened. A refused send
         // that wiped the notes would lose writing the user cannot get back.
         if let group = store.model.viewedGroup {
@@ -1872,6 +1898,36 @@ struct ReplyPanelView: View {
             guard !Task.isCancelled else { return }
             withAnimation(.easeIn(duration: 0.25)) { showCopiedNote = false }
         }
+    }
+
+    /// `#cm-91` — hides this window's right sidebar after a delivered send,
+    /// unless the pin holds it open, with the keyboard in the agent pane the
+    /// reply went to.
+    ///
+    /// Runs from `send`'s `defer` with `deliver`'s real result, so a refused
+    /// send reaches the store's rule as `false` and closes nothing.
+    ///
+    /// **Focus first, then hide.** If focus lands on the bound pane, the hide's
+    /// own restore finds the keyboard already out of the sidebar and declines,
+    /// so it moves once; if it does not land, that restore still runs. The window comes from the bound pane, not "the
+    /// active main window", which is another window when two are open.
+    private func closeSidebarAfterSendIfUnpinned(delivered: Bool) {
+        let close = store.closesSidebarAfterSend(delivered: delivered)
+        let window = store.boundPanelID
+            .flatMap { AppDelegate.shared?.locateSurface(surfaceId: $0) }
+            .flatMap { AppDelegate.shared?.windowForMainWindowId($0.windowId) }
+        #if DEBUG
+        dlog("reply.send delivered=\(delivered ? 1 : 0) pinned=\(store.isPinned ? 1 : 0) close=\(close ? 1 : 0) window=\(window != nil ? 1 : 0)")
+        #endif
+        guard close, let window else { return }
+        var focused = false
+        if let panelID = store.boundPanelID {
+            focused = AppDelegate.shared?.keyboardFocusCoordinator(for: window)?.focusTerminal(panelID: panelID) ?? false
+        }
+        _ = AppDelegate.shared?.closeRightSidebarInActiveMainWindow(preferredWindow: window)
+        #if DEBUG
+        dlog("reply.send closed focused=\(focused ? 1 : 0) fr=\(window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")")
+        #endif
     }
 
     /// A stable id for the renderer's WebKit session, distinct from any real

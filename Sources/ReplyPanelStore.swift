@@ -281,6 +281,21 @@ final class ReplyPanelStore {
         return drafts.draft(for: group, in: scope)
     }
 
+    /// Whether the right sidebar stays open after a send — `#cm-91`.
+    ///
+    /// Per window and memory-only by Tom's call: this store is one per window
+    /// and lives only as long as it, so every new window and launch starts
+    /// unpinned.
+    var isPinned = false
+
+    /// Whether a send should hide the right sidebar — `#cm-91`.
+    ///
+    /// - Parameter delivered: Whether `deliver` actually dispatched. A refused
+    ///   send leaves the user's marks in place, so it leaves the panel too.
+    func closesSidebarAfterSend(delivered: Bool) -> Bool {
+        delivered && !isPinned
+    }
+
     /// Text typed into `group`'s paste preview, if any — `#cm-90`.
     ///
     /// `nil` while the model still shows the previous session: `startTail`

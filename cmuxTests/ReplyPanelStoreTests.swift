@@ -571,3 +571,40 @@ struct ReplyDeliverySubmitKeyTests {
         return reading.group.markdown
     }
 }
+
+/// The Reply header's pin — `#cm-91`.
+///
+/// Unpinned, a send hides the right sidebar; pinned, it stays. The decision
+/// lives on the store so a test can reach it — no test drives
+/// `ReplyPanelView`, so where `send` calls it is checked by hand.
+@MainActor
+@Suite("Reply pin")
+struct ReplyPanelPinTests {
+    @Test("A new panel starts unpinned")
+    func newStoreIsUnpinned() {
+        #expect(ReplyPanelStore().isPinned == false)
+    }
+
+    @Test("Unpinned, a delivered send closes the sidebar")
+    func unpinnedDeliveredCloses() {
+        let store = ReplyPanelStore()
+        store.isPinned = false
+        #expect(store.closesSidebarAfterSend(delivered: true) == true)
+    }
+
+    @Test("A refused send never closes the sidebar")
+    func refusedNeverCloses() {
+        let store = ReplyPanelStore()
+        store.isPinned = false
+        #expect(store.closesSidebarAfterSend(delivered: false) == false)
+        store.isPinned = true
+        #expect(store.closesSidebarAfterSend(delivered: false) == false)
+    }
+
+    @Test("Pinned, a delivered send keeps the sidebar open")
+    func pinnedKeepsOpen() {
+        let store = ReplyPanelStore()
+        store.isPinned = true
+        #expect(store.closesSidebarAfterSend(delivered: true) == false)
+    }
+}
