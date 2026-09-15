@@ -67,15 +67,52 @@ struct ReplyDeliveryGateTests {
         ]
     )
     func storeGuardMatchesTheButtons(_ s: ReplyAnnotationSet) {
-        for turnEnded in [true, false] {
-            #expect(
-                ReplyDeliveryGate.canDeliver(s, submit: false, turnEnded: turnEnded)
-                    == ReplyDeliveryGate.canPaste(s)
-            )
-            #expect(
-                ReplyDeliveryGate.canDeliver(s, submit: true, turnEnded: turnEnded)
-                    == ReplyDeliveryGate.canSend(s, turnEnded: turnEnded)
-            )
+        for editedText in [nil, "", " \n", "x"] as [String?] {
+            for turnEnded in [true, false] {
+                #expect(
+                    ReplyDeliveryGate.canDeliver(s, editedText: editedText, submit: false, turnEnded: turnEnded)
+                        == ReplyDeliveryGate.canPaste(s, editedText: editedText)
+                )
+                #expect(
+                    ReplyDeliveryGate.canDeliver(s, editedText: editedText, submit: true, turnEnded: turnEnded)
+                        == ReplyDeliveryGate.canSend(s, editedText: editedText, turnEnded: turnEnded)
+                )
+            }
         }
+    }
+
+    // MARK: - The edited paste preview (`#cm-93`)
+
+    /// An edited box is what gets sent, so the box — not the marks — decides.
+    /// Blank means nothing to send (Tom, 2026-09-14, Q2).
+    @Test("A blank edited box is refused both ways, even with a written note", arguments: ["", "   ", " \n\t"])
+    func blankEditedBoxIsRefused(_ blank: String) {
+        let s = set([mark(note: "make this a question")])
+        #expect(!ReplyDeliveryGate.canPaste(s, editedText: blank))
+        #expect(!ReplyDeliveryGate.canSend(s, editedText: blank, turnEnded: true))
+    }
+
+    /// Tom, 2026-09-14: text you edited in the box is the instruction, so
+    /// `Paste & Send` no longer also wants a written note.
+    @Test("An edited box sends once the turn has ended, even with no written note")
+    func editedBoxIsTheInstruction() {
+        let s = set([mark(note: "")])
+        #expect(ReplyDeliveryGate.canPaste(s, editedText: "please reword this"))
+        #expect(ReplyDeliveryGate.canSend(s, editedText: "please reword this", turnEnded: true))
+    }
+
+    @Test("An edited box still does not send while the turn is running")
+    func editedBoxHoldsWhileTheTurnRuns() {
+        let s = set([mark(note: "")])
+        #expect(ReplyDeliveryGate.canPaste(s, editedText: "please reword this"))
+        #expect(!ReplyDeliveryGate.canSend(s, editedText: "please reword this", turnEnded: false))
+    }
+
+    @Test("No edited text keeps today's rule on the marks")
+    func noEditedTextKeepsTheMarksRule() {
+        let noteLess = set([mark(note: "")])
+        #expect(ReplyDeliveryGate.canPaste(noteLess, editedText: nil))
+        #expect(!ReplyDeliveryGate.canSend(noteLess, editedText: nil, turnEnded: true))
+        #expect(!ReplyDeliveryGate.canPaste(ReplyAnnotationSet(), editedText: nil))
     }
 }

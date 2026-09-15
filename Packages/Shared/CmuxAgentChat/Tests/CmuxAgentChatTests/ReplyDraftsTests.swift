@@ -359,7 +359,9 @@ struct ReplyDraftsTests {
     }
 
     /// `isEmpty` gates `Paste` and `annotatedSeqs` exempts a reply from the
-    /// history cap. Typed text is display-only, so it must move neither.
+    /// history cap. Typed text lives in its own map — once edited it is what
+    /// gets sent (`#cm-93`), passed to the gate as `editedText` — so it must
+    /// move neither.
     @Test("Typed preview text changes neither the marks nor which replies count as annotated")
     func typedPreviewLeavesMarksAlone() {
         let reply = try! #require(ReplyMessageGroup.groups(from: partialWindow).first)

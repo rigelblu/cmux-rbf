@@ -1,3 +1,4 @@
+import AppKit
 import CMUXAgentLaunch
 import CmuxAgentChat
 import Foundation
@@ -463,7 +464,7 @@ struct ReplyDeliverySubmitKeyTests {
             await store.refresh(workspace: rig.workspace)
 
             #expect(store.model.isNewestTurnWriting)
-            #expect(store.deliver(Self.draft, workspace: rig.workspace, submit: false))
+            #expect(store.deliver(Self.draft, editedText: nil, workspace: rig.workspace, submit: false))
         }
     }
 
@@ -475,7 +476,7 @@ struct ReplyDeliverySubmitKeyTests {
             await store.refresh(workspace: rig.workspace)
 
             #expect(!store.canSubmit)
-            #expect(!store.deliver(Self.draft, workspace: rig.workspace, submit: true))
+            #expect(!store.deliver(Self.draft, editedText: nil, workspace: rig.workspace, submit: true))
         }
     }
 
@@ -498,7 +499,7 @@ struct ReplyDeliverySubmitKeyTests {
 
             #expect(!store.model.isNewestTurnWriting)
             #expect(store.canSubmit)
-            #expect(store.deliver(Self.draft, workspace: rig.workspace, submit: true))
+            #expect(store.deliver(Self.draft, editedText: nil, workspace: rig.workspace, submit: true))
         }
     }
 
@@ -537,15 +538,49 @@ struct ReplyDeliverySubmitKeyTests {
 
             #expect(store.canSubmit)
             // Nothing marked at all: still refused, both ways.
-            #expect(!store.deliver(ReplyAnnotationSet(), workspace: rig.workspace, submit: false))
-            #expect(!store.deliver(ReplyAnnotationSet(), workspace: rig.workspace, submit: true))
+            #expect(!store.deliver(ReplyAnnotationSet(), editedText: nil, workspace: rig.workspace, submit: false))
+            #expect(!store.deliver(ReplyAnnotationSet(), editedText: nil, workspace: rig.workspace, submit: true))
 
             // Marked, unwritten: pastes...
-            #expect(store.deliver(markedOnly, workspace: rig.workspace, submit: false))
+            #expect(store.deliver(markedOnly, editedText: nil, workspace: rig.workspace, submit: false))
             // ...and the payload is the quote, so it is not an empty string.
             #expect(markedOnly.serialized().contains("a span"))
             // ...but does not send, because nothing has been asked.
-            #expect(!store.deliver(markedOnly, workspace: rig.workspace, submit: true))
+            #expect(!store.deliver(markedOnly, editedText: nil, workspace: rig.workspace, submit: true))
+        }
+    }
+
+    /// `#cm-93`: once the paste preview is edited, the box is what gets sent —
+    /// `#cm-69`'s 2026-09-04 *"exactly what Paste will send"* — so the payload
+    /// on the clipboard is the edited text, not the marks' serialization.
+    @Test("An edited preview is what gets pasted, not the marks' serialization")
+    func editedPreviewIsThePayload() async throws {
+        try await Self.withRig(transcript: Self.oneReply()) { rig, store in
+            Self.setLifecycle(.idle, rig: rig)
+            await store.refresh(workspace: rig.workspace)
+
+            let edited = "1.\n> \"a span\" please reword this"
+            #expect(edited != Self.draft.serialized())
+            #expect(store.deliver(Self.draft, editedText: edited, workspace: rig.workspace, submit: false))
+            #expect(NSPasteboard.general.string(forType: .string) == edited)
+        }
+    }
+
+    /// Tom, 2026-09-14 (Q2): a blank edited box is refused like an empty draft,
+    /// and a refusal leaves the clipboard as it was.
+    @Test("A blank edited preview is refused and leaves the clipboard alone")
+    func blankEditedPreviewIsRefused() async throws {
+        try await Self.withRig(transcript: Self.oneReply()) { rig, store in
+            Self.setLifecycle(.idle, rig: rig)
+            await store.refresh(workspace: rig.workspace)
+
+            let sentinel = "clipboard before #cm-93 \(UUID().uuidString)"
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(sentinel, forType: .string)
+
+            #expect(!store.deliver(Self.draft, editedText: " \n ", workspace: rig.workspace, submit: false))
+            #expect(!store.deliver(Self.draft, editedText: "", workspace: rig.workspace, submit: true))
+            #expect(NSPasteboard.general.string(forType: .string) == sentinel)
         }
     }
 
@@ -554,8 +589,8 @@ struct ReplyDeliverySubmitKeyTests {
     @Test("Nothing bound means nothing can be delivered")
     func unboundDeliversNothing() async throws {
         try await Self.withRig(transcript: "") { _, store in
-            #expect(!store.deliver(Self.draft, workspace: nil, submit: false))
-            #expect(!store.deliver(Self.draft, workspace: nil, submit: true))
+            #expect(!store.deliver(Self.draft, editedText: nil, workspace: nil, submit: false))
+            #expect(!store.deliver(Self.draft, editedText: nil, workspace: nil, submit: true))
         }
     }
 

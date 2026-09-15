@@ -27,30 +27,48 @@ import Foundation
 ///   instruction.** Typing into a running agent risks answering a permission
 ///   prompt with your notes, and an unwritten note submitted is a prompt that
 ///   says nothing.
+/// - **Once the paste preview is edited, its text is what gets sent** (`#cm-93`,
+///   Tom, 2026-09-14), so the box decides instead of the marks: blank is
+///   nothing to paste, and non-blank is itself the instruction — `Paste & Send`
+///   no longer also wants a written note.
 public enum ReplyDeliveryGate {
     /// Whether `Paste` may type the composed instruction into the composer.
-    public static func canPaste(_ set: ReplyAnnotationSet) -> Bool {
-        !set.isEmpty
+    ///
+    /// - Parameter editedText: The paste preview's text when it has been
+    ///   edited, else `nil`. It replaces the check on the marks.
+    public static func canPaste(_ set: ReplyAnnotationSet, editedText: String? = nil) -> Bool {
+        if let editedText {
+            return !editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return !set.isEmpty
     }
 
     /// Whether `Paste & Send` may also submit it.
     ///
-    /// - Parameter turnEnded: Whether the newest turn has settled. The store
-    ///   owns that reading; the rule owns what to do with it.
-    public static func canSend(_ set: ReplyAnnotationSet, turnEnded: Bool) -> Bool {
-        canPaste(set) && turnEnded && set.isDeliverable
+    /// - Parameters:
+    ///   - editedText: The paste preview's text when it has been edited, else
+    ///     `nil`. Edited text is the instruction, so it stands in for a note.
+    ///   - turnEnded: Whether the newest turn has settled. The store owns that
+    ///     reading; the rule owns what to do with it.
+    public static func canSend(_ set: ReplyAnnotationSet, editedText: String? = nil, turnEnded: Bool) -> Bool {
+        canPaste(set, editedText: editedText) && turnEnded && (editedText != nil || set.isDeliverable)
     }
 
     /// Whether a delivery may proceed at all, for a caller that knows only
     /// whether it intends to submit.
     ///
     /// The store's own guard, expressed once: a paste needs `canPaste`, and a
-    /// submit needs `canSend` on top of it.
+    /// submit needs `canSend` on top of it. `editedText` has no default here,
+    /// unlike the two predicates: the store is where a forgotten edited box
+    /// would silently send the marks instead.
     public static func canDeliver(
         _ set: ReplyAnnotationSet,
+        editedText: String?,
         submit: Bool,
         turnEnded: Bool
     ) -> Bool {
-        submit ? canSend(set, turnEnded: turnEnded) : canPaste(set)
+        submit
+            ? canSend(set, editedText: editedText, turnEnded: turnEnded)
+            : canPaste(set, editedText: editedText)
     }
 }

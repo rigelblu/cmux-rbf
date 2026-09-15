@@ -213,7 +213,8 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
 
     /// Whether there is nothing at all — no mark, no note.
     ///
-    /// **This is what `Paste` gates on, and it is a lower bar than
+    /// **This is what `Paste` gates on until the paste preview is edited
+    /// (`#cm-93`; then the box's text decides), and it is a lower bar than
     /// ``isDeliverable`` on purpose.** Paste puts text in the composer, where
     /// the user finishes it; a marked span with no note is worth pasting
     /// precisely because the quote is the part that is tedious to retype and
@@ -232,8 +233,9 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
     /// Whether there is anything worth **sending** — an instruction, not just
     /// a span.
     ///
-    /// `Paste & Send` alone gates on this. It has no composer step, so a bare
-    /// `> "span"` reaches the agent as a span with nothing asked of it, which
+    /// `Paste & Send` alone gates on this, until the paste preview is edited
+    /// (`#cm-93`; edited text is itself the instruction). It has no composer
+    /// step, so a bare `> "span"` reaches the agent as a span with nothing asked of it, which
     /// is the one thing this format exists to prevent. Paste keeps the same
     /// payload editable, so it does not need the guard.
     public var isDeliverable: Bool {

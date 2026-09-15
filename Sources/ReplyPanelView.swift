@@ -1270,7 +1270,7 @@ struct ReplyPanelView: View {
             }
 
             // One refusal, one sentence, and only for the button that is off.
-            if ReplyDeliveryGate.canSend(draft, turnEnded: true), !store.canSubmit {
+            if ReplyDeliveryGate.canSend(draft, editedText: editedPreview, turnEnded: true), !store.canSubmit {
                 footerNote(String(
                     localized: "reply.annotation.turnInFlight",
                     defaultValue: "Paste & Send returns when this turn ends"
@@ -1281,13 +1281,23 @@ struct ReplyPanelView: View {
         .padding(.top, 6)
     }
 
-    /// Whether `Paste & Send` is the primary button — once every highlight
-    /// has a note and the turn has ended, i.e. exactly when it can be
-    /// pressed (Tom, dogfood 2026-09-11). Until then `Paste` is primary: a
-    /// prominent button that is greyed out would point at the one action
-    /// that is not available.
+    /// Whether `Paste & Send` is the primary button — exactly when it can be
+    /// pressed (Tom, dogfood 2026-09-11): a written note, or an edited paste
+    /// preview (`#cm-93`), and the turn has ended. Until then `Paste` is
+    /// primary: a prominent button that is greyed out would point at the one
+    /// action that is not available.
     private var sendIsPrimary: Bool {
-        ReplyDeliveryGate.canSend(draft, turnEnded: store.canSubmit)
+        ReplyDeliveryGate.canSend(draft, editedText: editedPreview, turnEnded: store.canSubmit)
+    }
+
+    /// The paste preview's text once it has been edited, else `nil` — `#cm-93`.
+    ///
+    /// An edited box is what gets sent (`#cm-69`, 2026-09-04: *"exactly what
+    /// Paste will send"*), so the buttons and ``send(submit:)`` read the same
+    /// value. An unedited box is only the marks' serialization, which
+    /// `deliver` rebuilds itself.
+    private var editedPreview: String? {
+        previewIsEdited ? previewText : nil
     }
 
     private var pasteButton: some View {
@@ -1308,7 +1318,7 @@ struct ReplyPanelView: View {
         // action the user intends to finish in the terminal.
         //
         // Off only when there is genuinely nothing to put anywhere.
-        .disabled(!ReplyDeliveryGate.canPaste(draft))
+        .disabled(!ReplyDeliveryGate.canPaste(draft, editedText: editedPreview))
     }
 
     private var pasteAndSendButton: some View {
@@ -1323,7 +1333,7 @@ struct ReplyPanelView: View {
         .controlSize(.small)
         .modifier(ReplyDeliveryButtonStyle(prominent: sendIsPrimary))
         .replyHoverHighlight(cornerRadius: 5)
-        .disabled(!ReplyDeliveryGate.canSend(draft, turnEnded: store.canSubmit))
+        .disabled(!ReplyDeliveryGate.canSend(draft, editedText: editedPreview, turnEnded: store.canSubmit))
     }
 
     // MARK: - The paste preview
@@ -1377,18 +1387,15 @@ struct ReplyPanelView: View {
             // other chrome, so the word removes a guess for one line's cost.
             .frame(maxWidth: .infinity, alignment: .trailing)
 
-            TextEditor(text: Binding(
-                get: { text },
-                set: { typed in
-                    previewText = typed
-                    previewIsEdited = true
-                    // Written through as typed, like the note fields, so a
-                    // step or a mode switch has no moment to lose it — `#cm-90`.
-                    if let group = store.model.viewedGroup {
-                        store.setTypedPreview(typed, for: group)
-                    }
+            ReplyPreviewEditor(text: text) { typed in
+                previewText = typed
+                previewIsEdited = true
+                // Written through as typed, like the note fields, so a
+                // step or a mode switch has no moment to lose it — `#cm-90`.
+                if let group = store.model.viewedGroup {
+                    store.setTypedPreview(typed, for: group)
                 }
-            ))
+            }
             // Monospace is not decoration: a wire format shown in the body
             // face is indistinguishable from badly-wrapped prose, which is
             // the whole thing the fence exists to signal.
@@ -1894,10 +1901,10 @@ struct ReplyPanelView: View {
 
     private func send(submit: Bool) {
         clearEditingState()
-        // Sends the annotations, never the preview's text: the preview is
-        // one-way, and a paste that shipped what was typed into it would
-        // make the box a parser after all.
-        let delivered = store.deliver(draft, workspace: workspace, submit: submit)
+        // `#cm-93`: an edited preview is what gets sent — the box is the
+        // composer moved one step earlier (`#cm-69`, 2026-09-04). It stays
+        // one-way: nothing parses the edited text back into the marks.
+        let delivered = store.deliver(draft, editedText: editedPreview, workspace: workspace, submit: submit)
         // `#cm-91`: on every exit, with the real result, so the store's rule
         // (a refused send never closes) holds wherever this line ends up.
         defer { closeSidebarAfterSendIfUnpinned(delivered: delivered) }
@@ -2070,6 +2077,55 @@ enum ReplyNoteCaret {
     private static func lineRect(_ editor: NSTextView, at location: Int) -> NSRect? {
         let rect = editor.firstRect(forCharacterRange: NSRange(location: location, length: 0), actualRange: nil)
         return rect.isEmpty && rect.origin == .zero ? nil : rect
+    }
+}
+
+/// The paste preview's editor, on its own so a test can host it — `#cm-93`.
+///
+/// It binds `TextEditor` to text it owns. Bound to `Binding(get: { text },
+/// set:)` instead, every re-render of the panel — the keystroke's own, or the
+/// newest reply growing — rewrote the editor's string and threw the caret to
+/// the end, so the second character typed mid-text landed last.
+struct ReplyPreviewEditor: View {
+    let text: String
+    let onEdit: (String) -> Void
+    @State private var editorText: String
+    /// The last text this editor and the panel agreed on — reported up, or
+    /// taken in. Compared against instead of `text`, which lags a keystroke:
+    /// type then `⌫` before a re-render and the `⌫` matches `text`, goes
+    /// unreported, and the next render puts the character back.
+    @State private var syncedText: String
+
+    init(text: String, onEdit: @escaping (String) -> Void) {
+        self.text = text
+        self.onEdit = onEdit
+        _editorText = State(initialValue: text)
+        _syncedText = State(initialValue: text)
+    }
+
+    var body: some View {
+        // The getter reads the editor's own text, so a re-render never
+        // rewrites the box. The setter reports the edit on the keystroke
+        // itself: from an `onChange` it would land a run-loop pass later, and a
+        // click on `Paste` in that gap would send the text from before it.
+        TextEditor(text: Binding(
+            get: { editorText },
+            set: { typed in
+                editorText = typed
+                guard typed != syncedText else { return }
+                syncedText = typed
+                onEdit(typed)
+            }
+        ))
+            // Only text the panel has not already agreed on replaces the box:
+            // a step to a reply holding other typed text (`#cm-90`). Never an
+            // `.id` reset — `viewedGroup?.id` also moves while the newest reply
+            // grows, and that would rebuild the editor mid-typing.
+            .onChange(of: text) { incoming in
+                guard incoming != syncedText else { return }
+                syncedText = incoming
+                editorText = incoming
+            }
     }
 }
 

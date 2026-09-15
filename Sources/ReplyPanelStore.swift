@@ -89,8 +89,9 @@ final class ReplyPanelStore {
     /// ``setTypedPreview(_:for:)``, so that the model's exemption set cannot
     /// drift from the drafts it is derived from — the failure would be
     /// invisible, since both look right on their own. The third skips
-    /// ``syncAnnotatedReplies()`` because typed preview text is display-only:
-    /// it changes neither the marks nor which replies are annotated (`#cm-90`).
+    /// ``syncAnnotatedReplies()`` because typed preview text changes neither
+    /// the marks nor which replies are annotated (`#cm-90`); it is sent in
+    /// their place while the preview is edited (`#cm-93`).
     ///
     /// **Nothing here is ever cleared except by a delivery that happened.**
     /// Stepping to another reply takes the footer with it and brings it back
@@ -309,8 +310,9 @@ final class ReplyPanelStore {
 
     /// Keeps what was typed into `group`'s paste preview; `nil` drops it.
     ///
-    /// No `syncAnnotatedReplies()`: typed text is display-only and changes
-    /// neither the marks nor which replies are exempt from the cap.
+    /// No `syncAnnotatedReplies()`: typed text changes neither the marks nor
+    /// which replies are exempt from the cap. It is what `Paste` sends while
+    /// the preview is edited (`#cm-93`), but it is never parsed back.
     func setTypedPreview(_ text: String?, for group: ReplyMessageGroup) {
         // Same gap as ``typedPreview(for:)``: a keystroke there would file the
         // old reply's text under the new session's scope.
@@ -710,14 +712,20 @@ final class ReplyPanelStore {
 
     /// Types the serialized feedback into the bound pane's composer.
     ///
-    /// - Parameter submit: `false` leaves it unsent so the user can read it
-    ///   where it will run. `true` appends the agent's own submit key.
+    /// - Parameters:
+    ///   - editedText: The paste preview's text once edited, else `nil`. When
+    ///     set it is the payload, and the gate reads it instead of the marks
+    ///     (`#cm-93`). No default on purpose: a second way to deliver that
+    ///     forgot it would send the marks while the box shows other text.
+    ///   - submit: `false` leaves it unsent so the user can read it where it
+    ///     will run. `true` appends the agent's own submit key.
     /// - Returns: whether anything was dispatched. `false` means the gate
     ///   refused or the bound pane could not be resolved — the draft is kept
     ///   either way, since losing a written note is worse than a failed send.
     @discardableResult
     func deliver(
         _ annotations: ReplyAnnotationSet,
+        editedText: String?,
         workspace: Workspace?,
         submit: Bool
     ) -> Bool {
@@ -733,13 +741,15 @@ final class ReplyPanelStore {
         // defect outlived the fix for it and a cold review found the rule
         // written twice again a day later (2026-09-07).
         guard ReplyDeliveryGate.canDeliver(
-                  annotations, submit: submit, turnEnded: canSubmit
+                  annotations, editedText: editedText, submit: submit, turnEnded: canSubmit
               ),
               let workspace,
               let panelID = boundPanelID,
               let panel = workspace.panels[panelID] as? TerminalPanel else { return false }
 
-        let payload = annotations.serialized()
+        // `#cm-93`: an edited paste preview is sent as written; otherwise the
+        // marks' serialization, which is what an unedited preview shows.
+        let payload = editedText ?? annotations.serialized()
 
         // **Also on the clipboard, every time.** Claude Code collapses a long
         // paste to `[Pasted text #1 +4 lines]`, so the composer stops being a

@@ -120,8 +120,9 @@ public struct ReplyDrafts: Sendable, Equatable {
     /// Text typed into `group`'s paste preview, if any — `#cm-90`.
     ///
     /// Held beside the marks rather than inside ``ReplyAnnotationSet``: that
-    /// set's `isEmpty` gates `Paste` and feeds ``annotatedSeqs(in:)``, and the
-    /// typed text is display-only — `Paste` sends the marks, never this.
+    /// set's `isEmpty` gates `Paste` and feeds ``annotatedSeqs(in:)``, while the
+    /// typed text is what `Paste` sends once the preview is edited (`#cm-93`)
+    /// and is never parsed back into marks.
     public func typedPreview(for group: ReplyMessageGroup, in scope: Scope) -> String? {
         guard let anchor = anchor(held: group, in: scope) else { return nil }
         return typedPreviewByAnchor[anchor]
