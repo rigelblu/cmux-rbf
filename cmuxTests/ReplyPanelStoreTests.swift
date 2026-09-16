@@ -85,11 +85,72 @@ struct ReplyDeliverySubmitKeyTests {
     /// to stand one up and put it back. `PiFeedOwnershipTests` established
     /// this shape; this is the same rig with a transcript path under test.
     private struct Rig {
+        let tabManager: TabManager
         let workspace: Workspace
         let panelID: UUID
         let sessionID: String
         let transcriptPath: String
         let directory: URL
+    }
+
+    @MainActor
+    private final class TailerStopController {
+        private var nextID = 0
+        private var continuations: [Int: CheckedContinuation<Void, Never>] = [:]
+
+        var count: Int { nextID }
+
+        func stop(_ tailer: AgentChatTranscriptTailer) async {
+            let id = nextID
+            nextID += 1
+            await withCheckedContinuation { continuation in
+                continuations[id] = continuation
+            }
+            await tailer.stop()
+        }
+
+        func release(_ id: Int) {
+            continuations.removeValue(forKey: id)?.resume()
+        }
+    }
+
+    @MainActor
+    private final class TailerStopSpy {
+        private(set) var count = 0
+
+        func stop(_ tailer: AgentChatTranscriptTailer) async {
+            count += 1
+            await tailer.stop()
+        }
+    }
+
+    @MainActor
+    private final class InitialHistoryController {
+        private let suspendedCall: Int
+        private var nextCall = 0
+        private var continuation: CheckedContinuation<Void, Never>?
+
+        init(suspendedCall: Int) {
+            self.suspendedCall = suspendedCall
+        }
+
+        var isSuspended: Bool { continuation != nil }
+
+        func load(_ tailer: AgentChatTranscriptTailer, limit: Int) async -> ChatHistoryPage {
+            let call = nextCall
+            nextCall += 1
+            if call == suspendedCall {
+                await withCheckedContinuation { continuation in
+                    self.continuation = continuation
+                }
+            }
+            return await tailer.history(beforeSeq: nil, limit: limit)
+        }
+
+        func release() {
+            continuation?.resume()
+            continuation = nil
+        }
     }
 
     /// - Parameters:
@@ -102,6 +163,7 @@ struct ReplyDeliverySubmitKeyTests {
     private static func withRig(
         transcript: String?,
         registersTranscriptPath: Bool = true,
+        makeStore: @MainActor () -> ReplyPanelStore = { ReplyPanelStore() },
         _ body: (Rig, ReplyPanelStore) async throws -> Void
     ) async throws {
         let previousAppDelegate = AppDelegate.shared
@@ -161,13 +223,14 @@ struct ReplyDeliverySubmitKeyTests {
         ))
 
         let rig = Rig(
+            tabManager: tabManager,
             workspace: workspace,
             panelID: panelID,
             sessionID: sessionID,
             transcriptPath: transcriptPath,
             directory: directory
         )
-        try await body(rig, ReplyPanelStore())
+        try await body(rig, makeStore())
     }
 
     // MARK: - Binding
@@ -284,6 +347,260 @@ struct ReplyDeliverySubmitKeyTests {
                 Self.markdown(store)?.contains("Late.") == true,
                 "the panel should re-bind when a turn ends while nothing is bound"
             )
+        }
+    }
+
+    @Test("Switching workspaces does not let stale A suppress B's late transcript")
+    func workspaceSwitchRetriesTheSelectedSession() async throws {
+        let stops = TailerStopController()
+        try await Self.withRig(
+            transcript: Self.replyLine(id: "msg_A", text: "A-REPLY", uuid: "a-1"),
+            makeStore: {
+                ReplyPanelStore(tailerStopper: { await stops.stop($0) })
+            }
+        ) { rigA, store in
+            await store.refresh(workspace: rigA.workspace)
+            #expect(store.boundSessionID == rigA.sessionID)
+            #expect(Self.markdown(store)?.contains("A-REPLY") == true)
+
+            let workspaceB = rigA.tabManager.addWorkspace(select: true)
+            defer {
+                if rigA.tabManager.tabs.contains(where: { $0.id == workspaceB.id }) {
+                    rigA.tabManager.closeWorkspace(workspaceB)
+                }
+            }
+            let paneB = try #require(workspaceB.bonsplitController.allPaneIds.first)
+            let panelB = try #require(workspaceB.newTerminalSurface(inPane: paneB, focus: true)?.id)
+            let sessionB = "reply-panel-store-b-\(UUID().uuidString)"
+            let transcriptB = rigA.directory.appendingPathComponent("transcript-b.jsonl").path
+            let service = try #require(TerminalController.shared.agentChatTranscriptService)
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: sessionB,
+                hookEventName: .sessionStart,
+                source: "claude",
+                workspaceId: workspaceB.id.uuidString,
+                surfaceId: panelB.uuidString,
+                transcriptPath: nil,
+                cwd: rigA.directory.path,
+                ppid: nil,
+                receivedAt: Date()
+            ))
+
+            let switchTask = Task { await store.refresh(workspace: workspaceB) }
+            await Self.waitUntil { stops.count == 1 }
+            #expect(stops.count == 1)
+            #expect(store.boundSessionID == nil)
+            #expect(store.boundPanelID == nil)
+            #expect(
+                Self.markdown(store)?.contains("A-REPLY") == true,
+                "the outgoing presentation may remain visible, but it must be inactive"
+            )
+
+            FileManager.default.createFile(
+                atPath: transcriptB,
+                contents: Data(Self.replyLine(id: "msg_B", text: "B-REPLY", uuid: "b-1").utf8)
+            )
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: sessionB,
+                hookEventName: .userPromptSubmit,
+                source: "claude",
+                workspaceId: workspaceB.id.uuidString,
+                surfaceId: panelB.uuidString,
+                transcriptPath: transcriptB,
+                cwd: rigA.directory.path,
+                ppid: nil,
+                receivedAt: Date()
+            ))
+            NotificationCenter.default.post(
+                name: .agentChatSessionTurnDidFinish,
+                object: nil,
+                userInfo: [AgentChatTurnFinishedKeys.sessionID: sessionB]
+            )
+
+            // The registry is authoritative immediately, but the bind is
+            // still suspended retiring A. Both material wakes cross that
+            // suspension; no third event is posted after it resumes.
+            stops.release(0)
+            await switchTask.value
+            await Self.waitUntil { Self.markdown(store)?.contains("B-REPLY") == true }
+
+            #expect(
+                Self.markdown(store)?.contains("B-REPLY") == true,
+                "workspace B's completed reply should replace workspace A without a third wake"
+            )
+            #expect(store.boundSessionID == sessionB)
+            #expect(store.boundPanelID == panelB)
+        }
+    }
+
+    @Test("A waiting workspace replaces A and binds when B's own turn finishes")
+    func selectedWaitingWorkspaceOwnsItsRetry() async throws {
+        try await Self.withRig(
+            transcript: Self.replyLine(id: "msg_A", text: "A-REPLY", uuid: "a-1")
+        ) { rigA, store in
+            await store.refresh(workspace: rigA.workspace)
+
+            let workspaceB = rigA.tabManager.addWorkspace(select: true)
+            defer {
+                if rigA.tabManager.tabs.contains(where: { $0.id == workspaceB.id }) {
+                    rigA.tabManager.closeWorkspace(workspaceB)
+                }
+            }
+            let paneB = try #require(workspaceB.bonsplitController.allPaneIds.first)
+            let panelB = try #require(workspaceB.newTerminalSurface(inPane: paneB, focus: true)?.id)
+            let sessionB = "reply-panel-store-b-\(UUID().uuidString)"
+            let transcriptB = rigA.directory.appendingPathComponent("transcript-b-waiting.jsonl").path
+            let service = try #require(TerminalController.shared.agentChatTranscriptService)
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: sessionB,
+                hookEventName: .sessionStart,
+                source: "claude",
+                workspaceId: workspaceB.id.uuidString,
+                surfaceId: panelB.uuidString,
+                transcriptPath: transcriptB,
+                cwd: rigA.directory.path,
+                ppid: nil,
+                receivedAt: Date()
+            ))
+
+            await store.refresh(workspace: workspaceB)
+            #expect(store.model.state == .waiting)
+            #expect(store.boundSessionID == nil)
+            #expect(store.boundPanelID == nil)
+            #expect(store.draftScope == nil)
+
+            FileManager.default.createFile(
+                atPath: transcriptB,
+                contents: Data(Self.replyLine(id: "msg_B", text: "B-REPLY", uuid: "b-1").utf8)
+            )
+            NotificationCenter.default.post(
+                name: .agentChatSessionTurnDidFinish,
+                object: nil,
+                userInfo: [AgentChatTurnFinishedKeys.sessionID: sessionB]
+            )
+
+            await Self.waitUntil { Self.markdown(store)?.contains("B-REPLY") == true }
+            #expect(Self.markdown(store)?.contains("B-REPLY") == true)
+            #expect(store.boundSessionID == sessionB)
+            #expect(store.boundPanelID == panelB)
+        }
+    }
+
+    @Test("A stale A-to-B bind cannot publish after the user returns to A")
+    func staleWorkspaceBindCannotPublishAfterReturning() async throws {
+        let stops = TailerStopSpy()
+        // Call 0 loads A. Call 1 is B and is held after its tailer starts.
+        // The return to A is call 2 and may settle while B remains suspended.
+        let history = InitialHistoryController(suspendedCall: 1)
+        try await Self.withRig(
+            transcript: Self.replyLine(id: "msg_A", text: "A-REPLY", uuid: "a-1"),
+            makeStore: {
+                ReplyPanelStore(
+                    tailerStopper: { await stops.stop($0) },
+                    initialHistoryLoader: { await history.load($0, limit: $1) }
+                )
+            }
+        ) { rigA, store in
+            await store.refresh(workspace: rigA.workspace)
+
+            let workspaceB = rigA.tabManager.addWorkspace(select: true)
+            defer {
+                if rigA.tabManager.tabs.contains(where: { $0.id == workspaceB.id }) {
+                    rigA.tabManager.closeWorkspace(workspaceB)
+                }
+            }
+            let paneB = try #require(workspaceB.bonsplitController.allPaneIds.first)
+            let panelB = try #require(workspaceB.newTerminalSurface(inPane: paneB, focus: true)?.id)
+            let transcriptB = rigA.directory.appendingPathComponent("transcript-b-return.jsonl").path
+            FileManager.default.createFile(
+                atPath: transcriptB,
+                contents: Data(
+                    Self.replyLine(id: "msg_B", text: "B-REPLY", uuid: "b-1").utf8
+                )
+            )
+            let service = try #require(TerminalController.shared.agentChatTranscriptService)
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: "reply-panel-store-b-\(UUID().uuidString)",
+                hookEventName: .sessionStart,
+                source: "claude",
+                workspaceId: workspaceB.id.uuidString,
+                surfaceId: panelB.uuidString,
+                transcriptPath: transcriptB,
+                cwd: rigA.directory.path,
+                ppid: nil,
+                receivedAt: Date()
+            ))
+
+            let staleSwitch = Task { await store.refresh(workspace: workspaceB) }
+            await Self.waitUntil { history.isSuspended }
+            #expect(history.isSuspended)
+            #expect(stops.count == 1, "B should have retired A before reading history")
+
+            // B has created and started its candidate tailer, then suspended
+            // before publication. Returning to A creates a newer revision;
+            // when B resumes it must stop that candidate without publishing.
+            await store.refresh(workspace: rigA.workspace)
+            #expect(store.boundSessionID == rigA.sessionID)
+            #expect(store.boundPanelID == rigA.panelID)
+            #expect(Self.markdown(store)?.contains("A-REPLY") == true)
+
+            history.release()
+            await staleSwitch.value
+
+            #expect(store.boundSessionID == rigA.sessionID)
+            #expect(store.boundPanelID == rigA.panelID)
+            #expect(Self.markdown(store)?.contains("A-REPLY") == true)
+            #expect(Self.markdown(store)?.contains("B-REPLY") != true)
+            #expect(stops.count == 2, "the superseded B candidate tailer must also stop")
+        }
+    }
+
+    @Test("Only the waiting target retries, and bound metadata churn does not restart it")
+    func retryAndMetadataChurnAreTargetScoped() async throws {
+        let stops = TailerStopSpy()
+        try await Self.withRig(
+            transcript: nil,
+            makeStore: {
+                ReplyPanelStore(tailerStopper: { await stops.stop($0) })
+            }
+        ) { rig, store in
+            await store.refresh(workspace: rig.workspace)
+            #expect(store.model.state == .waiting)
+
+            FileManager.default.createFile(
+                atPath: rig.transcriptPath,
+                contents: Data(
+                    Self.replyLine(id: "msg_target", text: "TARGET-REPLY", uuid: "a-1").utf8
+                )
+            )
+
+            // A foreign turn ending must not turn a now-readable waiting
+            // target into a bound one. The matching turn is the authority.
+            NotificationCenter.default.post(
+                name: .agentChatSessionTurnDidFinish,
+                object: nil,
+                userInfo: [AgentChatTurnFinishedKeys.sessionID: "foreign-session"]
+            )
+            try? await Task.sleep(for: .milliseconds(100))
+            #expect(store.model.state == .waiting)
+            #expect(store.boundSessionID == nil)
+
+            NotificationCenter.default.post(
+                name: .agentChatSessionTurnDidFinish,
+                object: nil,
+                userInfo: [AgentChatTurnFinishedKeys.sessionID: rig.sessionID]
+            )
+            await Self.waitUntil { Self.markdown(store)?.contains("TARGET-REPLY") == true }
+            #expect(store.boundSessionID == rig.sessionID)
+
+            #expect(rig.workspace.setPanelCustomTitle(panelId: rig.panelID, title: "Renamed"))
+            await Self.waitUntil { store.identity == "Renamed" }
+            NotificationCenter.default.post(name: .agentChatSessionsDidChange, object: nil)
+            for _ in 0..<10 { await Task.yield() }
+
+            #expect(store.identity == "Renamed")
+            #expect(store.boundSessionID == rig.sessionID)
+            #expect(stops.count == 0, "same-target metadata must not replace the live tailer")
         }
     }
 

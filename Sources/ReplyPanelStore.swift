@@ -14,6 +14,48 @@ import Observation
 @MainActor
 @Observable
 final class ReplyPanelStore {
+    private struct BindingTarget: Equatable {
+        let workspaceID: UUID
+        let panelID: UUID
+        let sessionID: String
+    }
+
+    private struct BindingHeader {
+        let identity: String
+        let agentName: String
+    }
+
+    /// One source of truth for whether the panel may act on a session.
+    ///
+    /// A target becomes inactive as soon as a different bind starts. The
+    /// outgoing presentation can stay on screen while the replacement is
+    /// prepared, but delivery, drafts, paging, tail batches, and wakeups all
+    /// key off this state rather than independently mutable ids.
+    private enum BindingPhase {
+        case unbound
+        case binding(BindingTarget, revision: Int, retryPending: Bool)
+        case waiting(BindingTarget)
+        case unavailable(BindingTarget)
+        case bound(BindingTarget, revision: Int)
+    }
+
+    private enum RefreshCause {
+        case selection
+        case sessionsChanged
+        case titleChanged
+        case turnFinished
+        case retry
+
+        var retriesBinding: Bool {
+            switch self {
+            case .sessionsChanged, .turnFinished, .retry:
+                true
+            case .selection, .titleChanged:
+                false
+            }
+        }
+    }
+
     /// What the panel should render.
     private(set) var model = ReplyPanelModel()
 
@@ -37,7 +79,10 @@ final class ReplyPanelStore {
     /// into, and to read that pane's own lifecycle. Both must be the *bound*
     /// pane rather than the focused one — the binding is sticky, so the user
     /// can be looking elsewhere while the reply they annotated belongs here.
-    private(set) var boundPanelID: UUID?
+    var boundPanelID: UUID? {
+        guard case let .bound(target, _) = bindingPhase else { return nil }
+        return target.panelID
+    }
 
     /// How many transcript lines the initial read takes in.
     ///
@@ -60,7 +105,10 @@ final class ReplyPanelStore {
     /// Readable so the view can scope per-session state to it — `ReplyDrafts`
     /// keys on it, because a `seq` alone is a transcript line index that every
     /// session has. Still store-written only.
-    private(set) var boundSessionID: String?
+    var boundSessionID: String? {
+        guard case let .bound(target, _) = bindingPhase else { return nil }
+        return target.sessionID
+    }
 
     /// How many times the bound transcript has been replaced under us.
     ///
@@ -114,15 +162,14 @@ final class ReplyPanelStore {
     private(set) var drafts = ReplyDrafts()
     private var stickyPanelID: UUID?
     private var tailer: AgentChatTranscriptTailer?
-
-    /// Invalidates batches from a tailer the panel has already moved off.
-    ///
-    /// Stopping a tailer does not unschedule a batch already in flight, so
-    /// without this a workspace switch can land the previous agent's replies
-    /// in the new agent's panel.
-    private var generation = 0
+    private var bindingPhase: BindingPhase = .unbound
+    private var bindingRevision = 0
+    private var pendingHeader: BindingHeader?
 
     private var messages: [ChatMessage] = []
+    private let tailerStopper: @MainActor (AgentChatTranscriptTailer) async -> Void
+    private let initialHistoryLoader:
+        @MainActor (AgentChatTranscriptTailer, Int) async -> ChatHistoryPage
 
     /// Live subscription to agent turn endings.
     ///
@@ -152,6 +199,21 @@ final class ReplyPanelStore {
     /// does not keep it alive.
     private weak var followedWorkspace: Workspace?
 
+    init(
+        tailerStopper: @escaping @MainActor (AgentChatTranscriptTailer) async -> Void = {
+            await $0.stop()
+        },
+        initialHistoryLoader: @escaping @MainActor (
+            AgentChatTranscriptTailer,
+            Int
+        ) async -> ChatHistoryPage = { tailer, limit in
+            tailer.history(beforeSeq: nil, limit: limit)
+        }
+    ) {
+        self.tailerStopper = tailerStopper
+        self.initialHistoryLoader = initialHistoryLoader
+    }
+
     // MARK: - Driving
     deinit {
         // The sessions observer deliberately outlives `stop()` — waiting for
@@ -177,6 +239,10 @@ final class ReplyPanelStore {
     ///
     /// - Parameter workspace: The selected workspace, or `nil` when none is.
     func refresh(workspace: Workspace?) async {
+        await refresh(workspace: workspace, cause: .selection)
+    }
+
+    private func refresh(workspace: Workspace?, cause: RefreshCause) async {
         followedWorkspace = workspace
         observeSessionChanges()
         observeTitleChanges()
@@ -192,9 +258,15 @@ final class ReplyPanelStore {
         // observer on every refresh of an agentless workspace.
         observeTurnEndings()
 
-        identity = headerIdentity(workspace: workspace, panelID: panelID, record: record)
-        agentName = record.agentKind.displayName
-        boundPanelID = panelID
+        let target = BindingTarget(
+            workspaceID: workspace.id,
+            panelID: panelID,
+            sessionID: record.sessionID
+        )
+        let header = BindingHeader(
+            identity: headerIdentity(workspace: workspace, panelID: panelID, record: record),
+            agentName: record.agentKind.displayName
+        )
 
         // Before the early return, not after it. `applyConfiguredCap` used to
         // sit only in the bind path below, which made the setting reachable
@@ -207,13 +279,83 @@ final class ReplyPanelStore {
         // reads it.
         applyConfiguredCap()
 
-        guard record.sessionID != boundSessionID else {
-            // Already following this session. Only the header can have moved
-            // — a tab rename, or the pane picking up a title.
-            return
+        switch bindingPhase {
+        case let .bound(current, _):
+            guard current != target else {
+                commit(header: header)
+                return
+            }
+        case let .binding(current, revision, retryPending):
+            guard current != target else {
+                pendingHeader = header
+                if cause.retriesBinding, !retryPending {
+                    bindingPhase = .binding(current, revision: revision, retryPending: true)
+                }
+                return
+            }
+        case let .waiting(current), let .unavailable(current):
+            if current == target, case .titleChanged = cause {
+                commit(header: header)
+                return
+            }
+        case .unbound:
+            break
         }
 
-        await startTail(record: record, panelID: panelID, workspace: workspace)
+        await startTail(target: target, header: header, workspace: workspace)
+    }
+
+    private func commit(header: BindingHeader) {
+        identity = header.identity
+        agentName = header.agentName
+    }
+
+    private func currentRecord(for target: BindingTarget) -> AgentChatSessionRecord? {
+        guard let registry = TerminalController.shared.agentChatTranscriptService?.registry,
+              let record = registry.currentOrMostRecentSession(
+                  surfaceID: target.panelID.uuidString
+              ),
+              record.sessionID == target.sessionID else {
+            return nil
+        }
+        return record
+    }
+
+    private func isCurrentBinding(target: BindingTarget, revision: Int) -> Bool {
+        guard case let .binding(current, currentRevision, _) = bindingPhase else {
+            return false
+        }
+        return current == target && currentRevision == revision
+    }
+
+    private func takeRetryPending(target: BindingTarget, revision: Int) -> Bool {
+        guard case let .binding(current, currentRevision, retryPending) = bindingPhase,
+              current == target,
+              currentRevision == revision,
+              retryPending else {
+            return false
+        }
+        bindingPhase = .binding(current, revision: currentRevision, retryPending: false)
+        return true
+    }
+
+    private func isCurrentBound(target: BindingTarget, revision: Int) -> Bool {
+        guard case let .bound(current, currentRevision) = bindingPhase else {
+            return false
+        }
+        return current == target && currentRevision == revision
+    }
+
+    private func currentHeader(fallback: BindingHeader) -> BindingHeader {
+        pendingHeader ?? fallback
+    }
+
+    private func retryCurrentResolution() async {
+        guard let workspace = followedWorkspace else {
+            await unbind()
+            return
+        }
+        await refresh(workspace: workspace, cause: .sessionsChanged)
     }
 
     /// Re-opens the transcript after a read failure, for the error state's
@@ -221,8 +363,7 @@ final class ReplyPanelStore {
     ///
     /// - Parameter workspace: The selected workspace.
     func retry(workspace: Workspace?) async {
-        boundSessionID = nil
-        await refresh(workspace: workspace)
+        await refresh(workspace: workspace, cause: .retry)
     }
 
     /// Stops tailing and forgets the binding.
@@ -231,11 +372,15 @@ final class ReplyPanelStore {
             NotificationCenter.default.removeObserver(turnFinishedObserver)
             self.turnFinishedObserver = nil
         }
-        generation &+= 1
-        await tailer?.stop()
+        bindingRevision &+= 1
+        bindingPhase = .unbound
+        pendingHeader = nil
+        let outgoingTailer = tailer
         tailer = nil
-        boundSessionID = nil
         messages = []
+        if let outgoingTailer {
+            await tailerStopper(outgoingTailer)
+        }
     }
 
     // MARK: - Binding
@@ -299,10 +444,9 @@ final class ReplyPanelStore {
 
     /// Text typed into `group`'s paste preview, if any — `#cm-90`.
     ///
-    /// `nil` while the model still shows the previous session: `startTail`
-    /// sets `boundSessionID` before the new transcript loads, so for those
-    /// awaits the scope is the new session's while `group` is the old one's
-    /// (cold code review, 2026-09-13).
+    /// `nil` unless the displayed model and the active binding agree. During
+    /// a workspace switch the outgoing presentation may remain visible, but
+    /// the binding is inactive until its replacement commits.
     func typedPreview(for group: ReplyMessageGroup) -> String? {
         guard let scope = draftScope, model.sessionID == boundSessionID else { return nil }
         return drafts.typedPreview(for: group, in: scope)
@@ -314,8 +458,8 @@ final class ReplyPanelStore {
     /// which replies are exempt from the cap. It is what `Paste` sends while
     /// the preview is edited (`#cm-93`), but it is never parsed back.
     func setTypedPreview(_ text: String?, for group: ReplyMessageGroup) {
-        // Same gap as ``typedPreview(for:)``: a keystroke there would file the
-        // old reply's text under the new session's scope.
+        // Same boundary as ``typedPreview(for:)``: never file outgoing text
+        // under a replacement session while that replacement is binding.
         guard let scope = draftScope, model.sessionID == boundSessionID else { return }
         drafts.setTypedPreview(text, for: group, in: scope)
     }
@@ -350,10 +494,16 @@ final class ReplyPanelStore {
     /// absent or unusable value — which is where `0`, a negative and
     /// `"five"` all land, because the parser refuses to store them at all.
     private func applyConfiguredCap() {
-        model.setMaxMessagesBack(
-            UserDefaultsSettingsClient(defaults: .standard)
-                .value(for: SettingCatalog().reply.maxMessagesBack)
-        )
+        applyConfiguredCap(to: &model)
+    }
+
+    private func applyConfiguredCap(to model: inout ReplyPanelModel) {
+        model.setMaxMessagesBack(configuredCap())
+    }
+
+    private func configuredCap() -> Int {
+        UserDefaultsSettingsClient(defaults: .standard)
+            .value(for: SettingCatalog().reply.maxMessagesBack)
     }
 
     /// Steps to the next newer reply.
@@ -370,12 +520,12 @@ final class ReplyPanelStore {
     ///
     /// - Returns: `true` when the window grew, so a step is now possible.
     private func pageOlderHistory() async -> Bool {
-        guard model.hasMoreHistory,
+        guard case let .bound(target, revision) = bindingPhase,
+              model.hasMoreHistory,
               let tailer,
               let oldestSeq = messages.first?.seq else { return false }
-        let generation = generation
         let page = await tailer.history(beforeSeq: oldestSeq, limit: Self.historyPageLimit)
-        guard generation == self.generation else { return false }
+        guard isCurrentBound(target: target, revision: revision) else { return false }
 
         guard !page.messages.isEmpty else {
             // An empty page still carrying `hasMore` is the tailer saying
@@ -412,7 +562,12 @@ final class ReplyPanelStore {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                Task { await self.refresh(workspace: self.followedWorkspace) }
+                Task {
+                    await self.refresh(
+                        workspace: self.followedWorkspace,
+                        cause: .sessionsChanged
+                    )
+                }
             }
         }
     }
@@ -436,7 +591,12 @@ final class ReplyPanelStore {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                Task { await self.refresh(workspace: self.followedWorkspace) }
+                Task {
+                    await self.refresh(
+                        workspace: self.followedWorkspace,
+                        cause: .titleChanged
+                    )
+                }
             }
         }
     }
@@ -459,42 +619,61 @@ final class ReplyPanelStore {
                 .userInfo?[AgentChatTurnFinishedKeys.sessionID] as? String else { return }
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.model.markTurnFinished(sessionID: sessionID)
-
-                // Nothing bound means `startTail` found no transcript to open
-                // — the agent had not written one yet. The only other retry is
-                // `agentChatSessionsDidChange`, which fires on session start,
-                // first prompt and session end, so it races the file's
-                // creation and does not come back. Losing that race left the
-                // panel on "Waiting for the first message" through a whole
-                // completed turn.
-                //
-                // A turn ending is the one moment content is certain to exist,
-                // so it is the honest retry point. Cheap, too: this only runs
-                // while unbound, never on the ordinary per-turn path.
-                guard self.boundSessionID == nil else { return }
-                Task { await self.refresh(workspace: self.followedWorkspace) }
+                switch self.bindingPhase {
+                case let .bound(target, _):
+                    guard target.sessionID == sessionID else { return }
+                    self.model.markTurnFinished(sessionID: sessionID)
+                case let .binding(target, revision, retryPending):
+                    guard target.sessionID == sessionID else { return }
+                    if !retryPending {
+                        self.bindingPhase = .binding(
+                            target,
+                            revision: revision,
+                            retryPending: true
+                        )
+                    }
+                case let .waiting(target), let .unavailable(target):
+                    guard target.sessionID == sessionID else { return }
+                    self.model.markTurnFinished(sessionID: sessionID)
+                    Task {
+                        await self.refresh(
+                            workspace: self.followedWorkspace,
+                            cause: .turnFinished
+                        )
+                    }
+                case .unbound:
+                    Task {
+                        await self.refresh(
+                            workspace: self.followedWorkspace,
+                            cause: .turnFinished
+                        )
+                    }
+                }
             }
         }
     }
 
 
     private func unbind() async {
+        let revision = bindingRevision &+ 1
         await stop()
+        guard case .unbound = bindingPhase, bindingRevision == revision else { return }
         identity = nil
         agentName = nil
-        boundPanelID = nil
         model.unbind()
     }
 
     private func startTail(
-        record: AgentChatSessionRecord,
-        panelID: UUID,
+        target: BindingTarget,
+        header: BindingHeader,
         workspace: Workspace
     ) async {
-        generation &+= 1
-        let generation = generation
-        await tailer?.stop()
+        bindingRevision &+= 1
+        let revision = bindingRevision
+        bindingPhase = .binding(target, revision: revision, retryPending: false)
+        pendingHeader = header
+
+        let outgoingTailer = tailer
         tailer = nil
         // `messages` is private and nothing renders it, so clearing it now is
         // invisible — and it must be cleared now, or a batch arriving from
@@ -502,92 +681,105 @@ final class ReplyPanelStore {
         // agent's. `model` is what the panel draws, so it is deliberately
         // left showing the outgoing agent until the replacement is ready.
         messages = []
+        if let outgoingTailer {
+            await tailerStopper(outgoingTailer)
+        }
+        guard isCurrentBinding(target: target, revision: revision) else { return }
 
-        // No path recorded yet is a different fact from a path that will not
-        // open, and folding them together put a false sentence on the most
-        // common path in the feature. The session-start hook carries no
-        // transcript path — the record is created with `nil`
-        // (`CLI/cmux.swift:667`) and the path arrives with the first prompt —
-        // so every brand-new agent read as "Its transcript moved". Nothing had
-        // moved, and `waiting` was left unreachable in practice despite being
-        // written for exactly this.
-        //
-        // Both branches deliberately leave `boundSessionID` nil, so the next
-        // refresh retries rather than short-circuiting on "already following
-        // this session" (see the note above the claim below).
-        guard let path = record.transcriptPath,
-              FileManager.default.fileExists(atPath: path) else {
-            // No file yet. Claude's session-start hook records a well-formed
-            // path *before* creating anything at it — measured in
-            // `~/.cmuxterm/claude-hook-sessions.json`, where a fresh session
-            // reads `transcriptPath: <path>, exists: false` — so this is the
-            // ordinary state of every new agent, not a fault.
-            //
-            // Built whole and assigned once, for the same reason as the
-            // success path below.
-            var waiting = ReplyPanelModel()
-            waiting.bind(
-                sessionID: record.sessionID,
-                agentIsRunning: agentIsRunning(workspace: workspace, panelID: panelID)
+        while isCurrentBinding(target: target, revision: revision) {
+            // Re-read after stopping the old tailer. A session update can land
+            // while that stop is suspended; using the record captured before
+            // the await is the race that left workspace B waiting forever.
+            guard let record = currentRecord(for: target) else {
+                await retryCurrentResolution()
+                return
+            }
+
+            // No path recorded yet is different from a path that will not
+            // open. Both remain inactive so a matching wake can retry them.
+            guard let path = record.transcriptPath,
+                  FileManager.default.fileExists(atPath: path) else {
+                if takeRetryPending(target: target, revision: revision) {
+                    continue
+                }
+                var waiting = ReplyPanelModel()
+                waiting.bind(
+                    sessionID: target.sessionID,
+                    agentIsRunning: agentIsRunning(
+                        workspace: workspace,
+                        panelID: target.panelID
+                    )
+                )
+                commit(header: currentHeader(fallback: header))
+                model = waiting
+                pendingHeader = nil
+                bindingPhase = .waiting(target)
+                return
+            }
+            guard FileManager.default.isReadableFile(atPath: path) else {
+                if takeRetryPending(target: target, revision: revision) {
+                    continue
+                }
+                var unreadable = ReplyPanelModel()
+                unreadable.markUnreadable()
+                commit(header: currentHeader(fallback: header))
+                model = unreadable
+                pendingHeader = nil
+                bindingPhase = .unavailable(target)
+                return
+            }
+
+            let candidateTailer = AgentChatTranscriptTailer(
+                sessionID: target.sessionID,
+                agentKind: record.agentKind,
+                path: path
+            ) { [weak self] batch in
+                await self?.receive(batch: batch, target: target, revision: revision)
+            }
+
+            await candidateTailer.start()
+            let page = await initialHistoryLoader(candidateTailer, Self.initialHistoryLimit)
+            guard isCurrentBinding(target: target, revision: revision) else {
+                await tailerStopper(candidateTailer)
+                return
+            }
+            guard currentRecord(for: target)?.transcriptPath == path else {
+                await tailerStopper(candidateTailer)
+                guard isCurrentBinding(target: target, revision: revision) else { return }
+                continue
+            }
+
+            var replacement = ReplyPanelModel()
+            replacement.load(
+                groups: ReplyMessageGroup.groups(from: page.messages),
+                hasMoreHistory: page.hasMore,
+                sessionID: target.sessionID,
+                agentIsRunning: agentIsRunning(
+                    workspace: workspace,
+                    panelID: target.panelID
+                )
             )
-            model = waiting
+            applyConfiguredCap(to: &replacement)
+
+            // Header, body, resources, and active target cross the boundary
+            // together, with no suspension point between them.
+            commit(header: currentHeader(fallback: header))
+            messages = page.messages
+            model = replacement
+            tailer = candidateTailer
+            pendingHeader = nil
+            bindingPhase = .bound(target, revision: revision)
+            syncAnnotatedReplies()
             return
         }
-        guard FileManager.default.isReadableFile(atPath: path) else {
-            // The file is there and will not open — a permissions or media
-            // fault, which is a real thing to report rather than silence to
-            // wait through.
-            var unreadable = ReplyPanelModel()
-            unreadable.markUnreadable()
-            model = unreadable
-            return
-        }
-
-        // Claimed only once the transcript actually opened. Claiming it
-        // above the guard wedged the panel: `refresh` returns early on
-        // "already following this session", so a failed open was never
-        // retried and the error screen's own instruction — send the agent a
-        // message and the panel reconnects — could not work. A failed open
-        // must leave nothing bound for the next refresh to short-circuit on.
-        boundSessionID = record.sessionID
-
-        let tailer = AgentChatTranscriptTailer(
-            sessionID: record.sessionID,
-            agentKind: record.agentKind,
-            path: path
-        ) { [weak self] batch in
-            await self?.receive(batch: batch, generation: generation)
-        }
-        self.tailer = tailer
-
-        await tailer.start()
-        let page = await tailer.history(beforeSeq: nil, limit: Self.initialHistoryLimit)
-        guard generation == self.generation else { return }
-
-        // One mutation. Reset-then-fill here is what made the panel flash its
-        // empty state on every pane switch: the three awaits above each yield
-        // the main actor, and SwiftUI renders whatever the model holds at
-        // that moment.
-        messages = page.messages
-        model.load(
-            groups: ReplyMessageGroup.groups(from: page.messages),
-            hasMoreHistory: page.hasMore,
-            sessionID: record.sessionID,
-            agentIsRunning: agentIsRunning(workspace: workspace, panelID: panelID)
-        )
-        // Also here, because `load` resets the model — `load` carries the cap
-        // across its own reset, but this keeps the two paths from depending on
-        // that subtlety to agree.
-        applyConfiguredCap()
-        // `load` clears the model's exemption set, and `boundSessionID` has
-        // only just become this session — so the scope resolves here and not
-        // a line earlier. Drafts written against a different session or an
-        // earlier generation simply do not match, which is the intent.
-        syncAnnotatedReplies()
     }
 
-    private func receive(batch: AgentChatTranscriptTailer.Batch, generation: Int) async {
-        guard generation == self.generation else { return }
+    private func receive(
+        batch: AgentChatTranscriptTailer.Batch,
+        target: BindingTarget,
+        revision: Int
+    ) async {
+        guard isCurrentBound(target: target, revision: revision) else { return }
 
         if batch.didReset {
             messages = []
@@ -614,7 +806,7 @@ final class ReplyPanelStore {
                     beforeSeq: nil,
                     limit: Self.initialHistoryLimit
                 )
-                guard generation == self.generation else { return }
+                guard isCurrentBound(target: target, revision: revision) else { return }
                 messages = page.messages
                 model.apply(groups: ReplyMessageGroup.groups(from: messages))
                 model.noteHistory(hasMore: page.hasMore)
@@ -639,8 +831,8 @@ final class ReplyPanelStore {
         // either guess strands a reply wearing the wrong state. Told before
         // the groups are applied, so a batch carrying the prompt and the
         // first reply together resolves in the right order.
-        if let boundSessionID, batch.appended.contains(where: { $0.role == .user }) {
-            model.markTurnStarted(sessionID: boundSessionID)
+        if batch.appended.contains(where: { $0.role == .user }) {
+            model.markTurnStarted(sessionID: target.sessionID)
         }
 
         model.apply(groups: ReplyMessageGroup.groups(from: messages))
