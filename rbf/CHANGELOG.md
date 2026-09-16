@@ -7,6 +7,14 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 # 🔵⋯ [Unreleased]
 *Label a passage in one click instead of typing the same note again. Use the Reply panel from the keyboard — step through replies, and leave when you are done. Read the agent's reply with the line breaks it actually wrote.*
 
+# 🔵⋯ v0.27.2 (2026-09-16) — #cm-74.1
+
+## 🟠⋯ Changed for End Users
+- 2026-09-16 - feat | **Keep one browser pane loaded so you find it where you left it.** A browser pane idle for five minutes reloads when you come back to it — a Figma canvas comes back blank, a doc back at the top. Turn on **Keep Page Loaded** for a pane and it's exempted from that timer: a toolbar button when the pane is wide, an item in the `⋯` overflow menu when it's compact. Off by default, so nothing changes until you turn it on; the setting survives a restart. It doesn't protect the pane if the system is actually low on memory. (`#cm-74.1`)
+
+## 🟠⋯ Changed for Developers
+- Exempting a pane from discard reevaluates its scheduling on the spot — turning the flag on cancels an already-armed timer instead of waiting for it to fire once more, and turning it off re-arms one if the pane still qualifies. The exemption is read once, in `scheduleIfNeeded`, and never inside `blockers(for:)`, so it can't also suppress the emergency memory-pressure discard.
+
 ## 🟠⋯ Changed for End Users
 - 2026-09-15 - fix | **Switching between workspaces no longer leaves Reply on “Waiting for the first message” when the selected Claude has already replied.** Reply now changes its active session as one unit: while the next workspace is loading, the previous reply can remain visible but cannot receive a paste or a draft, and a late result from the workspace you left cannot replace the one you returned to. (`#cm-69.1c`)
 - 2026-09-14 - fix | **Typing in the middle of the paste preview keeps the caret where you put it.** Click anywhere before the end of the expanded preview and type: the first character landed there, but every one after it jumped to the very end. Now each keystroke, `⌫` and paste stays where you are — and `Paste` and `Paste & Send` send the text you edited, not the preview it started from. Once edited, `Paste & Send` no longer needs a written note. Clear the box and both buttons turn off; `Discard edits` brings the generated text back. (`#cm-93`)

@@ -85,6 +85,14 @@ Terminal links follow whatever routing you configured — usually into a cmux br
 - The browser action uses the page that is **loaded**, not what you have half-typed in the address bar. Editing the address bar retargets nothing until you press Return.
 - **Known limitation:** on a remote workspace whose proxy endpoint has not resolved yet, the action can open a page that was requested but never finished loading. Local workspaces are unaffected.
 
+## 🟠⋯ Keep one browser pane loaded so you find it where you left it
+
+A browser pane idle for five minutes reloads when you come back to it — Memory Saver's default, and usually the right trade. A Figma canvas or a long doc pays for that trade every time you return.
+
+- Turn on **Keep Page Loaded** for a pane you don't want reclaimed: a toolbar button when the pane is wide, an item in the `⋯` overflow menu when it's compact.
+- Off by default — nothing changes until you turn it on, and the setting survives a restart.
+- It exempts the pane from the timer only, not from an actual low-memory emergency; the system can still reclaim it if it needs to.
+
 ## 🟠⋯ Use the cmux you build as your everyday app
 
 The flavour installs as **cmux RBF** in `/Applications`, with its own green `RBF` banner icon, its own bundle id and its own socket — so it is something you open from the Dock rather than something you launch out of a build directory. Upstream's `cmux.app` is never read, written or replaced; it stays as the fallback, and both can run at once. `make install-rbf-plan` prints the whole plan and writes nothing; `make install-rbf` does it.
