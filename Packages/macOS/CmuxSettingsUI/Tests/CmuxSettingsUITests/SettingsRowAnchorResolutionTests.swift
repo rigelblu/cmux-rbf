@@ -181,6 +181,7 @@ struct SettingsRowAnchorResolutionTests {
         "setting:reset:reset-all",
         // `cm-69.3`: the Reply section's Reset row carries this anchor.
         "setting:reply:quick-labels",
+        "setting:terminal:restart-allowlisted-commands",
     ]
 
     @Test(arguments: rowConfigPaths)

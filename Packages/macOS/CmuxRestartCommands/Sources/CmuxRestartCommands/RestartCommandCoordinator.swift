@@ -75,17 +75,43 @@ public struct RestartCommandSettingsProjection: Equatable, Sendable {
     }
 }
 
+/// Structured fallback event emitted when entering degraded fallback mode.
+public struct RestartCommandFallbackDebugEvent: Equatable, Sendable {
+    public enum Reason: Equatable, Sendable {
+        case invalid(RestartCommandDefinitionError)
+        case unreadable
+        case missingAfterCustomization
+    }
+
+    public let reason: Reason
+    public let sourceIdentity: String?
+
+    public init(reason: Reason, sourceIdentity: String? = nil) {
+        self.reason = reason
+        self.sourceIdentity = sourceIdentity
+    }
+}
+
 /// One synchronous authority coordinator shared by lifecycle, Settings, and restore.
 public final class RestartCommandCoordinator: @unchecked Sendable {
     public let definitionsRepository: RestartCommandDefinitionsRepository
     public let stateRepository: RestartCommandStateRepository
+    public let bundledDefinitions: RestartCommandDefinitionSet?
+    public let onFallbackDebugEvent: (@Sendable (RestartCommandFallbackDebugEvent) -> Void)?
     private let coordinationLock = OSAllocatedUnfairLock(initialState: ())
     private let now: @Sendable () -> TimeInterval
     private let directoryExists: @Sendable (String) -> Bool
 
+    private struct InternalState {
+        var lastEmittedFallbackEvent: RestartCommandFallbackDebugEvent?
+    }
+    private let internalState = OSAllocatedUnfairLock(initialState: InternalState())
+
     public init(
         definitionsRepository: RestartCommandDefinitionsRepository,
         stateRepository: RestartCommandStateRepository,
+        bundledDefinitions: RestartCommandDefinitionSet? = try? BundledRestartCommandDefinitions.load(),
+        onFallbackDebugEvent: (@Sendable (RestartCommandFallbackDebugEvent) -> Void)? = nil,
         now: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 },
         directoryExists: @escaping @Sendable (String) -> Bool = { path in
             var isDirectory: ObjCBool = false
@@ -94,6 +120,8 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     ) {
         self.definitionsRepository = definitionsRepository
         self.stateRepository = stateRepository
+        self.bundledDefinitions = bundledDefinitions
+        self.onFallbackDebugEvent = onFallbackDebugEvent
         self.now = now
         self.directoryExists = directoryExists
     }
@@ -109,7 +137,7 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             let projection = effectiveStateUnserialized()
             return RestartCommandSettingsProjection(
                 state: projection.state,
-                commandCount: projection.definitions?.definitions.definitions.count ?? 0
+                commandCount: projection.definitions?.definitions.count ?? bundledDefinitions?.definitions.count ?? 0
             )
         }
     }
@@ -127,7 +155,7 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
                     rootGenerationID: generationID,
                     captureKind: kind
                 ),
-                definitions: definitions.definitions
+                definitions: definitions
             )
         }
     }
@@ -136,42 +164,62 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     @discardableResult
     public func setEnabled(_ enabled: Bool) -> RestartCommandAllowlistState {
         coordinationLock.withLock {
-            let definitionRead = definitionsRepository.read()
-            let definitionSnapshot: RestartCommandDefinitionSnapshot?
-            switch definitionRead {
-            case .snapshot(let snapshot):
-                definitionSnapshot = snapshot
-            case .invalid(let error):
-                guard !enabled else { return .disabledNeedsApproval(.invalidDefinitions(error)) }
-                definitionSnapshot = nil
-            case .unavailable:
-                guard !enabled else { return .disabledNeedsApproval(.stateUnavailable) }
-                definitionSnapshot = nil
+            guard let bundled = self.bundledDefinitions else {
+                return .disabledStateUnavailable
             }
-
             let existing: RestartCommandStateRecord? = switch stateRepository.load() {
-            case .record(let record): record
+            case .record(let record): record.isStructurallyValid ? record : nil
             case .missing, .unavailable: nil
             }
-            let digest = definitionSnapshot?.definitions.approvalDigest
-                ?? existing?.approvedDefinitionDigest
-                ?? RestartCommandDefinitionSet.appDefaults.approvalDigest
+            var record = existing ?? RestartCommandStateRecord.enabledDefaults(at: now())
+            if enabled {
+                record.setEnabled(
+                    true,
+                    definitionsAreAppDefaults: true,
+                    definitionDigest: bundled.approvalDigest,
+                    at: now()
+                )
+            } else {
+                record.setEnabled(
+                    false,
+                    definitionsAreAppDefaults: true,
+                    definitionDigest: record.approvedDefinitionDigest,
+                    at: now()
+                )
+            }
+            guard stateRepository.save(record) else {
+                return .disabledStateUnavailable
+            }
+            return effectiveStateUnserialized().state
+        }
+    }
+
+    /// Approves the current valid user definitions file and switches authority directly to it.
+    @discardableResult
+    public func approveCurrentDefinitions() -> RestartCommandAllowlistState {
+        coordinationLock.withLock {
+            guard self.bundledDefinitions != nil else {
+                return .disabledStateUnavailable
+            }
+            let userRead = definitionsRepository.read()
+            guard case .snapshot(let snapshot) = userRead else {
+                return effectiveStateUnserialized().state
+            }
+            let existing: RestartCommandStateRecord? = switch stateRepository.load() {
+            case .record(let record): record.isStructurallyValid ? record : nil
+            case .missing, .unavailable: nil
+            }
             var record = existing ?? RestartCommandStateRecord.enabledDefaults(at: now())
             record.setEnabled(
-                enabled,
-                definitionsAreAppDefaults: definitionSnapshot?.definitions == .appDefaults,
-                definitionDigest: digest,
+                true,
+                definitionsAreAppDefaults: false,
+                definitionDigest: snapshot.definitions.approvalDigest,
                 at: now()
             )
             guard stateRepository.save(record) else {
-                return .disabledNeedsApproval(.stateUnavailable)
+                return .disabledStateUnavailable
             }
-            guard let definitionSnapshot else { return .disabledByUser }
-            return RestartCommandAuthority.effectiveState(
-                record: record,
-                definitions: definitionSnapshot.definitions,
-                definitionsAreAppDefaults: definitionSnapshot.definitions == .appDefaults
-            )
+            return effectiveStateUnserialized().state
         }
     }
 
@@ -226,13 +274,13 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             switch firstProjection.state {
             case .disabledByUser:
                 return .quiet
-            case .disabledNeedsApproval(let reason):
-                let refusal: RestartCommandRestoreRefusalReason = switch reason {
-                case .stateUnavailable: .approvalUnavailable
-                case .definitionsChanged, .invalidDefinitions: .definitionsNeedApproval
-                }
-                return .plan(refusalPlan(request: request, candidates: boundCandidates, reason: refusal))
-            case .enabledAppDefaults, .enabledApproved:
+            case .disabledStateUnavailable:
+                return .plan(refusalPlan(
+                    request: request,
+                    candidates: boundCandidates,
+                    reason: .approvalUnavailable
+                ))
+            case .enabledAppDefaults, .enabledFallback, .enabledApproved:
                 break
             }
             guard let firstDefinitions = firstProjection.definitions,
@@ -258,13 +306,25 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             let plan = buildPlan(
                 request: request,
                 envelope: envelope,
-                definitions: firstDefinitions.definitions
+                definitions: firstDefinitions
             )
 
-            guard case .snapshot(let secondDefinitions) = definitionsRepository.read(),
-                  secondDefinitions.revision == firstDefinitions.revision,
-                  secondDefinitions.sourceIdentity == firstDefinitions.sourceIdentity,
+            let secondUserRead = definitionsRepository.read()
+            let secondUserObservationIdentity: String
+            switch secondUserRead {
+            case .missing:
+                secondUserObservationIdentity = "<missing>"
+            case .unavailable:
+                secondUserObservationIdentity = "<unavailable>"
+            case .invalid(_, let sourceIdentity):
+                secondUserObservationIdentity = sourceIdentity
+            case .snapshot(let snapshot):
+                secondUserObservationIdentity = snapshot.sourceIdentity
+            }
+
+            guard secondUserObservationIdentity == firstProjection.userObservationIdentity,
                   case .record(var secondRecord) = stateRepository.load(),
+                  secondRecord.isStructurallyValid,
                   secondRecord.revision == firstRecord.revision,
                   secondRecord.mode == firstRecord.mode,
                   secondRecord.approvedDefinitionDigest == firstRecord.approvedDefinitionDigest,
@@ -296,61 +356,139 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
 
     private struct Projection {
         let state: RestartCommandAllowlistState
-        let definitions: RestartCommandDefinitionSnapshot?
+        let definitions: RestartCommandDefinitionSet?
         let record: RestartCommandStateRecord?
+        let userObservationIdentity: String
     }
 
     private func effectiveStateUnserialized() -> Projection {
-        let definitionRead = definitionsRepository.read()
-        switch definitionRead {
-        case .invalid(let error):
+        guard let bundled = self.bundledDefinitions else {
             return Projection(
-                state: .disabledNeedsApproval(.invalidDefinitions(error)),
+                state: .disabledStateUnavailable,
                 definitions: nil,
-                record: nil
+                record: nil,
+                userObservationIdentity: ""
             )
+        }
+        let userRead = definitionsRepository.read()
+        let userObservationIdentity: String = switch userRead {
+        case .missing: "<missing>"
+        case .unavailable: "<unavailable>"
+        case .invalid(_, let sourceIdentity): sourceIdentity
+        case .snapshot(let snapshot): snapshot.sourceIdentity
+        }
+
+        let stateLoad = stateRepository.load()
+        let record: RestartCommandStateRecord
+        switch stateLoad {
         case .unavailable:
             return Projection(
-                state: .disabledNeedsApproval(.stateUnavailable),
+                state: .disabledStateUnavailable,
                 definitions: nil,
-                record: nil
+                record: nil,
+                userObservationIdentity: userObservationIdentity
             )
-        case .snapshot(let definitions):
-            switch stateRepository.load() {
-            case .record(let record):
+        case .missing:
+            let initial = RestartCommandStateRecord.enabledDefaults(at: now())
+            guard stateRepository.save(initial) else {
                 return Projection(
-                    state: RestartCommandAuthority.effectiveState(
-                        record: record,
-                        definitions: definitions.definitions,
-                        definitionsAreAppDefaults: definitions.definitions == .appDefaults
-                    ),
-                    definitions: definitions,
-                    record: record
-                )
-            case .missing:
-                guard definitions.definitions == .appDefaults else {
-                    return Projection(
-                        state: .disabledNeedsApproval(.definitionsChanged),
-                        definitions: definitions,
-                        record: nil
-                    )
-                }
-                let record = RestartCommandStateRecord.enabledDefaults(at: now())
-                guard stateRepository.save(record) else {
-                    return Projection(
-                        state: .disabledNeedsApproval(.stateUnavailable),
-                        definitions: definitions,
-                        record: nil
-                    )
-                }
-                return Projection(state: .enabledAppDefaults, definitions: definitions, record: record)
-            case .unavailable:
-                return Projection(
-                    state: .disabledNeedsApproval(.stateUnavailable),
-                    definitions: definitions,
-                    record: nil
+                    state: .disabledStateUnavailable,
+                    definitions: nil,
+                    record: nil,
+                    userObservationIdentity: userObservationIdentity
                 )
             }
+            record = initial
+        case .record(let loadedRecord):
+            guard loadedRecord.isStructurallyValid else {
+                return Projection(
+                    state: .disabledStateUnavailable,
+                    definitions: nil,
+                    record: nil,
+                    userObservationIdentity: userObservationIdentity
+                )
+            }
+            record = loadedRecord
+        }
+
+        let state = RestartCommandAuthority.effectiveState(
+            record: record,
+            bundledDefinitions: bundled,
+            userFileObservation: userRead
+        )
+
+        switch state {
+        case .disabledByUser, .disabledStateUnavailable:
+            internalState.withLock { $0.lastEmittedFallbackEvent = nil }
+            return Projection(
+                state: state,
+                definitions: nil,
+                record: record,
+                userObservationIdentity: userObservationIdentity
+            )
+        case .enabledAppDefaults:
+            internalState.withLock { $0.lastEmittedFallbackEvent = nil }
+            return Projection(
+                state: state,
+                definitions: bundled,
+                record: record,
+                userObservationIdentity: userObservationIdentity
+            )
+        case .enabledApproved:
+            internalState.withLock { $0.lastEmittedFallbackEvent = nil }
+            guard case .snapshot(let snapshot) = userRead else {
+                return Projection(
+                    state: .disabledStateUnavailable,
+                    definitions: nil,
+                    record: record,
+                    userObservationIdentity: userObservationIdentity
+                )
+            }
+            return Projection(
+                state: state,
+                definitions: snapshot.definitions,
+                record: record,
+                userObservationIdentity: userObservationIdentity
+            )
+        case .enabledFallback(let warning):
+            switch warning {
+            case .validUserDefinitionsChanged:
+                internalState.withLock { $0.lastEmittedFallbackEvent = nil }
+            case .unusableUserFile(let reason):
+                let debugReason: RestartCommandFallbackDebugEvent.Reason = switch reason {
+                case .invalid(let error): .invalid(error)
+                case .unreadable: .unreadable
+                case .missingAfterCustomization: .missingAfterCustomization
+                }
+                let sourceIdentity: String? = switch userRead {
+                case .invalid(_, let id): id
+                default: nil
+                }
+                emitFallbackDebugEvent(reason: debugReason, sourceIdentity: sourceIdentity)
+            }
+            return Projection(
+                state: state,
+                definitions: bundled,
+                record: record,
+                userObservationIdentity: userObservationIdentity
+            )
+        }
+    }
+
+    private func emitFallbackDebugEvent(
+        reason: RestartCommandFallbackDebugEvent.Reason,
+        sourceIdentity: String?
+    ) {
+        let event = RestartCommandFallbackDebugEvent(reason: reason, sourceIdentity: sourceIdentity)
+        let shouldEmit = internalState.withLock { state in
+            if state.lastEmittedFallbackEvent != event {
+                state.lastEmittedFallbackEvent = event
+                return true
+            }
+            return false
+        }
+        if shouldEmit {
+            onFallbackDebugEvent?(event)
         }
     }
 
@@ -359,7 +497,6 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     ) -> RestartCommandAuthorizationOutcome {
         let firstProjection = effectiveStateUnserialized()
         guard firstProjection.state.isEnabled,
-              let firstDefinitions = firstProjection.definitions,
               let firstRecord = firstProjection.record,
               let envelope = request.envelope,
               let identity = envelope.validatedIdentity,
@@ -374,10 +511,23 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
            firstRecord.automaticallyConsumedIdentities.contains(identity) {
             return .quiet
         }
-        guard case .snapshot(let secondDefinitions) = definitionsRepository.read(),
-              secondDefinitions.revision == firstDefinitions.revision,
-              secondDefinitions.sourceIdentity == firstDefinitions.sourceIdentity,
+
+        let secondUserRead = definitionsRepository.read()
+        let secondUserObservationIdentity: String
+        switch secondUserRead {
+        case .missing:
+            secondUserObservationIdentity = "<missing>"
+        case .unavailable:
+            secondUserObservationIdentity = "<unavailable>"
+        case .invalid(_, let sourceIdentity):
+            secondUserObservationIdentity = sourceIdentity
+        case .snapshot(let snapshot):
+            secondUserObservationIdentity = snapshot.sourceIdentity
+        }
+
+        guard secondUserObservationIdentity == firstProjection.userObservationIdentity,
               case .record(var record) = stateRepository.load(),
+              record.isStructurallyValid,
               record.revision == firstRecord.revision,
               record.mode == firstRecord.mode,
               record.approvedDefinitionDigest == firstRecord.approvedDefinitionDigest,

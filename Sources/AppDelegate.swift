@@ -1080,7 +1080,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             stateRepository: RestartCommandStateRepository(
                 fileURL: stateURL,
                 fileManager: fileManager
-            )
+            ),
+            onFallbackDebugEvent: { event in
+                #if DEBUG
+                cmuxDebugLog(
+                    "restart.commands.fallback reason=\(event.reason) sourceIdentity=\(event.sourceIdentity ?? "none")"
+                )
+                #endif
+            }
         )
     }()
     /// Separate Mac-only presentation persistence and projection. This store

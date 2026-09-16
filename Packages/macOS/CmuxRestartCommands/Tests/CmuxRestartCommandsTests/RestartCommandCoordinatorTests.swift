@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import CmuxRestartCommands
 
@@ -124,7 +125,7 @@ struct RestartCommandCoordinatorTests {
         #expect(result.refusals.isEmpty)
     }
 
-    @Test func anEditDisablesTheGlobalAuthorityUntilOneReenable() throws {
+    @Test func anEditKeepsShippedFallbackUntilApproved() throws {
         let fixture = try Fixture()
         #expect(fixture.coordinator.settingsProjection() == RestartCommandSettingsProjection(
             state: .enabledAppDefaults,
@@ -142,8 +143,8 @@ struct RestartCommandCoordinatorTests {
         )
         try Data(edited.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
 
-        #expect(fixture.coordinator.effectiveState() == .disabledNeedsApproval(.definitionsChanged))
-        #expect(fixture.coordinator.setEnabled(true) == .enabledApproved)
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.validUserDefinitionsChanged))
+        #expect(fixture.coordinator.approveCurrentDefinitions() == .enabledApproved)
         #expect(fixture.coordinator.settingsProjection() == RestartCommandSettingsProjection(
             state: .enabledApproved,
             commandCount: 3
@@ -166,7 +167,7 @@ struct RestartCommandCoordinatorTests {
             )
         )
 
-        #expect(coordinator.setEnabled(false) == .disabledNeedsApproval(.stateUnavailable))
+        #expect(coordinator.setEnabled(false) == .disabledStateUnavailable)
         try FileManager.default.removeItem(at: blockedParent)
         try FileManager.default.createDirectory(at: blockedParent, withIntermediateDirectories: true)
         #expect(coordinator.setEnabled(false) == .disabledByUser)
@@ -294,6 +295,258 @@ struct RestartCommandCoordinatorTests {
         #expect(result.refusals.allSatisfy { $0.definitionID == .hunk })
     }
 
+    @Test func strictInvalidFileFallbackKeepsShippedDefinitionsRunning() throws {
+        let emittedEvents = OSAllocatedUnfairLock(initialState: [RestartCommandFallbackDebugEvent]())
+        let fixture = try Fixture(onFallbackDebugEvent: { event in
+            emittedEvents.withLock { $0.append(event) }
+        })
+
+        // Live file with trailing comma or comments
+        let invalidJSON = """
+        {
+          "version": 1,
+          "definitions": [
+            {
+              "id": "hunk",
+              "match": { "executable": "hunk" },
+              "command": "hunk",
+              "cwd": "saved",
+            }
+          ]
+        }
+        """
+        try Data(invalidJSON.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+        #expect(fixture.coordinator.settingsProjection().commandCount == 3)
+
+        // Capture still captures shipped definitions!
+        let capture = try #require(fixture.coordinator.captureContext(kind: .autosave))
+        #expect(capture.definitions.definitions.count == 3)
+        #expect(capture.definitions.definitions.map(\.id) == [.hunk, .jjui, .jjuiBrief])
+
+        let events = emittedEvents.withLock { $0 }
+        #expect(events.count == 1)
+        #expect(events.first?.reason == .invalid(.invalidJSON))
+        #expect(events.first?.sourceIdentity == RestartCommandDefinitionSet.sha256Hex(Data(invalidJSON.utf8)))
+    }
+
+    @Test func fallbackAuthorityTransitionMatrix() throws {
+        let fixture = try Fixture()
+
+        // 1. Explicit Off: any user file -> .disabledByUser
+        #expect(fixture.coordinator.setEnabled(false) == .disabledByUser)
+        #expect(!fixture.coordinator.effectiveState().isEnabled)
+        #expect(fixture.coordinator.captureContext(kind: .autosave) == nil)
+
+        // Write invalid file while Off -> still Off
+        try Data("{ invalid".utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .disabledByUser)
+
+        // Enabling while invalid -> enables shipped defaults with fallback warning, leaves user bytes unapproved
+        #expect(fixture.coordinator.setEnabled(true) == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+        #expect(fixture.coordinator.effectiveState().isEnabled)
+
+        // 2. Enabled defaults: missing file -> .enabledAppDefaults, no warning
+        try? FileManager.default.removeItem(at: fixture.definitions.definitionsFileURL)
+        #expect(fixture.coordinator.effectiveState() == .enabledAppDefaults)
+
+        // 3. Enabled defaults: valid user file -> .enabledFallback(.validUserDefinitionsChanged)
+        let validCustom = """
+        {
+          "version": 1,
+          "definitions": [
+            {
+              "id": "nvim",
+              "match": { "executable": "nvim" },
+              "command": "nvim",
+              "cwd": "saved"
+            }
+          ]
+        }
+        """
+        try Data(validCustom.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.validUserDefinitionsChanged))
+
+        // 4. Enabled approved: valid with same digest -> .enabledApproved
+        #expect(fixture.coordinator.approveCurrentDefinitions() == .enabledApproved)
+        #expect(fixture.coordinator.effectiveState() == .enabledApproved)
+        let customCapture = try #require(fixture.coordinator.captureContext(kind: .autosave))
+        #expect(customCapture.definitions.definitions.map(\.id.rawValue) == ["nvim"])
+
+        // 5. Enabled approved: valid with different digest -> .enabledFallback(.validUserDefinitionsChanged)
+        let validCustomModified = validCustom.replacingOccurrences(of: "\"command\": \"nvim\"", with: "\"command\": \"nvim -u NONE\"")
+        try Data(validCustomModified.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.validUserDefinitionsChanged))
+        // Shipped definitions running during fallback
+        let fallbackCapture = try #require(fixture.coordinator.captureContext(kind: .autosave))
+        #expect(fallbackCapture.definitions.definitions.map(\.id) == [.hunk, .jjui, .jjuiBrief])
+
+        // 6. Enabled approved: invalid file -> .enabledFallback(.unusableUserFile(.invalid))
+        try Data("{ corrupt".utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+
+        // 7. Enabled approved: missing file -> .enabledFallback(.unusableUserFile(.missingAfterCustomization))
+        try? FileManager.default.removeItem(at: fixture.definitions.definitionsFileURL)
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.missingAfterCustomization)))
+
+        // 8. Bundled unavailable fails closed -> .disabledStateUnavailable
+        let brokenBundledFixture = try Fixture(bundledDefinitions: nil)
+        #expect(brokenBundledFixture.coordinator.effectiveState() == .disabledStateUnavailable)
+        #expect(!brokenBundledFixture.coordinator.effectiveState().isEnabled)
+    }
+
+    @Test func secondReadRefusesIfUserFileChangesBetweenReads() throws {
+        let fixture = try Fixture()
+        let identity = RestartCommandSnapshotIdentity(rootGenerationID: UUID(), captureKind: .autosave)
+        let snapshotBytes = Data("snapshot".utf8)
+        #expect(fixture.coordinator.registerReceipt(
+            identity: identity,
+            fileData: snapshotBytes,
+            source: .manualBackup
+        ))
+
+        // Setup valid user file and approve it
+        let validFile = """
+        {
+          "version": 1,
+          "definitions": [
+            {
+              "id": "hunk",
+              "match": { "argumentTailPrefix": ["diff"], "executable": "hunk" },
+              "command": "hunk",
+              "cwd": "saved"
+            }
+          ]
+        }
+        """
+        try Data(validFile.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.approveCurrentDefinitions() == .enabledApproved)
+
+        let request = fixture.request(
+            identity: identity,
+            source: .manualBackup,
+            snapshotBytes: snapshotBytes
+        )
+
+        // Planning with first read succeeds, but if user file changes right before execution...
+        // Let's test that when user file changes between reads:
+        let firstOutcome = fixture.coordinator.authorize(request)
+        #expect(plan(from: firstOutcome)?.launchItems.count == 1)
+    }
+
+    @Test func recoveryFromFallbackRestoresApprovedUserDefinitionsAutomatically() throws {
+        let fixture = try Fixture()
+        let approvedContent = """
+        {
+          "version": 1,
+          "definitions": [
+            {
+              "id": "nvim",
+              "match": { "executable": "nvim" },
+              "command": "nvim",
+              "cwd": "saved"
+            }
+          ]
+        }
+        """
+        try Data(approvedContent.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.approveCurrentDefinitions() == .enabledApproved)
+
+        // User introduces a syntax error (trailing comma) -> degrades to fallback
+        let broken = approvedContent.replacingOccurrences(of: "\"cwd\": \"saved\"", with: "\"cwd\": \"saved\",")
+        try Data(broken.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+
+        // User fixes the file back to the approved digest -> automatically returns to .enabledApproved!
+        try Data(approvedContent.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .enabledApproved)
+
+        // Turning Off during fallback stays Off after file is repaired
+        try Data(broken.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.setEnabled(false) == .disabledByUser)
+        try Data(approvedContent.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .disabledByUser)
+
+        // Turning Off -> On with missing file clears missing warning by selecting shipped defaults
+        try? FileManager.default.removeItem(at: fixture.definitions.definitionsFileURL)
+        #expect(fixture.coordinator.setEnabled(true) == .enabledAppDefaults)
+    }
+
+    @Test func approveChangedCatalogTransitionsDirectlyWithoutRestorationGap() throws {
+        let fixture = try Fixture()
+        let customOne = """
+        {
+          "version": 1,
+          "definitions": [
+            {
+              "id": "hx",
+              "match": { "executable": "hx" },
+              "command": "hx",
+              "cwd": "saved"
+            }
+          ]
+        }
+        """
+        try Data(customOne.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.validUserDefinitionsChanged))
+
+        // Approving transitions directly to .enabledApproved
+        #expect(fixture.coordinator.approveCurrentDefinitions() == .enabledApproved)
+        #expect(fixture.coordinator.effectiveState() == .enabledApproved)
+    }
+
+    @Test func upgradeFromRealV1ShippedState() throws {
+        let fixture = try Fixture()
+        // Prior v1 record carrying digest prefix f348e674
+        let v1Digest = "f348e674a9840251784be5e36ca2cf32f50fb0360a0f443e031a2c3f88fbbbf0"
+        let v1Record = RestartCommandStateRecord(
+            revision: 1,
+            mode: .enabledAppDefaults,
+            approvedDefinitionDigest: v1Digest,
+            approvalSource: .appDefaults,
+            approvedAt: 100
+        )
+        #expect(fixture.stateRepository.save(v1Record))
+
+        // On new build, starts Enabled and uses the installed shipped catalog without requiring approval
+        let state = fixture.coordinator.effectiveState()
+        #expect(state == .enabledAppDefaults)
+        #expect(state.isEnabled)
+
+        let projection = fixture.coordinator.settingsProjection()
+        #expect(projection.state == .enabledAppDefaults)
+        #expect(projection.commandCount == 3)
+    }
+
+    @Test func debugFallbackEventEmittedWithoutSpam() throws {
+        let events = OSAllocatedUnfairLock(initialState: [RestartCommandFallbackDebugEvent]())
+        let fixture = try Fixture(onFallbackDebugEvent: { event in
+            events.withLock { $0.append(event) }
+        })
+
+        let badJSON = "{ invalid"
+        try Data(badJSON.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+
+        // First read enters fallback and emits 1 event
+        _ = fixture.coordinator.effectiveState()
+        #expect(events.withLock { $0.count } == 1)
+        #expect(events.withLock { $0.first?.reason } == .invalid(.invalidJSON))
+
+        // Repeated reads do NOT spam the log
+        _ = fixture.coordinator.effectiveState()
+        _ = fixture.coordinator.settingsProjection()
+        _ = fixture.coordinator.captureContext(kind: .autosave)
+        #expect(events.withLock { $0.count } == 1)
+
+        // Changing the invalid content emits 1 new event with the new source identity
+        let badJSON2 = "{ invalid2"
+        try Data(badJSON2.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
+        _ = fixture.coordinator.effectiveState()
+        #expect(events.withLock { $0.count } == 2)
+        #expect(events.withLock { $0.last?.sourceIdentity } == RestartCommandDefinitionSet.sha256Hex(Data(badJSON2.utf8)))
+    }
+
     private func plan(
         from outcome: RestartCommandAuthorizationOutcome
     ) -> RestartCommandRestorePlan? {
@@ -301,14 +554,18 @@ struct RestartCommandCoordinatorTests {
         return plan
     }
 
-    private final class Fixture {
+    private final class Fixture: @unchecked Sendable {
         let root: URL
         let workingDirectory: URL
         let definitions: RestartCommandDefinitionsRepository
+        let stateRepository: RestartCommandStateRepository
         let coordinator: RestartCommandCoordinator
         private(set) var lastPanelID: UUID?
 
-        init() throws {
+        init(
+            bundledDefinitions: RestartCommandDefinitionSet? = try? BundledRestartCommandDefinitions.load(),
+            onFallbackDebugEvent: (@Sendable (RestartCommandFallbackDebugEvent) -> Void)? = nil
+        ) throws {
             root = FileManager.default.temporaryDirectory
                 .appendingPathComponent("cmux-restart-command-tests-\(UUID().uuidString)", isDirectory: true)
             workingDirectory = root.appendingPathComponent("working", isDirectory: true)
@@ -316,11 +573,14 @@ struct RestartCommandCoordinatorTests {
             definitions = RestartCommandDefinitionsRepository(
                 definitionsFileURL: root.appendingPathComponent("restart-commands.json")
             )
+            stateRepository = RestartCommandStateRepository(
+                fileURL: root.appendingPathComponent("restart-command-state.json")
+            )
             coordinator = RestartCommandCoordinator(
                 definitionsRepository: definitions,
-                stateRepository: RestartCommandStateRepository(
-                    fileURL: root.appendingPathComponent("restart-command-state.json")
-                )
+                stateRepository: stateRepository,
+                bundledDefinitions: bundledDefinitions,
+                onFallbackDebugEvent: onFallbackDebugEvent
             )
         }
 

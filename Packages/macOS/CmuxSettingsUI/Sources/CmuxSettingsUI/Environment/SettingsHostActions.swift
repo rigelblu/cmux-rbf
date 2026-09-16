@@ -4,26 +4,31 @@ import Foundation
 
 /// Host-owned global restart state projected into the package-only Settings UI.
 public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
-    case enabledBuiltIn(commandCount: Int)
+    public enum ShippedWarning: Equatable, Sendable {
+        case validChanged
+        case unusableUserFile(validationMessage: String?)
+    }
+
+    case enabledShipped(commandCount: Int)
     case enabledApproved(commandCount: Int)
+    case enabledFallback(warning: ShippedWarning)
     case off
-    case needsApproval(validationMessage: String?)
     case stateUnavailable
 
     public var isEnabled: Bool {
         switch self {
-        case .enabledBuiltIn, .enabledApproved: true
-        case .off, .needsApproval, .stateUnavailable: false
+        case .enabledShipped, .enabledApproved, .enabledFallback: true
+        case .off, .stateUnavailable: false
         }
     }
 
     public var displayText: String {
         switch self {
-        case .enabledBuiltIn(let commandCount):
+        case .enabledShipped(let commandCount):
             String.localizedStringWithFormat(
                 String(
-                    localized: "settings.terminal.restartCommands.status.builtIn",
-                    defaultValue: "Enabled · %lld built-in commands"
+                    localized: "settings.terminal.restartCommands.status.shipped",
+                    defaultValue: "Enabled · %lld shipped definitions"
                 ),
                 Int64(commandCount)
             )
@@ -31,17 +36,17 @@ public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
             String.localizedStringWithFormat(
                 String(
                     localized: "settings.terminal.restartCommands.status.approved",
-                    defaultValue: "Enabled · %lld approved commands"
+                    defaultValue: "Enabled · %lld approved definitions"
                 ),
                 Int64(commandCount)
             )
+        case .enabledFallback:
+            String(
+                localized: "settings.terminal.restartCommands.status.fallback",
+                defaultValue: "Enabled · Using shipped definitions"
+            )
         case .off:
             String(localized: "settings.terminal.restartCommands.status.off", defaultValue: "Off")
-        case .needsApproval:
-            String(
-                localized: "settings.terminal.restartCommands.status.needsApproval",
-                defaultValue: "Off · Review changes before re-enabling"
-            )
         case .stateUnavailable:
             String(
                 localized: "settings.terminal.restartCommands.status.stateUnavailable",
@@ -95,6 +100,9 @@ public protocol SettingsHostActions: AnyObject {
     func setRestartAllowlistedCommandsEnabled(
         _ enabled: Bool
     ) -> RestartAllowlistedCommandsSettingsMutationResult
+
+    /// Approves current custom definitions in fallback mode.
+    func approveRestartCommandDefinitions() -> RestartAllowlistedCommandsSettingsMutationResult
 
     /// Materializes and opens the dedicated definitions file.
     @discardableResult
@@ -342,6 +350,10 @@ public extension SettingsHostActions {
     ) -> RestartAllowlistedCommandsSettingsMutationResult {
         _ = enabled
         return .init(status: restartAllowlistedCommandsStatus())
+    }
+
+    func approveRestartCommandDefinitions() -> RestartAllowlistedCommandsSettingsMutationResult {
+        .init(status: restartAllowlistedCommandsStatus())
     }
 
     func openRestartCommandDefinitionsFile() -> Bool { false }

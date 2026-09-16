@@ -105,6 +105,125 @@ struct RestartCommandDefinitionTests {
         }
     }
 
+    @Test func bundledResourceLoadsShippedDefaults() throws {
+        let bundled = try BundledRestartCommandDefinitions.load()
+        #expect(bundled.definitions.count == 3)
+        #expect(bundled.definitions.map(\.id) == [.hunk, .jjui, .jjuiBrief])
+        #expect(bundled.definition(id: .hunk)?.command == "hunk")
+        #expect(bundled.definition(id: .jjui)?.command == "jjui")
+        #expect(bundled.definition(id: .jjuiBrief)?.command == "jjui-brief")
+    }
+
+    @Test func genericIdentifiersValidateSlugsAndAllowCustomEntries() throws {
+        #expect(RestartCommandDefinitionID(rawValue: "nvim") != nil)
+        #expect(RestartCommandDefinitionID(rawValue: "hx") != nil)
+        #expect(RestartCommandDefinitionID(rawValue: "custom-tui-1") != nil)
+        #expect(RestartCommandDefinitionID(rawValue: "0") != nil)
+
+        #expect(RestartCommandDefinitionID(rawValue: "") == nil)
+        #expect(RestartCommandDefinitionID(rawValue: "NVIM") == nil)
+        #expect(RestartCommandDefinitionID(rawValue: "a_b") == nil)
+        #expect(RestartCommandDefinitionID(rawValue: "a b") == nil)
+        #expect(RestartCommandDefinitionID(rawValue: "-start") == nil)
+        #expect(RestartCommandDefinitionID(rawValue: String(repeating: "a", count: 33)) == nil)
+
+        let customJSON = """
+        {
+          "version": 1,
+          "definitions": [
+            {
+              "id": "nvim",
+              "match": { "executable": "nvim" },
+              "command": "nvim",
+              "cwd": "saved"
+            }
+          ]
+        }
+        """
+        let decoded = try RestartCommandDefinitionSet.decodeJSON(Data(customJSON.utf8))
+        #expect(decoded.definitions.count == 1)
+        #expect(decoded.definitions.first?.id.rawValue == "nvim")
+        #expect(decoded.definition(id: RestartCommandDefinitionID(rawValue: "nvim")!)?.command == "nvim")
+    }
+
+    @Test func strictJSONRejectsTrailingCommas() {
+        let trailingComma = Data(
+            #"""
+            {
+              "version": 1,
+              "definitions": [
+                {
+                  "id": "nvim",
+                  "match": { "executable": "nvim" },
+                  "command": "nvim",
+                  "cwd": "saved",
+                }
+              ]
+            }
+            """#.utf8
+        )
+        #expect(throws: RestartCommandDefinitionError.invalidJSON) {
+            try RestartCommandDefinitionSet.decodeJSON(trailingComma)
+        }
+    }
+
+    @Test func definitionCountBoundsEnforced() throws {
+        #expect(throws: RestartCommandDefinitionError.incompleteDefinitionSet) {
+            try RestartCommandDefinitionSet(definitions: [])
+        }
+
+        let one = try RestartCommandDefinitionSet(definitions: [
+            RestartCommandDefinition(
+                id: .hunk,
+                match: RestartCommandMatchDefinition(executable: "hunk"),
+                command: "hunk",
+                cwd: .saved
+            )
+        ])
+        #expect(one.definitions.count == 1)
+
+        let thirtyTwoDefinitions = (1...32).map { index in
+            RestartCommandDefinition(
+                id: RestartCommandDefinitionID(rawValue: "app-\(index)")!,
+                match: RestartCommandMatchDefinition(executable: "app-\(index)"),
+                command: "app-\(index)",
+                cwd: .saved
+            )
+        }
+        let thirtyTwo = try RestartCommandDefinitionSet(definitions: thirtyTwoDefinitions)
+        #expect(thirtyTwo.definitions.count == 32)
+
+        let thirtyThreeDefinitions = (1...33).map { index in
+            RestartCommandDefinition(
+                id: RestartCommandDefinitionID(rawValue: "app-\(index)")!,
+                match: RestartCommandMatchDefinition(executable: "app-\(index)"),
+                command: "app-\(index)",
+                cwd: .saved
+            )
+        }
+        #expect(throws: RestartCommandDefinitionError.incompleteDefinitionSet) {
+            try RestartCommandDefinitionSet(definitions: thirtyThreeDefinitions)
+        }
+
+        let duplicateDefinitions = [
+            RestartCommandDefinition(
+                id: .hunk,
+                match: RestartCommandMatchDefinition(executable: "hunk"),
+                command: "hunk",
+                cwd: .saved
+            ),
+            RestartCommandDefinition(
+                id: .hunk,
+                match: RestartCommandMatchDefinition(executable: "hunk"),
+                command: "hunk-two",
+                cwd: .saved
+            ),
+        ]
+        #expect(throws: RestartCommandDefinitionError.duplicateDefinition) {
+            try RestartCommandDefinitionSet(definitions: duplicateDefinitions)
+        }
+    }
+
     private func evidence(
         argv: [String],
         configDirectory: RestartCommandEnvironmentEvidence

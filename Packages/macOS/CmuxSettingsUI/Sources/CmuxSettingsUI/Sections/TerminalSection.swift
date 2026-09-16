@@ -74,7 +74,7 @@ public struct TerminalSection: View {
             startObservingSettings()
             for await status in hostActions.restartAllowlistedCommandsStatusUpdates() {
                 restartCommandsStatus = status
-                if case .needsApproval(let validationMessage) = status {
+                if case .enabledFallback(.unusableUserFile(let validationMessage)) = status {
                     restartCommandsInlineError = validationMessage
                 } else {
                     restartCommandsInlineError = nil
@@ -198,7 +198,7 @@ public struct TerminalSection: View {
         SettingsCard {
             SettingsCardRow(
                 configurationReview: .settingsOnly,
-                searchAnchorID: "settings.terminal.restart-allowlisted-commands",
+                searchAnchorID: "setting:terminal:restart-allowlisted-commands",
                 String(
                     localized: "settings.terminal.restartCommands",
                     defaultValue: "Restart Allowlisted Commands"
@@ -240,17 +240,64 @@ public struct TerminalSection: View {
                         .accessibilityValue(Text(restartCommandsStatus.displayText))
                     }
 
-                    Button(
-                        String(
-                            localized: "settings.terminal.restartCommands.openDefinitions",
-                            defaultValue: "Open Definitions File"
-                        )
-                    ) {
-                        _ = hostActions.openRestartCommandDefinitionsFile()
+                    HStack(spacing: 8) {
+                        if case .enabledFallback(.validChanged) = restartCommandsStatus {
+                            Button(
+                                String(
+                                    localized: "settings.terminal.restartCommands.approveChanges",
+                                    defaultValue: "Approve Changes"
+                                )
+                            ) {
+                                let result = hostActions.approveRestartCommandDefinitions()
+                                restartCommandsStatus = result.status
+                                restartCommandsInlineError = result.inlineError
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .accessibilityIdentifier("SettingsRestartCommandsApproveChangesButton")
+                        }
+
+                        Button(
+                            String(
+                                localized: "settings.terminal.restartCommands.openDefinitions",
+                                defaultValue: "Open Definitions File"
+                            )
+                        ) {
+                            _ = hostActions.openRestartCommandDefinitionsFile()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .accessibilityIdentifier("SettingsRestartCommandsOpenDefinitionsButton")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .accessibilityIdentifier("SettingsRestartCommandsOpenDefinitionsButton")
+
+                    if case .enabledFallback(let warning) = restartCommandsStatus {
+                        switch warning {
+                        case .validChanged:
+                            Text(
+                                String(
+                                    localized: "settings.terminal.restartCommands.definitionsChangedWarning",
+                                    defaultValue: "Custom definitions changed — review to use them."
+                                )
+                            )
+                            .cmuxFont(.caption)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("SettingsRestartCommandsChangedWarning")
+                        case .unusableUserFile:
+                            Text(
+                                String(
+                                    localized: "settings.terminal.restartCommands.fallbackWarning",
+                                    defaultValue: "Your definitions file couldn’t be used. Shipped definitions are running; custom definitions aren’t."
+                                )
+                            )
+                            .cmuxFont(.caption)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("SettingsRestartCommandsFallbackWarning")
+                        }
+                    }
 
                     if let restartCommandsInlineError {
                         Text(restartCommandsInlineError)

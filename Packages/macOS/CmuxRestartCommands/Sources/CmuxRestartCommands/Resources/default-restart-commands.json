@@ -1,0 +1,42 @@
+{
+  "$schema": "./restart-commands.schema.json",
+  "version": 1,
+  "definitions": [
+    {
+      "id": "hunk",
+      "match": {
+        "executable": "hunk",
+        "argumentTailPrefix": ["diff"]
+      },
+      "command": "hunk",
+      "cwd": "saved"
+    },
+    {
+      "id": "jjui",
+      "match": {
+        "executable": "jjui",
+        "environment": {
+          "JJUI_CONFIG_DIR": {
+            "state": "absent"
+          }
+        }
+      },
+      "command": "jjui",
+      "cwd": "saved"
+    },
+    {
+      "id": "jjui-brief",
+      "match": {
+        "executable": "jjui",
+        "environment": {
+          "JJUI_CONFIG_DIR": {
+            "state": "present",
+            "normalizedFinalComponent": "jjui-brief"
+          }
+        }
+      },
+      "command": "jjui-brief",
+      "cwd": "saved"
+    }
+  ]
+}

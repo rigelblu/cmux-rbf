@@ -2,20 +2,72 @@ public import Foundation
 internal import CryptoKit
 
 /// Stable identifiers for commands cmux may restart after restoring a pane.
-public enum RestartCommandDefinitionID: String, Codable, CaseIterable, Sendable {
-    case jjui
-    case jjuiBrief = "jjui-brief"
-    case hunk
+public struct RestartCommandDefinitionID: RawRepresentable, Codable, Equatable, Hashable, Sendable, Comparable, CustomStringConvertible, ExpressibleByStringLiteral {
+    public let rawValue: String
+
+    public static func isValidSlug(_ value: String) -> Bool {
+        guard !value.isEmpty, value.utf8.count <= 32 else { return false }
+        let utf8 = value.utf8
+        guard let first = utf8.first else { return false }
+        let isFirstValid = (first >= UInt8(ascii: "a") && first <= UInt8(ascii: "z")) ||
+                           (first >= UInt8(ascii: "0") && first <= UInt8(ascii: "9"))
+        guard isFirstValid else { return false }
+
+        for byte in utf8.dropFirst() {
+            let isValid = (byte >= UInt8(ascii: "a") && byte <= UInt8(ascii: "z")) ||
+                          (byte >= UInt8(ascii: "0") && byte <= UInt8(ascii: "9")) ||
+                          byte == UInt8(ascii: "-")
+            guard isValid else { return false }
+        }
+        return true
+    }
+
+    public init?(rawValue: String) {
+        guard Self.isValidSlug(rawValue) else { return nil }
+        self.rawValue = rawValue
+    }
+
+    public init(stringLiteral value: String) {
+        guard let id = RestartCommandDefinitionID(rawValue: value) else {
+            fatalError("Invalid restart command definition id: \(value)")
+        }
+        self = id
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        guard let id = RestartCommandDefinitionID(rawValue: raw) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid restart command definition id: \(raw)"
+            )
+        }
+        self = id
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    public var description: String { rawValue }
+    public var displayName: String { rawValue }
+
+    public static func < (lhs: RestartCommandDefinitionID, rhs: RestartCommandDefinitionID) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+
+    public static let hunk = RestartCommandDefinitionID(rawValue: "hunk")!
+    public static let jjui = RestartCommandDefinitionID(rawValue: "jjui")!
+    public static let jjuiBrief = RestartCommandDefinitionID(rawValue: "jjui-brief")!
 
     /// The canonical order used for normalization and presentation.
     public static let canonicalOrder: [RestartCommandDefinitionID] = [
+        .hunk,
         .jjui,
         .jjuiBrief,
-        .hunk,
     ]
-
-    /// App-owned display name. It is intentionally excluded from approval authority.
-    public var displayName: String { rawValue }
 }
 
 /// A targeted environment condition used only while observing a live process.
@@ -91,6 +143,7 @@ public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
     case emptyCommand
     case unsafeCommand
     case commandTooLong
+    case unusableBundledResource
 
     /// Stable user-facing validation copy for the Settings inline error slot.
     public var localizedMessage: String {
@@ -103,14 +156,31 @@ public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
         default:
             return String(
                 localized: "settings.terminal.restartCommands.validation.invalidDefinitions",
-                defaultValue: "Fix all three command definitions before re-enabling."
+                defaultValue: "Fix all command definitions before re-enabling."
             )
         }
     }
 }
 
-/// A complete, normalized three-command definition set.
+/// Shipped restart command definitions loaded from the app bundle resource.
+public enum BundledRestartCommandDefinitions {
+    public static func load() throws -> RestartCommandDefinitionSet {
+        try load(bundle: .module)
+    }
+
+    public static func load(bundle: Bundle) throws -> RestartCommandDefinitionSet {
+        guard let url = bundle.url(forResource: "default-restart-commands", withExtension: "json") else {
+            throw RestartCommandDefinitionError.unusableBundledResource
+        }
+        let data = try Data(contentsOf: url)
+        return try RestartCommandDefinitionSet.decodeJSON(data)
+    }
+}
+
+/// A complete, normalized restart command definition set.
 public struct RestartCommandDefinitionSet: Equatable, Sendable {
+    public static let minimumDefinitionCount = 1
+    public static let maximumDefinitionCount = 32
     public static let schemaVersion = 1
     public static let maximumCommandUTF8Bytes = 1_000
     public static let approvalDomain = Data("cmux.restart-commands.approval.v1".utf8)
@@ -122,48 +192,54 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
         self.definitions = try Self.validatedAndSorted(definitions)
     }
 
-    /// The three app-owned definitions used when no editable file exists.
-    public static let appDefaults: RestartCommandDefinitionSet = try! RestartCommandDefinitionSet(
-        definitions: [
-            RestartCommandDefinition(
-                id: .jjui,
-                match: RestartCommandMatchDefinition(
-                    executable: "jjui",
-                    environment: [
-                        "JJUI_CONFIG_DIR": RestartCommandEnvironmentPredicate(state: .absent),
-                    ]
+    /// The app-owned definitions loaded from the bundled resource, with in-code fallback.
+    public static let appDefaults: RestartCommandDefinitionSet = {
+        if let bundled = try? BundledRestartCommandDefinitions.load() {
+            return bundled
+        }
+        return try! RestartCommandDefinitionSet(
+            definitions: [
+                RestartCommandDefinition(
+                    id: .hunk,
+                    match: RestartCommandMatchDefinition(
+                        executable: "hunk",
+                        argumentTailPrefix: ["diff"]
+                    ),
+                    command: "hunk",
+                    cwd: .saved
                 ),
-                command: "jjui",
-                cwd: .saved
-            ),
-            RestartCommandDefinition(
-                id: .jjuiBrief,
-                match: RestartCommandMatchDefinition(
-                    executable: "jjui",
-                    environment: [
-                        "JJUI_CONFIG_DIR": RestartCommandEnvironmentPredicate(
-                            state: .present,
-                            normalizedFinalComponent: "jjui-brief"
-                        ),
-                    ]
+                RestartCommandDefinition(
+                    id: .jjui,
+                    match: RestartCommandMatchDefinition(
+                        executable: "jjui",
+                        environment: [
+                            "JJUI_CONFIG_DIR": RestartCommandEnvironmentPredicate(state: .absent),
+                        ]
+                    ),
+                    command: "jjui",
+                    cwd: .saved
                 ),
-                command: "jjui-brief",
-                cwd: .saved
-            ),
-            RestartCommandDefinition(
-                id: .hunk,
-                match: RestartCommandMatchDefinition(
-                    executable: "hunk",
-                    argumentTailPrefix: ["diff"]
+                RestartCommandDefinition(
+                    id: .jjuiBrief,
+                    match: RestartCommandMatchDefinition(
+                        executable: "jjui",
+                        environment: [
+                            "JJUI_CONFIG_DIR": RestartCommandEnvironmentPredicate(
+                                state: .present,
+                                normalizedFinalComponent: "jjui-brief"
+                            ),
+                        ]
+                    ),
+                    command: "jjui-brief",
+                    cwd: .saved
                 ),
-                command: "hunk",
-                cwd: .saved
-            ),
-        ]
-    )
+            ]
+        )
+    }()
 
     /// Decodes strict JSON. `$schema` is editor metadata and never enters authority.
     public static func decodeJSON(_ data: Data) throws -> RestartCommandDefinitionSet {
+        try validateStrictJSONSyntax(data)
         let object: Any
         do {
             object = try JSONSerialization.jsonObject(with: data)
@@ -272,49 +348,50 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
 
     /// Pretty JSON defaults materialized only when the editable file is missing.
     public func editableDefaultsData(schemaFileName: String = "restart-commands.schema.json") -> Data {
-        let source = """
-        {
-          "$schema": "./\(schemaFileName)",
-          "version": 1,
-          "definitions": [
-            {
-              "id": "jjui",
-              "match": {
-                "executable": "jjui",
-                "environment": {
-                  "JJUI_CONFIG_DIR": { "state": "absent" }
-                }
-              },
-              "command": "jjui",
-              "cwd": "saved"
-            },
-            {
-              "id": "jjui-brief",
-              "match": {
-                "executable": "jjui",
-                "environment": {
-                  "JJUI_CONFIG_DIR": {
-                    "state": "present",
-                    "normalizedFinalComponent": "jjui-brief"
-                  }
-                }
-              },
-              "command": "jjui-brief",
-              "cwd": "saved"
-            },
-            {
-              "id": "hunk",
-              "match": {
-                "executable": "hunk",
-                "argumentTailPrefix": ["diff"]
-              },
-              "command": "hunk",
-              "cwd": "saved"
+        var lines: [String] = [
+            "{",
+            "  \"$schema\": \"./\(schemaFileName)\",",
+            "  \"version\": 1,",
+            "  \"definitions\": ["
+        ]
+        for (index, def) in definitions.enumerated() {
+            let isLast = index == definitions.count - 1
+            lines.append("    {")
+            lines.append("      \"id\": \"\(def.id.rawValue)\",")
+            let hasArgs = def.match.argumentTailPrefix != nil
+            let hasEnv = def.match.environment != nil
+            let hasExtraMatch = hasArgs || hasEnv
+            lines.append("      \"match\": {")
+            lines.append("        \"executable\": \"\(def.match.executable)\"\(hasExtraMatch ? "," : "")")
+            if let args = def.match.argumentTailPrefix {
+                let joinedArgs = args.map { "\"\($0)\"" }.joined(separator: ", ")
+                lines.append("        \"argumentTailPrefix\": [\(joinedArgs)]\(hasEnv ? "," : "")")
             }
-          ]
+            if let env = def.match.environment {
+                lines.append("        \"environment\": {")
+                let sortedKeys = env.keys.sorted()
+                for (envIndex, key) in sortedKeys.enumerated() {
+                    let pred = env[key]!
+                    let envLast = envIndex == sortedKeys.count - 1
+                    lines.append("          \"\(key)\": {")
+                    if let comp = pred.normalizedFinalComponent {
+                        lines.append("            \"normalizedFinalComponent\": \"\(comp)\",")
+                        lines.append("            \"state\": \"\(pred.state.rawValue)\"")
+                    } else {
+                        lines.append("            \"state\": \"\(pred.state.rawValue)\"")
+                    }
+                    lines.append("          }\(envLast ? "" : ",")")
+                }
+                lines.append("        }")
+            }
+            lines.append("      },")
+            lines.append("      \"command\": \"\(def.command)\",")
+            lines.append("      \"cwd\": \"\(def.cwd.rawValue)\"")
+            lines.append("    }\(isLast ? "" : ",")")
         }
-        """
-        return Data((source + "\n").utf8)
+        lines.append("  ]")
+        lines.append("}\n")
+        return Data(lines.joined(separator: "\n").utf8)
     }
 
     /// Lower-case SHA-256 for exact persisted bytes or other receipt payloads.
@@ -332,15 +409,12 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
     private static func validatedAndSorted(
         _ definitions: [RestartCommandDefinition]
     ) throws -> [RestartCommandDefinition] {
-        guard definitions.count == RestartCommandDefinitionID.allCases.count else {
+        guard !definitions.isEmpty, definitions.count <= maximumDefinitionCount else {
             throw RestartCommandDefinitionError.incompleteDefinitionSet
         }
         let ids = definitions.map(\.id)
         guard Set(ids).count == ids.count else {
             throw RestartCommandDefinitionError.duplicateDefinition
-        }
-        guard Set(ids) == Set(RestartCommandDefinitionID.allCases) else {
-            throw RestartCommandDefinitionError.incompleteDefinitionSet
         }
         for definition in definitions {
             guard !definition.match.executable.isEmpty,
@@ -381,16 +455,17 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
                 throw RestartCommandDefinitionError.commandTooLong
             }
         }
-        let order = Dictionary(uniqueKeysWithValues: RestartCommandDefinitionID.canonicalOrder.enumerated().map {
-            ($0.element, $0.offset)
-        })
-        return definitions.sorted { order[$0.id, default: .max] < order[$1.id, default: .max] }
+        return definitions.sorted { $0.id.rawValue < $1.id.rawValue }
     }
 
     private static func validateRawDefinitionShape(_ object: [String: Any]) throws {
         guard Set(object.keys).isSubset(of: ["id", "match", "command", "cwd"]),
               Set(object.keys) == ["id", "match", "command", "cwd"] else {
             throw RestartCommandDefinitionError.unknownField
+        }
+        guard let rawID = object["id"] as? String,
+              RestartCommandDefinitionID.isValidSlug(rawID) else {
+            throw RestartCommandDefinitionError.invalidJSON
         }
         guard let match = object["match"] as? [String: Any],
               Set(match.keys).isSubset(of: ["executable", "argumentTailPrefix", "environment"]),
@@ -489,5 +564,59 @@ private enum RestartCommandGrammar {
             index = scalars.index(after: index)
         }
         return quote == nil && !isAtTokenStart
+    }
+}
+
+private func validateStrictJSONSyntax(_ data: Data) throws {
+    var inString = false
+    var isEscaped = false
+    var lastSignificantChar: UInt8? = nil
+
+    var i = data.startIndex
+    while i < data.endIndex {
+        let byte = data[i]
+
+        if inString {
+            if isEscaped {
+                isEscaped = false
+            } else if byte == UInt8(ascii: "\\") {
+                isEscaped = true
+            } else if byte == UInt8(ascii: "\"") {
+                inString = false
+                lastSignificantChar = UInt8(ascii: "\"")
+            }
+            i = data.index(after: i)
+            continue
+        }
+
+        switch byte {
+        case UInt8(ascii: "\""):
+            inString = true
+            lastSignificantChar = UInt8(ascii: "\"")
+        case UInt8(ascii: " "), UInt8(ascii: "\t"), UInt8(ascii: "\r"), UInt8(ascii: "\n"):
+            break
+        case UInt8(ascii: "/"):
+            throw RestartCommandDefinitionError.invalidJSON
+        case UInt8(ascii: ","):
+            if lastSignificantChar == UInt8(ascii: ",") ||
+                lastSignificantChar == UInt8(ascii: "{") ||
+                lastSignificantChar == UInt8(ascii: "[") ||
+                lastSignificantChar == nil {
+                throw RestartCommandDefinitionError.invalidJSON
+            }
+            lastSignificantChar = UInt8(ascii: ",")
+        case UInt8(ascii: "}"), UInt8(ascii: "]"):
+            if lastSignificantChar == UInt8(ascii: ",") {
+                throw RestartCommandDefinitionError.invalidJSON
+            }
+            lastSignificantChar = byte
+        default:
+            lastSignificantChar = byte
+        }
+        i = data.index(after: i)
+    }
+
+    if inString {
+        throw RestartCommandDefinitionError.invalidJSON
     }
 }

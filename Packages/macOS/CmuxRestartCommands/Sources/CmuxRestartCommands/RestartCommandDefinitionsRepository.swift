@@ -29,8 +29,9 @@ public struct RestartCommandDefinitionSnapshot: Equatable, Sendable {
 
 /// Result of one synchronous, complete definition-source read.
 public enum RestartCommandDefinitionRead: Equatable, Sendable {
+    case missing
     case snapshot(RestartCommandDefinitionSnapshot)
-    case invalid(RestartCommandDefinitionError)
+    case invalid(error: RestartCommandDefinitionError, sourceIdentity: String)
     case unavailable
 }
 
@@ -70,14 +71,11 @@ public final class RestartCommandDefinitionsRepository: @unchecked Sendable {
     /// Reads one complete source snapshot or a fail-closed error.
     public func read() -> RestartCommandDefinitionRead {
         if !fileManager.fileExists(atPath: definitionsFileURL.path) {
-            let identity = "compiled-default-v1:\(RestartCommandDefinitionSet.appDefaults.approvalDigest)"
-            return .snapshot(snapshot(
-                source: .appDefaults,
-                sourceIdentity: identity,
-                definitions: .appDefaults
-            ))
+            _ = revision(for: "<missing>")
+            return .missing
         }
         guard let data = try? Data(contentsOf: definitionsFileURL) else {
+            _ = revision(for: "<unavailable>")
             return .unavailable
         }
         let sourceIdentity = RestartCommandDefinitionSet.sha256Hex(data)
@@ -90,10 +88,10 @@ public final class RestartCommandDefinitionsRepository: @unchecked Sendable {
             ))
         } catch let error as RestartCommandDefinitionError {
             _ = revision(for: sourceIdentity)
-            return .invalid(error)
+            return .invalid(error: error, sourceIdentity: sourceIdentity)
         } catch {
             _ = revision(for: sourceIdentity)
-            return .invalid(.invalidJSON)
+            return .invalid(error: .invalidJSON, sourceIdentity: sourceIdentity)
         }
     }
 

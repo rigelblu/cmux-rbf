@@ -171,46 +171,74 @@ public struct RestartCommandStateRecord: Codable, Equatable, Sendable {
 
 /// Effective state shared by restore and Settings.
 public enum RestartCommandAllowlistState: Equatable, Sendable {
-    public enum DisabledReason: Equatable, Sendable {
-        case definitionsChanged
-        case invalidDefinitions(RestartCommandDefinitionError)
-        case stateUnavailable
+    public enum ShippedWarning: Equatable, Sendable {
+        case validUserDefinitionsChanged
+        case unusableUserFile(UnusableUserFileReason)
+    }
+
+    public enum UnusableUserFileReason: Equatable, Sendable {
+        case invalid(RestartCommandDefinitionError)
+        case unreadable
+        case missingAfterCustomization
     }
 
     case enabledAppDefaults
+    case enabledFallback(ShippedWarning)
     case enabledApproved
     case disabledByUser
-    case disabledNeedsApproval(DisabledReason)
+    case disabledStateUnavailable
 
     public var isEnabled: Bool {
         switch self {
-        case .enabledAppDefaults, .enabledApproved: true
-        case .disabledByUser, .disabledNeedsApproval: false
+        case .enabledAppDefaults, .enabledFallback, .enabledApproved: true
+        case .disabledByUser, .disabledStateUnavailable: false
         }
     }
 }
 
-/// Pure authority projection over one state/definition snapshot pair.
+/// Pure authority projection over state, bundled definitions, and user-file observation.
 public enum RestartCommandAuthority {
     public static func effectiveState(
         record: RestartCommandStateRecord,
-        definitions: RestartCommandDefinitionSet,
-        definitionsAreAppDefaults: Bool
+        bundledDefinitions: RestartCommandDefinitionSet?,
+        userFileObservation: RestartCommandDefinitionRead
     ) -> RestartCommandAllowlistState {
         guard record.isStructurallyValid else {
-            return .disabledNeedsApproval(.stateUnavailable)
+            return .disabledStateUnavailable
         }
         if record.mode == .disabledByUser {
             return .disabledByUser
         }
-        guard record.approvedDefinitionDigest == definitions.approvalDigest else {
-            return .disabledNeedsApproval(.definitionsChanged)
+        guard bundledDefinitions != nil else {
+            return .disabledStateUnavailable
         }
         switch record.mode {
         case .enabledAppDefaults:
-            return definitionsAreAppDefaults ? .enabledAppDefaults : .disabledNeedsApproval(.definitionsChanged)
+            switch userFileObservation {
+            case .missing:
+                return .enabledAppDefaults
+            case .snapshot:
+                return .enabledFallback(.validUserDefinitionsChanged)
+            case .invalid(let error, _):
+                return .enabledFallback(.unusableUserFile(.invalid(error)))
+            case .unavailable:
+                return .enabledFallback(.unusableUserFile(.unreadable))
+            }
         case .enabledApproved:
-            return definitionsAreAppDefaults ? .disabledNeedsApproval(.definitionsChanged) : .enabledApproved
+            switch userFileObservation {
+            case .snapshot(let userSnapshot):
+                if userSnapshot.definitions.approvalDigest == record.approvedDefinitionDigest {
+                    return .enabledApproved
+                } else {
+                    return .enabledFallback(.validUserDefinitionsChanged)
+                }
+            case .invalid(let error, _):
+                return .enabledFallback(.unusableUserFile(.invalid(error)))
+            case .unavailable:
+                return .enabledFallback(.unusableUserFile(.unreadable))
+            case .missing:
+                return .enabledFallback(.unusableUserFile(.missingAfterCustomization))
+            }
         case .disabledByUser:
             return .disabledByUser
         }

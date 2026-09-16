@@ -276,13 +276,35 @@ final class HostSettingsActions: SettingsHostActions {
         let projection = coordinator.settingsProjection()
         let status = Self.restartAllowlistedCommandsStatus(from: projection)
         let inlineError: String? = switch state {
-        case .disabledNeedsApproval(.invalidDefinitions(let error)):
-            error.localizedMessage
-        case .disabledNeedsApproval(.stateUnavailable):
+        case .disabledStateUnavailable:
             Self.restartCommandStatePersistenceError
-        case .disabledNeedsApproval(.definitionsChanged):
+        case .enabledFallback(.unusableUserFile(.invalid(let error))):
+            error.localizedMessage
+        default:
             nil
-        case .enabledAppDefaults, .enabledApproved, .disabledByUser:
+        }
+        return RestartAllowlistedCommandsSettingsMutationResult(
+            status: status,
+            inlineError: inlineError
+        )
+    }
+
+    func approveRestartCommandDefinitions() -> RestartAllowlistedCommandsSettingsMutationResult {
+        guard let coordinator = AppDelegate.shared?.restartCommandCoordinator else {
+            return RestartAllowlistedCommandsSettingsMutationResult(
+                status: .stateUnavailable,
+                inlineError: Self.restartCommandStatePersistenceError
+            )
+        }
+        let state = coordinator.approveCurrentDefinitions()
+        let projection = coordinator.settingsProjection()
+        let status = Self.restartAllowlistedCommandsStatus(from: projection)
+        let inlineError: String? = switch state {
+        case .disabledStateUnavailable:
+            Self.restartCommandStatePersistenceError
+        case .enabledFallback(.unusableUserFile(.invalid(let error))):
+            error.localizedMessage
+        default:
             nil
         }
         return RestartAllowlistedCommandsSettingsMutationResult(
@@ -308,19 +330,28 @@ final class HostSettingsActions: SettingsHostActions {
     private static func restartAllowlistedCommandsStatus(
         from projection: RestartCommandSettingsProjection
     ) -> RestartAllowlistedCommandsSettingsStatus {
-        return switch projection.state {
+        switch projection.state {
         case .enabledAppDefaults:
-            .enabledBuiltIn(commandCount: projection.commandCount)
+            return .enabledShipped(commandCount: projection.commandCount)
         case .enabledApproved:
-            .enabledApproved(commandCount: projection.commandCount)
+            return .enabledApproved(commandCount: projection.commandCount)
+        case .enabledFallback(let warning):
+            switch warning {
+            case .validUserDefinitionsChanged:
+                return .enabledFallback(warning: .validChanged)
+            case .unusableUserFile(let reason):
+                let validationMessage: String? = switch reason {
+                case .invalid(let error):
+                    error.localizedMessage
+                case .unreadable, .missingAfterCustomization:
+                    nil
+                }
+                return .enabledFallback(warning: .unusableUserFile(validationMessage: validationMessage))
+            }
         case .disabledByUser:
-            .off
-        case .disabledNeedsApproval(.definitionsChanged):
-            .needsApproval(validationMessage: nil)
-        case .disabledNeedsApproval(.invalidDefinitions(let error)):
-            .needsApproval(validationMessage: error.localizedMessage)
-        case .disabledNeedsApproval(.stateUnavailable):
-            .stateUnavailable
+            return .off
+        case .disabledStateUnavailable:
+            return .stateUnavailable
         }
     }
 

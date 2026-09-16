@@ -12,8 +12,8 @@ struct RestartCommandStateTests {
         #expect(record.automaticallyConsumedIdentities.isEmpty)
         #expect(RestartCommandAuthority.effectiveState(
             record: record,
-            definitions: .appDefaults,
-            definitionsAreAppDefaults: true
+            bundledDefinitions: .appDefaults,
+            userFileObservation: .missing
         ) == .enabledAppDefaults)
     }
 
@@ -57,19 +57,25 @@ struct RestartCommandStateTests {
         #expect(!record.isStructurallyValid)
         #expect(RestartCommandAuthority.effectiveState(
             record: record,
-            definitions: .appDefaults,
-            definitionsAreAppDefaults: true
-        ) == .disabledNeedsApproval(.stateUnavailable))
+            bundledDefinitions: .appDefaults,
+            userFileObservation: .missing
+        ) == .disabledStateUnavailable)
 
         let edited = try! RestartCommandDefinitionSet(definitions: RestartCommandDefinitionSet.appDefaults.definitions.map {
             guard $0.id == .jjui else { return $0 }
             return RestartCommandDefinition(id: $0.id, match: $0.match, command: "jjui --new", cwd: $0.cwd)
         })
+        let snapshot = RestartCommandDefinitionSnapshot(
+            revision: 1,
+            source: .editableFile,
+            sourceIdentity: "different",
+            definitions: edited
+        )
         #expect(RestartCommandAuthority.effectiveState(
             record: RestartCommandStateRecord.enabledDefaults(at: 100),
-            definitions: edited,
-            definitionsAreAppDefaults: false
-        ) == .disabledNeedsApproval(.definitionsChanged))
+            bundledDefinitions: .appDefaults,
+            userFileObservation: .snapshot(snapshot)
+        ) == .enabledFallback(.validUserDefinitionsChanged))
     }
 
     @Test func summariesGroupAndBoundWithoutSensitiveFields() throws {
