@@ -119,6 +119,25 @@ public struct RestartCommandDefinition: Codable, Equatable, Sendable {
     }
 }
 
+public struct RestartCommandDefinitionProblem: Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
+        case unknownField
+        case missingField
+        case invalidValue
+        case repeatedID
+    }
+
+    public let kind: Kind
+    public let line: Int
+    public let field: String?
+
+    public init(kind: Kind, line: Int, field: String? = nil) {
+        self.kind = kind
+        self.line = line
+        self.field = field
+    }
+}
+
 /// Validation failures surfaced by the dedicated definitions editor and Settings.
 public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
     case invalidJSON
@@ -135,6 +154,7 @@ public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
     case unsafeCommand
     case commandTooLong
     case unusableBundledResource
+    case invalidDefinition(RestartCommandDefinitionProblem)
 
     /// Stable user-facing validation copy for the Settings inline error slot.
     public var localizedMessage: String {
@@ -174,6 +194,9 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
     public static let maximumDefinitionCount = 32
     public static let schemaVersion = 1
     public static let maximumCommandUTF8Bytes = 1_000
+    public static let environmentNamePattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+    public static let maximumEnvironmentPredicateCount = 4
+    public static let pathComponentPattern = "^[^/]+$"
     public static let approvalDomain = Data("cmux.restart-commands.approval.v1".utf8)
     public static let detectorDomain = Data("cmux.restart-commands.detector.v1".utf8)
 

@@ -342,14 +342,14 @@ final class HostSettingsActions: SettingsHostActions {
             case .validUserDefinitionsChanged:
                 return .enabledFallback(warning: .validChanged)
             case .unusableUserFile(let reason):
-                let syntaxErrorLine: Int? = switch reason {
+                let problem: RestartCommandsFileProblem? = switch reason {
                 case .invalid(.invalidJSONAtLine(let line)):
-                    line
+                    .invalidJSON(line: line)
                 case .invalid, .unreadable, .missingAfterCustomization:
                     nil
                 }
                 return .enabledFallback(
-                    warning: .unusableUserFile(syntaxErrorLine: syntaxErrorLine)
+                    warning: .unusableUserFile(problem: problem)
                 )
             }
         case .disabledByUser:

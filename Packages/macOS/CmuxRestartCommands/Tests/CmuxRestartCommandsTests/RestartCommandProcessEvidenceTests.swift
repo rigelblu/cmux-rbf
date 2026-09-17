@@ -24,6 +24,17 @@ struct RestartCommandProcessEvidenceTests {
         #expect(decoded.environment["JJUI_CONFIG_DIR"] == .absent)
     }
 
+    @Test func decodesAnyRequestedValidEnvironmentName() throws {
+        let decoded = try #require(decoder.decode(
+            kernProcArgs(
+                argv: ["herdr-agent"],
+                environment: [Data("HERDR_AGENT_RESTORE=/tmp/session".utf8)]
+            ),
+            environmentKeys: ["HERDR_AGENT_RESTORE"]
+        ))
+        #expect(decoded.environment["HERDR_AGENT_RESTORE"] == .present("/tmp/session"))
+    }
+
     @Test func duplicateOrInvalidTargetIsUnavailable() throws {
         let duplicate = try #require(decoder.decode(
             kernProcArgs(

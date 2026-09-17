@@ -2,11 +2,19 @@ import CMUXMobileCore
 import CmuxSettings
 import Foundation
 
+public enum RestartCommandsFileProblem: Equatable, Sendable {
+    case invalidJSON(line: Int)
+    case unknownField(line: Int, field: String)
+    case missingField(line: Int, field: String)
+    case invalidValue(line: Int, field: String)
+    case repeatedID(line: Int)
+}
+
 /// Host-owned global restart state projected into the package-only Settings UI.
 public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
     public enum ShippedWarning: Equatable, Sendable {
         case validChanged
-        case unusableUserFile(syntaxErrorLine: Int?)
+        case unusableUserFile(problem: RestartCommandsFileProblem?)
     }
 
     case enabledShipped(commandCount: Int)
@@ -62,14 +70,14 @@ public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
                 localized: "settings.terminal.restartCommands.definitionsChangedWarning",
                 defaultValue: "Custom definitions changed — review to use them."
             )
-        case .enabledFallback(.unusableUserFile(let syntaxErrorLine)):
-            if let syntaxErrorLine {
+        case .enabledFallback(.unusableUserFile(let problem)):
+            if case .invalidJSON(let line) = problem {
                 return String.localizedStringWithFormat(
                     String(
                         localized: "settings.terminal.restartCommands.fallbackWarning.atLine",
                         defaultValue: "Line %lld contains invalid JSON. Shipped definitions are running; custom definitions aren’t."
                     ),
-                    Int64(syntaxErrorLine)
+                    Int64(line)
                 )
             }
             return String(

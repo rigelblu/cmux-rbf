@@ -168,6 +168,247 @@ struct RestartCommandDefinitionTests {
         }
     }
 
+    @Test func locatedRuleFailuresNameExactLineKindAndField() throws {
+        let validDefinition = #"{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":"saved"}"#
+        let cases: [(String, RestartCommandDefinitionProblem)] = [
+            (#"{"version":1,"definitions":["# + validDefinition + #"],"mystery":true}"#, problem(.unknownField, 1, "mystery")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":"saved","mystery":true}]}"#, problem(.unknownField, 1, "mystery")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","mystery":true},"command":"nvim","cwd":"saved"}]}"#, problem(.unknownField, 1, "mystery")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{"state":"absent","mystery":true}}},"command":"nvim","cwd":"saved"}]}"#, problem(.unknownField, 1, "mystery")),
+            (#"{"definitions":["# + validDefinition + #"]}"#, problem(.missingField, 1, "version")),
+            (#"{"version":1}"#, problem(.missingField, 1, "definitions")),
+            (#"{"version":1,"definitions":[{"match":{"executable":"nvim"},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "id")),
+            (#"{"version":1,"definitions":[{"id":"nvim","command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "match")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"cwd":"saved"}]}"#, problem(.missingField, 1, "command")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim"}]}"#, problem(.missingField, 1, "cwd")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "executable")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{}}},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "state")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{"state":"present"}}},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "normalizedFinalComponent")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":3,"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "match")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":3}]}"#, problem(.invalidValue, 1, "cwd")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":"home"}]}"#, problem(.invalidValue, 1, "cwd")),
+            (#"{"version":true,"definitions":["# + validDefinition + #"]}"#, problem(.invalidValue, 1, "version")),
+            (#"{"version":1.5,"definitions":["# + validDefinition + #"]}"#, problem(.invalidValue, 1, "version")),
+            (#"{"version":1,"definitions":[]}"#, problem(.invalidValue, 1, "definitions")),
+            (#"{"version":1,"definitions":[{"id":"NVIM","match":{"executable":"nvim"},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "id")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":""},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "executable")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"bin/nvim"},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "executable")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","argumentTailPrefix":[]},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "argumentTailPrefix")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","argumentTailPrefix":[""]},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "argumentTailPrefix")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"BAD-NAME":{"state":"absent"}}},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "environment")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{}},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "environment")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"A":{"state":"absent"},"B":{"state":"absent"},"C":{"state":"absent"},"D":{"state":"absent"},"E":{"state":"absent"}}},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "environment")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{"state":"absent","normalizedFinalComponent":"x"}}},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "normalizedFinalComponent")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{"state":"present","normalizedFinalComponent":""}}},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "normalizedFinalComponent")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{"state":"present","normalizedFinalComponent":"a/b"}}},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "normalizedFinalComponent")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"","cwd":"saved"}]}"#, problem(.invalidValue, 1, "command")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim; whoami","cwd":"saved"}]}"#, problem(.invalidValue, 1, "command")),
+            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":""# + String(repeating: "x", count: 1_001) + #"","cwd":"saved"}]}"#, problem(.invalidValue, 1, "command")),
+        ]
+
+        for (source, expected) in cases {
+            expectLocatedProblem(source, expected)
+        }
+
+        let thirtyThree = (1...33).map {
+            #"{"id":"app-#($0)","match":{"executable":"app-#($0)"},"command":"app-#($0)","cwd":"saved"}"#
+        }.joined(separator: ",")
+        expectLocatedProblem(
+            #"{"version":1,"definitions":["# + thirtyThree + "]}",
+            problem(.invalidValue, 1, "definitions")
+        )
+    }
+
+    @Test func locatedFailuresUseStructuralPositionsAndEarliestSourcePosition() {
+        expectLocatedProblem(
+            """
+            {
+              "version": 1,
+              "definitions": [
+                {
+                  "id": "first",
+                  "match": { "executable": "first" },
+                  "command": "first",
+                  "cwd": "saved"
+                },
+                {
+                  "id": "second",
+                  "match": { "executable": "second" },
+                  "command": "second",
+                  "cwd": "home"
+                }
+              ]
+            }
+            """,
+            problem(.invalidValue, 14, "cwd")
+        )
+
+        expectLocatedProblem(
+            """
+            {
+              "version": 1,
+              "definitions": [{
+                "id": "nvim",
+                "match":
+                {},
+                "command": "nvim",
+                "cwd": "saved"
+              }]
+            }
+            """,
+            problem(.missingField, 5, "executable")
+        )
+
+        expectLocatedProblem(
+            """
+            {
+              "version": 1,
+              "definitions": [
+                {
+                  "match": { "executable": "nvim" },
+                  "command": "nvim",
+                  "cwd": "saved"
+                }
+              ]
+            }
+            """,
+            problem(.missingField, 4, "id")
+        )
+
+        expectLocatedProblem(
+            #"{"definitions":[],"version":true}"#,
+            problem(.invalidValue, 1, "definitions")
+        )
+        expectLocatedProblem(
+            #"{"version":true,"definitions":[]}"#,
+            problem(.invalidValue, 1, "version")
+        )
+
+        let crlf = """
+        {
+          "version": 1,
+          "definitions": []
+        }
+        """.replacingOccurrences(of: "\n", with: "\r\n")
+        expectLocatedProblem(crlf, problem(.invalidValue, 3, "definitions"))
+    }
+
+    @Test func repeatedObjectKeyIsInvalidJSONAtRepeatLine() {
+        let repeated = Data(
+            """
+            {
+              "version": 1,
+              "version": 1,
+              "definitions": []
+            }
+            """.utf8
+        )
+        #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(3)) {
+            try RestartCommandDefinitionSet.decodeJSON(repeated)
+        }
+    }
+
+    @Test func duplicateIDsPointAtLaterID() {
+        expectLocatedProblem(
+            """
+            {
+              "version": 1,
+              "definitions": [
+                { "id": "nvim", "match": { "executable": "nvim" }, "command": "nvim", "cwd": "saved" },
+                { "id": "nvim", "match": { "executable": "nvim" }, "command": "nvim", "cwd": "saved" }
+              ]
+            }
+            """,
+            problem(.repeatedID, 5)
+        )
+    }
+
+    @Test func topLevelArrayRemainsUnlocated() {
+        #expect(throws: RestartCommandDefinitionError.invalidTopLevelObject) {
+            try RestartCommandDefinitionSet.decodeJSON(Data(#"[]"#.utf8))
+        }
+    }
+
+    @Test func programmaticValidationKeepsPlainReasons() {
+        let definition = RestartCommandDefinition(
+            id: "nvim",
+            match: RestartCommandMatchDefinition(executable: "bin/nvim"),
+            command: "nvim",
+            cwd: .saved
+        )
+        #expect(throws: RestartCommandDefinitionError.emptyExecutable) {
+            try RestartCommandDefinitionSet(definitions: [definition])
+        }
+    }
+
+    @Test func approvedRBFFileAndBundledResourceStillDecode() throws {
+        let source = """
+        {
+          "$schema": "./restart-commands.schema.json",
+          "version": 1,
+          "definitions": [
+            {
+              "id": "jjui",
+              "match": {
+                "executable": "jjui",
+                "environment": {
+                  "JJUI_CONFIG_DIR": { "state": "absent" }
+                }
+              },
+              "command": "jjui",
+              "cwd": "saved"
+            },
+            {
+              "id": "jjui-brief",
+              "match": {
+                "executable": "jjui",
+                "environment": {
+                  "JJUI_CONFIG_DIR": {
+                    "state": "present",
+                    "normalizedFinalComponent": "jjui-brief"
+                  }
+                }
+              },
+              "command": "jjui-brief",
+              "cwd": "saved"
+            },
+            {
+              "id": "hunk",
+              "match": { "executable": "hunk", "argumentTailPrefix": ["diff"] },
+              "command": "hunk diff",
+              "cwd": "saved"
+            },
+            {
+              "id": "nvim",
+              "match": { "executable": "nvim" },
+              "command": "nvim",
+              "cwd": "saved"
+            },
+            {
+              "id": "herdr-agent-attach",
+              "match": { "executable": "herdr-agent-attach", "argumentTailPrefix": ["--session"] },
+              "command": "herdr-agent attach --restore",
+              "cwd": "saved"
+            }
+          ]
+        }
+        """
+        let decoded = try RestartCommandDefinitionSet.decodeJSON(Data(source.utf8))
+        #expect(decoded.approvalDigest == "5b0632e82e2b2d7240847661c96103f5c28d080a169d16dbde0700b517080127")
+        #expect(try BundledRestartCommandDefinitions.load().definitions.count == 3)
+    }
+
+    @Test func environmentNamesAreOpenAndBounded() throws {
+        let valid = #"{"version":1,"definitions":[{"id":"herdr","match":{"executable":"herdr","environment":{"HERDR_AGENT_RESTORE":{"state":"present","normalizedFinalComponent":"agent"}}},"command":"herdr","cwd":"saved"}]}"#
+        let decoded = try RestartCommandDefinitionSet.decodeJSON(Data(valid.utf8))
+        #expect(decoded.definition(id: "herdr")?.match.environment?["HERDR_AGENT_RESTORE"]?.state == .present)
+
+        for name in ["", "BAD=NAME", "BAD-NAME", "1BAD"] {
+            let source = #"{"version":1,"definitions":[{"id":"herdr","match":{"executable":"herdr","environment":{""# + name + #"":{"state":"absent"}}},"command":"herdr","cwd":"saved"}]}"#
+            expectLocatedProblem(source, problem(.invalidValue, 1, "environment"))
+        }
+    }
+
     @Test func definitionCountBoundsEnforced() throws {
         #expect(throws: RestartCommandDefinitionError.incompleteDefinitionSet) {
             try RestartCommandDefinitionSet(definitions: [])
@@ -244,6 +485,37 @@ struct RestartCommandDefinitionTests {
             guard $0.id == id else { return $0 }
             return RestartCommandDefinition(id: $0.id, match: $0.match, command: command, cwd: $0.cwd)
         })
+    }
+
+    private static func problem(
+        _ kind: RestartCommandDefinitionProblem.Kind,
+        _ line: Int,
+        _ field: String? = nil
+    ) -> RestartCommandDefinitionProblem {
+        RestartCommandDefinitionProblem(kind: kind, line: line, field: field)
+    }
+
+    private func problem(
+        _ kind: RestartCommandDefinitionProblem.Kind,
+        _ line: Int,
+        _ field: String? = nil
+    ) -> RestartCommandDefinitionProblem {
+        Self.problem(kind, line, field)
+    }
+
+    private func expectLocatedProblem(
+        _ source: String,
+        _ expected: RestartCommandDefinitionProblem,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        do {
+            _ = try RestartCommandDefinitionSet.decodeJSON(Data(source.utf8))
+            Issue.record("Expected located definition failure", sourceLocation: sourceLocation)
+        } catch let error as RestartCommandDefinitionError {
+            #expect(error == .invalidDefinition(expected), sourceLocation: sourceLocation)
+        } catch {
+            Issue.record("Unexpected error: \(error)", sourceLocation: sourceLocation)
+        }
     }
 }
 

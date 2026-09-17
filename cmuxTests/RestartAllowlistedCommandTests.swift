@@ -123,6 +123,38 @@ struct RestartAllowlistedCommandTests {
         }
     }
 
+    @Test func customEnvironmentNameBindsMatchingProcessOnly() throws {
+        let json = #"{"version":1,"definitions":[{"id":"herdr-agent","match":{"executable":"herdr-agent","environment":{"HERDR_AGENT_RESTORE":{"state":"present","normalizedFinalComponent":"session"}}},"command":"herdr-agent attach --restore","cwd":"saved"}]}"#
+        let definitions = try RestartCommandDefinitionSet.decodeJSON(Data(json.utf8))
+        let workspaceID = UUID()
+        let matchingPanel = RestartCommandPanelKey(workspaceID: workspaceID, panelID: UUID())
+        let missingPanel = RestartCommandPanelKey(workspaceID: workspaceID, panelID: UUID())
+        let identity = RestartCommandSnapshotIdentity(rootGenerationID: UUID(), captureKind: .pendingTermination)
+        let processes = [Self.process(pid: 301, tty: 31), Self.process(pid: 302, tty: 32)]
+        let bytes = [
+            301: Self.kernProcArgs(
+                arguments: ["/opt/bin/herdr-agent"],
+                environment: ["HERDR_AGENT_RESTORE=/tmp/session"]
+            ),
+            302: Self.kernProcArgs(arguments: ["/opt/bin/herdr-agent"], environment: []),
+        ]
+
+        let bindings = ProcessDetectedResumeIndexes.restartCommandBindings(
+            processSnapshot: CmuxTopProcessSnapshot(
+                processes: processes,
+                sampledAt: Date(timeIntervalSince1970: 100),
+                includesProcessDetails: true
+            ),
+            panelTTYDevices: [matchingPanel: 31, missingPanel: 32],
+            context: RestartCommandCaptureContext(identity: identity, definitions: definitions),
+            capturedAt: 100,
+            processBytes: { bytes[$0] }
+        )
+
+        #expect(bindings[matchingPanel]?.definitionID == "herdr-agent")
+        #expect(bindings[missingPanel] == nil)
+    }
+
     private static func process(pid: Int, tty: Int64) -> CmuxTopProcessInfo {
         CmuxTopProcessInfo(
             pid: pid,
