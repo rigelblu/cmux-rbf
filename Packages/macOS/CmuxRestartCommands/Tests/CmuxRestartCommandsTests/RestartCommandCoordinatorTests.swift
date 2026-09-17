@@ -23,16 +23,16 @@ struct RestartCommandCoordinatorTests {
             source: .manualBackup
         ))
 
-        let request = fixture.request(
+        let request = try fixture.request(
             identity: identity,
             source: .automaticPrimary,
             snapshotBytes: snapshotBytes
         )
         let first = try #require(plan(from: fixture.coordinator.authorize(request)))
-        #expect(first.launchItems.map(\.command) == ["hunk"])
+        #expect(first.launchItems.map(\.command) == ["hunk diff"])
         #expect(first.launchItems.map(\.savedWorkingDirectory) == [fixture.workingDirectory.path])
 
-        let automaticBackup = fixture.request(
+        let automaticBackup = try fixture.request(
             identity: identity,
             source: .automaticBackup,
             snapshotBytes: snapshotBytes
@@ -43,7 +43,7 @@ struct RestartCommandCoordinatorTests {
             Issue.record("Automatic backup replayed an already-consumed logical snapshot")
         }
 
-        let manual = fixture.request(
+        let manual = try fixture.request(
             identity: identity,
             source: .manualBackup,
             snapshotBytes: snapshotBytes
@@ -62,7 +62,7 @@ struct RestartCommandCoordinatorTests {
             source: .automaticPrimary
         ))
 
-        let request = fixture.request(
+        let request = try fixture.request(
             identity: identity,
             source: .automaticPrimary,
             snapshotBytes: bytes,
@@ -88,12 +88,12 @@ struct RestartCommandCoordinatorTests {
             source: .manualBackup
         ))
         let fingerprint = try #require(
-            RestartCommandDefinitionSet.appDefaults.detectorFingerprint(for: .hunk)
+            fixture.coordinator.bundledDefinitions?.detectorFingerprint(for: "hunk")
         )
         let existingIntentPanelID = UUID()
         let ordinaryPanelID = UUID()
         let binding = PaneRestartCommandBinding(
-            definitionID: .hunk,
+            definitionID: "hunk",
             detectorFingerprint: fingerprint,
             observedAt: 100,
             snapshotIdentity: identity
@@ -131,15 +131,19 @@ struct RestartCommandCoordinatorTests {
             state: .enabledAppDefaults,
             commandCount: 3
         ))
-        #expect(fixture.definitions.materializeForEditing(schemaData: Data("{}".utf8)))
+        let shipped = try #require(fixture.coordinator.bundledDefinitions)
+        #expect(fixture.definitions.materializeForEditing(
+            shippedDefinitions: shipped,
+            schemaData: Data("{}".utf8)
+        ))
 
         let defaults = String(
-            decoding: RestartCommandDefinitionSet.appDefaults.editableDefaultsData(),
+            decoding: shipped.editableDefaultsData(),
             as: UTF8.self
         )
         let edited = defaults.replacingOccurrences(
-            of: "\"command\": \"hunk\"",
-            with: "\"command\": \"hunk --staged\""
+            of: "\"command\": \"hunk diff\"",
+            with: "\"command\": \"hunk diff --staged\""
         )
         try Data(edited.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
 
@@ -190,7 +194,7 @@ struct RestartCommandCoordinatorTests {
             source: .manualBackup
         ))
         let fingerprint = try #require(
-            RestartCommandDefinitionSet.appDefaults.detectorFingerprint(for: .hunk)
+            fixture.coordinator.bundledDefinitions?.detectorFingerprint(for: "hunk")
         )
         let request = RestartCommandAuthorizationRequest(
             source: .manualBackup,
@@ -200,7 +204,7 @@ struct RestartCommandCoordinatorTests {
                 RestartCommandPaneCandidate(
                     panelID: UUID(),
                     binding: PaneRestartCommandBinding(
-                        definitionID: .hunk,
+                        definitionID: "hunk",
                         detectorFingerprint: fingerprint,
                         observedAt: 100,
                         snapshotIdentity: otherIdentity
@@ -234,14 +238,14 @@ struct RestartCommandCoordinatorTests {
             source: .manualBackup
         ))
 
-        let result = try #require(plan(from: fixture.coordinator.authorize(fixture.request(
+        let result = try #require(plan(from: fixture.coordinator.authorize(try fixture.request(
             identity: identity,
             source: .manualBackup,
             snapshotBytes: bytes,
             savedWorkingDirectory: exactWorkingDirectory.path
         ))))
         let launch = try #require(result.launchItems.first)
-        #expect(launch.definitionID == .hunk)
+        #expect(launch.definitionID == "hunk")
         #expect(launch.savedWorkingDirectory == exactWorkingDirectory.path)
         #expect(launch.originalPanelID == fixture.lastPanelID)
     }
@@ -258,10 +262,10 @@ struct RestartCommandCoordinatorTests {
         let remotePanelID = UUID()
         let missingDirectoryPanelID = UUID()
         let fingerprint = try #require(
-            RestartCommandDefinitionSet.appDefaults.detectorFingerprint(for: .hunk)
+            fixture.coordinator.bundledDefinitions?.detectorFingerprint(for: "hunk")
         )
         let binding = PaneRestartCommandBinding(
-            definitionID: .hunk,
+            definitionID: "hunk",
             detectorFingerprint: fingerprint,
             observedAt: 100,
             snapshotIdentity: identity
@@ -292,7 +296,7 @@ struct RestartCommandCoordinatorTests {
         #expect(result.launchItems.isEmpty)
         #expect(Set(result.refusals.compactMap(\.panelID)) == Set([remotePanelID, missingDirectoryPanelID]))
         #expect(Set(result.refusals.map(\.reason)) == Set([.paneBecameRemote, .missingWorkingDirectory]))
-        #expect(result.refusals.allSatisfy { $0.definitionID == .hunk })
+        #expect(result.refusals.allSatisfy { $0.definitionID == "hunk" })
     }
 
     @Test func strictInvalidFileFallbackKeepsShippedDefinitionsRunning() throws {
@@ -317,17 +321,17 @@ struct RestartCommandCoordinatorTests {
         """
         try Data(invalidJSON.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
 
-        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSONAtLine(8)))))
         #expect(fixture.coordinator.settingsProjection().commandCount == 3)
 
         // Capture still captures shipped definitions!
         let capture = try #require(fixture.coordinator.captureContext(kind: .autosave))
         #expect(capture.definitions.definitions.count == 3)
-        #expect(capture.definitions.definitions.map(\.id) == [.hunk, .jjui, .jjuiBrief])
+        #expect(capture.definitions.definitions.map(\.id.rawValue) == ["hunk", "jjui", "jjui-brief"])
 
         let events = emittedEvents.withLock { $0 }
         #expect(events.count == 1)
-        #expect(events.first?.reason == .invalid(.invalidJSON))
+        #expect(events.first?.reason == .invalid(.invalidJSONAtLine(8)))
         #expect(events.first?.sourceIdentity == RestartCommandDefinitionSet.sha256Hex(Data(invalidJSON.utf8)))
     }
 
@@ -380,7 +384,7 @@ struct RestartCommandCoordinatorTests {
         #expect(fixture.coordinator.effectiveState() == .enabledFallback(.validUserDefinitionsChanged))
         // Shipped definitions running during fallback
         let fallbackCapture = try #require(fixture.coordinator.captureContext(kind: .autosave))
-        #expect(fallbackCapture.definitions.definitions.map(\.id) == [.hunk, .jjui, .jjuiBrief])
+        #expect(fallbackCapture.definitions.definitions.map(\.id.rawValue) == ["hunk", "jjui", "jjui-brief"])
 
         // 6. Enabled approved: invalid file -> .enabledFallback(.unusableUserFile(.invalid))
         try Data("{ corrupt".utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
@@ -423,7 +427,7 @@ struct RestartCommandCoordinatorTests {
         try Data(validFile.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
         #expect(fixture.coordinator.approveCurrentDefinitions() == .enabledApproved)
 
-        let request = fixture.request(
+        let request = try fixture.request(
             identity: identity,
             source: .manualBackup,
             snapshotBytes: snapshotBytes
@@ -456,7 +460,7 @@ struct RestartCommandCoordinatorTests {
         // User introduces a syntax error (trailing comma) -> degrades to fallback
         let broken = approvedContent.replacingOccurrences(of: "\"cwd\": \"saved\"", with: "\"cwd\": \"saved\",")
         try Data(broken.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
-        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSONAtLine(8)))))
 
         // User fixes the file back to the approved digest -> automatically returns to .enabledApproved!
         try Data(approvedContent.utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
@@ -594,8 +598,11 @@ struct RestartCommandCoordinatorTests {
             snapshotBytes: Data,
             hasExistingResumeIntent: Bool = false,
             savedWorkingDirectory: String? = nil
-        ) -> RestartCommandAuthorizationRequest {
-            let fingerprint = RestartCommandDefinitionSet.appDefaults.detectorFingerprint(for: .hunk)!
+        ) throws -> RestartCommandAuthorizationRequest {
+            guard let definitions = coordinator.bundledDefinitions,
+                  let fingerprint = definitions.detectorFingerprint(for: "hunk") else {
+                throw RestartCommandDefinitionError.unusableBundledResource
+            }
             let panelID = UUID()
             lastPanelID = panelID
             return RestartCommandAuthorizationRequest(
@@ -606,7 +613,7 @@ struct RestartCommandCoordinatorTests {
                     RestartCommandPaneCandidate(
                         panelID: panelID,
                         binding: PaneRestartCommandBinding(
-                            definitionID: .hunk,
+                            definitionID: "hunk",
                             detectorFingerprint: fingerprint,
                             observedAt: 100,
                             snapshotIdentity: identity

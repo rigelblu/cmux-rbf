@@ -14,13 +14,13 @@ struct RestartCommandDefinitionTests {
     }
 
     @Test func defaultsMatchOnlyTheThreeApprovedForms() throws {
-        let definitions = RestartCommandDefinitionSet.appDefaults
+        let definitions = try BundledRestartCommandDefinitions.load()
         let matcher = RestartCommandMatcher(definitions: definitions)
 
-        #expect(matcher.match(evidence(argv: ["jjui"], configDirectory: .absent))?.definitionID == .jjui)
-        #expect(matcher.match(evidence(argv: ["/opt/bin/jjui"], configDirectory: .present("/tmp/jjui-brief/")))?.definitionID == .jjuiBrief)
-        #expect(matcher.match(evidence(argv: ["/opt/bin/hunk", "diff", "--stat"], configDirectory: .absent))?.definitionID == .hunk)
-        #expect(definitions.definition(id: .hunk)?.command == "hunk")
+        #expect(matcher.match(evidence(argv: ["jjui"], configDirectory: .absent))?.definitionID == "jjui")
+        #expect(matcher.match(evidence(argv: ["/opt/bin/jjui"], configDirectory: .present("/tmp/jjui-brief/")))?.definitionID == "jjui-brief")
+        #expect(matcher.match(evidence(argv: ["/opt/bin/hunk", "diff", "--stat"], configDirectory: .absent))?.definitionID == "hunk")
+        #expect(definitions.definition(id: "hunk")?.command == "hunk diff")
 
         #expect(matcher.match(evidence(argv: ["jjui"], configDirectory: .unavailable)) == nil)
         #expect(matcher.match(evidence(argv: ["jjui"], configDirectory: .present("/tmp/other"))) == nil)
@@ -33,7 +33,7 @@ struct RestartCommandDefinitionTests {
         let source = """
         {
           "definitions": [
-            { "cwd": "saved", "command": "hunk", "match": { "argumentTailPrefix": ["diff"], "executable": "hunk" }, "id": "hunk" },
+            { "cwd": "saved", "command": "hunk diff", "match": { "argumentTailPrefix": ["diff"], "executable": "hunk" }, "id": "hunk" },
             { "id": "jjui-brief", "match": { "environment": { "JJUI_CONFIG_DIR": { "normalizedFinalComponent": "jjui-brief", "state": "present" } }, "executable": "jjui" }, "command": "jjui-brief", "cwd": "saved" },
             { "id": "jjui", "match": { "environment": { "JJUI_CONFIG_DIR": { "state": "absent" } }, "executable": "jjui" }, "command": "jjui", "cwd": "saved" }
           ],
@@ -42,14 +42,15 @@ struct RestartCommandDefinitionTests {
         }
         """
         let decoded = try RestartCommandDefinitionSet.decodeJSON(Data(source.utf8))
-        #expect(decoded == .appDefaults)
-        #expect(decoded.approvalDigest == RestartCommandDefinitionSet.appDefaults.approvalDigest)
+        let shipped = try BundledRestartCommandDefinitions.load()
+        #expect(decoded == shipped)
+        #expect(decoded.approvalDigest == shipped.approvalDigest)
     }
 
     @Test func commandOnlyEditPreservesDetectorFingerprint() throws {
-        let defaults = RestartCommandDefinitionSet.appDefaults
+        let defaults = try BundledRestartCommandDefinitions.load()
         let edited = try RestartCommandDefinitionSet(definitions: defaults.definitions.map { definition in
-            guard definition.id == .hunk else { return definition }
+            guard definition.id == "hunk" else { return definition }
             return RestartCommandDefinition(
                 id: definition.id,
                 match: definition.match,
@@ -58,21 +59,21 @@ struct RestartCommandDefinitionTests {
             )
         })
         #expect(edited.approvalDigest != defaults.approvalDigest)
-        #expect(edited.detectorFingerprint(for: .hunk) == defaults.detectorFingerprint(for: .hunk))
+        #expect(edited.detectorFingerprint(for: "hunk") == defaults.detectorFingerprint(for: "hunk"))
     }
 
     @Test func unknownFieldsAndByteOverflowFailClosed() throws {
-        let unknown = RestartCommandDefinitionSet.appDefaults.editableDefaultsData()
+        let unknown = try BundledRestartCommandDefinitions.load().editableDefaultsData()
             .replacingUTF8("\"version\": 1", with: "\"version\": 1, \"enabled\": true")
         #expect(throws: RestartCommandDefinitionError.unknownField) {
             try RestartCommandDefinitionSet.decodeJSON(unknown)
         }
 
         let oneThousand = String(repeating: "é", count: 500)
-        let valid = try replacingCommand(.jjui, with: oneThousand)
-        #expect(valid.definition(id: .jjui)?.command.utf8.count == 1_000)
+        let valid = try replacingCommand("jjui", with: oneThousand)
+        #expect(valid.definition(id: "jjui")?.command.utf8.count == 1_000)
         #expect(throws: RestartCommandDefinitionError.commandTooLong) {
-            try replacingCommand(.jjui, with: oneThousand + "x")
+            try replacingCommand("jjui", with: oneThousand + "x")
         }
     }
 
@@ -84,15 +85,15 @@ struct RestartCommandDefinitionTests {
             """#.utf8
         )
 
-        #expect(throws: RestartCommandDefinitionError.invalidJSON) {
+        #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(1)) {
             try RestartCommandDefinitionSet.decodeJSON(commented)
         }
     }
 
     @Test func commandGrammarAllowsArgumentsButRejectsPromptInjection() throws {
-        #expect(try replacingCommand(.hunk, with: "hunk diff --stat").definition(id: .hunk)?.command == "hunk diff --stat")
-        #expect(try replacingCommand(.hunk, with: "hunk 'a file'").definition(id: .hunk)?.command == "hunk 'a file'")
-        #expect(try replacingCommand(.hunk, with: "hunk a\\ file").definition(id: .hunk)?.command == "hunk a\\ file")
+        #expect(try replacingCommand("hunk", with: "hunk diff --stat").definition(id: "hunk")?.command == "hunk diff --stat")
+        #expect(try replacingCommand("hunk", with: "hunk 'a file'").definition(id: "hunk")?.command == "hunk 'a file'")
+        #expect(try replacingCommand("hunk", with: "hunk a\\ file").definition(id: "hunk")?.command == "hunk a\\ file")
 
         for unsafe in [
             " hunk", "hunk ", "hunk\tdiff", "hunk\ndiff", "hunk\rdiff",
@@ -100,7 +101,7 @@ struct RestartCommandDefinitionTests {
             "hunk `whoami`", "hunk *", "hunk > out", "hunk 'unterminated",
         ] {
             #expect(throws: RestartCommandDefinitionError.unsafeCommand) {
-                try replacingCommand(.hunk, with: unsafe)
+                try replacingCommand("hunk", with: unsafe)
             }
         }
     }
@@ -108,10 +109,10 @@ struct RestartCommandDefinitionTests {
     @Test func bundledResourceLoadsShippedDefaults() throws {
         let bundled = try BundledRestartCommandDefinitions.load()
         #expect(bundled.definitions.count == 3)
-        #expect(bundled.definitions.map(\.id) == [.hunk, .jjui, .jjuiBrief])
-        #expect(bundled.definition(id: .hunk)?.command == "hunk")
-        #expect(bundled.definition(id: .jjui)?.command == "jjui")
-        #expect(bundled.definition(id: .jjuiBrief)?.command == "jjui-brief")
+        #expect(bundled.definitions.map(\.id.rawValue) == ["hunk", "jjui", "jjui-brief"])
+        #expect(bundled.definition(id: "hunk")?.command == "hunk diff")
+        #expect(bundled.definition(id: "jjui")?.command == "jjui")
+        #expect(bundled.definition(id: "jjui-brief")?.command == "jjui-brief")
     }
 
     @Test func genericIdentifiersValidateSlugsAndAllowCustomEntries() throws {
@@ -162,7 +163,7 @@ struct RestartCommandDefinitionTests {
             }
             """#.utf8
         )
-        #expect(throws: RestartCommandDefinitionError.invalidJSON) {
+        #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(8)) {
             try RestartCommandDefinitionSet.decodeJSON(trailingComma)
         }
     }
@@ -174,7 +175,7 @@ struct RestartCommandDefinitionTests {
 
         let one = try RestartCommandDefinitionSet(definitions: [
             RestartCommandDefinition(
-                id: .hunk,
+                id: "hunk",
                 match: RestartCommandMatchDefinition(executable: "hunk"),
                 command: "hunk",
                 cwd: .saved
@@ -207,13 +208,13 @@ struct RestartCommandDefinitionTests {
 
         let duplicateDefinitions = [
             RestartCommandDefinition(
-                id: .hunk,
+                id: "hunk",
                 match: RestartCommandMatchDefinition(executable: "hunk"),
                 command: "hunk",
                 cwd: .saved
             ),
             RestartCommandDefinition(
-                id: .hunk,
+                id: "hunk",
                 match: RestartCommandMatchDefinition(executable: "hunk"),
                 command: "hunk-two",
                 cwd: .saved
@@ -238,7 +239,8 @@ struct RestartCommandDefinitionTests {
         _ id: RestartCommandDefinitionID,
         with command: String
     ) throws -> RestartCommandDefinitionSet {
-        try RestartCommandDefinitionSet(definitions: RestartCommandDefinitionSet.appDefaults.definitions.map {
+        let shipped = try BundledRestartCommandDefinitions.load()
+        return try RestartCommandDefinitionSet(definitions: shipped.definitions.map {
             guard $0.id == id else { return $0 }
             return RestartCommandDefinition(id: $0.id, match: $0.match, command: command, cwd: $0.cwd)
         })

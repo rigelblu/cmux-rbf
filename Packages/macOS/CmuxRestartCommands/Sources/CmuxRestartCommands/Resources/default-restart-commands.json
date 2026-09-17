@@ -8,7 +8,7 @@
         "executable": "hunk",
         "argumentTailPrefix": ["diff"]
       },
-      "command": "hunk",
+      "command": "hunk diff",
       "cwd": "saved"
     },
     {

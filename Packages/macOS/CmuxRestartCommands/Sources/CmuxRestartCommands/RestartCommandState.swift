@@ -49,11 +49,14 @@ public struct RestartCommandStateRecord: Codable, Equatable, Sendable {
     }
 
     /// Initial default-on state; it deliberately carries no historical receipts.
-    public static func enabledDefaults(at time: TimeInterval) -> RestartCommandStateRecord {
+    public static func enabledDefaults(
+        definitionDigest: String,
+        at time: TimeInterval
+    ) -> RestartCommandStateRecord {
         RestartCommandStateRecord(
             revision: 1,
             mode: .enabledAppDefaults,
-            approvedDefinitionDigest: RestartCommandDefinitionSet.appDefaults.approvalDigest,
+            approvedDefinitionDigest: definitionDigest,
             approvalSource: .appDefaults,
             approvedAt: time
         )

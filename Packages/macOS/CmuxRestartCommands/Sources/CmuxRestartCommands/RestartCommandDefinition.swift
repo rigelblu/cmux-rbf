@@ -58,16 +58,6 @@ public struct RestartCommandDefinitionID: RawRepresentable, Codable, Equatable, 
         lhs.rawValue < rhs.rawValue
     }
 
-    public static let hunk = RestartCommandDefinitionID(rawValue: "hunk")!
-    public static let jjui = RestartCommandDefinitionID(rawValue: "jjui")!
-    public static let jjuiBrief = RestartCommandDefinitionID(rawValue: "jjui-brief")!
-
-    /// The canonical order used for normalization and presentation.
-    public static let canonicalOrder: [RestartCommandDefinitionID] = [
-        .hunk,
-        .jjui,
-        .jjuiBrief,
-    ]
 }
 
 /// A targeted environment condition used only while observing a live process.
@@ -132,6 +122,7 @@ public struct RestartCommandDefinition: Codable, Equatable, Sendable {
 /// Validation failures surfaced by the dedicated definitions editor and Settings.
 public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
     case invalidJSON
+    case invalidJSONAtLine(Int)
     case invalidTopLevelObject
     case unknownField
     case unsupportedVersion
@@ -156,7 +147,7 @@ public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
         default:
             return String(
                 localized: "settings.terminal.restartCommands.validation.invalidDefinitions",
-                defaultValue: "Fix all command definitions before re-enabling."
+                defaultValue: "Your definitions file couldn’t be used. Shipped definitions are running; custom definitions aren’t."
             )
         }
     }
@@ -191,51 +182,6 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
     public init(definitions: [RestartCommandDefinition]) throws {
         self.definitions = try Self.validatedAndSorted(definitions)
     }
-
-    /// The app-owned definitions loaded from the bundled resource, with in-code fallback.
-    public static let appDefaults: RestartCommandDefinitionSet = {
-        if let bundled = try? BundledRestartCommandDefinitions.load() {
-            return bundled
-        }
-        return try! RestartCommandDefinitionSet(
-            definitions: [
-                RestartCommandDefinition(
-                    id: .hunk,
-                    match: RestartCommandMatchDefinition(
-                        executable: "hunk",
-                        argumentTailPrefix: ["diff"]
-                    ),
-                    command: "hunk",
-                    cwd: .saved
-                ),
-                RestartCommandDefinition(
-                    id: .jjui,
-                    match: RestartCommandMatchDefinition(
-                        executable: "jjui",
-                        environment: [
-                            "JJUI_CONFIG_DIR": RestartCommandEnvironmentPredicate(state: .absent),
-                        ]
-                    ),
-                    command: "jjui",
-                    cwd: .saved
-                ),
-                RestartCommandDefinition(
-                    id: .jjuiBrief,
-                    match: RestartCommandMatchDefinition(
-                        executable: "jjui",
-                        environment: [
-                            "JJUI_CONFIG_DIR": RestartCommandEnvironmentPredicate(
-                                state: .present,
-                                normalizedFinalComponent: "jjui-brief"
-                            ),
-                        ]
-                    ),
-                    command: "jjui-brief",
-                    cwd: .saved
-                ),
-            ]
-        )
-    }()
 
     /// Decodes strict JSON. `$schema` is editor metadata and never enters authority.
     public static func decodeJSON(_ data: Data) throws -> RestartCommandDefinitionSet {
@@ -571,6 +517,8 @@ private func validateStrictJSONSyntax(_ data: Data) throws {
     var inString = false
     var isEscaped = false
     var lastSignificantChar: UInt8? = nil
+    var lastSignificantLine = 1
+    var line = 1
 
     var i = data.startIndex
     while i < data.endIndex {
@@ -584,6 +532,9 @@ private func validateStrictJSONSyntax(_ data: Data) throws {
             } else if byte == UInt8(ascii: "\"") {
                 inString = false
                 lastSignificantChar = UInt8(ascii: "\"")
+                lastSignificantLine = line
+            } else if byte == UInt8(ascii: "\n") || byte == UInt8(ascii: "\r") {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
             }
             i = data.index(after: i)
             continue
@@ -593,30 +544,41 @@ private func validateStrictJSONSyntax(_ data: Data) throws {
         case UInt8(ascii: "\""):
             inString = true
             lastSignificantChar = UInt8(ascii: "\"")
-        case UInt8(ascii: " "), UInt8(ascii: "\t"), UInt8(ascii: "\r"), UInt8(ascii: "\n"):
+            lastSignificantLine = line
+        case UInt8(ascii: " "), UInt8(ascii: "\t"):
             break
+        case UInt8(ascii: "\r"):
+            let next = data.index(after: i)
+            if next == data.endIndex || data[next] != UInt8(ascii: "\n") {
+                line += 1
+            }
+        case UInt8(ascii: "\n"):
+            line += 1
         case UInt8(ascii: "/"):
-            throw RestartCommandDefinitionError.invalidJSON
+            throw RestartCommandDefinitionError.invalidJSONAtLine(line)
         case UInt8(ascii: ","):
             if lastSignificantChar == UInt8(ascii: ",") ||
                 lastSignificantChar == UInt8(ascii: "{") ||
                 lastSignificantChar == UInt8(ascii: "[") ||
                 lastSignificantChar == nil {
-                throw RestartCommandDefinitionError.invalidJSON
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
             }
             lastSignificantChar = UInt8(ascii: ",")
+            lastSignificantLine = line
         case UInt8(ascii: "}"), UInt8(ascii: "]"):
             if lastSignificantChar == UInt8(ascii: ",") {
-                throw RestartCommandDefinitionError.invalidJSON
+                throw RestartCommandDefinitionError.invalidJSONAtLine(lastSignificantLine)
             }
             lastSignificantChar = byte
+            lastSignificantLine = line
         default:
             lastSignificantChar = byte
+            lastSignificantLine = line
         }
         i = data.index(after: i)
     }
 
     if inString {
-        throw RestartCommandDefinitionError.invalidJSON
+        throw RestartCommandDefinitionError.invalidJSONAtLine(line)
     }
 }

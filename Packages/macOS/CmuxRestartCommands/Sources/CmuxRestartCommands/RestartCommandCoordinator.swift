@@ -171,7 +171,10 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             case .record(let record): record.isStructurallyValid ? record : nil
             case .missing, .unavailable: nil
             }
-            var record = existing ?? RestartCommandStateRecord.enabledDefaults(at: now())
+            var record = existing ?? RestartCommandStateRecord.enabledDefaults(
+                definitionDigest: bundled.approvalDigest,
+                at: now()
+            )
             if enabled {
                 record.setEnabled(
                     true,
@@ -198,7 +201,7 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
     @discardableResult
     public func approveCurrentDefinitions() -> RestartCommandAllowlistState {
         coordinationLock.withLock {
-            guard self.bundledDefinitions != nil else {
+            guard let bundled = self.bundledDefinitions else {
                 return .disabledStateUnavailable
             }
             let userRead = definitionsRepository.read()
@@ -209,7 +212,10 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
             case .record(let record): record.isStructurallyValid ? record : nil
             case .missing, .unavailable: nil
             }
-            var record = existing ?? RestartCommandStateRecord.enabledDefaults(at: now())
+            var record = existing ?? RestartCommandStateRecord.enabledDefaults(
+                definitionDigest: bundled.approvalDigest,
+                at: now()
+            )
             record.setEnabled(
                 true,
                 definitionsAreAppDefaults: false,
@@ -389,7 +395,10 @@ public final class RestartCommandCoordinator: @unchecked Sendable {
                 userObservationIdentity: userObservationIdentity
             )
         case .missing:
-            let initial = RestartCommandStateRecord.enabledDefaults(at: now())
+            let initial = RestartCommandStateRecord.enabledDefaults(
+                definitionDigest: bundled.approvalDigest,
+                at: now()
+            )
             guard stateRepository.save(initial) else {
                 return Projection(
                     state: .disabledStateUnavailable,

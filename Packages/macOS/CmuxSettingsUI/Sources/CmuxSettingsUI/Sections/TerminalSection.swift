@@ -74,11 +74,7 @@ public struct TerminalSection: View {
             startObservingSettings()
             for await status in hostActions.restartAllowlistedCommandsStatusUpdates() {
                 restartCommandsStatus = status
-                if case .enabledFallback(.unusableUserFile(let validationMessage)) = status {
-                    restartCommandsInlineError = validationMessage
-                } else {
-                    restartCommandsInlineError = nil
-                }
+                restartCommandsInlineError = nil
             }
         }
     }
@@ -273,24 +269,14 @@ public struct TerminalSection: View {
                     if case .enabledFallback(let warning) = restartCommandsStatus {
                         switch warning {
                         case .validChanged:
-                            Text(
-                                String(
-                                    localized: "settings.terminal.restartCommands.definitionsChangedWarning",
-                                    defaultValue: "Custom definitions changed — review to use them."
-                                )
-                            )
+                            Text(restartCommandsStatus.warningText ?? "")
                             .cmuxFont(.caption)
                             .foregroundStyle(.orange)
                             .multilineTextAlignment(.trailing)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("SettingsRestartCommandsChangedWarning")
                         case .unusableUserFile:
-                            Text(
-                                String(
-                                    localized: "settings.terminal.restartCommands.fallbackWarning",
-                                    defaultValue: "Your definitions file couldn’t be used. Shipped definitions are running; custom definitions aren’t."
-                                )
-                            )
+                            Text(restartCommandsStatus.warningText ?? "")
                             .cmuxFont(.caption)
                             .foregroundStyle(.orange)
                             .multilineTextAlignment(.trailing)

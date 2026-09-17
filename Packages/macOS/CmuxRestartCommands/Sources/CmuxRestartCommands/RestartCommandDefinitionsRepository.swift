@@ -97,13 +97,16 @@ public final class RestartCommandDefinitionsRepository: @unchecked Sendable {
 
     /// Refreshes the adjacent schema and creates defaults only when the editable file is absent.
     @discardableResult
-    public func materializeForEditing(schemaData: Data) -> Bool {
+    public func materializeForEditing(
+        shippedDefinitions: RestartCommandDefinitionSet,
+        schemaData: Data
+    ) -> Bool {
         do {
             let directory = definitionsFileURL.deletingLastPathComponent()
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             try schemaData.write(to: schemaFileURL, options: .atomic)
             if !fileManager.fileExists(atPath: definitionsFileURL.path) {
-                try RestartCommandDefinitionSet.appDefaults
+                try shippedDefinitions
                     .editableDefaultsData(schemaFileName: schemaFileURL.lastPathComponent)
                     .write(to: definitionsFileURL, options: .atomic)
             }

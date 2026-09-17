@@ -11,6 +11,7 @@ import CmuxRestartCommands
 @Suite("Restart allowlisted commands")
 struct RestartAllowlistedCommandTests {
     @Test func matcherAndObservation() throws {
+        let shipped = try BundledRestartCommandDefinitions.load()
         let workspaceID = UUID()
         let identity = RestartCommandSnapshotIdentity(
             rootGenerationID: UUID(),
@@ -51,14 +52,14 @@ struct RestartAllowlistedCommandTests {
         let bindings = ProcessDetectedResumeIndexes.restartCommandBindings(
             processSnapshot: snapshot,
             panelTTYDevices: [panels[0]: 11, panels[1]: 12, panels[2]: 13],
-            context: RestartCommandCaptureContext(identity: identity, definitions: .appDefaults),
+            context: RestartCommandCaptureContext(identity: identity, definitions: shipped),
             capturedAt: 100,
             processBytes: { processBytes[$0] }
         )
 
-        #expect(bindings[panels[0]]?.definitionID == RestartCommandDefinitionID.jjui.rawValue)
-        #expect(bindings[panels[1]]?.definitionID == RestartCommandDefinitionID.jjuiBrief.rawValue)
-        #expect(bindings[panels[2]]?.definitionID == RestartCommandDefinitionID.hunk.rawValue)
+        #expect(bindings[panels[0]]?.definitionID == "jjui")
+        #expect(bindings[panels[1]]?.definitionID == "jjui-brief")
+        #expect(bindings[panels[2]]?.definitionID == "hunk")
         #expect(Set(bindings.values.map { $0.snapshotGenerationID }) == [identity.rootGenerationID])
 
         let ambiguous = CmuxTopProcessSnapshot(
@@ -70,7 +71,7 @@ struct RestartAllowlistedCommandTests {
         let noBinding = ProcessDetectedResumeIndexes.restartCommandBindings(
             processSnapshot: ambiguous,
             panelTTYDevices: [ambiguousPanel: 21],
-            context: RestartCommandCaptureContext(identity: identity, definitions: .appDefaults),
+            context: RestartCommandCaptureContext(identity: identity, definitions: shipped),
             capturedAt: 100,
             processBytes: { _ in
                 Self.kernProcArgs(arguments: ["jjui"], environment: [])
@@ -80,6 +81,7 @@ struct RestartAllowlistedCommandTests {
     }
 
     @Test func configCoexistence() throws {
+        let shipped = try BundledRestartCommandDefinitions.load()
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-restart-config-tests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -94,15 +96,18 @@ struct RestartAllowlistedCommandTests {
             RestartCommandDefinitionsRepository.defaultDefinitionsFileURL(homeDirectory: root)
                 .lastPathComponent == "restart-commands.json"
         )
-        #expect(repository.materializeForEditing(schemaData: Data("{}".utf8)))
+        #expect(repository.materializeForEditing(
+            shippedDefinitions: shipped,
+            schemaData: Data("{}".utf8)
+        ))
         #expect(try Data(contentsOf: sharedConfig) == originalSharedBytes)
         #expect(FileManager.default.fileExists(atPath: definitionsURL.path))
         guard case .snapshot(let snapshot) = repository.read() else {
             Issue.record("Materialized restart definitions were not readable")
             return
         }
-        #expect(snapshot.definitions == .appDefaults)
-        #expect(snapshot.definitions.definitions.map(\.id) == RestartCommandDefinitionID.canonicalOrder)
+        #expect(snapshot.definitions == shipped)
+        #expect(snapshot.definitions.definitions.map(\.id.rawValue) == ["hunk", "jjui", "jjui-brief"])
 
         let commented = definitionsURL
             .deletingLastPathComponent()
@@ -113,7 +118,7 @@ struct RestartAllowlistedCommandTests {
               "definitions": [] }
             """#.utf8
         ).write(to: commented)
-        #expect(throws: RestartCommandDefinitionError.invalidJSON) {
+        #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(1)) {
             try RestartCommandDefinitionSet.decodeJSON(Data(contentsOf: commented))
         }
     }

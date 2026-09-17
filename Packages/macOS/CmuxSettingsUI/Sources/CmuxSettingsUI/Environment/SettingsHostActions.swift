@@ -6,7 +6,7 @@ import Foundation
 public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
     public enum ShippedWarning: Equatable, Sendable {
         case validChanged
-        case unusableUserFile(validationMessage: String?)
+        case unusableUserFile(syntaxErrorLine: Int?)
     }
 
     case enabledShipped(commandCount: Int)
@@ -52,6 +52,32 @@ public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
                 localized: "settings.terminal.restartCommands.status.stateUnavailable",
                 defaultValue: "Off · Restart state unavailable"
             )
+        }
+    }
+
+    var warningText: String? {
+        switch self {
+        case .enabledFallback(.validChanged):
+            return String(
+                localized: "settings.terminal.restartCommands.definitionsChangedWarning",
+                defaultValue: "Custom definitions changed — review to use them."
+            )
+        case .enabledFallback(.unusableUserFile(let syntaxErrorLine)):
+            if let syntaxErrorLine {
+                return String.localizedStringWithFormat(
+                    String(
+                        localized: "settings.terminal.restartCommands.fallbackWarning.atLine",
+                        defaultValue: "Line %lld contains invalid JSON. Shipped definitions are running; custom definitions aren’t."
+                    ),
+                    Int64(syntaxErrorLine)
+                )
+            }
+            return String(
+                localized: "settings.terminal.restartCommands.fallbackWarning",
+                defaultValue: "Your definitions file couldn’t be used. Shipped definitions are running; custom definitions aren’t."
+            )
+        default:
+            return nil
         }
     }
 }

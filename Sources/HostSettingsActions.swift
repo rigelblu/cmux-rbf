@@ -278,8 +278,6 @@ final class HostSettingsActions: SettingsHostActions {
         let inlineError: String? = switch state {
         case .disabledStateUnavailable:
             Self.restartCommandStatePersistenceError
-        case .enabledFallback(.unusableUserFile(.invalid(let error))):
-            error.localizedMessage
         default:
             nil
         }
@@ -302,8 +300,6 @@ final class HostSettingsActions: SettingsHostActions {
         let inlineError: String? = switch state {
         case .disabledStateUnavailable:
             Self.restartCommandStatePersistenceError
-        case .enabledFallback(.unusableUserFile(.invalid(let error))):
-            error.localizedMessage
         default:
             nil
         }
@@ -314,12 +310,18 @@ final class HostSettingsActions: SettingsHostActions {
     }
 
     func openRestartCommandDefinitionsFile() -> Bool {
-        guard let repository = AppDelegate.shared?.restartCommandCoordinator.definitionsRepository,
+        guard let coordinator = AppDelegate.shared?.restartCommandCoordinator,
+              let shippedDefinitions = coordinator.bundledDefinitions,
               let schemaData = RestartCommandSchema.materializedData(),
-              repository.materializeForEditing(schemaData: schemaData) else {
+              coordinator.definitionsRepository.materializeForEditing(
+                  shippedDefinitions: shippedDefinitions,
+                  schemaData: schemaData
+              ) else {
             return false
         }
-        PreferredEditorService(defaults: .standard).open(repository.definitionsFileURL)
+        PreferredEditorService(defaults: .standard).open(
+            coordinator.definitionsRepository.definitionsFileURL
+        )
         return true
     }
 
@@ -340,13 +342,15 @@ final class HostSettingsActions: SettingsHostActions {
             case .validUserDefinitionsChanged:
                 return .enabledFallback(warning: .validChanged)
             case .unusableUserFile(let reason):
-                let validationMessage: String? = switch reason {
-                case .invalid(let error):
-                    error.localizedMessage
-                case .unreadable, .missingAfterCustomization:
+                let syntaxErrorLine: Int? = switch reason {
+                case .invalid(.invalidJSONAtLine(let line)):
+                    line
+                case .invalid, .unreadable, .missingAfterCustomization:
                     nil
                 }
-                return .enabledFallback(warning: .unusableUserFile(validationMessage: validationMessage))
+                return .enabledFallback(
+                    warning: .unusableUserFile(syntaxErrorLine: syntaxErrorLine)
+                )
             }
         case .disabledByUser:
             return .off
