@@ -5,7 +5,12 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(empty)
+
+## 🟠⋯ Changed for End Users
+- 2026-09-17 - feat | **cmux RBF no longer shows upstream's "Update Available" pill.** A new upstream cmux release doesn't mean you want to update the fork, so the sidebar footer stays clear. cmux RBF also stops checking upstream's release feed, and "Check for Updates" answers "No Updates Available" without checking anything. Upstream's own cmux app is unchanged. (`#cm-95`)
+
+## 🟠⋯ Changed for Developers
+- `UpdateController.isDevLikeBundleIdentifier` now treats `com.cmuxterm.app.rbf` and `com.cmuxterm.app.rbf.*` like debug and staging builds. It makes no launch or background checks against upstream's appcast, clears any detected update, and answers manual checks with `.notFound`. The gate writes `SUEnableAutomaticChecks = false` into the app's user defaults, and a rollback doesn't undo that (`defaults delete com.cmuxterm.app.rbf SUEnableAutomaticChecks`). Outside `rbf/scripts/lib/rbf-channel.env`, `UpdateController.swift` is now the only code that names the channel's bundle id, and the env file's header lists it. `rbf/scripts/install-rbf.sh` no longer writes `SUEnableAutomaticChecks` or `SUAutomaticallyUpdate` into the installed plist; those lines never took effect, because Sparkle reads registered and user defaults first.
 
 # 🔵⋯ v0.27.3 (2026-09-16) — #cm-96
 

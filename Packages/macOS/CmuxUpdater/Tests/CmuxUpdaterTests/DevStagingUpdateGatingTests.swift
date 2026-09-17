@@ -50,6 +50,55 @@ import Testing
         #expect(UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.staging.my-tag"))
     }
 
+    @Test func classifiesRbfBundlesAsDevLike() {
+        #expect(UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.rbf"))
+        #expect(UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.rbf.docktileplugin"))
+        #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.rbfx"))
+    }
+
+    /// The installed RBF host bundle turns on the updater gate without an explicit override
+    /// (#cm-95).
+    @Test func rbfHostBundleTurnsGateOn() throws {
+        let fileManager = FileManager.default
+        let scratchDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? fileManager.removeItem(at: scratchDirectory) }
+
+        let appURL = scratchDirectory.appendingPathComponent("Scratch.app", isDirectory: true)
+        let contentsURL = appURL.appendingPathComponent("Contents", isDirectory: true)
+        try fileManager.createDirectory(at: contentsURL, withIntermediateDirectories: true)
+        let plistData = try PropertyListSerialization.data(
+            fromPropertyList: [
+                "CFBundleIdentifier": "com.cmuxterm.app.rbf",
+                "CFBundlePackageType": "APPL",
+            ],
+            format: .xml,
+            options: 0
+        )
+        try plistData.write(to: contentsURL.appendingPathComponent("Info.plist"))
+
+        let hostBundle = try #require(Bundle(url: appURL))
+        #expect(hostBundle.bundleIdentifier == "com.cmuxterm.app.rbf")
+
+        let suiteName = "com.cmuxterm.updatertests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let controller = UpdateController(
+            log: NoopUpdateLog(),
+            clock: SystemUpdateClock(),
+            hostBundle: hostBundle,
+            defaults: defaults
+        )
+        #expect(defaults.bool(forKey: UpdateSettings.automaticChecksKey) == false)
+
+        controller.checkForUpdates()
+        guard case .notFound = controller.model.state else {
+            Issue.record("RBF manual check should surface .notFound, got \(controller.model.state)")
+            return
+        }
+    }
+
     @Test func doesNotClassifyPublicOrNightlyOrNilAsDevLike() {
         #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app"))
         #expect(!UpdateController.isDevLikeBundleIdentifier(nil))

@@ -370,21 +370,24 @@ public final class UpdateController {
 }
 
 extension UpdateController {
-    /// Whether `bundleIdentifier` is a cmux DEV (`com.cmuxterm.app.debug[.<tag>]`) or staging
-    /// (`com.cmuxterm.app.staging[.<tag>]`) build.
+    /// Whether `bundleIdentifier` is a cmux DEV (`com.cmuxterm.app.debug[.<tag>]`), staging
+    /// (`com.cmuxterm.app.staging[.<tag>]`), or RBF fork (`com.cmuxterm.app.rbf[.<tag>]`) build.
     ///
     /// Such builds are produced from local source and are not on the public release train, so
-    /// they must never be compared against the public Sparkle appcast (#6292).
+    /// they must never be compared against the public Sparkle appcast (#6292, #cm-95).
     ///
-    /// Mirrors `SocketControlSettings.isDebugLikeBundleIdentifier` +
-    /// `isStagingBundleIdentifier` (in the CmuxSettings package). The classification is
-    /// duplicated here deliberately to avoid introducing a `CmuxUpdater → CmuxSettings` package
-    /// dependency edge for a small string check.
+    /// The DEV and staging cases mirror `SocketControlSettings.isDebugLikeBundleIdentifier` +
+    /// `isStagingBundleIdentifier` (in the CmuxSettings package). The RBF case must stay out of
+    /// `SocketControlSettings` to preserve release socket, keychain, and client-secret behavior.
+    /// The classification is duplicated here deliberately to avoid introducing a
+    /// `CmuxUpdater → CmuxSettings` package dependency edge for a small string check.
     static func isDevLikeBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return false }
         return bundleIdentifier == "com.cmuxterm.app.debug"
             || bundleIdentifier.hasPrefix("com.cmuxterm.app.debug.")
             || bundleIdentifier == "com.cmuxterm.app.staging"
             || bundleIdentifier.hasPrefix("com.cmuxterm.app.staging.")
+            || bundleIdentifier == "com.cmuxterm.app.rbf"
+            || bundleIdentifier.hasPrefix("com.cmuxterm.app.rbf.")
     }
 }

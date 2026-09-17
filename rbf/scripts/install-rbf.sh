@@ -321,11 +321,12 @@ plist_set "$APP_PLIST" CFBundleName          string "$RBF_APP_NAME"
 plist_set "$APP_PLIST" CFBundleDisplayName   string "$RBF_APP_NAME"
 plist_set "$APP_PLIST" CFBundleIdentifier    string "$RBF_BUNDLE_ID"
 plist_set "$APP_PLIST" "$RBF_VERSION_PLIST_KEY" string "$RBF_VERSION"
-# Sparkle: upstream's feed is baked into the literal plist and would offer
-# upstream's 0.64.x as an "update" to this build. Both carry CFBundleVersion
-# 100, so the comparison is not something to rely on — turn the check off.
-plist_set "$APP_PLIST" SUEnableAutomaticChecks bool false
-plist_set "$APP_PLIST" SUAutomaticallyUpdate   bool false
+# Sparkle: no keys are set here. The installed plist keeps upstream's
+# SUEnableAutomaticChecks = true (Resources/Info.plist), and overriding it never
+# worked: Sparkle reads registered and user defaults before the plist, and
+# UpdateSettings.apply registers true. What turns update checks off for this
+# channel is UpdateController.isDevLikeBundleIdentifier (#cm-95).
+
 # The app reads its own identity from here; this is what makes Guard 1 above
 # work at all, and mirrors scripts/reloads.sh:233-236.
 /usr/libexec/PlistBuddy -c "Add :LSEnvironment dict" "$APP_PLIST" 2>/dev/null || true
