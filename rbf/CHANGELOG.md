@@ -5,6 +5,13 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
+(empty)
+
+# 🔵⋯ v0.27.4 (2026-09-17) — #cm-96.2, #cm-95
+
+*See which line and field broke your restart definitions, and match a pane's app on any environment variable. cmux RBF no longer shows upstream's "Update Available" pill.*
+
+**`#cm-95`'s on-screen check had not run when this version was cut** — its code is in the build because it was committed first. Run its two checks before relying on it.
 
 ## 🟠⋯ Changed for End Users
 - 2026-09-17 - feat | **cmux RBF no longer shows upstream's "Update Available" pill.** A new upstream cmux release doesn't mean you want to update the fork, so the sidebar footer stays clear. cmux RBF also stops checking upstream's release feed, and "Check for Updates" answers "No Updates Available" without checking anything. Upstream's own cmux app is unchanged. (`#cm-95`)
