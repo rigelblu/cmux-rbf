@@ -296,14 +296,17 @@ cmux can also restart a small allowlist of ordinary commands that were running
 in local panes when the session was saved. **Settings > Terminal > Restart
 Allowlisted Commands** controls this globally and is on by default. The built-in
 definitions recognize `jjui`, `jjui-brief`, and Hunk's `diff` process; cmux
-starts the canonical `jjui`, `jjui-brief`, or `hunk` shell command in the
+starts the canonical `jjui`, `jjui-brief`, or `hunk diff` shell command in the
 pane's restored working directory rather than replaying captured arguments or
 environment values. Agent, tmux, and custom surface resume bindings take
 precedence when a pane already has one.
 
 Choose **Open Definitions File** to edit the dedicated primary-global file at
-`~/.config/cmux/restart-commands.json`. Editing a definition turns automatic
-restart off until you review the file and re-enable the single global setting.
+`~/.config/cmux/restart-commands.json`. If the file is invalid or contains a
+valid change you have not approved, cmux keeps using only its shipped definitions
+and shows the problem in Settings. A valid changed catalog remains inert until
+you approve the complete list with **Approve Changes**; turning the global
+setting off still prevents every automatic command restart.
 The same rules apply to clean relaunch, crash recovery, **File > Reopen Previous
 Session**, and `cmux restore-session`; automatic recovery consumes a saved
 snapshot once, while an explicit manual restore may intentionally run it again.

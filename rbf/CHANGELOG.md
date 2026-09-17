@@ -5,9 +5,19 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-*Label a passage in one click instead of typing the same note again. Use the Reply panel from the keyboard — step through replies, and leave when you are done. Read the agent's reply with the line breaks it actually wrote.*
+(empty)
+
+# 🔵⋯ v0.27.3 (2026-09-16) — #cm-96
+
+## 🟠⋯ Changed for End Users
+- 2026-09-16 - fix | **Restarted `jjui` and Hunk panes no longer come back as blank shells because one custom definitions file has an error or an unapproved change.** cmux keeps its shipped definitions running, identifies a known JSON error line in Settings, and never runs custom definitions until you approve the complete repaired list. Hunk's diff mode returns as `hunk diff`, including commands launched through an alias that expands to it. (`#cm-96`)
+
+## 🟠⋯ Changed for Developers
+- Restart-command identifiers are bounded generic slugs backed by a bundled JSON catalog rather than compiled cases. Enabled shipped authority remains available while user data is invalid, unreadable, missing after customization, or valid but unapproved; explicit Off still wins, and receipt plus second-read checks remain intact.
 
 # 🔵⋯ v0.27.2 (2026-09-16) — #cm-74.1
+
+*Label a passage in one click instead of typing the same note again. Use the Reply panel from the keyboard — step through replies, and leave when you are done. Read the agent's reply with the line breaks it actually wrote.*
 
 ## 🟠⋯ Changed for End Users
 - 2026-09-16 - feat | **Keep one browser pane loaded so you find it where you left it.** A browser pane idle for five minutes reloads when you come back to it — a Figma canvas comes back blank, a doc back at the top. Turn on **Keep Page Loaded** for a pane and it's exempted from that timer: a toolbar button when the pane is wide, an item in the `⋯` overflow menu when it's compact. Off by default, so nothing changes until you turn it on; the setting survives a restart. It doesn't protect the pane if the system is actually low on memory. (`#cm-74.1`)
