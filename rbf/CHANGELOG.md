@@ -5,6 +5,13 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
+(empty)
+
+# 🔵⋯ v0.27.5 (2026-09-17) — #cm-96.3
+
+*A pane that once ran an agent comes back running its approved restart command, instead of as a bare shell.*
+
+**Cut before its dogfood, on purpose:** the human check needs the installed app's real panes, and `make install-rbf` is the restart it observes. Verified by tests and mutation before the cut; the on-screen result lands in the brief after the install.
 
 ## 🟠⋯ Changed for End Users
 - 2026-09-17 - fix | **When a pane's saved agent won't come back, the pane now runs its approved restart command instead of coming back empty.** A record of an agent that cmux had already retired — or one whose agent wasn't running when you quit — still counted as "something will restore this pane", so the pane's own command never started and you got a bare shell. A pane whose agent really will resume is unchanged: its restart command still stays out of the way. (`#cm-96.3`)
