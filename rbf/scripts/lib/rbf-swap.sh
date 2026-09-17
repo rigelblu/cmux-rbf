@@ -48,7 +48,16 @@ set -uo pipefail
 rbf_swap_app_running() { pgrep -f "$1/Contents/MacOS/" >/dev/null 2>&1; }
 rbf_swap_request_quit() { osascript -e "tell application id \"$1\" to quit" >/dev/null 2>&1 || true; }
 rbf_swap_sigterm() { pkill -TERM -f "$1/Contents/MacOS/" 2>/dev/null || true; }
-rbf_swap_relaunch() { open "$1"; }
+# Launches the way the Dock would. The caller is often an agent inside cmux or
+# herdr, and `open` passes its environment to the app and every tab it opens:
+# its CMUX_* socket and surface, and HERDR_* pane variables that make each tab
+# look "nested". RBF_SWAP_OPEN lets the tests record the call instead.
+rbf_swap_relaunch() {
+  env -i HOME="$HOME" USER="${USER:-}" LOGNAME="${LOGNAME:-${USER:-}}" \
+    SHELL="${SHELL:-/bin/zsh}" TMPDIR="${TMPDIR:-/tmp/}" LANG="${LANG:-en_US.UTF-8}" \
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    "${RBF_SWAP_OPEN:-/usr/bin/open}" "$1"
+}
 rbf_swap_sleep() { sleep "$1"; }
 rbf_swap_mv() { mv "$@"; }
 

@@ -1135,6 +1135,15 @@ if [[ "$LAUNCH" -eq 1 ]]; then
     -u GHOSTTY_RESOURCES_DIR
     -u GHOSTTY_SHELL_FEATURES
     -u GHOSTTY_SURFACE_ID
+    # An agent inside herdr runs this too; its pane variables make every tab of the
+    # new app look like a nested herdr, so herdr and herdr-agent refuse to run there.
+    -u HERDR_ENV
+    -u HERDR_PANE_ID
+    -u HERDR_TAB_ID
+    -u HERDR_WORKSPACE_ID
+    -u HERDR_SOCKET_PATH
+    -u HERDR_SESSION
+    -u HERDR_BIN_PATH
     # Dev shells (including CI/Codex) often force-disable paging by exporting these.
     # Don't leak that into cmux, otherwise `git diff` won't page even with PAGER=less.
     -u GIT_PAGER

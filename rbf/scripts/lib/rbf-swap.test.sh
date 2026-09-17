@@ -434,5 +434,32 @@ else
   bad "daemon process group" "daemon pgid='$daemon_pgid' equals the spawner's ('$spawner_pgid') — it would die with the app's group"
 fi
 
+# --- relaunch environment --------------------------------------------------
+printf '\nrelaunch environment (real seam, recorder instead of open)\n'
+
+# The install usually runs from an agent inside cmux or herdr. A relaunch that
+# passes that environment on gives the new app — and every tab it opens — the
+# agent's CMUX_* and HERDR_* variables (2026-09-17: every tab then refused herdr
+# as "nested", and restore started duplicate agents).
+fx="$SANDBOX/relaunch-env"; mkdir -p "$fx/bin"
+cat > "$fx/bin/open" <<'RECORDER'
+#!/bin/bash
+env > "${0%/bin/open}/env"
+printf '%s\n' "$@" > "${0%/bin/open}/args"
+RECORDER
+chmod +x "$fx/bin/open"
+# PATH reaches the recorder for a bare `open`; RBF_SWAP_OPEN for the fixed seam.
+env HERDR_ENV=1 HERDR_PANE_ID=w1:p1 HERDR_SOCKET_PATH=/tmp/herdr.sock \
+  CMUX_SURFACE_ID=0000 CMUX_SOCKET_PATH=/tmp/cmux.sock CMUX_SOCKET_CAPABILITY=secret \
+  PATH="$fx/bin:$PATH" RBF_SWAP_OPEN="$fx/bin/open" LIB_DIR="$LIB_DIR" \
+  bash -c 'source "$LIB_DIR/rbf-swap.sh"; rbf_swap_relaunch "/Applications/Fake RBF.app"'
+leaked="$(grep -E '^(HERDR|CMUX)_' "$fx/env" 2>/dev/null | cut -d= -f1 | tr '\n' ' ')"
+if [[ -s "$fx/env" && -z "$leaked" ]] && grep -qx "HOME=$HOME" "$fx/env" \
+  && [[ "$(cat "$fx/args")" == "/Applications/Fake RBF.app" ]]; then
+  ok "relaunch hands the app a Dock-like environment: no CMUX_*/HERDR_*, HOME kept, app path passed"
+else
+  bad "relaunch environment" "leaked: ${leaked:-none}; env recorded: $([[ -s "$fx/env" ]] && echo y || echo n); args: $(cat "$fx/args" 2>&1)"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ $fail -eq 0 ]]
