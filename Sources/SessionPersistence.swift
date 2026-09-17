@@ -405,6 +405,23 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
         autoResume == true
     }
 
+    /// Whether this binding may still resume its pane, judged from the snapshot alone.
+    ///
+    /// `true` is the conservative answer, not a claim that the binding will resume: for a `cli`
+    /// binding the stored approval record re-derives `autoResume` at restore
+    /// (`SurfaceResumeApprovalSigningSecretCache.bindingByApplying`), so the saved flag here can
+    /// be stale in both directions and must not be read.
+    ///
+    /// `agent-hook` and `process-detected` are the two sources whose saved flag restore really
+    /// does honour. **`process-detected` depends on two pre-filters staying in place** —
+    /// `Workspace.swift`'s and `DockSplitStore+SessionRestore.swift`'s — because `trustedBinding`
+    /// otherwise forces `autoResume = true` for that source. Removing either one makes this
+    /// property wrong in the dangerous direction; see `RestartCommandPaneProjection`.
+    var mayResumePaneOnItsOwn: Bool {
+        if isAgentHookBinding || isProcessDetected { return allowsAutomaticResume }
+        return true
+    }
+
     var usesLocalRestoreVerb: Bool {
         launchFlavor == .local
     }

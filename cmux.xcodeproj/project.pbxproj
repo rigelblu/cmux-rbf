@@ -218,6 +218,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		F87910180000000000000001 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87910180000000000000002 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift */; };
 		357DF9BBBB0D71C5EE23D997 /* AppDelegate+WorkspaceTodoShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E213BAD49ECD0698B3471B /* AppDelegate+WorkspaceTodoShortcut.swift */; };
 		A5001093 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001090 /* AppDelegate.swift */; };
+		C09630000000000000000002 /* RestartCommandPaneProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09630000000000000000001 /* RestartCommandPaneProjection.swift */; };
 		725746692D9647948561044D /* AppDelegateBareSpaceShortcutRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FCD4CC61D54A2F8F2F463D /* AppDelegateBareSpaceShortcutRoutingTests.swift */; };
 		B1F0C0080000000000000001 /* AppDelegateDetachedInspectorClose.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F0C0080000000000000002 /* AppDelegateDetachedInspectorClose.swift */; };
 		A1B2C3D4E5F600000000CF01 /* AppDelegateDisplayConfigRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000CF02 /* AppDelegateDisplayConfigRestoreTests.swift */; };
@@ -1748,6 +1749,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */; };
 		CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY03 /* ReplyPanelView.swift */; };
 		C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0540000000000000000000A /* RestartAllowlistedCommandTests.swift */; };
+		C09630000000000000000004 /* RestartCommandPaneProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09630000000000000000003 /* RestartCommandPaneProjectionTests.swift */; };
 		C05400000000000000000007 /* RestartCommandRestoreSummaryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05400000000000000000008 /* RestartCommandRestoreSummaryRowView.swift */; };
 		C05400000000000000000005 /* RestartCommandRestoreSummaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05400000000000000000006 /* RestartCommandRestoreSummaryStore.swift */; };
 		F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5410005A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift */; };
@@ -2960,6 +2962,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		F87910180000000000000002 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/AppDelegate+WorkspaceTerminalFontSizeDebug.swift"; sourceTree = "<group>"; };
 		D7E213BAD49ECD0698B3471B /* AppDelegate+WorkspaceTodoShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+WorkspaceTodoShortcut.swift"; sourceTree = "<group>"; };
 		A5001090 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		C09630000000000000000001 /* RestartCommandPaneProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandPaneProjection.swift; sourceTree = "<group>"; };
 		17FCD4CC61D54A2F8F2F463D /* AppDelegateBareSpaceShortcutRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateBareSpaceShortcutRoutingTests.swift; sourceTree = "<group>"; };
 		B1F0C0080000000000000002 /* AppDelegateDetachedInspectorClose.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegateDetachedInspectorClose.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000CF02 /* AppDelegateDisplayConfigRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateDisplayConfigRestoreTests.swift; sourceTree = "<group>"; };
@@ -4407,6 +4410,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStoreTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY03 /* ReplyPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelView.swift; sourceTree = "<group>"; };
 		C0540000000000000000000A /* RestartAllowlistedCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartAllowlistedCommandTests.swift; sourceTree = "<group>"; };
+		C09630000000000000000003 /* RestartCommandPaneProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandPaneProjectionTests.swift; sourceTree = "<group>"; };
 		C05400000000000000000008 /* RestartCommandRestoreSummaryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandRestoreSummaryRowView.swift; sourceTree = "<group>"; };
 		C05400000000000000000006 /* RestartCommandRestoreSummaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandRestoreSummaryStore.swift; sourceTree = "<group>"; };
 		F5410005A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestorableAgentHookProviderHermesTests.swift; sourceTree = "<group>"; };
@@ -6555,6 +6559,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				F4350A130000000000000001 /* AppBundleIconPersistencePolicy.swift */,
 				D1320AA0D1320AA0D1320AA4 /* AppIconDockTilePlugin.swift */,
 				A5001090 /* AppDelegate.swift */,
+				C09630000000000000000001 /* RestartCommandPaneProjection.swift */,
 				C51A740000000000000000A2 /* AppDelegate+SimulatorShortcutRouting.swift */,
 				D35B00000000000000000011 /* TerminalController+BrowserDesignMode.swift */,
 				D35B00000000000000000014 /* TerminalController+AgentPromptDelivery.swift */,
@@ -7431,6 +7436,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 			isa = PBXGroup;
 			children = (
 				C0540000000000000000000A /* RestartAllowlistedCommandTests.swift */,
+				C09630000000000000000003 /* RestartCommandPaneProjectionTests.swift */,
 				A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */,
 				F2000001A1B2C3D4E5F60718 /* UpdatePillReleaseVisibilityTests.swift */,
 				F3000001A1B2C3D4E5F60718 /* CJKIMEInputTests.swift */,
@@ -8780,6 +8786,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				F87910180000000000000001 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift in Sources */,
 				357DF9BBBB0D71C5EE23D997 /* AppDelegate+WorkspaceTodoShortcut.swift in Sources */,
 				A5001093 /* AppDelegate.swift in Sources */,
+				C09630000000000000000002 /* RestartCommandPaneProjection.swift in Sources */,
 				B1F0C0080000000000000001 /* AppDelegateDetachedInspectorClose.swift in Sources */,
 				D37777040000000000000001 /* AppDelegateSettingsPresentation.swift in Sources */,
 				A11EAB000000000000000000 /* AppearanceSettings.swift in Sources */,
@@ -10988,6 +10995,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */,
 				69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */,
 				C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */,
+				C09630000000000000000004 /* RestartCommandPaneProjectionTests.swift in Sources */,
 					F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */,
 					F5410000A1B2C3D4E5F60718 /* RestorableAgentHookProviderResumeTests.swift in Sources */,
 					F5410002A1B2C3D4E5F60718 /* RestorableAgentNonInteractiveTests.swift in Sources */,

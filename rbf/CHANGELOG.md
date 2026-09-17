@@ -5,7 +5,12 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(empty)
+
+## 🟠⋯ Changed for End Users
+- 2026-09-17 - fix | **When a pane's saved agent won't come back, the pane now runs its approved restart command instead of coming back empty.** A record of an agent that cmux had already retired — or one whose agent wasn't running when you quit — still counted as "something will restore this pane", so the pane's own command never started and you got a bare shell. A pane whose agent really will resume is unchanged: its restart command still stays out of the way. (`#cm-96.3`)
+
+## 🟠⋯ Changed for Developers
+- `restartCommandPaneCandidates` moved out of `AppDelegate` into `RestartCommandPaneProjection` unchanged, so the snapshot → candidate projection is reachable from a test for the first time; the window/workspace/dock traversal above it stays private. `hasExistingResumeIntent` now asks whether a saved binding would resume the pane by itself rather than whether one exists. The saved `autoResume` flag decides for `agent-hook` and `process-detected` bindings, which is where restore reads it; a `cli` binding keeps counting as an intent, because its approval record re-derives that flag at restore and a stale `false` would start a restart command beside a resuming pane. An `agent-hook` binding also stops counting when the pane was captured with `wasAgentRunning: false`, matching the agent-hook-only gate restore applies, and the `agent` snapshot clause takes the same flag, matching the gate on the agent's own relaunch. `managedAgentResumeBinding` takes the same rule, since by construction it only ever holds an `agent-hook` binding. `mayResumePaneOnItsOwn` answers `true` conservatively for every other source, and the two pre-filters it depends on now carry comments naming it.
 
 # 🔵⋯ v0.27.4 (2026-09-17) — #cm-96.2, #cm-95
 

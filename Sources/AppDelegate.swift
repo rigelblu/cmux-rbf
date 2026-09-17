@@ -3683,38 +3683,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 .prefix(SessionPersistencePolicy.maxWorkspacesPerWindow)
                 .flatMap {
                 workspaceSnapshot in
-                restartCommandPaneCandidates(
+                RestartCommandPaneProjection.candidates(
                     in: workspaceSnapshot.panels,
                     workspaceIsRemote: workspaceSnapshot.remote != nil
-                ) + restartCommandPaneCandidates(
+                ) + RestartCommandPaneProjection.candidates(
                     in: workspaceSnapshot.dock?.panels ?? [],
                     workspaceIsRemote: workspaceSnapshot.remote != nil
                 )
             }
-            return workspaceCandidates + restartCommandPaneCandidates(
+            return workspaceCandidates + RestartCommandPaneProjection.candidates(
                 in: windowSnapshot.dock?.panels ?? [],
                 workspaceIsRemote: false
-            )
-        }
-    }
-
-    private func restartCommandPaneCandidates(
-        in panels: [SessionPanelSnapshot],
-        workspaceIsRemote: Bool
-    ) -> [RestartCommandPaneCandidate] {
-        panels.compactMap { panel in
-            guard panel.type == .terminal, let terminal = panel.terminal else { return nil }
-            let hasExistingResumeIntent = terminal.agent != nil
-                || terminal.tmuxStartCommand != nil
-                || terminal.hibernation != nil
-                || terminal.resumeBinding != nil
-                || terminal.managedAgentResumeBinding != nil
-            return RestartCommandPaneCandidate(
-                panelID: panel.id,
-                binding: terminal.restartCommandBinding,
-                hasExistingResumeIntent: hasExistingResumeIntent,
-                isRemote: workspaceIsRemote || terminal.isRemoteTerminal == true,
-                savedWorkingDirectory: terminal.workingDirectory ?? panel.directory
             )
         }
     }

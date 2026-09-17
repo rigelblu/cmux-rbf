@@ -189,6 +189,10 @@ extension DockSplitStore {
         let shouldAutoResumeAgent = AgentSessionAutoResumeSettings.isEnabled(
             defaults: agentSessionAutoResumeDefaults
         ) && agentWasRunning
+        // Twin of the pre-filter in Workspace.swift. RestartCommandPaneProjection's
+        // mayResumePaneOnItsOwn reads a process-detected binding's saved autoResume only because
+        // both copies drop it here first; trustedBinding would otherwise force autoResume = true.
+        // Changing this is a change to #cm-96.3.
         let resumeBindingForStartup = hibernation != nil ||
             (resumeBinding?.isProcessDetected == true && resumeBinding?.autoResume != true)
             ? nil

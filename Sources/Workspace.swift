@@ -1456,6 +1456,11 @@ extension Workspace {
                 locatedResumeBinding,
                 restorableAgent: restorableAgent
             )
+            // A process-detected binding with autoResume != true is dropped here, before
+            // approval. RestartCommandPaneProjection.mayResumePaneOnItsOwn depends on this
+            // pre-filter and its twin in DockSplitStore+SessionRestore: without them
+            // trustedBinding forces autoResume = true for this source, and a pane would both
+            // resume and run its approved restart command. Changing this is a change to #cm-96.3.
             let resumeBindingForStartup =
                 restoredHibernation != nil ||
                 (resumeBinding?.isProcessDetected == true && resumeBinding?.autoResume != true)
