@@ -27,7 +27,23 @@ struct RestartCommandSchemaTests {
         let predicateProperties = try dictionary(predicate["properties"])
         let component = try dictionary(predicateProperties["normalizedFinalComponent"])
         #expect(component["pattern"] as? String == RestartCommandDefinitionSet.pathComponentPattern)
-        #expect(predicate["oneOf"] != nil || predicate["allOf"] != nil)
+        let alternatives = try #require(predicate["oneOf"] as? [Any])
+        #expect(alternatives.count == 2)
+        let branches = try alternatives.map { try dictionary($0) }
+        let present = try #require(branches.first { branch in
+            guard let properties = branch["properties"] as? [String: Any],
+                  let state = properties["state"] as? [String: Any] else { return false }
+            return state["const"] as? String == "present"
+        })
+        #expect((present["required"] as? [String]) == ["normalizedFinalComponent"])
+
+        let absent = try #require(branches.first { branch in
+            guard let properties = branch["properties"] as? [String: Any],
+                  let state = properties["state"] as? [String: Any] else { return false }
+            return state["const"] as? String == "absent"
+        })
+        let absentNot = try dictionary(absent["not"])
+        #expect((absentNot["required"] as? [String]) == ["normalizedFinalComponent"])
 
         let command = try dictionary(definitionProperties["command"])
         let description = try #require(command["description"] as? String)

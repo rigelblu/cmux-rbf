@@ -1,5 +1,6 @@
 public import Foundation
 internal import CryptoKit
+internal import CoreFoundation
 
 /// Stable identifiers for commands cmux may restart after restoring a pane.
 public struct RestartCommandDefinitionID: RawRepresentable, Codable, Equatable, Hashable, Sendable, Comparable, CustomStringConvertible, ExpressibleByStringLiteral {
@@ -144,6 +145,12 @@ public enum RestartCommandDefinitionError: Error, Equatable, Sendable {
     case invalidJSONAtLine(Int)
     case invalidTopLevelObject
     case unknownField
+    /// A required field is absent from its enclosing object.
+    case missingField
+    /// A definition identifier is not a valid stable slug.
+    case invalidDefinitionID
+    /// A definition's `match` value is not an object.
+    case invalidMatch
     case unsupportedVersion
     case incompleteDefinitionSet
     case duplicateDefinition
@@ -208,7 +215,7 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
 
     /// Decodes strict JSON. `$schema` is editor metadata and never enters authority.
     public static func decodeJSON(_ data: Data) throws -> RestartCommandDefinitionSet {
-        try validateStrictJSONSyntax(data)
+        let sourcePositions = try validateStrictJSONSyntax(data)
         let object: Any
         do {
             object = try JSONSerialization.jsonObject(with: data)
@@ -218,34 +225,88 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
         guard let root = object as? [String: Any] else {
             throw RestartCommandDefinitionError.invalidTopLevelObject
         }
-        guard Set(root.keys).isSubset(of: ["$schema", "version", "definitions"]) else {
-            throw RestartCommandDefinitionError.unknownField
-        }
-        guard (root["version"] as? NSNumber)?.intValue == schemaVersion else {
-            throw RestartCommandDefinitionError.unsupportedVersion
-        }
-        guard let rawDefinitions = root["definitions"] as? [[String: Any]] else {
-            throw RestartCommandDefinitionError.incompleteDefinitionSet
-        }
-        for rawDefinition in rawDefinitions {
-            try validateRawDefinitionShape(rawDefinition)
+
+        var failures: [RestartCommandValidationFailure] = []
+        let rootKeys = Set(root.keys)
+        for key in rootKeys.subtracting(["$schema", "version", "definitions"]) {
+            failures.append(.unknownField(path: [.key(key)], field: key))
         }
 
-        struct FilePayload: Decodable {
-            let version: Int
-            let definitions: [RestartCommandDefinition]
-        }
-        do {
-            let payload = try JSONDecoder().decode(FilePayload.self, from: data)
-            guard payload.version == schemaVersion else {
-                throw RestartCommandDefinitionError.unsupportedVersion
+        if let version = root["version"] {
+            if !isSchemaVersion(version) {
+                failures.append(.invalidValue(
+                    path: [.key("version")],
+                    field: "version",
+                    reason: .unsupportedVersion
+                ))
             }
-            return try RestartCommandDefinitionSet(definitions: payload.definitions)
-        } catch let error as RestartCommandDefinitionError {
-            throw error
-        } catch {
-            throw RestartCommandDefinitionError.invalidJSON
+        } else {
+            failures.append(.missingField(path: [], field: "version"))
         }
+
+        var decodedDefinitions: [(index: Int, definition: RestartCommandDefinition)] = []
+        if let rawDefinitions = root["definitions"] as? [Any] {
+            if rawDefinitions.count < minimumDefinitionCount || rawDefinitions.count > maximumDefinitionCount {
+                failures.append(.invalidValue(
+                    path: [.key("definitions")],
+                    field: "definitions",
+                    reason: .incompleteDefinitionSet
+                ))
+            }
+            for (index, rawDefinition) in rawDefinitions.enumerated() {
+                let path: RestartCommandJSONPath = [.key("definitions"), .index(index)]
+                guard let object = rawDefinition as? [String: Any] else {
+                    failures.append(.invalidValue(
+                        path: path,
+                        field: "definitions",
+                        reason: .incompleteDefinitionSet
+                    ))
+                    continue
+                }
+                let result = decodeDefinition(object, at: path)
+                failures.append(contentsOf: result.failures)
+                if let definition = result.definition {
+                    decodedDefinitions.append((index, definition))
+                }
+            }
+        } else if root["definitions"] != nil {
+            failures.append(.invalidValue(
+                path: [.key("definitions")],
+                field: "definitions",
+                reason: .incompleteDefinitionSet
+            ))
+        } else {
+            failures.append(.missingField(path: [], field: "definitions"))
+        }
+
+        var firstIndexByID: [RestartCommandDefinitionID: Int] = [:]
+        for decoded in decodedDefinitions {
+            if firstIndexByID.updateValue(decoded.index, forKey: decoded.definition.id) != nil {
+                failures.append(.repeatedID(path: [
+                    .key("definitions"), .index(decoded.index), .key("id")
+                ]))
+            }
+        }
+
+        if !failures.isEmpty {
+            if let located = failures.compactMap({ failure -> (RestartCommandValidationFailure, RestartCommandSourcePosition)? in
+                guard let position = sourcePositions[failure.path] else { return nil }
+                return (failure, position)
+            }).min(by: { lhs, rhs in
+                lhs.1.line != rhs.1.line ? lhs.1.line < rhs.1.line : lhs.1.column < rhs.1.column
+            }) {
+                throw RestartCommandDefinitionError.invalidDefinition(
+                    RestartCommandDefinitionProblem(
+                        kind: located.0.kind,
+                        line: located.1.line,
+                        field: located.0.field
+                    )
+                )
+            }
+            throw failures[0].reason
+        }
+
+        return try RestartCommandDefinitionSet(definitions: decodedDefinitions.map(\.definition))
     }
 
     /// Fixed-key canonical JSON bytes used only as digest input.
@@ -385,76 +446,416 @@ public struct RestartCommandDefinitionSet: Equatable, Sendable {
         guard Set(ids).count == ids.count else {
             throw RestartCommandDefinitionError.duplicateDefinition
         }
-        for definition in definitions {
-            guard !definition.match.executable.isEmpty,
-                  (definition.match.executable as NSString).lastPathComponent == definition.match.executable else {
-                throw RestartCommandDefinitionError.emptyExecutable
-            }
-            if let prefix = definition.match.argumentTailPrefix,
-               prefix.isEmpty || prefix.contains(where: \.isEmpty) {
-                throw RestartCommandDefinitionError.invalidArgumentPrefix
-            }
-            if let environment = definition.match.environment {
-                guard !environment.isEmpty,
-                      environment.keys.allSatisfy({ $0 == "JJUI_CONFIG_DIR" }) else {
-                    throw RestartCommandDefinitionError.invalidEnvironmentPredicate
-                }
-                for predicate in environment.values {
-                    switch predicate.state {
-                    case .absent:
-                        guard predicate.normalizedFinalComponent == nil else {
-                            throw RestartCommandDefinitionError.invalidEnvironmentPredicate
-                        }
-                    case .present:
-                        guard let component = predicate.normalizedFinalComponent,
-                              !component.isEmpty,
-                              (component as NSString).lastPathComponent == component else {
-                            throw RestartCommandDefinitionError.invalidEnvironmentPredicate
-                        }
-                    }
-                }
-            }
-            guard !definition.command.isEmpty else {
-                throw RestartCommandDefinitionError.emptyCommand
-            }
-            guard RestartCommandGrammar.isSafeSingleCommand(definition.command) else {
-                throw RestartCommandDefinitionError.unsafeCommand
-            }
-            guard definition.command.utf8.count <= maximumCommandUTF8Bytes else {
-                throw RestartCommandDefinitionError.commandTooLong
+        for (index, definition) in definitions.enumerated() {
+            if let failure = definitionFailures(
+                definition,
+                at: [.key("definitions"), .index(index)]
+            ).first {
+                throw failure.reason
             }
         }
         return definitions.sorted { $0.id.rawValue < $1.id.rawValue }
     }
 
-    private static func validateRawDefinitionShape(_ object: [String: Any]) throws {
-        guard Set(object.keys).isSubset(of: ["id", "match", "command", "cwd"]),
-              Set(object.keys) == ["id", "match", "command", "cwd"] else {
-            throw RestartCommandDefinitionError.unknownField
+    /// Decodes and validates one raw definition object.
+    private static func decodeDefinition(
+        _ object: [String: Any],
+        at path: RestartCommandJSONPath
+    ) -> (definition: RestartCommandDefinition?, failures: [RestartCommandValidationFailure]) {
+        var failures: [RestartCommandValidationFailure] = []
+        let allowedKeys: Set<String> = ["id", "match", "command", "cwd"]
+        let objectKeys = Set(object.keys)
+        for key in objectKeys.subtracting(allowedKeys) {
+            failures.append(.unknownField(path: path + [.key(key)], field: key))
         }
-        guard let rawID = object["id"] as? String,
-              RestartCommandDefinitionID.isValidSlug(rawID) else {
-            throw RestartCommandDefinitionError.invalidJSON
+        for key in ["id", "match", "command", "cwd"] where object[key] == nil {
+            failures.append(.missingField(path: path, field: key))
         }
-        guard let match = object["match"] as? [String: Any],
-              Set(match.keys).isSubset(of: ["executable", "argumentTailPrefix", "environment"]),
-              match["executable"] != nil else {
-            throw RestartCommandDefinitionError.unknownField
-        }
-        if let environment = match["environment"] as? [String: Any] {
-            guard Set(environment.keys).isSubset(of: ["JJUI_CONFIG_DIR"]) else {
-                throw RestartCommandDefinitionError.unknownField
+
+        var id: RestartCommandDefinitionID?
+        if let rawID = object["id"] {
+            if let value = rawID as? String,
+               let decoded = RestartCommandDefinitionID(rawValue: value) {
+                id = decoded
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("id")],
+                    field: "id",
+                    reason: .invalidDefinitionID
+                ))
             }
-            for value in environment.values {
-                guard let predicate = value as? [String: Any],
-                      Set(predicate.keys).isSubset(of: ["state", "normalizedFinalComponent"]),
-                      predicate["state"] != nil else {
-                    throw RestartCommandDefinitionError.unknownField
+        }
+
+        var match: RestartCommandMatchDefinition?
+        if let rawMatch = object["match"] {
+            if let value = rawMatch as? [String: Any] {
+                let result = decodeMatch(value, at: path + [.key("match")])
+                match = result.match
+                failures.append(contentsOf: result.failures)
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("match")],
+                    field: "match",
+                    reason: .invalidMatch
+                ))
+            }
+        }
+
+        var command: String?
+        if let rawCommand = object["command"] {
+            if let value = rawCommand as? String {
+                command = value
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("command")],
+                    field: "command",
+                    reason: .invalidJSON
+                ))
+            }
+        }
+
+        var cwd: RestartCommandWorkingDirectoryPolicy?
+        if let rawCWD = object["cwd"] {
+            if let value = rawCWD as? String,
+               let decoded = RestartCommandWorkingDirectoryPolicy(rawValue: value) {
+                cwd = decoded
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("cwd")],
+                    field: "cwd",
+                    reason: .invalidJSON
+                ))
+            }
+        }
+
+        guard let id, let match, let command, let cwd else {
+            return (nil, failures)
+        }
+        let definition = RestartCommandDefinition(id: id, match: match, command: command, cwd: cwd)
+        failures.append(contentsOf: definitionFailures(definition, at: path))
+        return failures.isEmpty ? (definition, []) : (nil, failures)
+    }
+
+    private static func decodeMatch(
+        _ object: [String: Any],
+        at path: RestartCommandJSONPath
+    ) -> (match: RestartCommandMatchDefinition?, failures: [RestartCommandValidationFailure]) {
+        var failures: [RestartCommandValidationFailure] = []
+        let allowedKeys: Set<String> = ["executable", "argumentTailPrefix", "environment"]
+        for key in Set(object.keys).subtracting(allowedKeys) {
+            failures.append(.unknownField(path: path + [.key(key)], field: key))
+        }
+        if object["executable"] == nil {
+            failures.append(.missingField(path: path, field: "executable"))
+        }
+
+        var executable: String?
+        if let rawExecutable = object["executable"] {
+            if let value = rawExecutable as? String {
+                executable = value
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("executable")],
+                    field: "executable",
+                    reason: .emptyExecutable
+                ))
+            }
+        }
+
+        var argumentTailPrefix: [String]?
+        if let rawPrefix = object["argumentTailPrefix"] {
+            if let values = rawPrefix as? [Any] {
+                var decoded: [String] = []
+                for (index, rawValue) in values.enumerated() {
+                    if let value = rawValue as? String {
+                        decoded.append(value)
+                    } else {
+                        failures.append(.invalidValue(
+                            path: path + [.key("argumentTailPrefix"), .index(index)],
+                            field: "argumentTailPrefix",
+                            reason: .invalidArgumentPrefix
+                        ))
+                    }
+                }
+                if decoded.count == values.count {
+                    argumentTailPrefix = decoded
+                }
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("argumentTailPrefix")],
+                    field: "argumentTailPrefix",
+                    reason: .invalidArgumentPrefix
+                ))
+            }
+        }
+
+        var environment: [String: RestartCommandEnvironmentPredicate]?
+        if let rawEnvironment = object["environment"] {
+            if let values = rawEnvironment as? [String: Any] {
+                var decoded: [String: RestartCommandEnvironmentPredicate] = [:]
+                for key in values.keys.sorted() {
+                    let predicatePath = path + [.key("environment"), .key(key)]
+                    guard let predicateObject = values[key] as? [String: Any] else {
+                        failures.append(.invalidValue(
+                            path: predicatePath,
+                            field: key,
+                            reason: .invalidEnvironmentPredicate
+                        ))
+                        continue
+                    }
+                    let result = decodePredicate(predicateObject, at: predicatePath)
+                    failures.append(contentsOf: result.failures)
+                    if let predicate = result.predicate {
+                        decoded[key] = predicate
+                    }
+                }
+                if decoded.count == values.count {
+                    environment = decoded
+                }
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("environment")],
+                    field: "environment",
+                    reason: .invalidEnvironmentPredicate
+                ))
+            }
+        }
+
+        guard let executable else { return (nil, failures) }
+        return (
+            RestartCommandMatchDefinition(
+                executable: executable,
+                argumentTailPrefix: argumentTailPrefix,
+                environment: environment
+            ),
+            failures
+        )
+    }
+
+    private static func decodePredicate(
+        _ object: [String: Any],
+        at path: RestartCommandJSONPath
+    ) -> (predicate: RestartCommandEnvironmentPredicate?, failures: [RestartCommandValidationFailure]) {
+        var failures: [RestartCommandValidationFailure] = []
+        let allowedKeys: Set<String> = ["state", "normalizedFinalComponent"]
+        for key in Set(object.keys).subtracting(allowedKeys) {
+            failures.append(.unknownField(path: path + [.key(key)], field: key))
+        }
+        if object["state"] == nil {
+            failures.append(.missingField(path: path, field: "state"))
+        }
+
+        var state: RestartCommandEnvironmentPredicate.State?
+        if let rawState = object["state"] {
+            if let value = rawState as? String,
+               let decoded = RestartCommandEnvironmentPredicate.State(rawValue: value) {
+                state = decoded
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("state")],
+                    field: "state",
+                    reason: .invalidEnvironmentPredicate
+                ))
+            }
+        }
+
+        var normalizedFinalComponent: String?
+        if let rawComponent = object["normalizedFinalComponent"] {
+            if let value = rawComponent as? String {
+                normalizedFinalComponent = value
+            } else {
+                failures.append(.invalidValue(
+                    path: path + [.key("normalizedFinalComponent")],
+                    field: "normalizedFinalComponent",
+                    reason: .invalidEnvironmentPredicate
+                ))
+            }
+        }
+
+        if state == .absent, object.keys.contains("normalizedFinalComponent") {
+            failures.append(.invalidValue(
+                path: path + [.key("normalizedFinalComponent")],
+                field: "normalizedFinalComponent",
+                reason: .invalidEnvironmentPredicate
+            ))
+        }
+
+        guard let state else { return (nil, failures) }
+        let predicate = RestartCommandEnvironmentPredicate(
+            state: state,
+            normalizedFinalComponent: normalizedFinalComponent
+        )
+        return failures.isEmpty ? (predicate, []) : (nil, failures)
+    }
+
+    private static func definitionFailures(
+        _ definition: RestartCommandDefinition,
+        at path: RestartCommandJSONPath
+    ) -> [RestartCommandValidationFailure] {
+        var failures: [RestartCommandValidationFailure] = []
+        let matchPath = path + [.key("match")]
+        let executablePath = matchPath + [.key("executable")]
+        if !isValidPathComponent(definition.match.executable) {
+            failures.append(.invalidValue(
+                path: executablePath,
+                field: "executable",
+                reason: .emptyExecutable
+            ))
+        }
+
+        if let prefix = definition.match.argumentTailPrefix {
+            let prefixPath = matchPath + [.key("argumentTailPrefix")]
+            if prefix.isEmpty {
+                failures.append(.invalidValue(
+                    path: prefixPath,
+                    field: "argumentTailPrefix",
+                    reason: .invalidArgumentPrefix
+                ))
+            }
+            for (index, value) in prefix.enumerated() where value.isEmpty {
+                failures.append(.invalidValue(
+                    path: prefixPath + [.index(index)],
+                    field: "argumentTailPrefix",
+                    reason: .invalidArgumentPrefix
+                ))
+            }
+        }
+
+        if let environment = definition.match.environment {
+            let environmentPath = matchPath + [.key("environment")]
+            if environment.isEmpty || environment.count > maximumEnvironmentPredicateCount {
+                failures.append(.invalidValue(
+                    path: environmentPath,
+                    field: "environment",
+                    reason: .invalidEnvironmentPredicate
+                ))
+            }
+            for key in environment.keys.sorted() {
+                let predicatePath = environmentPath + [.key(key)]
+                if key.range(of: environmentNamePattern, options: .regularExpression) == nil {
+                    failures.append(.invalidValue(
+                        path: predicatePath,
+                        field: "environment",
+                        reason: .invalidEnvironmentPredicate
+                    ))
+                }
+                guard let predicate = environment[key] else { continue }
+                switch predicate.state {
+                case .absent:
+                    if predicate.normalizedFinalComponent != nil {
+                        failures.append(.invalidValue(
+                            path: predicatePath + [.key("normalizedFinalComponent")],
+                            field: "normalizedFinalComponent",
+                            reason: .invalidEnvironmentPredicate
+                        ))
+                    }
+                case .present:
+                    guard let component = predicate.normalizedFinalComponent else {
+                        failures.append(.missingField(
+                            path: predicatePath,
+                            field: "normalizedFinalComponent",
+                            reason: .invalidEnvironmentPredicate
+                        ))
+                        continue
+                    }
+                    if !isValidPathComponent(component) {
+                        failures.append(.invalidValue(
+                            path: predicatePath + [.key("normalizedFinalComponent")],
+                            field: "normalizedFinalComponent",
+                            reason: .invalidEnvironmentPredicate
+                        ))
+                    }
                 }
             }
-        } else if match["environment"] != nil {
-            throw RestartCommandDefinitionError.invalidEnvironmentPredicate
         }
+
+        let commandPath = path + [.key("command")]
+        if definition.command.isEmpty {
+            failures.append(.invalidValue(path: commandPath, field: "command", reason: .emptyCommand))
+        } else if !RestartCommandGrammar.isSafeSingleCommand(definition.command) {
+            failures.append(.invalidValue(path: commandPath, field: "command", reason: .unsafeCommand))
+        } else if definition.command.utf8.count > maximumCommandUTF8Bytes {
+            failures.append(.invalidValue(path: commandPath, field: "command", reason: .commandTooLong))
+        }
+        return failures
+    }
+
+    private static func isSchemaVersion(_ value: Any) -> Bool {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else {
+            return false
+        }
+        return number.doubleValue == Double(schemaVersion)
+    }
+
+    private static func isValidPathComponent(_ value: String) -> Bool {
+        value.range(of: pathComponentPattern, options: .regularExpression) != nil
+    }
+}
+
+private enum RestartCommandJSONPathComponent: Hashable, Sendable {
+    case key(String)
+    case index(Int)
+}
+
+private typealias RestartCommandJSONPath = [RestartCommandJSONPathComponent]
+
+private struct RestartCommandSourcePosition: Equatable, Sendable {
+    let line: Int
+    let column: Int
+}
+
+private struct RestartCommandValidationFailure: Sendable {
+    let kind: RestartCommandDefinitionProblem.Kind
+    let path: RestartCommandJSONPath
+    let field: String?
+    let reason: RestartCommandDefinitionError
+
+    static func unknownField(
+        path: RestartCommandJSONPath,
+        field: String
+    ) -> RestartCommandValidationFailure {
+        RestartCommandValidationFailure(
+            kind: .unknownField,
+            path: path,
+            field: field,
+            reason: .unknownField
+        )
+    }
+
+    static func missingField(
+        path: RestartCommandJSONPath,
+        field: String,
+        reason: RestartCommandDefinitionError = .missingField
+    ) -> RestartCommandValidationFailure {
+        RestartCommandValidationFailure(
+            kind: .missingField,
+            path: path,
+            field: field,
+            reason: reason
+        )
+    }
+
+    static func invalidValue(
+        path: RestartCommandJSONPath,
+        field: String,
+        reason: RestartCommandDefinitionError
+    ) -> RestartCommandValidationFailure {
+        RestartCommandValidationFailure(
+            kind: .invalidValue,
+            path: path,
+            field: field,
+            reason: reason
+        )
+    }
+
+    static func repeatedID(path: RestartCommandJSONPath) -> RestartCommandValidationFailure {
+        RestartCommandValidationFailure(
+            kind: .repeatedID,
+            path: path,
+            field: nil,
+            reason: .duplicateDefinition
+        )
     }
 }
 
@@ -536,14 +937,35 @@ private enum RestartCommandGrammar {
     }
 }
 
-private func validateStrictJSONSyntax(_ data: Data) throws {
+private func validateStrictJSONSyntax(
+    _ data: Data
+) throws -> [RestartCommandJSONPath: RestartCommandSourcePosition] {
+    try validateStrictJSONLexicalSyntax(data)
+    var scanner = RestartCommandStructuralScanner(data: data)
+    return try scanner.scan()
+}
+
+private func indexAfterLeadingByteOrderMark(
+    in data: Data,
+    from index: Data.Index
+) -> Data.Index {
+    guard data.distance(from: index, to: data.endIndex) >= 3,
+          data[index] == 0xEF,
+          data[data.index(after: index)] == 0xBB,
+          data[data.index(index, offsetBy: 2)] == 0xBF else {
+        return index
+    }
+    return data.index(index, offsetBy: 3)
+}
+
+private func validateStrictJSONLexicalSyntax(_ data: Data) throws {
     var inString = false
     var isEscaped = false
     var lastSignificantChar: UInt8? = nil
     var lastSignificantLine = 1
     var line = 1
 
-    var i = data.startIndex
+    var i = indexAfterLeadingByteOrderMark(in: data, from: data.startIndex)
     while i < data.endIndex {
         let byte = data[i]
 
@@ -603,5 +1025,200 @@ private func validateStrictJSONSyntax(_ data: Data) throws {
 
     if inString {
         throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+    }
+}
+
+private struct RestartCommandStructuralScanner {
+    private static let maximumContainerDepth = 64
+
+    let data: Data
+    var index: Data.Index
+    var line = 1
+    var column = 1
+    var positions: [RestartCommandJSONPath: RestartCommandSourcePosition] = [:]
+
+    init(data: Data) {
+        self.data = data
+        index = data.startIndex
+    }
+
+    mutating func scan() throws -> [RestartCommandJSONPath: RestartCommandSourcePosition] {
+        index = indexAfterLeadingByteOrderMark(in: data, from: index)
+        skipWhitespace()
+        guard index < data.endIndex else {
+            throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+        }
+        positions[[]] = position
+        try scanValue(at: [], containerDepth: 0)
+        skipWhitespace()
+        guard index == data.endIndex else {
+            throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+        }
+        return positions
+    }
+
+    private var position: RestartCommandSourcePosition {
+        RestartCommandSourcePosition(line: line, column: column)
+    }
+
+    private mutating func scanValue(
+        at path: RestartCommandJSONPath,
+        containerDepth: Int
+    ) throws {
+        guard index < data.endIndex else {
+            throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+        }
+        switch data[index] {
+        case UInt8(ascii: "{"):
+            guard containerDepth < Self.maximumContainerDepth else {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+            }
+            try scanObject(at: path, containerDepth: containerDepth + 1)
+        case UInt8(ascii: "["):
+            guard containerDepth < Self.maximumContainerDepth else {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+            }
+            try scanArray(at: path, containerDepth: containerDepth + 1)
+        case UInt8(ascii: "\""):
+            _ = try scanString()
+        default:
+            try scanScalar()
+        }
+    }
+
+    private mutating func scanObject(
+        at path: RestartCommandJSONPath,
+        containerDepth: Int
+    ) throws {
+        consumeByte()
+        skipWhitespace()
+        if consumeIf(UInt8(ascii: "}")) { return }
+
+        var keys: Set<String> = []
+        while true {
+            guard index < data.endIndex, data[index] == UInt8(ascii: "\"") else {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+            }
+            let keyPosition = position
+            let key = try scanString()
+            if !keys.insert(key).inserted {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(keyPosition.line)
+            }
+            let memberPath = path + [.key(key)]
+            positions[memberPath] = keyPosition
+
+            skipWhitespace()
+            guard consumeIf(UInt8(ascii: ":")) else {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+            }
+            skipWhitespace()
+            try scanValue(at: memberPath, containerDepth: containerDepth)
+            skipWhitespace()
+            if consumeIf(UInt8(ascii: "}")) { return }
+            guard consumeIf(UInt8(ascii: ",")) else {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+            }
+            skipWhitespace()
+        }
+    }
+
+    private mutating func scanArray(
+        at path: RestartCommandJSONPath,
+        containerDepth: Int
+    ) throws {
+        consumeByte()
+        skipWhitespace()
+        if consumeIf(UInt8(ascii: "]")) { return }
+
+        var elementIndex = 0
+        while true {
+            let elementPath = path + [.index(elementIndex)]
+            positions[elementPath] = position
+            try scanValue(at: elementPath, containerDepth: containerDepth)
+            elementIndex += 1
+            skipWhitespace()
+            if consumeIf(UInt8(ascii: "]")) { return }
+            guard consumeIf(UInt8(ascii: ",")) else {
+                throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+            }
+            skipWhitespace()
+        }
+    }
+
+    private mutating func scanString() throws -> String {
+        let start = index
+        consumeByte()
+        var escaped = false
+        while index < data.endIndex {
+            let byte = data[index]
+            consumeByte()
+            if escaped {
+                escaped = false
+            } else if byte == UInt8(ascii: "\\") {
+                escaped = true
+            } else if byte == UInt8(ascii: "\"") {
+                let token = data.subdata(in: start..<index)
+                guard let value = try? JSONSerialization.jsonObject(
+                    with: token,
+                    options: [.fragmentsAllowed]
+                ) as? String else {
+                    throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+                }
+                return value
+            }
+        }
+        throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+    }
+
+    private mutating func scanScalar() throws {
+        let start = index
+        while index < data.endIndex {
+            let byte = data[index]
+            if byte == UInt8(ascii: ",") || byte == UInt8(ascii: "]") ||
+                byte == UInt8(ascii: "}") || isWhitespace(byte) {
+                break
+            }
+            consumeByte()
+        }
+        guard index != start else {
+            throw RestartCommandDefinitionError.invalidJSONAtLine(line)
+        }
+    }
+
+    private mutating func skipWhitespace() {
+        while index < data.endIndex, isWhitespace(data[index]) {
+            consumeByte()
+        }
+    }
+
+    private func isWhitespace(_ byte: UInt8) -> Bool {
+        byte == UInt8(ascii: " ") || byte == UInt8(ascii: "\t") ||
+            byte == UInt8(ascii: "\r") || byte == UInt8(ascii: "\n")
+    }
+
+    @discardableResult
+    private mutating func consumeIf(_ byte: UInt8) -> Bool {
+        guard index < data.endIndex, data[index] == byte else { return false }
+        consumeByte()
+        return true
+    }
+
+    private mutating func consumeByte() {
+        let byte = data[index]
+        let next = data.index(after: index)
+        if byte == UInt8(ascii: "\r") {
+            if next < data.endIndex, data[next] == UInt8(ascii: "\n") {
+                column += 1
+            } else {
+                line += 1
+                column = 1
+            }
+        } else if byte == UInt8(ascii: "\n") {
+            line += 1
+            column = 1
+        } else {
+            column += 1
+        }
+        index = next
     }
 }

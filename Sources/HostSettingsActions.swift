@@ -345,6 +345,32 @@ final class HostSettingsActions: SettingsHostActions {
                 let problem: RestartCommandsFileProblem? = switch reason {
                 case .invalid(.invalidJSONAtLine(let line)):
                     .invalidJSON(line: line)
+                case .invalid(.invalidDefinition(let definitionProblem)):
+                    switch definitionProblem.kind {
+                    case .unknownField:
+                        definitionProblem.field.map { field in
+                            RestartCommandsFileProblem.unknownField(
+                                line: definitionProblem.line,
+                                field: field
+                            )
+                        }
+                    case .missingField:
+                        definitionProblem.field.map { field in
+                            RestartCommandsFileProblem.missingField(
+                                line: definitionProblem.line,
+                                field: field
+                            )
+                        }
+                    case .invalidValue:
+                        definitionProblem.field.map { field in
+                            RestartCommandsFileProblem.invalidValue(
+                                line: definitionProblem.line,
+                                field: field
+                            )
+                        }
+                    case .repeatedID:
+                        RestartCommandsFileProblem.repeatedID(line: definitionProblem.line)
+                    }
                 case .invalid, .unreadable, .missingAfterCustomization:
                     nil
                 }

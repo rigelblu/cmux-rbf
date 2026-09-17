@@ -65,7 +65,7 @@ struct RestartCommandDefinitionTests {
     @Test func unknownFieldsAndByteOverflowFailClosed() throws {
         let unknown = try BundledRestartCommandDefinitions.load().editableDefaultsData()
             .replacingUTF8("\"version\": 1", with: "\"version\": 1, \"enabled\": true")
-        #expect(throws: RestartCommandDefinitionError.unknownField) {
+        #expect(throws: RestartCommandDefinitionError.invalidDefinition(problem(.unknownField, 3, "enabled"))) {
             try RestartCommandDefinitionSet.decodeJSON(unknown)
         }
 
@@ -168,29 +168,159 @@ struct RestartCommandDefinitionTests {
         }
     }
 
+    @Test func leadingUTF8BOMStillDecodesValidCatalog() throws {
+        var source = Data([0xEF, 0xBB, 0xBF])
+        source.append(try BundledRestartCommandDefinitions.load().editableDefaultsData())
+
+        let decoded = try RestartCommandDefinitionSet.decodeJSON(source)
+        #expect(decoded == (try BundledRestartCommandDefinitions.load()))
+    }
+
+    @Test func leadingUTF8BOMPreservesLocatedRuleFailure() {
+        let source = Data(
+            """
+            {
+              "version": 1,
+              "definitions": [{
+                "id": "NVIM",
+                "match": { "executable": "nvim" },
+                "command": "nvim",
+                "cwd": "saved"
+              }]
+            }
+            """.utf8
+        )
+        let expected = RestartCommandDefinitionError.invalidDefinition(problem(.invalidValue, 4, "id"))
+        #expect(throws: expected) {
+            try RestartCommandDefinitionSet.decodeJSON(source)
+        }
+
+        var withBOM = Data([0xEF, 0xBB, 0xBF])
+        withBOM.append(source)
+        #expect(throws: expected) {
+            try RestartCommandDefinitionSet.decodeJSON(withBOM)
+        }
+    }
+
     @Test func locatedRuleFailuresNameExactLineKindAndField() throws {
         let validDefinition = #"{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":"saved"}"#
         let cases: [(String, RestartCommandDefinitionProblem)] = [
-            (#"{"version":1,"definitions":["# + validDefinition + #"],"mystery":true}"#, problem(.unknownField, 1, "mystery")),
-            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":"saved","mystery":true}]}"#, problem(.unknownField, 1, "mystery")),
-            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","mystery":true},"command":"nvim","cwd":"saved"}]}"#, problem(.unknownField, 1, "mystery")),
-            (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{"state":"absent","mystery":true}}},"command":"nvim","cwd":"saved"}]}"#, problem(.unknownField, 1, "mystery")),
+            (
+                """
+                {
+                  "mystery": true,
+                  "version": 1,
+                  "definitions": [\(validDefinition)]
+                }
+                """,
+                problem(.unknownField, 2, "mystery")
+            ),
+            (
+                """
+                {
+                  "version": 1,
+                  "definitions": [{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":"saved","mystery":true}]
+                }
+                """,
+                problem(.unknownField, 3, "mystery")
+            ),
+            (
+                """
+                {
+                  "version": 1,
+                  "definitions": [{"id":"nvim","match":{
+                    "mystery": true,
+                    "executable": "nvim"
+                  },"command":"nvim","cwd":"saved"}]
+                }
+                """,
+                problem(.unknownField, 4, "mystery")
+            ),
+            (
+                """
+                {
+                  "version": 1,
+                  "definitions": [{"id":"nvim","match":{"executable":"nvim","environment":{
+                    "NAME": {
+                      "state": "absent", "mystery": true
+                    }
+                  }},"command":"nvim","cwd":"saved"}]
+                }
+                """,
+                problem(.unknownField, 5, "mystery")
+            ),
             (#"{"definitions":["# + validDefinition + #"]}"#, problem(.missingField, 1, "version")),
             (#"{"version":1}"#, problem(.missingField, 1, "definitions")),
-            (#"{"version":1,"definitions":[{"match":{"executable":"nvim"},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "id")),
+            (
+                """
+                {
+                  "$schema": "schema.json",
+                  "version": 1,
+                  "definitions":
+                  [
+                    {"match":{"executable":"nvim"},"command":"nvim","cwd":"saved"}
+                  ]
+                }
+                """,
+                problem(.missingField, 6, "id")
+            ),
             (#"{"version":1,"definitions":[{"id":"nvim","command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "match")),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"cwd":"saved"}]}"#, problem(.missingField, 1, "command")),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim"}]}"#, problem(.missingField, 1, "cwd")),
-            (#"{"version":1,"definitions":[{"id":"nvim","match":{},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "executable")),
+            (
+                """
+                {
+                  "$schema": "schema.json",
+                  "version": 1,
+                  "definitions":
+                  [{
+                    "id": "nvim",
+                    "match": {},
+                    "command":"nvim","cwd":"saved"}]
+                }
+                """,
+                problem(.missingField, 7, "executable")
+            ),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{}}},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "state")),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","environment":{"NAME":{"state":"present"}}},"command":"nvim","cwd":"saved"}]}"#, problem(.missingField, 1, "normalizedFinalComponent")),
-            (#"{"version":1,"definitions":[{"id":"nvim","match":3,"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "match")),
+            (
+                """
+                {
+                  "$schema": "schema.json",
+                  "version": 1,
+                  "definitions":
+                  [{
+                    "id": "nvim",
+                    "command": "nvim",
+                    "match": 3,
+                    "cwd": "saved"
+                  }]
+                }
+                """,
+                problem(.invalidValue, 8, "match")
+            ),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":3}]}"#, problem(.invalidValue, 1, "cwd")),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim"},"command":"nvim","cwd":"home"}]}"#, problem(.invalidValue, 1, "cwd")),
             (#"{"version":true,"definitions":["# + validDefinition + #"]}"#, problem(.invalidValue, 1, "version")),
             (#"{"version":1.5,"definitions":["# + validDefinition + #"]}"#, problem(.invalidValue, 1, "version")),
             (#"{"version":1,"definitions":[]}"#, problem(.invalidValue, 1, "definitions")),
-            (#"{"version":1,"definitions":[{"id":"NVIM","match":{"executable":"nvim"},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "id")),
+            (
+                """
+                {
+                  "$schema": "schema.json",
+                  "version": 1,
+                  "definitions":
+                  [
+                  {
+                    "command": "nvim",
+                    "cwd": "saved",
+                    "id": "NVIM",
+                    "match": {"executable":"nvim"}
+                  }]
+                }
+                """,
+                problem(.invalidValue, 9, "id")
+            ),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":""},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "executable")),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"bin/nvim"},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "executable")),
             (#"{"version":1,"definitions":[{"id":"nvim","match":{"executable":"nvim","argumentTailPrefix":[]},"command":"nvim","cwd":"saved"}]}"#, problem(.invalidValue, 1, "argumentTailPrefix")),
@@ -211,12 +341,91 @@ struct RestartCommandDefinitionTests {
         }
 
         let thirtyThree = (1...33).map {
-            #"{"id":"app-#($0)","match":{"executable":"app-#($0)"},"command":"app-#($0)","cwd":"saved"}"#
+            #"{"id":"app-\#($0)","match":{"executable":"app-\#($0)"},"command":"app-\#($0)","cwd":"saved"}"#
         }.joined(separator: ",")
         expectLocatedProblem(
             #"{"version":1,"definitions":["# + thirtyThree + "]}",
             problem(.invalidValue, 1, "definitions")
         )
+    }
+
+    @Test func explicitNullValuesAreInvalidAtTheirKey() {
+        let cases: [(String, RestartCommandDefinitionProblem)] = [
+            (
+                """
+                {
+                  "version": 1,
+                  "definitions": [{
+                    "id": "nvim",
+                    "match": {
+                      "executable": "nvim",
+                      "argumentTailPrefix": null
+                    },
+                    "command": "nvim",
+                    "cwd": "saved"
+                  }]
+                }
+                """,
+                problem(.invalidValue, 7, "argumentTailPrefix")
+            ),
+            (
+                """
+                {
+                  "version": 1,
+                  "definitions": [{
+                    "id": "nvim",
+                    "match": {
+                      "executable": "nvim",
+                      "environment": null
+                    },
+                    "command": "nvim",
+                    "cwd": "saved"
+                  }]
+                }
+                """,
+                problem(.invalidValue, 7, "environment")
+            ),
+            (
+                """
+                {
+                  "version": 1,
+                  "definitions": [{
+                    "id": "nvim",
+                    "match": {
+                      "executable": "nvim",
+                      "environment": {
+                        "NAME": {
+                          "state": "present",
+                          "normalizedFinalComponent": null
+                        }
+                      }
+                    },
+                    "command": "nvim",
+                    "cwd": "saved"
+                  }]
+                }
+                """,
+                problem(.invalidValue, 10, "normalizedFinalComponent")
+            ),
+            (
+                """
+                {
+                  "version": 1,
+                  "definitions": [{
+                    "id": "nvim",
+                    "match": { "executable": "nvim" },
+                    "command": "nvim",
+                    "cwd": null
+                  }]
+                }
+                """,
+                problem(.invalidValue, 7, "cwd")
+            ),
+        ]
+
+        for (source, expected) in cases {
+            expectLocatedProblem(source, expected)
+        }
     }
 
     @Test func locatedFailuresUseStructuralPositionsAndEarliestSourcePosition() {
@@ -305,6 +514,41 @@ struct RestartCommandDefinitionTests {
         )
         #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(3)) {
             try RestartCommandDefinitionSet.decodeJSON(repeated)
+        }
+    }
+
+    @Test func structuralScannerReportsMissingColonLine() {
+        let missingColon = Data(
+            """
+            {
+              "version" 1,
+              "definitions": []
+            }
+            """.utf8
+        )
+        #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(2)) {
+            try RestartCommandDefinitionSet.decodeJSON(missingColon)
+        }
+    }
+
+    @Test func structuralScannerRejectsNestingBombWithoutCrashing() {
+        let bomb = Data(String(repeating: "[", count: 60_000).utf8)
+        #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(1)) {
+            try RestartCommandDefinitionSet.decodeJSON(bomb)
+        }
+    }
+
+    @Test func structuralScannerAllows64Containers() {
+        let source = String(repeating: "[", count: 64) + "0" + String(repeating: "]", count: 64)
+        #expect(throws: RestartCommandDefinitionError.invalidTopLevelObject) {
+            try RestartCommandDefinitionSet.decodeJSON(Data(source.utf8))
+        }
+    }
+
+    @Test func structuralScannerRejects65thContainerAtItsLine() {
+        let source = String(repeating: "[", count: 64) + "\n[0" + String(repeating: "]", count: 65)
+        #expect(throws: RestartCommandDefinitionError.invalidJSONAtLine(2)) {
+            try RestartCommandDefinitionSet.decodeJSON(Data(source.utf8))
         }
     }
 

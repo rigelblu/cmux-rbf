@@ -26,7 +26,7 @@ public enum RestartCommandSchema {
             ),
             "__COMMAND_DESCRIPTION__": String(
                 localized: "restartCommands.schema.command.description",
-                defaultValue: "Canonical command cmux starts after restoring an eligible pane. Maximum 1,000 UTF-8 bytes."
+                defaultValue: "Canonical command cmux starts after restoring an eligible pane. It must be one non-empty command with no leading or trailing whitespace; no control characters or tabs; no $, `, !, *, ?, [, {, }, ;, |, &, <, >, (, or ); no token beginning with ~ or =; and balanced quotes and escapes. Maximum 1,000 UTF-8 bytes."
             ),
             "__CWD_DESCRIPTION__": String(
                 localized: "restartCommands.schema.cwd.description",

@@ -275532,6 +275532,506 @@
         }
       }
     },
+    "settings.terminal.restartCommands.fallbackWarning.invalidValue": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يحتوي السطر %lld على قيمة غير صالحة للحقل «%@». التعريفات المضمّنة قيد التشغيل؛ التعريفات المخصصة ليست قيد التشغيل."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Red %lld ima nevažeću vrijednost polja „%@“. Isporučene definicije rade; prilagođene definicije ne rade."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld har en ugyldig værdi for “%@”. Medfølgende definitioner kører; brugerdefinerede definitioner gør ikke."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeile %lld enthält einen ungültigen Wert für „%@“. Mitgelieferte Definitionen werden ausgeführt; benutzerdefinierte Definitionen nicht."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %lld has an invalid “%@” value. Shipped definitions are running; custom definitions aren’t."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La línea %lld tiene un valor «%@» no válido. Las definiciones integradas están en ejecución; las personalizadas no."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ligne %lld contient une valeur « %@ » non valide. Les définitions intégrées sont actives ; les définitions personnalisées ne le sont pas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La riga %lld contiene un valore “%@” non valido. Le definizioni integrate sono attive; le definizioni personalizzate no."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目の「%@」の値が無効です。同梱の定義が動作しており、カスタム定義は動作していません。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បន្ទាត់ %lld មានតម្លៃ “%@” មិនត្រឹមត្រូវ។ និយមន័យដែលបានភ្ជាប់មកជាមួយកំពុងដំណើរការ និយមន័យផ្ទាល់ខ្លួនមិនដំណើរការទេ។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행의 “%@” 값이 잘못되었습니다. 기본 제공 정의가 실행 중이며 사용자 지정 정의는 실행되지 않습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld har en ugyldig verdi for «%@». Medfølgende definisjoner kjører; egendefinerte definisjoner gjør det ikke."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiersz %lld zawiera nieprawidłową wartość pola „%@”. Uruchomione są definicje dostarczone; definicje niestandardowe nie działają."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A linha %lld tem um valor inválido para “%@”. As definições integradas estão em execução; as personalizadas não."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В строке %lld указано недопустимое значение поля «%@». Работают встроенные определения; пользовательские определения не активны."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "บรรทัด %lld มีค่า “%@” ที่ไม่ถูกต้อง คำจำกัดความที่มาพร้อมเครื่องกำลังทำงาน คำจำกัดความที่กำหนดเองไม่ทำงาน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. satırda geçersiz bir “%@” değeri var. Hazır tanımlar çalışıyor; özel tanımlar çalışmıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рядок %lld містить неприпустиме значення поля «%@». Працюють вбудовані визначення; власні визначення не активні."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行的“%@”值无效。正在运行内置定义；自定义定义未运行。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行的「%@」值無效。正在執行內建定義；自訂定義未執行。"
+          }
+        }
+      }
+    },
+    "settings.terminal.restartCommands.fallbackWarning.missingField": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يفتقد السطر %lld الحقل «%@». التعريفات المضمّنة قيد التشغيل؛ التعريفات المخصصة ليست قيد التشغيل."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "U redu %lld nedostaje „%@“. Isporučene definicije rade; prilagođene definicije ne rade."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld mangler “%@”. Medfølgende definitioner kører; brugerdefinerede definitioner gør ikke."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In Zeile %lld fehlt „%@“. Mitgelieferte Definitionen werden ausgeführt; benutzerdefinierte Definitionen nicht."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %lld is missing “%@”. Shipped definitions are running; custom definitions aren’t."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En la línea %lld falta «%@». Las definiciones integradas están en ejecución; las personalizadas no."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il manque « %@ » à la ligne %lld. Les définitions intégrées sont actives ; les définitions personnalisées ne le sont pas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nella riga %lld manca “%@”. Le definizioni integrate sono attive; le definizioni personalizzate no."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目に「%@」がありません。同梱の定義が動作しており、カスタム定義は動作していません。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បន្ទាត់ %lld ខ្វះ “%@”។ និយមន័យដែលបានភ្ជាប់មកជាមួយកំពុងដំណើរការ និយមន័យផ្ទាល់ខ្លួនមិនដំណើរការទេ។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행에 “%@”이(가) 없습니다. 기본 제공 정의가 실행 중이며 사용자 지정 정의는 실행되지 않습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld mangler «%@». Medfølgende definisjoner kjører; egendefinerte definisjoner gjør det ikke."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "W wierszu %lld brakuje pola „%@”. Uruchomione są definicje dostarczone; definicje niestandardowe nie działają."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A linha %lld não contém “%@”. As definições integradas estão em execução; as personalizadas não."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В строке %lld отсутствует поле «%@». Работают встроенные определения; пользовательские определения не активны."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "บรรทัด %lld ไม่มี “%@” คำจำกัดความที่มาพร้อมเครื่องกำลังทำงาน คำจำกัดความที่กำหนดเองไม่ทำงาน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. satırda “%@” eksik. Hazır tanımlar çalışıyor; özel tanımlar çalışmıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У рядку %lld відсутнє поле «%@». Працюють вбудовані визначення; власні визначення не активні."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行缺少“%@”。正在运行内置定义；自定义定义未运行。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行缺少「%@」。正在執行內建定義；自訂定義未執行。"
+          }
+        }
+      }
+    },
+    "settings.terminal.restartCommands.fallbackWarning.repeatedID": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يكرر السطر %lld معرّفًا مستخدمًا أعلاه. التعريفات المضمّنة قيد التشغيل؛ التعريفات المخصصة ليست قيد التشغيل."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Red %lld ponavlja identifikator korišten iznad. Isporučene definicije rade; prilagođene definicije ne rade."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld gentager et id, der er brugt ovenfor. Medfølgende definitioner kører; brugerdefinerede definitioner gør ikke."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeile %lld wiederholt eine oben verwendete ID. Mitgelieferte Definitionen werden ausgeführt; benutzerdefinierte Definitionen nicht."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %lld repeats an id used above. Shipped definitions are running; custom definitions aren’t."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La línea %lld repite un identificador usado anteriormente. Las definiciones integradas están en ejecución; las personalizadas no."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ligne %lld répète un identifiant utilisé plus haut. Les définitions intégrées sont actives ; les définitions personnalisées ne le sont pas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La riga %lld ripete un ID usato sopra. Le definizioni integrate sono attive; le definizioni personalizzate no."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目で上ですでに使用されている id が重複しています。同梱の定義が動作しており、カスタム定義は動作していません。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បន្ទាត់ %lld ប្រើ id ដែលបានប្រើខាងលើម្ដងទៀត។ និយមន័យដែលបានភ្ជាប់មកជាមួយកំពុងដំណើរការ និយមន័យផ្ទាល់ខ្លួនមិនដំណើរការទេ។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행에서 위에서 사용한 id가 반복됩니다. 기본 제공 정의가 실행 중이며 사용자 지정 정의는 실행되지 않습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld gjentar en id som er brukt ovenfor. Medfølgende definisjoner kjører; egendefinerte definisjoner gjør det ikke."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiersz %lld powtarza identyfikator użyty wyżej. Uruchomione są definicje dostarczone; definicje niestandardowe nie działają."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A linha %lld repete um id usado acima. As definições integradas estão em execução; as personalizadas não."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В строке %lld повторяется идентификатор, использованный выше. Работают встроенные определения; пользовательские определения не активны."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "บรรทัด %lld ใช้ id ซ้ำกับด้านบน คำจำกัดความที่มาพร้อมเครื่องกำลังทำงาน คำจำกัดความที่กำหนดเองไม่ทำงาน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. satır yukarıda kullanılan bir kimliği yineliyor. Hazır tanımlar çalışıyor; özel tanımlar çalışmıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рядок %lld повторює ідентифікатор, використаний вище. Працюють вбудовані визначення; власні визначення не активні."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行重复了上方使用过的 id。正在运行内置定义；自定义定义未运行。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行重複了上方使用過的 id。正在執行內建定義；自訂定義未執行。"
+          }
+        }
+      }
+    },
+    "settings.terminal.restartCommands.fallbackWarning.unknownField": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يحتوي السطر %lld على حقل لا يعرفه cmux: «%@». التعريفات المضمّنة قيد التشغيل؛ التعريفات المخصصة ليست قيد التشغيل."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Red %lld sadrži polje koje cmux ne poznaje: „%@“. Isporučene definicije rade; prilagođene definicije ne rade."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld har et felt, som cmux ikke kender: “%@”. Medfølgende definitioner kører; brugerdefinerede definitioner gør ikke."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeile %lld enthält ein Feld, das cmux nicht kennt: „%@“. Mitgelieferte Definitionen werden ausgeführt; benutzerdefinierte Definitionen nicht."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %lld has a field cmux doesn’t know: “%@”. Shipped definitions are running; custom definitions aren’t."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La línea %lld tiene un campo que cmux no reconoce: «%@». Las definiciones integradas están en ejecución; las personalizadas no."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ligne %lld contient un champ que cmux ne connaît pas : « %@ ». Les définitions intégrées sont actives ; les définitions personnalisées ne le sont pas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La riga %lld contiene un campo non riconosciuto da cmux: “%@”. Le definizioni integrate sono attive; le definizioni personalizzate no."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目に cmux が認識しないフィールド「%@」があります。同梱の定義が動作しており、カスタム定義は動作していません。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បន្ទាត់ %lld មានវាលដែល cmux មិនស្គាល់៖ “%@”។ និយមន័យដែលបានភ្ជាប់មកជាមួយកំពុងដំណើរការ និយមន័យផ្ទាល់ខ្លួនមិនដំណើរការទេ។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행에 cmux가 인식하지 못하는 필드 “%@”이(가) 있습니다. 기본 제공 정의가 실행 중이며 사용자 지정 정의는 실행되지 않습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linje %lld har et felt som cmux ikke kjenner: «%@». Medfølgende definisjoner kjører; egendefinerte definisjoner gjør det ikke."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiersz %lld zawiera pole nieznane cmux: „%@”. Uruchomione są definicje dostarczone; definicje niestandardowe nie działają."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A linha %lld tem um campo que o cmux não reconhece: “%@”. As definições integradas estão em execução; as personalizadas não."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В строке %lld есть неизвестное cmux поле: «%@». Работают встроенные определения; пользовательские определения не активны."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "บรรทัด %lld มีฟิลด์ที่ cmux ไม่รู้จัก: “%@” คำจำกัดความที่มาพร้อมเครื่องกำลังทำงาน คำจำกัดความที่กำหนดเองไม่ทำงาน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. satırda cmux’un tanımadığı bir alan var: “%@”. Hazır tanımlar çalışıyor; özel tanımlar çalışmıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У рядку %lld є невідоме cmux поле: «%@». Працюють вбудовані визначення; власні визначення не активні."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行有一个 cmux 无法识别的字段：“%@”。正在运行内置定义；自定义定义未运行。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行有一個 cmux 無法識別的欄位：「%@」。正在執行內建定義；自訂定義未執行。"
+          }
+        }
+      }
+    },
     "settings.terminal.restartCommands.definitionsChangedWarning": {
       "extractionState": "manual",
       "localizations": {

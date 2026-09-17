@@ -348,7 +348,7 @@ struct RestartCommandCoordinatorTests {
         #expect(fixture.coordinator.effectiveState() == .disabledByUser)
 
         // Enabling while invalid -> enables shipped defaults with fallback warning, leaves user bytes unapproved
-        #expect(fixture.coordinator.setEnabled(true) == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+        #expect(fixture.coordinator.setEnabled(true) == .enabledFallback(.unusableUserFile(.invalid(.invalidJSONAtLine(1)))))
         #expect(fixture.coordinator.effectiveState().isEnabled)
 
         // 2. Enabled defaults: missing file -> .enabledAppDefaults, no warning
@@ -388,7 +388,7 @@ struct RestartCommandCoordinatorTests {
 
         // 6. Enabled approved: invalid file -> .enabledFallback(.unusableUserFile(.invalid))
         try Data("{ corrupt".utf8).write(to: fixture.definitions.definitionsFileURL, options: .atomic)
-        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSON))))
+        #expect(fixture.coordinator.effectiveState() == .enabledFallback(.unusableUserFile(.invalid(.invalidJSONAtLine(1)))))
 
         // 7. Enabled approved: missing file -> .enabledFallback(.unusableUserFile(.missingAfterCustomization))
         try? FileManager.default.removeItem(at: fixture.definitions.definitionsFileURL)
@@ -535,7 +535,7 @@ struct RestartCommandCoordinatorTests {
         // First read enters fallback and emits 1 event
         _ = fixture.coordinator.effectiveState()
         #expect(events.withLock { $0.count } == 1)
-        #expect(events.withLock { $0.first?.reason } == .invalid(.invalidJSON))
+        #expect(events.withLock { $0.first?.reason } == .invalid(.invalidJSONAtLine(1)))
 
         // Repeated reads do NOT spam the log
         _ = fixture.coordinator.effectiveState()

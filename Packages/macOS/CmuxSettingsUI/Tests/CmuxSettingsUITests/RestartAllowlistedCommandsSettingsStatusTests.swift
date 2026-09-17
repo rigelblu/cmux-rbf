@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import CmuxSettingsUI
 
@@ -55,6 +56,14 @@ struct RestartAllowlistedCommandsSettingsStatusTests {
         #expect(
             status.warningText ==
                 "Line 9 has a field cmux doesn’t know: “1234567890123456789012345678901\\n…”. Shipped definitions are running; custom definitions aren’t."
+        )
+
+        let bidi = RestartAllowlistedCommandsSettingsStatus.enabledFallback(
+            warning: .unusableUserFile(problem: .missingField(line: 10, field: "ab\u{202E}cd"))
+        )
+        #expect(
+            bidi.warningText ==
+                "Line 10 is missing “ab\\u{202E}cd”. Shipped definitions are running; custom definitions aren’t."
         )
     }
 

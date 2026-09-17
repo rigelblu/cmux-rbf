@@ -71,7 +71,8 @@ public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
                 defaultValue: "Custom definitions changed — review to use them."
             )
         case .enabledFallback(.unusableUserFile(let problem)):
-            if case .invalidJSON(let line) = problem {
+            switch problem {
+            case .invalidJSON(let line):
                 return String.localizedStringWithFormat(
                     String(
                         localized: "settings.terminal.restartCommands.fallbackWarning.atLine",
@@ -79,14 +80,71 @@ public enum RestartAllowlistedCommandsSettingsStatus: Equatable, Sendable {
                     ),
                     Int64(line)
                 )
+            case .unknownField(let line, let field):
+                return String.localizedStringWithFormat(
+                    String(
+                        localized: "settings.terminal.restartCommands.fallbackWarning.unknownField",
+                        defaultValue: "Line %lld has a field cmux doesn’t know: “%@”. Shipped definitions are running; custom definitions aren’t."
+                    ),
+                    Int64(line),
+                    Self.warningField(field)
+                )
+            case .missingField(let line, let field):
+                return String.localizedStringWithFormat(
+                    String(
+                        localized: "settings.terminal.restartCommands.fallbackWarning.missingField",
+                        defaultValue: "Line %lld is missing “%@”. Shipped definitions are running; custom definitions aren’t."
+                    ),
+                    Int64(line),
+                    Self.warningField(field)
+                )
+            case .invalidValue(let line, let field):
+                return String.localizedStringWithFormat(
+                    String(
+                        localized: "settings.terminal.restartCommands.fallbackWarning.invalidValue",
+                        defaultValue: "Line %lld has an invalid “%@” value. Shipped definitions are running; custom definitions aren’t."
+                    ),
+                    Int64(line),
+                    Self.warningField(field)
+                )
+            case .repeatedID(let line):
+                return String.localizedStringWithFormat(
+                    String(
+                        localized: "settings.terminal.restartCommands.fallbackWarning.repeatedID",
+                        defaultValue: "Line %lld repeats an id used above. Shipped definitions are running; custom definitions aren’t."
+                    ),
+                    Int64(line)
+                )
+            case nil:
+                return String(
+                    localized: "settings.terminal.restartCommands.fallbackWarning",
+                    defaultValue: "Your definitions file couldn’t be used. Shipped definitions are running; custom definitions aren’t."
+                )
             }
-            return String(
-                localized: "settings.terminal.restartCommands.fallbackWarning",
-                defaultValue: "Your definitions file couldn’t be used. Shipped definitions are running; custom definitions aren’t."
-            )
         default:
             return nil
         }
+    }
+
+    private static func warningField(_ field: String) -> String {
+        let isTruncated = field.count > 32
+        let prefix = String(field.prefix(32))
+        var escaped = ""
+        for scalar in prefix.unicodeScalars {
+            switch scalar.value {
+            case 0x09:
+                escaped += "\\t"
+            case 0x0A:
+                escaped += "\\n"
+            case 0x0D:
+                escaped += "\\r"
+            case 0x00...0x1F, 0x7F, 0x202A...0x202E, 0x2066...0x2069:
+                escaped += "\\u{\(String(scalar.value, radix: 16, uppercase: true))}"
+            default:
+                escaped.unicodeScalars.append(scalar)
+            }
+        }
+        return escaped + (isTruncated ? "…" : "")
     }
 }
 
