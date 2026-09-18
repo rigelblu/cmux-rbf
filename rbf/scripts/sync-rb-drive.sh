@@ -64,6 +64,27 @@ done
 [ -d "${product_root}/rb-drive/projects" ] \
   || fail "rb-drive/projects not found — refusing to mirror a missing or empty source with --delete"
 
+# -L follows symlinks, so a symlink inside the store pointing at the store — or at any
+# ancestor of it — makes rsync copy the store into itself, one nesting level per pass,
+# without bound. --max-delete cannot catch this: it guards deletions, and this only adds.
+# Hit 2026-09-18, from an rb-drive/rb-drive self-link created the day before: ~30 levels of
+# rb-drive/rb-drive/... and 12 GB at the destination, from a 381 MB store. The only warning
+# was the dry-run's entry count (1.28 million), which reads like a first full sync.
+src_real="$(cd "${product_root}/rb-drive" && pwd -P)"
+loop=""
+while IFS= read -r link; do
+  [ -n "$link" ] || continue
+  target="$(cd "$(dirname "$link")" 2>/dev/null && cd "$(readlink "$link")" 2>/dev/null && pwd -P)" || continue
+  [ -n "$target" ] || continue
+  # Fires when the link resolves to the store itself, or to any ancestor of it.
+  if [ "$src_real" = "$target" ] || [ "${src_real#"$target"/}" != "$src_real" ]; then
+    loop="${loop}  ${link} -> ${target}
+"
+  fi
+done < <(find -H "$src_real" -type l 2>/dev/null)
+[ -z "$loop" ] || fail "symlink loops back into the store — rsync -L would recurse forever:
+${loop}Remove the link (plain rm is interactive here, use rm -f) and re-run."
+
 # -L dereferences symlinks so the backup holds real files; --delete mirrors the source
 # exactly; --max-delete is the runaway-deletion backstop to the sentinel above.
 # The array stays non-empty so "${rsync_opts[@]}" is safe under set -u on bash 3.2.
