@@ -327,6 +327,10 @@ final class SavingTextView: NSTextView {
         setPreviewFontSize(Self.defaultPreviewFontSize)
     }
 
+    var isPreviewFontSizeAdjusted: Bool {
+        abs(previewFontSize - Self.defaultPreviewFontSize) > 0.0001
+    }
+
     @discardableResult
     private func adjustPreviewFontSize(by factor: CGFloat) -> Bool {
         setPreviewFontSize(previewFontSize * factor)
@@ -339,6 +343,7 @@ final class SavingTextView: NSTextView {
         guard abs(clamped - previewFontSize) > 0.0001 else { return false }
         previewFontSize = clamped
         applyCurrentPreviewFont()
+        NotificationCenter.default.post(name: .paneZoomDidChange, object: self)
         return true
     }
 
@@ -473,5 +478,11 @@ extension FilePreviewPanel {
         guard previewMode == .text,
               let textView = textView as? SavingTextView else { return false }
         return textView.resetPreviewFontSize()
+    }
+
+    var isTextPreviewZoomed: Bool {
+        guard previewMode == .text,
+              let textView = textView as? SavingTextView else { return false }
+        return textView.isPreviewFontSizeAdjusted
     }
 }

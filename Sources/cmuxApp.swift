@@ -989,31 +989,38 @@ struct cmuxApp: App {
                 }
             }
             .disabled(!browserFocusModeMenu.canToggle)
+            let canZoomPane = activeTabManager.canZoomFocusedPane
             splitCommandButton(title: String(localized: "menu.view.zoomIn", defaultValue: "Zoom In"), shortcut: menuShortcut(for: .browserZoomIn)) {
-                _ = activeTabManager.zoomInFocusedBrowserOrTextFilePreview()
+                _ = activeTabManager.zoomInFocusedPane()
             }
+            .disabled(!canZoomPane)
 
             splitCommandButton(title: String(localized: "menu.view.zoomOut", defaultValue: "Zoom Out"), shortcut: menuShortcut(for: .browserZoomOut)) {
-                _ = activeTabManager.zoomOutFocusedBrowserOrTextFilePreview()
+                _ = activeTabManager.zoomOutFocusedPane()
             }
+            .disabled(!canZoomPane)
 
             splitCommandButton(title: String(localized: "menu.view.actualSize", defaultValue: "Actual Size"), shortcut: menuShortcut(for: .browserZoomReset)) {
-                _ = activeTabManager.resetZoomFocusedBrowserOrTextFilePreview()
+                _ = activeTabManager.resetZoomFocusedPane()
             }
+            .disabled(!activeTabManager.canResetFocusedPane)
 
             Divider()
 
             splitCommandButton(title: String(localized: "menu.view.globalZoomIn", defaultValue: "Everything: Zoom In"), shortcut: menuShortcut(for: .globalZoomIn)) {
                 GlobalZoomAction.zoomIn.perform()
             }
+            .disabled(!GlobalZoomAction.canZoomIn)
 
             splitCommandButton(title: String(localized: "menu.view.globalZoomOut", defaultValue: "Everything: Zoom Out"), shortcut: menuShortcut(for: .globalZoomOut)) {
                 GlobalZoomAction.zoomOut.perform()
             }
+            .disabled(!GlobalZoomAction.canZoomOut)
 
             splitCommandButton(title: String(localized: "menu.view.globalActualSize", defaultValue: "Everything: Actual Size"), shortcut: menuShortcut(for: .globalZoomReset)) {
-                GlobalZoomAction.reset.perform()
+                GlobalZoomAction.reset.perform(in: activeTabManager)
             }
+            .disabled(!GlobalZoomAction.canReset(in: activeTabManager))
 
             Divider()
 

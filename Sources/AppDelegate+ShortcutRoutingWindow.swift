@@ -93,4 +93,19 @@ extension AppDelegate {
         }
         return nil
     }
+
+    func allActiveTabManagers() -> [TabManager] {
+        var managers: [TabManager] = []
+        var seen: Set<ObjectIdentifier> = []
+        if let manager = tabManager, seen.insert(ObjectIdentifier(manager)).inserted {
+            managers.append(manager)
+        }
+        for context in mainWindowContexts.values {
+            let manager = context.tabManager
+            if seen.insert(ObjectIdentifier(manager)).inserted {
+                managers.append(manager)
+            }
+        }
+        return managers
+    }
 }

@@ -817,6 +817,15 @@ extension TerminalSurface {
         )
     }
 
+    /// Whether this surface has had its font size manually adjusted.
+    @MainActor
+    public var isFontSizeAdjusted: Bool {
+        if let runtimeSurface = surface {
+            return ghostty_surface_font_size_adjusted(runtimeSurface)
+        }
+        return lastKnownFontSizeLineage?.isExplicitOverride ?? false
+    }
+
     /// Reconciles observed runtime points with durable surface ownership.
     ///
     /// A live value matching the active mobile fit is temporary and leaves the

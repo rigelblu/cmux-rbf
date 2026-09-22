@@ -728,6 +728,53 @@ final class TerminalPanel: Panel, ObservableObject {
         return surface.performExplicitInputBindingAction(action)
     }
 
+    /// Whether the pane is off its configured size, which is what `Actual Size`
+    /// resets. Ghostty's own flag only says the size was changed at some point.
+    var isFontSizeAdjusted: Bool {
+        let ghosttyAdjusted = surface.isFontSizeAdjusted
+        guard ghosttyAdjusted,
+              let runtimeSurface = surface.surface,
+              let livePoints = cmuxCurrentSurfaceFontSizePoints(runtimeSurface) else {
+            return ghosttyAdjusted
+        }
+        return Self.isFontSizeOffConfigured(
+            ghosttyAdjusted: ghosttyAdjusted,
+            livePoints: livePoints,
+            configuredRuntimePoints: GhosttyApp.shared
+                .terminalFontConfigurationSnapshot().configuredRuntimePoints
+        )
+    }
+
+    static func isFontSizeOffConfigured(
+        ghosttyAdjusted: Bool,
+        livePoints: Float,
+        configuredRuntimePoints: Float32
+    ) -> Bool {
+        guard ghosttyAdjusted else { return false }
+        let resetTarget = TerminalFontSizePolicy().clampedRuntimePoints(configuredRuntimePoints)
+        return abs(livePoints - resetTarget) > 0.01
+    }
+
+    @discardableResult
+    func zoomIn() -> Bool {
+        performBindingAction("increase_font_size:1")
+    }
+
+    @discardableResult
+    func zoomOut() -> Bool {
+        performBindingAction("decrease_font_size:1")
+    }
+
+    @discardableResult
+    func resetZoom() -> Bool {
+        let configuration = GhosttyApp.shared.terminalFontConfigurationSnapshot()
+        let outcome = surface.resetFontSizeOutcome(
+            toConfiguredRuntimePoints: configuration.configuredRuntimePoints,
+            magnificationPercent: configuration.magnificationPercent
+        )
+        return outcome.didSucceed
+    }
+
     @discardableResult
     func clearScreenKeepingScrollback() -> Bool {
         resumeForExplicitInputIfNeeded()

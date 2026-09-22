@@ -218,7 +218,6 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		F87910180000000000000001 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87910180000000000000002 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift */; };
 		357DF9BBBB0D71C5EE23D997 /* AppDelegate+WorkspaceTodoShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E213BAD49ECD0698B3471B /* AppDelegate+WorkspaceTodoShortcut.swift */; };
 		A5001093 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001090 /* AppDelegate.swift */; };
-		C09630000000000000000002 /* RestartCommandPaneProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09630000000000000000001 /* RestartCommandPaneProjection.swift */; };
 		725746692D9647948561044D /* AppDelegateBareSpaceShortcutRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FCD4CC61D54A2F8F2F463D /* AppDelegateBareSpaceShortcutRoutingTests.swift */; };
 		B1F0C0080000000000000001 /* AppDelegateDetachedInspectorClose.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F0C0080000000000000002 /* AppDelegateDetachedInspectorClose.swift */; };
 		A1B2C3D4E5F600000000CF01 /* AppDelegateDisplayConfigRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000CF02 /* AppDelegateDisplayConfigRestoreTests.swift */; };
@@ -1742,13 +1741,14 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */; };
 		7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */; };
 		D8830002D8830002D8830002 /* ReplyNoteEntranceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */; };
-		D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */; };
-		D8890004D8890004D8890004 /* ReplyTerminalFindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */; };
 		D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */; };
 		CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY01 /* ReplyPanelStore.swift */; };
 		69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */; };
 		CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM69000000000000REPLY03 /* ReplyPanelView.swift */; };
+		9093A0010000000000000001 /* ReplyPreviewEditorCaretTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9093A0010000000000000002 /* ReplyPreviewEditorCaretTests.swift */; };
+		D8890004D8890004D8890004 /* ReplyTerminalFindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */; };
 		C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0540000000000000000000A /* RestartAllowlistedCommandTests.swift */; };
+		C09630000000000000000002 /* RestartCommandPaneProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09630000000000000000001 /* RestartCommandPaneProjection.swift */; };
 		C09630000000000000000004 /* RestartCommandPaneProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09630000000000000000003 /* RestartCommandPaneProjectionTests.swift */; };
 		C05400000000000000000007 /* RestartCommandRestoreSummaryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05400000000000000000008 /* RestartCommandRestoreSummaryRowView.swift */; };
 		C05400000000000000000005 /* RestartCommandRestoreSummaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05400000000000000000006 /* RestartCommandRestoreSummaryStore.swift */; };
@@ -2348,6 +2348,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		F87910110000000000000001 /* TerminalPendingConfigurationReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87910110000000000000002 /* TerminalPendingConfigurationReload.swift */; };
 		C7261F010000000000000001 /* TerminalPointerFocusActivationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7261F010000000000000002 /* TerminalPointerFocusActivationPolicy.swift */; };
 		C7261F020000000000000001 /* TerminalPointerFocusActivationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7261F020000000000000002 /* TerminalPointerFocusActivationPolicyTests.swift */; };
+		D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */; };
 		D5671001D5671001D5671001 /* TerminalScrollSpeedSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671002D5671002D5671002 /* TerminalScrollSpeedSettings.swift */; };
 		D5671101D5671101D5671101 /* TerminalScrollSpeedSettingsFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671102D5671102D5671102 /* TerminalScrollSpeedSettingsFileStoreTests.swift */; };
 		862C77A9D235803A22B715B5 /* TerminalSearchNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E62F3D413D19EEA3E96B1271 /* TerminalSearchNavigation.swift */; };
@@ -2414,7 +2415,6 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		C0DE7B220000000000000001 /* TextBoxMentionSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE7B220000000000000002 /* TextBoxMentionSuggestion.swift */; };
 		C0DE7B290000000000000001 /* TextBoxProcessTerminationStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE7B290000000000000002 /* TextBoxProcessTerminationStatus.swift */; };
 		9005A0010000000000000001 /* TextBoxSelectionReplacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9005A0010000000000000002 /* TextBoxSelectionReplacementTests.swift */; };
-		9093A0010000000000000001 /* ReplyPreviewEditorCaretTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9093A0010000000000000002 /* ReplyPreviewEditorCaretTests.swift */; };
 		C0DE7B370000000000000001 /* TextBoxSubmitAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE7B370000000000000002 /* TextBoxSubmitAction.swift */; };
 		C0DE7B400000000000000001 /* TextBoxSubmitActionCycling.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE7B400000000000000002 /* TextBoxSubmitActionCycling.swift */; };
 		C0DE7B390000000000000001 /* TextBoxSubmitActionImageSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE7B390000000000000002 /* TextBoxSubmitActionImageSupport.swift */; };
@@ -2468,6 +2468,7 @@ C0DE71B10000000000000001 /* AppDelegate+AgentChatNotifications.swift in Sources 
 		C9A57209C9A57209C9A57209 /* VerticalTabsSidebar+WorkspaceGroups.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A5720AC9A5720AC9A5720A /* VerticalTabsSidebar+WorkspaceGroups.swift */; };
 		A28B087F0000000000000005 /* ViewerNavigationKeyRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28B087F0000000000000006 /* ViewerNavigationKeyRouter.swift */; };
 		A3340002A3340002A3340002 /* ViewerNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3340001A3340001A3340001 /* ViewerNavigationTests.swift */; };
+		CM16B1C2D3E4F5A60718293B /* ViewMenuZoomActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM16A1B2C3D4E5F60718293A /* ViewMenuZoomActionTests.swift */; };
 		ACE4FE1A8F1CC6C0B6A673AB /* VMClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CEC6EF35B71AE59FA45BA69 /* VMClient.swift */; };
 		ACE4FE2A8F1CC6C0B6A673AB /* VMClientSocketCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CEC6F0035B71AE59FA45BA7 /* VMClientSocketCommands.swift */; };
 		C37800000000000000000003 /* VMDefaultCloudCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37800000000000000000004 /* VMDefaultCloudCommandTests.swift */; };
@@ -2962,7 +2963,6 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		F87910180000000000000002 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/AppDelegate+WorkspaceTerminalFontSizeDebug.swift"; sourceTree = "<group>"; };
 		D7E213BAD49ECD0698B3471B /* AppDelegate+WorkspaceTodoShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+WorkspaceTodoShortcut.swift"; sourceTree = "<group>"; };
 		A5001090 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		C09630000000000000000001 /* RestartCommandPaneProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandPaneProjection.swift; sourceTree = "<group>"; };
 		17FCD4CC61D54A2F8F2F463D /* AppDelegateBareSpaceShortcutRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateBareSpaceShortcutRoutingTests.swift; sourceTree = "<group>"; };
 		B1F0C0080000000000000002 /* AppDelegateDetachedInspectorClose.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegateDetachedInspectorClose.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000CF02 /* AppDelegateDisplayConfigRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegateDisplayConfigRestoreTests.swift; sourceTree = "<group>"; };
@@ -4403,13 +4403,14 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelShortcutActionTests.swift; sourceTree = "<group>"; };
 		6BDA43362A7843CB9F569095 /* ReplyMaxMessagesBackConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyMaxMessagesBackConfigTests.swift; sourceTree = "<group>"; };
 		D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteEntranceTests.swift; sourceTree = "<group>"; };
-		D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReplyStartTests.swift; sourceTree = "<group>"; };
-		D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyTerminalFindTests.swift; sourceTree = "<group>"; };
 		D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyNoteStepTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY01 /* ReplyPanelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStore.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D28F47 /* ReplyPanelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelStoreTests.swift; sourceTree = "<group>"; };
 		CM69000000000000REPLY03 /* ReplyPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPanelView.swift; sourceTree = "<group>"; };
+		9093A0010000000000000002 /* ReplyPreviewEditorCaretTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPreviewEditorCaretTests.swift; sourceTree = "<group>"; };
+		D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyTerminalFindTests.swift; sourceTree = "<group>"; };
 		C0540000000000000000000A /* RestartAllowlistedCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartAllowlistedCommandTests.swift; sourceTree = "<group>"; };
+		C09630000000000000000001 /* RestartCommandPaneProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandPaneProjection.swift; sourceTree = "<group>"; };
 		C09630000000000000000003 /* RestartCommandPaneProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandPaneProjectionTests.swift; sourceTree = "<group>"; };
 		C05400000000000000000008 /* RestartCommandRestoreSummaryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandRestoreSummaryRowView.swift; sourceTree = "<group>"; };
 		C05400000000000000000006 /* RestartCommandRestoreSummaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandRestoreSummaryStore.swift; sourceTree = "<group>"; };
@@ -4999,6 +5000,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		F87910110000000000000002 /* TerminalPendingConfigurationReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPendingConfigurationReload.swift; sourceTree = "<group>"; };
 		C7261F010000000000000002 /* TerminalPointerFocusActivationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPointerFocusActivationPolicy.swift; sourceTree = "<group>"; };
 		C7261F020000000000000002 /* TerminalPointerFocusActivationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPointerFocusActivationPolicyTests.swift; sourceTree = "<group>"; };
+		D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReplyStartTests.swift; sourceTree = "<group>"; };
 		D5671002D5671002D5671002 /* TerminalScrollSpeedSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/TerminalScrollSpeedSettings.swift; sourceTree = "<group>"; };
 		D5671102D5671102D5671102 /* TerminalScrollSpeedSettingsFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalScrollSpeedSettingsFileStoreTests.swift; sourceTree = "<group>"; };
 		E62F3D413D19EEA3E96B1271 /* TerminalSearchNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Find/TerminalSearchNavigation.swift; sourceTree = "<group>"; };
@@ -5065,7 +5067,6 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		C0DE7B220000000000000002 /* TextBoxMentionSuggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBoxMentionSuggestion.swift; sourceTree = "<group>"; };
 		C0DE7B290000000000000002 /* TextBoxProcessTerminationStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBoxProcessTerminationStatus.swift; sourceTree = "<group>"; };
 		9005A0010000000000000002 /* TextBoxSelectionReplacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBoxSelectionReplacementTests.swift; sourceTree = "<group>"; };
-		9093A0010000000000000002 /* ReplyPreviewEditorCaretTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyPreviewEditorCaretTests.swift; sourceTree = "<group>"; };
 		C0DE7B370000000000000002 /* TextBoxSubmitAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/TextBoxSubmitAction.swift; sourceTree = "<group>"; };
 		C0DE7B400000000000000002 /* TextBoxSubmitActionCycling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBoxSubmitActionCycling.swift; sourceTree = "<group>"; };
 		C0DE7B390000000000000002 /* TextBoxSubmitActionImageSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBoxSubmitActionImageSupport.swift; sourceTree = "<group>"; };
@@ -5119,6 +5120,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 		C9A5720AC9A5720AC9A5720A /* VerticalTabsSidebar+WorkspaceGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VerticalTabsSidebar+WorkspaceGroups.swift"; sourceTree = "<group>"; };
 		A28B087F0000000000000006 /* ViewerNavigationKeyRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ViewerNavigationKeyRouter.swift; sourceTree = "<group>"; };
 		A3340001A3340001A3340001 /* ViewerNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerNavigationTests.swift; sourceTree = "<group>"; };
+		CM16A1B2C3D4E5F60718293A /* ViewMenuZoomActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewMenuZoomActionTests.swift; sourceTree = "<group>"; };
 		9CEC6EF35B71AE59FA45BA69 /* VMClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VMClient.swift; sourceTree = "<group>"; };
 		9CEC6F0035B71AE59FA45BA7 /* VMClientSocketCommands.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VMClientSocketCommands.swift; sourceTree = "<group>"; };
 		C37800000000000000000004 /* VMDefaultCloudCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMDefaultCloudCommandTests.swift; sourceTree = "<group>"; };
@@ -7876,6 +7878,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				C06552030000000000000002 /* TabManagerTitleUpdateStalenessTests.swift */,
 				C06552020000000000000002 /* TabManagerTitleUpdateTests.swift */,
 				CM14A1B2C3D4E5F60718293A /* PanelGlobalMagnificationObserverTests.swift */,
+				CM16A1B2C3D4E5F60718293A /* ViewMenuZoomActionTests.swift */,
 				42092CDB2109E250F7F2A76E /* TabManagerUnitTests.swift */,
 				9492CAFE0000000000000001 /* LastTerminalChildExitRecoveryTests.swift */,
 				C9D9924AC89D7C3408DBC56A /* WorkspaceRecoveryTests.swift */,
@@ -8786,7 +8789,6 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				F87910180000000000000001 /* AppDelegate+WorkspaceTerminalFontSizeDebug.swift in Sources */,
 				357DF9BBBB0D71C5EE23D997 /* AppDelegate+WorkspaceTodoShortcut.swift in Sources */,
 				A5001093 /* AppDelegate.swift in Sources */,
-				C09630000000000000000002 /* RestartCommandPaneProjection.swift in Sources */,
 				B1F0C0080000000000000001 /* AppDelegateDetachedInspectorClose.swift in Sources */,
 				D37777040000000000000001 /* AppDelegateSettingsPresentation.swift in Sources */,
 				A11EAB000000000000000000 /* AppearanceSettings.swift in Sources */,
@@ -9646,6 +9648,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				A5009001 /* ReplyAnnotationManifest.swift in Sources */,
 				CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */,
 				CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */,
+				C09630000000000000000002 /* RestartCommandPaneProjection.swift in Sources */,
 				C05400000000000000000007 /* RestartCommandRestoreSummaryRowView.swift in Sources */,
 				C05400000000000000000005 /* RestartCommandRestoreSummaryStore.swift in Sources */,
 				C6711A040000000000000001 /* RestorableAgentHookSessionRecord.swift in Sources */,
@@ -10990,10 +10993,10 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				D8840002D8840002D8840002 /* ReplyLabelShortcutActionTests.swift in Sources */,
 				7D3173C61769445BAF864B9E /* ReplyMaxMessagesBackConfigTests.swift in Sources */,
 				D8830002D8830002D8830002 /* ReplyNoteEntranceTests.swift in Sources */,
-				D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */,
-				D8890004D8890004D8890004 /* ReplyTerminalFindTests.swift in Sources */,
 				D8820002D8820002D8820002 /* ReplyNoteStepTests.swift in Sources */,
 				69321CEE24F94B66B7AC2C95 /* ReplyPanelStoreTests.swift in Sources */,
+				9093A0010000000000000001 /* ReplyPreviewEditorCaretTests.swift in Sources */,
+				D8890004D8890004D8890004 /* ReplyTerminalFindTests.swift in Sources */,
 				C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */,
 				C09630000000000000000004 /* RestartCommandPaneProjectionTests.swift in Sources */,
 					F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */,
@@ -11132,6 +11135,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				A5E380700000000000000001 /* TerminalNotificationSocketActionTests.swift in Sources */,
 				596100000000000000000007 /* TerminalNotificationStore+NativeNotificationDeliveryTesting.swift in Sources */,
 				C7261F020000000000000001 /* TerminalPointerFocusActivationPolicyTests.swift in Sources */,
+				D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */,
 				D5671101D5671101D5671101 /* TerminalScrollSpeedSettingsFileStoreTests.swift in Sources */,
 				222425EC9FE2E318D8F6F46A /* TerminalSearchNavigationTests.swift in Sources */,
 				C0DE53360000000000000001 /* TerminalSearchOverlayMouseReleaseTests.swift in Sources */,
@@ -11149,7 +11153,6 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				C0DE7B300000000000000001 /* TextBoxMentionCompletionTests.swift in Sources */,
 				7898A0010000000000000001 /* TextBoxMentionGitIgnoreProbeTests.swift in Sources */,
 				9005A0010000000000000001 /* TextBoxSelectionReplacementTests.swift in Sources */,
-				9093A0010000000000000001 /* ReplyPreviewEditorCaretTests.swift in Sources */,
 				C0DE7B410000000000000001 /* TextBoxSubmitActionMemoryTests.swift in Sources */,
 				C0DE7B3C0000000000000001 /* TextBoxSubmitActionSettingsFileTests.swift in Sources */,
 				C0DE7B360000000000000001 /* TextBoxSubmitActionTests.swift in Sources */,
@@ -11159,6 +11162,7 @@ C0DE71B10000000000000002 /* AppDelegate+AgentChatNotifications.swift */ = {isa =
 				468100000000000000000003 /* TypingHotPathRegressionTests.swift in Sources */,
 				F2000000A1B2C3D4E5F60718 /* UpdatePillReleaseVisibilityTests.swift in Sources */,
 				A3340002A3340002A3340002 /* ViewerNavigationTests.swift in Sources */,
+				CM16B1C2D3E4F5A60718293B /* ViewMenuZoomActionTests.swift in Sources */,
 				C37800000000000000000003 /* VMDefaultCloudCommandTests.swift in Sources */,
 				C37800000000000000000001 /* VMSSHCommandTests.swift in Sources */,
 				063BC42CEE257D6213A2E30C /* WindowAndDragTests.swift in Sources */,

@@ -5,7 +5,12 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(empty)
+
+## 🟠⋯ Changed for End Users
+- 2026-09-22 - fix | **View menu zoom actions now control whatever pane you are focused on, and disable honestly when a pane cannot zoom.** Previously, "Zoom In", "Zoom Out", and "Actual Size" only operated on browser panes and did nothing when a terminal, markdown preview, or file preview was focused, while remaining enabled everywhere. Now, the zoom actions dispatch to the active pane across Terminal, Browser, Markdown Preview, and Text File Preview, and disable when focus is on an unzoomable surface (such as Canvas, markdown text edit mode, image/PDF preview, or settings). "Everything: Actual Size" now resets both global font magnification and all individual pane zoom adjustments across workspaces back to 100%, and disables when nothing is magnified or zoomed. (`#cm-16`)
+
+## 🟠⋯ Changed for Developers
+- Centralized pane zoom dispatch and availability in `TabManager+BrowserFocus.swift` (`canZoomFocusedPane`, `zoomInFocusedPane()`, `zoomOutFocusedPane()`, `resetZoomFocusedPane()`, `hasAnyZoomedPane`, `resetAllPaneZooms()`). Added `isFontSizeAdjusted`, `zoomIn()`, `zoomOut()`, `resetZoom()` to `TerminalPanel` and exposed `isFontSizeAdjusted` on `TerminalSurface`. Added `isPageZoomAdjusted` on `BrowserPanel`, `isFontSizeAdjusted` on `MarkdownPanel`, and `isPreviewFontSizeAdjusted`/`isTextPreviewZoomed` on `SavingTextView`/`FilePreviewPanel`. Expanded `GlobalZoomAction.reset` to perform both `GlobalFontMagnification.reset()` and `resetAllPaneZooms()` across all active tab managers. Wired availability guards `.disabled(!canZoomPane)` and `.disabled(!GlobalZoomAction.canReset(in: activeTabManager))` directly into the View menu. Tested comprehensively in `cmuxTests/ViewMenuZoomActionTests.swift`.
 
 # 🔵⋯ v0.27.5 (2026-09-17) — #cm-96.3
 

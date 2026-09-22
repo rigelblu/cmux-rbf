@@ -8823,17 +8823,17 @@ struct ContentView: View {
             }
         }
         registry.register(commandId: "palette.browserZoomIn") {
-            if !tabManager.zoomInFocusedBrowserOrTextFilePreview() {
+            if !tabManager.zoomInFocusedPane() {
                 NSSound.beep()
             }
         }
         registry.register(commandId: "palette.browserZoomOut") {
-            if !tabManager.zoomOutFocusedBrowserOrTextFilePreview() {
+            if !tabManager.zoomOutFocusedPane() {
                 NSSound.beep()
             }
         }
         registry.register(commandId: "palette.browserZoomReset") {
-            if !tabManager.resetZoomFocusedBrowserOrTextFilePreview() {
+            if !tabManager.resetZoomFocusedPane() {
                 NSSound.beep()
             }
         }

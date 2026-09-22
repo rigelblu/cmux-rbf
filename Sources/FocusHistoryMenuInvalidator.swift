@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import CmuxFoundation
 
 @MainActor
 final class FocusHistoryMenuInvalidator: ObservableObject {
@@ -21,6 +22,36 @@ final class FocusHistoryMenuInvalidator: ObservableObject {
         })
         observers.append(center.addObserver(
             forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.revision &+= 1
+            }
+        })
+        observers.append(center.addObserver(
+            forName: .paneZoomDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.revision &+= 1
+            }
+        })
+        // A terminal's font can change through Ghostty's own bindings, which
+        // bypass cmux's zoom routing; Ghostty reports every such change as a
+        // cell-size action.
+        observers.append(center.addObserver(
+            forName: .ghosttyDidUpdateCellSize,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.revision &+= 1
+            }
+        })
+        observers.append(center.addObserver(
+            forName: GlobalFontMagnification.didChangeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in

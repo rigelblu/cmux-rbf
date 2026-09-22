@@ -233,6 +233,10 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
         setFontSize(MarkdownFontSizeSettings.resolvedDefault())
     }
 
+    var isFontSizeAdjusted: Bool {
+        abs(fontSize - MarkdownFontSizeSettings.resolvedDefault()) > 0.0001
+    }
+
     /// Sets the preview font size to an explicit point value (clamped). Used by
     /// the header font-size popover's manual entry. Returns `true` if changed.
     @discardableResult
@@ -240,6 +244,7 @@ final class MarkdownPanel: Panel, ObservableObject, FilePreviewTextEditingPanel 
         let clamped = MarkdownFontSizeSettings.clamp(candidate)
         guard abs(clamped - fontSize) > 0.0001 else { return false }
         fontSize = clamped
+        NotificationCenter.default.post(name: .paneZoomDidChange, object: self)
         return true
     }
 

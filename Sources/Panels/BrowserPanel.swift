@@ -3050,7 +3050,12 @@ final class BrowserPanel: Panel, ObservableObject {
     /// which outlives its web view — is what lets a reload, crash recovery, or
     /// profile switch restore zoom without re-multiplying the global scale into
     /// the base and compounding it on every replacement.
-    private var basePageZoom: CGFloat = 1.0
+    private var basePageZoom: CGFloat = 1.0 {
+        didSet {
+            guard basePageZoom != oldValue else { return }
+            NotificationCenter.default.post(name: .paneZoomDidChange, object: self)
+        }
+    }
     private nonisolated(unsafe) var globalFontMagnificationObserver: GlobalFontMagnificationChangeObserver?
 
     /// The pane's base zoom combined with the current app-wide scale.
@@ -7472,6 +7477,10 @@ extension BrowserPanel {
     @discardableResult
     func resetZoom() -> Bool {
         pageZoomMutationHandled(resetZoomResult())
+    }
+
+    var isPageZoomAdjusted: Bool {
+        abs(basePageZoom - 1.0) > 0.0001
     }
 
     func zoomInResult() -> Result<Bool, BrowserAutomationViewportError> {
