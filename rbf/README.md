@@ -196,7 +196,8 @@ Workspaces that carry a colour but sit outside any group now gather under compac
 
 - `⌘=` still sizes only the pane you are in, and the two compose: a pane you enlarged by hand stays proportionally larger when everything scales around it.
 - Reachable from the View menu and the Command Palette, and rebindable in Settings or `~/.config/cmux/cmux.json`.
-- **Everything: Actual Size** resets the app-wide scale only; a hand-sized pane keeps its own zoom. Reset that pane with `⌘0` while it is focused.
+- **Everything: Actual Size** (`⇧⌘0`) resets the app-wide scale and every hand-sized pane, in every window. `⌘0` resets only the pane you are in.
+- The View menu's **Zoom In**, **Zoom Out** and **Actual Size** act on whichever pane you are in — terminal, browser, markdown preview or text preview. They grey out on a pane that can't zoom, and **Actual Size** also greys out when the pane is already at its normal size.
 - The scale runs 50%–200% with no on-screen indicator; at either limit the shortcut simply stops responding. The current percentage is in **Settings › App › Global Font Magnification**.
 - PDF previews, image previews, and the canvas layout keep their own view zoom — fit-to-window is a different operation from scaling text.
 
