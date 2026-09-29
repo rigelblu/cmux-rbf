@@ -34,10 +34,11 @@ struct SidebarWorkspaceRowInput {
     let rowSpacing: CGFloat
     let showsModifierShortcutHints: Bool
     let isPointerHovering: Bool
+    // Drop validation is owned by the parent overlay; rows carry only the
+    // paint state needed for the dragged row and its indicator lines.
     let isBeingDragged: Bool
     let topDropIndicatorVisible: Bool
     let bottomDropIndicatorVisible: Bool
-    let isBonsplitWorkspaceDropActive: Bool
     let settings: SidebarTabItemSettingsSnapshot
     let isChecklistExpanded: Bool
     let checklistAddFieldActivationToken: Int
@@ -77,7 +78,6 @@ struct SidebarWorkspaceRowInput {
             isBeingDragged: isBeingDragged,
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
-            isBonsplitWorkspaceDropActive: isBonsplitWorkspaceDropActive,
             settings: settings,
             isChecklistExpanded: isChecklistExpanded,
             checklistAddFieldActivationToken: checklistAddFieldActivationToken,
@@ -101,6 +101,7 @@ struct SidebarWorkspaceRowInput {
                 canMarkRead: targetAggregate.canMarkRead,
                 canMarkUnread: targetAggregate.canMarkUnread,
                 hasLatestNotification: targetAggregate.hasLatestNotification,
+                allNotificationsMuted: targetAggregate.allNotificationsMuted,
                 notifications: targetAggregate.notifications,
                 targetColorHexes: targetAggregate.targetColorHexes
             )

@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import UniformTypeIdentifiers
 
 extension SplitViewController {
     @discardableResult
@@ -8,77 +7,81 @@ extension SplitViewController {
 #if DEBUG
         dlog("tab.dragStart pane=\(paneId.id.uuidString.prefix(5)) tab=\(tab.id.uuidString.prefix(5)) title=\"\(tab.title)\"")
 #endif
+        clearTabDragState()
         dragGeneration += 1
-        draggingTab = tab
-        dragSourcePaneId = paneId
-        activeDragTab = tab
-        activeDragSourcePaneId = paneId
+        reclaimSupersededNativeTabDragSources()
+        let session = TabDragSession(tab: tab, sourcePaneId: paneId, generation: dragGeneration)
+        tabDragSession = session
         return dragGeneration
     }
 
+    /// Releases native source holds from older generations after a new tab
+    /// drag boundary. AppKit cannot begin the new gesture while an older native
+    /// session is still active, so a source whose `endedAt` callback was lost
+    /// is safe to retire here; any late callback remains idempotent.
+    private func reclaimSupersededNativeTabDragSources() {
+        let superseded = nativeTabDragSources.filter { $0.key < dragGeneration }
+        for (generation, source) in superseded {
+            nativeTabDragSources[generation] = nil
+            source.finishAfterNativeBoundary()
+        }
+    }
+
     func clearTabDragState() {
-        draggingTab = nil
-        dragSourcePaneId = nil
-        activeDragTab = nil
-        activeDragSourcePaneId = nil
+        tabDragSession = nil
     }
 
     func cancelTabDragIfGenerationMatches(_ generation: Int) {
-        guard dragGeneration == generation else { return }
-        if draggingTab != nil || activeDragTab != nil {
+        guard tabDragSession?.generation == generation else { return }
 #if DEBUG
-            dlog("tab.dragCancel (stale draggingTab cleared)")
+        dlog("tab.dragCancel (stale tabDragSession cleared)")
 #endif
-            clearTabDragState()
-        }
+        clearTabDragState()
     }
 
-    func makeTabDragItemProvider(
-        for tab: TabItem,
+    @discardableResult
+    func beginNativeTabDrag(
+        _ tab: TabItem,
         from paneId: PaneID,
-        clearDropState: () -> Void
-    ) -> NSItemProvider {
+        sourceView: NSView,
+        event: NSEvent,
+        draggingFrame: NSRect,
+        dragImage: NSImage
+    ) -> Bool {
 #if DEBUG
-        NSLog("[Bonsplit Drag] createItemProvider for tab: \(tab.title)")
+        NSLog("[Bonsplit Drag] begin native session for tab: \(tab.title)")
 #endif
-        clearDropState()
-        let dragGeneration = beginTabDrag(tab, from: paneId)
-        installCancelledTabDragCleanup(forGeneration: dragGeneration)
-
-        let transfer = TabTransferData(tab: tab, sourcePaneId: paneId.id)
-        if let data = try? JSONEncoder().encode(transfer) {
-            let provider = NSItemProvider()
-            provider.registerDataRepresentation(
-                forTypeIdentifier: UTType.tabTransfer.identifier,
-                visibility: .ownProcess
-            ) { completion in
-                completion(data, nil)
-                return nil
-            }
-#if DEBUG
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-                let types = NSPasteboard(name: .drag).types?.map(\.rawValue).joined(separator: ",") ?? "-"
-                dlog("tab.dragPasteboard types=\(types)")
-            }
-#endif
-            return provider
+        let transfer = TabDragTransfer(tab: Tab(from: tab), sourcePaneId: paneId)
+        guard let registration = tabDragTransferRegistry.register(transfer) else {
+            return false
         }
-        return NSItemProvider()
+        let generation = beginTabDrag(tab, from: paneId)
+        let source = TabDragSessionSource(
+            generation: generation,
+            transferRegistration: registration,
+            transferRegistry: tabDragTransferRegistry,
+            controller: self
+        )
+        nativeTabDragSources[generation] = source
+
+        let draggingItem = NSDraggingItem(pasteboardWriter: registration.pasteboardItem)
+        draggingItem.setDraggingFrame(draggingFrame, contents: dragImage)
+        let session = sourceView.beginDraggingSession(
+            with: [draggingItem],
+            event: event,
+            source: source
+        )
+        source.bind(sourceView: sourceView)
+        // A tab drag is owned by the source lifecycle. Avoid AppKit's return
+        // animation delaying (or suppressing) `endedAt` when the pointer is
+        // released without a valid destination, so transfer state is revoked
+        // immediately and the next tab press can arm normally.
+        session.animatesToStartingPositionsOnCancelOrFail = false
+        return true
     }
 
-    private func installCancelledTabDragCleanup(forGeneration generation: Int) {
-        var monitorRef: Any?
-        monitorRef = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
-            // One-shot: remove ourselves AND nil the capture box, or the cycle
-            // monitor -> closure -> box -> monitor leaks one monitor per drag.
-            if let m = monitorRef {
-                NSEvent.removeMonitor(m)
-                monitorRef = nil
-            }
-            DispatchQueue.main.async {
-                self?.cancelTabDragIfGenerationMatches(generation)
-            }
-            return event
-        }
+    func nativeTabDragSessionDidEnd(generation: Int) {
+        nativeTabDragSources[generation] = nil
+        cancelTabDragIfGenerationMatches(generation)
     }
 }

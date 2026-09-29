@@ -7,22 +7,26 @@ import Foundation
 extension Workspace {
     // MARK: - Title Management
 
-    /// Who set a custom title. Direct cmux names outrank explicit agent-session
-    /// names, which outrank automatic names. The provenance round-trips through
-    /// session persistence for both workspace and panel custom titles.
+    /// Direct cmux names outrank agent-session and automatic names. A remote
+    /// daemon observation is authoritative for a cloud-bound projection and
+    /// may replace a local title after another client changes the daemon name.
+    /// Provenance round-trips through session persistence.
     enum CustomTitleSource: String, Codable, Sendable {
         case user
         case agentSession
         case auto
+        case remote
 
         func canReplace(_ existing: CustomTitleSource?) -> Bool {
             switch self {
             case .user:
                 return true
             case .agentSession:
-                return existing != .user
+                return existing != .user && existing != .remote
             case .auto:
                 return existing == nil || existing == .auto
+            case .remote:
+                return true
             }
         }
 
@@ -43,7 +47,27 @@ extension Workspace {
                 return true
             case .auto, .agentSession:
                 return false
+            case .remote:
+                return true
             }
+        }
+
+        /// Session manifests are also read by older cmux builds. Those builds
+        /// know `user` and `auto`, but not `remote`. Decode unknown values as
+        /// user-owned so a newer source can never make an older title unsafe
+        /// to overwrite. New session snapshots carry a separate compatibility
+        /// marker when the source is remote and encode this field as `user`.
+        init(from decoder: any Decoder) throws {
+            let value = try decoder.singleValueContainer().decode(String.self)
+            self = Self(rawValue: value) ?? .user
+        }
+
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.singleValueContainer()
+            // `remote` is represented by the optional snapshot marker. Keeping
+            // this enum value in the old vocabulary makes downgrade restores
+            // safe instead of making the whole manifest unreadable.
+            try container.encode(self == .remote ? Self.user.rawValue : rawValue)
         }
     }
 
@@ -97,7 +121,7 @@ extension Workspace {
         }
         setCustomTitle(
             snapshot.customTitle,
-            source: snapshot.customTitleAuthority ?? snapshot.customTitleSource ?? .user
+            source: snapshot.customTitleAuthority ?? snapshot.effectiveCustomTitleSource ?? .user
         )
     }
 
@@ -162,9 +186,10 @@ extension Workspace {
 
     @discardableResult
     func updatePanelTitle(panelId: UUID, title: String) -> Bool {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remote = cloudProjectedResource(forPanel: panelId).flatMap { $0.kind == .terminal ? $0 : nil }
+        let trimmed = (remote?.cloudProcessDisplayTitle ?? title).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, panels[panelId] != nil else { return false }
-        guard shouldApplyRestoredPanelTitle(panelId: panelId, rawTitle: trimmed) else {
+        guard remote != nil || shouldApplyRestoredPanelTitle(panelId: panelId, rawTitle: trimmed) else {
             return false
         }
         var didMutate = false
@@ -177,7 +202,7 @@ extension Workspace {
             didMutatePanelTitle = true
         }
 
-        if didMutatePanelTitle,
+        if !isRemoteTmuxMirror,
            let tabId = surfaceIdFromPanelId(panelId),
            let panel = panels[panelId],
            let existing = bonsplitController.tab(tabId) {
@@ -191,6 +216,7 @@ extension Workspace {
                     title: titleUpdate,
                     hasCustomTitle: hasCustomTitle
                 )
+                didMutate = true
             }
         }
 
@@ -224,9 +250,8 @@ extension Workspace {
 
     /// Sets, replaces, or clears (empty/nil `title`) the workspace custom title.
     ///
-    /// Lower-priority writes are rejected, and non-user sources never clear —
-    /// an empty write from an agent or an automatic namer leaves the existing
-    /// title alone rather than wiping the label the user is reading.
+    /// Lower-priority writes are rejected. A remote daemon observation may
+    /// replace a local title; automatic writes never clear an existing title.
     /// Returns whether the write landed.
     @discardableResult
     func setCustomTitle(_ title: String?, source: CustomTitleSource = .user) -> Bool {

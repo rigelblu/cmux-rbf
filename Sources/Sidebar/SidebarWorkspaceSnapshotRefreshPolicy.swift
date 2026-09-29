@@ -5,6 +5,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let title: String
         let customDescription: String?
         let isPinned: Bool
+        let isMuted: Bool
+        let cloudWorkspaceLabel: String?
         let customColorHex: String?
         let finderDirectoryPath: String?
         let mediaActivity: BrowserMediaActivity
@@ -17,6 +19,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let checklistTotalCount: Int
         let checklistFirstUncheckedText: String?
         let activeCodingAgentCount: Int
+        let taskStatusInput: SidebarWorkspaceTaskStatusSnapshot
     }
 
     var contextMenuImmediateFields: ContextMenuImmediateFields {
@@ -24,6 +27,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             title: title,
             customDescription: customDescription,
             isPinned: isPinned,
+            isMuted: isMuted,
+            cloudWorkspaceLabel: cloudWorkspaceLabel,
             customColorHex: customColorHex,
             finderDirectoryPath: finderDirectoryPath,
             mediaActivity: mediaActivity,
@@ -35,7 +40,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             checklistCompletedCount: checklistCompletedCount,
             checklistTotalCount: checklistTotalCount,
             checklistFirstUncheckedText: checklistFirstUncheckedText,
-            activeCodingAgentCount: activeCodingAgentCount
+            activeCodingAgentCount: activeCodingAgentCount,
+            taskStatusInput: taskStatusInput
         )
     }
 
@@ -46,7 +52,9 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             title: snapshot.title,
             customDescription: snapshot.customDescription,
             isPinned: snapshot.isPinned,
+            isMuted: snapshot.isMuted,
             customColorHex: snapshot.customColorHex,
+            cloudWorkspaceLabel: snapshot.cloudWorkspaceLabel,
             remoteWorkspaceSidebarText: remoteWorkspaceSidebarText,
             remoteConnectionStatusText: remoteConnectionStatusText,
             remoteStateHelpText: remoteStateHelpText,
@@ -82,7 +90,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             checklistItems: snapshot.checklistItems,
             checklistCompletedCount: snapshot.checklistCompletedCount,
             checklistTotalCount: snapshot.checklistTotalCount,
-            checklistFirstUncheckedText: snapshot.checklistFirstUncheckedText
+            checklistFirstUncheckedText: snapshot.checklistFirstUncheckedText,
+            taskStatusInput: snapshot.taskStatusInput
         )
     }
 }

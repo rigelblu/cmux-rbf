@@ -8,7 +8,7 @@ extension WorkspaceContentView {
         reason: String = "unspecified",
         backgroundOverride: NSColor? = nil,
         loadConfig: () -> GhosttyConfig = {
-            GhosttyConfig.load(globalFontMagnificationPercent: GlobalFontMagnification.storedPercent)
+            GhosttyConfig.loadForCmux(globalFontMagnificationPercent: GlobalFontMagnification.storedPercent)
         },
         defaultBackground: () -> NSColor = { GhosttyApp.shared.defaultBackgroundColor },
         defaultForeground: () -> NSColor = { GhosttyApp.shared.defaultForegroundColor },

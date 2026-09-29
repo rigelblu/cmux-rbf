@@ -4,8 +4,8 @@ import CmuxSidebar
 import CmuxWorkspaces
 import SwiftUI
 
-/// Resolved color helpers for one row render (parity with the SwiftUI
-/// active/inactive foreground rules in SidebarAppearanceSupport).
+/// Row-owned color helpers that preserve native semantic variants while
+/// deriving selected colors from the row model (parity with SwiftUI).
 @MainActor
 struct SidebarRowPalette {
     let model: SidebarWorkspaceRowModel
@@ -37,21 +37,37 @@ struct SidebarRowPalette {
         visual.primaryTextColor.withAlphaComponent(opacity)
     }
 
+    /// Resolves semantic colors against the row's concrete cmux scheme.
+    func semantic(_ color: NSColor, opacity: CGFloat? = nil) -> NSColor {
+        SidebarAppearanceColorResolver().resolvedColor(
+            color,
+            for: colorScheme,
+            opacity: opacity
+        )
+    }
+
     var primaryText: NSColor {
         visual.primaryTextColor
     }
 
-    func secondary(_ opacity: CGFloat = 0.75) -> NSColor {
-        visual.secondaryTextColor(opacity: opacity)
+    func secondary(
+        _ selectedOpacity: CGFloat = 0.75,
+        inactiveOpacity: CGFloat? = nil
+    ) -> NSColor {
+        let color = visual.secondaryTextColor(opacity: selectedOpacity)
+        guard !model.isActive, let inactiveOpacity else { return color }
+        return color.withAlphaComponent(inactiveOpacity)
     }
 
-    static func attributed(_ source: AttributedString, font: NSFont, color: NSColor) -> NSAttributedString {
-        let mutable = NSMutableAttributedString(attributedString: NSAttributedString(source))
-        let fullRange = NSRange(location: 0, length: mutable.length)
-        mutable.addAttribute(.font, value: font, range: fullRange)
-        mutable.addAttribute(.foregroundColor, value: color, range: fullRange)
-        return mutable
+    /// Link color for row-owned text. AppKit paints `.link` runs in
+    /// `NSColor.linkColor` and ignores the row foreground, which is unreadable
+    /// on an active row because the sidebar selection background is the same
+    /// blue. Active rows therefore derive the link color from the selected
+    /// foreground so a custom `sidebarSelectionColorHex` stays legible.
+    var linkText: NSColor {
+        model.isActive ? selectedForeground(1.0) : semantic(.linkColor)
     }
+
 }
 
 /// One-line attributed metadata label whose individual Markdown links route
@@ -364,7 +380,7 @@ final class SidebarRowIconTextLine: NSView {
             }
         } else {
             switch log.level {
-            case .info: color = .secondaryLabelColor
+            case .info: color = palette.secondary(0.5)
             case .progress: color = .systemBlue
             case .success: color = .systemGreen
             case .warning: color = .systemOrange
@@ -538,7 +554,7 @@ final class SidebarRowPullRequestLine: NSView {
         clickable: Bool,
         onOpen: @escaping () -> Void
     ) {
-        let color = model.isActive ? palette.secondary(0.75) : NSColor.secondaryLabelColor
+        let color = palette.secondary(0.75)
         let font = NSFont.systemFont(ofSize: model.scaled(10), weight: .semibold)
         iconView.configure(status: display.status, color: color, fontScale: model.fontScale)
         iconSize = SidebarRowPullRequestIconView.size(status: display.status, fontScale: model.fontScale)

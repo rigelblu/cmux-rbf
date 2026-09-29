@@ -17,6 +17,8 @@ extension ContentView {
             return .newTab
         case "palette.newBrowserWorkspace":
             return .newBrowserWorkspace
+        case ContentView.commandPaletteCloudNewMachineCommandId:
+            return .newCloudMachine
         case "palette.newWindow":
             return .newWindow
         case "palette.openFolder":
@@ -109,6 +111,14 @@ extension ContentView {
             return .equalizeSplitWidths
         case "palette.equalizeSplitHeights":
             return .equalizeSplitHeights
+        case "palette.resizePaneLeft":
+            return .resizePaneLeft
+        case "palette.resizePaneRight":
+            return .resizePaneRight
+        case "palette.resizePaneUp":
+            return .resizePaneUp
+        case "palette.resizePaneDown":
+            return .resizePaneDown
         case "palette.triggerFlash":
             return .triggerFlash
         default:
@@ -121,7 +131,14 @@ extension ContentView {
             { _ in value }
         }
 
-        return RightSidebarMode.availableModes().map { mode in
+        // Palette execution resolves through the mode's shortcut action;
+        // customSidebar has none yet (a new cmux-owned shortcut carries the
+        // full settings/config/docs policy), so it stays out of the palette
+        // until that lands. The mode bar, CLI, and socket verb cover it.
+        // cmux-rbf `#cm-69`: `.reply` has no shortcut action either, but
+        // `handleCommandPaletteRightSidebarMode` needs none, so keep it in the
+        // palette. Reject this hunk on upstream sync.
+        return RightSidebarMode.availableModes().filter { $0.shortcutAction != nil || $0 == .reply }.map { mode in
             let title = mode.shortcutAction?.label ?? mode.label
             return CommandPaletteCommandContribution(
                 commandId: Self.commandPaletteRightSidebarModeCommandID(mode),
@@ -161,6 +178,8 @@ extension ContentView {
             return "palette.showRightSidebarDock"
         case .reply:
             return "palette.showRightSidebarReply"
+        case .machines:
+            return "palette.showRightSidebarMachines"
         case .customSidebar:
             return "palette.showRightSidebarCustomSidebar"
         }
@@ -168,7 +187,8 @@ extension ContentView {
 
     static func commandPaletteRightSidebarToolPaneCommandDescriptors() -> [(mode: RightSidebarMode, commandId: String, title: String)] {
         RightSidebarMode.paneModes.compactMap { mode in
-            guard let commandId = commandPaletteRightSidebarToolPaneCommandID(mode),
+            guard mode.isAvailable(),
+                  let commandId = commandPaletteRightSidebarToolPaneCommandID(mode),
                   let title = commandPaletteRightSidebarToolPaneTitle(mode) else {
                 return nil
             }
@@ -186,6 +206,8 @@ extension ContentView {
             return "palette.openVaultPane"
         case .reply:
             return "palette.openReplyPane"
+        case .machines:
+            return "palette.openCloudPane"
         case .feed, .dock, .customSidebar:
             return nil
         }
@@ -201,6 +223,8 @@ extension ContentView {
             return String(localized: "command.openVaultPane.title", defaultValue: "Open Vault as Pane")
         case .reply:
             return String(localized: "command.openReplyPane.title", defaultValue: "Open Reply as Pane")
+        case .machines:
+            return String(localized: "command.openCloudPane.title", defaultValue: "Open Cloud as Pane")
         case .feed, .dock, .customSidebar:
             return nil
         }

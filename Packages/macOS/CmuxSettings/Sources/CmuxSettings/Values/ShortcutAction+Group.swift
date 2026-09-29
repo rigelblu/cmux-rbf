@@ -6,20 +6,24 @@ extension ShortcutAction {
              .newWindow, .closeWindow, .toggleFullScreen, .quit,
              .globalZoomIn, .globalZoomOut, .globalZoomReset:
             return .app
-        case .toggleSidebar, .newTab, .newBrowserWorkspace, .saveLayoutTemplate, .openFolder, .reopenPreviousSession, .goToWorkspace,
+        case .toggleSidebar, .newTab, .newBrowserWorkspace, .newCloudWorkspace, .newCloudMachine, .saveLayoutTemplate, .openFolder, .reopenPreviousSession, .goToWorkspace,
              .commandPalette, .commandPaletteNext, .commandPalettePrevious, .sendFeedback,
              .showNotifications, .jumpToUnread, .toggleUnread, .markOldestUnreadAndJumpNext,
+             .markAllNotificationsRead, .clearAllNotifications,
              .focusRightSidebar, .focusRightSidebarInReply,
              .switchRightSidebarToFiles, .switchRightSidebarToFind,
              .switchRightSidebarToSessions, .switchRightSidebarToFeed,
-             .switchRightSidebarToDock, .insertReplyLabelByNumber, .triggerFlash, .reopenClosedWorkspace:
+             .switchRightSidebarToDock, .switchRightSidebarToMachines,
+             .insertReplyLabelByNumber, .triggerFlash, .reopenClosedWorkspace:
             return .workspace
         case .nextSurface, .prevSurface, .moveSurfaceLeft, .moveSurfaceRight,
              .moveSurfaceToPreviousPane, .moveSurfaceToNextPane,
              .moveSurfaceToPaneLeft, .moveSurfaceToPaneRight,
              .moveSurfaceToPaneUp, .moveSurfaceToPaneDown,
              .selectSurfaceByNumber,
-             .nextSidebarTab, .prevSidebarTab, .moveWorkspaceUp, .moveWorkspaceDown,
+             .nextSidebarTab, .prevSidebarTab,
+             .nextSidebarTabInGroup, .prevSidebarTabInGroup,
+             .moveWorkspaceUp, .moveWorkspaceDown,
              .focusHistoryBack, .focusHistoryForward, .selectWorkspaceByNumber,
              .renameTab, .renameWorkspace, .editWorkspaceDescription,
              .markWorkspaceDone, .cycleWorkspaceStatus, .toggleChecklistItemComplete,
@@ -36,6 +40,7 @@ extension ShortcutAction {
              .toggleSplitZoom, .increaseWorkspaceTerminalFontSize,
              .decreaseWorkspaceTerminalFontSize, .resetWorkspaceTerminalFontSize,
              .equalizeSplits, .equalizeSplitWidths, .equalizeSplitHeights,
+             .resizePaneLeft, .resizePaneRight, .resizePaneUp, .resizePaneDown,
              .splitBrowserRight, .splitBrowserDown,
              .toggleRightSidebar, .fileExplorerOpenSelection, .fileExplorerOpenSelectionFinderAlias,
              .toggleCanvasLayout, .canvasRevealFocusedPane, .canvasOverview,

@@ -135,7 +135,7 @@ final class MainWindowFocusController {
             fileExplorerHost = host
         case .find:
             fileSearchHost = host
-        case .sessions, .feed, .dock, .reply, .customSidebar:
+        case .sessions, .feed, .dock, .reply, .machines, .customSidebar:
             break
         }
         focusRegisteredRightSidebarEndpointIfNeeded(mode: mode)
@@ -218,6 +218,33 @@ final class MainWindowFocusController {
         case .mainPanel, nil:
             return true
         }
+    }
+
+    /// Whether the exact main-area terminal target owns this window's current
+    /// input focus. A pending right-sidebar intent wins over a stale terminal
+    /// first responder; otherwise the live responder is authoritative.
+    func ownsMainPanelInputFocus(
+        workspaceId: UUID,
+        containerPanelId: UUID,
+        surfaceId: UUID
+    ) -> Bool {
+        if case .rightSidebar = intent {
+            return false
+        }
+        guard let responder = window?.firstResponder else { return false }
+
+        if let terminal = terminalFocusRequest(for: responder) {
+            return terminal.workspaceId == workspaceId
+                && (terminal.panelId == surfaceId || terminal.panelId == containerPanelId)
+        }
+        if rightSidebarModeOwning(responder) != nil {
+            return false
+        }
+        guard let mainPanel = selectedFocusedPanelRequest(owning: responder) else {
+            return false
+        }
+        return mainPanel.workspaceId == workspaceId
+            && (mainPanel.panelId == containerPanelId || mainPanel.panelId == surfaceId)
     }
 
     func allowsBonsplitTabShortcutHints(workspaceId: UUID) -> Bool {
@@ -497,15 +524,30 @@ final class MainWindowFocusController {
 
     @discardableResult
     func focusRightSidebar(mode requestedMode: RightSidebarMode? = nil, focusFirstItem: Bool = true) -> Bool {
-        guard let state = fileExplorerState else { return false }
-        let desiredMode = requestedMode ?? rememberedRightSidebarMode ?? state.mode
-        guard desiredMode.isAvailable() else {
-            guard requestedMode == nil else { return false }
-            return focusRightSidebar(mode: .files, focusFirstItem: focusFirstItem)
+        guard let mode = resolvedRightSidebarMode(requestedMode: requestedMode) else {
+            return false
         }
-        let mode = desiredMode
         let target = rightSidebarFocusTarget(mode: mode, focusFirstItem: focusFirstItem)
         return focusRightSidebar(mode: mode, target: target, terminalYieldReason: "rightSidebarFocus")
+    }
+
+    /// Whether a right-sidebar focus request has an available, window-owned
+    /// state target. This preflight is intentionally nonmutating so callers can
+    /// reject an unavailable request before activating or ordering its window.
+    func canFocusRightSidebar(mode requestedMode: RightSidebarMode? = nil) -> Bool {
+        resolvedRightSidebarMode(requestedMode: requestedMode) != nil
+    }
+
+    private func resolvedRightSidebarMode(requestedMode: RightSidebarMode?) -> RightSidebarMode? {
+        guard let state = fileExplorerState else { return nil }
+        let desiredMode = requestedMode ?? rememberedRightSidebarMode ?? state.mode
+        if desiredMode.isAvailable() {
+            return desiredMode
+        }
+        guard requestedMode == nil, RightSidebarMode.files.isAvailable() else {
+            return nil
+        }
+        return .files
     }
 
     @discardableResult
@@ -822,7 +864,7 @@ final class MainWindowFocusController {
             return .outline
         case .find:
             return .searchField
-        case .sessions, .reply, .customSidebar:
+        case .sessions, .reply, .machines, .customSidebar:
             return .host
         case .feed:
             return focusFirstItem ? .firstItem : .host
@@ -864,6 +906,8 @@ final class MainWindowFocusController {
                 return false
             }
             return window.makeFirstResponder(host)
+        case .machines:
+            return focusFallbackRightSidebarHost()
         case .feed:
             if target == .firstItem {
                 feedHost?.focusFirstItemFromCoordinator()

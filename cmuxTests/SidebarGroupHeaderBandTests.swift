@@ -64,7 +64,8 @@ struct SidebarGroupHeaderBandTests {
 
     private static func groupHeaderModel(
         tintHex: String,
-        isAnchorActive: Bool
+        isAnchorActive: Bool,
+        colorSchemeIsDark: Bool = true
     ) -> SidebarGroupHeaderRowModel {
         SidebarGroupHeaderRowModel(
             groupId: UUID(),
@@ -95,7 +96,8 @@ struct SidebarGroupHeaderBandTests {
             isFirstRow: true,
             isBeingDragged: false,
             topDropIndicatorVisible: false,
-            bottomDropIndicatorVisible: false
+            bottomDropIndicatorVisible: false,
+            colorSchemeIsDark: colorSchemeIsDark
         )
     }
 
@@ -599,7 +601,8 @@ struct SidebarGroupHeaderColorMenuTests {
 
     private static func model(
         tintHex: String?,
-        customColorHex: String?
+        customColorHex: String?,
+        colorSchemeIsDark: Bool = true
     ) -> SidebarGroupHeaderRowModel {
         SidebarGroupHeaderRowModel(
             groupId: UUID(),
@@ -630,7 +633,8 @@ struct SidebarGroupHeaderColorMenuTests {
             isFirstRow: false,
             isBeingDragged: false,
             topDropIndicatorVisible: false,
-            bottomDropIndicatorVisible: false
+            bottomDropIndicatorVisible: false,
+            colorSchemeIsDark: colorSchemeIsDark
         )
     }
 

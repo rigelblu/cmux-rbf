@@ -26,6 +26,13 @@ struct SidebarWorkspaceRenderItemID: Hashable {
         return Self(kind: 3, uuid: colorSentinel, colorKey: (rgb << 1) | tier)
     }
 
+    /// Returns the durable group identifier when this row represents a group.
+    /// Workspace rows return `nil`; callers should use their row-specific
+    /// fallback identity for those rows.
+    var groupId: UUID? {
+        kind == 1 ? uuid : nil
+    }
+
     static func == (lhs: Self, rhs: Self) -> Bool {
         guard lhs.kind == rhs.kind, lhs.colorKey == rhs.colorKey else { return false }
         return lhs.kind == 3 || lhs.uuid == rhs.uuid

@@ -1,4 +1,5 @@
 import CoreGraphics
+import CmuxBrowser
 import CmuxCore
 import Foundation
 import Bonsplit
@@ -26,7 +27,11 @@ enum SessionPersistencePolicy {
     static let sidebarMinimumWidthRange: ClosedRange<Double> = 120...260
     static let maximumSidebarWidth: Double = 600
     static let minimumWindowWidth: Double = 300
-    static let minimumWindowHeight: Double = 200
+    // Below ~400pt the chrome cannot lay out without overlap: the sidebar
+    // footer (account/help/update pill) collides with workspace rows and the
+    // update pill clips at the window edge. User resizes stop here via
+    // minSize/contentMinSize; programmatic paths via CmuxMainWindow.setFrame.
+    static let minimumWindowHeight: Double = 400
     static let autosaveInterval: TimeInterval = 8.0
     static let maxWindowsPerSnapshot: Int = 12
     static let maxWorkspacesPerWindow: Int = 128
@@ -207,10 +212,10 @@ enum SessionSidebarSelection: String, Codable, Sendable, Equatable {
 
     init(selection: SidebarSelection) {
         switch selection {
-        case .tabs:
+        case .tabs, .notifications:
+            // Notifications moved from a window-level overlay to a pane tab.
+            // Never persist the retired overlay selection.
             self = .tabs
-        case .notifications:
-            self = .notifications
         }
     }
 
@@ -219,7 +224,8 @@ enum SessionSidebarSelection: String, Codable, Sendable, Equatable {
         case .tabs:
             return .tabs
         case .notifications:
-            return .notifications
+            // Migrate snapshots written by builds that used the overlay.
+            return .tabs
         }
     }
 }
@@ -305,6 +311,7 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
         case name, kind, command, cwd, checkpointId, source
         case environment, autoResume, approvalPolicy, approvalRecordId
         case launchCommand, permissionMode, launchFlavor, updatedAt
+        case resumeEvidenceProvenance
     }
 
     var name: String?
@@ -317,6 +324,9 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
     var launchCommand: AgentLaunchCommandSnapshot?
     var permissionMode: String?
     var autoResume: Bool?
+    /// Verified Codex hook provenance carried into the app-owned atomic gate.
+    /// Non-Codex and legacy bindings leave this unset.
+    var resumeEvidenceProvenance: String?
     var approvalPolicy: SurfaceResumeApprovalPolicy?
     var approvalRecordId: String?
     var launchFlavor: SurfaceResumeLaunchFlavor
@@ -335,6 +345,7 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
         launchCommand: AgentLaunchCommandSnapshot? = nil,
         permissionMode: String? = nil,
         autoResume: Bool? = nil,
+        resumeEvidenceProvenance: String? = nil,
         approvalPolicy: SurfaceResumeApprovalPolicy? = nil,
         approvalRecordId: String? = nil,
         launchFlavor: SurfaceResumeLaunchFlavor = .local,
@@ -357,6 +368,11 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
         self.launchCommand = Self.normalizedLaunchCommand(launchCommand)
         self.permissionMode = Self.normalized(permissionMode)
         self.autoResume = autoResume
+        let retainsCodexEvidence = normalizedSource?.lowercased() == "agent-hook"
+            && normalizedKind?.lowercased() == "codex"
+        self.resumeEvidenceProvenance = retainsCodexEvidence
+            ? Self.normalized(resumeEvidenceProvenance)
+            : nil
         self.approvalPolicy = approvalPolicy
         self.approvalRecordId = Self.normalized(approvalRecordId)
         self.launchFlavor = launchFlavor
@@ -380,6 +396,7 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
             ),
             permissionMode: try container.decodeIfPresent(String.self, forKey: .permissionMode),
             autoResume: try container.decodeIfPresent(Bool.self, forKey: .autoResume),
+            resumeEvidenceProvenance: try container.decodeIfPresent(String.self, forKey: .resumeEvidenceProvenance),
             approvalPolicy: try container.decodeIfPresent(SurfaceResumeApprovalPolicy.self, forKey: .approvalPolicy),
             approvalRecordId: try container.decodeIfPresent(String.self, forKey: .approvalRecordId),
             launchFlavor: decodedLaunchFlavor ?? .local,
@@ -391,6 +408,14 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
 
     var isProcessDetected: Bool {
         source == "process-detected"
+    }
+
+    /// Plain interactive SSH bindings are intentionally durable across a
+    /// restore pass.  Their process is expected to be absent while the new
+    /// local PTY is starting, so a transiently empty process scan must not
+    /// erase the command before the next autosave can observe it again.
+    var isPlainSSHProcessDetectedBinding: Bool {
+        isProcessDetected && kind?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "ssh"
     }
 
     var isAgentHookBinding: Bool {
@@ -420,6 +445,16 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
     var mayResumePaneOnItsOwn: Bool {
         if isAgentHookBinding || isProcessDetected { return allowsAutomaticResume }
         return true
+    }
+
+    /// Keeps an uncertain binding available for manual continuation without
+    /// allowing a stale process observation to launch on the next restore.
+    func disablingAutomaticResume() -> Self {
+        guard autoResume == true else { return self }
+        var disabled = self
+        disabled.autoResume = false
+        disabled.approvalPolicy = .manual
+        return disabled
     }
 
     var usesLocalRestoreVerb: Bool {
@@ -482,6 +517,7 @@ struct SurfaceResumeBindingSnapshot: Codable, Equatable, Sendable {
     ) -> AgentLaunchCommandSnapshot? {
         guard var launchCommand else { return nil }
         launchCommand.workingDirectory = normalized(launchCommand.workingDirectory)
+        launchCommand.verificationHome = normalized(launchCommand.verificationHome)
         launchCommand.environment = normalizedEnvironment(launchCommand.environment)
         return launchCommand
     }
@@ -1625,6 +1661,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
     var developerToolsVisible: Bool
     var isMuted: Bool
     var keepLoaded: Bool = false
+    var chromeVisibility: BrowserChromeVisibility? = nil
     var omnibarVisible: Bool? = nil
     var backHistoryURLStrings: [String]?
     var forwardHistoryURLStrings: [String]?
@@ -1645,6 +1682,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         developerToolsVisible: Bool,
         isMuted: Bool = false,
         keepLoaded: Bool = false,
+        chromeVisibility: BrowserChromeVisibility? = nil,
         omnibarVisible: Bool? = nil,
         backHistoryURLStrings: [String]?,
         forwardHistoryURLStrings: [String]?,
@@ -1659,6 +1697,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         self.developerToolsVisible = developerToolsVisible
         self.isMuted = isMuted
         self.keepLoaded = keepLoaded
+        self.chromeVisibility = chromeVisibility
         self.omnibarVisible = omnibarVisible
         self.backHistoryURLStrings = backHistoryURLStrings
         self.forwardHistoryURLStrings = forwardHistoryURLStrings
@@ -1675,6 +1714,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         case developerToolsVisible
         case isMuted
         case keepLoaded
+        case chromeVisibility
         case omnibarVisible
         case backHistoryURLStrings
         case forwardHistoryURLStrings
@@ -1692,6 +1732,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         developerToolsVisible = try container.decode(Bool.self, forKey: .developerToolsVisible)
         isMuted = try container.decodeIfPresent(Bool.self, forKey: .isMuted) ?? false
         keepLoaded = try container.decodeIfPresent(Bool.self, forKey: .keepLoaded) ?? false
+        chromeVisibility = try container.decodeIfPresent(BrowserChromeVisibility.self, forKey: .chromeVisibility)
         omnibarVisible = try container.decodeIfPresent(Bool.self, forKey: .omnibarVisible)
         backHistoryURLStrings = try container.decodeIfPresent([String].self, forKey: .backHistoryURLStrings)
         forwardHistoryURLStrings = try container.decodeIfPresent([String].self, forKey: .forwardHistoryURLStrings)
@@ -1709,6 +1750,8 @@ struct SessionFilePreviewPanelSnapshot: Codable, Sendable {
 /// Marker for a workspace todo pane; the pane has no content of its own (the checklist
 /// persists on the workspace), so the panel `type` plus this empty marker is enough to restore it.
 struct SessionWorkspaceTodoPanelSnapshot: Codable, Sendable {}
+/// Marker for the global notifications pane; its feed lives in the notification store.
+struct SessionNotificationsPanelSnapshot: Codable, Sendable {}
 struct SessionProjectPanelSnapshot: Codable, Sendable {
     var projectPath: String
     var selectedNodePath: String?
@@ -1741,6 +1784,10 @@ struct SessionPanelSnapshot: Codable, Sendable {
     var customTitleSource: Workspace.CustomTitleSource? = nil
     /// Current-build authority when `customTitleSource` uses a downgrade-safe value.
     var customTitleAuthority: Workspace.CustomTitleSource? = nil
+    /// Compatibility marker for builds that do not know the `.remote` enum
+    /// case. Older builds ignore this field and read the encoded source as
+    /// `.user`; newer builds restore the remote provenance from the marker.
+    var customTitleWasRemote: Bool? = nil
     var directory: String?
     var directoryIsTrustedRemoteReport: Bool? = nil
     var directoryRequiresRemoteTrust: Bool? = nil
@@ -1762,6 +1809,7 @@ struct SessionPanelSnapshot: Codable, Sendable {
     var agentSession: SessionAgentSessionPanelSnapshot? = nil
     var project: SessionProjectPanelSnapshot?
     var workspaceTodo: SessionWorkspaceTodoPanelSnapshot? = nil
+    var notificationsPanel: SessionNotificationsPanelSnapshot? = nil
 }
 extension SessionPanelSnapshot: WorkspaceSessionRemoteRestorePanelSnapshot {}
 
@@ -1853,6 +1901,18 @@ struct SessionCanvasPaneSnapshot: Codable, Equatable, Sendable {
     var selectedPanelId: UUID? = nil
 }
 
+/// A cloud machine bound to a workspace through the cmux-tui remote daemon, persisted so a
+/// restored `vm:<id>` workspace stays that machine's workspace (`workspace(forCloudVMID:)`,
+/// the sidebar cloud button's Base reuse, `vm.terminal_open` targeting). Only the binding is
+/// persisted: the pane's link is a process and is not replayed on restore.
+struct SessionCloudVMBindingSnapshot: Codable, Sendable, Equatable {
+    var vmID: String
+    var isBase: Bool
+    /// The machine's cmux-tui workspace this local workspace stands for; absent in
+    /// legacy snapshots and for machine-only bindings (`vm shell`).
+    var remoteWorkspaceID: String? = nil
+}
+
 struct SessionWorkspaceSnapshot: Codable, Sendable {
     /// Original workspace ID captured when the snapshot comes from a live workspace.
     /// Restore reuses this identity when it is present and non-colliding; legacy,
@@ -1866,11 +1926,19 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
     var customTitleSource: Workspace.CustomTitleSource? = nil
     /// Current-build authority when `customTitleSource` uses a downgrade-safe value.
     var customTitleAuthority: Workspace.CustomTitleSource? = nil
+    /// Compatibility marker for builds that do not know the `.remote` enum
+    /// case. Older builds ignore this field and read the encoded source as
+    /// `.user`; newer builds restore the remote provenance from the marker.
+    var customTitleWasRemote: Bool? = nil
     var customDescription: String?
     var customColor: String?
     var customizationDirectory: String? = nil
     var usesWorkspaceDirectoryCustomization: Bool? = nil // `nil` infers a legacy local root.
     var isPinned: Bool
+    /// Whether notification side effects are muted for this workspace. The
+    /// optional form keeps manifests written before per-workspace mute support
+    /// backwards-compatible; missing values restore as `false`.
+    var isMuted: Bool? = nil
     var groupId: UUID? = nil
     var isManuallyUnread: Bool? = nil
     var hasUnreadIndicator: Bool? = nil
@@ -1890,6 +1958,12 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
     var progress: SessionProgressSnapshot?
     var gitBranch: SessionGitBranchSnapshot?
     var remote: SessionRemoteWorkspaceSnapshot?
+    /// cmux-tui cloud machine binding; absent in manifests written before the Cloud tree and for
+    /// workspaces that are not cloud machines.
+    var cloudVM: SessionCloudVMBindingSnapshot? = nil
+    /// Remote surfaces this workspace's panes projected (`SurfaceCatalog`); absent for
+    /// workspaces that only ever showed local panes, so older manifests decode unchanged.
+    var surfaceProjections: [SurfaceProjectionRecord]? = nil
     /// Optional so manifests written before this field decode cleanly.
     var environment: [String: String]? = nil
     /// Manual task-status override raw values and the persisted checklist. Optional-with-nil-default
@@ -1903,22 +1977,49 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
 }
 extension SessionWorkspaceSnapshot: WorkspaceSessionRemoteRestoreSnapshot {}
 
+extension SessionPanelSnapshot {
+    /// The source after applying the forward-compatible remote marker.
+    var effectiveCustomTitleSource: Workspace.CustomTitleSource? {
+        guard customTitle != nil else { return nil }
+        if customTitleWasRemote == true { return .remote }
+        return customTitleSource ?? .user
+    }
+}
+
+extension SessionWorkspaceSnapshot {
+    /// The source after applying the forward-compatible remote marker.
+    var effectiveCustomTitleSource: Workspace.CustomTitleSource? {
+        guard customTitle != nil else { return nil }
+        if customTitleWasRemote == true { return .remote }
+        return customTitleSource ?? .user
+    }
+}
+
 struct SessionWorkspaceGroupSnapshot: Codable, Sendable, Equatable {
     var id: UUID
     var name: String
     var isCollapsed: Bool
-    /// The group's anchor workspace (the group header). The loader prefers
-    /// `anchorMemberIndex` (restore-stable) and treats this field as a hint when
-    /// duplicate/corrupt snapshots force a workspace to mint a fresh UUID.
+    /// The group's anchor identity (the group header). For an empty pinned
+    /// group this is a stable placeholder rather than a live workspace. The
+    /// loader prefers `anchorMemberIndex` (restore-stable) for live groups and
+    /// treats this field as a hint when duplicate/corrupt snapshots force a
+    /// workspace to mint a fresh UUID.
     var anchorWorkspaceId: UUID? = nil
     /// 0-based index of the anchor among the group's members in tab order. Restore-stable:
     /// tab order is preserved across restore, so the same index resolves to the same
     /// logical anchor even when a workspace UUID cannot be reused. Older snapshots
     /// that omit this field fall back to "first member by tab order".
     var anchorMemberIndex: Int? = nil
+    /// `true` when the group intentionally has no live workspace anchor.
+    /// Optional for snapshots written before pinned empty groups were supported.
+    var anchorIsEmpty: Bool? = nil
     var isPinned: Bool? = nil
     var customColor: String? = nil
     var iconSymbol: String? = nil
+    /// Optional caller-owned identity for idempotent group creation.
+    var externalID: String? = nil
+    /// Raw ``WorkspaceGroupAnchorProvenance`` value; absent in older snapshots.
+    var anchorWorkspaceProvenance: String? = nil
 }
 
 extension SessionWorkspaceSnapshot {
