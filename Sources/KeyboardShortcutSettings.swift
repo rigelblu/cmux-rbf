@@ -466,7 +466,8 @@ enum KeyboardShortcutSettings {
                 // plus menu, File menu, and palette can all advertise it.
                 return StoredShortcut(key: "y", command: true, shift: false, option: false, control: false)
             case .newCloudMachine:
-                return StoredShortcut(key: "y", command: true, shift: true, option: false, control: false)
+                // cmux-rbf cm-78.1: Reply owns the released Cmd+Shift+Y default.
+                return .unbound
             case .saveLayoutTemplate:
                 return StoredShortcut(key: "s", command: true, shift: false, option: false, control: true)
             case .openFolder:

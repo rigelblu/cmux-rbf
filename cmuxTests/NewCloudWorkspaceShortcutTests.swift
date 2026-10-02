@@ -2,6 +2,7 @@ import AppKit
 import CmuxSettings
 import Foundation
 import XCTest
+import Testing
 import CmuxCloudMachines
 
 #if canImport(cmux_DEV)
@@ -118,9 +119,9 @@ final class NewCloudWorkspaceShortcutTests: XCTestCase {
         }
     }
 
-    func testNewCloudMachineUsesCommandShiftY() {
+    func testNewCloudMachineShipsUnboundToPreserveReplyShortcut() {
         let action = KeyboardShortcutSettings.Action.newCloudMachine
-        XCTAssertEqual(action.defaultShortcut, StoredShortcut(key: "y", command: true, shift: true, option: false, control: false))
+        XCTAssertTrue(action.defaultShortcut.isUnbound)
         XCTAssertEqual(action.label, "New Cloud Machine")
     }
 
@@ -214,8 +215,7 @@ final class NewCloudWorkspaceShortcutTests: XCTestCase {
             XCTAssertEqual(hints[.newWorkspace]?.keyEquivalentModifierMask, [.command])
             XCTAssertEqual(hints[.newCloudWorkspace]?.keyEquivalent, "y")
             XCTAssertEqual(hints[.newCloudWorkspace]?.keyEquivalentModifierMask, [.command])
-            XCTAssertEqual(hints[.newCloudMachine]?.keyEquivalent, "y")
-            XCTAssertEqual(hints[.newCloudMachine]?.keyEquivalentModifierMask, [.command, .shift])
+            XCTAssertNil(hints[.newCloudMachine])
             XCTAssertEqual(hints[.newTerminal]?.keyEquivalent, "t")
             XCTAssertEqual(hints[.newTerminal]?.keyEquivalentModifierMask, [.command])
             XCTAssertEqual(hints[.newBrowser]?.keyEquivalent, "l")
@@ -437,11 +437,50 @@ final class NewCloudWorkspaceShortcutTests: XCTestCase {
 #endif
     }
 
-    func testCommandPaletteNewMachineAdvertisesShortcut() {
+    func testCommandPaletteNewMachineResolvesShortcutAction() {
         XCTAssertEqual(
             ContentView.commandPaletteShortcutAction(forCommandID: ContentView.commandPaletteCloudNewMachineCommandId),
             .newCloudMachine
         )
     }
 
+}
+
+@MainActor
+@Suite("Released Reply shortcut ownership", .serialized)
+struct CloudMachineReplyShortcutOwnershipTests {
+    @Test("The released Reply key reaches Reply when Cloud is unavailable")
+    func replyKeyIsNotInterceptedByCloud() async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let previousStore = KeyboardShortcutSettings.installIsolatedTestFileStore(prefix: "cloud-reply-ownership")
+            defer { KeyboardShortcutSettings.settingsFileStore = previousStore }
+            KeyboardShortcutSettings.resetShortcut(for: .newCloudMachine)
+            KeyboardShortcutSettings.resetShortcut(for: .focusRightSidebarInReply)
+            let appDelegate = AppDelegate()
+            appDelegate.cloudWorkspaceOperationController = nil
+            appDelegate.debugResetShortcutRoutingStateForTesting(clearFocusedWindowOverride: false)
+            let event = try #require(NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [.command, .shift],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: NSApp.keyWindow?.windowNumber ?? 0,
+                context: nil,
+                characters: "Y",
+                charactersIgnoringModifiers: "y",
+                isARepeat: false,
+                keyCode: 16
+            ))
+            #expect(KeyboardShortcutSettings.Action.focusRightSidebarInReply.defaultShortcut.matches(event: event))
+            #expect(appDelegate.debugHandleCustomShortcut(event: event))
+        }
+    }
+
+    @Test("Settings keeps the new Cloud action available without taking Reply's key")
+    func cloudActionRemainsConfigurableAndUnbound() {
+        #expect(KeyboardShortcutSettings.Action.newCloudMachine.defaultShortcut.isUnbound)
+        #expect(ShortcutAction.newCloudMachine.defaultStroke == nil)
+        #expect(KeyboardShortcutSettings.settingsVisibleActions.contains(.newCloudMachine))
+        #expect(ShortcutAction.settingsVisibleActions.contains(.newCloudMachine))
+    }
 }

@@ -188,9 +188,9 @@ Cmd+Ctrl+= and Cmd+Ctrl+- increase or decrease every terminal in the selected wo
 
 ## New Cloud Workspace shortcut and the plus-button menu
 
-Cmd+Y creates a workspace on the starred default Cloud machine. Cmd+Shift+Y opens the New Machine flow to provision a new machine and attach its first workspace. Rebind or unbind these shortcuts from Settings > Keyboard Shortcuts or with `shortcuts.bindings.newCloudWorkspace` and `shortcuts.bindings.newCloudMachine`. Both are inert unless Cloud Machines is enabled and the account is signed in.
+Cmd+Y creates a workspace on the starred default Cloud machine. New Cloud Machine is unbound by default in cmux RBF: Cmd+Shift+Y opens Reply. Choose New Cloud Machine from the menu or command palette to provision a machine and attach its first workspace. Rebind or unbind these shortcuts from Settings > Keyboard Shortcuts or with `shortcuts.bindings.newCloudWorkspace` and `shortcuts.bindings.newCloudMachine`. Both are inert unless Cloud Machines is enabled and the account is signed in.
 
-When `ui.newWorkspace.contextMenu` is not set, the plus-button menu lists `cmux.newWorkspace` (Cmd+N), `cmux.newCloudWorkspace` (Cmd+Y), `cmux.newCloudMachine` (Cmd+Shift+Y), `cmux.newTerminal` (Cmd+T), and `cmux.newBrowser` (Cmd+Shift+L). Each row shows its current shortcut, so a rebind in Settings or `cmux.json` appears the next time the menu opens; unbound and chord shortcuts show no hint. Cloud rows appear only when Cloud Machines is enabled. A configured menu keeps your order and still shows hints for built-in rows and for actions with a `shortcut`.
+When `ui.newWorkspace.contextMenu` is not set, the plus-button menu lists `cmux.newWorkspace` (Cmd+N), `cmux.newCloudWorkspace` (Cmd+Y), `cmux.newCloudMachine` (unbound), `cmux.newTerminal` (Cmd+T), and `cmux.newBrowser` (Cmd+Shift+L). Each row shows its current shortcut, so a rebind in Settings or `cmux.json` appears the next time the menu opens; unbound and chord shortcuts show no hint. Cloud rows appear only when Cloud Machines is enabled. A configured menu keeps your order and still shows hints for built-in rows and for actions with a `shortcut`.
 
 ## `terminal.textBoxSubmitActions`
 
