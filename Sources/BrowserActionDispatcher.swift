@@ -85,14 +85,15 @@ struct BrowserActionDispatcher {
         }
     }
 
-    private func openInDefaultBrowser(_ panel: BrowserPanel) -> Bool {
-        guard let rawURL = panel.preferredURLStringForOmnibar(),
-              let url = URL(string: rawURL),
-              let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https" else {
-            return false
-        }
-        return NSWorkspace.shared.open(url)
+    func openInDefaultBrowser(
+        _ panel: BrowserPanel,
+        defaultBrowserOpenAction: DefaultBrowserOpenAction = DefaultBrowserOpenAction(),
+        presentAlert: @escaping BrowserAlertPresenter = browserPresentAlert
+    ) -> Bool {
+        panel.openCurrentPageInDefaultBrowser(
+            defaultBrowserOpenAction: defaultBrowserOpenAction,
+            presentAlert: presentAlert
+        )
     }
 
     private func toggleReactGrab(

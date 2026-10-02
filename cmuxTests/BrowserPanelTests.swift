@@ -141,6 +141,79 @@ struct BrowserCurrentPageDefaultBrowserActionTests {
     }
 }
 
+@MainActor
+@Suite("Browser command palette default-browser action", .serialized)
+struct BrowserCommandPaletteDefaultBrowserActionTests {
+    @Test(
+        "Command palette rejects every page rejected by the toolbar",
+        arguments: [
+            "about:blank",
+            "file:///tmp/cm-46.html",
+            "mailto:test@example.com",
+            "cmux-diff-viewer://token/index.html",
+            "http://127.0.0.1:49152/token/diff.html#cmux-diff-viewer",
+            "https:///tmp/cmux.txt"
+        ]
+    )
+    func rejectsIneligiblePages(rawURL: String) throws {
+        let panel = BrowserPanel(
+            workspaceId: UUID(),
+            initialURL: try #require(URL(string: rawURL)),
+            renderInitialNavigation: false
+        )
+        var openedURLs: [URL] = []
+        let opened = BrowserActionDispatcher(appDelegate: AppDelegate()).openInDefaultBrowser(
+            panel,
+            defaultBrowserOpenAction: DefaultBrowserOpenAction { url in
+                openedURLs.append(url)
+                return true
+            }
+        )
+        #expect(!opened)
+        #expect(openedURLs.isEmpty)
+    }
+
+    @Test("Command palette opens the committed page once and keeps it in cmux")
+    func opensCommittedPageOnce() throws {
+        let url = try #require(URL(string: "https://example.com/?cmux=cm-46-palette"))
+        let panel = BrowserPanel(workspaceId: UUID(), initialURL: url, renderInitialNavigation: false)
+        var openedURLs: [URL] = []
+        let opened = BrowserActionDispatcher(appDelegate: AppDelegate()).openInDefaultBrowser(
+            panel,
+            defaultBrowserOpenAction: DefaultBrowserOpenAction { url in
+                openedURLs.append(url)
+                return true
+            }
+        )
+        #expect(opened)
+        #expect(openedURLs == [url])
+        #expect(panel.currentURL == url)
+    }
+
+    @Test("Command palette uses the toolbar refusal recovery without retrying")
+    func refusalUsesSharedRecovery() throws {
+        let url = try #require(URL(string: "https://example.com/refused"))
+        let panel = BrowserPanel(workspaceId: UUID(), initialURL: url, renderInitialNavigation: false)
+        var openedURLs: [URL] = []
+        var alerts: [String] = []
+        let opened = BrowserActionDispatcher(appDelegate: AppDelegate()).openInDefaultBrowser(
+            panel,
+            defaultBrowserOpenAction: DefaultBrowserOpenAction { url in
+                openedURLs.append(url)
+                return false
+            },
+            presentAlert: { alert, _, completion, _ in
+                alerts.append(alert.messageText)
+                completion(.alertFirstButtonReturn)
+            }
+        )
+        #expect(!opened)
+        #expect(openedURLs == [url])
+        #expect(alerts == [String(localized: "browser.externalOpenFailure.title", defaultValue: "Cannot Open Link")])
+        #expect(panel.currentURL == url)
+    }
+}
+
 private func drainBrowserPanelMainQueue() {
     let expectation = XCTestExpectation(description: "drain main queue")
     DispatchQueue.main.async {
