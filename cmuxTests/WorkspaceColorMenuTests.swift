@@ -11,44 +11,39 @@ import Testing
 @MainActor
 struct WorkspaceColorMenuTests {
     @Test
-    func namedPaletteColorMarksTheMatchingMenuItem() {
-        let menu = NSMenu()
-        let palette = [
-            WorkspaceTabColorEntry(name: "Teal", hex: "#006B6B"),
-            WorkspaceTabColorEntry(name: "Blue", hex: "#1565C0"),
-        ]
-
-        SidebarWorkspaceRowColorMenu(
-            currentColorHex: "  #006b6b ",
-            colorScheme: .light
-        ).addPaletteItems(
-            to: menu,
-            palette: palette,
-            apply: { _ in }
+    func namedPaletteColorMarksTheMatchingMenuItem() throws {
+        let palette = WorkspaceTabColorSettings.labeledPaletteEntries()
+        let selected = try #require(palette.first)
+        let menu = SidebarColorSubmenu.make(
+            targetHexes: ["  \(selected.hex.lowercased()) "],
+            apply: { _ in },
+            promptCustomColor: {}
         )
-
-        #expect(menu.items.map(\.state) == [.on, .off])
-        #expect(menu.items.map(\.title) == ["Teal", "Blue"])
-        #expect(menu.items.allSatisfy { $0.image != nil })
+        #expect(menu.items.count >= palette.count + 3)
+        for (entry, item) in zip(palette, menu.items.dropFirst(3)) {
+            #expect(item.title == entry.displayName)
+            #expect(item.state == (entry.hex == selected.hex ? .on : .off))
+            #expect(item.image != nil)
+        }
     }
 
     @Test
-    func unmatchedCustomColorLeavesNamedPaletteItemsUnmarked() {
-        let menu = NSMenu()
-        let palette = [
-            WorkspaceTabColorEntry(name: "Teal", hex: "#006B6B"),
-            WorkspaceTabColorEntry(name: "Blue", hex: "#1565C0"),
-        ]
-
-        SidebarWorkspaceRowColorMenu(
-            currentColorHex: "#123456",
-            colorScheme: .light
-        ).addPaletteItems(
-            to: menu,
-            palette: palette,
-            apply: { _ in }
+    func unmatchedCustomColorLeavesNamedPaletteItemsUnmarked() throws {
+        let palette = WorkspaceTabColorSettings.labeledPaletteEntries()
+        #expect(!palette.isEmpty)
+        let usedHexes = Set(palette.map { $0.hex.uppercased() })
+        let customHex = try #require((0..<0x1000000).lazy.map {
+            String(format: "#%06X", $0)
+        }.first { !usedHexes.contains($0) })
+        let menu = SidebarColorSubmenu.make(
+            targetHexes: [customHex],
+            apply: { _ in },
+            promptCustomColor: {}
         )
-
-        #expect(menu.items.allSatisfy { $0.state == .off })
+        #expect(menu.items.count >= palette.count + 3)
+        for (entry, item) in zip(palette, menu.items.dropFirst(3)) {
+            #expect(item.title == entry.displayName)
+            #expect(item.state == .off)
+        }
     }
 }
