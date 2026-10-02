@@ -11,6 +11,8 @@
 #   BUILT_PRODUCTS_DIR                output directory for libwg-go.a
 #   CMUX_WIREGUARD_GO_OUTPUT          explicit output path (overrides the above)
 #   TARGET_TEMP_DIR                   per-arch intermediates
+#   CMUX_WIREGUARD_GO_CACHE_DIR        Go workspace/module/build cache root
+#                                     (default: per-target intermediates)
 #   MACOSX_DEPLOYMENT_TARGET          minimum macOS (default 14.0)
 #   SDKROOT                           macOS SDK (default: xcrun --show-sdk-path)
 #   CONFIGURATION                     Release always requires a real toolchain
@@ -36,6 +38,12 @@ CONFIGURATION="${CONFIGURATION:-Debug}"
 MIN_MACOS="${MACOSX_DEPLOYMENT_TARGET:-14.0}"
 OUTPUT="${CMUX_WIREGUARD_GO_OUTPUT:-${BUILT_PRODUCTS_DIR:-${GO_SRC_DIR}/out}/libwg-go.a}"
 WORK_DIR="${TARGET_TEMP_DIR:-${GO_SRC_DIR}/.tmp}/wireguard-go"
+# cmux-rbf: own the engine's caches within its build intermediates instead of
+# inheriting a shell's GOPATH/GOMODCACHE/GOCACHE. A fresh login shell can expose
+# /go as GOPATH, where macOS refuses writes. All entrypoints use this phase;
+# a runner-only environment override hides the failure from `make run`.
+# Preserve this cache isolation on upstream sync.
+GO_CACHE_DIR="${CMUX_WIREGUARD_GO_CACHE_DIR:-${WORK_DIR}/go-cache}"
 
 # Xcode build phases do not inherit a login-shell PATH.
 export PATH="/usr/local/go/bin:/opt/homebrew/bin:/usr/local/bin:${HOME}/go/bin:${PATH}"
@@ -105,6 +113,9 @@ if [[ -n "$GO_BIN" && -x "$GO_BIN" ]]; then
     (
       cd "$GO_SRC_DIR"
       env \
+        GOPATH="$GO_CACHE_DIR" \
+        GOMODCACHE="$GO_CACHE_DIR/pkg/mod" \
+        GOCACHE="$GO_CACHE_DIR/build" \
         CGO_ENABLED=1 \
         GOOS=darwin \
         GOARCH="$goarch" \
