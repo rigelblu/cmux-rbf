@@ -154,7 +154,7 @@ import Testing
 
     @Test func everySelectedWorkspaceChangeUsesTheSharedRevealHook() throws {
         let manager = TabManager(autoWelcomeIfNeeded: false)
-        let selected = manager.addTab(select: false)
+        let selected = try #require(manager.addTab(select: false))
         selected.customColor = "#ABCDEF"
         let state = SidebarState(collapsedColorSectionHexes: ["#ABCDEF"])
         manager.revealSelectedWorkspaceInSidebar = { workspace in
@@ -190,9 +190,9 @@ import Testing
     @Test func legalReorderPermutesOnlySectionMemberSlots() throws {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         let first = try #require(manager.selectedWorkspace)
-        let nonmember = manager.addTab(select: false)
-        let second = manager.addTab(select: false)
-        let third = manager.addTab(select: false)
+        let nonmember = try #require(manager.addTab(select: false))
+        let second = try #require(manager.addTab(select: false))
+        let third = try #require(manager.addTab(select: false))
 
         #expect(manager.reorderWorkspace(tabId: nonmember.id, after: first.id))
 

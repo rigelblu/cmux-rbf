@@ -1,4 +1,5 @@
 import AppKit
+import CmuxFoundation
 import Foundation
 import SwiftUI
 import Testing
@@ -55,13 +56,35 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
         #expect(resolvedTopologies == [[firstWindowId, laterWindowId]])
     }
 
+    @Test
     @MainActor
-    private static func rowSnapshot() throws -> SidebarWorkspaceRowSnapshot {
+    func transientDropSessionStateDoesNotInvalidateWorkspaceRowSnapshot() throws {
+        let workspaceId = UUID()
+        let idleSnapshot = try Self.rowSnapshot(workspaceId: workspaceId)
+        let activeSnapshot = try Self.rowSnapshot(workspaceId: workspaceId)
+        let planner = SidebarDropPlanner()
+
+        #expect(!planner.shouldCollectWorkspaceDropTargets(draggedTabId: nil))
+        #expect(
+            planner.shouldCollectWorkspaceDropTargets(
+                draggedTabId: nil,
+                isBonsplitWorkspaceDropActive: true
+            )
+        )
+
+        #expect(
+            idleSnapshot == activeSnapshot,
+            "A parent-owned drop session must not invalidate every workspace row."
+        )
+    }
+
+    @MainActor
+    private static func rowSnapshot(workspaceId: UUID = UUID()) throws -> SidebarWorkspaceRowSnapshot {
         let suiteName = "SidebarWorkspaceContextMenuWindowTargetsTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         return SidebarWorkspaceRowSnapshot(
-            workspaceId: UUID(),
+            workspaceId: workspaceId,
             groupId: nil,
             isColorSectionMember: false,
             index: 0,
@@ -85,7 +108,6 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
             isBeingDragged: false,
             topDropIndicatorVisible: false,
             bottomDropIndicatorVisible: false,
-            isBonsplitWorkspaceDropActive: false,
             settings: SidebarTabItemSettingsSnapshot(defaults: defaults),
             isChecklistExpanded: false,
             checklistAddFieldActivationToken: 0,
@@ -105,6 +127,7 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
                 canMarkRead: false,
                 canMarkUnread: false,
                 hasLatestNotification: false,
+                allNotificationsMuted: false,
                 notifications: [],
                 targetColorHexes: []
             )
@@ -145,6 +168,8 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
             markRead: { _ in },
             markUnread: { _ in },
             clearLatestNotifications: { _ in },
+            currentNotificationsMuted: { _ in false },
+            setNotificationsMuted: { _, _ in },
             openNotification: { _ in },
             copyWorkspaceLinks: { _ in },
             openPullRequest: { _ in },
@@ -160,18 +185,14 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
                 removeAttachment: { _, _ in },
                 openAttachments: { _, _ in }
             ),
-            onDragStart: { NSItemProvider() },
-            bonsplitSourceWorkspaceId: { _ in nil },
-            moveBonsplitTabToWorkspace: { _, _ in false },
-            syncAfterBonsplitDrop: {},
-            selectAfterBonsplitDrop: {},
             onToggleChecklistExpansion: {},
             onConsumeChecklistAddFieldActivation: {},
             onChecklistPopoverPresentedChange: { _ in },
             onContextMenuAppear: {},
             onContextMenuDisappear: {},
             onPointerFrameChange: { _ in },
-            onPointerFrameDisappear: {}
+            onPointerFrameDisappear: {},
+            onPointerDragEligibilityChange: { _ in }
         )
     }
 }

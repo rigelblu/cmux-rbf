@@ -156,6 +156,7 @@ final class MarkdownReplyLineBreakTests {
             markdown: "# Existing\n",
             theme: MarkdownWebTheme.resolve(backgroundColor: .windowBackgroundColor),
             backgroundColor: .windowBackgroundColor,
+            isVisibleInUI: true,
             panelId: UUID(),
             workspaceId: UUID(),
             filePath: "",

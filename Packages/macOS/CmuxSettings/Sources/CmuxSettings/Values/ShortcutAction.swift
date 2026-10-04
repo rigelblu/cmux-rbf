@@ -21,6 +21,8 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case toggleSidebar
     case newTab
     case newBrowserWorkspace
+    case newCloudWorkspace
+    case newCloudMachine
     case saveLayoutTemplate
     case openFolder
     case reopenPreviousSession
@@ -33,6 +35,10 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case jumpToUnread
     case toggleUnread
     case markOldestUnreadAndJumpNext
+    /// Marks every notification read without removing notification rows.
+    case markAllNotificationsRead
+    /// Removes every notification row and its unread indicators.
+    case clearAllNotifications
     case focusRightSidebar
     case focusRightSidebarInReply
     case switchRightSidebarToFiles
@@ -41,6 +47,7 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case switchRightSidebarToFeed
     case switchRightSidebarToDock
     case insertReplyLabelByNumber
+    case switchRightSidebarToMachines
     case triggerFlash
 
     // MARK: Navigation
@@ -65,6 +72,10 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case selectSurfaceByNumber
     case nextSidebarTab
     case prevSidebarTab
+    /// Selects the next non-anchor workspace in the focused workspace group.
+    case nextSidebarTabInGroup
+    /// Selects the previous non-anchor workspace in the focused workspace group.
+    case prevSidebarTabInGroup
     /// Moves the selected workspace one position up within its pin tier.
     case moveWorkspaceUp
     /// Moves the selected workspace one position down within its pin tier.
@@ -126,6 +137,14 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case equalizeSplitWidths
     /// Equalizes only stacked splits (row heights).
     case equalizeSplitHeights
+    /// Moves the focused pane's controlling divider left by one resize step.
+    case resizePaneLeft = "resize-pane-left"
+    /// Moves the focused pane's controlling divider right by one resize step.
+    case resizePaneRight = "resize-pane-right"
+    /// Moves the focused pane's controlling divider up by one resize step.
+    case resizePaneUp = "resize-pane-up"
+    /// Moves the focused pane's controlling divider down by one resize step.
+    case resizePaneDown = "resize-pane-down"
     case splitBrowserRight
     case splitBrowserDown
     case toggleRightSidebar = "toggleFileExplorer"
@@ -283,7 +302,8 @@ extension ShortcutAction {
     public var defaultFocusWhenClause: ShortcutWhenClause {
         switch self {
         case .switchRightSidebarToFiles, .switchRightSidebarToFind,
-             .switchRightSidebarToSessions, .switchRightSidebarToFeed, .switchRightSidebarToDock:
+             .switchRightSidebarToSessions, .switchRightSidebarToFeed, .switchRightSidebarToDock,
+             .switchRightSidebarToMachines:
             return .atom(.sidebarFocus)
         case .fileExplorerOpenSelection, .fileExplorerOpenSelectionFinderAlias:
             return .atom(.sidebarFocus)

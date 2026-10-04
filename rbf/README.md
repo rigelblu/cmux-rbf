@@ -5,6 +5,15 @@ title: "Cmux RBF"
 This directory holds this flavour's docs, scripts, changelog, and version metadata. The upstream cmux README and changelog remain at the repository root.
 
 # 🔵⋯ Use
+
+Dev builds and tests use the existing `cmux Dev Signing` certificate by default, including noninteractive agent shells. `CMUX_DEV_CODESIGN_IDENTITY` selects another existing identity. Missing identities or failed stable signing stop the build instead of silently reverting to ad-hoc signing and invalidating permissions.
+
+New build IDs also need the terminal running `make` to have Full Disk Access so the preseed can copy your existing approved dev grants. Without it, builds still work, but a new ID may ask for external-drive access. Run candidate builds from their source checkout with `make -C <absolute-checkout-path> run`; `BUILD_ID` only names the output slot.
+
+`make run` and tagged `reload.sh --launch` start the native app directly under the invoking terminal. When that terminal already has Full Disk Access, tagged builds retain its permission context: you do not need to add each build ID to FDA. Tags still keep their own bundle IDs, sockets and saved workspaces, and the app survives the launching shell closing. Launch from the approved terminal to use this behavior.
+
+An independent Finder launch has its own permission context. The “access data from other apps” consent expires when the app quits, so it can appear there without an FDA grant for that app; preseed cannot make this session consent permanent. See [Apple's privacy explanation](https://developer.apple.com/videos/play/wwdc2023/10053/). Stable signing also preserves any FDA grant you already gave an app. If that grant predates stable signing, removing and re-adding the current app refreshes its obsolete signing requirement.
+
 This is for my personal use and shared publicly for those curious. I'm not accepting issues or contributions here.
 
 # 🔵⋯ Context
@@ -102,7 +111,7 @@ The flavour installs as **cmux RBF** in `/Applications`, with its own green `RBF
 - **You will sign in once, by hand.** Auth lives in the keychain under a service name derived from the bundle id, so a separate app cannot see it by construction. No file copy reaches it.
 - macOS permissions survive every reinstall, because the install signs with a stable identity rather than ad-hoc. An ad-hoc signature changes the designated requirement each time, which silently drops every grant.
 - **Running `make install-rbf` from inside cmux RBF works.** The build runs where you are; the 2-second swap hands off to a detached helper that quits the app — ending every shell and agent it hosts — swaps, relaunches the new build, and confirms by notification, with the transcript in `~/Library/Logs/cmux-rbf/install.log`. From any other terminal the whole install runs inline with live output, exactly as before.
-- **About still reports upstream's version** (`0.64.20 / 100`) — both version keys were inherited at the fork point. A fork-owned version key (`RBFVersion`) is already written into the installed bundle, but nothing reads it yet; until `#cm-17.3` lands that reader, `env | grep CMUX_BUNDLE_ID` answers "which cmux am I in?"; `com.cmuxterm.app.rbf` is the flavour.
+- **About still reports upstream's version** — both version keys were inherited at the fork point. A fork-owned version key (`RBFVersion`) is already written into the installed bundle, but nothing reads it yet; until `#cm-17.3` lands that reader, `env | grep CMUX_BUNDLE_ID` answers "which cmux am I in?"; `com.cmuxterm.app.rbf` is the flavour.
 - If a state clone half-completes, `rbf/scripts/migrate-rbf-state.sh` is the way back — it reports and guards each store separately, and re-clones only what is missing.
 
 ## 🟠⋯ Resume an agent on the model and effort you left it on
@@ -284,3 +293,19 @@ make help     # everything else, including disk cleanup and install
 You never pick a build-id — it comes from your branch (`tom-rigelblu/cm-19` → `cm-19`) and decides the DerivedData directory, the debug socket, the app name and the bundle id suffix, so two builds never collide. `make -C <path> run` builds a different checkout, which is how a worktree names its own build rather than someone else's.
 
 `make install-rbf` installs the result as **cmux RBF** in `/Applications`; `make install-rbf-plan` prints that plan and writes nothing.
+
+For a candidate alongside your regular app, use `make install-dogfood`.
+It builds the current checkout as **cmux RBF (dogfood)**, with a persistent
+dogfood identity, its own socket and saved state, and a separate Release build
+directory. `make install-dogfood-plan` previews the destination and source
+revision without building or writing. First install copies regular RBF's saved
+windows and workspaces; updates preserve dogfood's own state. Regular RBF is
+only read. The dogfood app shares `~/.config/cmux/cmux.json` with other cmux
+apps and requires its own sign-in.
+
+If a first install was interrupted, quit dogfood and run
+`make migrate-dogfood-state` to fill missing stores; `migrate-dogfood-state-plan`
+previews it. An explicit refresh of existing stores uses
+`rbf/scripts/migrate-rbf-state.sh --dogfood --force`; it backs up dogfood's
+existing stores before replacing them and refuses while dogfood is running.
+This command does not cut a release or move a bookmark.

@@ -1,5 +1,5 @@
 {
-  "originHash" : "a44cf039348606fc14d5a8b392911aa9d2903db44b1aee29f12ff0a736caf38d",
+  "originHash" : "94c869e41b811afe0bc2e93524646e8e7c3cfd8de5343c096271fd898748d8e9",
   "pins" : [
     {
       "identity" : "aexml",
@@ -11,12 +11,21 @@
       }
     },
     {
+      "identity" : "highlightr",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/raspu/Highlightr.git",
+      "state" : {
+        "revision" : "05e7fcc63b33925cd0c1faaa205cdd5681e7bbef",
+        "version" : "2.3.0"
+      }
+    },
+    {
       "identity" : "iroh-ffi",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/manaflow-ai/iroh-ffi.git",
       "state" : {
-        "revision" : "20f0e67cc3cb5179e816ef45b7a7ec5c8c58b0e0",
-        "version" : "1.0.2-cmux.7"
+        "revision" : "7bcc93b4255935546df04f66f22cf130972212e7",
+        "version" : "1.0.2-cmux.7.ios17.1"
       }
     },
     {
@@ -60,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sparkle-project/Sparkle",
       "state" : {
-        "revision" : "d46d456107feacc80711b21847b82b07bd9fb46e",
-        "version" : "2.9.3"
+        "revision" : "79bc9e872948e47877e76f194cb0c8e0412b0b90",
+        "version" : "2.9.5"
       }
     },
     {
@@ -123,8 +132,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tuist/XcodeProj.git",
       "state" : {
-        "revision" : "3259a01e7193d55174c2f370d72e3ff4c277d8fd",
-        "version" : "9.15.0"
+        "revision" : "de37089f9c739bfc9fe8d76cd8755e26848aeefe",
+        "version" : "9.15.1"
       }
     }
   ],

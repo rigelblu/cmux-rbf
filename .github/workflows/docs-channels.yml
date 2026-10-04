@@ -1,10 +1,8 @@
 name: Deploy docs channels
 
 on:
-  push:
-    branches: [main]
-    paths: ["web/**", "CHANGELOG.md"]
-    tags: ["v*"]
+  # cmux-rbf: explicit dispatch only; no automatic deployment in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

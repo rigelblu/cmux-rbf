@@ -1,7 +1,7 @@
 name: Notify IndexNow
 
 on:
-  deployment_status:
+  # cmux-rbf: explicit dispatch only; no automatic deployments in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

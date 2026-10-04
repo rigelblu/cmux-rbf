@@ -879,6 +879,7 @@ struct ReplyPanelView: View {
             ),
             theme: pageTheme,
             backgroundColor: pageCanvas,
+            isVisibleInUI: true,
             // The renderer keys its WebKit identity off these, so they must
             // stay stable across SwiftUI churn or the page reloads on every
             // rebuild. The reply's own id would reload the page on each new

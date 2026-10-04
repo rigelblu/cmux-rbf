@@ -1,8 +1,8 @@
 name: sdk bootstrap crates
 
 on:
-  repository_dispatch:
-    types: [sdk-bootstrap-crates]
+  # cmux-rbf: explicit dispatch only; no automatic publishing in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

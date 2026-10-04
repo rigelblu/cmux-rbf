@@ -2,6 +2,9 @@ import AppKit
 import SwiftUI
 import CmuxFoundation
 
+/// Re-renders the app's command menus when state they read outside SwiftUI changes.
+/// The History menu refreshes through `HistoryMenuCoordinator`; this keeps the
+/// View menu's zoom items' enablement current (#cm-16).
 @MainActor
 final class FocusHistoryMenuInvalidator: ObservableObject {
     @Published private(set) var revision: UInt64 = 0

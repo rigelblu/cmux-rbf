@@ -31,6 +31,7 @@ extension KeyboardShortcutSettings.Action {
              .focusLeft, .focusRight, .focusUp, .focusDown,
              .focusPreviousPane, .focusNextPane,
              .splitLeft, .splitRight, .splitUp, .splitDown, .toggleSplitZoom,
+             .resizePaneLeft, .resizePaneRight, .resizePaneUp, .resizePaneDown,
              .equalizeSplits, .equalizeSplitWidths, .equalizeSplitHeights,
              .splitBrowserRight, .splitBrowserDown,
              .openBrowser, .focusBrowserAddressBar,
@@ -71,12 +72,13 @@ extension KeyboardShortcutSettings.Action {
         case .openSettings, .reloadConfiguration,
              .showHideAllWindows, .globalSearch,
              .newWindow, .closeWindow, .toggleFullScreen, .quit,
-             .toggleSidebar, .newTab, .newBrowserWorkspace,
+             .toggleSidebar, .newTab, .newBrowserWorkspace, .newCloudWorkspace, .newCloudMachine,
              .saveLayoutTemplate, .openFolder,
              .reopenPreviousSession, .goToWorkspace,
              .commandPalette, .sendFeedback,
              .showNotifications, .jumpToUnread, .toggleUnread,
              .markOldestUnreadAndJumpNext,
+             .markAllNotificationsRead, .clearAllNotifications,
              .focusRightSidebar,
              .focusRightSidebarInReply,
              .switchRightSidebarToFiles,
@@ -88,7 +90,9 @@ extension KeyboardShortcutSettings.Action {
              // it is live only while the caret sits in a note field, which the
              // Dock's surfaces never contain.
              .insertReplyLabelByNumber,
+             .switchRightSidebarToMachines,
              .nextSidebarTab, .prevSidebarTab,
+             .nextSidebarTabInGroup, .prevSidebarTabInGroup,
              .moveWorkspaceUp, .moveWorkspaceDown,
              .selectWorkspaceByNumber,
              .renameWorkspace, .editWorkspaceDescription,
@@ -186,7 +190,11 @@ extension AppDelegate {
                   preferredWindow: preferredWindow
               ),
               let pane = store.resolvePane(requestedPaneID: nil),
-              let panelId = store.newSurface(kind: kind, inPane: pane, focus: true) else {
+              let panelId = store.newSurfaceFromDockAffordance(
+                  kind: kind,
+                  inPane: pane,
+                  window: preferredWindow
+              ) else {
             return nil
         }
         if focusAddressBar, kind == .browser, let browser = store.browserPanel(for: panelId) {
@@ -215,13 +223,25 @@ extension AppDelegate {
         ) else {
             return false
         }
-        return store.newSplit(
+        store.noteKeyboardFocusIntent(window: preferredWindow)
+        guard let panelId = store.newSplit(
             kind: kind,
             orientation: direction.orientation,
             insertFirst: direction.insertFirst,
             sourcePanelId: store.focusedPanelId,
-            focus: true
-        ) != nil
+            focus: false
+        ) else {
+            return false
+        }
+        store.focusPanelFromDockInteraction(
+            panelId,
+            window: preferredWindow
+        )
+        if kind == .browser,
+           let browser = store.browserPanel(for: panelId) {
+            _ = focusBrowserAddressBar(in: browser)
+        }
+        return true
     }
 
     /// Executes a semantic surface/focus command when the Dock owns keyboard

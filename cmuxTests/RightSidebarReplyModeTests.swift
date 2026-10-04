@@ -30,8 +30,8 @@ struct RightSidebarReplyModeTests {
     func replyIsAvailableWithBetaFeaturesOff() {
         // An unavailable mode beeps instead of opening. Feed and Dock are the
         // gated pair; Reply ships on, like Files/Find/Vault.
-        #expect(RightSidebarMode.reply.isAvailable(feedEnabled: false, dockEnabled: false))
-        #expect(RightSidebarMode.availableModes(feedEnabled: false, dockEnabled: false).contains(.reply))
+        #expect(RightSidebarMode.reply.isAvailable(feedEnabled: false, dockEnabled: false, machinesEnabled: false))
+        #expect(RightSidebarMode.availableModes(feedEnabled: false, dockEnabled: false, machinesEnabled: false).contains(.reply))
     }
 
     @Test("Reply promotes to a pane, and both palette descriptors exist for it")

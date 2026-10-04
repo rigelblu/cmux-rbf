@@ -38,16 +38,19 @@ source "$SCRIPT_DIR/lib/rbf-install-target.sh"
 RECLONE=0
 FORCE=0
 DRY_RUN=0
+INSTALL_CHANNEL=rbf
 
 usage() {
   cat <<'USAGE'
-Usage: rbf/scripts/migrate-rbf-state.sh [--reclone] [--force] [--dry-run]
+Usage: rbf/scripts/migrate-rbf-state.sh [--dogfood] [--reclone] [--force] [--dry-run]
 
 Copy bundle-id-scoped state from upstream's cmux into the RBF channel.
 Run with no flags, it copies only stores that are still empty -- so it is safe
 after an interrupted first install and does nothing on a healthy one.
 
 Options:
+  --dogfood   Copy regular RBF state into dogfood, using the fixed channel ids.
+              With --force, back up existing dogfood state before replacing it.
   --reclone   Re-copy stores that are empty. Same as no flags; state it when
               recovering so the intent is on the record.
   --force     Overwrite stores that already hold RBF data. Destructive: it
@@ -62,16 +65,18 @@ while [[ $# -gt 0 ]]; do
     --reclone) RECLONE=1; shift ;;
     --force)   FORCE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
+    --dogfood) INSTALL_CHANNEL=dogfood; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'error: unknown option: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-rbf_channel_load "$SCRIPT_DIR/lib" || exit 1
+rbf_channel_load "$SCRIPT_DIR/lib" "$INSTALL_CHANNEL" || exit 1
 rbf_assert_safe_target || exit 1
 
 APP_SUPPORT="$HOME/Library/Application Support/cmux"
 SRC_ID="$UPSTREAM_BUNDLE_ID"
+[[ "$INSTALL_CHANNEL" == dogfood ]] && SRC_ID="$RBF_PROTECTED_BUNDLE_ID"
 DST_ID="$RBF_BUNDLE_ID"
 
 # The bundle-id-scoped stores. They land independently, so the guard is
@@ -158,12 +163,47 @@ copy_store() {
 # above, so editing the record would have moved the install and left this guard
 # watching a path nothing runs from -- it would have passed, always, silently.
 # rbf_physical_path matches what the installer's own pgrep uses.
+# Reuse literal-path process matching, including parentheses in dogfood's name.
+source "$SCRIPT_DIR/lib/rbf-swap.sh"
 RBF_RUNNING_PATH="$(rbf_physical_path "$RBF_INSTALL_PATH")"
-if [[ $DRY_RUN -eq 0 ]] && pgrep -f "$RBF_RUNNING_PATH/Contents/MacOS/" >/dev/null 2>&1; then
-  printf 'error: cmux RBF is running — quit it first.\n' >&2
+if [[ $DRY_RUN -eq 0 ]] && rbf_swap_app_running "$RBF_RUNNING_PATH"; then
+  printf 'error: %s is running — quit it first.\n' "$RBF_APP_NAME" >&2
   printf '       It rewrites its session snapshot on quit, which would undo\n' >&2
   printf '       this migration without any error being reported.\n' >&2
   exit 1
+fi
+
+# A missing/unusable regular layout cannot seed a dogfood session.
+if [[ "$INSTALL_CHANNEL" == dogfood ]]; then
+  python3 - "$(store_src 3)" <<'PY_SNAPSHOT'
+import json,sys
+try:
+    with open(sys.argv[1]) as f:
+        snapshot=json.load(f)
+    assert snapshot.get('version') == 1 and snapshot.get('windows')
+except Exception:
+    raise SystemExit('error: regular RBF has no usable saved session to copy')
+PY_SNAPSHOT
+  [[ $? -eq 0 ]] || exit 1
+fi
+
+# --force is an explicit refresh. Preserve all destination stores before
+# replacing any one of them, so a failed or unwanted refresh is recoverable.
+if [[ "$INSTALL_CHANNEL" == dogfood && $FORCE -eq 1 && $DRY_RUN -eq 0 ]]; then
+  BACKUP_ROOT="$APP_SUPPORT/migration-backups/$DST_ID"
+  mkdir -p "$BACKUP_ROOT" || exit 1
+  BACKUP_DIR="$(mktemp -d "$BACKUP_ROOT/seed.XXXXXX")" || exit 1
+  chmod 700 "$BACKUP_DIR" || exit 1
+  for idx in 0 1 2 3 4; do
+    if store_present "$idx"; then
+      if [[ "$idx" -eq 0 ]]; then
+        defaults export "$DST_ID" "$BACKUP_DIR/defaults.plist" || exit 1
+      else
+        ditto "$(store_dst "$idx")" "$BACKUP_DIR/store-$idx" || exit 1
+      fi
+    fi
+  done
+  printf '  backup    %s\n' "$BACKUP_DIR"
 fi
 
 printf 'migrate-rbf-state: %s -> %s\n' "$SRC_ID" "$DST_ID"

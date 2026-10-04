@@ -21,7 +21,7 @@ extension Workspace {
     /// eligibility for every workspace on every render pass, on top of the
     /// per-row sampling that was already there), which is what surfaced the
     /// duplication in a cold review.
-    func taskStatusSignals() -> WorkspaceTaskStatusSignals {
+    func taskStatusSignals(orderedPanelIds: [UUID]? = nil) -> WorkspaceTaskStatusSignals {
         taskStatusSignals(orderedPanelIds: sidebarOrderedPanelIds())
     }
 
@@ -35,6 +35,7 @@ extension Workspace {
                 if state == .running { anyAgentRunning = true }
             }
         }
+        let orderedPanelIds = orderedPanelIds ?? sidebarOrderedPanelIds()
         let pullRequests = sidebarPullRequestsInDisplayOrder(orderedPanelIds: orderedPanelIds)
         return WorkspaceTaskStatusSignals(
             anyAgentNeedsInput: anyAgentNeedsInput,

@@ -7,6 +7,22 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 # 🔵⋯ [Unreleased]
 (empty)
 
+# 🔵⋯ v0.28.0 (2026-10-04) — #cm-97.1
+
+*Run upstream cmux v0.64.25 while keeping the fork's workflow. Candidate installs have independent saved state and stable permissions.*
+
+## 🟠⋯ Changed for End Users
+- Take upstream's fixes and features through `v0.64.25` (2026-09-17), preserving fork behavior including Reply's `⌘⇧Y`, browser command-palette actions and workspace colour menus
+- Try the candidate through `make install-dogfood` without replacing regular RBF. Its first install seeds the regular RBF layout; subsequent installs preserve the candidate's independent workspaces and layout
+- Dev builds use the existing stable signing identity even in noninteractive shells. `make run` launches directly under the invoking terminal, retaining its approved Full Disk Access without granting each new build ID separately; Finder launches have their own permission context
+
+## 🟠⋯ Changed for Developers
+- Preserve the real upstream merge ancestry and pin the tested Ghostty merge now published in `rigelblu/ghostty-rbf` through PR #4
+- Retain the fork's no-CI/no-automatic-deployment behavior: upstream workflow triggers are manual-only or reusable; existing manual inputs and job definitions remain intact
+- Keep cloud credential setup out of ordinary tagged launches, isolate Go build caches, and repair fork test compatibility with the synced APIs
+- Tom completed personal dogfood and accepted this release on 2026-10-04. The full no-new-test-failures comparison remains **FAIL / incomplete**, explicitly accepted rather than reported green. Existing evidence and baseline results are retained
+- The proposed one-command future sync (`cm-97.2`) is deferred and is not included in this release
+
 # 🔵⋯ v0.27.6 (2026-09-23) — #cm-16
 
 *The View menu's Zoom In, Zoom Out and Actual Size now act on whichever pane you're in, and grey out when there's nothing for them to do.*

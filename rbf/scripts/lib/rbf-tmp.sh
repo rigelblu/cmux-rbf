@@ -20,14 +20,16 @@
 # Resolve (and create) a directory for throwaway artifacts.
 #   rbf_tmp_dir                      -> <base>
 #   rbf_tmp_dir cmux-rbf/xcresults   -> <base>/cmux-rbf/xcresults
+#   rbf_tmp_dir subdir --no-create  -> resolve only, for read-only previews
 rbf_tmp_dir() {
   local subdir="${1:-}"
+  local create="${2:-}"
   # The default is assigned on its own line, NOT as "${RBF_EXTERNAL_DRIVE:-…}".
   # bash cannot parse an apostrophe inside a ${var:-word} default — "Tom's HDD"
   # there is a hard syntax error, while zsh accepts it happily. Since dev.sh
   # runs under bash and an interactive check runs under zsh, the inline form
   # tests clean and then breaks every `make test`.
-  local drive="${RBF_EXTERNAL_DRIVE:-}"
+  local drive="${RBF_EXTERNAL_DRIVE:-${EXTERNAL_DRIVE:-}}"
   [[ -n "$drive" ]] || drive="/Volumes/Tom's HDD"
   local base
 
@@ -40,10 +42,12 @@ rbf_tmp_dir() {
 
   [[ -n "$subdir" ]] && base="$base/$subdir"
 
-  mkdir -p "$base" || {
-    echo "rbf-tmp: could not create '$base'" >&2
-    return 1
-  }
+  if [[ "$create" != "--no-create" ]]; then
+    mkdir -p "$base" || {
+      echo "rbf-tmp: could not create '$base'" >&2
+      return 1
+    }
+  fi
 
   printf '%s\n' "$base"
 }

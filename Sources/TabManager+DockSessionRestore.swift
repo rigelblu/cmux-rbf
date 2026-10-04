@@ -2,9 +2,14 @@ import Foundation
 
 extension TabManager {
     @discardableResult
+    /// Restores each workspace's persisted Dock after workspace topology exists.
+    ///
+    /// Deferred browser panels are passed through without constructing WebKit
+    /// until the corresponding Dock pane becomes visible.
     func restoreWorkspaceDockSessionSnapshots(
         from snapshot: SessionTabManagerSnapshot,
-        excludingStableIdentities: Set<UUID>
+        excludingStableIdentities: Set<UUID>,
+        deferBrowserPanels: Bool = false
     ) -> [[UUID: UUID]] {
         let pairs = restoredSessionWorkspacePairs(from: snapshot)
         var workspacesByOriginalId: [UUID: Workspace] = [:]
@@ -14,10 +19,12 @@ extension TabManager {
             }
         }
         return pairs.map { pair in
-            guard let dockSnapshot = pair.snapshot.dock else { return [:] }
-            return pair.workspace.dockSplit.restoreSessionSnapshot(
+            guard let dockSnapshot = pair.snapshot.dock,
+                  let dockSplit = pair.workspace.dockSplit else { return [:] }
+            return dockSplit.restoreSessionSnapshot(
                 dockSnapshot,
                 excludingStableIdentities: excludingStableIdentities,
+                deferBrowserPanels: deferBrowserPanels,
                 sourceWorkspaceResolver: { workspacesByOriginalId[$0] }
             )
         }

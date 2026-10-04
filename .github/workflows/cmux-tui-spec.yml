@@ -1,16 +1,7 @@
 name: cmux-tui spec inventory
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "cmux-tui/**"
-      - ".github/workflows/cmux-tui-spec.yml"
-  pull_request:
-    paths:
-      - "cmux-tui/**"
-      - ".github/workflows/cmux-tui-spec.yml"
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +22,9 @@ jobs:
 
       - name: Test inventory checker
         run: python3 cmux-tui/scripts/test_check_spec_inventory.py
+
+      - name: Test frontend documentation protocol
+        run: python3 cmux-tui/scripts/test_frontend_docs.py
 
       - name: Check protocol and TUI action inventory
         run: python3 cmux-tui/scripts/check-spec-inventory.py

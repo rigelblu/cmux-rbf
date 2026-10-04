@@ -1,0 +1,18 @@
+name: CI status fallback
+
+on:
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  ci-status:
+    name: ci-status
+    runs-on: ${{ vars.LINUX_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+    timeout-minutes: 5
+    steps:
+      - name: Report filtered CI as successful
+        run: |
+          echo "CI workflow was skipped because no routed CI trigger path changed."
+          echo "No CI area was selected for this pull request; ci-status is satisfied."

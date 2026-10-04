@@ -353,6 +353,8 @@ extension CMUXCLI {
             return "com.cmuxterm.app.debug"
         case "cmux-nightly.sock":
             return "com.cmuxterm.app.nightly"
+        case "cmux-rc.sock":
+            return "com.cmuxterm.app.rc"
         case "cmux-staging.sock":
             return "com.cmuxterm.app.staging"
         default:
@@ -368,6 +370,9 @@ extension CMUXCLI {
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-nightly-", suffix: ".sock") {
             return "com.cmuxterm.app.nightly.\(slug)"
+        }
+        if let slug = themeReloadSocketSlug(name, prefix: "cmux-rc-", suffix: ".sock") {
+            return "com.cmuxterm.app.rc.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-staging-", suffix: ".sock") {
             return "com.cmuxterm.app.staging.\(slug)"
@@ -439,6 +444,7 @@ extension CMUXCLI {
     /// with no error naming the real cause. Add every new mode here.
     static let rightSidebarCLIModes: Set<String> = [
         "files", "find", "vault", "sessions", "feed", "dock", "reply",
+        "cloud", "machines", "vms", "custom", "custom-sidebar",
     ]
 
     func isRightSidebarCLIMode(_ value: String) -> Bool {
@@ -446,6 +452,9 @@ extension CMUXCLI {
     }
 
     func normalizedRightSidebarCLIArgument(_ value: String) -> String {
-        isRightSidebarCLIMode(value) ? value.lowercased() : value
+        switch value.lowercased() {
+        case "cloud", "vms": return "machines"
+        default: return isRightSidebarCLIMode(value) ? value.lowercased() : value
+        }
     }
 }

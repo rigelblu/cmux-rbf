@@ -2,7 +2,7 @@
 #
 # Why: TCC keys grants on (bundle id, designated requirement). Every branch
 # mints a fresh bundle id (com.cmuxterm.app.debug.<slug>), so the first launch
-# of every branch's build re-prompts for removable-volume and app-data access
+# of every branch's build re-prompts for persistent grants such as removable-volume access
 # even though the app is signed with the stable CMUX_DEV_CODESIGN_IDENTITY.
 # macOS offers no supported cross-bundle-id pre-grant without MDM, so this
 # clones the user's existing grants (the rows Tom already approved for a
@@ -22,10 +22,17 @@
 rbf_tcc_preseed() {
   local target="$1"
   local db="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
-  local identity="${CMUX_DEV_CODESIGN_IDENTITY:-}"
+  # Standalone callers use the same stable default as make/reload/install.
+  # The helper only defines functions; sourcing it does not change permissions.
+  local signing_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rbf-signing.sh"
+  # shellcheck source=rbf/scripts/lib/rbf-signing.sh
+  source "$signing_lib"
+  if ! rbf_configure_dev_signing; then
+    echo "rbf-tcc-preseed: stable signing unavailable; skipping" >&2
+    return 0
+  fi
 
   [[ -n "$target" ]] || { echo "rbf-tcc-preseed: no build-id given; skipping" >&2; return 0; }
-  [[ -n "$identity" ]] || { echo "rbf-tcc-preseed: CMUX_DEV_CODESIGN_IDENTITY unset; ad-hoc builds cannot be pre-granted; skipping" >&2; return 0; }
 
   # Bundle id: passed through if already one, else derived exactly as
   # reload.sh does (sanitize_bundle -> cmux_attach__bundle_seg).
@@ -44,27 +51,23 @@ rbf_tcc_preseed() {
   fi
 
   # Cert SHA1 of the stable identity (what "certificate leaf = H..." names).
-  local cert_hash
-  cert_hash="$(security find-identity -v -p codesigning 2>/dev/null \
-    | awk -v id="\"$identity\"" 'index($0, id) { print $2; exit }' | tr 'A-F' 'a-f')"
-  [[ "$cert_hash" =~ ^[0-9a-f]{40}$ ]] \
-    || { echo "rbf-tcc-preseed: identity '$identity' not in keychain; skipping" >&2; return 0; }
+  local cert_hash="$RBF_DEV_CODESIGN_CERT_HASH"
 
   # User TCC.db needs the calling process to hold Full Disk Access.
   if ! sqlite3 "$db" "SELECT 1 FROM access LIMIT 1;" >/dev/null 2>&1; then
-    echo "rbf-tcc-preseed: cannot read $db — grant Full Disk Access to this terminal app (System Settings > Privacy & Security) to make dev builds promptless; skipping" >&2
+    echo "rbf-tcc-preseed: cannot read $db — grant Full Disk Access to this terminal app (System Settings > Privacy & Security) to preseed new build IDs; new IDs may prompt until then; skipping" >&2
     return 0
   fi
 
   # Template = an already-user-approved cmux dev client. Its row set IS the
-  # discovery of which services need seeding — no hardcoded service names,
-  # so a new macOS prompt class is covered the moment Tom approves it once.
+  # discovery of persistent services to seed. App Data is an exception:
+  # its consent is session-only and cannot be copied across app restarts.
   local template
-  # auth_value: 2 = allowed; 5 = allowed, the value SystemPolicyAppData rows
-  # carry on this macOS (observed live, 2026-08-05). 0 = denied, never cloned.
-  template="$(sqlite3 "$db" "SELECT client FROM access WHERE client = 'com.cmuxterm.app.debug' AND auth_value IN (2,5) LIMIT 1;")"
+  # auth_value: 2 = persistent Allow; 0 = Deny. App Data value 5 is
+  # session consent, not a durable grant (Apple WWDC23, session 10053).
+  template="$(sqlite3 "$db" "SELECT client FROM access WHERE client = 'com.cmuxterm.app.debug' AND auth_value = 2 AND service <> 'kTCCServiceSystemPolicyAppData' LIMIT 1;")"
   [[ -n "$template" ]] || template="$(sqlite3 "$db" \
-    "SELECT client FROM access WHERE client LIKE 'com.cmuxterm.app.debug%' AND auth_value IN (2,5) ORDER BY last_modified DESC LIMIT 1;")"
+    "SELECT client FROM access WHERE client LIKE 'com.cmuxterm.app.debug%' AND auth_value = 2 AND service <> 'kTCCServiceSystemPolicyAppData' ORDER BY last_modified DESC LIMIT 1;")"
   [[ -n "$template" ]] || { echo "rbf-tcc-preseed: no approved cmux dev grants to clone yet (approve one build's prompts first); skipping" >&2; return 0; }
 
   # csreq for the new bundle id + stable cert, as a hex blob for SQL.
@@ -77,6 +80,11 @@ rbf_tcc_preseed() {
   csreq_hex="$(xxd -p "$tmp" | tr -d '\n')"
   rm -f "$tmp"
 
+  # App Data consent is session-only. RBF tagged reload preserves the FDA-
+  # approved invoking terminal's responsibility instead of requiring FDA for
+  # each build ID. Independent Finder launches have their own attribution.
+  # Never clone App Data consent or create system Full Disk Access grants.
+
   # Repair rows whose stored requirement can never match a future build:
   # - NULL csreq: tccd saves that when Allow is clicked while the bundle is
   #   being rewritten mid-build (observed live, 2026-08-05)
@@ -86,7 +94,7 @@ rbf_tcc_preseed() {
   # Either way the user's Allow decision stands; only the identity key is
   # rewritten to the stable requirement. Runs before the template
   # short-circuit below so the target's own rows get repaired too.
-  sqlite3 "$db" "UPDATE access SET csreq = X'$csreq_hex' WHERE client = '$bundle_id' AND (csreq IS NULL OR hex(csreq) <> upper('$csreq_hex'));" 2>/dev/null || true
+  sqlite3 "$db" "UPDATE access SET csreq = X'$csreq_hex' WHERE client = '$bundle_id' AND service <> 'kTCCServiceSystemPolicyAppData' AND (csreq IS NULL OR hex(csreq) <> upper('$csreq_hex'));" 2>/dev/null || true
   # tccd serves grants from an in-memory cache; without a bounce it keeps
   # answering from the stale rows AND writes them back over the repair on the
   # next user Allow (observed 2026-08-05 15:30). Bounce on every invocation,
@@ -120,10 +128,10 @@ rbf_tcc_preseed() {
   # every record within a minute. The durable fix is app-side: dev builds
   # default the Bonjour listener off (MobileHostService.isListeningEnabled),
   # so no dev build multicasts at launch and the prompt never fires.
-  if sqlite3 "$db" "INSERT OR IGNORE INTO access ($cols) SELECT $select_exprs FROM access WHERE client = '$template' AND auth_value IN (2,5);" 2>/dev/null; then
+  if sqlite3 "$db" "INSERT OR IGNORE INTO access ($cols) SELECT $select_exprs FROM access WHERE client = '$template' AND auth_value = 2 AND service <> 'kTCCServiceSystemPolicyAppData';" 2>/dev/null; then
     local n
-    n="$(sqlite3 "$db" "SELECT count(*) FROM access WHERE client = '$bundle_id' AND auth_value IN (2,5);")"
-    echo "rbf-tcc-preseed: $bundle_id pre-granted ($n services, cloned from $template)" >&2
+    n="$(sqlite3 "$db" "SELECT count(*) FROM access WHERE client = '$bundle_id' AND auth_value = 2 AND service <> 'kTCCServiceSystemPolicyAppData';")"
+    echo "rbf-tcc-preseed: $bundle_id pre-granted ($n persistent services, cloned from $template; App Data excluded)" >&2
     # tccd caches; nudge it so the new rows are live before first launch.
     killall tccd 2>/dev/null || true
   else

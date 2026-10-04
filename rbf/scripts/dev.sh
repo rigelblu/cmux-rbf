@@ -23,6 +23,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# shellcheck source=rbf/scripts/lib/rbf-signing.sh
+source "$REPO_ROOT/rbf/scripts/lib/rbf-signing.sh"
+
 # Pre-grant TCC permissions for this build's bundle id so a new branch's first
 # launch doesn't re-prompt. Fail-soft: every failure inside degrades to the old
 # behavior (one prompt pair), never a broken build.
@@ -185,6 +188,10 @@ check_submodule_sync() {
 
 cmd="${1:-run}"
 [[ $# -gt 0 ]] && shift || true
+case "$cmd" in
+  build|run|test) rbf_configure_dev_signing || exit 1 ;;
+esac
+
 
 case "$cmd" in
   build-id)
@@ -305,16 +312,9 @@ case "$cmd" in
     # ("cmux DEV.app"), whose designated requirement is a cdhash that changes
     # every build, so EVERY `make test` re-prompts for removable-volume and
     # app-data access. Passing the identity here gives the host the same stable
-    # identifier-based requirement, so one grant sticks. Unset → ad-hoc, as before.
-    sign_args=()
-    if [[ -n "${CMUX_DEV_CODESIGN_IDENTITY:-}" ]]; then
-      if security find-identity -v -p codesigning 2>/dev/null \
-          | grep -Fq "\"$CMUX_DEV_CODESIGN_IDENTITY\""; then
-        sign_args+=(CODE_SIGN_IDENTITY="$CMUX_DEV_CODESIGN_IDENTITY" CODE_SIGN_STYLE=Manual)
-      else
-        echo "dev.sh: warning: CMUX_DEV_CODESIGN_IDENTITY='$CMUX_DEV_CODESIGN_IDENTITY' not in the keychain; test host stays ad-hoc signed (macOS will re-prompt for permissions)" >&2
-      fi
-    fi
+    # identifier-based requirement, so one grant sticks. The shared resolver
+    # supplies the stable default even in noninteractive agent shells.
+    sign_args=(CODE_SIGN_IDENTITY="$CMUX_DEV_CODESIGN_IDENTITY" CODE_SIGN_STYLE=Manual)
     # xcodebuild writes a ~450MB .xcresult per run into $TMPDIR — on the
     # internal disk — and never removes it. 108 of them (19GB) piled up in five
     # days and helped take the SSD to 570MB free; 47 landed on 2026-08-04 alone.
