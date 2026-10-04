@@ -1,3 +1,4 @@
+import CmuxSettings
 import Foundation
 
 /// A validated custom palette edit and its current explicit-assignment impact.
@@ -80,6 +81,13 @@ public enum WorkspacePaletteColorEditResult: Equatable, Sendable {
 }
 
 public extension SettingsHostActions {
+    /// Refuses preference writes in previews without a persistence owner.
+    func applyWorkspaceColorPreferences(
+        _ action: WorkspaceColorSettingsSnapshot.Action,
+        expected: WorkspaceColorSettingsSnapshot
+    ) async throws -> WorkspaceColorSettingsSnapshot {
+        throw WorkspaceColorSettingsSnapshot.SaveError.failed
+    }
     /// Validates a custom palette value and counts matching explicit overrides.
     ///
     /// - Parameters:

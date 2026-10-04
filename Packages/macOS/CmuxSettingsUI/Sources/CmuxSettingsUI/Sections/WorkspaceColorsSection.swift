@@ -2,6 +2,7 @@ import CmuxFoundation
 import AppKit
 import CmuxSettings
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// **Workspace Colors** section — mirrors the legacy in-app section:
 /// indicator-style picker, selection highlight color, notification
@@ -28,6 +29,11 @@ public struct WorkspaceColorsSection: View {
     @State private var customNameHighWaterMark: DefaultsValueModel<Int>
     @State private var paletteReconcileTracker = WorkspacePaletteColorReconcileTracker()
     @State private var colorEditErrors: [String: String] = [:]
+    @State private var menuPreferences: DefaultsValueModel<WorkspaceColorMenuPreferences>
+    @State private var preferenceSave = WorkspaceColorPreferenceSaveModel()
+    @State private var activeDrag: (token: String, name: String, snapshot: WorkspaceColorSettingsSnapshot)?
+    @State private var dropTarget: String?
+    @FocusState private var focusedReorderName: String?
 
     /// Built-in palette order and default hexes. Mirrors
     /// `WorkspaceTabColorSettings.defaultPalette` in the legacy app target.
@@ -70,6 +76,7 @@ public struct WorkspaceColorsSection: View {
         _paletteModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.palette))
         _displayNamesModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.displayNames))
         _labelsModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.labels))
+        _menuPreferences = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.menuPreferences))
         _customNameHighWaterMark = State(
             initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.customNameHighWaterMark)
         )
@@ -82,10 +89,10 @@ public struct WorkspaceColorsSection: View {
         }
         .task {
             startObservingSettings()
-            paletteReconcileTracker.startTracking(effectivePaletteMap(stored: paletteModel.current))
+            paletteReconcileTracker.startTracking(paletteModel.current)
         }
         .onChange(of: paletteModel.current) { _, newPalette in
-            paletteReconcileTracker.reconcileExternalHexes(effectivePaletteMap(stored: newPalette))
+            paletteReconcileTracker.reconcileExternalHexes(newPalette)
             advanceCustomNameHighWaterMark(for: newPalette)
         }
         .task {
@@ -105,6 +112,7 @@ public struct WorkspaceColorsSection: View {
             // mint mark could be read stale after an external palette write.
             labelsModel,
             displayNamesModel,
+            menuPreferences,
             customNameHighWaterMark,
         ]
         models.forEach { $0.startObserving() }
@@ -143,6 +151,8 @@ public struct WorkspaceColorsSection: View {
             SettingsCardNote(
                 String(localized: "settings.workspaceColors.dictionaryNote", defaultValue: "Edit cmux.json to add or remove named colors. \"Choose Custom Color...\" still adds local Custom N entries.")
             )
+            SettingsCardNote(String(localized: "settings.workspaceColors.order.help", defaultValue: "Drag colors to change their order in Workspace Color and Group Color menus."))
+            SettingsCardNote(String(localized: "settings.workspaceColors.visibility.help", defaultValue: "Hidden colors stay available in Settings. Existing workspaces keep their colors."))
 
             let entries = effectivePaletteEntries(overrides: paletteModel.current)
             if entries.isEmpty {
@@ -153,25 +163,65 @@ public struct WorkspaceColorsSection: View {
                 ForEach(Array(entries.enumerated()), id: \.element.name) { index, entry in
                     if index > 0 { SettingsCardDivider() }
                     paletteEntryRow(entry: entry, paletteModel: paletteModel)
+                        .overlay(alignment: .top) {
+                            if dropTarget == entry.name, activeDrag != nil {
+                                Rectangle().fill(Color.accentColor).frame(height: 2)
+                            }
+                        }
+                        .onDrop(of: [UTType.text], isTargeted: Binding(
+                            get: { dropTarget == entry.name },
+                            set: { targeted in
+                                if targeted { dropTarget = entry.name }
+                                else if dropTarget == entry.name { dropTarget = nil }
+                            }
+                        )) { providers in
+                            finishDrop(providers, before: entry.name)
+                        }
+                }
+                Color.clear.frame(height: 8)
+                    .onDrop(of: [UTType.text], isTargeted: nil) { providers in
+                        finishDrop(providers, before: nil)
+                    }
+                if entries.allSatisfy({ menuPreferences.current.hiddenNames.contains($0.name) }) {
+                    SettingsCardNote(String(localized: "settings.workspaceColors.visibility.allHidden", defaultValue: "All colors are hidden from menus. Show a color here to make it available again."))
                 }
             }
 
+            if preferenceSave.isSaving {
+                SettingsCardNote(String(localized: "settings.workspaceColors.preferences.saving", defaultValue: "Saving…"))
+            }
+            if let message = preferenceError {
+                Text(message).foregroundStyle(.red)
+                    .cmuxFont(.caption)
+                    .padding(.horizontal, 14)
+                    .accessibilityIdentifier("SettingsWorkspaceColorPreferencesError")
+            }
+
+            SettingsCardDivider()
+
+            SettingsCardRow(String(localized: "settings.workspaceColors.order.restore", defaultValue: "Restore Default Order")) {
+                Button(String(localized: "settings.workspaceColors.order.restore", defaultValue: "Restore Default Order")) {
+                    requestPreference(.restoreOrder)
+                }
+                .buttonStyle(.bordered).controlSize(.small)
+                .disabled(preferenceSave.isSaving || menuPreferences.current.order(canonicalNames: canonicalPaletteNames) == canonicalPaletteNames)
+                .accessibilityIdentifier("SettingsWorkspaceColorsRestoreOrder")
+            }
             SettingsCardDivider()
 
             SettingsCardRow(
                 configurationReview: .action,
                 searchAnchorID: "setting:workspaceColors:palette",
                 String(localized: "settings.workspaceColors.resetPalette", defaultValue: "Reset Palette"),
-                subtitle: String(localized: "settings.workspaceColors.resetPalette.subtitleV2", defaultValue: "Restore the built-in palette and remove extra named colors.")
+                subtitle: String(localized: "settings.workspaceColors.resetPalette.preferencesHelp", defaultValue: "Restore built-in colors, remove extra named colors, restore default order, and show remaining colors in menus.")
             ) {
                 Button(String(localized: "settings.workspaceColors.resetPalette.button", defaultValue: "Reset")) {
-                    paletteModel.reset()
-                    displayNamesModel.reset()
-                    pruneOrphanedMetadata(against: effectivePaletteMap(stored: [:]))
-                    paletteReconcileTracker.recordPaletteReset(resultingHexes: effectivePaletteMap(stored: [:]))
+                    requestPreference(.resetPalette)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .disabled(preferenceSave.isSaving)
+                .accessibilityIdentifier("SettingsWorkspaceColorsResetPalette")
             }
         }
     }
@@ -191,7 +241,7 @@ public struct WorkspaceColorsSection: View {
         displayNames: [String: String]? = nil,
         labels: [String: String]? = nil
     ) -> WorkspaceColorNameResolver.Validation {
-        let palette = effectivePaletteMap(stored: paletteModel.current)
+        let palette = paletteModel.current
         return WorkspaceColorNameResolver().validate(
             rawDisplayNames: displayNames ?? displayNamesModel.current,
             rawLabels: labels ?? labelsModel.current,
@@ -209,7 +259,7 @@ public struct WorkspaceColorsSection: View {
     /// message can ever surface it. It would then silently reattach if a name with the
     /// same spelling ever returned.
     private func commitLabel(_ text: String, for paletteName: String) -> String? {
-        guard effectivePaletteMap(stored: paletteModel.current)[paletteName] != nil else {
+        guard paletteModel.current[paletteName] != nil else {
             return Self.aliasRejectionMessage(.unknownPaletteName)
         }
         var labels = labelsModel.current
@@ -227,7 +277,7 @@ public struct WorkspaceColorsSection: View {
     }
 
     private func commitDisplayName(_ text: String, for paletteName: String) -> String? {
-        guard effectivePaletteMap(stored: paletteModel.current)[paletteName] != nil,
+        guard paletteModel.current[paletteName] != nil,
               baseHex(for: paletteName) == nil else {
             return Self.aliasRejectionMessage(.builtInPaletteEntry)
         }
@@ -348,11 +398,15 @@ public struct WorkspaceColorsSection: View {
         paletteModel: DefaultsValueModel<[String: String]>
     ) -> some View {
         let validation = nameValidation()
-        return SettingsCardRow(
+        return SettingsEditableTitleCardRow(
             configurationReview: .json("workspaceColors.colors", "workspaceColors.labels"),
-            entry.name,
-            subtitle: String(localized: "settings.workspaceColors.base", defaultValue: "Base: \(baseHex)")
+            subtitle: String(localized: "settings.workspaceColors.base", defaultValue: "Base: \(baseHex)"),
+            stacksWhenNeeded: true
         ) {
+            preferenceTitle(name: entry.name) {
+                Text(entry.name).cmuxFont(size: 13, weight: .medium)
+            }
+        } trailing: {
             HStack(spacing: 8) {
                 WorkspaceColorAliasField(
                     paletteName: entry.name,
@@ -390,7 +444,10 @@ public struct WorkspaceColorsSection: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                preferenceVisibilityToggle(name: entry.name)
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .disabled(preferenceSave.isSaving)
         }
     }
 
@@ -405,8 +462,10 @@ public struct WorkspaceColorsSection: View {
                 "workspaceColors.displayNames",
                 "workspaceColors.labels"
             ),
-            subtitle: String(localized: "settings.workspaceColors.customEntry", defaultValue: "Named palette entry.")
+            subtitle: String(localized: "settings.workspaceColors.customEntry", defaultValue: "Named palette entry."),
+            stacksWhenNeeded: true
         ) {
+            preferenceTitle(name: entry.name) {
             WorkspaceColorAliasField(
                 paletteName: entry.name,
                 storedValue: displayNamesModel.current[entry.name] ?? "",
@@ -416,6 +475,8 @@ public struct WorkspaceColorsSection: View {
                 importedErrorMessage: validation.displayNameRejections[entry.name].map(Self.aliasRejectionMessage),
                 commit: { commitDisplayName($0, for: entry.name) }
             )
+            .disabled(preferenceSave.isSaving)
+            }
         } trailing: {
             HStack(spacing: 8) {
                 WorkspaceColorAliasField(
@@ -462,7 +523,7 @@ public struct WorkspaceColorsSection: View {
                     }
                 )
                 Button(String(localized: "settings.workspaceColors.remove", defaultValue: "Remove")) {
-                    var snapshot = effectivePaletteMap(stored: paletteModel.current)
+                    var snapshot = paletteModel.current
                     snapshot.removeValue(forKey: entry.name)
                     paletteModel.set(snapshot)
                     pruneOrphanedMetadata(against: snapshot)
@@ -471,7 +532,10 @@ public struct WorkspaceColorsSection: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                preferenceVisibilityToggle(name: entry.name)
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .disabled(preferenceSave.isSaving)
         }
     }
 
@@ -507,7 +571,7 @@ public struct WorkspaceColorsSection: View {
             paletteReconcileTracker.rejectPickerWrite(name: name)
             return
         }
-        var snapshot = effectivePaletteMap(stored: paletteModel.current)
+        var snapshot = paletteModel.current
         if let duplicate = snapshot.first(where: { entry in
             entry.key != name && WorkspaceColorHex.normalized(entry.value) == normalized
         }) {
@@ -601,7 +665,7 @@ public struct WorkspaceColorsSection: View {
     /// hex), followed by custom entries sorted by name. Mirrors
     /// `WorkspaceTabColorSettings.palette()`.
     private func effectivePaletteEntries(overrides: [String: String]) -> [(name: String, hex: String)] {
-        let resolved = effectivePaletteMap(stored: overrides)
+        let resolved = overrides
         let builtInNames = Set(Self.builtInPalette.map(\.name))
         let builtIn: [(name: String, hex: String)] = Self.builtInPalette.compactMap { entry in
             guard let hex = resolved[entry.name] else { return nil }
@@ -611,18 +675,190 @@ public struct WorkspaceColorsSection: View {
             .filter { !builtInNames.contains($0.key) }
             .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
             .map { (name: $0.key, hex: $0.value) }
-        return builtIn + customs
+        let entries = builtIn + customs
+        let byName = Dictionary(uniqueKeysWithValues: entries.map { ($0.name, $0.hex) })
+        return menuPreferences.current.order(canonicalNames: entries.map(\.name)).compactMap { name in
+            byName[name].map { (name: name, hex: $0) }
+        }
     }
 
-    /// Returns the full effective palette dictionary. When `stored` is
-    /// empty (no UserDefaults entry yet) this is the built-in default
-    /// palette; otherwise the stored map is returned verbatim. Matches
-    /// legacy `WorkspaceTabColorSettings.effectivePaletteMap`.
-    private func effectivePaletteMap(stored: [String: String]) -> [String: String] {
-        if stored.isEmpty {
-            return Dictionary(uniqueKeysWithValues: Self.builtInPalette.map { ($0.name, $0.hex) })
+    private var canonicalPaletteNames: [String] {
+        let palette = paletteModel.current
+        let builtIns = Self.builtInPalette.map(\.name)
+        let builtInSet = Set(builtIns)
+        return builtIns.filter { palette[$0] != nil }
+            + palette.keys.filter { !builtInSet.contains($0) }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    private var colorSettingsSnapshot: WorkspaceColorSettingsSnapshot {
+        WorkspaceColorSettingsSnapshot(
+            palette: paletteModel.current,
+            displayNames: displayNamesModel.current,
+            labels: labelsModel.current,
+            preferences: menuPreferences.current
+        )
+    }
+
+    private func requestPreference(
+        _ action: WorkspaceColorSettingsSnapshot.Action,
+        expected: WorkspaceColorSettingsSnapshot? = nil
+    ) {
+        guard !preferenceSave.isSaving else { return }
+        activeDrag = nil
+        dropTarget = nil
+        let expected = expected ?? colorSettingsSnapshot
+        let restoreReorderFocus = focusedReorderName
+        Task { @MainActor in
+            await preferenceSave.save(action, expected: expected, using: { action, expected in
+                try await hostActions.applyWorkspaceColorPreferences(action, expected: expected)
+            }, accept: { saved in
+                paletteModel.acceptCommittedValue(saved.palette)
+                labelsModel.acceptCommittedValue(saved.labels)
+                displayNamesModel.acceptCommittedValue(saved.displayNames)
+                menuPreferences.acceptCommittedValue(saved.preferences)
+                if action == .resetPalette {
+                    paletteReconcileTracker.recordPaletteReset(resultingHexes: saved.palette)
+                }
+                if case let .move(name, _) = action {
+                    let order = saved.preferences.order(canonicalNames: canonicalPaletteNames)
+                    if let index = order.firstIndex(of: name) {
+                        announce(String(format: String(localized: "settings.workspaceColors.order.position", defaultValue: "%@, position %lld of %lld"), nameValidation().displayNames[name] ?? name, Int64(index + 1), Int64(order.count)))
+                    }
+                }
+            })
+            if let name = restoreReorderFocus, paletteModel.current[name] != nil {
+                focusedReorderName = name
+            }
+            if let message = preferenceError { announce(message) }
         }
-        return stored
+    }
+
+    @ViewBuilder
+    private func preferenceTitle<Title: View>(name: String, @ViewBuilder title: () -> Title) -> some View {
+        // Child controls receive saved scalar values and action closures, not a store.
+        let expected = colorSettingsSnapshot
+        let visible = !expected.preferences.hiddenNames.contains(name)
+        let saving = preferenceSave.isSaving
+        let visibleName = nameValidation().displayNames[name] ?? name
+        let names = expected.preferences.order(canonicalNames: canonicalPaletteNames)
+        let position = (names.firstIndex(of: name) ?? 0) + 1
+        HStack(spacing: 8) {
+            Canvas { context, _ in
+                for row in 0..<3 {
+                    for column in 0..<2 {
+                        let dot = CGRect(x: column * 4, y: row * 4, width: 2, height: 2)
+                        context.fill(Path(ellipseIn: dot), with: .style(.secondary))
+                    }
+                }
+            }
+                .frame(width: 6, height: 10)
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 24)
+                .contentShape(Rectangle())
+                .focusable()
+                .focused($focusedReorderName, equals: name)
+                .onKeyPress(.upArrow, phases: [.down, .repeat]) { press in
+                    guard WorkspaceColorReorderKeyPolicy.isBareArrow(press.modifiers) else { return .ignored }
+                    adjustColorOrder(name: name, offset: -1)
+                    return .handled
+                }
+                .onKeyPress(.downArrow, phases: [.down, .repeat]) { press in
+                    guard WorkspaceColorReorderKeyPolicy.isBareArrow(press.modifiers) else { return .ignored }
+                    adjustColorOrder(name: name, offset: 1)
+                    return .handled
+                }
+                .accessibilityLabel(String(format: String(localized: "settings.workspaceColors.order.reorder", defaultValue: "Reorder %@"), visibleName))
+                .accessibilityValue(String(format: String(localized: "settings.workspaceColors.order.position", defaultValue: "%@, position %lld of %lld"), visibleName, Int64(position), Int64(names.count)))
+                .accessibilityHint(String(localized: "settings.workspaceColors.order.handleHelp", defaultValue: "Use Up to move earlier and Down to move later."))
+                .accessibilityIdentifier("SettingsWorkspaceColorReorderHandle.\(name)")
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .decrement: adjustColorOrder(name: name, offset: -1)
+                    case .increment: adjustColorOrder(name: name, offset: 1)
+                    @unknown default: break
+                    }
+                }
+                .onDrag {
+                    let token = UUID().uuidString
+                    activeDrag = (token, name, colorSettingsSnapshot)
+                    return NSItemProvider(object: token as NSString)
+                }
+                .disabled(saving)
+            title()
+            if !visible {
+                Text(String(localized: "settings.workspaceColors.visibility.hidden", defaultValue: "Hidden"))
+                    .cmuxFont(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func preferenceVisibilityToggle(name: String) -> some View {
+        let expected = colorSettingsSnapshot
+        let visible = !expected.preferences.hiddenNames.contains(name)
+        let visibleName = nameValidation().displayNames[name] ?? name
+        return Toggle(isOn: Binding(get: { visible }, set: {
+            requestPreference(.visibility(name: name, visible: $0), expected: expected)
+        })) {
+            EmptyView()
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .labelsHidden()
+        .accessibilityLabel(String(format: String(localized: "settings.workspaceColors.visibility.accessibility", defaultValue: "Show %@ in menus"), visibleName))
+        .accessibilityIdentifier("SettingsWorkspaceColorVisibility.\(name)")
+        .disabled(preferenceSave.isSaving)
+    }
+
+    private func adjustColorOrder(name: String, offset: Int) {
+        guard !preferenceSave.isSaving else { return }
+        let expected = colorSettingsSnapshot
+        let names = expected.preferences.order(canonicalNames: canonicalPaletteNames)
+        guard let index = names.firstIndex(of: name) else { return }
+        let destination = index + offset
+        guard names.indices.contains(destination) else {
+            announce(offset < 0
+                ? String(localized: "settings.workspaceColors.order.first", defaultValue: "First color.")
+                : String(localized: "settings.workspaceColors.order.last", defaultValue: "Last color."))
+            return
+        }
+        let before: String? = offset < 0
+            ? names[destination]
+            : names.indices.contains(destination + 1) ? names[destination + 1] : nil
+        requestPreference(.move(name: name, before: before), expected: expected)
+    }
+
+    private func finishDrop(_ providers: [NSItemProvider], before: String?) -> Bool {
+        guard !preferenceSave.isSaving, let drag = activeDrag,
+              let provider = providers.first, provider.canLoadObject(ofClass: NSString.self) else { return false }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            let token = object as? String
+            Task { @MainActor in
+                guard token == drag.token, activeDrag?.token == drag.token else { return }
+                requestPreference(.move(name: drag.name, before: before), expected: drag.snapshot)
+            }
+        }
+        return true
+    }
+
+    private var preferenceError: String? {
+        guard let error = preferenceSave.error else { return nil }
+        if error == .stale {
+            return String(localized: "settings.workspaceColors.preferences.stale", defaultValue: "The palette changed. Review the current colors and try again.")
+        }
+        switch preferenceSave.lastAction {
+        case .visibility:
+            return String(localized: "settings.workspaceColors.visibility.saveError", defaultValue: "Couldn't save menu visibility. Your previous setting is unchanged.")
+        case .resetPalette:
+            return String(localized: "settings.workspaceColors.preferences.resetError", defaultValue: "Couldn't reset the palette. Your previous colors and menu preferences are unchanged.")
+        default:
+            return String(localized: "settings.workspaceColors.order.saveError", defaultValue: "Couldn't save the color order. Your previous order is unchanged.")
+        }
+    }
+
+    private func announce(_ message: String) {
+        guard let window = NSApp.keyWindow else { return }
+        NSAccessibility.post(element: window, notification: .announcementRequested,
+                             userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
     }
 
     private func baseHex(for name: String) -> String? {
