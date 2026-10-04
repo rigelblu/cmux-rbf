@@ -59,6 +59,7 @@ final class HostSettingsActions: SettingsHostActions {
     ) {
         self.configFileURL = configFileURL
         self.computerUseRuntimeService = computerUseRuntimeService
+        WorkspaceTabColorSettings.migrateLegacyPaletteForSettings()
         startObservingAppIconMode()
     }
 
@@ -204,6 +205,13 @@ final class HostSettingsActions: SettingsHostActions {
         )
         #endif
         return result
+    }
+
+    func applyWorkspaceColorPreferences(
+        _ action: WorkspaceColorSettingsSnapshot.Action,
+        expected: WorkspaceColorSettingsSnapshot
+    ) async throws -> WorkspaceColorSettingsSnapshot {
+        try WorkspaceTabColorSettings.applyColorPreferences(action, expected: expected)
     }
 
     func applyWorkspacePaletteColorEdit(

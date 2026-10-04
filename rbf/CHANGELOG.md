@@ -5,7 +5,11 @@ title: "Cmux RBF Changelog"
 Fork releases use the version in `rbf/VERSION`; upstream release history remains in the root `CHANGELOG.md`.
 
 # 🔵⋯ [Unreleased]
-(empty)
+
+## 🟠⋯ Changed for End Users
+- Put preferred workspace colours first in Settings and Workspace Color / Group Color menus using drag or four move actions (#cm-107)
+- Hide unused colours from those menus with the checkbox before each colour name, while keeping existing assignments and appearance (#cm-108)
+- Save each completed preference action immediately; restore order separately, or reset the palette together with order and visibility
 
 # 🔵⋯ v0.28.0 (2026-10-04) — #cm-97.1
 

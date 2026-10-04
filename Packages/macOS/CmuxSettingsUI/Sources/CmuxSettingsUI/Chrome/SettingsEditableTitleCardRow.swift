@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsEditableTitleCardRow<Leading: View, Trailing: View>: View {
     let configurationReview: SettingsConfigurationReview
     let subtitle: String?
+    let stacksWhenNeeded: Bool
     @ViewBuilder let leading: Leading
     @ViewBuilder let trailing: Trailing
 
@@ -14,11 +15,13 @@ struct SettingsEditableTitleCardRow<Leading: View, Trailing: View>: View {
     init(
         configurationReview: SettingsConfigurationReview,
         subtitle: String?,
+        stacksWhenNeeded: Bool = false,
         @ViewBuilder leading: () -> Leading,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.configurationReview = configurationReview
         self.subtitle = subtitle
+        self.stacksWhenNeeded = stacksWhenNeeded
         self.leading = leading()
         self.trailing = trailing()
     }
@@ -28,21 +31,40 @@ struct SettingsEditableTitleCardRow<Leading: View, Trailing: View>: View {
         return configurationReview.paths.compactMap(searchIndex.anchorID(forSettingsPath:))
     }
 
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
-                leading
-                if let subtitle {
-                    Text(subtitle)
-                        .cmuxFont(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
+    private var title: some View {
+        VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
+            leading
+            if let subtitle {
+                Text(subtitle)
+                    .cmuxFont(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
-            trailing
-                .layoutPriority(1)
+    private var horizontalRow: some View {
+        HStack(alignment: .center, spacing: 12) {
+            title
+                .fixedSize(horizontal: stacksWhenNeeded, vertical: false)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            trailing.layoutPriority(1)
+        }
+    }
+
+    var body: some View {
+        Group {
+            if stacksWhenNeeded {
+                ViewThatFits(in: .horizontal) {
+                    horizontalRow
+                    VStack(alignment: .leading, spacing: 8) {
+                        title
+                        trailing
+                    }
+                }
+            } else {
+                horizontalRow
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
