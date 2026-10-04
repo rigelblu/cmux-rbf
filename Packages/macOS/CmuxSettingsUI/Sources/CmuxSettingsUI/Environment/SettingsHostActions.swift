@@ -274,6 +274,17 @@ public protocol SettingsHostActions: AnyObject {
         decision: WorkspacePaletteColorEditDecision
     ) -> WorkspacePaletteColorEditResult
 
+    /// Commits a still-current color preference or broad reset through one host action.
+    /// - Parameters:
+    ///   - action: Completed user action.
+    ///   - expected: Complete saved state the interaction started from.
+    /// - Returns: The committed complete state.
+    /// - Throws: A stale or failed save, leaving the preceding saved state intact.
+    func applyWorkspaceColorPreferences(
+        _ action: WorkspaceColorSettingsSnapshot.Action,
+        expected: WorkspaceColorSettingsSnapshot
+    ) async throws -> WorkspaceColorSettingsSnapshot
+
     /// Persists an explicit menu-bar-only preference change in the host app.
     ///
     /// The host pairs the visible `app.menuBarOnly` setting with any hidden
