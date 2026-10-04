@@ -41,7 +41,10 @@ enum WorkspaceTabColorSettings {
     }
 
     static func palette(defaults: UserDefaults = .standard) -> [WorkspaceTabColorEntry] {
-        let paletteMap = effectivePaletteMap(defaults: defaults)
+        orderedPaletteEntries(effectivePaletteMap(defaults: defaults))
+    }
+
+    private static func orderedPaletteEntries(_ paletteMap: [String: String]) -> [WorkspaceTabColorEntry] {
         let builtInOrder = defaultPalette.compactMap { entry -> WorkspaceTabColorEntry? in
             guard let hex = paletteMap[entry.name] else { return nil }
             return WorkspaceTabColorEntry(name: entry.name, hex: hex)
@@ -88,6 +91,10 @@ enum WorkspaceTabColorSettings {
 
     static func persistPaletteMap(_ rawPalette: [String: String], defaults: UserDefaults = .standard) {
         let normalizedPalette = normalizedPaletteMap(rawPalette)
+        let previousNames = palette(defaults: defaults).map(\.name)
+        let currentNames = orderedPaletteEntries(normalizedPalette).map(\.name)
+        let preferencesKey = SettingCatalog().workspaceColors.menuPreferences
+        let preferences = preferencesKey.value(in: defaults)
         // Advance on persistence, not on minting: `Custom N` names also arrive through a
         // hand-written cmux.json and the legacy migration, neither of which mints.
         WorkspaceColorCustomNameMint.advanceHighWaterMark(
@@ -101,6 +108,21 @@ enum WorkspaceTabColorSettings {
         }
         defaults.removeObject(forKey: legacyDefaultOverridesKey)
         defaults.removeObject(forKey: legacyCustomColorsKey)
+        if previousNames != currentNames {
+            preferencesKey.set(preferences.reconciled(
+                previousCanonicalNames: previousNames,
+                canonicalNames: currentNames
+            ), in: defaults)
+        }
+    }
+
+    /// Materializes the existing legacy fallback before typed Settings models seed rows.
+    /// Uses the established palette writer, preserving resolved colors and monotonic names.
+    @MainActor
+    static func migrateLegacyPaletteForSettings(defaults: UserDefaults = .standard) {
+        guard storedPaletteMap(defaults: defaults) == nil,
+              let legacy = legacyPaletteMap(defaults: defaults) else { return }
+        persistPaletteMap(legacy, defaults: defaults)
     }
 
     static func backupPaletteMap(defaults: UserDefaults = .standard) -> [String: String]? {
@@ -130,7 +152,54 @@ enum WorkspaceTabColorSettings {
         return normalized
     }
 
+    @MainActor
+    static func applyColorPreferences(
+        _ action: WorkspaceColorSettingsSnapshot.Action,
+        expected: WorkspaceColorSettingsSnapshot,
+        defaults: UserDefaults = .standard,
+        persist: ((WorkspaceColorSettingsSnapshot.Action, WorkspaceColorSettingsSnapshot) throws -> Void)? = nil
+    ) throws -> WorkspaceColorSettingsSnapshot {
+        // No suspension inside this action: every UI/menu read runs on the main actor,
+        // so a broad reset cannot publish an intermediate palette or metadata state.
+        let colors = SettingCatalog().workspaceColors
+        let before = WorkspaceTabColorSettings.colorSettingsSnapshot(defaults: defaults)
+        guard before == expected else { throw WorkspaceColorSettingsSnapshot.SaveError.stale }
+        let after = try before.applying(
+            action,
+            canonicalNames: WorkspaceTabColorSettings.palette(defaults: defaults).map(\.name),
+            defaultPalette: Dictionary(uniqueKeysWithValues: WorkspaceTabColorSettings.defaultPalette.map { ($0.name, $0.hex) })
+        )
+        let keys = [
+            WorkspaceTabColorSettings.paletteKey,
+            WorkspaceTabColorSettings.legacyDefaultOverridesKey,
+            WorkspaceTabColorSettings.legacyCustomColorsKey,
+            colors.displayNames.userDefaultsKey,
+            colors.labels.userDefaultsKey,
+            colors.menuPreferences.userDefaultsKey
+        ]
+        let previousObjects = keys.map { defaults.object(forKey: $0) }
+        do {
+            if let persist {
+                try persist(action, after)
+            } else {
+                if action == .resetPalette { WorkspaceTabColorSettings.reset(defaults: defaults) }
+                colors.menuPreferences.set(after.preferences, in: defaults)
+            }
+            guard WorkspaceTabColorSettings.colorSettingsSnapshot(defaults: defaults) == after else {
+                throw WorkspaceColorSettingsSnapshot.SaveError.failed
+            }
+        } catch {
+            for (key, value) in zip(keys, previousObjects) {
+                if let value { defaults.set(value, forKey: key) }
+                else { defaults.removeObject(forKey: key) }
+            }
+            throw WorkspaceColorSettingsSnapshot.SaveError.failed
+        }
+        return after
+    }
+
     static func reset(defaults: UserDefaults = .standard) {
+        SettingCatalog().workspaceColors.menuPreferences.removeValue(in: defaults)
         defaults.removeObject(forKey: paletteKey)
         defaults.removeObject(forKey: legacyDefaultOverridesKey)
         defaults.removeObject(forKey: legacyCustomColorsKey)

@@ -41,11 +41,12 @@ public struct WorkspaceColorMenuCandidate: Equatable, Sendable {
 /// palette. Menus call this while opening, so it performs no I/O, schedules no work, and
 /// touches no observable store.
 public enum WorkspaceColorMenuModel {
-    /// Rows in display order: **No Color**, the effective palette, then any current colors
+    /// Rows in display order: **No Color**, visible palette choices, then any current colors
     /// the palette no longer lists.
     ///
     /// - Parameters:
-    ///   - orderedNames: palette names in display order (built-ins, then custom).
+    ///   - orderedNames: palette names in canonical order (built-ins, then custom).
+    ///   - preferences: presentation order and hidden raw names; assignments use the full palette.
     ///   - targetHexes: one entry per workspace the action will apply to; `nil` if uncolored.
     public static func candidates(
         orderedNames: [String],
@@ -53,6 +54,7 @@ public enum WorkspaceColorMenuModel {
         displayNames: [String: String] = [:],
         labels: [String: String],
         builtInNames: Set<String> = [],
+        preferences: WorkspaceColorMenuPreferences = WorkspaceColorMenuPreferences(),
         targetHexes: [String?]
     ) -> [WorkspaceColorMenuCandidate] {
         // Targets are used un-normalized on purpose: WorkspaceColorAssignmentState
@@ -75,7 +77,10 @@ public enum WorkspaceColorMenuModel {
             labels: labels,
             builtInNames: builtInNames
         )
-        for entry in entries {
+        let byName = entries.reduce(into: [String: WorkspaceColorPaletteEntry]()) { $0[$1.name] = $1 }
+        let hidden = Set(preferences.hiddenNames)
+        for name in preferences.order(canonicalNames: entries.map(\.name)) where !hidden.contains(name) {
+            guard let entry = byName[name] else { continue }
             // Every entry matching the assigned hex is checked. cmux stores a color, not
             // the slot that produced it, so nominating one winner would invent state.
             rows.append(

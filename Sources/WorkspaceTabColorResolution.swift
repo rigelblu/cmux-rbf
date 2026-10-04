@@ -2,6 +2,14 @@ import CmuxSettings
 import Foundation
 
 extension WorkspaceTabColorSettings {
+    static func colorSettingsSnapshot(defaults: UserDefaults = .standard) -> WorkspaceColorSettingsSnapshot {
+        WorkspaceColorSettingsSnapshot(
+            palette: resolvedPaletteMap(defaults: defaults),
+            displayNames: rawColorDisplayNames(defaults: defaults),
+            labels: rawColorLabels(defaults: defaults),
+            preferences: SettingCatalog().workspaceColors.menuPreferences.value(in: defaults)
+        )
+    }
     /// Editable custom display names exactly as stored, before validation.
     static func rawColorDisplayNames(defaults: UserDefaults = .standard) -> [String: String] {
         defaults.dictionary(forKey: SettingCatalog().workspaceColors.displayNames.userDefaultsKey)
@@ -83,6 +91,7 @@ extension WorkspaceTabColorSettings {
             displayNames: rawColorDisplayNames(defaults: defaults),
             labels: rawColorLabels(defaults: defaults),
             builtInNames: Set(defaultPalette.map(\.name)),
+            preferences: SettingCatalog().workspaceColors.menuPreferences.value(in: defaults),
             targetHexes: targetHexes
         )
     }

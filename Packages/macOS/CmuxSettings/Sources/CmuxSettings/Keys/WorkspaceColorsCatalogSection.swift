@@ -2,6 +2,12 @@ import Foundation
 
 /// Settings under the dotted-id prefix `workspaceColors.*`.
 public struct WorkspaceColorsCatalogSection: SettingCatalogSection {
+    /// Local chooser presentation only; never changes palette resolution or assignments.
+    public let menuPreferences = DefaultsKey<WorkspaceColorMenuPreferences>(
+        id: "workspaceColors.menuPreferences",
+        defaultValue: WorkspaceColorMenuPreferences(),
+        userDefaultsKey: "workspaceTabColor.menuPreferences"
+    )
     // `workspaceColors.indicatorStyle` was removed 2026-07-31. Accent Strip is
     // no longer one style among three — it is how a coloured workspace row
     // renders, so there is nothing left to choose between. Stored
@@ -23,7 +29,14 @@ public struct WorkspaceColorsCatalogSection: SettingCatalogSection {
 
     public let palette = DefaultsKey<[String: String]>(
         id: "workspaceColors.colors",
-        defaultValue: [:],
+        // A missing key is the built-in palette; a stored empty dictionary is an
+        // intentionally empty palette. Do not collapse those two states in Settings.
+        defaultValue: [
+            "Red": "#C0392B", "Crimson": "#922B21", "Orange": "#A04000", "Amber": "#7D6608",
+            "Olive": "#4A5C18", "Green": "#196F3D", "Teal": "#006B6B", "Aqua": "#0E6B8C",
+            "Blue": "#1565C0", "Navy": "#1A5276", "Indigo": "#283593", "Purple": "#6A1B9A",
+            "Magenta": "#AD1457", "Rose": "#880E4F", "Brown": "#7B3F00", "Charcoal": "#3E4B5E"
+        ],
         userDefaultsKey: "workspaceTabColor.colors"
     )
 
