@@ -45,9 +45,13 @@ set -uo pipefail
 # Seams. Tests override these to simulate a running app, a failing rename, or
 # a fake clock; production never does. Each wraps exactly one external effect.
 # ---------------------------------------------------------------------------
-rbf_swap_app_running() { pgrep -f "$1/Contents/MacOS/" >/dev/null 2>&1; }
+# App names may contain regex characters, including dogfood's parentheses.
+rbf_swap_process_pattern() {
+  printf '%s' "$1/Contents/MacOS/" | sed 's/[][\\.^$*+?(){}|]/\\&/g'
+}
+rbf_swap_app_running() { pgrep -f "$(rbf_swap_process_pattern "$1")" >/dev/null 2>&1; }
 rbf_swap_request_quit() { osascript -e "tell application id \"$1\" to quit" >/dev/null 2>&1 || true; }
-rbf_swap_sigterm() { pkill -TERM -f "$1/Contents/MacOS/" 2>/dev/null || true; }
+rbf_swap_sigterm() { pkill -TERM -f "$(rbf_swap_process_pattern "$1")" 2>/dev/null || true; }
 # Launches the way the Dock would. The caller is often an agent inside cmux or
 # herdr, and `open` passes its environment to the app and every tab it opens:
 # its CMUX_* socket and surface, and HERDR_* pane variables that make each tab
@@ -172,7 +176,7 @@ rbf_swap_launch_detached() { # $1 staging_root, $2 log, $3 timeout_s, rest = arg
 # each message from the branch that knows it.
 rbf_swap_die() {
   printf 'error: %s\n' "$1" >&2
-  rbf_swap_notify "cmux RBF install failed" "${2:-$1 — see $SWAP_LOG_FILE}"
+  rbf_swap_notify "${SWAP_APP_NAME:-cmux RBF} install failed" "${2:-$1 — see $SWAP_LOG_FILE}"
   exit 1
 }
 
@@ -196,7 +200,7 @@ rbf_swap_quit_app() {
 
   # The step line prints unconditionally, matching the pre-split script —
   # inline output parity is a promise (brief: one deliberate difference only).
-  rbf_swap_step "quitting a running cmux RBF"
+  rbf_swap_step "quitting a running ${SWAP_APP_NAME:-cmux RBF}"
   rbf_swap_app_running "$install_path" || return 0
   rbf_swap_request_quit "$bundle_id"
 
@@ -205,7 +209,7 @@ rbf_swap_quit_app() {
   while rbf_swap_app_running "$install_path"; do
     [[ $waited -ge $timeout ]] && break
     if [[ "$mode" == "detached" && $waited -ge 10 && $notified -eq 0 ]]; then
-      rbf_swap_notify "cmux RBF is waiting on a dialog" \
+      rbf_swap_notify "${SWAP_APP_NAME:-cmux RBF} is waiting on a dialog" \
         "Dismiss it to continue the install."
       notified=1
     fi
@@ -218,12 +222,12 @@ rbf_swap_quit_app() {
   fi
 
   if rbf_swap_app_running "$install_path"; then
-    printf 'error: cmux RBF is still running after %ds and a SIGTERM.\n' "$timeout" >&2
+    printf 'error: %s is still running after %ds and a SIGTERM.\n' "${SWAP_APP_NAME:-cmux RBF}" "$timeout" >&2
     printf '       Refusing to force-quit — it is probably holding an unsaved-state\n' >&2
     printf '       or confirm-close dialog, and killing it would discard workspaces.\n' >&2
     printf '       Quit it by hand, then re-run. Nothing was written; the existing\n' >&2
     printf '       install at %s is untouched.\n' "$install_path" >&2
-    rbf_swap_notify "cmux RBF install aborted" \
+    rbf_swap_notify "${SWAP_APP_NAME:-cmux RBF} install aborted" \
       "The app never quit (a dialog?). Nothing was changed. See $SWAP_LOG_FILE"
     return 1
   fi
@@ -288,15 +292,28 @@ rbf_swap_install() {
 # nothing here names.
 # ---------------------------------------------------------------------------
 rbf_swap_migrate() {
-  local first_install="$1" upstream_bundle_id="$2"
+  local first_install="$1" upstream_bundle_id="$2" channel="${3:-rbf}" migration_status
   SWAP_MIGRATION_RESULT="skipped (existing install)"
   if [[ "$first_install" -eq 1 ]]; then
-    rbf_swap_step "migrating state from upstream (first install only)"
-    bash "$SWAP_MIGRATE_SCRIPT" 2>&1 | sed 's/^/  /'
-    if [[ ${PIPESTATUS[0]} -eq 0 ]]; then
+    rbf_swap_step "copying initial saved state ($channel)"
+    if [[ "$channel" == dogfood ]]; then
+      bash "$SWAP_MIGRATE_SCRIPT" --dogfood 2>&1 | sed 's/^/  /'
+      migration_status=${PIPESTATUS[0]}
+    else
+      bash "$SWAP_MIGRATE_SCRIPT" 2>&1 | sed 's/^/  /'
+      migration_status=${PIPESTATUS[0]}
+    fi
+    if [[ "$migration_status" -eq 0 ]]; then
       SWAP_MIGRATION_RESULT="migrated from $upstream_bundle_id"
+      if [[ "$channel" == dogfood ]]; then
+        SWAP_MIGRATION_RESULT="copied initial regular RBF state; independent dogfood saves"
+      fi
     else
       SWAP_MIGRATION_RESULT="FAILED — run rbf/scripts/migrate-rbf-state.sh --reclone"
+      if [[ "$channel" == dogfood ]]; then
+        printf 'error: dogfood installed but state copy failed; run make migrate-dogfood-state\n' >&2
+        return 1
+      fi
     fi
   fi
 }
@@ -307,6 +324,7 @@ Usage (from install-rbf.sh only): rbf-swap.sh --mode inline|detached \
   --staged-app P --staging-root P --rollback-root P --install-path P \
   --bundle-id ID --upstream-bundle-id ID --upstream-path P \
   --first-install 0|1 --rbf-version V --git-commit SHA --log-file P
+  [--app-name NAME] [--migration-channel rbf|dogfood]
 
 install-rbf.sh picks the mode: inline (live output, any ordinary terminal)
 or detached (daemonized; log + notifications + relaunch) when the invoking
@@ -319,6 +337,7 @@ rbf_swap_main() {
   SWAP_INSTALL_PATH="" SWAP_BUNDLE_ID="" SWAP_UPSTREAM_BUNDLE_ID=""
   SWAP_UPSTREAM_PATH="" SWAP_FIRST_INSTALL="" SWAP_RBF_VERSION=""
   SWAP_GIT_COMMIT="" SWAP_LOG_FILE=""
+  SWAP_APP_NAME="cmux RBF" SWAP_MIGRATION_CHANNEL=rbf
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -328,6 +347,8 @@ rbf_swap_main() {
       --rollback-root)       SWAP_ROLLBACK_ROOT="$2"; shift 2 ;;
       --install-path)        SWAP_INSTALL_PATH="$2"; shift 2 ;;
       --bundle-id)           SWAP_BUNDLE_ID="$2"; shift 2 ;;
+      --app-name)            SWAP_APP_NAME="$2"; shift 2 ;;
+      --migration-channel)   SWAP_MIGRATION_CHANNEL="$2"; shift 2 ;;
       --upstream-bundle-id)  SWAP_UPSTREAM_BUNDLE_ID="$2"; shift 2 ;;
       --upstream-path)       SWAP_UPSTREAM_PATH="$2"; shift 2 ;;
       --first-install)       SWAP_FIRST_INSTALL="$2"; shift 2 ;;
@@ -351,6 +372,11 @@ rbf_swap_main() {
   done
   case "$SWAP_MODE" in inline|detached) ;; *)
     printf 'error: rbf-swap.sh: --mode must be inline or detached, got: %s\n' "$SWAP_MODE" >&2
+    return 2 ;;
+  esac
+
+  case "$SWAP_MIGRATION_CHANNEL" in rbf|dogfood) ;; *)
+    printf 'error: rbf-swap.sh: --migration-channel must be rbf or dogfood\n' >&2
     return 2 ;;
   esac
 
@@ -382,7 +408,7 @@ rbf_swap_main() {
   rbf_swap_step "installing"
   rbf_swap_install "$SWAP_STAGED_APP" "$SWAP_INSTALL_PATH" "$SWAP_ROLLBACK_ROOT"
 
-  rbf_swap_migrate "$SWAP_FIRST_INSTALL" "$SWAP_UPSTREAM_BUNDLE_ID"
+  rbf_swap_migrate "$SWAP_FIRST_INSTALL" "$SWAP_UPSTREAM_BUNDLE_ID" "$SWAP_MIGRATION_CHANNEL" || return 1
 
   printf '\n✓ installed\n'
   printf '  %s\n' "$SWAP_INSTALL_PATH"
@@ -393,7 +419,7 @@ rbf_swap_main() {
 
   if [[ "$SWAP_MODE" == "detached" ]]; then
     rbf_swap_relaunch "$SWAP_INSTALL_PATH" || true
-    rbf_swap_notify "cmux RBF $SWAP_RBF_VERSION installed" \
+    rbf_swap_notify "$SWAP_APP_NAME $SWAP_RBF_VERSION installed" \
       "Swap complete; the app has relaunched. Log: $SWAP_LOG_FILE"
   fi
   return 0

@@ -7,8 +7,8 @@
 #   # shellcheck source=rbf/scripts/lib/rbf-install-target.sh
 #   source "$SCRIPT_DIR/lib/rbf-install-target.sh"
 #
-# THE INSTALL TARGET IS NOT A PARAMETER. It comes from rbf-channel.env and
-# nothing else — no flag, no environment override, no argument reaches it. The
+# Install identities come from fixed regular/dogfood channel records. The
+# caller may select the channel, never an arbitrary path or bundle identifier. The
 # installer has no way to be aimed, which is why the refusal paths below are
 # unreachable from the real entry point and this file is the only honest place
 # to prove they work. See the brief's Decisions log (2026-08-01).
@@ -104,11 +104,23 @@ rbf_channel_load() {
   if [[ -z "$lib_dir" ]]; then
     lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   fi
-  local record="${lib_dir}/rbf-channel.env"
+  local channel="${2:-rbf}" record
+  case "$channel" in
+    rbf) record="${lib_dir}/rbf-channel.env" ;;
+    dogfood) record="${lib_dir}/rbf-dogfood-channel.env" ;;
+    *) printf 'error: unknown install channel: %s\n' "$channel" >&2; return 1 ;;
+  esac
 
   if [[ ! -r "$record" ]]; then
     printf 'error: channel record not readable: %s\n' "$record" >&2
     return 1
+  fi
+
+  # Reset protection when a caller resolves both channels in one shell.
+  RBF_PROTECTED_INSTALL_PATH="" RBF_PROTECTED_BUNDLE_ID=""
+  if [[ "$channel" == dogfood ]]; then
+    RBF_PROTECTED_INSTALL_PATH="$(source "$lib_dir/rbf-channel.env"; printf '%s' "$RBF_INSTALL_PATH")"
+    RBF_PROTECTED_BUNDLE_ID="$(source "$lib_dir/rbf-channel.env"; printf '%s' "$RBF_BUNDLE_ID")"
   fi
 
   # shellcheck disable=SC1090
@@ -173,6 +185,22 @@ rbf_assert_safe_target() {
       ;;
   esac
 
+  # Dogfood must also protect the regular fork, including a destination
+  # symlink that resolves into its bundle.
+  if [[ -n "${RBF_PROTECTED_INSTALL_PATH:-}" ]]; then
+    local protected
+    protected="$(rbf_physical_path "$RBF_PROTECTED_INSTALL_PATH")"
+    case "$resolved/" in
+      "$protected/"|"$protected/"*)
+        printf 'error: refusing — dogfood target resolves onto regular RBF: %s\n' "$resolved" >&2
+        return 1 ;;
+    esac
+    if [[ "$bundle_id" == "$RBF_PROTECTED_BUNDLE_ID" || "$plugin_id" == "$RBF_PROTECTED_BUNDLE_ID" ]]; then
+      printf 'error: refusing — dogfood bundle ids collide with regular RBF: %s\n' "$RBF_PROTECTED_BUNDLE_ID" >&2
+      return 1
+    fi
+  fi
+
   case "$resolved" in
     *.app) ;;
     *)
@@ -188,7 +216,7 @@ rbf_assert_safe_target() {
 # as KEY=value lines on stdout. Same call the installer makes, --dry-run makes,
 # and the test makes — so a preview cannot disagree with a real run.
 rbf_resolve_install_target() {
-  rbf_channel_load "${1:-}" || return 1
+  rbf_channel_load "${1:-}" "${2:-rbf}" || return 1
   rbf_assert_safe_target || return 1
 
   printf 'RBF_APP_NAME=%s\n'           "$RBF_APP_NAME"

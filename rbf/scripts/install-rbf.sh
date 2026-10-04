@@ -2,12 +2,11 @@
 # install-rbf.sh — build this checkout and install it as `cmux RBF.app`,
 # alongside upstream's cmux rather than replacing it.
 #
-#   rbf/scripts/install-rbf.sh [--dry-run]
+#   rbf/scripts/install-rbf.sh [--dogfood] [--dry-run]
 #
-# THERE IS NO TARGET FLAG, DELIBERATELY. The install path and both bundle ids
-# come from rbf/scripts/lib/rbf-channel.env via the resolver, and nothing an
-# argument can reach. Aiming an installer that writes to /Applications is the
-# dangerous capability; the design choice was that it must not exist rather
+# --dogfood selects a second fixed channel record. Neither channel permits
+# an arbitrary install path or bundle id. Both use the same build and swap.
+# Aiming an installer at an arbitrary /Applications path is the dangerous capability; the design choice was that it must not exist rather
 # than exist and be blocked. The refusal paths are proved in
 # rbf/scripts/lib/rbf-install-target.test.sh, the only place they are reachable.
 #
@@ -68,26 +67,30 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/lib/rbf-install-target.sh"
 
 DRY_RUN=0
+INSTALL_CHANNEL=rbf
 
 usage() {
   cat <<'USAGE'
-Usage: rbf/scripts/install-rbf.sh [--dry-run]
+Usage: rbf/scripts/install-rbf.sh [--dogfood] [--dry-run]
 
 Build this checkout and install it as `cmux RBF.app` in /Applications, beside
 upstream's cmux. Upstream's install is never read, written, or replaced.
 
 Options:
+  --dogfood   Install cmux RBF (dogfood) with separate identity and saved state;
+              seed its first layout from regular RBF; later updates preserve dogfood state.
   --dry-run   Print the plan -- target path, both bundle ids, signing identity,
               and the state-migration decision -- then exit without building.
   -h, --help  Show this help.
 
-There is intentionally no option to change the install path or bundle id.
+Only the two fixed channels are available; paths and bundle ids are not options.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
+    --dogfood) INSTALL_CHANNEL=dogfood; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'error: unknown option: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -98,7 +101,7 @@ step() { printf '⋯ %s\n' "$1"; }
 
 # Load and validate the channel record before anything reads RBF_* — this is
 # the resolver's own guard (rbf-install-target.sh), not Guard 1 below.
-rbf_channel_load "$SCRIPT_DIR/lib" || exit 1
+rbf_channel_load "$SCRIPT_DIR/lib" "$INSTALL_CHANNEL" || exit 1
 rbf_assert_safe_target || exit 1
 
 # ---------------------------------------------------------------------------
@@ -119,6 +122,7 @@ rbf_assert_safe_target || exit 1
 source "$SCRIPT_DIR/lib/rbf-swap.sh"
 SWAP_MODE="$(rbf_swap_mode "$RBF_BUNDLE_ID")"
 SWAP_LOG="${HOME}/Library/Logs/cmux-rbf/install.log"
+[[ "$INSTALL_CHANNEL" == dogfood ]] && SWAP_LOG="${HOME}/Library/Logs/cmux-rbf/install-dogfood.log"
 # Generous on purpose: a healthy helper claims in milliseconds, so waiting costs
 # nothing, while a false timeout costs the user the session they are sitting in.
 SWAP_CLAIM_TIMEOUT_S=30
@@ -126,23 +130,14 @@ SWAP_CLAIM_TIMEOUT_S=30
 # ---------------------------------------------------------------------------
 # Guard 2 — a stable signing identity, or nothing.
 #
-# Deliberately the OPPOSITE of reload.sh:1071, which warns and falls back to
-# ad-hoc. macOS keys TCC grants (Accessibility, Screen Recording, Full Disk
-# Access) to the code-signing designated requirement; an ad-hoc install changes
-# it every build and silently drops every permission. For a throwaway tagged
-# build that is a shrug. For the app you live in it is not.
+# Builds and installs share the same stable certificate contract. macOS keys
+# TCC grants to the code-signing requirement, so an ad-hoc replacement can
+# invalidate the saved permission even when its bundle identifier is unchanged.
 # ---------------------------------------------------------------------------
-CODESIGN_IDENTITY="${CMUX_DEV_CODESIGN_IDENTITY:-cmux Dev Signing}"
-if ! security find-identity -v -p codesigning 2>/dev/null | grep -Fq "$CODESIGN_IDENTITY"; then
-  printf 'error: signing identity not found: %s\n' "$CODESIGN_IDENTITY" >&2
-  printf '       Not falling back to ad-hoc signing: that changes the designated\n' >&2
-  printf '       requirement on every install, so macOS drops every permission\n' >&2
-  printf '       you have granted (Accessibility, Screen Recording, Full Disk).\n' >&2
-  printf '       Create it once in Keychain Access (Certificate Assistant →\n' >&2
-  printf '       Create a Certificate → Code Signing, self-signed), or set\n' >&2
-  printf '       CMUX_DEV_CODESIGN_IDENTITY to one you already have.\n' >&2
-  exit 1
-fi
+# shellcheck source=rbf/scripts/lib/rbf-signing.sh
+source "$SCRIPT_DIR/lib/rbf-signing.sh"
+rbf_configure_dev_signing || exit 1
+CODESIGN_IDENTITY="$CMUX_DEV_CODESIGN_IDENTITY"
 
 # ---------------------------------------------------------------------------
 # Guard 3 — a Zig ghostty will accept, or nothing.
@@ -179,13 +174,14 @@ fi
 # a Release install that dies in a script phase costs a full compile first.
 # shellcheck source=rbf/scripts/lib/rbf-metal.sh
 source "$SCRIPT_DIR/lib/rbf-metal.sh"
-rbf_ensure_metal_toolchain --required || die "no runnable Metal compiler; see rbf/scripts/lib/rbf-metal.sh"
-TOOLCHAINS="$CMUX_METAL_TOOLCHAIN" "$REPO_ROOT/scripts/ensure-ghosttykit.sh" \
-  || die "GhosttyKit build failed"
 
 RBF_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/rbf/VERSION" 2>/dev/null || true)"
 [[ -n "$RBF_VERSION" ]] || die "rbf/VERSION is empty or unreadable"
-GIT_COMMIT="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [[ -d "$REPO_ROOT/.jj" ]]; then
+  GIT_COMMIT="$(jj --ignore-working-copy --no-pager -R "$REPO_ROOT" log -r @ --no-graph -T 'commit_id.short(12)' 2>/dev/null || echo unknown)"
+else
+  GIT_COMMIT="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+fi
 
 INSTALL_PATH="$(rbf_physical_path "$RBF_INSTALL_PATH")"
 STAGING_ROOT="$(dirname "$INSTALL_PATH")/.cmux-rbf-staging.$$"
@@ -210,9 +206,13 @@ ROLLBACK_ROOT="$(dirname "$INSTALL_PATH")/.cmux-rbf-rollback.$$"
 # internal, both throwaway, and reached only when the drive is unplugged.
 # shellcheck source=rbf/scripts/lib/rbf-tmp.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-tmp.sh"
+TMP_RESOLVE_MODE=""
+[[ "$DRY_RUN" -eq 1 ]] && TMP_RESOLVE_MODE=--no-create
 DERIVED_DATA="${CMUX_RBF_DERIVED_DATA:-}"
-if [[ -z "$DERIVED_DATA" ]]; then
-  DERIVED_DATA="$(rbf_tmp_dir "cmux-rbf-cm-17-install")/derived"
+if [[ "$INSTALL_CHANNEL" == dogfood ]]; then
+  DERIVED_DATA="${CMUX_DOGFOOD_DERIVED_DATA:-$(rbf_tmp_dir "cmux-rbf-dogfood-install" "$TMP_RESOLVE_MODE")/derived}"
+elif [[ -z "$DERIVED_DATA" ]]; then
+  DERIVED_DATA="$(rbf_tmp_dir "cmux-rbf-cm-17-install" "$TMP_RESOLVE_MODE")/derived"
 fi
 
 # Is this a first install? Decides whether state migration runs. Destination
@@ -220,13 +220,14 @@ fi
 FIRST_INSTALL=0
 [[ -d "$INSTALL_PATH" ]] || FIRST_INSTALL=1
 
-printf 'cmux RBF install plan\n'
+printf '%s install plan\n' "$RBF_APP_NAME"
 printf '  app name       %s\n'  "$RBF_APP_NAME"
 printf '  bundle id      %s\n'  "$RBF_BUNDLE_ID"
 printf '  plugin id      %s\n'  "$RBF_PLUGIN_BUNDLE_ID"
 printf '  install path   %s\n'  "$INSTALL_PATH"
 printf '  icon set       %s\n'  "$RBF_ICON_SET"
 printf '  rbf version    %s (%s)\n' "$RBF_VERSION" "$GIT_COMMIT"
+printf '  source         %s (working copy)\n' "$REPO_ROOT"
 printf '  signing        %s\n'  "$CODESIGN_IDENTITY"
 printf '  zig            %s\n'  "$ZIG_STATUS"
 printf '  derived data   %s\n'  "$DERIVED_DATA"
@@ -237,7 +238,14 @@ else
   printf '  swap           inline — live output in this terminal\n'
 fi
 printf '  upstream       %s (never touched)\n' "$UPSTREAM_INSTALL_PATH"
-if [[ $FIRST_INSTALL -eq 1 ]]; then
+if [[ "$INSTALL_CHANNEL" == dogfood ]]; then
+  if [[ $FIRST_INSTALL -eq 1 ]]; then
+    printf '  state          first install — copy layout from regular RBF\n'
+  else
+    printf '  state          dogfood state preserved; migrate-dogfood-state fills missing stores\n'
+  fi
+  printf '  regular RBF    read only; independent dogfood saves\n'
+elif [[ $FIRST_INSTALL -eq 1 ]]; then
   printf '  state          first install — will migrate from %s\n' "$UPSTREAM_BUNDLE_ID"
 else
   printf '  state          existing install — RBF state preserved, not re-cloned\n'
@@ -248,7 +256,12 @@ if [[ $DRY_RUN -eq 1 ]]; then
   printf 'dry run — nothing built, nothing written.\n'
   if [[ $FIRST_INSTALL -eq 1 ]]; then
     printf '\nstate migration would run:\n'
-    bash "$SCRIPT_DIR/migrate-rbf-state.sh" --dry-run 2>&1 | sed 's/^/  /'
+    if [[ "$INSTALL_CHANNEL" == dogfood ]]; then
+      bash "$SCRIPT_DIR/migrate-rbf-state.sh" --dogfood --dry-run
+    else
+      bash "$SCRIPT_DIR/migrate-rbf-state.sh" --dry-run
+    fi
+    exit $?
   fi
   exit 0
 fi
@@ -263,6 +276,9 @@ fi
 # reason before exiting. Do not put a condition in front of it — the previous
 # `[[ -z "${CMUX_ZIG:-}" ]]` made a wrong CMUX_ZIG the one input that skipped it.
 rbf_ensure_zig --required || exit 1
+rbf_ensure_metal_toolchain --required || die "no runnable Metal compiler; see rbf/scripts/lib/rbf-metal.sh"
+TOOLCHAINS="$CMUX_METAL_TOOLCHAIN" "$REPO_ROOT/scripts/ensure-ghosttykit.sh" \
+  || die "GhosttyKit build failed"
 
 # Claim-aware: once the swap helper has claimed staging (atomic mkdir of the
 # sentinel — rbf_swap_claim_path in lib/rbf-swap.sh), this trap owns nothing
@@ -365,7 +381,7 @@ done < <(find "$STAGED_APP/Contents/PlugIns" "$STAGED_APP/Contents/Frameworks" \
 
 codesign --force --deep --timestamp=none \
   --sign "$CODESIGN_IDENTITY" "$STAGED_APP" || die "failed to sign $STAGED_APP"
-codesign --verify --deep --strict "$STAGED_APP" || die "signature verification failed"
+rbf_verify_dev_signing "$STAGED_APP" || die "stable signature verification failed"
 
 # ---------------------------------------------------------------------------
 # The tail — quit, swap, migrate, report — lives in lib/rbf-swap.sh since
@@ -382,6 +398,8 @@ SWAP_ARGS=(
   --rollback-root "$ROLLBACK_ROOT"
   --install-path "$INSTALL_PATH"
   --bundle-id "$RBF_BUNDLE_ID"
+  --app-name "$RBF_APP_NAME"
+  --migration-channel "$INSTALL_CHANNEL"
   --upstream-bundle-id "$UPSTREAM_BUNDLE_ID"
   --upstream-path "$UPSTREAM_INSTALL_PATH"
   --first-install "$FIRST_INSTALL"
@@ -426,7 +444,7 @@ fi
 # The claim-aware trap above is already inert; this disarm is hygiene.
 trap - EXIT
 
-printf '\n⋯ handing off — cmux RBF will quit, ending ALL its shells and agents, then swap and relaunch.\n'
+printf '\n⋯ handing off — %s will quit, ending ALL its shells and agents, then swap and relaunch.\n' "$RBF_APP_NAME"
 printf '  log: %s\n' "$SWAP_LOG"
 printf '  a notification will confirm success or failure.\n'
 exit 0

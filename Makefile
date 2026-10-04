@@ -28,7 +28,7 @@
 # git worktrees with uncommitted work, and nothing distinguishes dead from
 # dormant. So it refuses without an explicit list. Read the descriptions, not the
 # shared `clean-` prefix; a dogfooder assumed symmetry and predicted backwards.
-.PHONY: help setup run build test install install-rbf install-rbf-plan clean-builds clean-builds-plan clean-tmp clean-tmp-plan
+.PHONY: help setup run build test install install-rbf install-rbf-plan install-dogfood install-dogfood-plan migrate-dogfood-state migrate-dogfood-state-plan clean-builds clean-builds-plan clean-tmp clean-tmp-plan
 
 DEV := rbf/scripts/dev.sh
 
@@ -51,7 +51,9 @@ help: ## Show this help
 		"make clean-tmp-plan"         "DRY RUN - list external-tmp build dirs with sizes" \
 		"make clean-tmp REMOVE=\"a b\"" "delete those two by name; refuses live ones" \
 		"make install-rbf"            "build + REPLACE /Applications/cmux RBF.app (~10 min)" \
-		"make install-rbf-plan"       "DRY RUN - preview only, nothing is written"
+		"make install-rbf-plan"       "DRY RUN - preview only, nothing is written" \
+		"make install-dogfood"        "build + install cmux RBF (dogfood), keeping regular RBF" \
+		"make install-dogfood-plan"   "DRY RUN - preview the separate dogfood install"
 	@echo
 	@if [ -n "$(BUILD_ID)" ]; then \
 		echo "  current build-id: $$($(DEV) build-id)   (from BUILD_ID=, overriding your branch)"; \
@@ -85,6 +87,18 @@ install-rbf: ## Build and install `cmux RBF.app` into /Applications (replaces it
 
 install-rbf-plan: ## DRY RUN - print the install plan, build nothing, write nothing
 	@rbf/scripts/install-rbf.sh --dry-run
+
+install-dogfood: ## Build and install cmux RBF (dogfood) alongside regular RBF
+	@rbf/scripts/install-rbf.sh --dogfood
+
+install-dogfood-plan: ## DRY RUN - preview dogfood, build nothing, write nothing
+	@rbf/scripts/install-rbf.sh --dogfood --dry-run
+
+migrate-dogfood-state: ## Fill missing dogfood state from regular RBF (quit dogfood first)
+	@rbf/scripts/migrate-rbf-state.sh --dogfood
+
+migrate-dogfood-state-plan: ## DRY RUN - preview copying missing RBF state into dogfood
+	@rbf/scripts/migrate-rbf-state.sh --dogfood --dry-run
 
 install: ## (renamed) Use install-rbf - this is NOT dependency setup
 	@echo 'make install was renamed to `make install-rbf`.'

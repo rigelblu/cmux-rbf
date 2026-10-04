@@ -7,6 +7,15 @@ source "$SCRIPT_DIR/lib/mobile-attach.sh"
 # shellcheck source=scripts/lib/dev-secrets.sh
 source "$SCRIPT_DIR/lib/dev-secrets.sh"
 
+# RBF owns a stable default shared by make test and the installer. Keep this
+# optional so the upstream script remains usable without the fork's helpers.
+RBF_STABLE_SIGNING_ENABLED=0
+if [[ -f "$SCRIPT_DIR/../rbf/scripts/lib/rbf-signing.sh" ]]; then
+  # shellcheck source=rbf/scripts/lib/rbf-signing.sh
+  source "$SCRIPT_DIR/../rbf/scripts/lib/rbf-signing.sh"
+  RBF_STABLE_SIGNING_ENABLED=1
+fi
+
 APP_NAME="cmux DEV"
 BUNDLE_ID="com.cmuxterm.app.debug"
 BASE_APP_NAME="cmux DEV"
@@ -1401,6 +1410,10 @@ if should_skip_ghostty_cli_helper_zig_build; then
   export CMUX_SKIP_ZIG_BUILD=1
 fi
 
+if [[ "$RBF_STABLE_SIGNING_ENABLED" == "1" ]]; then
+  rbf_configure_dev_signing || exit 1
+fi
+
 XCODEBUILD_ARGS=(
   -project cmux.xcodeproj
   -scheme cmux
@@ -1424,6 +1437,9 @@ if [[ -z "$TAG" ]]; then
   )
 fi
 XCODEBUILD_ARGS+=(PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID")
+if [[ "$RBF_STABLE_SIGNING_ENABLED" == "1" ]]; then
+  XCODEBUILD_ARGS+=(CODE_SIGN_IDENTITY="$CMUX_DEV_CODESIGN_IDENTITY" CODE_SIGN_STYLE=Manual)
+fi
 # The helper is assembled before Xcode emits the host's processed Info.plist.
 # Pass the final tagged display name explicitly so its TCC entry matches the
 # app the user is dogfooding instead of falling back to the untagged product.
@@ -1800,12 +1816,16 @@ fi
 # requirement, so every rebuild looks like a brand-new app and macOS re-prompts
 # for things like removable-volume access — and leaves a dead Settings row behind.
 # Signing with a stable identity yields an identifier-based requirement instead,
-# so a single grant survives rebuilds. Opt in by exporting a codesigning identity
-# (see `security find-identity -v -p codesigning`):
-#   export CMUX_DEV_CODESIGN_IDENTITY="cmux Dev Signing"
+# so a single grant survives rebuilds. RBF resolves its existing stable
+# certificate before building; CMUX_DEV_CODESIGN_IDENTITY can select another.
+# The upstream path without the RBF helper retains its optional identity.
 CODESIGN_IDENTITY="${CMUX_DEV_CODESIGN_IDENTITY:--}"
 if [[ "$CODESIGN_IDENTITY" != "-" ]] \
   && ! /usr/bin/codesign --force --sign "$CODESIGN_IDENTITY" --timestamp=none --generate-entitlement-der "$APP_PATH" >/dev/null 2>&1; then
+  if [[ "$RBF_STABLE_SIGNING_ENABLED" == "1" ]]; then
+    echo "error: stable signing failed; refusing to replace or launch an ad-hoc cmux build" >&2
+    exit 1
+  fi
   echo "warning: codesign with CMUX_DEV_CODESIGN_IDENTITY='$CODESIGN_IDENTITY' failed; falling back to ad-hoc (macOS will re-prompt for permissions)" >&2
   CODESIGN_IDENTITY="-"
 fi
@@ -1817,6 +1837,14 @@ if [[ "$CODESIGN_IDENTITY" == "-" ]] \
     echo "error: codesign failed for $APP_PATH" >&2
     exit 1
   fi
+fi
+if [[ "$RBF_STABLE_SIGNING_ENABLED" == "1" ]]; then
+  rbf_verify_dev_signing "$APP_PATH" || exit 1
+  # Seed after final signing and before launch, including direct reload callers.
+  # Missing Full Disk Access remains a warning, never a new system permission.
+  # shellcheck source=rbf/scripts/lib/rbf-tcc-preseed.sh
+  source "$SCRIPT_DIR/../rbf/scripts/lib/rbf-tcc-preseed.sh"
+  RBF_REPO_ROOT="$PWD" rbf_tcc_preseed "$BUNDLE_ID"
 fi
 if [[ -n "${TAG_APP_FINAL_PATH:-}" && -n "${TAG_APP_STAGING_PATH:-}" ]]; then
   rm -rf "$TAG_APP_FINAL_PATH"
@@ -1841,9 +1869,9 @@ if [[ -n "$TAG" ]]; then
   sleep 0.3
   pkill -f "${APP_NAME}.app/Contents/MacOS/${BASE_APP_NAME}" || true
   sleep 0.3
-  # Tagged --launch runs are handed off to launchd so they survive the terminal or
-  # automation process that invoked reload.sh. Remove a still-registered prior job
-  # after giving the app a chance to quit gracefully.
+  # Remove a still-registered job from an older launchd-based reload after
+  # giving the app a chance to quit gracefully. RBF launches now preserve the
+  # invoking terminal's permission attribution through a direct native launch.
   /bin/launchctl bootout "$TAG_LAUNCHD_DOMAIN/$TAG_LAUNCHD_LABEL" >/dev/null 2>&1 || true
   /bin/launchctl remove "$TAG_LAUNCHD_LABEL" >/dev/null 2>&1 || true
 fi
@@ -1993,11 +2021,8 @@ if [[ "$LAUNCH" -eq 1 ]]; then
   LAUNCH_CMD=()
   LAUNCH_RETRY_CMD=()
   if [[ -n "${TAG_SLUG:-}" ]]; then
-    # Launch tagged apps through an explicit one-shot launchd job. `launchctl
-    # submit` infers KeepAlive for app executables, which relaunches the app after
-    # the user chooses Quit. A loaded plist with KeepAlive=false still survives
-    # the invoking terminal/automation process, while a normal exit stays exited.
-    # It also avoids LaunchServices reusing stale LSEnvironment values.
+    # Execute the tagged binary with explicit environment values so stale
+    # LaunchServices state cannot override its socket or resource paths.
     APP_EXECUTABLE="$APP_PATH/Contents/MacOS/${BASE_APP_NAME}"
     if [[ ! -x "$APP_EXECUTABLE" ]]; then
       echo "error: tagged app executable not found: $APP_EXECUTABLE" >&2
@@ -2014,14 +2039,9 @@ if [[ "$LAUNCH" -eq 1 ]]; then
         CMUXD_UNIX_PATH="$CMUXD_SOCKET"
       )
     fi
-    TAG_LAUNCH_PLIST="$CMUX_TAG_LAUNCH_LOG_DIRECTORY/$TAG_LAUNCHD_LABEL.plist"
-    /usr/bin/plutil -create xml1 "$TAG_LAUNCH_PLIST"
-    /usr/bin/plutil -insert Label -string "$TAG_LAUNCHD_LABEL" "$TAG_LAUNCH_PLIST"
-    # A launchd job inherits the GUI domain environment even when the plist has
-    # its own EnvironmentVariables dictionary. That domain can contain stale
-    # test/socket overrides from another dev session. Run through `env -i` so
-    # the app receives only the ordinary user context and this tag's explicit
-    # values; `env` execs the app in place, so launchd still tracks its lifetime.
+    # Neither the invoking shell nor launchd's GUI domain may leak ambient
+    # test/socket overrides into this tag. env -i supplies only ordinary user
+    # context and this tag's explicit values, then execs the native app.
     TAG_LAUNCH_PROGRAM_ARGUMENTS=(
       /usr/bin/env
       -i
@@ -2036,21 +2056,35 @@ if [[ "$LAUNCH" -eq 1 ]]; then
       TAG_LAUNCH_PROGRAM_ARGUMENTS+=(SSH_AUTH_SOCK="$SSH_AUTH_SOCK")
     fi
     TAG_LAUNCH_PROGRAM_ARGUMENTS+=("${TAG_LAUNCH_ENV[@]}" "$APP_EXECUTABLE")
-    /usr/bin/plutil -insert ProgramArguments -array "$TAG_LAUNCH_PLIST"
-    for TAG_LAUNCH_ARGUMENT_INDEX in "${!TAG_LAUNCH_PROGRAM_ARGUMENTS[@]}"; do
-      /usr/bin/plutil -insert "ProgramArguments.$TAG_LAUNCH_ARGUMENT_INDEX" \
-        -string "${TAG_LAUNCH_PROGRAM_ARGUMENTS[$TAG_LAUNCH_ARGUMENT_INDEX]}" \
-        "$TAG_LAUNCH_PLIST"
-    done
-    /usr/bin/plutil -insert RunAtLoad -bool true "$TAG_LAUNCH_PLIST"
-    /usr/bin/plutil -insert KeepAlive -bool false "$TAG_LAUNCH_PLIST"
-    /usr/bin/plutil -insert ProcessType -string Interactive "$TAG_LAUNCH_PLIST"
-    /usr/bin/plutil -insert StandardOutPath -string "$TAG_LAUNCH_LOG" "$TAG_LAUNCH_PLIST"
-    /usr/bin/plutil -insert StandardErrorPath -string "$TAG_LAUNCH_LOG" "$TAG_LAUNCH_PLIST"
-    chmod 0600 "$TAG_LAUNCH_PLIST"
-    if ! /bin/launchctl bootstrap "$TAG_LAUNCHD_DOMAIN" "$TAG_LAUNCH_PLIST"; then
-      echo "error: failed to bootstrap one-shot tagged launch job: $TAG_LAUNCHD_LABEL" >&2
-      exit 1
+    if [[ "$RBF_STABLE_SIGNING_ENABLED" == "1" ]]; then
+      # cmux-rbf: preserve the invoking terminal's TCC responsibility. A new
+      # launchd job discards it, requiring FDA separately for every bundle ID.
+      # nohup survives the launcher's exit without a KeepAlive job; Quit stays
+      # exited. Close saved output descriptors so caller pipelines reach EOF.
+      # Reject the launchd-only path on upstream sync (cm-39/40).
+      /usr/bin/nohup "${TAG_LAUNCH_PROGRAM_ARGUMENTS[@]}" \
+        </dev/null >"$TAG_LAUNCH_LOG" 2>&1 3>&- 4>&- &
+    else
+      # Upstream builds retain the one-shot launchd lifetime policy.
+      TAG_LAUNCH_PLIST="$CMUX_TAG_LAUNCH_LOG_DIRECTORY/$TAG_LAUNCHD_LABEL.plist"
+      /usr/bin/plutil -create xml1 "$TAG_LAUNCH_PLIST"
+      /usr/bin/plutil -insert Label -string "$TAG_LAUNCHD_LABEL" "$TAG_LAUNCH_PLIST"
+      /usr/bin/plutil -insert ProgramArguments -array "$TAG_LAUNCH_PLIST"
+      for TAG_LAUNCH_ARGUMENT_INDEX in "${!TAG_LAUNCH_PROGRAM_ARGUMENTS[@]}"; do
+        /usr/bin/plutil -insert "ProgramArguments.$TAG_LAUNCH_ARGUMENT_INDEX" \
+          -string "${TAG_LAUNCH_PROGRAM_ARGUMENTS[$TAG_LAUNCH_ARGUMENT_INDEX]}" \
+          "$TAG_LAUNCH_PLIST"
+      done
+      /usr/bin/plutil -insert RunAtLoad -bool true "$TAG_LAUNCH_PLIST"
+      /usr/bin/plutil -insert KeepAlive -bool false "$TAG_LAUNCH_PLIST"
+      /usr/bin/plutil -insert ProcessType -string Interactive "$TAG_LAUNCH_PLIST"
+      /usr/bin/plutil -insert StandardOutPath -string "$TAG_LAUNCH_LOG" "$TAG_LAUNCH_PLIST"
+      /usr/bin/plutil -insert StandardErrorPath -string "$TAG_LAUNCH_LOG" "$TAG_LAUNCH_PLIST"
+      chmod 0600 "$TAG_LAUNCH_PLIST"
+      if ! /bin/launchctl bootstrap "$TAG_LAUNCHD_DOMAIN" "$TAG_LAUNCH_PLIST"; then
+        echo "error: failed to bootstrap one-shot tagged launch job: $TAG_LAUNCHD_LABEL" >&2
+        exit 1
+      fi
     fi
   else
     echo "/tmp/cmux-debug.sock" > /tmp/cmux-last-socket-path || true
