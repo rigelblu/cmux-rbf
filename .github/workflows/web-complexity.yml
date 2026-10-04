@@ -1,15 +1,8 @@
 name: Web complexity candidate
 
 on:
-  # This is a fast, contributor-side diagnostic. The authoritative required
-  # check runs from the base branch in web-complexity-trusted.yml.
-  pull_request:
-  push:
-    branches:
-      - main
-    paths:
-      - web/**
-      - .github/workflows/web-complexity.yml
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

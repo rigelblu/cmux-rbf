@@ -1,23 +1,7 @@
 name: Agent notification semantics
 on:
-  pull_request:
-    paths:
-      - Packages/macOS/CmuxAgentJournal/**
-      - CLI/*Notification*.swift
-      - CLI/CMUXCLI+AgentJournalEmission.swift
-      - CLI/CMUXCLI+VMTui.swift
-      - CLI/VMRemoteWorkspaceResolver.swift
-      - CLI/cmux.swift
-      - Sources/AgentNotification*.swift
-      - Sources/TerminalNotification*.swift
-      - Sources/AgentFeedSemanticInput.swift
-      - Sources/Feed/**
-      - cmuxTests/**
-      - Packages/macOS/CMUXAgentLaunch/**
-      - .github/workflows/test-depot.yml
-      - scripts/ci/classify-app-host-test-output.py
-      - Sources/AgentJournalLifecycleCenter*.swift
-      - .github/workflows/agent-notification-tests.yml
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -30,9 +30,7 @@ on:
         required: true
         default: false
         type: boolean
-  push:
-    tags:
-      - "cmux-tui-v*"
+  # cmux-rbf: no tag-triggered publishing. Reject upstream automatic triggers on sync.
 
 permissions: {}
 

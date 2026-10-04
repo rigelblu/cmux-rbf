@@ -1,14 +1,7 @@
 name: CLI pipe regressions
 
 on:
-  pull_request:
-    paths:
-      - 'CLI/**'
-      - 'tests/test_cli_broken_pipe_writes.py'
-      - 'tests/test_cli_socket_operation_deadline.py'
-      - 'cmux.xcodeproj/**'
-      - 'Packages/macOS/CmuxFoundation/**'
-      - '.github/workflows/cli-pipe-regressions.yml'
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

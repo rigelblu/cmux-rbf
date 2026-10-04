@@ -1,25 +1,7 @@
 name: SSH remote daemon
 
 on:
-  pull_request:
-    paths:
-      - daemon/remote/**
-      - scripts/*remote_daemon*
-      - scripts/release_asset_guard*
-      - tests/*remote_daemon*
-      - .github/workflows/remote-daemon.yml
-      - .github/workflows/release.yml
-      - .github/workflows/nightly.yml
-  push:
-    branches: [main]
-    paths:
-      - daemon/remote/**
-      - scripts/*remote_daemon*
-      - scripts/release_asset_guard*
-      - tests/*remote_daemon*
-      - .github/workflows/remote-daemon.yml
-      - .github/workflows/release.yml
-      - .github/workflows/nightly.yml
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

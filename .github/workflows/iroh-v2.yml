@@ -1,17 +1,7 @@
 name: IROH v2
 
 on:
-  pull_request:
-    paths:
-      - workers/iroh-v2/**
-      - Packages/Shared/CmuxIrxTransport/**
-      - .github/workflows/iroh-v2.yml
-  push:
-    branches: [main]
-    paths:
-      - workers/iroh-v2/**
-      - Packages/Shared/CmuxIrxTransport/**
-      - .github/workflows/iroh-v2.yml
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

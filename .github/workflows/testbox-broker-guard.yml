@@ -5,10 +5,8 @@ name: Testbox broker guard
 # every pull request, with no path filter: a path filter is exactly the thing a
 # change that moves the guard could slip past.
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

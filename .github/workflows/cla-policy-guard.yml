@@ -1,12 +1,8 @@
 name: CLA policy guard
 
 on:
-  # This workflow is evaluated from the base branch. It never checks out or
-  # executes the pull-request revision, so a contributor cannot edit the guard
-  # and the policy it protects in the same pull request.
-  pull_request_target:
-    branches: [main]
-    types: [opened,edited,reopened,synchronize,ready_for_review]
+  # cmux-rbf: explicit dispatch only; no automatic bots in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 permissions: {}
 
 jobs:

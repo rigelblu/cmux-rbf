@@ -1,15 +1,8 @@
 name: cmux-browser
 
 on:
-  pull_request:
-    paths:
-      - "cmux-browser/**"
-      - ".github/workflows/cmux-browser.yml"
-  push:
-    branches: [main]
-    paths:
-      - "cmux-browser/**"
-      - ".github/workflows/cmux-browser.yml"
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

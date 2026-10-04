@@ -1,20 +1,7 @@
 name: CI status fallback
 
 on:
-  # CI is intentionally path-filtered below. Branch protection still requires
-  # the aggregate `ci-status` context for every pull request, so this small
-  # companion reports a neutral success when the routed CI workflow is skipped.
-  # Keep this list in sync with .github/workflows/ci.yml's pull_request.paths.
-  pull_request:
-    paths-ignore:
-      - ghostty
-      - scripts/download-prebuilt-ghosttykit.sh
-      - scripts/validate-xcframework-archive.py
-      - scripts/ghosttykit-checksums.txt
-      - tests/test_ci_ghosttykit_release_check.sh
-      - tests/test_ci_change_areas.py
-      - .github/workflows/ci.yml
-    types: [opened, edited, reopened, synchronize, ready_for_review]
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch: {}
 
 permissions: {}

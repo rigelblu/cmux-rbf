@@ -1,19 +1,8 @@
 name: Web complexity
 
 on:
-  # This workflow is read from the base branch. It checks the pull-request
-  # source as data and executes only the trusted checker from the base.
-  pull_request_target:
-    branches:
-      - main
-    types: [opened, edited, reopened, synchronize, ready_for_review]
-  push:
-    branches:
-      - main
-    paths:
-      - web/**
-      - .github/workflows/web-complexity.yml
-      - .github/workflows/web-complexity-trusted.yml
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

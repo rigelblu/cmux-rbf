@@ -7,26 +7,7 @@ name: Cloud VM image reachability
 # to a new client with every cmux-tui release while the manifest keeps
 # pinning yesterday's snapshot.
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - web/services/vms/images/manifest.json
-      - web/services/vms/images/devbox/**
-      - web/services/vms/drivers/cmuxTuiDaemon.ts
-      - web/scripts/check-devbox-image-reachable.ts
-      - web/scripts/devbox-image-common.ts
-      - .github/workflows/cloud-vm-image-reachability.yml
-  push:
-    branches: [main]
-    paths:
-      - web/services/vms/images/manifest.json
-      - web/services/vms/drivers/cmuxTuiDaemon.ts
-      - web/scripts/check-devbox-image-reachable.ts
-      - .github/workflows/cloud-vm-image-reachability.yml
-  # The client moves without a commit here, so check daily. The cache skip
-  # below makes that a no-op on a day when nothing moved.
-  schedule:
-    - cron: "17 7 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       image:

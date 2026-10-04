@@ -1,9 +1,8 @@
 name: Vercel auth health
 
 on:
+  # cmux-rbf: explicit dispatch only; no scheduled services in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
-  schedule:
-    - cron: "17 6 * * *"
 
 permissions:
   contents: read

@@ -1,25 +1,8 @@
 name: cmux skill contracts
 
 on:
-  pull_request:
-    paths:
-      - "skills/cmux-browser/**"
-      - ".agents/skills"
-      - ".claude/skills/**"
-      - "skills.sh"
-      - "scripts/validate-cmux-browser-skill.py"
-      - "tests/test_cmux_browser_skill.py"
-      - ".github/workflows/cmux-skill-contract.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skills/cmux-browser/**"
-      - ".agents/skills"
-      - ".claude/skills/**"
-      - "skills.sh"
-      - "scripts/validate-cmux-browser-skill.py"
-      - "tests/test_cmux_browser_skill.py"
-      - ".github/workflows/cmux-skill-contract.yml"
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

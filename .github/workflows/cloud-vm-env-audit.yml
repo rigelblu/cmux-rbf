@@ -8,14 +8,7 @@ name: Cloud VM env audit
 # workflow on merge (and daily) instead of a user-facing outage.
 
 on:
-  schedule:
-    - cron: "23 8 * * *"
-  push:
-    branches: [main]
-    paths:
-      - web/services/vms/**
-      - web/scripts/cloud-vm/**
-      - .github/workflows/cloud-vm-env-audit.yml
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch: {}
 
 permissions:

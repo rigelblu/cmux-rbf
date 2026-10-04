@@ -7,11 +7,8 @@ name: "CLA Assistant"
 # committer field never need to sign, and a signature is reused in every
 # later pull request. Maintainer accounts in allowlist-ids never sign.
 on:
-  issue_comment:
-    types: [created]
-  pull_request_target:
-    branches: [main]
-    types: [opened, closed, reopened, synchronize]
+  # cmux-rbf: explicit dispatch only; no automatic bots in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

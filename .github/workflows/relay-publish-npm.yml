@@ -15,9 +15,8 @@ name: cmux-relay release
 #   repo variable CHATMUX_RELAY_PUBLISH_MODE=external-rust so the old Node
 #   publisher stands down first.
 on:
-  push:
-    tags:
-      - "cmux-relay-v*"
+  # cmux-rbf: explicit dispatch only; no automatic publishing in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

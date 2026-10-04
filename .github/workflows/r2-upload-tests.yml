@@ -1,15 +1,7 @@
 name: R2 upload tests
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/r2-upload-tests.yml
-      - .github/workflows/nightly.yml
-      - .github/workflows/release.yml
-      - .github/workflows/cmux-tui-artifacts.yml
-      - scripts/ci/upload-r2-object.py
-      - tests/test_ci_r2_upload_python.sh
-      - tests/test_r2_upload_requests.py
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

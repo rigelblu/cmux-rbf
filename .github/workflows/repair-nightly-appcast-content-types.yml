@@ -1,12 +1,7 @@
 name: Repair nightly appcast Content-Type
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/repair-nightly-appcast-content-types.yml
-      - scripts/ci/repair-nightly-appcast-content-types.py
-      - scripts/ci/upload-r2-object.py
-      - tests/test_repair_nightly_appcast_content_types.py
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       execute:

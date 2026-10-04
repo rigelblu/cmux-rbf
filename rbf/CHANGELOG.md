@@ -18,6 +18,7 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 ## 🟠⋯ Changed for Developers
 - Preserve the real upstream merge ancestry and pin the tested Ghostty merge now published in `rigelblu/ghostty-rbf` through PR #4
+- Retain the fork's no-CI/no-automatic-deployment behavior: upstream workflow triggers are manual-only or reusable; existing manual inputs and job definitions remain intact
 - Keep cloud credential setup out of ordinary tagged launches, isolate Go build caches, and repair fork test compatibility with the synced APIs
 - Tom completed personal dogfood and accepted this release on 2026-10-04. The full no-new-test-failures comparison remains **FAIL / incomplete**, explicitly accepted rather than reported green. Existing evidence and baseline results are retained
 - The proposed one-command future sync (`cm-97.2`) is deferred and is not included in this release

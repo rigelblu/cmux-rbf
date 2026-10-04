@@ -1,12 +1,8 @@
 name: cmux-tui registry delivery
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic publishing in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
-  workflow_run:
-    workflows: [cmux-tui release binaries]
-    types: [completed]
-  schedule:
-    - cron: "17 */6 * * *"
 
 permissions:
   contents: read

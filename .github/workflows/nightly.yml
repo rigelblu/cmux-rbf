@@ -8,15 +8,7 @@ name: Nightly macOS build
 # only ever advances within its own channel. Everything channel-specific is
 # resolved once in `decide`; every later job reads it from there.
 on:
-  # Publish every changed main revision, while keeping the scheduled cache warm.
-  # Publish every push to a release-candidate branch as the RC channel.
-  push:
-    branches:
-      - main
-      - "rc/**"
-  schedule:
-    - cron: "17 */6 * * *"
-    - cron: "47 8 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic publishing in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       force:

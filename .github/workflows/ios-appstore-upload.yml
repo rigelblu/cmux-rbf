@@ -1,9 +1,7 @@
 name: iOS TestFlight (cmux.app)
 
 on:
-  # Upload the official bundle for internal testing. App Review remains manual.
-  schedule:
-    - cron: "17 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic publishing in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       build_number:

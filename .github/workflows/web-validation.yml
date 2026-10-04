@@ -1,12 +1,7 @@
 name: Web validation
 
 on:
-  # Always create the required status, including mixed and docs-only PRs.
-  # The changes job owns routing; no separate fallback may report success.
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:
