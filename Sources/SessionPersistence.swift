@@ -2038,6 +2038,10 @@ struct SessionTabManagerSnapshot: Codable, Sendable {
     var selectedWorkspaceIndex: Int?
     var workspaces: [SessionWorkspaceSnapshot]
     var workspaceGroups: [SessionWorkspaceGroupSnapshot]? = nil
+    /// The name the user gave the window (#cm-104). Optional and additive so
+    /// older persisted snapshots decode unchanged; `nil` (never an empty
+    /// string) means unnamed, and the key is then omitted.
+    var windowName: String? = nil
 }
 
 struct SessionWindowSnapshot: Codable, Sendable {
