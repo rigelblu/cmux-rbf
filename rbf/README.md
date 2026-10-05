@@ -20,6 +20,16 @@ This is for my personal use and shared publicly for those curious. I'm not accep
 This is my ~~fork~~ flavour of [cmux](https://github.com/manaflow-ai/cmux): a terminal workspace adapted around how I organize and move through active work.
 
 # 🔵⋯ Features
+## 🟠⋯ Tell your windows apart by a name you give each one
+
+Open the command palette in a window and choose **Name Window…**. The name then leads that window's title in the macOS Window menu and the Dock's window list: they read `research — <workspace>`, where they used to show whichever workspace was selected. Mission Control does not show it; its label is the app's name. Because the Window menu sorts by title, a named window also keeps its place there.
+
+- The name stays when you switch workspaces and comes back after a relaunch.
+- **Clear Window Name**, or an empty name, removes it and gives back today's title.
+- In the workspace search, a row in a named window ends in the window's name where it said `Workspace`, and typing the name finds that window's workspaces. A name longer than 24 characters is cut at its end there.
+- Nothing else inside the window changes: cmux's own titlebar still shows the workspace, and Move Workspace to Window still says `Window 2`. Global Search's window label is the one other place that leads with the name.
+- Always on; no setting, no shortcut. With `app.windowTitleTemplate` set, the template still controls the format and `{defaultTitle}` carries the name (`docs/configuration.md`).
+
 ## 🟠⋯ Mark up what your agent said and send the notes back as one prompt
 
 Select a passage in a rendered reply and it becomes a tinted, numbered phrase. Write what should change about it, mark another, and the notes collect into a numbered list under the reply — in the order you marked them, not the order they appear in the message.

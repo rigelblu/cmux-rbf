@@ -65,7 +65,12 @@ extension TabManager {
     }
 
     private func windowTitle(for tab: Workspace?) -> String {
-        let defaultTitle = defaultWindowTitle(for: tab)
+        // Two titles (#cm-104). The unnamed one is what a window nobody named
+        // shows. `defaultTitle` leads with the window's name when it has one,
+        // and is what `{defaultTitle}` expands to — the only placeholder that
+        // carries the name.
+        let unnamedTitle = defaultWindowTitle(for: tab)
+        let defaultTitle = namedWindowTitle(unnamedTitle: unnamedTitle)
         guard let windowId, let template = WindowTitleTemplate.configured() else { return defaultTitle }
 
         let workspaceTitle = tab.map {
@@ -75,13 +80,20 @@ extension TabManager {
         let activeDirectory = activeWindowTitleDirectory(for: tab)
         let resolvedTitle = template.resolved(context: WindowTitleTemplateContext(
             defaultTitle: defaultTitle,
-            activeWorkspace: workspaceTitle.isEmpty ? defaultTitle : workspaceTitle,
+            activeWorkspace: workspaceTitle.isEmpty ? unnamedTitle : workspaceTitle,
             activeDirectory: activeDirectory,
             windowId: windowId,
             appName: "cmux"
         ))
         let trimmedResolvedTitle = resolvedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedResolvedTitle.isEmpty ? defaultTitle : trimmedResolvedTitle
+    }
+
+    /// `<name> — <unnamed title>` for a window the user named (#cm-104); the
+    /// unnamed title, untouched, for one they did not.
+    private func namedWindowTitle(unnamedTitle: String) -> String {
+        guard let windowName else { return unnamedTitle }
+        return "\(windowName) \u{2014} \(unnamedTitle)"
     }
 
     private func defaultWindowTitle(for tab: Workspace?) -> String {

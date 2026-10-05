@@ -79,9 +79,9 @@ Supported placeholders:
 
 - `{windowId}`: the persisted per-window UUID.
 - `{windowToken}`: the first 8 characters of the persisted window UUID.
-- `{activeWorkspace}`: the active workspace title, falling back to the default title when the workspace title is blank.
+- `{activeWorkspace}`: the active workspace title. When the workspace title is blank it falls back to the default title without the window's name: the active directory, else `cmux`.
 - `{activeDirectory}`: the active workspace's current directory.
-- `{defaultTitle}`: the title cmux would have used without a template.
+- `{defaultTitle}`: the title cmux would have used without a template. For a window you named, that is the name, then ` — `, then the title the window would have had unnamed (the workspace title, else the active directory, else `cmux`), e.g. `research — Build`. No other placeholder carries the window's name, so a template without `{defaultTitle}` shows none, unless the template resolves to nothing, in which case the title is the one cmux would have used without a template.
 - `{appName}`: `cmux`.
 
 For tiling window managers such as AeroSpace or yabai, match on the stable token in the title. For example, the template above gives each restored macOS window a title containing `[cmux:abcd1234]`, so a rule can match `\\[cmux:abcd1234\\]`. The token is stable across relaunches for restored windows because it comes from the persisted window UUID.
