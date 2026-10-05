@@ -5106,6 +5106,8 @@ struct ContentView: View {
             return String(localized: "commandPalette.rename.tabInputHint", defaultValue: "Enter a tab name. Press Enter to rename, Escape to cancel.")
         case .workspaceGroup:
             return String(localized: "commandPalette.rename.workspaceGroupInputHint", defaultValue: "Enter a group name. Press Enter to rename, Escape to cancel.")
+        case .window:
+            return String(localized: "commandPalette.rename.windowInputHint", defaultValue: "Enter a window name. Press Enter to apply, Escape to cancel.")
         }
     }
 
@@ -5117,6 +5119,8 @@ struct ContentView: View {
             return String(localized: "commandPalette.rename.tabConfirmHint", defaultValue: "Press Enter to apply this tab name, or Escape to cancel.")
         case .workspaceGroup:
             return String(localized: "commandPalette.rename.workspaceGroupConfirmHint", defaultValue: "Press Enter to apply this group name, or Escape to cancel.")
+        case .window:
+            return String(localized: "commandPalette.rename.windowConfirmHint", defaultValue: "Press Enter to apply this window name, or Escape to cancel.")
         }
     }
 
@@ -5725,7 +5729,10 @@ struct ContentView: View {
                 }
             )
         }
-        return CommandPaletteSwitcherFingerprintContext.fingerprint(windowContexts: fingerprintContexts)
+        return Self.commandPaletteSwitcherFingerprint(
+            base: CommandPaletteSwitcherFingerprintContext.fingerprint(windowContexts: fingerprintContexts),
+            windowNames: windowContexts.map { $0.tabManager.windowName }
+        )
     }
 
     private static func commandPaletteHighlightedTitleText(
@@ -5895,6 +5902,10 @@ struct ContentView: View {
             let windowId = context.windowId
             let windowTabManager = context.tabManager
             let windowKeywords = commandPaletteWindowKeywords(windowLabel: context.windowLabel)
+            let windowPresentation = Self.commandPaletteSwitcherWorkspaceWindowPresentation(
+                windowName: context.tabManager.windowName,
+                kindWord: String(localized: "commandPalette.kind.workspace", defaultValue: "Workspace")
+            )
             for workspace in workspaces {
                 let workspaceName = workspaceDisplayName(workspace)
                 let workspaceCommandId = "switcher.workspace.\(workspace.id.uuidString.lowercased())"
@@ -5905,7 +5916,7 @@ struct ContentView: View {
                         "go",
                         "open",
                         workspaceName
-                    ] + windowKeywords,
+                    ] + windowKeywords + windowPresentation.extraKeywords,
                     metadata: commandPaletteWorkspaceSearchMetadata(for: workspace),
                     detail: .workspace
                 ).keywords
@@ -5917,7 +5928,7 @@ struct ContentView: View {
                         title: workspaceName,
                         subtitle: Self.commandPaletteSwitcherSubtitle(base: String(localized: "commandPalette.switcher.workspaceLabel", defaultValue: "Workspace"), windowLabel: context.windowLabel),
                         shortcutHint: nil,
-                        kindLabel: String(localized: "commandPalette.kind.workspace", defaultValue: "Workspace"),
+                        kindLabel: windowPresentation.trailingLabel,
                         keywords: workspaceKeywords,
                         dismissOnRun: true,
                         action: {
@@ -7218,6 +7229,10 @@ struct ContentView: View {
             snapshot.setBool(CommandPaletteContextKeys.authWorking, auth.accountFlow.isWorkingOnAuth)
         }
 
+        // Outside the workspace block on purpose: a named window with no
+        // workspace still offers "Clear Window Name" (#cm-104).
+        snapshot.setBool(CommandPaletteContextKeys.windowHasName, tabManager.windowName != nil)
+
         if let workspace = tabManager.selectedWorkspace {
             let pinTarget = WorkspaceActionDispatcher.Target.single(workspace.id)
             let pinState = WorkspaceActionDispatcher.pinState(in: tabManager, target: pinTarget)
@@ -7649,6 +7664,7 @@ struct ContentView: View {
             )
         )
         contributions.append(contentsOf: Self.commandPaletteViewCommandContributions())
+        contributions.append(contentsOf: Self.commandPaletteWindowNameCommandContributions())
         contributions.append(contentsOf: Self.commandPaletteCanvasCommandContributions())
         contributions.append(
             CommandPaletteCommandContribution(
@@ -9066,6 +9082,12 @@ struct ContentView: View {
         }
         registerSettingsToggleCommandHandlers(&registry)
 
+        registry.register(commandId: "palette.nameWindow") {
+            beginNameWindowFlow()
+        }
+        registry.register(commandId: "palette.clearWindowName") {
+            tabManager.setWindowName(nil)
+        }
         registry.register(commandId: "palette.renameWorkspace") {
             beginRenameWorkspaceFlow()
         }
@@ -10811,6 +10833,12 @@ struct ContentView: View {
         startRenameFlow(target)
     }
 
+    private func beginNameWindowFlow() {
+        startRenameFlow(
+            CommandPaletteRenameTarget(kind: .window, currentName: tabManager.windowName ?? "")
+        )
+    }
+
     private func beginWorkspaceDescriptionFlow() {
         guard let workspace = tabManager.selectedWorkspace else {
             NSSound.beep()
@@ -10936,6 +10964,10 @@ struct ContentView: View {
                 return
             }
             tabManager.renameWorkspaceGroup(groupId: groupId, name: normalizedName)
+        case .window:
+            // The raw text goes to the one setter, which normalizes for every
+            // entrance; an empty field clears the name.
+            tabManager.setWindowName(proposedName)
         }
 
         dismissCommandPalette()

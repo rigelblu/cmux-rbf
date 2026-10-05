@@ -1540,6 +1540,7 @@
 		C51A740000000000000000B1 /* ContentView+SidebarSurfaceKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51A740000000000000000B2 /* ContentView+SidebarSurfaceKind.swift */; };
 		875200000000000000000011 /* ContentView+SurfaceNavigationCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875200000000000000000001 /* ContentView+SurfaceNavigationCommands.swift */; };
 		C3408A000000000000000005 /* ContentView+ViewCommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3408A000000000000000006 /* ContentView+ViewCommandPalette.swift */; };
+		C0DE01040000000000000001 /* ContentView+WindowNameCommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE01040000000000000002 /* ContentView+WindowNameCommandPalette.swift */; };
 		A5001002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001012 /* ContentView.swift */; };
 		C0DE32470000000000000001 /* ContentViewIdentifierCopyCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE32470000000000000002 /* ContentViewIdentifierCopyCommands.swift */; };
 		B88356000000000000000003 /* ControlledPastePreparationDeadlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88356000000000000000004 /* ControlledPastePreparationDeadlines.swift */; };
@@ -3652,6 +3653,7 @@
 		D0B10024A1B2C3D4E5F60001 /* WindowInputRoutingContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0B10025A1B2C3D4E5F60001 /* WindowInputRoutingContext.swift */; };
 		313585583035A1E685010A97 /* WindowKeyDownReplayGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81B8CFAF8FCA4231C702D16A /* WindowKeyDownReplayGuard.swift */; };
 		8770D0F2D2BB45359D6BE5E3 /* WindowKeyDownReplayGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79482F1ECA54E98BE5C8953 /* WindowKeyDownReplayGuardTests.swift */; };
+		C0DE01040000000000000003 /* WindowNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE01040000000000000004 /* WindowNameTests.swift */; };
 		973DC7D4CD41516D459E17FC /* WindowPointHitTestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02BCEFD7668C02FB795ED26F /* WindowPointHitTestTests.swift */; };
 		6042C0056042C0056042C005 /* WindowScopedShortcutHintModifierMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6042D0056042D0056042D005 /* WindowScopedShortcutHintModifierMonitor.swift */; };
 		9065A0090000000000000001 /* WindowScreenshotBackendAttempt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9065A0090000000000000002 /* WindowScreenshotBackendAttempt.swift */; };
@@ -5422,6 +5424,7 @@
 		C51A740000000000000000B2 /* ContentView+SidebarSurfaceKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+SidebarSurfaceKind.swift"; sourceTree = "<group>"; };
 		875200000000000000000001 /* ContentView+SurfaceNavigationCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+SurfaceNavigationCommands.swift"; sourceTree = "<group>"; };
 		C3408A000000000000000006 /* ContentView+ViewCommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+ViewCommandPalette.swift"; sourceTree = "<group>"; };
+		C0DE01040000000000000002 /* ContentView+WindowNameCommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+WindowNameCommandPalette.swift"; sourceTree = "<group>"; };
 		A5001012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		C0DE32470000000000000002 /* ContentViewIdentifierCopyCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewIdentifierCopyCommands.swift; sourceTree = "<group>"; };
 		B88356000000000000000004 /* ControlledPastePreparationDeadlines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlledPastePreparationDeadlines.swift; sourceTree = "<group>"; };
@@ -7508,6 +7511,7 @@
 		D0B10025A1B2C3D4E5F60001 /* WindowInputRoutingContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowInputRoutingContext.swift; sourceTree = "<group>"; };
 		81B8CFAF8FCA4231C702D16A /* WindowKeyDownReplayGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/WindowKeyDownReplayGuard.swift; sourceTree = "<group>"; };
 		B79482F1ECA54E98BE5C8953 /* WindowKeyDownReplayGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowKeyDownReplayGuardTests.swift; sourceTree = "<group>"; };
+		C0DE01040000000000000004 /* WindowNameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowNameTests.swift; sourceTree = "<group>"; };
 		02BCEFD7668C02FB795ED26F /* WindowPointHitTestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowPointHitTestTests.swift; sourceTree = "<group>"; };
 		6042D0056042D0056042D005 /* WindowScopedShortcutHintModifierMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowScopedShortcutHintModifierMonitor.swift; sourceTree = "<group>"; };
 		9065A0090000000000000002 /* WindowScreenshotBackendAttempt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowScreenshotBackendAttempt.swift; sourceTree = "<group>"; };
@@ -8662,6 +8666,7 @@
 				C3408A000000000000000002 /* ContentView+RightSidebarCommandPalette.swift */,
 				875200000000000000000001 /* ContentView+SurfaceNavigationCommands.swift */,
 				C3408A000000000000000006 /* ContentView+ViewCommandPalette.swift */,
+				C0DE01040000000000000002 /* ContentView+WindowNameCommandPalette.swift */,
 				C0DEF0A90000000000000002 /* ContentView+ForkAgentConversation.swift */,
 				D7AB00000000000000000004 /* ContentView+MoveTabToNewWorkspace.swift */,
 				C0DE1A010000000000000002 /* ContentView+SavedLayoutCommands.swift */,
@@ -11455,6 +11460,7 @@
 				D1F0A00400000000000000C2 /* PhonePushSerialDeliveryQueueTests.swift */,
 				B79482F1ECA54E98BE5C8953 /* WindowKeyDownReplayGuardTests.swift */,
 				604500100000000000000004 /* WindowTitleTemplateTests.swift */,
+				C0DE01040000000000000004 /* WindowNameTests.swift */,
 				D1FFC0DE000000000000C001 /* DiffCommentStoreTests.swift */,
 				CC0033E15A1B2C3D4E5F0006 /* CommentsListPayloadTests.swift */,
 				C9A57002C9A57002C9A57002 /* WorkspaceGroupTests.swift */,
@@ -13244,6 +13250,7 @@
 				C51A740000000000000000B1 /* ContentView+SidebarSurfaceKind.swift in Sources */,
 				875200000000000000000011 /* ContentView+SurfaceNavigationCommands.swift in Sources */,
 				C3408A000000000000000005 /* ContentView+ViewCommandPalette.swift in Sources */,
+				C0DE01040000000000000001 /* ContentView+WindowNameCommandPalette.swift in Sources */,
 				A5001002 /* ContentView.swift in Sources */,
 				C0DE32470000000000000001 /* ContentViewIdentifierCopyCommands.swift in Sources */,
 				BFC914190FEF400683D6DEBC /* ControlSidebarAgentLifecycleRegistryScope.swift in Sources */,
@@ -16135,6 +16142,7 @@
 				D6212D0C00000000000000D1 /* WindowDockLifecycleTests.swift in Sources */,
 				D6212D0C00000000000000D7 /* WindowDockRoutingSocketTests.swift in Sources */,
 				8770D0F2D2BB45359D6BE5E3 /* WindowKeyDownReplayGuardTests.swift in Sources */,
+				C0DE01040000000000000003 /* WindowNameTests.swift in Sources */,
 				973DC7D4CD41516D459E17FC /* WindowPointHitTestTests.swift in Sources */,
 				606600010000000000000001 /* WindowTerminalHostViewTitlebarHitTests.swift in Sources */,
 				604500100000000000000003 /* WindowTitleTemplateTests.swift in Sources */,
