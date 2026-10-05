@@ -41,6 +41,9 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     public static let workspaceCanMarkRead = CommandPaletteContextKeys(rawValue: "workspace.canMarkRead")
     /// Whether mark-unread is available for the workspace.
     public static let workspaceCanMarkUnread = CommandPaletteContextKeys(rawValue: "workspace.canMarkUnread")
+    /// Whether the window the palette belongs to has a name the user gave it.
+    /// Set whether or not a workspace is selected.
+    public static let windowHasName = CommandPaletteContextKeys(rawValue: "window.hasName")
     /// Whether the sidebar matches the terminal background.
     public static let sidebarMatchTerminalBackground = CommandPaletteContextKeys(rawValue: "sidebar.matchTerminalBackground")
     /// Whether a panel has focus.

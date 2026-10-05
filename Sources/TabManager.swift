@@ -184,6 +184,48 @@ class TabManager: ObservableObject {
     /// Stable identifier of the owning macOS window. Used only for opt-in title
     /// templates that expose a WM-matchable per-window token.
     var windowId: UUID?
+    /// The name the user gave this window (#cm-104); `nil` means unnamed.
+    /// Never blank and never more than one line: both `setWindowName(_:)` and
+    /// session restore normalize through `normalizedWindowName(_:)`. Deliberately
+    /// not `@Published` — nothing in the window observes it; the title and the
+    /// palette's context snapshot read it on demand.
+    private(set) var windowName: String?
+
+    /// Normalizes a proposed window name (#cm-104): turns runs of newlines into
+    /// single spaces, trims whitespace and newlines from both ends, and returns
+    /// `nil` when empty.
+    static func normalizedWindowName(_ proposedName: String?) -> String? {
+        let singleLine = (proposedName ?? "")
+            .components(separatedBy: .newlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return singleLine.isEmpty ? nil : singleLine
+    }
+
+    /// The one action path for naming a window (#cm-104): every entrance, now
+    /// or later, calls this. Returns whether the name changed.
+    ///
+    /// Each run of newline characters becomes one space, both ends are trimmed,
+    /// and blank means no name. Nothing happens when the name is unchanged:
+    /// no title write and, in debug builds, no log line.
+    @discardableResult
+    func setWindowName(_ proposedName: String?) -> Bool {
+        let normalizedName = Self.normalizedWindowName(proposedName)
+        guard normalizedName != windowName else { return false }
+        windowName = normalizedName
+#if DEBUG
+        // The length, never the name: a debug log gets pasted into reports.
+        let windowLabel = windowId.map { String($0.uuidString.prefix(8)) } ?? "unknown"
+        if let normalizedName {
+            cmuxDebugLog("window.name.set window=\(windowLabel) len=\(normalizedName.count)")
+        } else {
+            cmuxDebugLog("window.name.clear window=\(windowLabel)")
+        }
+#endif
+        refreshWindowTitle()
+        return true
+    }
     /// Window-owned reveal hook shared by every selection entrypoint.
     var revealSelectedWorkspaceInSidebar: ((Workspace) -> Void)?
     private(set) var isFinalizedForWindowClose = false
@@ -6196,6 +6238,10 @@ extension TabManager {
         var hasher = Hasher()
         hasher.combine(selectedTabId)
         hasher.combine(tabs.count)
+        // The window name is saved in the session snapshot and a change to it
+        // triggers no save of its own, so it must bump the fingerprint or the
+        // autosave timer skips the write for up to a minute (#cm-104).
+        hasher.combine(windowName)
         let notificationStore = AppDelegate.shared?.notificationStore
         // Workspace groups participate in the session snapshot, so changes
         // that only touch group metadata (rename / collapse / pin a group,
@@ -6544,7 +6590,8 @@ extension TabManager {
         return SessionTabManagerSnapshot(
             selectedWorkspaceIndex: selectedWorkspaceIndex,
             workspaces: workspaceSnapshots,
-            workspaceGroups: groupSnapshots
+            workspaceGroups: groupSnapshots,
+            windowName: windowName
         )
     }
 
@@ -6629,6 +6676,13 @@ extension TabManager {
         workspaceCreateIdempotencyCache: TerminalController.WorkspaceCreateIdempotencyCache? = nil
     ) -> [[UUID: UUID]] {
         guard !isFinalizedForWindowClose else { return [] }
+        // Set before the restored workspaces are published, so every title
+        // written from here on leads with the saved name: on the in-place path
+        // a window is already attached and a title can be written mid-restore.
+        // Assigned directly, not through `setWindowName` — restoring is not
+        // naming, so no log line — and a snapshot with no name clears this
+        // window's name (#cm-104).
+        windowName = Self.normalizedWindowName(snapshot.windowName)
         let promptBatch = SurfaceResumeRunPromptBatch.shared
         promptBatch.beginRestorePass()
         defer { promptBatch.endRestorePass() }
