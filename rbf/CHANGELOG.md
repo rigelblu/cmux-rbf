@@ -6,6 +6,29 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.30.1 (2026-10-05) — #cm-104.2
+
+*See which window a workspace is in when you search for it.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-05 - feat | see which window a workspace is in when I search for it. In the workspace search, a row in a named window ends in the window's name where it said `Workspace`, and typing the name finds that window's workspaces. A name longer than 24 characters is cut at its end (#cm-104.2)
+- Released on unit tests and Tom's read of the design. The four human checks for this slice were skipped by Tom's decision on 2026-10-05, so the list wiring has not been seen running by anyone
+
+# 🔵⋯ v0.30.0 (2026-10-05) — #cm-104.1
+
+*Tell your windows apart by a name you give each one.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-05 - feat | tell my windows apart by a name I give each one. "Name Window…" in the command palette puts the name first in the macOS Window menu and the Dock's window list (`research — <workspace>`). It stays when you switch workspaces and comes back after a relaunch. "Clear Window Name", or an empty name, removes it. Nothing inside the window changes (#cm-104.1)
+- Mission Control does not show the name: its label is the app's name. Seen by Tom on 2026-10-05 and accepted
+
+## 🟠⋯ Improved for Technical Users
+- 2026-10-05 - feat (technical) | keep matching my windows by a stable token after I name one. With `app.windowTitleTemplate` set, the template still controls the format; `{defaultTitle}` carries the window's name and no other placeholder does. Saved sessions gain one optional `windowName` key; sessions saved before load unchanged, and an older build drops the names at its next save (#cm-104.1)
+
+## 🟠⋯ Changed for Builders
+- Tom ran part of the human checks and passed them (naming, the editor, the Window menu, both windows named, the Dock list), then closed the rest by decision. Not run: the Global Search label (blocked by an existing ripgrep error), the relaunch restore, clearing by an empty field, the forced-quit save and Recently Closed reopen
+- The full unit suite was not compared. By Tom's call only the test classes near this change were, before and after: 82 suites, 290 failing before and 162 after, 130 failing in both. Untouched `main` fails 2,044 of 11,320 tests on this machine
+
 # 🔵⋯ v0.29.0 (2026-10-05) — #cm-107, #cm-108
 
 *Put the workspace colours you use first, and hide the ones you never use. Both features ship in one release because they share one Settings screen and one saved record.*
