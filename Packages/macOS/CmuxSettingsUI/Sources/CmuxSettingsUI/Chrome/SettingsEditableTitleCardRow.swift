@@ -7,6 +7,7 @@ struct SettingsEditableTitleCardRow<Leading: View, Trailing: View>: View {
     let configurationReview: SettingsConfigurationReview
     let subtitle: String?
     let stacksWhenNeeded: Bool
+    let verticalAlignment: VerticalAlignment
     @ViewBuilder let leading: Leading
     @ViewBuilder let trailing: Trailing
 
@@ -16,12 +17,14 @@ struct SettingsEditableTitleCardRow<Leading: View, Trailing: View>: View {
         configurationReview: SettingsConfigurationReview,
         subtitle: String?,
         stacksWhenNeeded: Bool = false,
+        verticalAlignment: VerticalAlignment = .top,
         @ViewBuilder leading: () -> Leading,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.configurationReview = configurationReview
         self.subtitle = subtitle
         self.stacksWhenNeeded = stacksWhenNeeded
+        self.verticalAlignment = verticalAlignment
         self.leading = leading()
         self.trailing = trailing()
     }
@@ -44,7 +47,7 @@ struct SettingsEditableTitleCardRow<Leading: View, Trailing: View>: View {
     }
 
     private var horizontalRow: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: verticalAlignment, spacing: 12) {
             title
                 .fixedSize(horizontal: stacksWhenNeeded, vertical: false)
                 .frame(maxWidth: .infinity, alignment: .leading)
