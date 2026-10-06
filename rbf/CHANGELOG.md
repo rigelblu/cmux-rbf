@@ -6,6 +6,19 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.31.0 (2026-10-06) — #cm-112
+
+*See built-in and custom workspace colors in aligned rows.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-06 - feat (settings) | see built-in and custom workspace colors in aligned rows. In Settings > Workspace Colors, built-in and custom color rows share a coordinated 5-column trailing alignment: Semantic Label fields begin at identical horizontal coordinates, color pills align vertically, hex values sit beside pills in an aligned 92pt column, and an invisible placeholder preserves the Remove button slot on built-in rows so trailing visibility switches stay flush with the right margin without row-to-row jitter (#cm-112)
+- Top edges of custom color display name fields align horizontally with trailing label and hex text fields within 1.0pt, eliminating vertical baseline offset between leading and trailing controls
+
+## 🟠⋯ Changed for Developers
+- Trailing controls across built-in and custom color rows unified into `paletteTrailingControls` in `WorkspaceColorsSection.swift`. Static `Text(entry.hex)` retained on built-in rows for XCTest accessibility hierarchy compatibility. Built-in error message moved to row-level `VStack(alignment: .trailing, spacing: 2)` under controls via opt-in `rowError: String?`
+- `SettingsEditableTitleCardRow` parameterized with `verticalAlignment: VerticalAlignment = .top` in `horizontalRow`, resolving the 8.0pt center-alignment drop caused by the subtitle line
+- Regression and alignment verified with `WorkspaceColorRowAlignmentTests` (0.0pt coordinate drift measured) and human visual verification passed by Tom on 2026-10-06
+
 # 🔵⋯ v0.30.1 (2026-10-05) — #cm-104.2
 
 *See which window a workspace is in when you search for it.*
