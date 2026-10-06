@@ -163,10 +163,11 @@ Give workspace colours your own meaning — such as **GOAL: Primary (Tangerine)*
 - **Edit Color Labels…** at the foot of the menu opens Settings on the Workspace Colors rows, rather than leaving you to find them.
 - **No Color** is always offered and carries its own state. The command palette calls it **No Color** too, so one action has one name; `clear-color` remains its CLI spelling.
 - A colour a workspace still wears after you removed it from the palette appears as a temporary **Custom (#RRGGBB)** row rather than vanishing.
-Workspace-colour order and visibility preferences below are unreleased development changes.
 
-- In Settings → Workspace Colors, drag a row or use Move to Top, Move Up, Move Down or Move to Bottom to put preferred choices first. Settings and both Workspace Color / Group Color menus follow that order; workspace navigation stays stable.
-- The checkbox before a colour name controls whether it appears in those menus. Hover for **Show in menus**; unchecked rows show **Hidden**. Existing assignments and appearance stay intact, and you can show the colour again from Settings.
+Order and hide colours, since v0.29.0:
+
+- In Settings → Workspace Colors, every colour row has a six-dot handle. Drag it to move the colour, or focus the handle and press Up or Down. Settings and both Workspace Color / Group Color menus follow that order; workspace navigation stays stable.
+- The switch at the right edge of a row controls whether that colour appears in those menus. Off rows show **Hidden** and stay in Settings. A workspace or group already using a hidden colour keeps it, and you can show the colour again from Settings.
 - Each completed preference change saves immediately. **Restore Default Order** changes ordering alone. **Reset Palette** restores built-in colours, removes extra named colours, restores default order and shows remaining colours in menus; built-in labels and existing assignments survive.
 - Edit custom names and hex values in Settings. You can also set names in `~/.config/cmux/cmux.json` under `workspaceColors.displayNames`; clearing one restores the raw colour name. Labels remain under `workspaceColors.labels`.
 - Custom palette hex values must be unique. Existing imported duplicates remain visible so you can repair them, but a new duplicate is rejected.
