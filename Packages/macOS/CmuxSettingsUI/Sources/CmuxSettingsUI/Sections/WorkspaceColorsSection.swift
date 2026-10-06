@@ -407,47 +407,19 @@ public struct WorkspaceColorsSection: View {
                 Text(entry.name).cmuxFont(size: 13, weight: .medium)
             }
         } trailing: {
-            HStack(spacing: 8) {
-                WorkspaceColorAliasField(
-                    paletteName: entry.name,
-                    storedValue: labelsModel.current[entry.name] ?? "",
-                    placeholder: String(localized: "settings.workspaceColors.label.placeholder", defaultValue: "Label"),
-                    accessibilityLabel: String(
-                        format: String(
-                            localized: "settings.workspaceColors.label.accessibility",
-                            defaultValue: "Label for %@"
-                        ),
-                        entry.name
-                    ),
-                    accessibilityIdentifier: "SettingsWorkspaceColorLabelField.\(entry.name)",
-                    importedErrorMessage: validation.labelRejections[entry.name].map(Self.aliasRejectionMessage),
-                    commit: { commitLabel($0, for: entry.name) }
-                )
-                HexColorPicker(
-                    storedHex: entry.hex,
-                    fallback: Color(nsColor: .systemBlue),
-                    reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
-                    commitBehavior: .interactionEnd
-                ) { hex in
+            paletteTrailingControls(
+                entry: entry,
+                validation: validation,
+                hexColumn: Text(entry.hex)
+                    .cmuxFont(size: 12, weight: .medium, design: .monospaced)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 92, alignment: .leading),
+                rowError: colorEditErrors[entry.name],
+                onPick: { hex in
                     requestBuiltInColorEdit(name: entry.name, proposedHex: hex)
-                }
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(entry.hex)
-                        .cmuxFont(size: 12, weight: .medium, design: .monospaced)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 190, alignment: .trailing)
-                    if let error = colorEditErrors[entry.name] {
-                        Text(error)
-                            .cmuxFont(size: 10, weight: .regular)
-                            .foregroundStyle(.red)
-                            .frame(width: 190, alignment: .trailing)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                preferenceVisibilityToggle(name: entry.name)
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .disabled(preferenceSave.isSaving)
+                },
+                onRemove: nil
+            )
         }
     }
 
@@ -466,18 +438,67 @@ public struct WorkspaceColorsSection: View {
             stacksWhenNeeded: true
         ) {
             preferenceTitle(name: entry.name) {
-            WorkspaceColorAliasField(
-                paletteName: entry.name,
-                storedValue: displayNamesModel.current[entry.name] ?? "",
-                placeholder: entry.name,
-                accessibilityLabel: String(localized: "settings.workspaceColors.displayName.accessibility", defaultValue: "Custom color name"),
-                accessibilityIdentifier: "SettingsWorkspaceColorDisplayNameField.\(entry.name)",
-                importedErrorMessage: validation.displayNameRejections[entry.name].map(Self.aliasRejectionMessage),
-                commit: { commitDisplayName($0, for: entry.name) }
-            )
-            .disabled(preferenceSave.isSaving)
+                WorkspaceColorAliasField(
+                    paletteName: entry.name,
+                    storedValue: displayNamesModel.current[entry.name] ?? "",
+                    placeholder: entry.name,
+                    accessibilityLabel: String(localized: "settings.workspaceColors.displayName.accessibility", defaultValue: "Custom color name"),
+                    accessibilityIdentifier: "SettingsWorkspaceColorDisplayNameField.\(entry.name)",
+                    importedErrorMessage: validation.displayNameRejections[entry.name].map(Self.aliasRejectionMessage),
+                    commit: { commitDisplayName($0, for: entry.name) }
+                )
+                .disabled(preferenceSave.isSaving)
             }
         } trailing: {
+            paletteTrailingControls(
+                entry: entry,
+                validation: validation,
+                hexColumn: WorkspaceColorHexField(
+                    paletteName: entry.name,
+                    storedHex: entry.hex,
+                    reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
+                    errorMessage: colorEditErrors[entry.name],
+                    clearError: { colorEditErrors.removeValue(forKey: entry.name) },
+                    commit: {
+                        requestColorEdit(
+                            name: entry.name,
+                            oldHex: entry.hex,
+                            proposedHex: $0,
+                            input: .directHex
+                        )
+                    }
+                ),
+                rowError: nil,
+                onPick: { hex in
+                    _ = requestColorEdit(
+                        name: entry.name,
+                        oldHex: entry.hex,
+                        proposedHex: hex,
+                        input: .picker
+                    )
+                },
+                onRemove: {
+                    var snapshot = paletteModel.current
+                    snapshot.removeValue(forKey: entry.name)
+                    paletteModel.set(snapshot)
+                    pruneOrphanedMetadata(against: snapshot)
+                    colorEditErrors.removeValue(forKey: entry.name)
+                    paletteReconcileTracker.reconcileExternalHexes(snapshot)
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func paletteTrailingControls(
+        entry: (name: String, hex: String),
+        validation: WorkspaceColorNameResolver.Validation,
+        hexColumn: some View,
+        rowError: String?,
+        onPick: @escaping (String) -> Void,
+        onRemove: (() -> Void)?
+    ) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
             HStack(spacing: 8) {
                 WorkspaceColorAliasField(
                     paletteName: entry.name,
@@ -498,45 +519,34 @@ public struct WorkspaceColorsSection: View {
                     storedHex: entry.hex,
                     fallback: Color(nsColor: .systemBlue),
                     reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
-                    commitBehavior: .interactionEnd
-                ) { hex in
-                    _ = requestColorEdit(
-                        name: entry.name,
-                        oldHex: entry.hex,
-                        proposedHex: hex,
-                        input: .picker
-                    )
-                }
-                WorkspaceColorHexField(
-                    paletteName: entry.name,
-                    storedHex: entry.hex,
-                    reconcileRevision: paletteReconcileTracker.revision(for: entry.name),
-                    errorMessage: colorEditErrors[entry.name],
-                    clearError: { colorEditErrors.removeValue(forKey: entry.name) },
-                    commit: {
-                        requestColorEdit(
-                            name: entry.name,
-                            oldHex: entry.hex,
-                            proposedHex: $0,
-                            input: .directHex
-                        )
-                    }
+                    commitBehavior: .interactionEnd,
+                    onChange: onPick
                 )
-                Button(String(localized: "settings.workspaceColors.remove", defaultValue: "Remove")) {
-                    var snapshot = paletteModel.current
-                    snapshot.removeValue(forKey: entry.name)
-                    paletteModel.set(snapshot)
-                    pruneOrphanedMetadata(against: snapshot)
-                    colorEditErrors.removeValue(forKey: entry.name)
-                    paletteReconcileTracker.reconcileExternalHexes(snapshot)
+                hexColumn
+                if let onRemove {
+                    Button(String(localized: "settings.workspaceColors.remove", defaultValue: "Remove"), action: onRemove)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                } else {
+                    Button(String(localized: "settings.workspaceColors.remove", defaultValue: "Remove")) {}
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .hidden()
+                        .disabled(true)
+                        .accessibilityHidden(true)
+                        .allowsHitTesting(false)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
                 preferenceVisibilityToggle(name: entry.name)
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .disabled(preferenceSave.isSaving)
+            if let rowError {
+                Text(rowError)
+                    .cmuxFont(size: 10, weight: .regular)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .disabled(preferenceSave.isSaving)
     }
 
     private func requestColorEdit(
