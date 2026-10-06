@@ -185,6 +185,11 @@ Order and hide colours, since v0.29.0:
 - Automation reads the palette with `cmux workspace-color list [--json]` and can assign by raw name, custom display name, or label: `cmux workspace-action set-color "GOAL: Primary"`.
 - **No Color** itself cannot be labelled, `workspace-group set-color` stays hex-only, and if two entries share a hex both show as assigned — cmux stores a colour, not which entry you picked.
 
+Aligned built-in and custom colour rows, since v0.31.0:
+
+- In Settings → Workspace Colors, built-in and custom color rows share an aligned 5-column layout: semantic labels start at identical coordinates, color pills align, hex values share an aligned 92pt column, and an invisible placeholder preserves the Remove button slot so visibility toggles stay pinned to the right margin.
+- Custom color display name fields align vertically at their top edge with trailing label and hex text fields within 1.0pt.
+
 ## 🟠⋯ Tell a group header from the workspaces inside it at a glance
 
 Every workspace-group header carries a band across its whole row, so the container is visible without hunting for a small folder icon. A coloured group uses its colour; a group with no colour gets a neutral band. Set that colour from the header's **Group Color** menu (below). The active group's band deepens while member workspaces keep their narrow leading strip, so container and contents remain different shapes.
