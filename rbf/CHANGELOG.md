@@ -6,10 +6,21 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.29.0 (2026-10-05) — #cm-107, #cm-108
+
+*Put the workspace colours you use first, and hide the ones you never use. Both features ship in one release because they share one Settings screen and one saved record.*
+
 ## 🟠⋯ Changed for End Users
-- Put preferred workspace colours first in Settings and Workspace Color / Group Color menus using drag or four move actions (#cm-107)
-- Hide unused colours from those menus with the checkbox before each colour name, while keeping existing assignments and appearance (#cm-108)
-- Save each completed preference action immediately; restore order separately, or reset the palette together with order and visibility
+- 2026-10-05 - feat | **Put workspace colours in the order you use them** (#cm-107). In Settings → Workspace Colors, drag a colour by its six-dot handle, or focus the handle and press Up or Down. Workspace Color and Group Color menus list colours in that order. **Restore Default Order** puts the built-in order back and keeps hidden colours hidden
+- 2026-10-05 - feat | **Hide workspace colours you do not use** (#cm-108). The switch at the right edge of each row takes a colour out of both menus; the row stays in Settings and shows **Hidden**. A workspace or group already using a hidden colour keeps it
+- Each change saves immediately. **Reset Palette** restores built-in colours, default order and visibility together
+
+## 🟠⋯ Changed for Developers
+- One saved record, `WorkspaceColorMenuPreferences` (order and hidden names), stored per bundle id. Assignments, the palette, the CLI and `cmux.json` are untouched; `WorkspaceColorMenuModel` applies the record when a menu opens
+- Arrow keys on the handle were ignored until the handlers stopped requiring an empty modifier set: an arrow press always carries the numeric-pad and function flags. `WorkspaceColorReorderKeyPolicy.isBareArrow` refuses only Command, Control, Option and Shift
+- Tom verified hiding, showing, dragging, arrow keys and narrow Dark rows on 2026-10-05. He deferred three checks, which were not run: Tab to the switch, narrow rows in Light, and VoiceOver
+- The broad agent scenarios in both briefs stay **PENDING**, deferred by Tom at release. Not proven in the running app: Reset Palette, malformed saved records, duplicate aliases, a visible save failure and the pending-save state. Unit tests cover them
+- Known: `WorkspaceColorDisplayNameEditingTests.replacingAnExistingDisplayNameDoesNotCollideWithItsOwnPaletteEntry` passes or fails with machine load: it waits on the run loop against a deadline. It failed 4 of 4 at load near 80, on `main` as well, and 2 of 4 at load near 39 on 2026-10-05. The test build stopped responding once after 7.5 hours with Settings open; no cause is known
 
 # 🔵⋯ v0.28.0 (2026-10-04) — #cm-97.1
 
