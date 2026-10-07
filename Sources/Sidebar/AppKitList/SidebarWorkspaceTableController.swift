@@ -42,6 +42,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
     private var deferredStructuralHeightRows = IndexSet()
     private var appKitDropIndicator: SidebarDropIndicator?
     private var appKitDropIndicatorScope: SidebarWorkspaceReorderDropIndicatorScope = .raw
+    /// How many groups hold the rows the reorder drop lands among, for the end-of-list line's indent (#cm-106).
+    private var appKitDropIndicatorLevel: Int?
     private var appKitDropIndicatorIncludesRowTargets = false
     /// Live group-anchor ids resolved once per native drag session. Group
     /// headers retain their stable row identity while an anchor may be
@@ -1826,9 +1828,11 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             indicator: update.indicator,
             scope: update.scope,
             draggedWorkspaceId: update.draggedWorkspaceId,
-            indicatorRowIds: update.indicatorRowIds
+            indicatorRowIds: update.indicatorRowIds,
+            level: update.level // (#cm-106)
         )
         lastAcceptedReorderDropPlan = update.plan
+        appKitDropIndicatorLevel = update.level // (#cm-106)
         enforceReorderIndicatorPaintOnVisibleCells()
         setAppKitDropIndicator(update.indicator, scope: update.scope, includeRowTargets: false)
         reorderDragWindowPoint = windowPoint
@@ -1837,6 +1841,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
 
     private func retireReorderIndicator() {
         lastAcceptedReorderDropPlan = nil
+        appKitDropIndicatorLevel = nil
         guard reorderIndicatorPainter != nil else { return }
         reorderIndicatorPainter = nil
         clearReorderIndicatorPaintOnVisibleCells()
@@ -1869,9 +1874,9 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 ?? (top: false, bottom: false)
             switch table.view(atColumn: 0, row: row, makeIfNecessary: false) {
             case let cell as SidebarWorkspaceRowTableCellView:
-                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom)
+                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter?.level)
             case let cell as SidebarGroupHeaderTableCellView:
-                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom)
+                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter?.level)
             default:
                 break
             }
@@ -1948,6 +1953,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             guard let workspaceCell else { return }
             if let hitView, workspaceCell.selectionPreviewShouldIgnore(hitView) { return }
         } else if rows[row].appKitGroupHeaderModel != nil {
+            // A header with no workspace of its own is never active and a click on it selects nothing: no preview (#cm-106).
+            if rows[row].appKitGroupHeaderModel?.hasOwnWorkspace == false { return }
             guard let headerCell else { return }
             if let hitView, headerCell.selectionPreviewShouldIgnore(hitView) { return }
         } else {
@@ -2504,7 +2511,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // the controller-owned paint or scrolling mid-drag drops the line.
         if let painter = reorderIndicatorPainter {
             let paint = painter.paint(forRowWorkspaceId: configuration.workspaceId)
-            cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom)
+            cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter.level)
         }
     }
 
@@ -2732,7 +2739,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // controller-owned drop line after the model reset it.
         if let painter = reorderIndicatorPainter {
             let paint = painter.paint(forRowWorkspaceId: configuration.workspaceId)
-            cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom)
+            cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter.level)
         }
     }
 
@@ -2887,6 +2894,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // carries bonsplit indicators now, so syncing from it mid-reorder
         // would clear the past-the-end overlay on every apply.
         if let painter = reorderIndicatorPainter {
+            appKitDropIndicatorLevel = painter.level // (#cm-106)
             setAppKitDropIndicator(painter.indicator, scope: painter.scope, includeRowTargets: false)
             return
         }
@@ -2952,6 +2960,10 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 - SidebarWorkspaceListMetrics.rowVerticalPadding
         }
         let leadingIndent: CGFloat = {
+            // A reorder drop in a window with a nested group indents the line to the level the drop lands at (#cm-106).
+            if !appKitDropIndicatorIncludesRowTargets, let level = appKitDropIndicatorLevel {
+                return SidebarNestedIndent.points(levels: level, availableWidth: container.bounds.width)
+            }
             guard appKitDropIndicatorIncludesRowTargets,
                   let targetRow,
                   rows[targetRow].groupId != nil,

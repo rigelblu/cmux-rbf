@@ -23,6 +23,8 @@ let package = Package(
         .package(path: "../CMUXDebugLog"),
         // CmuxTestSupport backs FileOpen/ PreferredEditorService UI-test capture.
         .package(path: "../CmuxTestSupport"),
+        // The sidebar drop planner (#cm-106): the tests plan a drop with it and commit the plan through the coordinator.
+        .package(path: "../CmuxFoundation"),
     ],
     targets: [
         .target(
@@ -45,6 +47,7 @@ let package = Package(
                 "CmuxWorkspaces",
                 .product(name: "Bonsplit", package: "bonsplit"),
                 .product(name: "CmuxTestSupport", package: "CmuxTestSupport"),
+                .product(name: "CmuxFoundation", package: "CmuxFoundation"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

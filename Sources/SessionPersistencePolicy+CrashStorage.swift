@@ -1,5 +1,6 @@
 import Foundation
 import CmuxTerminalCore
+import CmuxWorkspaces // (#cm-106)
 
 extension SessionPersistencePolicy {
     static func defaultCmuxCrashDirectoryURL(
@@ -278,14 +279,25 @@ extension SessionPersistencePolicy {
         let originalMembersByGroupId = Dictionary(grouping: originalWorkspaces, by: \.groupId)
         let keptMembersByGroupId = Dictionary(grouping: keptWorkspaces, by: \.groupId)
         let occupiedGroupIds = Set(keptMembersByGroupId.keys.compactMap { $0 })
+        // The save's rule decides which groups stay (#cm-106).
+        let keptGroupIds = WorkspaceGroupPersistenceRule.keptGroupIdsForPruning(
+            saved: groups.map { ($0.id, $0.parentGroupId, $0.anchorIsEmpty, $0.isPinned) },
+            occupiedGroupIds: occupiedGroupIds
+        )
         let pruned = groups.compactMap { group -> SessionWorkspaceGroupSnapshot? in
-            let keepsEmptyPinnedGroup = group.isPinned == true && group.anchorIsEmpty == true
-            guard occupiedGroupIds.contains(group.id) || keepsEmptyPinnedGroup else { return nil }
+            guard keptGroupIds.contains(group.id) else { return nil }
             let groupId = Optional(group.id)
             let originalMembers = originalMembersByGroupId[groupId] ?? []
             let keptMembers = keptMembersByGroupId[groupId] ?? []
             if keptMembers.isEmpty {
-                return keepsEmptyPinnedGroup ? group : nil
+                if group.anchorIsEmpty == true {
+                    return group
+                }
+                // Kept only because a kept group names it as parent (#cm-106).
+                var copy = group
+                copy.anchorIsEmpty = true
+                copy.anchorMemberIndex = nil
+                return copy
             }
 
             var copy = group

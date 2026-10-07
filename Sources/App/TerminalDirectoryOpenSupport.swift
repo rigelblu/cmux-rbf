@@ -1138,11 +1138,12 @@ extension WorkspaceShortcutEligibility {
         // alone would make it a numberless visible row — the shape `#cm-37` exists
         // to remove.
         let groupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        let hiddenGroupIds = WorkspaceGroupRowWalk.groupIdsUnderAFoldedGroup(groups: groups) // (#cm-106) no number under a folded ancestor
         return resolve(candidates: workspaces.map { workspace in
             let group = workspace.groupId.flatMap { groupsById[$0] }
             return Candidate(
                 isGroupAnchor: group?.anchorWorkspaceId == workspace.id,
-                isInCollapsedGroup: group?.isCollapsed == true,
+                isInCollapsedGroup: group?.isCollapsed == true || (group.map { hiddenGroupIds.contains($0.id) } ?? false),
                 // The lane comes from the same place the sidebar reads it, never
                 // a local re-derivation: the palette that owns strip suppression,
                 // so "numbered" and "striped" answer to one definition.

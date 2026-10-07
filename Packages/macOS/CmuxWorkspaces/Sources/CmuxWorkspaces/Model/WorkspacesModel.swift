@@ -45,6 +45,25 @@ public final class WorkspacesModel<Tab: WorkspaceTabRepresenting> {
     @ObservationIgnored
     private weak var host: (any WorkspacesHosting<Tab>)?
 
+#if DEBUG
+    /// Receives each line the nested operations log for a refused move; only a test sets it (#cm-106).
+    @ObservationIgnored
+    var nestedGroupLog: ((String) -> Void)?
+
+    /// How many times the nested versions built the tree; a flat window never does (checked by a test) (#cm-106).
+    @ObservationIgnored
+    var nestedGroupTreeBuilds = 0
+
+    /// How many times `normalizeWorkspaceGroupContiguity` ran; a test checks that a flat path does not repair (#cm-106).
+    @ObservationIgnored
+    var contiguityRepairs = 0
+
+    /// How many times the nested order repair built the set of top-level rows; it is once per repair, however many
+    /// workspaces the window holds (checked by a test) (#cm-106).
+    @ObservationIgnored
+    var nestedTopLevelRowSetBuilds = 0
+#endif
+
     /// Creates an empty model; the owning window attaches itself as host
     /// before the first mutation.
     public init() {}

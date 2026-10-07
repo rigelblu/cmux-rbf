@@ -79,6 +79,12 @@ extension VerticalTabsSidebar {
             tabIds: renderContext.sidebarReorderIds,
             indicatorScope: dragState.dropIndicatorScope
         )
+        // The look of a header with no workspace of its own is drawn in every window (#cm-106).
+        let headerOnlyLook = SidebarHeaderOnlyLook.Answer(
+            hasLiveAnchor: liveAnchorId != nil,
+            isCollapsed: group.isCollapsed,
+            selectedWorkspaceIsInside: tabManager.selectedTabId.map { memberWorkspaceIds.contains($0) } ?? false
+        )
         let model = SidebarGroupHeaderRowModel(
             groupId: group.id,
             anchorWorkspaceId: group.anchorWorkspaceId,
@@ -118,7 +124,11 @@ extension VerticalTabsSidebar {
             isBeingDragged: dragState.draggedTabId == dragIdentity,
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
-            colorSchemeIsDark: renderContext.environment.colorScheme == .dark
+            colorSchemeIsDark: renderContext.environment.colorScheme == .dark,
+            depth: renderContext.rowDepthById[group.id] ?? 0, // (#cm-106)
+            hasOwnWorkspace: headerOnlyLook.hasOwnWorkspace, // (#cm-106)
+            isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
+            holdsGroups: renderContext.workspaceGroups.contains { $0.parentGroupId == group.id } // (#cm-106)
         )
         let actions = makeWorkspaceGroupHeaderActions(
             groupId: group.id,
@@ -243,6 +253,11 @@ extension VerticalTabsSidebar {
             tabIds: renderContext.sidebarReorderIds,
             indicatorScope: dragState.dropIndicatorScope
         )
+        let headerOnlyLook = SidebarHeaderOnlyLook.Answer(
+            hasLiveAnchor: liveAnchorId != nil,
+            isCollapsed: group.isCollapsed,
+            selectedWorkspaceIsInside: tabManager.selectedTabId.map { memberWorkspaceIds.contains($0) } ?? false
+        ) // (#cm-106)
         return SidebarWorkspaceGroupRowSnapshot(
             groupId: group.id,
             anchorWorkspaceId: group.anchorWorkspaceId,
@@ -276,7 +291,14 @@ extension VerticalTabsSidebar {
             isBeingDragged: dragState.draggedTabId == dragIdentity,
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
-            shouldCollectWorkspaceDropTargets: shouldCollectWorkspaceDropTargets
+            shouldCollectWorkspaceDropTargets: shouldCollectWorkspaceDropTargets,
+            depth: renderContext.rowDepthById[group.id] ?? 0, // (#cm-106)
+            hasOwnWorkspace: headerOnlyLook.hasOwnWorkspace, // (#cm-106)
+            isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
+            moveMenu: WorkspaceGroupMoveMenu.menu(for: group.id, groups: renderContext.workspaceGroups), // (#cm-106)
+            holdsGroups: renderContext.workspaceGroups.contains { $0.parentGroupId == group.id }, // (#cm-106)
+            listWidth: renderContext.listWidth, // (#cm-106)
+            dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil // (#cm-106)
         )
     }
 
@@ -328,6 +350,13 @@ extension VerticalTabsSidebar {
             isBeingDragged: snapshot.isBeingDragged,
             topDropIndicatorVisible: snapshot.topDropIndicatorVisible,
             bottomDropIndicatorVisible: snapshot.bottomDropIndicatorVisible,
+            depth: snapshot.depth, // (#cm-106)
+            hasOwnWorkspace: snapshot.hasOwnWorkspace, // (#cm-106)
+            isFoldedOverSelection: snapshot.isFoldedOverSelection, // (#cm-106)
+            moveMenu: snapshot.moveMenu, // (#cm-106)
+            holdsGroups: snapshot.holdsGroups, // (#cm-106)
+            dropLineLevel: snapshot.dropLineLevel, // (#cm-106)
+            listWidth: snapshot.listWidth, // (#cm-106)
             actions: actions,
             onContextMenuAppear: {},
             onContextMenuDisappear: {}
@@ -375,8 +404,10 @@ extension VerticalTabsSidebar {
                 ?? UserDefaultsSettingsClient(defaults: .standard)
                     .value(for: SettingCatalog().workspaceGroups.newWorkspacePlacement)
         }
+        let nestedNotifications = SidebarNestedGroupNotifications(tabManager: tabManager, notificationStore: notificationStore, groupId: groupId) // (#cm-106)
         let resolveNotificationState: () -> SidebarGroupHeaderRowActions.NotificationState = {
-            [resolveLiveAnchor, weak notificationStore] in
+            [resolveLiveAnchor, nestedNotifications, weak notificationStore] in
+            if let state = nestedNotifications.state() { return state } // (#cm-106)
             guard let (tabManager, anchorId) = resolveLiveAnchor(),
                   let notificationStore else {
                 return .unavailable
@@ -476,7 +507,8 @@ extension VerticalTabsSidebar {
                 }
                 notificationStore.clearLatestNotification(forTabId: anchorId)
             },
-            onMarkAllRead: { [resolveLiveAnchor, weak notificationStore] in
+            onMarkAllRead: { [resolveLiveAnchor, nestedNotifications, weak notificationStore] in
+                if nestedNotifications.markAll(read: true) { return } // (#cm-106)
                 guard let (tabManager, anchorId) = resolveLiveAnchor(),
                       let notificationStore else { return }
                 let ids = tabManager.tabs.compactMap { tab in
@@ -486,7 +518,8 @@ extension VerticalTabsSidebar {
                     notificationStore.markRead(forTabId: id)
                 }
             },
-            onMarkAllUnread: { [resolveLiveAnchor, weak notificationStore] in
+            onMarkAllUnread: { [resolveLiveAnchor, nestedNotifications, weak notificationStore] in
+                if nestedNotifications.markAll(read: false) { return } // (#cm-106)
                 guard let (tabManager, anchorId) = resolveLiveAnchor(),
                       let notificationStore else { return }
                 let ids = tabManager.tabs.compactMap { tab in
@@ -510,10 +543,12 @@ extension VerticalTabsSidebar {
                 }
                 let isPinned = tabManager.workspaceGroups
                     .first(where: { $0.id == groupId })?.isPinned ?? false
-                if isPinned || confirmation.containedWorkspaceCount > 0 {
+                // A group that holds groups also asks, and the message counts every workspace that closes (#cm-106).
+                if let ask = deleteGroupAsk(isPinned: isPinned, confirmation: confirmation) {
                     guard confirmDeleteWorkspaceGroup(
-                        groupName: confirmation.groupName,
-                        memberCount: confirmation.containedWorkspaceCount
+                        groupName: ask.groupName,
+                        memberCount: ask.memberCount,
+                        groupsInside: ask.groupsInside
                     ) else {
                         return
                     }
@@ -528,6 +563,10 @@ extension VerticalTabsSidebar {
             }
         )
         actions.notificationState = resolveNotificationState
+        actions.onMoveGroup = { [weak tabManager] parentId in // (#cm-106)
+            tabManager?.moveWorkspaceGroup(groupId: groupId, intoParent: parentId)
+        }
+        actions.moveMenu = { [weak tabManager] in tabManager?.workspaceGroupMoveMenu(for: groupId) } // (#cm-106)
         return actions
     }
 
@@ -552,6 +591,11 @@ extension VerticalTabsSidebar {
             guard let selectedAnchor = tabManager.selectWorkspaceGroupAnchor(for: groupId) else { return }
             anchorId = selectedAnchor.id
         } else {
+            // A click on the name of a header with no workspace behind it folds or unfolds the group, in every window (#cm-106).
+            if tabManager.workspaceGroupAnchor(for: groupId) == nil {
+                tabManager.toggleWorkspaceGroupCollapsed(groupId: groupId)
+                return
+            }
             guard let selectedAnchor = tabManager.selectWorkspaceGroupAnchor(for: groupId) else { return }
             anchorId = selectedAnchor.id
             if selectedTabIds.wrappedValue != [anchorId] {

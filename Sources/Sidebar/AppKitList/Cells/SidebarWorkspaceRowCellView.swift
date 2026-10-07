@@ -608,13 +608,15 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         setAccessibilityLabel(snapshot.accessibilityLabel(
             index: model.index, workspaceCount: model.accessibilityWorkspaceCount
         ))
+        setAccessibilityValue(SidebarNestedAccessibility.value(depth: SidebarNestedAccessibility.workspaceRowDepth(depth: model.depth, isGrouped: model.isGrouped))) // (#cm-106)
+        setAccessibilityDisclosureLevel(SidebarNestedAccessibility.disclosureLevel(forDepth: model.depth))
     }
 
     /// Live drop-line painting during native reorder drags. The controller
     /// owns the indicator for the drag's lifetime (the model's flags stay
     /// false, so no SwiftUI rows rebuild runs per gap change) and moves it
     /// with two direct view mutations instead of a full-list apply.
-    func paintControllerDropIndicator(top: Bool, bottom: Bool) {
+    func paintControllerDropIndicator(top: Bool, bottom: Bool, level: Int? = nil) {
         let colorScheme = model.map { $0.colorSchemeIsDark ? ColorScheme.dark : .light }
             ?? SidebarAppearanceColorResolver().currentColorScheme()
         let accent = cmuxAccentNSColor(for: colorScheme)
@@ -622,12 +624,47 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         bottomDropIndicator.layer?.backgroundColor = accent.cgColor
         topDropIndicator.isHidden = !top
         bottomDropIndicator.isHidden = !bottom
+        // The line is indented to the level the drop lands at; a window with no nested group passes none (#cm-106).
+        if dropLineLevel != level {
+            dropLineLevel = level
+            applyDropLineInset()
+        }
+    }
+
+    /// How many groups hold the rows the drop lands among, while a reorder drag paints this row; nil draws the line
+    /// full width, as before nested groups (#cm-106).
+    private var dropLineLevel: Int?
+
+    private func dropLineLeadingInset(width: CGFloat) -> CGFloat {
+        dropLineLevel.map { SidebarNestedIndent.points(levels: $0, availableWidth: width) } ?? 0
+    }
+
+    private func applyDropLineInset() {
+        let leading = SidebarReorderIndicatorView.horizontalInset + dropLineLeadingInset(width: bounds.width)
+        for line in [topDropIndicator, bottomDropIndicator] {
+            line.frame = NSRect(
+                x: bounds.minX + leading, y: line.frame.minY,
+                width: max(0, bounds.width - leading - SidebarReorderIndicatorView.horizontalInset),
+                height: SidebarReorderIndicatorView.thickness
+            )
+        }
     }
 
 #if DEBUG
     var dropIndicatorPaintForTesting: (top: Bool, bottom: Bool) {
         (!topDropIndicator.isHidden, !bottomDropIndicator.isHidden)
     }
+
+    /// The laid-out frames of the two drop lines, in the cell's coordinates.
+    var dropIndicatorFramesForTesting: (top: NSRect, bottom: NSRect) {
+        (topDropIndicator.frame, bottomDropIndicator.frame)
+    }
+
+    /// Where the row's background is laid out, in the cell's own coordinates: the row's indent shows as its x (#cm-106).
+    var backgroundFrameForTesting: NSRect { backgroundView.frame }
+
+    /// Where the row's title is laid out, in the cell's own coordinates: the content's indent shows as its x (#cm-106).
+    var titleFrameForTesting: NSRect { titleView.frame }
 #endif
 
     private func configureStatusSlot(
@@ -1093,7 +1130,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let stripInset = SidebarWorkspaceRowVisualPalette
             .accentStripContentInset(contentPadding: contentPad)
         let leading = outerPad + contentPad + stripInset
-            + (model.isIndentedUnderHeader ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
+            + model.indentPoints(width: width) // (#cm-106)
         let trailing = width - outerPad - contentPad
         let contentWidth = max(10, trailing - leading)
         var y: CGFloat = 8
@@ -1349,7 +1386,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             // and hover background shift right with the content. Indenting
             // only the content left the full-width highlight hiding the
             // nesting ("can't tell when a workspace is in a group").
-            let bgX = outerPad + (model.isIndentedUnderHeader ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
+            let bgX = outerPad + model.indentPoints(width: width) // (#cm-106)
             backgroundView.frame = NSRect(x: bgX, y: 0, width: max(0, width - outerPad - bgX), height: y)
             // railView is a child of backgroundView, so this frame is in
             // background-local coordinates. The strip runs flush to the
@@ -1375,8 +1412,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             )
             railView.layer?.mask = railMaskLayer
             let indicatorBounds = NSRect(x: 0, y: 0, width: width, height: y)
-            topDropIndicator.position(in: indicatorBounds, at: model.isFirstRow ? 0 : -(model.rowSpacing / 2))
-            bottomDropIndicator.position(in: indicatorBounds, at: y - SidebarReorderIndicatorView.thickness + model.rowSpacing / 2)
+            let lineInset = dropLineLeadingInset(width: width) // (#cm-106)
+            topDropIndicator.position(in: indicatorBounds, at: model.isFirstRow ? 0 : -(model.rowSpacing / 2), leadingInset: lineInset)
+            bottomDropIndicator.position(in: indicatorBounds, at: y - SidebarReorderIndicatorView.thickness + model.rowSpacing / 2, leadingInset: lineInset)
             let pillSize = hintPill.fittingPillSize()
             hintPill.frame = NSRect(
                 x: width - pillSize.width - 10 + ShortcutHintDebugSettings.clamped(model.settings.sidebarShortcutHintXOffset),

@@ -32,6 +32,10 @@ public final class SidebarDragState {
     /// The visible row scope where the active indicator should be drawn.
     public var dropIndicatorScope: SidebarWorkspaceReorderDropIndicatorScope = .raw
 
+    /// How many groups hold the rows the active reorder drop lands among, for the indent of the line; `nil` in a
+    /// window with no nested group (#cm-106).
+    public var dropIndicatorLevel: Int?
+
     /// Explicit source/mirror role for the coordinator session represented by
     /// this window. The session token prevents an old clear from ending a newer
     /// drag of the same workspace.
@@ -216,9 +220,11 @@ public final class SidebarDragState {
     /// Sets the current drop indicator and the visible row scope it belongs to.
     public func setDropIndicator(
         _ indicator: SidebarDropIndicator?,
-        scope: SidebarWorkspaceReorderDropIndicatorScope
+        scope: SidebarWorkspaceReorderDropIndicatorScope,
+        level: Int? = nil
     ) {
         dropIndicator = indicator
+        dropIndicatorLevel = indicator == nil ? nil : level // (#cm-106)
         dropIndicatorScope = indicator == nil ? .raw : scope
         dropIndicatorUsesTopLevelRows = indicator != nil && scope == .topLevel
     }

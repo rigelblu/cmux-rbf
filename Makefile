@@ -28,7 +28,7 @@
 # git worktrees with uncommitted work, and nothing distinguishes dead from
 # dormant. So it refuses without an explicit list. Read the descriptions, not the
 # shared `clean-` prefix; a dogfooder assumed symmetry and predicted backwards.
-.PHONY: help setup run build test install install-rbf install-rbf-plan install-dogfood install-dogfood-plan migrate-dogfood-state migrate-dogfood-state-plan clean-builds clean-builds-plan clean-tmp clean-tmp-plan
+.PHONY: help setup run build test test-packages install install-rbf install-rbf-plan install-dogfood install-dogfood-plan migrate-dogfood-state migrate-dogfood-state-plan clean-builds clean-builds-plan clean-tmp clean-tmp-plan
 
 DEV := rbf/scripts/dev.sh
 
@@ -44,6 +44,7 @@ help: ## Show this help
 		"make build"                  "build only; prints the App path" \
 		"make -C <path> run"          "build+launch ANOTHER checkout (agents: name your worktree, not a BUILD_ID)" \
 		"make test"                   "run the unit tests (the only gate here)" \
+		"make test-packages"          "run the workspace-group packages' swift tests (no app build)" \
 		"make run BUILD_ID=spike"     "name the build yourself, instead of using the branch" \
 		"make build ARGS=--prod-auth" "forward a flag: reload.sh for run/build, xcodebuild for test" \
 		"make clean-builds"           "reclaim disk; keeps running + most-recent + current only" \
@@ -69,6 +70,9 @@ build: ## Build only; prints the App path
 
 test: ## Run unit tests via the cmux-unit scheme (nothing else compiles them)
 	@$(DEV) test $(ARGS)
+
+test-packages: ## Run swift test for the workspace-group packages (CmuxWorkspaces, CmuxControlSocket); not the app
+	@$(DEV) test-packages
 
 setup: ## First-time checkout setup - submodules, GhosttyKit, pbxproj hook
 	@./scripts/setup.sh

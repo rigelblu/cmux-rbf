@@ -69,6 +69,8 @@ struct SidebarWorkspaceRowModel: Equatable {
     /// apply pass.
     let isMetadataExpanded: Bool
     let isMarkdownExpanded: Bool
+    /// How many groups hold this row; 0 in a window with no nested group (#cm-106).
+    var depth: Int = 0
 
     /// Mirrors `SidebarWorkspaceRowSnapshot.isIndentedUnderHeader` so both
     /// renderers inset a row under a header — real group or color section —
@@ -78,6 +80,11 @@ struct SidebarWorkspaceRowModel: Equatable {
             isGrouped: isGrouped,
             isColorSectionMember: isColorSectionMember
         )
+    }
+
+    /// The indent in points: its depth in a nested window, else one step under a header (#cm-106).
+    func indentPoints(width: CGFloat) -> CGFloat {
+        SidebarNestedIndent.points(levels: depth > 0 ? depth : (isIndentedUnderHeader ? 1 : 0), availableWidth: width)
     }
 
     var fontScale: CGFloat { settings.sidebarFontScale }

@@ -4,6 +4,7 @@ import CmuxFoundation
 import CmuxSidebar
 import SwiftUI
 import CmuxSettings
+import CmuxWorkspaces
 
 /// Collapsible group header that doubles as the anchor workspace row.
 struct SidebarWorkspaceGroupHeaderView: View, Equatable {
@@ -42,7 +43,14 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             lhs.isFirstRow == rhs.isFirstRow &&
             lhs.isBeingDragged == rhs.isBeingDragged &&
             lhs.topDropIndicatorVisible == rhs.topDropIndicatorVisible &&
-            lhs.bottomDropIndicatorVisible == rhs.bottomDropIndicatorVisible
+            lhs.bottomDropIndicatorVisible == rhs.bottomDropIndicatorVisible &&
+            lhs.depth == rhs.depth &&
+            lhs.hasOwnWorkspace == rhs.hasOwnWorkspace &&
+            lhs.isFoldedOverSelection == rhs.isFoldedOverSelection &&
+            lhs.moveMenu == rhs.moveMenu &&
+            lhs.holdsGroups == rhs.holdsGroups &&
+            lhs.dropLineLevel == rhs.dropLineLevel &&
+            lhs.listWidth == rhs.listWidth
     }
 
     let groupId: UUID
@@ -80,6 +88,18 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     let isBeingDragged: Bool
     let topDropIndicatorVisible: Bool
     let bottomDropIndicatorVisible: Bool
+    /// How many groups hold this header; 0 at the top level and in a window with no nested group (#cm-106).
+    var depth: Int = 0
+    /// See `SidebarHeaderOnlyLook` (#cm-106).
+    var hasOwnWorkspace: Bool = true
+    var isFoldedOverSelection: Bool = false
+    /// What `Move Group to` offers, built above the lazy boundary; the body never reads the model (#cm-106).
+    var moveMenu: WorkspaceGroupMoveMenu? = nil
+    var holdsGroups: Bool = false
+    /// The level a reorder drop lands at, on a header that draws a drop line (#cm-106).
+    var dropLineLevel: Int? = nil
+    /// The list's width, for the cap on the indent (#cm-106).
+    var listWidth: CGFloat? = nil
     /// Shared actions for SwiftUI and AppKit group headers.
     let actions: SidebarGroupHeaderRowActions
     let onContextMenuAppear: () -> Void
@@ -95,6 +115,15 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     @Environment(\.sidebarLazyContractProbe) private var sidebarLazyContractProbe
 #endif
 
+    /// How far the drop line starts from the left edge of the whole header view: the landing level's indent. The
+    /// header's own indent padding is applied before the line overlays (`.padding(.leading, ...)` above), so the
+    /// overlay already spans that padding and the line takes the landing indent as it is, not less the header's own.
+    /// Nil in a window with no nested group, where the lines are drawn as before (#cm-106).
+    private var dropLineLeadingInset: CGFloat? {
+        guard let level = dropLineLevel else { return nil }
+        return SidebarNestedDropLine.inset(level: level, availableWidth: listWidth)
+    }
+
     private var metrics: SidebarWorkspaceGroupHeaderMetrics {
         SidebarWorkspaceGroupHeaderMetrics(fontScale: fontScale)
     }
@@ -106,6 +135,17 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
         return .secondary
     }
 
+    /// The dot's colour (#cm-106): the group's tint by the color group header's function, else secondary.
+    private var dotColor: Color {
+        SidebarHeaderOnlyLook.dotTint(tintHex: tintHex, colorScheme: colorScheme).map { Color(nsColor: $0) } ?? .secondary
+    }
+
+    /// The name's colour: the accent tint while a folded header holds the selected workspace, else the band's own (#cm-106).
+    private var nameColor: Color {
+        if isFoldedOverSelection { return .accentColor }
+        return Color(nsColor: bandPalette.primaryTextColor)
+    }
+
     private var displayedIconSymbol: String {
         RenderableSystemSymbol.resolvedWorkspaceGroupIcon(explicit: iconSymbol, configured: nil)
     }
@@ -115,6 +155,40 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
               let shortcutDigit,
               let shortcutModifierSymbol else { return nil }
         return "\(shortcutModifierSymbol)\(shortcutDigit)"
+    }
+
+    /// `Move Group to`: `Top Level`, then every group this one may go into, the current place ticked. A SwiftUI menu has
+    /// no indent, so the title is padded by depth. The destinations come with the header's snapshot, built on every pass
+    /// of the sidebar (`VerticalTabsSidebar+WorkspaceGroups.swift`); the AppKit header reads them when the menu opens
+    /// (#cm-106).
+    @ViewBuilder
+    private var moveGroupMenu: some View {
+        if let moveMenu {
+            Menu(String(localized: "workspaceGroup.contextMenu.moveTo", defaultValue: "Move Group to")) {
+                Button {
+                    actions.onMoveGroup(nil)
+                } label: {
+                    if moveMenu.topLevelIsCurrent {
+                        Label(String(localized: "workspaceGroup.contextMenu.moveTo.topLevel", defaultValue: "Top Level"), systemImage: "checkmark")
+                    } else {
+                        Text(String(localized: "workspaceGroup.contextMenu.moveTo.topLevel", defaultValue: "Top Level"))
+                    }
+                }
+                Divider()
+                ForEach(moveMenu.destinations) { destination in
+                    Button {
+                        actions.onMoveGroup(destination.id)
+                    } label: {
+                        let title = String(repeating: "\u{2003}", count: destination.depth) + destination.name
+                        if destination.isCurrent {
+                            Label(title, systemImage: "checkmark")
+                        } else {
+                            Text(title)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var pinnedGroupTooltip: String {
@@ -187,9 +261,18 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     appliesGlobalFontMagnification: true)
                     .frame(width: metrics.iconFrame, height: metrics.iconFrame)
                     .accessibilityHidden(true)
+                    // (#cm-106) a header with no workspace draws a dot where the icon was; the icon keeps its frame
+                    .opacity(hasOwnWorkspace ? 1 : 0)
+                    .overlay {
+                        if !hasOwnWorkspace {
+                            Circle()
+                                .fill(dotColor)
+                                .frame(width: SidebarHeaderOnlyLook.dotDiameter, height: SidebarHeaderOnlyLook.dotDiameter)
+                        }
+                    }
                 Text(name)
                     .cmuxFont(size: metrics.nameFontSize, weight: .semibold)
-                    .foregroundStyle(Color(nsColor: bandPalette.primaryTextColor))
+                    .foregroundStyle(nameColor) // (#cm-106)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if anchorUnreadCount > 0 {
@@ -212,10 +295,15 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             }
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(Text(name))
-            .accessibilityHint(Text(String(
-                localized: "workspaceGroup.focusAnchor.a11y",
-                defaultValue: "Focus the group's anchor workspace"
-            )))
+            .accessibilityHint(Text(hasOwnWorkspace // (#cm-106) a click on a header with no workspace folds it
+                ? String(
+                    localized: "workspaceGroup.focusAnchor.a11y",
+                    defaultValue: "Focus the group's anchor workspace"
+                )
+                : String(
+                    localized: "workspaceGroup.noOwnWorkspace.hint.a11y",
+                    defaultValue: "Fold or unfold the group"
+                )))
 
             let plusVisible = isPointerHovering && !contextMenuVisible && !showsShortcutHint
             Button(action: actions.onTapPlus) {
@@ -294,6 +382,8 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             cornerRadius: isMultiSelected && !isAnchorActive ? 6 : 4,
             style: .continuous
         ))
+        .sidebarNestedAccessibilityValue(SidebarNestedAccessibility.value(depth: depth, hasOwnWorkspace: hasOwnWorkspace)) // (#cm-106)
+        .padding(.leading, SidebarNestedIndent.points(levels: depth, availableWidth: listWidth)) // (#cm-106) the band starts at the header's own indent
         .sidebarShortcutHintOverlay(
             text: shortcutHintPillText,
             emphasis: isAnchorActive ? 1.0 : 0.9,
@@ -307,7 +397,8 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             SidebarWorkspaceTopDropIndicator(
                 isVisible: topDropIndicatorVisible,
                 isFirstRow: isFirstRow,
-                rowSpacing: rowSpacing
+                rowSpacing: rowSpacing,
+                leadingInset: dropLineLeadingInset ?? 0 // (#cm-106)
             )
         }
         .overlay(alignment: .bottom) {
@@ -316,7 +407,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                 isFirstRow: false,
                 rowSpacing: rowSpacing,
                 isBottomEdge: true,
-                leadingInset: metrics.groupScopedBottomDropIndicatorLeadingInset
+                leadingInset: dropLineLeadingInset ?? metrics.groupScopedBottomDropIndicatorLeadingInset // (#cm-106)
             )
         }
         .contextMenu {
@@ -373,6 +464,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     ),
                 action: actions.onTogglePinned
             )
+            moveGroupMenu // (#cm-106)
             Divider()
             Button(
                 String(
@@ -431,7 +523,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                 action: actions.onOpenDocs
             )
             Divider()
-            if !isPinned || memberCount > 0 {
+            if !isPinned || memberCount > 0 || holdsGroups { // (#cm-106)
                 Button(
                     String(
                         localized: "workspaceGroup.contextMenu.ungroup",
