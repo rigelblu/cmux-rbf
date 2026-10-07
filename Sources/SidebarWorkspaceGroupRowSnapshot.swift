@@ -1,5 +1,6 @@
 import AppKit
 import CmuxSettings
+import CmuxWorkspaces
 import Foundation
 
 /// Immutable presentation and menu state for one workspace-group row.
@@ -45,4 +46,18 @@ struct SidebarWorkspaceGroupRowSnapshot {
     let topDropIndicatorVisible: Bool
     let bottomDropIndicatorVisible: Bool
     let shouldCollectWorkspaceDropTargets: Bool
+    /// How many groups hold this header; 0 at the top level and in a window with no nested group (#cm-106).
+    var depth: Int = 0
+    /// See `SidebarHeaderOnlyLook`; false for a header with no workspace behind its name, in any window (#cm-106).
+    var hasOwnWorkspace: Bool = true
+    var isFoldedOverSelection: Bool = false
+    /// What `Move Group to` offers this group, a value built above the lazy boundary so the header never reads the
+    /// model while its body runs (#cm-106).
+    var moveMenu: WorkspaceGroupMoveMenu? = nil
+    /// Whether a group sits inside this one; a pinned group that holds only groups is still offered Ungroup (#cm-106).
+    var holdsGroups: Bool = false
+    /// The list's width, for the cap on the indent; nil outside the SwiftUI list (#cm-106).
+    var listWidth: CGFloat? = nil
+    /// The level a reorder drop lands at, set only on a header that draws a drop line, for the line's indent (#cm-106).
+    var dropLineLevel: Int? = nil
 }

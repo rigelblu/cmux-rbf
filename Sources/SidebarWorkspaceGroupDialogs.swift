@@ -104,13 +104,15 @@ func presentInvalidWorkspaceColorAlert(_ value: String, presentingWindow: NSWind
 
 /// Confirmation dialog for destructive group deletion.
 @MainActor
-func confirmDeleteWorkspaceGroup(groupName: String, memberCount: Int) -> Bool {
+func confirmDeleteWorkspaceGroup(groupName: String, memberCount: Int, groupsInside: Int = 0) -> Bool { // (#cm-106)
     let title = String(
         localized: "dialog.deleteGroup.title",
         defaultValue: "Delete this group?"
     )
     let message: String?
-    if memberCount <= 0 {
+    if groupsInside > 0 { // (#cm-106)
+        message = deleteMessageForGroupsInside(groupName: groupName, inside: groupsInside, workspaces: memberCount)
+    } else if memberCount <= 0 {
         message = nil
     } else if memberCount == 1 {
         let format = String(

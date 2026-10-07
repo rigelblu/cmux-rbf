@@ -61,7 +61,8 @@ extension TabItemView {
             if moveToGroupMenuState.rendersSubmenu {
                 Menu(moveToGroupLabel) {
                     ForEach(groups) { group in
-                        Button(group.name) {
+                        // A SwiftUI menu has no indent: a nested group's title is padded by its depth (#cm-106).
+                        Button(group.paddedTitle) {
                             actions.addTargetsToGroup(eligibleTargetIds, group.id)
                         }
                         .disabled(allTargetsInSameGroup == group.id)

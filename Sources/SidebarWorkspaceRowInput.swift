@@ -49,6 +49,12 @@ struct SidebarWorkspaceRowInput {
     let inferredTaskStatus: WorkspaceTaskStatus
     let activeTodoOverride: WorkspaceTaskStatus?
     let isTodoStatusHidden: Bool
+    /// How many groups hold this row; 0 in a window with no nested group, where `groupId` alone says it (#cm-106).
+    var depth: Int = 0
+    /// The level a reorder drop lands at, set only on a row that draws a drop line, for the line's indent (#cm-106).
+    var dropLineLevel: Int? = nil
+    /// The SwiftUI list's width, for the cap on the indent; nil in the AppKit list, which reads its own (#cm-106).
+    var listWidth: CGFloat? = nil
 
     @MainActor
     func rowSnapshot(list: SidebarWorkspaceRowsSnapshot) -> SidebarWorkspaceRowSnapshot {
@@ -104,7 +110,10 @@ struct SidebarWorkspaceRowInput {
                 allNotificationsMuted: targetAggregate.allNotificationsMuted,
                 notifications: targetAggregate.notifications,
                 targetColorHexes: targetAggregate.targetColorHexes
-            )
+            ),
+            depth: depth, // (#cm-106)
+            dropLineLevel: dropLineLevel, // (#cm-106)
+            listWidth: listWidth
         )
     }
 }

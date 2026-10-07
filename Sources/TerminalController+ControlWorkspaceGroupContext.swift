@@ -83,7 +83,9 @@ extension TerminalController: ControlWorkspaceGroupContext {
             iconSymbol: group.iconSymbol,
             memberWorkspaceIDs: memberIds,
             externalID: group.externalID,
-            anchorWorkspaceProvenance: group.anchorWorkspaceProvenance.rawValue
+            anchorWorkspaceProvenance: group.anchorWorkspaceProvenance.rawValue,
+            parentGroupID: group.parentGroupId, // (#cm-106)
+            holdsNothing: tabManager.workspaces.groupHoldsNothing(group.id) // (#cm-106)
         )
     }
 
@@ -93,7 +95,7 @@ extension TerminalController: ControlWorkspaceGroupContext {
         guard let tabManager = resolveTabManager(routing: routing) else {
             return .tabManagerUnavailable
         }
-        let groups = tabManager.workspaceGroups.map {
+        let groups = tabManager.workspaces.workspaceGroupsParentFirst().map { // (#cm-106) a parent is listed before its children
             controlWorkspaceGroupSnapshot($0, tabManager: tabManager)
         }
         let windowId = AppDelegate.shared?.windowId(for: tabManager)
@@ -362,10 +364,15 @@ extension TerminalController: ControlWorkspaceGroupContext {
         toIndex: Int?,
         beforeGroupID: UUID?,
         afterGroupID: UUID?
-    ) -> Bool? {
-        guard let tabManager = resolveTabManager(routing: routing) else { return nil }
+    ) -> ControlWorkspaceGroupMoveResolution {
+        guard let tabManager = resolveTabManager(routing: routing) else { return .tabManagerUnavailable }
         guard let current = tabManager.workspaceGroups.firstIndex(where: { $0.id == groupID }) else {
-            return false
+            return .unresolved
+        }
+        // In a window with a nested group a target in another parent is refused, and a move that changes nothing is
+        // `.unchanged`; the socket answers `.unchanged` with the same plain success as `.moved` (#cm-106).
+        if tabManager.workspaces.hasNestedWorkspaceGroup {
+            return Self.controlMoveNestedWorkspaceGroup(tabManager: tabManager, groupID: groupID, toIndex: toIndex, beforeGroupID: beforeGroupID, afterGroupID: afterGroupID)
         }
         // moveWorkspaceGroup interprets toIndex as the FINAL position the group
         // should occupy. before/after refer to a peer's CURRENT index, so when
@@ -386,9 +393,9 @@ extension TerminalController: ControlWorkspaceGroupContext {
             }
             return nil
         }()
-        guard let target else { return false }
+        guard let target else { return .unresolved }
         tabManager.moveWorkspaceGroup(groupId: groupID, toIndex: target)
-        return true
+        return .moved
     }
 
     func controlFocusWorkspaceGroup(

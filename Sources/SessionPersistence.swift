@@ -2020,6 +2020,8 @@ struct SessionWorkspaceGroupSnapshot: Codable, Sendable, Equatable {
     var externalID: String? = nil
     /// Raw ``WorkspaceGroupAnchorProvenance`` value; absent in older snapshots.
     var anchorWorkspaceProvenance: String? = nil
+    /// Optional parent group identity for nested groups (#cm-106).
+    var parentGroupId: UUID? = nil
 }
 
 extension SessionWorkspaceSnapshot {

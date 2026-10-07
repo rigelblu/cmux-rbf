@@ -71,7 +71,8 @@ extension ControlCommandCoordinator {
             "is_pinned": .bool(group.isPinned),
             "anchor_workspace_id": .string(wireAnchorWorkspaceID.uuidString),
             "anchor_workspace_ref": ref(.workspace, group.anchorWorkspaceID),
-            "is_empty": .bool(group.isEmpty),
+            "is_empty": .bool(group.holdsNothing), // (#cm-106) true only when the group holds nothing
+            "parent_group_id": orNull(group.parentGroupID?.uuidString), // (#cm-106)
             "custom_color": orNull(group.customColor),
             "icon_symbol": orNull(group.iconSymbol),
             "member_workspace_ids": .array(group.memberWorkspaceIDs.map { .string($0.uuidString) }),
@@ -396,22 +397,31 @@ extension ControlCommandCoordinator {
         guard let gid = uuid(params, "group_id") else {
             return .err(code: "invalid_params", message: "Missing or invalid group_id", data: nil)
         }
-        guard let ok = context?.controlMoveWorkspaceGroup(
+        let resolution = context?.controlMoveWorkspaceGroup(
             routing: routingSelectors(params),
             groupID: gid,
             toIndex: int(params, "to_index"),
             beforeGroupID: uuid(params, "before_group_id"),
             afterGroupID: uuid(params, "after_group_id")
-        ) else {
+        ) ?? .tabManagerUnavailable
+        switch resolution {
+        case .tabManagerUnavailable:
             return .err(code: "unavailable", message: "TabManager not available", data: nil)
-        }
-        return ok
-            ? .ok(.object(["group_id": .string(gid.uuidString)]))
-            : .err(
+        case .moved, .unchanged: // (#cm-106) a move that changes nothing answers exactly as the base release did
+            return .ok(.object(["group_id": .string(gid.uuidString)]))
+        case .unresolved:
+            return .err(
                 code: "invalid_params",
                 message: "Missing or unresolvable target position",
                 data: .object(["group_id": .string(gid.uuidString)])
             )
+        case .targetNotBeside: // (#cm-106)
+            return .err(
+                code: "invalid_params",
+                message: "Target group is not beside this group",
+                data: .object(["group_id": .string(gid.uuidString)])
+            )
+        }
     }
 
     // MARK: - Focus

@@ -281,7 +281,7 @@ extension ControlWorkspaceGroupContext {
         toIndex: Int?,
         beforeGroupID: UUID?,
         afterGroupID: UUID?
-    ) -> Bool? { nil }
+    ) -> ControlWorkspaceGroupMoveResolution { .tabManagerUnavailable }
 
     func controlFocusWorkspaceGroup(
         routing: ControlRoutingSelectors,

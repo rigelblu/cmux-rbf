@@ -424,6 +424,8 @@ struct SidebarWorkspaceRowMenuBuilder {
                     }
                 })
             }
+            // A nested group is indented by its depth (#cm-106).
+            for (groupItem, group) in zip(submenu.items, groups) { groupItem.indentationLevel = group.menuIndentationLevel }
             let parent = item(moveToGroupLabel) {}
             parent.submenu = submenu
             menu.addItem(parent)

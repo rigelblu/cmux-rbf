@@ -191,6 +191,11 @@ class TabManager: ObservableObject {
     /// palette's context snapshot read it on demand.
     private(set) var windowName: String?
 
+#if DEBUG
+    /// Receives each line the restore logs for a repaired group parent; only a test sets it (#cm-106).
+    var workspaceGroupRepairLog: ((String) -> Void)?
+#endif
+
     /// Normalizes a proposed window name (#cm-104): turns runs of newlines into
     /// single spaces, trims whitespace and newlines from both ends, and returns
     /// `nil` when empty.
@@ -2649,10 +2654,16 @@ class TabManager: ObservableObject {
         invalidateFocusHistoryTarget(workspaceId: tabId, panelId: nil)
 
         let removed = tabs.remove(at: index)
+        let nestedWindow = workspaces.hasNestedWorkspaceGroup // (#cm-106)
+        let orderLeft = tabs.map(\.id) // (#cm-106)
         // Same anchor-close lifecycle as closeWorkspace: an unpinned group's
         // anchor dissolves it, while a pinned group promotes a remaining member
         // or retains an empty header.
         workspaces.dissolveGroupsAnchoredBy(closedWorkspaceId: removed.id)
+        // In a window that held a nested group the rows left behind can change order (a child group's header passes to
+        // the next workspace, which then rises above the groups); the notice names the ones that changed place. It is
+        // sent once the selection is settled below, as closeWorkspace does. A flat window sends nothing, as before (#cm-106).
+        let movedLeftBehind = nestedWindow ? workspaces.workspaceIdsThatChangedPlace(since: orderLeft) : [] // (#cm-106)
         // Clear the detached workspace's own group membership so the
         // destination window — which has no matching WorkspaceGroup — doesn't
         // render it as an orphaned indented row with stale grouping state.
@@ -2663,6 +2674,7 @@ class TabManager: ObservableObject {
         lastFocusedPanelByTab.removeValue(forKey: removed.id)
 
         if recoverEmptyWorkspaceAfterStartupIfNeeded() {
+            workspaceOrderDidChange(movedWorkspaceIds: movedLeftBehind) // (#cm-106)
             return removed
         }
 
@@ -2671,6 +2683,7 @@ class TabManager: ObservableObject {
             selectedTabId = tabs[nextIndex].id
         }
 
+        workspaceOrderDidChange(movedWorkspaceIds: movedLeftBehind) // (#cm-106)
         return removed
     }
 
@@ -4855,7 +4868,8 @@ class TabManager: ObservableObject {
         // reinserted at its old absolute index, which may now sit inside a
         // different group section after intervening reorders. Renormalize
         // so the restored member lands beside its group.
-        let needsNormalize = workspace.groupId != nil && !workspaceGroups.isEmpty
+        // A nested window also repairs, for an ungrouped workspace whose old place now falls inside an area (#cm-106).
+        let needsNormalize = (workspace.groupId != nil && !workspaceGroups.isEmpty) || workspaces.hasNestedWorkspaceGroup
         if !sourceWorkspaceIdIsAmbiguous {
             ClosedItemHistoryStore.shared.remapPanelWorkspaceIds(
                 from: entry.workspaceId,
@@ -6259,6 +6273,7 @@ extension TabManager {
             hasher.combine(group.iconSymbol ?? "")
             hasher.combine(group.externalID ?? "")
             hasher.combine(group.anchorWorkspaceProvenance.rawValue)
+            hasher.combine(group.parentGroupId) // (#cm-106)
         }
         for workspace in tabs.prefix(SessionPersistencePolicy.maxWorkspacesPerWindow) {
             hasher.combine(workspace.id)
@@ -6561,11 +6576,13 @@ extension TabManager {
             return map
         }()
         let groupSnapshots: [SessionWorkspaceGroupSnapshot]? = {
+            // Which groups are saved (#cm-106): occupied, empty, or a parent of one.
+            let keptGroupIds = WorkspaceGroupPersistenceRule.keptGroupIdsForSave(
+                groups: workspaceGroups,
+                occupiedGroupIds: occupiedGroupIds
+            )
             let snapshots = workspaceGroups
-                .filter { group in
-                    occupiedGroupIds.contains(group.id)
-                        || (group.isPinned && group.isEmpty)
-                }
+                .filter { keptGroupIds.contains($0.id) }
                 .map { group in
                     let memberIds = restorableMembersByGroupId[group.id] ?? []
                     let anchorIndex = group.liveAnchorWorkspaceId.flatMap {
@@ -6582,7 +6599,8 @@ extension TabManager {
                         customColor: group.customColor,
                         iconSymbol: group.iconSymbol,
                         externalID: group.externalID,
-                        anchorWorkspaceProvenance: group.anchorWorkspaceProvenance.rawValue
+                        anchorWorkspaceProvenance: group.anchorWorkspaceProvenance.rawValue,
+                        parentGroupId: group.parentGroupId // (#cm-106)
                     )
                 }
             return snapshots.isEmpty ? nil : snapshots
@@ -6809,7 +6827,7 @@ extension TabManager {
             excludingStableIdentities: excludingStableIdentities,
             deferBrowserPanels: deferBrowserPanels
         )
-        let restoredGroups: [WorkspaceGroup] = {
+        let unrepairedRestoredGroups: [WorkspaceGroup] = {
             guard let groupSnapshots = snapshot.workspaceGroups else { return [] }
             let workspaceIdsByGroupId: [UUID: [UUID]] = {
                 var map: [UUID: [UUID]] = [:]
@@ -6820,20 +6838,28 @@ extension TabManager {
                 }
                 return map
             }()
+            // Which groups come back, and which parents were kept (#cm-106).
+            let keptGroupIds = WorkspaceGroupPersistenceRule.keptGroupIdsForRestore(
+                saved: groupSnapshots.map { ($0.id, $0.parentGroupId, $0.anchorIsEmpty, $0.isPinned) },
+                occupiedGroupIds: Set(workspaceIdsByGroupId.keys)
+            )
             var seen: Set<UUID> = []
             return groupSnapshots.compactMap { groupSnapshot in
                 guard seen.insert(groupSnapshot.id).inserted else { return nil }
+                guard keptGroupIds.contains(groupSnapshot.id) else { return nil }
                 let members = workspaceIdsByGroupId[groupSnapshot.id] ?? []
+                // The parent as saved. A parent that names no group, or a loop, is repaired after this closure, with a log line.
+                let savedParentId = groupSnapshot.parentGroupId
                 if members.isEmpty {
-                    // Only pinned groups are durable without a live member.
+                    // Pinned groups, empty headers and parents of kept groups
+                    // are durable without a live member (#cm-106).
                     // Their persisted anchor id is a stable header identity;
                     // older snapshots that omit it fall back to the group id.
-                    guard groupSnapshot.isPinned == true else { return nil }
                     return WorkspaceGroup(
                         id: groupSnapshot.id,
                         name: groupSnapshot.name,
                         isCollapsed: groupSnapshot.isCollapsed,
-                        isPinned: true,
+                        isPinned: groupSnapshot.isPinned ?? false,
                         // The group id is the durable header identity. Older
                         // snapshots stored a former workspace id here; use
                         // the group id on restore so header drags resolve as
@@ -6844,7 +6870,8 @@ extension TabManager {
                         externalID: groupSnapshot.externalID,
                         anchorWorkspaceProvenance: WorkspaceGroupAnchorProvenance(
                             rawValue: groupSnapshot.anchorWorkspaceProvenance ?? ""
-                        ) ?? .unknown
+                        ) ?? .unknown,
+                        parentGroupId: savedParentId
                     )
                 }
                 // Resolve anchor: prefer the restore-stable index, then the
@@ -6872,10 +6899,21 @@ extension TabManager {
                     externalID: groupSnapshot.externalID,
                     anchorWorkspaceProvenance: WorkspaceGroupAnchorProvenance(
                         rawValue: groupSnapshot.anchorWorkspaceProvenance ?? ""
-                    ) ?? .unknown
+                    ) ?? .unknown,
+                    parentGroupId: savedParentId
                 )
             }
         }()
+        // A saved file with a loop of groups or a parent that names no group is repaired, one log line each (#cm-106).
+        let parentRepair = WorkspaceGroupTree.repairingParents(of: unrepairedRestoredGroups)
+        for repair in parentRepair.repairs {
+            let line = WorkspaceGroupTree.message(for: repair)
+            tabManagerLogger.info("\(line, privacy: .public)")
+#if DEBUG
+            workspaceGroupRepairLog?(line)
+#endif
+        }
+        let restoredGroups = parentRepair.groups
         // Clear any group references on restored workspaces that no longer correspond
         // to a known group (older snapshots, manual edits, etc.).
         let knownGroupIds = Set(restoredGroups.map(\.id))
@@ -6883,6 +6921,8 @@ extension TabManager {
             workspace.groupId = nil
         }
         workspaceGroups = restoredGroups
+        // A restored window that holds a nested group ends in one nested bare repair (#cm-106).
+        if workspaces.hasNestedWorkspaceGroup { workspaces.normalizeWorkspaceGroupContiguity() }
         selectedTabId = newSelectedId
         let existingIds = Set(newTabs.map(\.id))
         pruneBackgroundWorkspaceLoads(existingIds: existingIds)

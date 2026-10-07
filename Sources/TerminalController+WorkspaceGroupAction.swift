@@ -126,6 +126,18 @@ extension TerminalController {
                     )
                 }
             case .delete:
+                // The Mac refuses Delete on a group that holds groups, before anything closes (#cm-106).
+                guard !tabManager.workspaces.holdsWorkspaceGroups(groupID) else {
+                    mutationError = .err(
+                        code: "invalid_request",
+                        message: String(
+                            localized: "workspaceGroup.error.holdsGroupsDeleteOnMac",
+                            defaultValue: "This group holds other groups. Delete it on the Mac."
+                        ),
+                        data: ["group_id": groupID.uuidString]
+                    )
+                    return
+                }
                 let memberCount = tabManager.tabs.filter { $0.groupId == groupID }.count
                 let isPinnedEmptyGroup = tabManager.workspaceGroups.first {
                     $0.id == groupID

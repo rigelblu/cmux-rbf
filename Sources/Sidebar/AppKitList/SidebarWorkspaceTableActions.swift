@@ -27,6 +27,8 @@ struct SidebarWorkspaceTableReorderDropUpdate {
     /// the coalesced repaint, so re-resolving could commit a different gap
     /// than the line the user released on.
     let plan: SidebarWorkspaceReorderDropPlan?
+    /// The level the drop lands at, for the indent of the line (#cm-106); nil in a window with no nested group.
+    var level: Int? = nil
 }
 
 /// Closure bundle routing table input and drag operations to existing sidebar actions.

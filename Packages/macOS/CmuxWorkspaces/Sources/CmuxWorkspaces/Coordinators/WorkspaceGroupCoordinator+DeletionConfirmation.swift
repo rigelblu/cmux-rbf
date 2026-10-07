@@ -12,6 +12,7 @@ extension WorkspaceGroupCoordinator {
         guard let group = model.workspaceGroups.first(where: { $0.id == groupId }) else {
             return nil
         }
+        if model.hasNestedWorkspaceGroup { return nestedDeletionConfirmation(group: group) } // (#cm-106)
         let liveAnchorId = group.liveAnchorWorkspaceId
         let includesAnchorWorkspace = liveAnchorId.map { anchorId in
             model.tabs.contains { $0.id == anchorId }
@@ -56,7 +57,8 @@ extension WorkspaceGroupCoordinator {
             groupName: fallbackGroupName,
             anchorWorkspaceId: fallbackAnchorWorkspaceId,
             includesAnchorWorkspace: true,
-            memberWorkspaceIds: [fallbackAnchorWorkspaceId]
+            memberWorkspaceIds: [fallbackAnchorWorkspaceId],
+            forStaleHeader: true // (#cm-106)
         )
     }
 
@@ -73,6 +75,9 @@ extension WorkspaceGroupCoordinator {
         recordHistory: Bool = true
     ) -> Int {
         guard let host else { return 0 }
+        // A confirmation taken in a nested window is always pressed nested. One taken on a header whose group record was
+        // already gone is upstream's, in a nested window as in a flat one: it closes the header's workspace (#cm-106).
+        if !confirmation.forStaleHeader, confirmation.takenInNestedWindow || model.hasNestedWorkspaceGroup { return nestedDeleteWorkspaceGroup(confirmed: confirmation, recordHistory: recordHistory) } // (#cm-106)
         guard model.workspaceGroups.contains(where: { $0.id == confirmation.groupId })
             || model.tabs.contains(where: { $0.id == confirmation.anchorWorkspaceId }) else {
             return 0

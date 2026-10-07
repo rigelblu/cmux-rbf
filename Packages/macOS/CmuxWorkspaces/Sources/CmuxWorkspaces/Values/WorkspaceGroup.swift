@@ -23,6 +23,8 @@ public struct WorkspaceGroup: Identifiable, Equatable, Sendable {
     public var isPinned: Bool
     /// Current header anchor state.
     public var anchor: WorkspaceGroupAnchor
+    /// Optional parent group id when this group sits inside another group (#cm-106).
+    public var parentGroupId: UUID?
     /// Group-level color override (hex string). When nil, falls back to the
     /// cwd-config color resolved from `cmux.json` for the anchor's cwd, then
     /// to no tint.
@@ -69,7 +71,8 @@ public struct WorkspaceGroup: Identifiable, Equatable, Sendable {
         customColor: String?,
         iconSymbol: String?,
         externalID: String? = nil,
-        anchorWorkspaceProvenance: WorkspaceGroupAnchorProvenance = .unknown
+        anchorWorkspaceProvenance: WorkspaceGroupAnchorProvenance = .unknown,
+        parentGroupId: UUID? = nil // (#cm-106)
     ) {
         self.id = id
         self.name = name
@@ -80,6 +83,7 @@ public struct WorkspaceGroup: Identifiable, Equatable, Sendable {
         self.iconSymbol = iconSymbol
         self.externalID = externalID
         self.anchorWorkspaceProvenance = anchorWorkspaceProvenance
+        self.parentGroupId = parentGroupId // (#cm-106)
     }
 
     /// Creates a group with an explicit live or empty anchor state.
@@ -92,7 +96,8 @@ public struct WorkspaceGroup: Identifiable, Equatable, Sendable {
         customColor: String?,
         iconSymbol: String?,
         externalID: String? = nil,
-        anchorWorkspaceProvenance: WorkspaceGroupAnchorProvenance = .unknown
+        anchorWorkspaceProvenance: WorkspaceGroupAnchorProvenance = .unknown,
+        parentGroupId: UUID? = nil // (#cm-106)
     ) {
         self.id = id
         self.name = name
@@ -103,5 +108,6 @@ public struct WorkspaceGroup: Identifiable, Equatable, Sendable {
         self.iconSymbol = iconSymbol
         self.externalID = externalID
         self.anchorWorkspaceProvenance = anchorWorkspaceProvenance
+        self.parentGroupId = parentGroupId // (#cm-106)
     }
 }

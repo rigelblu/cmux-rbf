@@ -12,6 +12,7 @@ struct SidebarWorkspaceRowView: View {
             .equatable()
             .id(snapshot.workspaceId)
             .accessibilityIdentifier("sidebarWorkspace.\(snapshot.workspaceId.uuidString)")
+            .sidebarNestedAccessibilityValue(SidebarNestedAccessibility.value(depth: SidebarNestedAccessibility.workspaceRowDepth(depth: snapshot.depth, isGrouped: snapshot.groupId != nil))) // (#cm-106)
             .sidebarWorkspaceFrameAnchor(
                 id: snapshot.workspaceId,
                 isEnabled: shouldCollectWorkspaceDropTargets
@@ -22,7 +23,7 @@ struct SidebarWorkspaceRowView: View {
             )
             .padding(
                 .leading,
-                snapshot.isIndentedUnderHeader ? SidebarWorkspaceGroupingMetrics.memberIndent : 0
+                SidebarNestedIndent.points(levels: snapshot.indentLevels, availableWidth: snapshot.listWidth) // (#cm-106)
             )
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())

@@ -92,6 +92,8 @@ extension TabManager {
             let insertIndex = Self.clampedDetachedWorkspaceInsertIndex(plannedInsertIndex, workspaces: updatedTabs)
             updatedTabs.insert(newWorkspace, at: insertIndex)
             tabs = updatedTabs
+            // The insert index can fall inside an area of a nested window: repair the order (#cm-106).
+            if workspaces.hasNestedWorkspaceGroup { workspaces.normalizeWorkspaceGroupContiguity() }
 
             if select {
 #if DEBUG

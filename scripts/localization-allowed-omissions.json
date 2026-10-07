@@ -2972,6 +2972,10 @@
       "de": "Reviewed native UI spelling, established developer terminology, or the named macOS Dock component; an explicit translated entry remains required."
     }
   },
+  "workspaceGroup.a11y.joined": {
+    "class": "format",
+    "source": "%1$@, %2$@"
+  },
   "workspaceTodoPane.title": {
     "source": "Todos",
     "identityLocales": {

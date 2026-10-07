@@ -176,6 +176,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             )
             pinImageView.contentTintColor = colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme)
             pinImageView.toolTip = String(localized: "workspaceGroup.pinned.tooltip", defaultValue: "Pinned group")
+            pinImageView.setAccessibilityLabel(String(localized: "workspaceGroup.pinned.tooltip", defaultValue: "Pinned group")) // (#cm-106)
         }
 
         chevronButton.glyphImage = RenderableSystemSymbol.configuredAppKitImage(
@@ -198,13 +199,18 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         )
         iconImageView.contentTintColor = model.tintHex.flatMap { NSColor(hex: $0) }
             ?? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme)
+        if !model.hasOwnWorkspace { // (#cm-106) a dot where the icon was
+            iconImageView.image = SidebarHeaderOnlyLook.dotImage
+            iconImageView.contentTintColor = SidebarHeaderOnlyLook.dotTint(tintHex: model.tintHex, colorScheme: colorScheme)
+                ?? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme)
+        }
 
         nameField.stringValue = model.name
         nameField.font = .systemFont(
             ofSize: GlobalFontMagnification.scaledSize(metrics.nameFontSize, percent: percent),
             weight: .semibold
         )
-        nameField.textColor = headerPalette.primaryTextColor
+        nameField.textColor = nameTextColor(model, palette: headerPalette) // (#cm-106)
 
         let showsBadge = model.anchorUnreadCount > 0
         unreadBadgeView.isHidden = !showsBadge
@@ -259,11 +265,20 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         updatePlusVisibility()
         setAccessibilityIdentifier("sidebarWorkspaceGroup.\(model.groupId.uuidString)")
         setAccessibilityLabel(model.name)
+        // The level, whether it is open, and when no workspace stands behind the name (#cm-106).
+        setAccessibilityValue(SidebarNestedAccessibility.value(depth: model.depth, hasOwnWorkspace: model.hasOwnWorkspace))
+        setAccessibilityDisclosureLevel(SidebarNestedAccessibility.disclosureLevel(forDepth: model.depth))
+        setAccessibilityExpanded(!model.isCollapsed)
+        // A click on a header with no workspace of its own folds it; say so, as the SwiftUI header does (#cm-106).
+        setAccessibilityHelp(model.hasOwnWorkspace ? nil : String(
+            localized: "workspaceGroup.noOwnWorkspace.hint.a11y",
+            defaultValue: "Fold or unfold the group"
+        ))
     }
 
     /// Live drop-line painting during native reorder drags; see
     /// `SidebarWorkspaceRowTableCellView.paintControllerDropIndicator`.
-    func paintControllerDropIndicator(top: Bool, bottom: Bool) {
+    func paintControllerDropIndicator(top: Bool, bottom: Bool, level: Int? = nil) {
         let colorScheme: ColorScheme = model.map { $0.colorSchemeIsDark ? .dark : .light }
             ?? SidebarAppearanceColorResolver().currentColorScheme()
         let accent = cmuxAccentNSColor(for: colorScheme)
@@ -271,6 +286,33 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         bottomDropIndicator.layer?.backgroundColor = accent.cgColor
         topDropIndicator.isHidden = !top
         bottomDropIndicator.isHidden = !bottom
+        // The line is indented to the level the drop lands at; a window with no nested group passes none (#cm-106).
+        if dropLineLevel != level {
+            dropLineLevel = level
+            applyDropLineInset()
+        }
+    }
+
+    /// How many groups hold the rows the drop lands among, while a reorder drag paints this header; nil keeps the
+    /// lines as they were before nested groups (#cm-106).
+    private var dropLineLevel: Int?
+
+    private func dropLineLeadingInsets(width: CGFloat) -> (top: CGFloat, bottom: CGFloat) {
+        guard let level = dropLineLevel else { return (0, SidebarWorkspaceGroupHeaderMetrics.memberScopedDropIndicatorLeadingInset) }
+        let inset = SidebarNestedIndent.points(levels: level, availableWidth: width)
+        return (inset, inset)
+    }
+
+    private func applyDropLineInset() {
+        let insets = dropLineLeadingInsets(width: bounds.width)
+        for (line, inset) in [(topDropIndicator, insets.top), (bottomDropIndicator, insets.bottom)] {
+            let leading = SidebarReorderIndicatorView.horizontalInset + inset
+            line.frame = NSRect(
+                x: bounds.minX + leading, y: line.frame.minY,
+                width: max(0, bounds.width - leading - SidebarReorderIndicatorView.horizontalInset),
+                height: SidebarReorderIndicatorView.thickness
+            )
+        }
     }
 
 #if DEBUG
@@ -278,9 +320,28 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         (!topDropIndicator.isHidden, !bottomDropIndicator.isHidden)
     }
 
+    /// The laid-out frames of the two drop lines, in the header's coordinates.
+    var dropIndicatorFramesForTesting: (top: NSRect, bottom: NSRect) {
+        (topDropIndicator.frame, bottomDropIndicator.frame)
+    }
+
     var nameTextColorForTesting: NSColor {
         nameField.textColor ?? .clear
     }
+
+    /// Where the band is drawn, in the cell's own coordinates (#cm-106).
+    var bandFrameForTesting: NSRect { backgroundView.frame }
+
+    /// The icon's symbol image and tint (#cm-106).
+    var iconTintForTesting: NSColor? { iconImageView.contentTintColor }
+
+    /// The model the cell was last given, and the image its icon view holds (#cm-106). A test that mounts the real
+    /// sidebar reads these to see what the app's own builder produced and what the cell drew from it.
+    var currentModelForTesting: SidebarGroupHeaderRowModel? { model }
+    var iconImageForTesting: NSImage? { iconImageView.image }
+
+    /// Where the icon view sits, in the cell's own coordinates (#cm-106).
+    var iconFrameForTesting: NSRect { iconImageView.frame }
 #endif
 
     private func updatePlusVisibility() {
@@ -311,7 +372,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         backgroundView.layer?.backgroundColor = palette.bandColor
             .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
-        nameField.textColor = palette.primaryTextColor
+        nameField.textColor = nameTextColor(model, palette: palette) // (#cm-106)
     }
 
     /// Modifier-click preview: paints the same dim membership tint as an
@@ -325,7 +386,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         backgroundView.layer?.backgroundColor = palette.bandColor
             .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
-        nameField.textColor = palette.primaryTextColor
+        nameField.textColor = nameTextColor(model, palette: palette) // (#cm-106)
     }
 
     /// Plain-click counterpart: clears active and multi-selected header paint
@@ -340,7 +401,14 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
         let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
-        nameField.textColor = palette.primaryTextColor
+        nameField.textColor = nameTextColor(model, palette: palette) // (#cm-106)
+    }
+
+    /// The name's colour: the accent tint while a folded header holds the selected workspace, else the band's own (#cm-106).
+    private func nameTextColor(_ model: SidebarGroupHeaderRowModel, palette: SidebarGroupHeaderBandPalette) -> NSColor {
+        let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
+        if model.isFoldedOverSelection { return cmuxAccentNSColor(for: colorScheme) }
+        return palette.primaryTextColor
     }
 
     /// Rollback for optimistic press paint: reapplies the stored model
@@ -404,7 +472,9 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         defer { CATransaction.commit() }
         let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale)
         let outerPad = SidebarWorkspaceListMetrics.rowOuterHorizontalPadding
-        let bgFrame = NSRect(x: outerPad, y: 0, width: bounds.width - outerPad * 2, height: bounds.height)
+        // A nested header's band starts at its own indent, 12 pt per level; a top-level header's is full width (#cm-106).
+        let indent = SidebarNestedIndent.points(levels: model.depth, availableWidth: bounds.width)
+        let bgFrame = NSRect(x: outerPad + indent, y: 0, width: bounds.width - outerPad * 2 - indent, height: bounds.height)
         backgroundView.frame = bgFrame
         let contentMaxX = bgFrame.maxX - SidebarWorkspaceListMetrics.rowContentHorizontalPadding
         let midY = bounds.height / 2
@@ -460,8 +530,9 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         }
 
         let topOffset: CGFloat = model.isFirstRow ? 0 : -(model.rowSpacing / 2)
-        topDropIndicator.position(in: bounds, at: topOffset)
-        let bottomInset = metrics.groupScopedBottomDropIndicatorLeadingInset
+        let lineInsets = dropLineLeadingInsets(width: bounds.width) // (#cm-106)
+        topDropIndicator.position(in: bounds, at: topOffset, leadingInset: lineInsets.top)
+        let bottomInset = lineInsets.bottom
         bottomDropIndicator.position(
             in: bounds,
             at: bounds.height - SidebarReorderIndicatorView.thickness + model.rowSpacing / 2,
@@ -571,6 +642,32 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         ))
     }
 
+    /// `Move Group to`: `Top Level`, then every group this one may go into, indented by depth, the current place
+    /// ticked. The destinations are read when the menu opens (#cm-106).
+    private func appendMoveGroupItem(to menu: NSMenu, actions: SidebarGroupHeaderRowActions) {
+        guard let moveMenu = actions.moveMenu() else { return }
+        let parent = menuItem(
+            String(localized: "workspaceGroup.contextMenu.moveTo", defaultValue: "Move Group to"),
+            action: {}
+        )
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let topLevel = menuItem(
+            String(localized: "workspaceGroup.contextMenu.moveTo.topLevel", defaultValue: "Top Level")
+        ) { actions.onMoveGroup(nil) }
+        topLevel.state = moveMenu.topLevelIsCurrent ? .on : .off
+        submenu.addItem(topLevel)
+        if !moveMenu.destinations.isEmpty { submenu.addItem(.separator()) }
+        for destination in moveMenu.destinations {
+            let item = menuItem(destination.name) { actions.onMoveGroup(destination.id) }
+            item.indentationLevel = min(destination.depth, 15)
+            item.state = destination.isCurrent ? .on : .off
+            submenu.addItem(item)
+        }
+        parent.submenu = submenu
+        menu.addItem(parent)
+    }
+
     private func makeHeaderMenu() -> NSMenu {
         guard let model, let actions else { return NSMenu() }
         let menu = trackedMenu()
@@ -607,6 +704,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
                 : String(localized: "workspaceGroup.contextMenu.pin", defaultValue: "Pin Group"),
             action: actions.onTogglePinned
         ))
+        appendMoveGroupItem(to: menu, actions: actions) // (#cm-106)
         menu.addItem(.separator())
         menu.addItem(menuItem(
             String(localized: "workspaceGroup.contextMenu.markRead", defaultValue: "Mark Group as Read"),
@@ -637,7 +735,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         menu.addItem(.separator())
         appendConfigAndDocsItems(to: menu)
         menu.addItem(.separator())
-        if !model.isPinned || model.memberCount > 0 {
+        if !model.isPinned || model.memberCount > 0 || model.holdsGroups { // (#cm-106)
             menu.addItem(menuItem(
                 String(localized: "workspaceGroup.contextMenu.ungroup", defaultValue: "Ungroup Workspaces"),
                 action: actions.onUngroup
