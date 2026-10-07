@@ -28,7 +28,7 @@ struct SidebarWorkspaceTopDropIndicator: View {
                 .frame(height: SidebarReorderIndicatorView.thickness)
                 .padding(.leading, Self.horizontalPadding + max(leadingInset, 0))
                 .padding(.trailing, Self.horizontalPadding)
-                .offset(y: indicatorOffset)
+                .offset(x: min(leadingInset, 0), y: indicatorOffset) // a negative inset draws left of the row (#cm-106)
         }
     }
 

@@ -16,8 +16,8 @@
 # branch no longer exists is safe to delete, which is not knowable when build-ids are
 # hand-picked names like `fix-blur-effect`. Each of those dirs is multiple GB.
 #
-# Usage:  rbf/scripts/dev.sh <build|run|build-id|test> [extra reload.sh args...]
-# Prefer the Makefile front door: `make run`, `make build`, `make test`.
+# Usage:  rbf/scripts/dev.sh <build|run|build-id|test|test-packages> [extra reload.sh args...]
+# Prefer the Makefile front door: `make run`, `make build`, `make test`, `make test-packages`.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -344,8 +344,15 @@ case "$cmd" in
       ${sign_args[@]+"${sign_args[@]}"} \
       "$@"
     ;;
+  test-packages)
+    # The workspace-group packages' own `swift test` runs (#cm-106). `make test` never runs them. Logic is in
+    # lib/ — see its header — and this does not touch the app, the submodule, Zig or a build-id.
+    # shellcheck source=rbf/scripts/lib/rbf-package-tests.sh
+    . "$REPO_ROOT/rbf/scripts/lib/rbf-package-tests.sh"
+    rbf_run_package_tests "$REPO_ROOT"
+    ;;
   *)
-    echo "usage: rbf/scripts/dev.sh <build|run|build-id|test> [extra reload.sh args...]" >&2
+    echo "usage: rbf/scripts/dev.sh <build|run|build-id|test|test-packages> [extra reload.sh args...]" >&2
     exit 2
     ;;
 esac

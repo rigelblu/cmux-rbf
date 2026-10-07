@@ -15,6 +15,9 @@ struct SidebarWorkspaceTableReorderIndicatorPainter {
     /// `sidebarDropIndicatorRowIds` computation the SwiftUI sidebar feeds the
     /// predicate, so adjacency and end-of-scope answers cannot diverge.
     let indicatorRowIds: [UUID]
+    /// How many groups hold the rows the drop lands among, so a cell draws its line indented to that level; nil in a
+    /// window with no nested group, which keeps the line the cell draws today (#cm-106).
+    var level: Int? = nil
 
     func paint(forRowWorkspaceId rowWorkspaceId: UUID) -> (top: Bool, bottom: Bool) {
         guard indicator != nil else { return (false, false) }

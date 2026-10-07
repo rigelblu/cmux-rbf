@@ -18,6 +18,7 @@ extension WorkspacesModel {
     /// The top-level sidebar row id for each given workspace (its group's
     /// anchor when grouped, itself when ungrouped), deduplicated in order.
     func topLevelWorkspaceIds(for workspaces: [Tab]) -> [UUID] {
+        if hasNestedWorkspaceGroup { return nestedTopLevelWorkspaceIds(for: workspaces) } // (#cm-106)
         let groupsById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
         var emittedIds = Set<UUID>()
         var ids: [UUID] = []
@@ -41,6 +42,7 @@ extension WorkspacesModel {
     /// ungrouped workspaces). Optionally inserts a grouped workspace being
     /// promoted to top level as close to its group's row as its pin tier allows.
     func sidebarTopLevelWorkspaceIds(promotingWorkspaceId promotedWorkspaceId: UUID? = nil) -> [UUID] {
+        if hasNestedWorkspaceGroup { return nestedSidebarTopLevelWorkspaceIds(promotingWorkspaceId: promotedWorkspaceId) } // (#cm-106)
         let groupsById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
         let groupsByAnchorId = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.anchorWorkspaceId, $0) })
         let tabsById = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0) })
@@ -99,6 +101,7 @@ extension WorkspacesModel {
     func sidebarTopLevelWorkspaceIdsIncludingEmptyGroups(
         preservingTopLevelIds baseIds: [UUID]
     ) -> [UUID] {
+        if hasNestedWorkspaceGroup { return nestedSidebarTopLevelWorkspaceIdsIncludingEmptyGroups(preservingTopLevelIds: baseIds) } // (#cm-106)
         let emptyGroups = workspaceGroups.filter(\.isEmpty)
         guard !emptyGroups.isEmpty else { return baseIds }
 
@@ -168,6 +171,7 @@ extension WorkspacesModel {
     /// Projects a desired full workspace-id order down to top-level row ids,
     /// appending any unmentioned workspaces in `tabs[]` order.
     func topLevelWorkspaceIdsPreservingOrder(_ desiredIds: [UUID]) -> [UUID] {
+        if hasNestedWorkspaceGroup { return nestedTopLevelWorkspaceIdsPreservingOrder(desiredIds) } // (#cm-106)
         let groupsById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
         let tabsById = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0) })
         var emittedWorkspaceIds = Set<UUID>()
@@ -315,6 +319,7 @@ extension WorkspacesModel {
         for workspace: Tab,
         clampedTargetIndex: Int
     ) -> Int? {
+        if hasNestedWorkspaceGroup { return nestedClampedGroupedMemberReorderIndex(for: workspace, clampedTargetIndex: clampedTargetIndex) } // (#cm-106)
         guard let groupId = workspace.groupId,
               let group = workspaceGroups.first(where: { $0.id == groupId }),
               workspace.id != group.liveAnchorWorkspaceId else {
@@ -353,6 +358,7 @@ extension WorkspacesModel {
     /// Whether the row renders as pinned: group pin for grouped members,
     /// workspace pin otherwise.
     func isGlobalPinnedRow(_ tab: Tab) -> Bool {
+        if hasNestedWorkspaceGroup { return nestedIsGlobalPinnedRow(tab) } // (#cm-106)
         if let groupId = tab.groupId,
            let group = workspaceGroups.first(where: { $0.id == groupId }) {
             return group.isPinned

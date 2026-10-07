@@ -93,6 +93,18 @@ extension TerminalController {
                     )
                     return
                 }
+                // A group inside another group can only be moved on the Mac (#cm-106).
+                if tabManager.workspaces.isNestedWorkspaceGroupHeader(workspaceID) {
+                    mutationError = .err(
+                        code: "invalid_request",
+                        message: String(
+                            localized: "workspaceGroup.error.nestedGroupMoveOnMac",
+                            defaultValue: "A group inside another group can only be moved on the Mac"
+                        ),
+                        data: ["workspace_id": workspaceID.uuidString]
+                    )
+                    return
+                }
                 if targetGroupID != nil {
                     mutationError = .err(
                         code: "invalid_request",

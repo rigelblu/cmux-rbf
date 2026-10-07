@@ -262,6 +262,31 @@
       2
     ]
   },
+  "dialog.deleteGroup.message.group.many": {
+    "source": "Delete the group “%1$@”, the group inside it, and close their %2$lld workspaces?",
+    "arguments": [
+      2
+    ]
+  },
+  "dialog.deleteGroup.message.groups.none": {
+    "source": "Delete the group “%1$@” and the %2$lld groups inside it?",
+    "arguments": [
+      2
+    ]
+  },
+  "dialog.deleteGroup.message.groups.lone": {
+    "source": "Delete the group “%1$@”, the %2$lld groups inside it, and close their workspace?",
+    "arguments": [
+      2
+    ]
+  },
+  "dialog.deleteGroup.message.groups.many": {
+    "source": "Delete the group “%1$@”, the %2$lld groups inside it, and close their %3$lld workspaces?",
+    "arguments": [
+      2,
+      3
+    ]
+  },
   "dialog.saveWorkspaceLayout.commandTooLongMessage": {
     "source": "One or more captured commands are longer than %lld UTF-8 bytes and cannot be replayed reliably from a saved layout. Shorten them before saving.",
     "arguments": [

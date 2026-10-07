@@ -223,15 +223,20 @@ public protocol ControlWorkspaceGroupContext: AnyObject {
     ///   - toIndex: The explicit absolute target index, if provided.
     ///   - beforeGroupID: The peer to move before, if provided.
     ///   - afterGroupID: The peer to move after, if provided.
-    /// - Returns: `true` if the group existed and a target resolved, `false`
-    ///   otherwise, or `nil` if no TabManager resolved.
+    /// - Returns: ``ControlWorkspaceGroupMoveResolution/moved`` if the group existed and a
+    ///   target resolved (``ControlWorkspaceGroupMoveResolution/unchanged`` when, in a window with a nested
+    ///   group, the group already sat there; the answer to the caller is the same plain success either way),
+    ///   ``ControlWorkspaceGroupMoveResolution/unresolved`` otherwise,
+    ///   ``ControlWorkspaceGroupMoveResolution/targetNotBeside`` if the target sits in a different
+    ///   parent (#cm-106), or ``ControlWorkspaceGroupMoveResolution/tabManagerUnavailable`` if no
+    ///   TabManager resolved.
     func controlMoveWorkspaceGroup(
         routing: ControlRoutingSelectors,
         groupID: UUID,
         toIndex: Int?,
         beforeGroupID: UUID?,
         afterGroupID: UUID?
-    ) -> Bool?
+    ) -> ControlWorkspaceGroupMoveResolution
 
     /// Focuses a group for `workspace.group.focus`: focuses the owning window,
     /// makes its TabManager active, and selects the group anchor.

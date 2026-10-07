@@ -15,7 +15,8 @@ extension WorkspaceGroupCoordinator {
         let childCount = memberIds.reduce(into: 0) { count, id in
             if id != liveAnchorID { count += 1 }
         }
-        guard childCount == 0 else {
+        // A group that holds groups is not only its generated workspace (#cm-106).
+        guard childCount == 0, !model.holdsWorkspaceGroups(groupId) else {
             return .generatedAnchorRequiresAnchorOnly(memberWorkspaceCount: childCount)
         }
         guard let host,

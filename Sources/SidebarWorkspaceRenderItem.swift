@@ -54,6 +54,9 @@ enum SidebarWorkspaceRenderItem {
         guard !tabs.isEmpty || !groupsById.isEmpty else { return [] }
         let effectiveMembershipByWorkspaceId = effectiveMembership
             ?? effectiveGroupIdByWorkspaceId(tabs: tabs, groupsById: groupsById)
+        if SidebarNestedWorkspaceRows.hasNestedGroup(groupsById) { // (#cm-106)
+            return SidebarNestedWorkspaceRows.items(tabs: tabs, groupsById: groupsById, orderedGroups: orderedGroups, effectiveMembership: effectiveMembershipByWorkspaceId)
+        }
         var items: [SidebarWorkspaceRenderItem] = []
         items.reserveCapacity(tabs.count + groupsById.count)
         var lastEmittedGroupId: UUID? = nil
@@ -278,6 +281,9 @@ enum SidebarWorkspaceRenderItem {
         var result: [UUID: [UUID]] = [:]
         let effectiveMembershipByWorkspaceId = effectiveMembership
             ?? groupsById.map { effectiveGroupIdByWorkspaceId(tabs: tabs, groupsById: $0) }
+        if let groupsById, let effectiveMembershipByWorkspaceId, SidebarNestedWorkspaceRows.hasNestedGroup(groupsById) { // (#cm-106)
+            return SidebarNestedWorkspaceRows.workspaceIdsInside(tabs: tabs, groupsById: groupsById, effectiveMembership: effectiveMembershipByWorkspaceId)
+        }
         for tab in tabs {
             let groupId: UUID?
             if let effectiveMembershipByWorkspaceId {
