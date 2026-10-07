@@ -67,6 +67,7 @@ The build-id is what `scripts/reload.sh --tag` takes. It decides the DerivedData
 make run                       # build this branch's build-id and launch it
 make build                     # build only; prints the App path
 make test                      # cmux-unit scheme — nothing else compiles the unit tests
+make test-packages             # swift test for CmuxWorkspaces and CmuxControlSocket (the workspace-group packages); not the app
 make clean-builds              # reclaim ~6GB per build-id; keeps running/most-recent/current, no branch check (-plan previews)
 make install-rbf               # build + install `cmux RBF.app` (install-rbf-plan previews)
 make run BUILD_ID=spike        # a second build alongside your branch's
@@ -179,6 +180,17 @@ Its first check compares our `CURRENT_PROJECT_VERSION` against **upstream's** ap
   - `./scripts/lint-pbxproj-test-wiring.sh` (any `cmuxTests/` file)
   - `python3 scripts/check-workspace-package-groups.py --check` (any package move)
   - `python3 scripts/check-package-resolved-policy.py` (any SwiftPM change)
+
+### 🟣⋯ Nested workspace groups (`#cm-106`): what nothing runs for you
+A workspace group can sit inside another group. The model, the drop planner and the socket handlers carry the nested rules, and upstream's functions hand over to them. `make test` runs none of what follows, and only the first item has a command.
+
+- **The model package's tests are not part of `make test`.** `cmux-unit.xcscheme` names no package test target. **`make test-packages` runs them**: `swift test` for `Packages/macOS/CmuxWorkspaces` and `Packages/macOS/CmuxControlSocket`, each package's `Test run with <n> tests` line printed at the end, non-zero if either fails. It does not build or run the app. The logic is `rbf/scripts/lib/rbf-package-tests.sh`, called from `dev.sh`
+  - The drop planner's nested suites, and the frozen v0.31.0 copy of the planner they compare with, live in `CmuxWorkspaces`' test target, not in `CmuxFoundation`'s. `swift test --package-path Packages/macOS/CmuxFoundation` does not build under Xcode 27, because `SSHPTYReplayOutputFilterTests.swift` (lines 9 and 31, upstream's, unchanged since the base release) fails with "unable to type-check this expression in reasonable time"; the planner's suites would have sat behind it. `CmuxWorkspaces` already depends on `CmuxFoundation` for its tests, so they build there with `@testable import CmuxFoundation`
+  - Read the Swift Testing line, `Test run with <n> tests`. The same log also carries XCTest's `Executed 0 tests`, which is not a result
+- **One test reads source text on purpose, and it is the only one.** `WorkspaceGroupNestedHandOverGuardTests` (in `CmuxWorkspaces`' tests) scans the six upstream files that carry hand-overs and fails when a function there that reads `groupId` or `workspaceGroups` is not on its list, where each entry says "hands over at …" or "one level is right here because …". `skills/cmux-testing` forbids tests that read source text. This one is the exception, because no behaviour test can notice a function nobody has written a nested test for; its header says so. Do not add a second. Read the listed functions again after a sync; do not just add the new one to the list
+- **After every upstream sync, search the incoming diff** for new readers of `groupId` and `workspaceGroups` and new writers of `tabs`. A new upstream function that assumes one level of groups has no nested branch, and neither `make test` nor a re-check of the files both sides changed will show it. The existing hand-over lines are marked `(#cm-106)`: `rg -n "#cm-106" Sources Packages` lists them, so a new reader with no such line beside it is the one to read
+- **One upstream test is changed on purpose:** `cmuxTests/WorkspaceGroupTests.swift`, around line 529. `createUnpinnedGroupFromPinnedGroupChildStaysBelowPinnedGroups` is now `createUnpinnedGroupFromPinnedGroupChildIsMadeInsideThatPinnedGroup`, because a group made from workspaces that sit in a group is now made inside that group. Keep ours when upstream touches the test
+- **`Packages/macOS/CmuxWorkspaces/Package.swift` gives `CmuxFoundation` to the test target only.** The tests plan a drop with the planner and commit the plan through the coordinator. The planner lives in `CmuxFoundation`, which depends on no other package, and the `CmuxWorkspaces` library does not import it. Keep the `.product` on the test target; moving it to the library would make the model depend on the planner
 
 ### 🟣⋯ The gate that does exist is the manual suite plus dogfood
 - Every feature is shipped through these, not through a pipeline

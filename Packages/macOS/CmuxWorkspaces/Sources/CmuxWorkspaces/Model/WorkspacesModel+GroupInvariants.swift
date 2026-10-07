@@ -19,6 +19,9 @@ extension WorkspacesModel {
             workspaceGroups[groupIndex].anchor = .workspace(workspaceId)
             workspaceGroups[groupIndex].anchorWorkspaceProvenance = .user
         }
+        // A nested window shows the selection only when the reassigned workspace is the selected one,
+        // so a fold of a parent with no workspace of its own is not undone by any workspace changing group.
+        if hasNestedWorkspaceGroup, workspaceId != selectedTabId { return } // (#cm-106)
         expandWorkspaceGroupForSelectionIfNeeded()
     }
 
@@ -60,6 +63,7 @@ extension WorkspacesModel {
         for tab in tabs where tab.groupId.map({ !knownGroupIds.contains($0) }) ?? false {
             tab.groupId = nil
         }
+        if hasNestedWorkspaceGroup { return nestedNormalizeWorkspaceGroupRunsPreservingOrder(desiredIds) } // (#cm-106)
 
         let tabsById = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0) })
 
@@ -103,6 +107,9 @@ extension WorkspacesModel {
     public func normalizeWorkspaceGroupContiguity(
         preservingTopLevelIds preferredTopLevelIds: [UUID]? = nil
     ) {
+#if DEBUG
+        contiguityRepairs += 1 // (#cm-106)
+#endif
         guard !tabs.isEmpty else { return }
         let knownGroupIds = Set(workspaceGroups.map(\.id))
         for tab in tabs where tab.groupId.map({ !knownGroupIds.contains($0) }) ?? false {
@@ -138,6 +145,7 @@ extension WorkspacesModel {
     /// selected row is actually visible in the sidebar. Called from `selectedTabId`'s
     /// didSet hook. No-op when the workspace is ungrouped or its group is already expanded.
     public func expandWorkspaceGroupForSelectionIfNeeded() {
+        if hasNestedWorkspaceGroup { return nestedExpandWorkspaceGroupForSelectionIfNeeded() } // (#cm-106)
         guard let selectedTabId,
               let groupId = tabs.first(where: { $0.id == selectedTabId })?.groupId,
               let index = workspaceGroups.firstIndex(where: { $0.id == groupId }),
@@ -157,6 +165,7 @@ extension WorkspacesModel {
     /// reorder so later group-slot commands observe the same order the user
     /// sees in the sidebar.
     func syncWorkspaceGroupsOrderToAnchorOrder(preferredTopLevelIds: [UUID]? = nil) {
+        if hasNestedWorkspaceGroup { return nestedSyncWorkspaceGroupsOrderToAnchorOrder(preferredTopLevelIds: preferredTopLevelIds) } // (#cm-106)
         if let preferredTopLevelIds {
             let groupsByAnchorId = Dictionary(
                 uniqueKeysWithValues: workspaceGroups.map { ($0.anchorWorkspaceId, $0) }
@@ -198,6 +207,7 @@ extension WorkspacesModel {
     /// Hoist promoted (non-anchor) members to the front of their group's
     /// member run, right after the anchor, preserving each group's position.
     func moveWorkspaceGroupMembersAfterAnchors(workspaceIds: [UUID]) {
+        if hasNestedWorkspaceGroup { return nestedMoveWorkspaceGroupMembersAfterAnchors(workspaceIds: workspaceIds) } // (#cm-106)
         let groupsById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
         let tabsById = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0) })
         var promotedIdsByGroupId: [UUID: [UUID]] = [:]
@@ -258,8 +268,8 @@ extension WorkspacesModel {
         let affectedGroups = workspaceGroups
             .filter { $0.anchorWorkspaceId == closedWorkspaceId }
         guard !affectedGroups.isEmpty else { return }
-        let dissolvedGroupIds = affectedGroups.filter { !$0.isPinned }.map(\.id)
-        for group in affectedGroups where group.isPinned {
+        let dissolvedGroupIds = affectedGroups.filter { !keepsHeaderWhenEmptied($0) }.map(\.id) // (#cm-106)
+        for group in affectedGroups where keepsHeaderWhenEmptied(group) {
             guard let groupIndex = workspaceGroups.firstIndex(where: { $0.id == group.id }) else { continue }
             if let nextAnchor = tabs.first(where: { $0.groupId == group.id }) {
                 workspaceGroups[groupIndex].anchor = .workspace(nextAnchor.id)
@@ -271,8 +281,9 @@ extension WorkspacesModel {
         }
         for gid in dissolvedGroupIds {
             for tab in tabs where tab.groupId == gid {
-                tab.groupId = nil
+                tab.groupId = parentGroupIdIfNested(of: gid) // (#cm-106) a dissolved group's workspaces take its parent
             }
+            giveGroupItsFirstOwnWorkspaceIfNeeded(parentGroupIdIfNested(of: gid)) // (#cm-106)
         }
         workspaceGroups.removeAll { dissolvedGroupIds.contains($0.id) }
         // Newly-ungrouped members may be sitting above other groups, which
@@ -309,7 +320,7 @@ extension WorkspacesModel {
                 workspaceGroups[groupIndex].anchorWorkspaceId = nextAnchor.id
                 workspaceGroups[groupIndex].anchorWorkspaceProvenance = .user
                 promotedAnchorIds.append(nextAnchor.id)
-            } else if workspaceGroups[groupIndex].isPinned {
+            } else if keepsHeaderWhenEmptied(workspaceGroups[groupIndex]) { // (#cm-106)
                 workspaceGroups[groupIndex].anchor = .empty(workspaceGroups[groupIndex].id)
                 workspaceGroups[groupIndex].anchorWorkspaceProvenance = .unknown
             } else {

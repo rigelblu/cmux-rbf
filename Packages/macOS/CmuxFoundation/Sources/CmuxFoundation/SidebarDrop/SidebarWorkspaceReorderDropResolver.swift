@@ -20,6 +20,9 @@ public struct SidebarWorkspaceReorderDropResolver: Sendable {
             return lhs.frame.minY < rhs.frame.minY
         }
         guard !sortedTargets.isEmpty else { return nil }
+        if request.groups.contains(where: { $0.parentGroupId != nil }) { // (#cm-106)
+            return planNested(request: request, sortedTargets: sortedTargets)
+        }
 
         let groupsById = Dictionary(uniqueKeysWithValues: request.groups.map { ($0.id, $0) })
         let groupByAnchorId = Dictionary(uniqueKeysWithValues: request.groups.map { ($0.anchorWorkspaceId, $0) })
@@ -302,7 +305,7 @@ public struct SidebarWorkspaceReorderDropResolver: Sendable {
             : finalGroupIndex
     }
 
-    private func hitContext(
+    func hitContext( // (#cm-106) internal: the nested rules read the same pointer context
         point: CGPoint,
         sortedTargets: [SidebarWorkspaceReorderDropTarget]
     ) -> SidebarWorkspaceReorderHitContext {
@@ -934,7 +937,7 @@ public struct SidebarWorkspaceReorderDropResolver: Sendable {
     /// Adds durable empty-group header identities to a live top-level row
     /// sequence. The reverse pass records the next live group in each pin tier,
     /// keeping each pointer update linear in the number of groups and rows.
-    private func topLevelWorkspaceIdsIncludingEmptyGroups(
+    func topLevelWorkspaceIdsIncludingEmptyGroups( // (#cm-106) internal: the nested rules (`topLevelRowIds`) and the three-copies test read it
         baseIds: [UUID],
         request: SidebarWorkspaceReorderDropRequest,
         workspacesById: [UUID: SidebarWorkspaceReorderWorkspaceSnapshot]
@@ -1008,7 +1011,7 @@ public struct SidebarWorkspaceReorderDropResolver: Sendable {
         })
     }
 
-    private func topLevelWorkspaceIds(
+    func topLevelWorkspaceIds( // (#cm-106) internal: read by the nested rules (`topLevelRowIds`), as above
         workspaces: [SidebarWorkspaceReorderWorkspaceSnapshot],
         workspacesById: [UUID: SidebarWorkspaceReorderWorkspaceSnapshot],
         groupsById: [UUID: SidebarWorkspaceReorderGroupSnapshot],

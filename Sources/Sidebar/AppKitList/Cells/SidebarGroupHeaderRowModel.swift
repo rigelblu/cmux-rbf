@@ -1,4 +1,5 @@
 import AppKit
+import CmuxWorkspaces
 import CoreGraphics
 import Foundation
 import SwiftUI
@@ -49,6 +50,15 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     let bottomDropIndicatorVisible: Bool
     /// Resolved cmux scheme used by native group-header chrome.
     let colorSchemeIsDark: Bool
+    /// How many groups hold this header; 0 at the top level and in a window with no nested group (#cm-106).
+    var depth: Int = 0
+    /// Whether a workspace stands behind the group's name. When none does the header is never active, a dot in the
+    /// group's tint stands where its icon was and its name keeps the band's colour (#cm-106).
+    var hasOwnWorkspace: Bool = true
+    /// Whether the group is folded over the selected workspace, at any depth; its name then takes the accent tint (#cm-106).
+    var isFoldedOverSelection: Bool = false
+    /// Whether a group sits inside this one; a pinned group that holds only groups is still offered Ungroup (#cm-106).
+    var holdsGroups: Bool = false
 }
 
 /// Behavior bundle for one group header row; recreated per apply and excluded
@@ -76,4 +86,8 @@ struct SidebarGroupHeaderRowActions {
     let onOpenDocs: () -> Void
     /// Resolves current notification availability for retained rows.
     var notificationState: () -> NotificationState = { .unavailable }
+    /// `Move Group to`: puts the group inside a destination, or at the top level for `nil` (#cm-106).
+    var onMoveGroup: (UUID?) -> Void = { _ in }
+    /// What `Move Group to` offers, read when the menu opens (#cm-106).
+    var moveMenu: () -> WorkspaceGroupMoveMenu? = { nil }
 }

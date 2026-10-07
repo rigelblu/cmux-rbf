@@ -121633,55 +121633,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Delete the group AND close every member workspace. Explicitly destructive."
+            "value": "Delete the group AND close every member workspace. On a group that holds groups, it also closes every workspace inside them, at every level, and removes those groups. Explicitly destructive."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "グループを削除し、すべてのメンバーワークスペースを閉じます。明示的な破壊操作です。"
+            "value": "グループを削除し、すべてのメンバーワークスペースを閉じます。グループを含むグループに対して実行すると、内側のグループも含めてすべての階層のワークスペースを閉じ、それらのグループも削除します。明示的な破壊操作です。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "删除分组并关闭其中每一个成员工作区。明确的破坏性操作。"
+            "value": "删除分组并关闭其中每一个成员工作区。对包含其他分组的分组，还会关闭其内部各层分组中的所有工作区，并移除这些分组。明确的破坏性操作。"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Gruppe löschen UND jeden Mitglieds-Arbeitsbereich schließen. Explizit destruktiv."
+            "value": "Die Gruppe löschen UND jeden Mitglieds-Arbeitsbereich schließen. Bei einer Gruppe, die weitere Gruppen enthält, werden zusätzlich alle Arbeitsbereiche darin auf jeder Ebene geschlossen und diese Gruppen entfernt. Explizit destruktiv."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Supprime le groupe ET ferme chaque espace de travail membre. Explicitement destructeur."
+            "value": "Supprime le groupe ET ferme chaque espace de travail membre. Sur un groupe qui contient d’autres groupes, ferme aussi tous les espaces de travail qu’ils contiennent, à tous les niveaux, et supprime ces groupes. Explicitement destructeur."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "حذف المجموعة وإغلاق كل مساحة عمل عضو فيها. إجراء تدميري صريح."
+            "value": "حذف المجموعة وإغلاق كل مساحة عمل عضو فيها. في المجموعة التي تحتوي على مجموعات أخرى، يغلق أيضًا كل مساحات العمل الموجودة داخلها على جميع المستويات ويزيل تلك المجموعات. إجراء تدميري صريح."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Elimina el grupo Y cierra cada espacio de trabajo miembro. Explícitamente destructivo."
+            "value": "Elimina el grupo Y cierra cada espacio de trabajo miembro. En un grupo que contiene otros grupos, cierra también todos los espacios de trabajo que hay dentro, a todos los niveles, y elimina esos grupos. Explícitamente destructivo."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "刪除群組並關閉每個成員工作區。具有明確的破壞性。"
+            "value": "刪除群組並關閉每個成員工作區。對包含其他群組的群組，還會關閉其內部各層群組中的所有工作區，並移除這些群組。具有明確的破壞性。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "그룹을 삭제하고 모든 멤버 작업 공간을 닫습니다. (명시적으로 파괴적인 작업입니다.)"
+            "value": "그룹을 삭제하고 모든 멤버 작업 공간을 닫습니다. 다른 그룹을 포함한 그룹에서는 그 안에 있는 모든 작업 공간을 모든 단계에서 함께 닫고, 해당 그룹들도 제거합니다. (명시적으로 파괴적인 작업입니다.)"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Briše grupu I zatvara svaki radni prostor člana. Za grupu koja sadrži druge grupe zatvara i svaki radni prostor u njima, na svim nivoima, i uklanja te grupe. Izričito destruktivno."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sletter gruppen OG lukker alle medlemmers arbejdsområder. På en gruppe, der indeholder andre grupper, lukkes også alle arbejdsområder i dem på alle niveauer, og grupperne fjernes. Udtrykkeligt destruktivt."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina il gruppo E chiude ogni area di lavoro membro. Su un gruppo che contiene altri gruppi chiude anche ogni area di lavoro al loro interno, a tutti i livelli, e rimuove quei gruppi. Esplicitamente distruttivo."
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លុបក្រុម និងបិទ workspace សមាជិកទាំងអស់។ លើក្រុមដែលមានក្រុមផ្សេងទៀត វាក៏បិទ workspace ទាំងអស់នៅក្នុងក្រុមទាំងនោះគ្រប់កម្រិត ហើយលុបក្រុមទាំងនោះដែរ។ មានលក្ខណៈបំផ្លាញយ៉ាងច្បាស់លាស់។"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sletter gruppen OG lukker alle medlemmenes arbeidsområder. På en gruppe som inneholder andre grupper lukkes også alle arbeidsområder i dem, på alle nivåer, og gruppene fjernes. Uttrykkelig destruktivt."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usuwa grupę I zamyka każdą przestrzeń członkowską. W grupie zawierającej inne grupy zamyka też każdą przestrzeń w nich, na wszystkich poziomach, i usuwa te grupy. Wyraźnie destrukcyjne."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exclui o grupo E fecha cada área de trabalho membro. Em um grupo que contém outros grupos, fecha também todas as áreas de trabalho dentro deles, em todos os níveis, e remove esses grupos. Explicitamente destrutivo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удаляет группу И закрывает каждое рабочее пространство-участник. Для группы, содержащей другие группы, также закрывает все рабочие пространства внутри них на всех уровнях и удаляет эти группы. Явно разрушительное действие."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบกลุ่ม และปิดเวิร์กสเปซของสมาชิกทุกรายการ สำหรับกลุ่มที่มีกลุ่มอื่นอยู่ข้างใน จะปิดเวิร์กสเปซทั้งหมดในกลุ่มเหล่านั้นทุกระดับและลบกลุ่มเหล่านั้นด้วย เป็นการดำเนินการที่ทำลายข้อมูลอย่างชัดเจน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grubu siler VE her üye çalışma alanını kapatır. Başka gruplar içeren bir grupta, içindeki gruplardaki tüm çalışma alanlarını da her düzeyde kapatır ve bu grupları kaldırır. Açıkça yıkıcıdır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видаляє групу І закриває кожну робочу область-учасник. Для групи, що містить інші групи, також закриває всі робочі області в них на всіх рівнях і видаляє ці групи. Явно руйнівна дія."
           }
         }
       }
@@ -121751,55 +121817,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Manage collapsible workspace groups in the sidebar. Each group is owned by an \"anchor\" workspace; the group header IS the anchor's sidebar representation. Closing the anchor closes only that workspace and promotes the group's next member to be the new anchor, so the group and its other members stay intact. When the anchor is the group's only workspace, the group is removed."
+            "value": "Manage collapsible workspace groups in the sidebar. Each group is owned by an \"anchor\" workspace; the group header IS the anchor's sidebar representation. Closing the anchor closes only that workspace and promotes the group's next member to be the new anchor, so the group and its other members stay intact. When the anchor is the group's only workspace, the group is removed, unless it is pinned or holds other groups."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "サイドバーで折りたたみ可能なワークスペースグループを管理します。各グループは「アンカー」ワークスペースが所有し、サイドバーのグループヘッダーがそのアンカーを表します。アンカーを閉じると、閉じられるのはそのワークスペースだけで、グループの次のメンバーが新しいアンカーに昇格するため、グループと他のメンバーはそのまま維持されます。アンカーがグループ唯一のワークスペースだった場合は、グループが削除されます。"
+            "value": "サイドバーで折りたたみ可能なワークスペースグループを管理します。各グループは「アンカー」ワークスペースが所有し、サイドバーのグループヘッダーがそのアンカーを表します。アンカーを閉じると、閉じられるのはそのワークスペースだけで、グループの次のメンバーが新しいアンカーに昇格するため、グループと他のメンバーはそのまま維持されます。アンカーがグループ唯一のワークスペースだった場合は、グループが削除されます。ただし、ピン留めされている場合や他のグループを含む場合は削除されません。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "管理侧边栏中可折叠的工作区分组。每个分组由一个「锚点」工作区拥有；分组标题就是该锚点在侧边栏中的呈现。关闭锚点只会关闭这一个工作区，并把分组中的下一个成员提升为新锚点，因此分组及其他成员保持不变。当锚点是分组中唯一的工作区时，该分组会被移除。"
+            "value": "管理侧边栏中可折叠的工作区分组。每个分组由一个「锚点」工作区拥有；分组标题就是该锚点在侧边栏中的呈现。关闭锚点只会关闭这一个工作区，并把分组中的下一个成员提升为新锚点，因此分组及其他成员保持不变。当锚点是分组中唯一的工作区时，该分组会被移除，除非该分组已固定或包含其他分组。"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verwalte einklappbare Arbeitsbereichsgruppen in der Seitenleiste. Jede Gruppe gehört einem „Anker“-Arbeitsbereich; der Gruppenkopf IST die Repräsentation des Ankers in der Seitenleiste. Das Schließen des Ankers schließt nur diesen Arbeitsbereich und befördert das nächste Mitglied der Gruppe zum neuen Anker, sodass die Gruppe und ihre anderen Mitglieder intakt bleiben. Wenn der Anker der einzige Arbeitsbereich der Gruppe ist, wird die Gruppe entfernt."
+            "value": "Verwalte einklappbare Arbeitsbereichsgruppen in der Seitenleiste. Jede Gruppe gehört einem „Anker“-Arbeitsbereich; der Gruppenkopf IST die Repräsentation des Ankers in der Seitenleiste. Das Schließen des Ankers schließt nur diesen Arbeitsbereich und befördert das nächste Mitglied der Gruppe zum neuen Anker, sodass die Gruppe und ihre anderen Mitglieder intakt bleiben. Wenn der Anker der einzige Arbeitsbereich der Gruppe ist, wird die Gruppe entfernt, es sei denn, sie ist angeheftet oder enthält weitere Gruppen."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gérez les groupes d’espaces de travail réductibles dans la barre latérale. Chaque groupe appartient à un espace de travail « ancrage » ; l’en-tête du groupe EST la représentation de cet ancrage dans la barre latérale. Fermer l’ancrage ferme uniquement cet espace de travail et promeut le membre suivant du groupe comme nouvel ancrage, de sorte que le groupe et ses autres membres restent intacts. Lorsque l'ancrage est le seul espace de travail du groupe, le groupe est supprimé."
+            "value": "Gérez les groupes d’espaces de travail réductibles dans la barre latérale. Chaque groupe appartient à un espace de travail « ancrage » ; l’en-tête du groupe EST la représentation de cet ancrage dans la barre latérale. Fermer l’ancrage ferme uniquement cet espace de travail et promeut le membre suivant du groupe comme nouvel ancrage, de sorte que le groupe et ses autres membres restent intacts. Lorsque l'ancrage est le seul espace de travail du groupe, le groupe est supprimé, sauf s’il est épinglé ou contient d’autres groupes."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إدارة مجموعات مساحات العمل القابلة للطي في الشريط الجانبي. كل مجموعة مملوكة لمساحة عمل \"مرساة\"؛ ترويسة المجموعة هي تمثيل المرساة في الشريط الجانبي. يؤدي إغلاق المرساة إلى إغلاق مساحة العمل تلك فقط وترقية العضو التالي في المجموعة ليكون المرساة الجديدة، وبذلك تظل المجموعة وأعضاؤها الآخرون سليمين. عندما تكون المرساة هي مساحة العمل الوحيدة في المجموعة، يتم إزالة المجموعة."
+            "value": "إدارة مجموعات مساحات العمل القابلة للطي في الشريط الجانبي. كل مجموعة مملوكة لمساحة عمل \"مرساة\"؛ ترويسة المجموعة هي تمثيل المرساة في الشريط الجانبي. يؤدي إغلاق المرساة إلى إغلاق مساحة العمل تلك فقط وترقية العضو التالي في المجموعة ليكون المرساة الجديدة، وبذلك تظل المجموعة وأعضاؤها الآخرون سليمين. عندما تكون المرساة هي مساحة العمل الوحيدة في المجموعة، يتم إزالة المجموعة ما لم تكن مثبتة أو تحتوي على مجموعات أخرى."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gestiona grupos de espacios de trabajo colapsables en la barra lateral. Cada grupo es propiedad de un espacio de trabajo de \"anclaje\"; el encabezado del grupo ES la representación del anclaje en la barra lateral. Al cerrar el anclaje solo se cierra ese espacio de trabajo y se promueve al siguiente miembro del grupo como nuevo anclaje, por lo que el grupo y sus demás miembros permanecen intactos. Cuando el anclaje es el único espacio de trabajo del grupo, el grupo se elimina."
+            "value": "Gestiona grupos de espacios de trabajo colapsables en la barra lateral. Cada grupo es propiedad de un espacio de trabajo de \"anclaje\"; el encabezado del grupo ES la representación del anclaje en la barra lateral. Al cerrar el anclaje solo se cierra ese espacio de trabajo y se promueve al siguiente miembro del grupo como nuevo anclaje, por lo que el grupo y sus demás miembros permanecen intactos. Cuando el anclaje es el único espacio de trabajo del grupo, el grupo se elimina, salvo que esté fijado o contenga otros grupos."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在側邊欄中管理可摺疊的工作區群組。每個群組都由一個「錨點」工作區所擁有；群組標頭「即是」錨點在側邊欄上的呈現。關閉錨點僅會關閉該工作區，並將群組的下一個成員提升為新錨點，因此群組及其其他成員仍會保持原樣。當錨點是群組中唯一的工作區時，該群組將被移除。"
+            "value": "在側邊欄中管理可摺疊的工作區群組。每個群組都由一個「錨點」工作區所擁有；群組標頭「即是」錨點在側邊欄上的呈現。關閉錨點僅會關閉該工作區，並將群組的下一個成員提升為新錨點，因此群組及其其他成員仍會保持原樣。當錨點是群組中唯一的工作區時，該群組將被移除，除非該群組已釘選或包含其他群組。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사이드바에서 접고 펼칠 수 있는 작업 공간 그룹을 관리합니다. 각 그룹은 \"앵커\" 작업 공간에 의해 소유되며, 그룹 헤더는 해당 앵커의 사이드바 표시 형태가 됩니다. 앵커를 닫으면 해당 작업 공간만 닫히고 그룹의 다음 멤버가 새 앵커로 승격되므로, 그룹 및 기타 멤버는 그대로 유지됩니다. 앵커가 그룹의 유일한 작업 공간인 경우 그룹이 제거됩니다."
+            "value": "사이드바에서 접고 펼칠 수 있는 작업 공간 그룹을 관리합니다. 각 그룹은 \"앵커\" 작업 공간에 의해 소유되며, 그룹 헤더는 해당 앵커의 사이드바 표시 형태가 됩니다. 앵커를 닫으면 해당 작업 공간만 닫히고 그룹의 다음 멤버가 새 앵커로 승격되므로, 그룹 및 기타 멤버는 그대로 유지됩니다. 앵커가 그룹의 유일한 작업 공간인 경우 그룹이 제거됩니다. 단, 그룹이 고정되어 있거나 다른 그룹을 포함하는 경우에는 제거되지 않습니다."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upravljajte grupama radnih prostora koje se mogu sažeti u bočnoj traci. Svaku grupu posjeduje radni prostor „sidro“; zaglavlje grupe JE prikaz sidra u bočnoj traci. Zatvaranjem sidra zatvara se samo taj radni prostor, a sljedeći član grupe postaje novo sidro, pa grupa i njeni ostali članovi ostaju netaknuti. Kada je sidro jedini radni prostor grupe, grupa se uklanja, osim ako je prikvačena ili sadrži druge grupe."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Administrer grupper af arbejdsområder, der kan skjules, i sidepanelet. Hver gruppe ejes af et “anker”-arbejdsområde; gruppeoverskriften ER ankerets visning i sidepanelet. Når ankeret lukkes, lukkes kun det arbejdsområde, og gruppens næste medlem bliver det nye anker, så gruppen og dens øvrige medlemmer forbliver intakte. Når ankeret er gruppens eneste arbejdsområde, fjernes gruppen, medmindre den er fastgjort eller indeholder andre grupper."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci i gruppi di aree di lavoro comprimibili nella barra laterale. Ogni gruppo appartiene a un’area di lavoro «ancora»; l’intestazione del gruppo È la rappresentazione dell’ancora nella barra laterale. Chiudendo l’ancora si chiude solo quell’area di lavoro e il membro successivo del gruppo diventa la nuova ancora, così il gruppo e gli altri membri restano intatti. Quando l’ancora è l’unica area di lavoro del gruppo, il gruppo viene rimosso, a meno che non sia fissato o contenga altri gruppi."
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "គ្រប់គ្រងក្រុម workspace ដែលអាចបត់បានក្នុងរបារចំហៀង។ ក្រុមនីមួយៗត្រូវបានគ្រប់គ្រងដោយ workspace “anchor”; ក្បាលក្រុមគឺជាតំណាងរបស់ anchor ក្នុងរបារចំហៀង។ ការបិទ anchor បិទតែ workspace នោះប៉ុណ្ណោះ ហើយសមាជិកបន្ទាប់របស់ក្រុមក្លាយជា anchor ថ្មី ដូច្នេះក្រុម និងសមាជិកផ្សេងទៀតរបស់វានៅដដែល។ នៅពេលដែល anchor ជា workspace តែមួយគត់របស់ក្រុម ក្រុមនោះត្រូវបានលុបចេញ លើកលែងតែវាត្រូវបាន pin ឬមានក្រុមផ្សេងទៀត។"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Administrer sammenleggbare grupper av arbeidsområder i sidepanelet. Hver gruppe eies av et «anker»-arbeidsområde; gruppeoverskriften ER ankerets fremstilling i sidepanelet. Når ankeret lukkes, lukkes bare det arbeidsområdet, og gruppens neste medlem blir det nye ankeret, slik at gruppen og de andre medlemmene forblir intakte. Når ankeret er gruppens eneste arbeidsområde, fjernes gruppen, med mindre den er festet eller inneholder andre grupper."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zarządzaj zwijanymi grupami przestrzeni na pasku bocznym. Każda grupa należy do przestrzeni „kotwicy”; nagłówek grupy JEST reprezentacją kotwicy na pasku bocznym. Zamknięcie kotwicy zamyka tylko tę przestrzeń, a następny członek grupy staje się nową kotwicą, więc grupa i jej pozostali członkowie pozostają nienaruszeni. Gdy kotwica jest jedyną przestrzenią grupy, grupa jest usuwana, chyba że jest przypięta lub zawiera inne grupy."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gerencie grupos recolhíveis de áreas de trabalho na barra lateral. Cada grupo pertence a uma área de trabalho “âncora”; o cabeçalho do grupo É a representação da âncora na barra lateral. Fechar a âncora fecha apenas essa área de trabalho e promove o próximo membro do grupo a nova âncora, de modo que o grupo e seus outros membros permanecem intactos. Quando a âncora é a única área de trabalho do grupo, o grupo é removido, a menos que esteja fixado ou contenha outros grupos."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Управление сворачиваемыми группами рабочих пространств на боковой панели. Каждая группа принадлежит «якорному» рабочему пространству; заголовок группы — это и есть представление якоря на боковой панели. Закрытие якоря закрывает только это рабочее пространство, а следующий участник группы становится новым якорем, поэтому группа и её остальные участники остаются нетронутыми. Если якорь — единственное рабочее пространство группы, группа удаляется, кроме случаев, когда она закреплена или содержит другие группы."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "จัดการกลุ่มเวิร์กสเปซที่ยุบได้ในแถบด้านข้าง แต่ละกลุ่มเป็นของเวิร์กสเปซ “แองเคอร์” ส่วนหัวของกลุ่มคือการแสดงแองเคอร์ในแถบด้านข้าง การปิดแองเคอร์จะปิดเฉพาะเวิร์กสเปซนั้น และเลื่อนสมาชิกถัดไปของกลุ่มเป็นแองเคอร์ใหม่ ทำให้กลุ่มและสมาชิกอื่นยังคงอยู่ครบ เมื่อแองเคอร์เป็นเวิร์กสเปซเดียวของกลุ่ม กลุ่มจะถูกลบออก ยกเว้นกรณีที่กลุ่มถูกปักหมุดหรือมีกลุ่มอื่นอยู่ข้างใน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kenar çubuğundaki daraltılabilir çalışma alanı gruplarını yönetin. Her grup bir “çapa” çalışma alanına aittir; grup başlığı, çapanın kenar çubuğundaki temsilidir. Çapayı kapatmak yalnızca o çalışma alanını kapatır ve grubun sonraki üyesini yeni çapa yapar; böylece grup ve diğer üyeleri bozulmadan kalır. Çapa grubun tek çalışma alanıysa grup kaldırılır; ancak grup sabitlenmişse veya başka gruplar içeriyorsa kalır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Керуйте групами робочих областей, що згортаються, на бічній панелі. Кожна група належить «якорній» робочій області; заголовок групи — це і є представлення якоря на бічній панелі. Закриття якоря закриває лише цю робочу область, а наступний учасник групи стає новим якорем, тож група та її інші учасники залишаються недоторканими. Якщо якір — єдина робоча область групи, групу видаляють, крім випадків, коли вона закріплена або містить інші групи."
           }
         }
       }
@@ -181340,6 +181472,3186 @@
           "stringUnit": {
             "state": "translated",
             "value": "刪除"
+          }
+        }
+      }
+    },
+    "dialog.deleteGroup.message.group.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هل تريد حذف المجموعة «%@» والمجموعة الموجودة بداخلها؟"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obrisati grupu „%@“ i grupu unutar nje?"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slet gruppen “%@” og gruppen indeni?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe „%@“ und die darin enthaltene Gruppe löschen?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the group “%@” and the group inside it?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar el grupo «%@» y el grupo que contiene?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le groupe « %@ » et le groupe qu’il contient ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare il gruppo «%@» e il gruppo al suo interno?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループ「%@」とその中のグループを削除しますか？"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "តើលុបក្រុម “%@” និងក្រុមនៅខាងក្នុងវាមែនទេ?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 “%@”과(와) 그 안의 그룹을 삭제할까요?"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette gruppen «%@» og gruppen inni den?"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usunąć grupę „%@” i grupę w niej?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir o grupo “%@” e o grupo dentro dele?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить группу «%@» и группу внутри неё?"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบกลุ่ม “%@” และกลุ่มที่อยู่ในนั้นใช่ไหม?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” grubunu ve içindeki grubu sileyim mi?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити групу «%@» та групу всередині неї?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是否删除分组“%@”及其中的分组？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定要刪除群組「%@」及其中的群組嗎？"
+          }
+        }
+      }
+    },
+    "dialog.deleteGroup.message.group.lone": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هل تريد حذف المجموعة «%@» والمجموعة الموجودة بداخلها وإغلاق مساحة العمل الخاصة بهما؟"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obrisati grupu „%@“, grupu unutar nje i zatvoriti njihov radni prostor?"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slet gruppen “%@”, gruppen indeni og luk deres arbejdsområde?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe „%@“ und die darin enthaltene Gruppe löschen und ihren Arbeitsbereich schließen?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the group “%@”, the group inside it, and close their workspace?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar el grupo «%@», el grupo que contiene y cerrar su espacio de trabajo?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le groupe « %@ », le groupe qu’il contient et fermer leur espace de travail ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare il gruppo «%@», il gruppo al suo interno e chiudere la loro area di lavoro?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループ「%@」とその中のグループを削除してワークスペースを閉じますか？"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "តើលុបក្រុម “%@” ក្រុមនៅខាងក្នុងវា និងបិទ workspace របស់ពួកវាមែនទេ?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 “%@”과(와) 그 안의 그룹을 삭제하고 해당 작업 공간을 닫을까요?"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette gruppen «%@», gruppen inni den og lukke arbeidsområdet?"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usunąć grupę „%@”, grupę w niej i zamknąć ich przestrzeń?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir o grupo “%@”, o grupo dentro dele e fechar a área de trabalho deles?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить группу «%@», группу внутри неё и закрыть их рабочее пространство?"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบกลุ่ม “%@” กลุ่มที่อยู่ในนั้น และปิดเวิร์กสเปซในนั้นใช่ไหม?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” grubunu ve içindeki grubu silip çalışma alanını kapatayım mı?"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити групу «%@», групу всередині неї та закрити їхню робочу область?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是否删除分组“%@”及其中的分组，并关闭它们的工作区？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定要刪除群組「%@」及其中的群組，並關閉它們的工作區嗎？"
+          }
+        }
+      }
+    },
+    "dialog.deleteGroup.message.group.many": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هل تريد حذف المجموعة «%1$@» والمجموعة الموجودة بداخلها وإغلاق %#@count2@؟"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مساحات العمل الخاصة بها (%lld)"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مساحة العمل الخاصة بها (%lld)"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مساحتي العمل الخاصتين بها (%lld)"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مساحات عمل خاصة بها"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مساحة عمل خاصة بها"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مساحة عمل خاصة بها"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obrisati grupu „%1$@“, grupu unutar nje i zatvoriti %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "njihov %lld radni prostor"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "njihova %lld radna prostora"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "njihovih %lld radnih prostora"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slet gruppen “%1$@”, gruppen indeni og luk %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbejdsområde"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbejdsområder"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe „%1$@“ und die darin enthaltene Gruppe löschen und %#@count2@ schließen?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ihren %lld Arbeitsbereich"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ihre %lld Arbeitsbereiche"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the group “%1$@”, the group inside it, and close %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "their %lld workspace"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "their %lld workspaces"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar el grupo «%1$@», el grupo que contiene y cerrar %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "su %lld espacio de trabajo"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "sus %lld espacios de trabajo"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "sus %lld espacios de trabajo"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le groupe « %1$@ », le groupe qu’il contient et fermer %#@count2@ ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "leur %lld espace de travail"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "leurs %lld espaces de travail"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "leurs %lld espaces de travail"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare il gruppo «%1$@», il gruppo al suo interno e chiudere %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "la loro %lld area di lavoro"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "le loro %lld aree di lavoro"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "le loro %lld aree di lavoro"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループ「%1$@」とその中のグループを削除して%#@count2@を閉じますか？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld 個のワークスペース"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "តើលុបក្រុម “%1$@” ក្រុមនៅខាងក្នុងវា និងបិទ %#@count2@ មែនទេ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "workspace ចំនួន %lld របស់ពួកវា"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 “%1$@”과(와) 그 안의 그룹을 삭제하고 %#@count2@를 닫을까요?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "작업 공간 %lld개"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette gruppen «%1$@», gruppen inni den og lukke %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbeidsområde"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbeidsområder"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usunąć grupę „%1$@”, grupę w niej i zamknąć %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzeń"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzenie"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzeni"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzeni"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir o grupo “%1$@”, o grupo dentro dele e fechar %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "a %lld área de trabalho deles"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "as %lld áreas de trabalho deles"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "as %lld áreas de trabalho deles"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить группу «%1$@», группу внутри неё и закрыть %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочее пространство"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочих пространства"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочих пространств"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочего пространства"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบกลุ่ม “%1$@” กลุ่มที่อยู่ในนั้น และปิด %#@count2@ ใช่ไหม?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "เวิร์กสเปซ %lld รายการในนั้น"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” grubunu ve içindeki grubu silip %#@count2@ kapatayım mı?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld çalışma alanını"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld çalışma alanını"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити групу «%1$@», групу всередині неї та закрити %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхню %lld робочу область"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхні %lld робочі області"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхніх %lld робочих областей"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхньої %lld робочої області"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是否删除分组“%1$@”及其中的分组，并关闭%#@count2@？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "它们的 %lld 个工作区"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定要刪除群組「%1$@」及其中的群組，並關閉%#@count2@嗎？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "它們的 %lld 個工作區"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dialog.deleteGroup.message.groups.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هل تريد حذف المجموعة «%1$@» و%#@count2@؟"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعات الموجودة بداخلها (%lld)"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعة الواحدة الموجودة بداخلها (%lld)"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعتين (%lld) الموجودتين بداخلها"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعات موجودة بداخلها"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعة موجودة بداخلها"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعة موجودة بداخلها"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obrisati grupu „%1$@“ i %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupu unutar nje"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupe unutar nje"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupa unutar nje"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slet gruppen “%1$@” og %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "den %lld gruppe indeni"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "de %lld grupper indeni"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe „%1$@“ und %#@count2@ löschen?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "die %lld darin enthaltene Gruppe"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "die %lld darin enthaltenen Gruppen"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the group “%1$@” and %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "the %lld group inside it"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "the %lld groups inside it"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar el grupo «%1$@» y %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "el %lld grupo que contiene"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "los %lld grupos que contiene"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "los %lld grupos que contiene"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le groupe « %1$@ » et %#@count2@ ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "le %lld groupe qu’il contient"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "les %lld groupes qu’il contient"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "les %lld groupes qu’il contient"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare il gruppo «%1$@» e %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "il %lld gruppo al suo interno"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "i %lld gruppi al suo interno"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "i %lld gruppi al suo interno"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループ「%1$@」と%#@count2@を削除しますか？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "その中の %lld 個のグループ"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "តើលុបក្រុម “%1$@” និង %#@count2@ មែនទេ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ក្រុមចំនួន %lld នៅខាងក្នុងវា"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 “%1$@”과(와) %#@count2@를 삭제할까요?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "그 안의 그룹 %lld개"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette gruppen «%1$@» og %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "den %lld gruppen inni den"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "de %lld gruppene inni den"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usunąć grupę „%1$@” i %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupę w niej"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupy w niej"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grup w niej"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupy w niej"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir o grupo “%1$@” e %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "o %lld grupo dentro dele"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "os %lld grupos dentro dele"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "os %lld grupos dentro dele"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить группу «%1$@» и %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группу внутри неё"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группы внутри неё"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групп внутри неё"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группы внутри неё"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบกลุ่ม “%1$@” และ %#@count2@ ใช่ไหม?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "กลุ่มที่อยู่ในนั้น %lld กลุ่ม"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” grubunu ve %#@count2@ sileyim mi?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "içindeki %lld grubu"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "içindeki %lld grubu"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити групу «%1$@» та %#@count2@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групу всередині неї"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групи всередині неї"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld груп всередині неї"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групи всередині неї"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是否删除分组“%1$@”及%#@count2@？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "其中的 %lld 个分组"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定要刪除群組「%1$@」及%#@count2@嗎？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "其中的 %lld 個群組"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dialog.deleteGroup.message.groups.lone": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هل تريد حذف المجموعة «%1$@» و%#@count2@ وإغلاق مساحة العمل الخاصة بها؟"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعات الموجودة بداخلها (%lld)"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعة الواحدة الموجودة بداخلها (%lld)"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعتين (%lld) الموجودتين بداخلها"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعات موجودة بداخلها"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعة موجودة بداخلها"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعة موجودة بداخلها"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obrisati grupu „%1$@“, %#@count2@ i zatvoriti njihov radni prostor?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupu unutar nje"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupe unutar nje"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupa unutar nje"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slet gruppen “%1$@”, %#@count2@ og luk deres arbejdsområde?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "den %lld gruppe indeni"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "de %lld grupper indeni"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe „%1$@“ und %#@count2@ löschen und ihren Arbeitsbereich schließen?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "die %lld darin enthaltene Gruppe"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "die %lld darin enthaltenen Gruppen"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the group “%1$@”, %#@count2@, and close their workspace?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "the %lld group inside it"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "the %lld groups inside it"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar el grupo «%1$@», %#@count2@ y cerrar su espacio de trabajo?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "el %lld grupo que contiene"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "los %lld grupos que contiene"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "los %lld grupos que contiene"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le groupe « %1$@ », %#@count2@ et fermer leur espace de travail ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "le %lld groupe qu’il contient"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "les %lld groupes qu’il contient"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "les %lld groupes qu’il contient"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare il gruppo «%1$@», %#@count2@ e chiudere la loro area di lavoro?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "il %lld gruppo al suo interno"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "i %lld gruppi al suo interno"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "i %lld gruppi al suo interno"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループ「%1$@」と%#@count2@を削除してワークスペースを閉じますか？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "その中の %lld 個のグループ"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "តើលុបក្រុម “%1$@” %#@count2@ និងបិទ workspace របស់ពួកវាមែនទេ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ក្រុមចំនួន %lld នៅខាងក្នុងវា"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 “%1$@”과(와) %#@count2@를 삭제하고 해당 작업 공간을 닫을까요?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "그 안의 그룹 %lld개"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette gruppen «%1$@», %#@count2@ og lukke arbeidsområdet?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "den %lld gruppen inni den"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "de %lld gruppene inni den"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usunąć grupę „%1$@”, %#@count2@ i zamknąć ich przestrzeń?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupę w niej"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupy w niej"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grup w niej"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupy w niej"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir o grupo “%1$@”, %#@count2@ e fechar a área de trabalho deles?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "o %lld grupo dentro dele"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "os %lld grupos dentro dele"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "os %lld grupos dentro dele"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить группу «%1$@», %#@count2@ и закрыть их рабочее пространство?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группу внутри неё"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группы внутри неё"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групп внутри неё"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группы внутри неё"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบกลุ่ม “%1$@” %#@count2@ และปิดเวิร์กสเปซในนั้นใช่ไหม?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "กลุ่มที่อยู่ในนั้น %lld กลุ่ม"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” grubunu ve %#@count2@ silip çalışma alanını kapatayım mı?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "içindeki %lld grubu"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "içindeki %lld grubu"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити групу «%1$@», %#@count2@ та закрити їхню робочу область?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групу всередині неї"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групи всередині неї"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld груп всередині неї"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групи всередині неї"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是否删除分组“%1$@”及%#@count2@，并关闭它们的工作区？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "其中的 %lld 个分组"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定要刪除群組「%1$@」及%#@count2@，並關閉它們的工作區嗎？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "其中的 %lld 個群組"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dialog.deleteGroup.message.groups.many": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هل تريد حذف المجموعة «%1$@» و%#@count2@ وإغلاق %#@count3@؟"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعات الموجودة بداخلها (%lld)"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعة الواحدة الموجودة بداخلها (%lld)"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "المجموعتين (%lld) الموجودتين بداخلها"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعات موجودة بداخلها"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعة موجودة بداخلها"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مجموعة موجودة بداخلها"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مساحات العمل الخاصة بها (%lld)"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مساحة العمل الخاصة بها (%lld)"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مساحتي العمل الخاصتين بها (%lld)"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مساحات عمل خاصة بها"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مساحة عمل خاصة بها"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld مساحة عمل خاصة بها"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obrisati grupu „%1$@“, %#@count2@ i zatvoriti %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupu unutar nje"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupe unutar nje"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupa unutar nje"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "njihov %lld radni prostor"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "njihova %lld radna prostora"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "njihovih %lld radnih prostora"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slet gruppen “%1$@”, %#@count2@ og luk %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "den %lld gruppe indeni"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "de %lld grupper indeni"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbejdsområde"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbejdsområder"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe „%1$@“ und %#@count2@ löschen und %#@count3@ schließen?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "die %lld darin enthaltene Gruppe"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "die %lld darin enthaltenen Gruppen"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ihren %lld Arbeitsbereich"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ihre %lld Arbeitsbereiche"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the group “%1$@”, %#@count2@, and close %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "the %lld group inside it"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "the %lld groups inside it"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "their %lld workspace"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "their %lld workspaces"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar el grupo «%1$@», %#@count2@ y cerrar %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "el %lld grupo que contiene"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "los %lld grupos que contiene"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "los %lld grupos que contiene"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "su %lld espacio de trabajo"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "sus %lld espacios de trabajo"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "sus %lld espacios de trabajo"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le groupe « %1$@ », %#@count2@ et fermer %#@count3@ ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "le %lld groupe qu’il contient"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "les %lld groupes qu’il contient"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "les %lld groupes qu’il contient"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "leur %lld espace de travail"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "leurs %lld espaces de travail"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "leurs %lld espaces de travail"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare il gruppo «%1$@», %#@count2@ e chiudere %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "il %lld gruppo al suo interno"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "i %lld gruppi al suo interno"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "i %lld gruppi al suo interno"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "la loro %lld area di lavoro"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "le loro %lld aree di lavoro"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "le loro %lld aree di lavoro"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループ「%1$@」と%#@count2@を削除して%#@count3@を閉じますか？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "その中の %lld 個のグループ"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld 個のワークスペース"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "តើលុបក្រុម “%1$@” %#@count2@ និងបិទ %#@count3@ មែនទេ?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ក្រុមចំនួន %lld នៅខាងក្នុងវា"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "workspace ចំនួន %lld របស់ពួកវា"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 “%1$@”과(와) %#@count2@를 삭제하고 %#@count3@를 닫을까요?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "그 안의 그룹 %lld개"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "작업 공간 %lld개"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette gruppen «%1$@», %#@count2@ og lukke %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "den %lld gruppen inni den"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "de %lld gruppene inni den"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbeidsområde"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "deres %lld arbeidsområder"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usunąć grupę „%1$@”, %#@count2@ i zamknąć %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupę w niej"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupy w niej"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grup w niej"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld grupy w niej"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzeń"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzenie"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzeni"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ich %lld przestrzeni"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir o grupo “%1$@”, %#@count2@ e fechar %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "o %lld grupo dentro dele"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "os %lld grupos dentro dele"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "os %lld grupos dentro dele"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "a %lld área de trabalho deles"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "as %lld áreas de trabalho deles"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "as %lld áreas de trabalho deles"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить группу «%1$@», %#@count2@ и закрыть %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группу внутри неё"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группы внутри неё"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групп внутри неё"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld группы внутри неё"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочее пространство"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочих пространства"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочих пространств"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "их %lld рабочего пространства"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลบกลุ่ม “%1$@” %#@count2@ และปิด %#@count3@ ใช่ไหม?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "กลุ่มที่อยู่ในนั้น %lld กลุ่ม"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "เวิร์กสเปซ %lld รายการในนั้น"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” grubunu ve %#@count2@ silip %#@count3@ kapatayım mı?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "içindeki %lld grubu"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "içindeki %lld grubu"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld çalışma alanını"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld çalışma alanını"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити групу «%1$@», %#@count2@ та закрити %#@count3@?"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групу всередині неї"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групи всередині неї"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld груп всередині неї"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%lld групи всередині неї"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхню %lld робочу область"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхні %lld робочі області"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхніх %lld робочих областей"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "їхньої %lld робочої області"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是否删除分组“%1$@”及%#@count2@，并关闭%#@count3@？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "其中的 %lld 个分组"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "它们的 %lld 个工作区"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定要刪除群組「%1$@」及%#@count2@，並關閉%#@count3@嗎？"
+          },
+          "substitutions": {
+            "count2": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "其中的 %lld 個群組"
+                    }
+                  }
+                }
+              }
+            },
+            "count3": {
+              "argNum": 3,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "它們的 %lld 個工作區"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -472824,6 +476136,131 @@
         }
       }
     },
+    "workspaceGroup.a11y.joined": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@، %2$@"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@、%2$@"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@，%2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@，%2$@"
+          }
+        }
+      }
+    },
     "workspaceGroup.autoName.numbered": {
       "extractionState": "manual",
       "localizations": {
@@ -473949,6 +477386,256 @@
         }
       }
     },
+    "workspaceGroup.contextMenu.moveTo": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "نقل المجموعة إلى"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Premjesti grupu u"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flyt gruppe til"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe verschieben nach"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Group to"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover grupo a"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacer le groupe vers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta gruppo in"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループの移動先"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ផ្លាស់ទីក្រុមទៅ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 이동 위치"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flytt gruppe til"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przenieś grupę do"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover grupo para"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Переместить группу в"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ย้ายกลุ่มไปยัง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grubu şuraya taşı"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перемістити групу до"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将分组移到"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將群組移至"
+          }
+        }
+      }
+    },
+    "workspaceGroup.contextMenu.moveTo.topLevel": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المستوى الأعلى"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Najviši nivo"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øverste niveau"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oberste Ebene"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top Level"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nivel superior"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niveau supérieur"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livello superiore"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最上位"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "កម្រិតកំពូល"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최상위"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øverste nivå"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Najwyższy poziom"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nível superior"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Верхний уровень"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ระดับบนสุด"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En üst düzey"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Верхній рівень"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顶层"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最上層"
+          }
+        }
+      }
+    },
     "workspaceGroup.contextMenu.openDocs": {
       "extractionState": "manual",
       "localizations": {
@@ -475046,6 +478733,131 @@
         }
       }
     },
+    "workspaceGroup.error.holdsGroupsDeleteOnMac": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تحتوي هذه المجموعة على مجموعات أخرى. احذفها على جهاز Mac."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ova grupa sadrži druge grupe. Obrišite je na Macu."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne gruppe indeholder andre grupper. Slet den på Mac’en."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Gruppe enthält weitere Gruppen. Lösche sie auf dem Mac."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This group holds other groups. Delete it on the Mac."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este grupo contiene otros grupos. Elimínalo en el Mac."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce groupe contient d’autres groupes. Supprimez-le sur le Mac."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo gruppo contiene altri gruppi. Eliminalo sul Mac."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このグループには他のグループが含まれています。Macで削除してください。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ក្រុមនេះមានក្រុមផ្សេងទៀត។ សូមលុបវានៅលើ Mac។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 그룹에는 다른 그룹이 들어 있습니다. Mac에서 삭제하세요."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne gruppen inneholder andre grupper. Slett den på Mac-en."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta grupa zawiera inne grupy. Usuń ją na Macu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este grupo contém outros grupos. Exclua-o no Mac."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В этой группе есть другие группы. Удалите её на Mac."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กลุ่มนี้มีกลุ่มอื่นอยู่ข้างใน ให้ลบบน Mac"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu grup başka gruplar içeriyor. Mac’te sil."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ця група містить інші групи. Видаліть її на Mac."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该分组包含其他分组。请在 Mac 上删除。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此群組包含其他群組。請在 Mac 上刪除。"
+          }
+        }
+      }
+    },
     "workspaceGroup.error.idempotencyKeyMustBeString": {
       "extractionState": "manual",
       "localizations": {
@@ -475219,6 +479031,131 @@
           "stringUnit": {
             "state": "translated",
             "value": "external_id 및 idempotency_key가 일치해야 합니다"
+          }
+        }
+      }
+    },
+    "workspaceGroup.error.nestedGroupMoveOnMac": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا يمكن نقل مجموعة داخل مجموعة أخرى إلا على جهاز Mac"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grupa unutar druge grupe može se premjestiti samo na Macu"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En gruppe inde i en anden gruppe kan kun flyttes på Mac’en"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine Gruppe in einer anderen Gruppe kann nur auf dem Mac verschoben werden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A group inside another group can only be moved on the Mac"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un grupo dentro de otro grupo solo se puede mover en el Mac"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un groupe placé dans un autre groupe ne peut être déplacé que sur le Mac"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un gruppo all’interno di un altro gruppo può essere spostato solo sul Mac"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別のグループ内のグループは、Macでのみ移動できます"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ក្រុមដែលនៅក្នុងក្រុមផ្សេងអាចផ្លាស់ទីបានតែនៅលើ Mac ប៉ុណ្ណោះ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 그룹 안의 그룹은 Mac에서만 이동할 수 있습니다"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En gruppe inni en annen gruppe kan bare flyttes på Mac-en"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grupę znajdującą się w innej grupie można przenieść tylko na Macu"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um grupo dentro de outro grupo só pode ser movido no Mac"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Группу внутри другой группы можно переместить только на Mac"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กลุ่มที่อยู่ในกลุ่มอื่นย้ายได้บน Mac เท่านั้น"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başka bir grubun içindeki grup yalnızca Mac’te taşınabilir"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Групу всередині іншої групи можна перемістити лише на Mac"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只能在 Mac 上移动位于其他分组内的分组"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只能在 Mac 上移動位於其他群組內的群組"
           }
         }
       }
@@ -475705,6 +479642,381 @@
           "stringUnit": {
             "state": "translated",
             "value": "聚焦群組的錨點工作區"
+          }
+        }
+      }
+    },
+    "workspaceGroup.level.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المستوى %lld"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nivo %lld"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niveau %lld"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ebene %lld"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Level %lld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nivel %lld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niveau %lld"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livello %lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "レベル %lld"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "កម្រិត %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "레벨 %lld"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nivå %lld"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poziom %lld"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nível %lld"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Уровень %lld"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ระดับ %lld"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzey %lld"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рівень %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "层级 %lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "層級 %lld"
+          }
+        }
+      }
+    },
+    "workspaceGroup.noOwnWorkspace.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ليس لها مساحة عمل خاصة"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bez vlastitog radnog prostora"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Har intet eget arbejdsområde"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein eigener Arbeitsbereich"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No workspace of its own"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin espacio de trabajo propio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun espace de travail propre"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna area di lavoro propria"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "独自のワークスペースなし"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "គ្មាន workspace ផ្ទាល់ខ្លួន"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자체 작업 공간 없음"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Har ikke noe eget arbeidsområde"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak własnej przestrzeni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem área de trabalho própria"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет собственного рабочего пространства"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไม่มีเวิร์กสเปซของตัวเอง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendi çalışma alanı yok"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Немає власної робочої області"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有自己的工作区"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有自己的工作區"
+          }
+        }
+      }
+    },
+    "workspaceGroup.noOwnWorkspace.hint.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "طي المجموعة أو توسيعها"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sažmi ili proširi grupu"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skjul eller vis gruppe"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe ein- oder ausklappen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fold or unfold the group"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contraer o expandir grupo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réduire ou développer le groupe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comprimi o espandi gruppo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グループを折りたたむ、または展開"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បត់ ឬពង្រីកក្រុម"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그룹 접기 또는 펼치기"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skjul eller utvid gruppen"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zwiń lub rozwiń grupę"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recolher ou expandir grupo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Свернуть или развернуть группу"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ยุบหรือขยายกลุ่ม"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grubu daralt veya genişlet"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Згорнути або розгорнути групу"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "折叠或展开分组"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收合或展開群組"
           }
         }
       }

@@ -23,6 +23,11 @@ public struct ControlWorkspaceGroupSnapshot: Sendable, Equatable {
     public let anchorWorkspaceID: UUID?
     /// Whether the group currently has no live workspace anchor.
     public var isEmpty: Bool { anchorWorkspaceID == nil }
+    /// The id of the group that holds this one, or `nil` at the top level (#cm-106).
+    public let parentGroupID: UUID?
+    /// Whether the group holds nothing: no workspace names it and no group names it as parent.
+    /// This is what `workspace-group list` reports as `is_empty` (#cm-106).
+    public let holdsNothing: Bool
     /// The group's custom color override, if any.
     public let customColor: String?
     /// The group's custom icon symbol, if any.
@@ -56,6 +61,9 @@ public struct ControlWorkspaceGroupSnapshot: Sendable, Equatable {
     ///   - externalID: Caller-owned identity, if any.
     ///   - anchorWorkspaceProvenance: Raw anchor provenance.
     ///   - memberWorkspaceIDs: The member workspace identifiers, in tab order.
+    ///   - parentGroupID: The group that holds this one, or `nil` at the top level.
+    ///   - holdsNothing: Whether nothing is inside the group; when `nil`, it holds nothing if it has
+    ///     no workspace of its own and no member.
     public init(
         id: UUID,
         name: String,
@@ -66,7 +74,9 @@ public struct ControlWorkspaceGroupSnapshot: Sendable, Equatable {
         iconSymbol: String?,
         memberWorkspaceIDs: [UUID],
         externalID: String? = nil,
-        anchorWorkspaceProvenance: String = "unknown"
+        anchorWorkspaceProvenance: String = "unknown",
+        parentGroupID: UUID? = nil, // (#cm-106)
+        holdsNothing: Bool? = nil // (#cm-106)
     ) {
         self.id = id
         self.name = name
@@ -78,5 +88,7 @@ public struct ControlWorkspaceGroupSnapshot: Sendable, Equatable {
         self.externalID = externalID
         self.anchorWorkspaceProvenance = anchorWorkspaceProvenance
         self.memberWorkspaceIDs = memberWorkspaceIDs
+        self.parentGroupID = parentGroupID // (#cm-106)
+        self.holdsNothing = holdsNothing ?? (anchorWorkspaceID == nil && memberWorkspaceIDs.isEmpty) // (#cm-106)
     }
 }

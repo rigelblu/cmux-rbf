@@ -97,6 +97,9 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
         )
         model.workspaceGroups.append(group)
         anchor.groupId = group.id
+        // The first eligible workspace sits in a group: the new group lands there, in place (#cm-106). Upstream's
+        // assignment and placement below then change nothing, and run in both cases.
+        nestedPlaceNewWorkspaceGroup(groupId: group.id, anchorId: anchor.id, eligibleChildren: eligibleChildren)
         for id in eligibleChildren {
             model.assignGroup(workspaceId: id, groupId: group.id)
         }
@@ -167,6 +170,10 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
             select: select,
             applyCreationTitleAsCustomTitle: applyCreationTitleAsCustomTitle
         ) else { return nil }
+        if model.hasNestedWorkspaceGroup {
+            nestedPlaceNewWorkspace(newWorkspace, groupId: groupId, placement: placement, referenceWorkspaceId: referenceWorkspaceId) // (#cm-106)
+            return newWorkspace
+        }
         model.assignGroup(workspaceId: newWorkspace.id, groupId: groupId)
         var preferredTopLevelIds = originalTopLevelIds.filter { $0 != newWorkspace.id }
         if let emptyHeaderId,
@@ -269,6 +276,7 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
             group.id != groupId && group.liveAnchorWorkspaceId == workspaceId
         }
         if isAnchorOfOtherGroup { return }
+        if model.hasNestedWorkspaceGroup { return nestedAddWorkspaceToGroup(workspaceId: workspaceId, groupId: groupId, placement: placement, referenceWorkspaceId: referenceWorkspaceId) } // (#cm-106)
         let originalTopLevelIds = model.sidebarTopLevelWorkspaceIdsIncludingEmptyGroups()
         let emptyHeaderId = targetGroup.isEmpty ? targetGroup.anchorWorkspaceId : nil
         model.assignGroup(workspaceId: workspaceId, groupId: groupId)
@@ -302,6 +310,7 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
             ungroupWorkspaceGroup(groupId: groupId)
             return
         }
+        if model.hasNestedWorkspaceGroup { return nestedRemoveWorkspaceFromGroup(workspaceId: workspaceId, groupId: groupId) } // (#cm-106)
         model.assignGroup(workspaceId: workspaceId, groupId: nil)
         model.normalizeWorkspaceGroupContiguity()
         host?.workspaceOrderDidChange(movedWorkspaceIds: [workspaceId])
@@ -329,6 +338,7 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
         if removeGeneratedAnchor {
             return removeGeneratedAnchorWorkspace(group: group, groupId: groupId, memberIds: memberIds)
         }
+        if model.hasNestedWorkspaceGroup { return nestedUngroupWorkspaceGroup(group: group) } // (#cm-106)
         // An empty pinned group is durable state. Removing it through Ungroup
         // would bypass the explicit Delete Group action that owns its
         // confirmation; users can unpin it first if they want to flatten it.
@@ -381,6 +391,7 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
     public func toggleWorkspaceGroupCollapsed(groupId: UUID) {
         guard let host else { return }
         guard let index = model.workspaceGroups.firstIndex(where: { $0.id == groupId }) else { return }
+        if model.hasNestedWorkspaceGroup { return nestedToggleWorkspaceGroupCollapsed(groupId: groupId) } // (#cm-106)
         let nextCollapsed = !model.workspaceGroups[index].isCollapsed
         if nextCollapsed {
             guard let anchorId = model.workspaceGroups[index].liveAnchorWorkspaceId else {
@@ -440,7 +451,8 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
         guard model.workspaceGroups[index].isPinned != isPinned else { return }
         model.workspaceGroups[index].isPinned = isPinned
         model.normalizeWorkspaceGroupContiguity()
-        let memberIds = model.tabs.filter { $0.groupId == groupId }.map(\.id)
+        // Every workspace inside, at every level: the direct workspaces of a parent with none of its own are none (#cm-106).
+        let memberIds = model.workspaceIdsInside(groupId)
         host?.workspaceOrderDidChange(movedWorkspaceIds: memberIds)
     }
 
@@ -494,6 +506,7 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
     /// slots; the reordered group anchors are projected back into the existing
     /// group slots.
     public func moveWorkspaceGroup(groupId: UUID, toIndex targetIndex: Int) {
+        if model.hasNestedWorkspaceGroup { return nestedMoveWorkspaceGroup(groupId: groupId, toIndex: targetIndex) } // (#cm-106)
         guard moveWorkspaceGroupSlot(groupId: groupId, toIndex: targetIndex) else { return }
         applyWorkspaceGroupSlotOrderToTabs()
         let memberIds = model.tabs.filter { $0.groupId == groupId }.map(\.id)

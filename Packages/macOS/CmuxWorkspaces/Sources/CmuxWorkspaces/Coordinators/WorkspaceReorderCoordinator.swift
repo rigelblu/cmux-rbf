@@ -8,9 +8,9 @@ public import Foundation
 /// order-change publication inverts through `WorkspaceOrderHosting`.
 @MainActor
 public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
-    private let model: WorkspacesModel<Tab>
+    let model: WorkspacesModel<Tab> // (#cm-106) internal: the nested drop in WorkspaceReorderCoordinator+NestedDrop.swift reads it
     private let planner = WorkspaceReorderPlanner()
-    private weak var host: (any WorkspaceOrderHosting)?
+    weak var host: (any WorkspaceOrderHosting)? // (#cm-106) internal, as `model`
 
     /// Creates the coordinator over the window's workspace model.
     public init(model: WorkspacesModel<Tab>) {
@@ -37,7 +37,10 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
         guard !selectedTabs.isEmpty else { return }
         let previousOrder = model.tabs.map(\.id)
 
-        if !model.workspaceGroups.isEmpty {
+        var carriedGroupIds: [UUID] = []
+        if model.hasNestedWorkspaceGroup { // (#cm-106)
+            carriedGroupIds = model.nestedMoveTabsToTop(selectedTabs)
+        } else if !model.workspaceGroups.isEmpty {
             model.moveWorkspaceGroupMembersAfterAnchors(workspaceIds: selectedTabs.map(\.id))
             let topLevelIds = model.sidebarTopLevelWorkspaceIdsIncludingEmptyGroups()
             let selectedTopLevelIds = model.topLevelWorkspaceIds(for: selectedTabs)
@@ -59,7 +62,7 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
             model.tabs = selectedPinned + remainingPinned + selectedUnpinned + remainingUnpinned
         }
         if model.tabs.map(\.id) != previousOrder {
-            host?.workspaceOrderDidChange(movedWorkspaceIds: selectedTabs.map(\.id))
+            host?.workspaceOrderDidChange(movedWorkspaceIds: model.workspaceIdsMovedUpThrough(selectedTabs, carriedGroupIds: carriedGroupIds)) // (#cm-106)
         }
     }
 
@@ -69,7 +72,10 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
         guard let tab = model.tabs.first(where: { $0.id == tabId }) else { return }
         let previousOrder = model.tabs.map(\.id)
 
-        if !model.workspaceGroups.isEmpty {
+        var carriedGroupIds: [UUID] = []
+        if model.hasNestedWorkspaceGroup { // (#cm-106)
+            carriedGroupIds = model.nestedMoveTabToTopForNotification(tab)
+        } else if !model.workspaceGroups.isEmpty {
             guard let topLevelId = model.topLevelWorkspaceIds(for: [tab]).first else { return }
             let pinnedTopLevelIds = model.sidebarTopLevelPinnedWorkspaceIdsIncludingEmptyGroups()
             guard !pinnedTopLevelIds.contains(topLevelId) else { return }
@@ -97,7 +103,7 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
             model.tabs.insert(tab, at: pinnedCount)
         }
         if model.tabs.map(\.id) != previousOrder {
-            host?.workspaceOrderDidChange(movedWorkspaceIds: [tabId])
+            host?.workspaceOrderDidChange(movedWorkspaceIds: model.workspaceIdsMovedUpThrough([tab], carriedGroupIds: carriedGroupIds)) // (#cm-106)
         }
     }
 
@@ -112,6 +118,17 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
         isDragOperation: Bool = false,
         explicitGroupId: UUID? = nil
     ) -> Bool {
+        // Move Up, Move Down and an index from the socket: one row of the workspace's level. // (#cm-106)
+        if model.hasNestedWorkspaceGroup, !isDragOperation, explicitGroupId == nil {
+            let previousOrder = model.tabs.map(\.id)
+            let handled = model.nestedReorderWorkspace(tabId: tabId, toIndex: targetIndex)
+            if model.tabs.map(\.id) != previousOrder {
+                // The workspace behind a group's name moves its group's row: the notice names everything inside it.
+                let ownGroup = model.workspaceGroups.first { $0.liveAnchorWorkspaceId == tabId }
+                host?.workspaceOrderDidChange(movedWorkspaceIds: ownGroup.map { [tabId] + model.workspaceIdsInside($0.id).filter { $0 != tabId } } ?? [tabId])
+            }
+            return handled
+        }
         if let explicitGroupId,
            !model.workspaceGroups.contains(where: { $0.id == explicitGroupId }) {
             return false
@@ -338,6 +355,13 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
         usesTopLevelRows: Bool = false,
         explicitGroupId: UUID? = nil
     ) -> Bool {
+        // A nested group's header moves inside its parent (#cm-106); a workspace dropped on a group of a nested window is a layout edit.
+        if (isDragOperation || usesTopLevelRows), model.isNestedWorkspaceGroupHeader(tabId) {
+            return reorderNestedGroupHeader(tabId: tabId, toIndex: targetIndex, usesTopLevelRows: usesTopLevelRows, explicitGroupId: explicitGroupId)
+        }
+        if isDragOperation, !usesTopLevelRows, let explicitGroupId, model.hasNestedWorkspaceGroup, !model.isWorkspaceGroupAnchor(tabId) {
+            return reorderNestedWorkspacesIntoGroup(movingIds: [tabId], draggedTabId: tabId, toIndex: targetIndex, groupId: explicitGroupId)
+        }
         if usesTopLevelRows || model.isWorkspaceGroupAnchor(tabId) {
             return reorderTopLevelWorkspaceItem(
                 tabId: tabId,
@@ -413,6 +437,16 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
             )
         }
         let movingIds = movingTabs.map(\.id)
+        // Headers that include a nested group's header move inside their parent, or not at all (#cm-106).
+        if movingIds.contains(where: { model.isNestedWorkspaceGroupHeader($0) }) {
+            return reorderNestedGroupHeaders(
+                movingAnchorIds: movingIds,
+                draggedTabId: draggedTabId,
+                toIndex: targetIndex,
+                usesTopLevelRows: usesTopLevelRows,
+                explicitGroupId: explicitGroupId
+            )
+        }
         if movingIds.allSatisfy(anchorIds.contains) {
             return reorderTopLevelWorkspaceBlock(
                 movingAnchorIds: movingIds,
@@ -423,6 +457,13 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
         if let explicitGroupId,
            !model.workspaceGroups.contains(where: { $0.id == explicitGroupId }) {
             return false
+        }
+        if isDragOperation, !usesTopLevelRows, let explicitGroupId, model.hasNestedWorkspaceGroup { // (#cm-106)
+            return reorderNestedWorkspacesIntoGroup(movingIds: movingIds, draggedTabId: draggedTabId, toIndex: targetIndex, groupId: explicitGroupId)
+        }
+        // Workspaces dropped at a top-level place of a nested window all go to the top level (#cm-106).
+        if isDragOperation, explicitGroupId == nil, model.hasNestedWorkspaceGroup {
+            return reorderNestedWorkspacesToTopLevel(movingIds: movingIds, draggedTabId: draggedTabId, toIndex: targetIndex, usesTopLevelRows: usesTopLevelRows)
         }
 
         let previousOrder = model.tabs.map(\.id)
@@ -609,12 +650,10 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
         ) != topLevelIds else {
             return true
         }
+        // Every workspace inside each moved group, at every level (#cm-106); the direct members in a flat window.
+        let movedIdSet = Set(movedGroupIds.flatMap { model.workspaceIdsInside($0) })
         let movedWorkspaceIds: [UUID] = model.tabs.compactMap { workspace -> UUID? in
-            guard let groupId = workspace.groupId,
-                  movedGroupIds.contains(groupId) else {
-                return nil
-            }
-            return workspace.id
+            movedIdSet.contains(workspace.id) ? workspace.id : nil
         }
         host?.workspaceOrderDidChange(movedWorkspaceIds: movedWorkspaceIds)
         return true
@@ -664,7 +703,7 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
 
         let movedWorkspaceIds: [UUID]
         if let group = model.workspaceGroups.first(where: { $0.anchorWorkspaceId == tabId }) {
-            movedWorkspaceIds = model.tabs.filter { $0.groupId == group.id }.map(\.id)
+            movedWorkspaceIds = model.workspaceIdsInside(group.id) // every level (#cm-106)
         } else {
             movedWorkspaceIds = [tabId]
         }
@@ -773,6 +812,8 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
             // so the anchor stays at the section's leading edge (matches
             // the visible header position).
             model.normalizeWorkspaceGroupContiguity()
+        } else if model.hasNestedWorkspaceGroup { // (#cm-106) an ungrouped row dropped inside an area
+            model.normalizeWorkspaceGroupContiguity()
         }
     }
 
@@ -826,8 +867,10 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
             .map(\.workspaceId)
         guard !movedWorkspaceIds.isEmpty else { return result }
 
+        let previousOrder = model.tabs.map(\.id)
         applyWorkspaceBatchReorder(orderedWorkspaceIds: orderedWorkspaceIds)
-        host?.workspaceOrderDidChange(movedWorkspaceIds: movedWorkspaceIds)
+        // In a nested window the repair after the rebuild can place groups the plan did not list (#cm-106).
+        host?.workspaceOrderDidChange(movedWorkspaceIds: model.workspaceIdsNamedForBatchReorder(planned: movedWorkspaceIds, previousOrder: previousOrder))
         return result
     }
 
@@ -914,6 +957,7 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
                     reorderTabForPinnedState(workspace)
                 }
             }
+            if model.hasNestedWorkspaceGroup { model.normalizeWorkspaceGroupContiguity() } // (#cm-106)
             host?.workspaceOrderDidChange(movedWorkspaceIds: changedIds)
             return changedIds
         }

@@ -11,6 +11,8 @@ final class FakeWorkspaceGroupSafetyContext: ControlCommandContext {
     var removeGeneratedAnchor = false
     var deletedGroupIDs: [UUID] = []
     var deleteResult = 2
+    var listResolution: ControlWorkspaceGroupListResolution = .tabManagerUnavailable // (#cm-106)
+    var moveResolution: ControlWorkspaceGroupMoveResolution = .moved // (#cm-106)
 
     func controlCreateWorkspaceGroup(
         routing: ControlRoutingSelectors,
@@ -40,5 +42,19 @@ final class FakeWorkspaceGroupSafetyContext: ControlCommandContext {
     ) -> Int? {
         deletedGroupIDs.append(groupID)
         return deleteResult
+    }
+
+    func controlWorkspaceGroupList(routing: ControlRoutingSelectors) -> ControlWorkspaceGroupListResolution {
+        listResolution
+    }
+
+    func controlMoveWorkspaceGroup(
+        routing: ControlRoutingSelectors,
+        groupID: UUID,
+        toIndex: Int?,
+        beforeGroupID: UUID?,
+        afterGroupID: UUID?
+    ) -> ControlWorkspaceGroupMoveResolution {
+        moveResolution
     }
 }

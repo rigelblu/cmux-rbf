@@ -40,6 +40,12 @@ struct SidebarWorkspaceRowSnapshot: Equatable {
     let checklistAddFieldActivationToken: Int
     let isChecklistPopoverPresented: Bool
     let contextMenu: SidebarWorkspaceContextMenuSnapshot
+    /// How many groups hold this row; 0 in a window with no nested group (#cm-106).
+    var depth: Int = 0
+    /// The level a reorder drop lands at, on a row that draws a drop line, for the line's indent (#cm-106).
+    var dropLineLevel: Int? = nil
+    /// The list's width, for the cap on the indent; nil outside the SwiftUI list (#cm-106).
+    var listWidth: CGFloat? = nil
 
     /// Rows that sit *inside* a header — a real workspace group or a generated
     /// color section — carry the same leading indent, so the container reads as
@@ -50,5 +56,10 @@ struct SidebarWorkspaceRowSnapshot: Equatable {
             isGrouped: groupId != nil,
             isColorSectionMember: isColorSectionMember
         )
+    }
+
+    /// How many steps of indent the row carries: its depth in a nested window, else one under a header (#cm-106).
+    var indentLevels: Int {
+        depth > 0 ? depth : (isIndentedUnderHeader ? 1 : 0)
     }
 }

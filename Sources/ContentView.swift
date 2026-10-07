@@ -11830,6 +11830,12 @@ struct VerticalTabsSidebar: View, Equatable {
             return visibleWorkspaceRowIds.filter { topLevelSet.contains($0) }
         case .group(let groupId):
             guard workspaceGroups.contains(where: { $0.id == groupId }) else { return [] }
+            // A group's rows for the line are the rows of its whole run, at every level (#cm-106).
+            if let runRowIds = SidebarNestedDropLine.runRowIds(
+                groupId: groupId, tabs: tabs, groups: workspaceGroups, visibleRowIds: visibleWorkspaceRowIds
+            ) {
+                return runRowIds
+            }
             let visibleIds = Set(visibleWorkspaceRowIds)
             let memberIds = tabs
                 .filter { $0.groupId == groupId && visibleIds.contains($0.id) }
@@ -11970,6 +11976,18 @@ struct VerticalTabsSidebar: View, Equatable {
         let colorSectionProjection: SidebarWorkspaceColorSectionProjection
         let workspaceRenderItems: [SidebarWorkspaceRenderItem]
         let visibleWorkspaceRowIds: [UUID]
+        /// How many groups hold each row, by workspace id or group id; empty in a window with no nested group (#cm-106).
+        let rowDepthById: [UUID: Int]
+        /// The list's width, set from the viewport above the lazy boundary where the SwiftUI list has one, so a row's
+        /// indent can stop at 40% of it; nil elsewhere (#cm-106).
+        var listWidth: CGFloat? = nil
+
+        /// The same context with the list's width set (#cm-106).
+        func withListWidth(_ width: CGFloat) -> WorkspaceListRenderContext {
+            var copy = self
+            copy.listWidth = width
+            return copy
+        }
 
         var workspaceIds: [UUID] { tabIds }
     }
@@ -12090,8 +12108,12 @@ struct VerticalTabsSidebar: View, Equatable {
             groupsById: workspaceGroupById,
             effectiveMembership: workspaceGroupIdByWorkspaceId
         )
+        let rowDepthById = SidebarNestedWorkspaceRows.depthById(
+            groupsById: workspaceGroupById,
+            effectiveMembership: workspaceGroupIdByWorkspaceId
+        ) // (#cm-106)
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
-            items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name) }
+            items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name, depth: rowDepthById[$0.id] ?? 0) }
         )
         let baseWorkspaceRenderItems = SidebarWorkspaceRenderItem.renderItems(
             tabs: tabs,
@@ -12169,7 +12191,8 @@ struct VerticalTabsSidebar: View, Equatable {
             workspaceGroupMenuSnapshot: workspaceGroupMenuSnapshot,
             colorSectionProjection: colorSectionProjection,
             workspaceRenderItems: workspaceRenderItems,
-            visibleWorkspaceRowIds: visibleWorkspaceRowIds
+            visibleWorkspaceRowIds: visibleWorkspaceRowIds,
+            rowDepthById: rowDepthById
         )
         let _ = SidebarProfilingSignposts.end(signpost)
         ZStack(alignment: .bottomLeading) {
@@ -12359,6 +12382,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 viewportHeight: viewport.size.height,
                 insets: scrollInsets
             )
+            // The width goes down as a plain value, like the height: rows read it for the cap on the indent (#cm-106).
+            let renderContext = renderContext.withListWidth(viewport.size.width)
             ScrollViewReader { scrollProxy in
                 ScrollView(.vertical) {
                     workspaceScrollContent(
@@ -12980,7 +13005,8 @@ struct VerticalTabsSidebar: View, Equatable {
             editingChecklistItemId: editingChecklistItemIds[tab.id],
             todoControlsEnabled: WorkspaceTodoFeature.isEnabled,
             isMetadataExpanded: expandedMetadataWorkspaceIds.contains(tab.id),
-            isMarkdownExpanded: expandedMarkdownWorkspaceIds.contains(tab.id)
+            isMarkdownExpanded: expandedMarkdownWorkspaceIds.contains(tab.id),
+            depth: input.depth // (#cm-106)
         )
         let commands = SidebarWorkspaceRowCommands(
             tab: tab,
@@ -14741,11 +14767,13 @@ struct VerticalTabsSidebar: View, Equatable {
             return false
         }
         dragAutoScrollController.updateFromDragLocation()
+        let level = SidebarNestedDropLine.level(for: plan, depthById: renderContext.rowDepthById) // (#cm-106)
         guard dragState.dropIndicator != plan.indicator ||
-                dragState.dropIndicatorScope != plan.indicatorScope else {
+                dragState.dropIndicatorScope != plan.indicatorScope ||
+                dragState.dropIndicatorLevel != level else {
             return true
         }
-        dragState.setDropIndicator(plan.indicator, scope: plan.indicatorScope)
+        dragState.setDropIndicator(plan.indicator, scope: plan.indicatorScope, level: level)
         return true
     }
 
@@ -14776,7 +14804,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 workspaceGroups: renderContext.workspaceGroups,
                 visibleWorkspaceRowIds: renderContext.visibleWorkspaceRowIds
             ),
-            plan: plan
+            plan: plan,
+            level: SidebarNestedDropLine.level(for: plan, depthById: renderContext.rowDepthById) // (#cm-106)
         )
     }
 
@@ -14869,7 +14898,8 @@ struct VerticalTabsSidebar: View, Equatable {
                             id: $0.id,
                             anchorWorkspaceId: $0.anchorWorkspaceId,
                             isPinned: $0.isPinned,
-                            isEmpty: $0.isEmpty
+                            isEmpty: $0.isEmpty,
+                            parentGroupId: $0.parentGroupId // (#cm-106)
                         )
                 },
                 targets: targets.map {
@@ -15440,7 +15470,10 @@ struct VerticalTabsSidebar: View, Equatable {
             contextMenuPinState: contextMenuPinState,
             inferredTaskStatus: workspaceSnapshot.taskStatusInput.inferred,
             activeTodoOverride: workspaceSnapshot.taskStatusInput.activeOverride,
-            isTodoStatusHidden: workspaceSnapshot.taskStatusInput.isHidden
+            isTodoStatusHidden: workspaceSnapshot.taskStatusInput.isHidden,
+            depth: renderContext.rowDepthById[tab.id] ?? 0, // (#cm-106)
+            dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil, // (#cm-106)
+            listWidth: renderContext.listWidth
         )
         return result
     }
@@ -16214,6 +16247,13 @@ struct TabItemView: View, Equatable {
     var isBeingDragged: Bool { snapshot.isBeingDragged }
     var topDropIndicatorVisible: Bool { snapshot.topDropIndicatorVisible }
     var bottomDropIndicatorVisible: Bool { snapshot.bottomDropIndicatorVisible }
+    /// How far the drop line starts from this row's own left edge: the landing level's indent less the row's own, so
+    /// the line sits at the level the drop lands at. Zero in a window with no nested group (#cm-106).
+    var dropLineLeadingInset: CGFloat {
+        guard let level = snapshot.dropLineLevel else { return 0 }
+        return SidebarNestedDropLine.inset(level: level, availableWidth: snapshot.listWidth)
+            - SidebarNestedIndent.points(levels: snapshot.indentLevels, availableWidth: snapshot.listWidth)
+    }
     var contextMenuWorkspaceIds: [UUID] { snapshot.contextMenu.targetWorkspaceIds }
     var settings: SidebarTabItemSettingsSnapshot { snapshot.settings }
     var isChecklistExpanded: Bool { snapshot.isChecklistExpanded }
@@ -16918,7 +16958,8 @@ struct TabItemView: View, Equatable {
             SidebarWorkspaceTopDropIndicator(
                 isVisible: topDropIndicatorVisible,
                 isFirstRow: index == 0,
-                rowSpacing: rowSpacing
+                rowSpacing: rowSpacing,
+                leadingInset: dropLineLeadingInset // (#cm-106)
             )
         }
         .overlay(alignment: .bottom) {
@@ -16926,7 +16967,8 @@ struct TabItemView: View, Equatable {
                 isVisible: bottomDropIndicatorVisible,
                 isFirstRow: false,
                 rowSpacing: rowSpacing,
-                isBottomEdge: true
+                isBottomEdge: true,
+                leadingInset: dropLineLeadingInset // (#cm-106)
             )
         }
         .task(id: workspaceFinderDirectoryOpenRequest) {

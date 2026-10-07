@@ -524,7 +524,9 @@ struct WorkspaceGroupTests {
         ] + Array(originalIds.dropFirst(4)))
     }
 
-    @Test func createUnpinnedGroupFromPinnedGroupChildStaysBelowPinnedGroups() throws {
+    // Changed by `cm-106.1` (Scenario 39): a group made from workspaces that sit in a group is made inside that group,
+    // where it used to land at the top level below the pinned groups.
+    @Test func createUnpinnedGroupFromPinnedGroupChildIsMadeInsideThatPinnedGroup() throws {
         let manager = makeTabManager()
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         manager.addWorkspace(autoWelcomeIfNeeded: false)
@@ -537,13 +539,12 @@ struct WorkspaceGroupTests {
 
         let newGroupId = try #require(manager.createWorkspaceGroup(name: "Unpinned", childWorkspaceIds: [originalIds[1]]))
         let newGroup = try #require(manager.workspaceGroups.first { $0.id == newGroupId })
-        let pinnedGroupIds = Set(manager.workspaceGroups.filter(\.isPinned).map(\.id))
-        let lastPinnedIndex = try #require(manager.tabs.lastIndex { tab in
-            tab.groupId.map { pinnedGroupIds.contains($0) } ?? false
-        })
-        let newGroupIndex = try #require(manager.tabs.firstIndex { $0.id == newGroup.anchorWorkspaceId })
 
-        #expect(newGroupIndex > lastPinnedIndex)
+        #expect(!newGroup.isPinned)
+        #expect(newGroup.parentGroupId == firstPinnedId)
+        #expect(manager.tabs.first { $0.id == originalIds[1] }?.groupId == newGroupId)
+        // The second pinned group is untouched and still sits at the top level.
+        #expect(manager.workspaceGroups.first { $0.id == secondPinnedId }?.parentGroupId == nil)
     }
 
     @Test func movingGroupedChildToTopKeepsAnchorFirstWhenGroupIsAlreadyFirst() throws {
