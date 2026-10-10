@@ -178,6 +178,25 @@ enum FigmaPaneURL {
         return URL(string: raw)
     }
 
+    /// Which Figma file a link or a pane address names, as one comparable string.
+    ///
+    /// It is the path segment right after `/design/`, `/file/`, `/board/` or
+    /// `/slides/`, so the name after the key and the kind of link do not matter:
+    /// `/design/KEY/a`, `/design/KEY/renamed`, `/design/KEY` and `/file/KEY/a`
+    /// are one file. A branch link, `.../KEY/branch/BRANCHKEY/...`, is its own
+    /// file: the answer is `KEY/branch/BRANCHKEY`. `documentURL(fromPaneURL:)`
+    /// keeps the path as given and cannot serve here.
+    ///
+    /// Reads a pane in either surface, as ``documentURL(fromPaneURL:wrapper:)`` does.
+    static func fileKey(fromPaneURL paneURL: URL, wrapper: URL = wrapperFileURL()) -> String? {
+        guard let document = documentURL(fromPaneURL: paneURL, wrapper: wrapper) else { return nil }
+        // `[kind, KEY, ...]`: `isFileLink` has already held the first segment to one of the four.
+        let segments = document.path.split(separator: "/").map(String.init)
+        guard segments.count >= 2, !segments[1].isEmpty else { return nil }
+        if segments.count >= 4, segments[2] == "branch" { return "\(segments[1])/branch/\(segments[3])" }
+        return segments[1]
+    }
+
     /// The node a pane is currently steered to, if any.
     static func node(fromPaneURL paneURL: URL, wrapper: URL = wrapperFileURL()) -> String? {
         if let embedded = embeddedURL(inWrapper: paneURL, wrapper: wrapper) { return nodeID(in: embedded) }
