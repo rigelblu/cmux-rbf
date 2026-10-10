@@ -762,6 +762,9 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
             return
         }
 
+        // cmux-rbf `#cm-73`: a Figma link goes to a Figma pane.
+        if location.workspace.openClickedFigmaLink(url, sourcePanelId: panelId) { return }
+
         _ = location.workspace.newBrowserSurface(
             inPane: paneId,
             url: url,
