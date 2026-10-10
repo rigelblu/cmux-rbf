@@ -2736,6 +2736,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         "cmux.workspaceTerminalScrollBarHiddenDidChange"
     )
     let id: UUID
+    // cmux-rbf `#cm-73`: the page location and defaults a clicked Figma link uses through `openTerminalBrowserLink`. Only tests set it.
+    var figmaClickEnvironment = FigmaClickEnvironment()
     private(set) var isRetiredFromOwningTabManager = false
     /// Restart-stable workspace identifier persisted for durable deep links.
     private(set) var stableId = UUID()

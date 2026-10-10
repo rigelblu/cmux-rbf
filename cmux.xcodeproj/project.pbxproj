@@ -1706,11 +1706,17 @@
 		807300000000000000000018 /* FigmaCLIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000017 /* FigmaCLIRules.swift */; };
 		80730000000000000000001C /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
 		80730000000000000000001E /* FigmaStayInPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001D /* FigmaStayInPane.swift */; };
+		807300000000000000000031 /* FigmaClickRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000030 /* FigmaClickRoute.swift */; };
+		807300000000000000000032 /* FigmaClickRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000030 /* FigmaClickRoute.swift */; };
+		807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000033 /* FigmaClickRouteTests.swift */; };
 		807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001F /* FigmaStayInPaneTests.swift */; };
 		807300000000000000000019 /* FigmaCLIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000017 /* FigmaCLIRules.swift */; };
 		80730000000000000000001B /* FigmaCLIRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001A /* FigmaCLIRulesTests.swift */; };
 		807300000000000000000007 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
 		807300000000000000000008 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
+		807300000000000000000037 /* Workspace+FigmaClick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000036 /* Workspace+FigmaClick.swift */; };
+		807300000000000000000039 /* FigmaClickWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000038 /* FigmaClickWorkspaceTests.swift */; };
+		807300000000000000000035 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
 		4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29BA503AF85868C6325335B /* FeedWaiterRegistry.swift */; };
 		330A15CE33CDB525DE207F7F /* FeedWaiterRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B74E6D94323FE9C5804E0B4 /* FeedWaiterRegistryTests.swift */; };
 		10200F1E0000000000000007 /* FileContentChangeCoordinator+Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10200F1E0000000000000008 /* FileContentChangeCoordinator+Entry.swift */; };
@@ -5627,6 +5633,10 @@
 		807300000000000000000015 /* FigmaWrapperPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPageTests.swift; sourceTree = "<group>"; };
 		807300000000000000000017 /* FigmaCLIRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIRules.swift; sourceTree = "<group>"; };
 		80730000000000000000001A /* FigmaCLIRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIRulesTests.swift; sourceTree = "<group>"; };
+		807300000000000000000030 /* FigmaClickRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickRoute.swift; sourceTree = "<group>"; };
+		807300000000000000000033 /* FigmaClickRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickRouteTests.swift; sourceTree = "<group>"; };
+		807300000000000000000036 /* Workspace+FigmaClick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaClick.swift"; sourceTree = "<group>"; };
+		807300000000000000000038 /* FigmaClickWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickWorkspaceTests.swift; sourceTree = "<group>"; };
 		80730000000000000000001D /* FigmaStayInPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaStayInPane.swift; sourceTree = "<group>"; };
 		80730000000000000000001F /* FigmaStayInPaneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaStayInPaneTests.swift; sourceTree = "<group>"; };
 		807300000000000000000006 /* FigmaWrapperPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPage.swift; sourceTree = "<group>"; };
@@ -9162,6 +9172,7 @@
 				804100000000000000000002 /* TabManager+AdjacentWorkspaceReordering.swift */,
 				E3B7A400000000000000020B /* Workspace+WorkspaceSurfaceTreeReading.swift */,
 				CA52C0170000000000000000 /* Workspace+SurfaceNavigation.swift */,
+				807300000000000000000036 /* Workspace+FigmaClick.swift */,
 				9504A0010000000000000002 /* Workspace+MovingTabSplit.swift */,
 				875200000000000000000004 /* SurfacePaneMovement.swift */,
 				822900000000000000000002 /* Workspace+TerminalResizeInteraction.swift */,
@@ -10618,6 +10629,7 @@
 				807300000000000000000001 /* FigmaPaneURL.swift */,
 				80730000000000000000000F /* FigmaFileLink.swift */,
 				807300000000000000000017 /* FigmaCLIRules.swift */,
+				807300000000000000000030 /* FigmaClickRoute.swift */,
 				805500000000000000000003 /* BrowserValueTextFormatter.swift */,
 				B9000001A1B2C3D4E5F60719 /* cmux.swift */,
 				D7AB12048000000000000002 /* CMUXCLI+RemoteWorkingDirectory.swift */,
@@ -11290,6 +11302,8 @@
 				807300000000000000000015 /* FigmaWrapperPageTests.swift */,
 				80730000000000000000001A /* FigmaCLIRulesTests.swift */,
 				80730000000000000000001F /* FigmaStayInPaneTests.swift */,
+				807300000000000000000033 /* FigmaClickRouteTests.swift */,
+				807300000000000000000038 /* FigmaClickWorkspaceTests.swift */,
 				AC61257DCDCA431A908C55CC /* CLIChildEnvironmentTests.swift */,
 				95C00A2330C34E7DA7630E4D /* CLIChildEnvironment.swift */,
 				805500000000000000000002 /* CLIBrowserEvalOutputTests.swift */,
@@ -13475,6 +13489,8 @@
 				807300000000000000000011 /* FigmaFileLink.swift in Sources */,
 				80730000000000000000001C /* FigmaPaneURL.swift in Sources */,
 				80730000000000000000001E /* FigmaStayInPane.swift in Sources */,
+				807300000000000000000035 /* FigmaWrapperPage.swift in Sources */,
+				807300000000000000000031 /* FigmaClickRoute.swift in Sources */,
 				4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */,
 				10200F1E0000000000000007 /* FileContentChangeCoordinator+Entry.swift in Sources */,
 				10200F1E0000000000000001 /* FileContentChangeCoordinator.swift in Sources */,
@@ -14904,6 +14920,7 @@
 				8300A0040000000000000004 /* Workspace+SSHConnectionBroker.swift in Sources */,
 				F9219DE12AF2E4D9CFFC66CF /* Workspace+SurfaceCatalog.swift in Sources */,
 				CA52B0170000000000000000 /* Workspace+SurfaceNavigation.swift in Sources */,
+				807300000000000000000037 /* Workspace+FigmaClick.swift in Sources */,
 				7DD5BF8AB5B84491BC89EEE9 /* Workspace+SurfaceOwnership.swift in Sources */,
 				85911000000000000000000B /* Workspace+TerminalLinkOpening.swift in Sources */,
 				822900000000000000000001 /* Workspace+TerminalResizeInteraction.swift in Sources */,
@@ -15754,6 +15771,9 @@
 				807300000000000000000019 /* FigmaCLIRules.swift in Sources */,
 				80730000000000000000001B /* FigmaCLIRulesTests.swift in Sources */,
 				807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */,
+				807300000000000000000032 /* FigmaClickRoute.swift in Sources */,
+				807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */,
+				807300000000000000000039 /* FigmaClickWorkspaceTests.swift in Sources */,
 				807300000000000000000008 /* FigmaWrapperPage.swift in Sources */,
 				FEEDC0DEC0DEC0DEC0DE0003 /* FeedJumpResolverTests.swift in Sources */,
 				330A15CE33CDB525DE207F7F /* FeedWaiterRegistryTests.swift in Sources */,
