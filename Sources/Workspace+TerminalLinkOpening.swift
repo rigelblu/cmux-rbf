@@ -49,6 +49,13 @@ extension Workspace: TerminalLinkOpenContainer {
 
     func openTerminalBrowserLink(url: URL, sourcePanelId: UUID) -> Bool {
         guard let target = surfaceOwnershipTarget(for: sourcePanelId) else { return false }
+        // cmux-rbf `#cm-73`: a Figma link goes to a Figma pane. Asked after the caller's settings checks, so a person's link settings win.
+        if openClickedFigmaLink(
+            url,
+            sourcePanelId: target.containerPanelID,
+            page: figmaClickEnvironment.page,
+            defaults: figmaClickEnvironment.defaults
+        ) { return true }
         if let targetPane = preferredRightSideTargetPane(fromPanelId: target.containerPanelID) {
             return newBrowserSurface(inPane: targetPane, url: url, focus: true) != nil
         }
