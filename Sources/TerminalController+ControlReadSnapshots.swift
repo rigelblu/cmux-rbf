@@ -23,7 +23,7 @@ extension TerminalController {
         controlCommandCoordinator.invalidateHandleTopologyRefresh()
     }
 
-    // cmux-rbf `#cm-73`: not private, so the `browser.open_split` reply can publish before it is sent.
+    // cmux-rbf `#cm-73`: not private, so the `browser.open_split` reply and a clicked Figma link that makes a pane (`Workspace.openClickedFigmaLink`) can publish before they return.
     func publishSocketReadSnapshot() {
         let requests: [ControlRequest] = [
             ControlRequest(id: nil, method: "window.list", params: [:]),
