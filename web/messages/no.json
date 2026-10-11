@@ -1265,6 +1265,10 @@
         "diffViewer": {
           "defaultLayout": "Default layout for newly opened diff viewers. The toolbar layout toggle persists the user's last choice; an explicit `cmux diff --layout` option overrides both."
         },
+        "figma": {
+          "description": "Figma-innstillinger.",
+          "defaultFolder": "Lenke til Figma-mappen der nye design som agenten din oppretter, skal havne. Bruk lenken fra Figmas adressefelt på mappens side. Agenter leser den med \"cmux figma folder\"."
+        },
         "reply": {
           "description": "Svarpanel",
           "maxMessagesBack": "Hvor mange svar uten usendte notater tilbakepilen går gjennom. Svar med usendte notater forblir alltid tilgjengelige.",

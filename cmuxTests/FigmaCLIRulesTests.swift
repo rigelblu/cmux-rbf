@@ -151,7 +151,7 @@ struct FigmaCLIRulesTests {
 
     @Test("the help starts with the usage line and has no --theme")
     func usageLineAndNoTheme() {
-        #expect(lines.first == "Usage: cmux figma <open|goto> [args]")
+        #expect(lines.first == "Usage: cmux figma <open|goto|folder> [args]")
         #expect(!FigmaUsage.text.contains("--theme"))
     }
 

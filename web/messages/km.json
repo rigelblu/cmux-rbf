@@ -1265,6 +1265,10 @@
         "diffViewer": {
           "defaultLayout": "Default layout for newly opened diff viewers. The toolbar layout toggle persists the user's last choice; an explicit `cmux diff --layout` option overrides both."
         },
+        "figma": {
+          "description": "ការកំណត់ Figma។",
+          "defaultFolder": "តំណទៅកាន់ថត Figma ដែលការរចនាថ្មីៗដែលភ្នាក់ងាររបស់អ្នកបង្កើតគួរទៅកាន់។ ប្រើតំណពីរបារអាសយដ្ឋានរបស់ Figma នៅលើទំព័រថត។ ភ្នាក់ងារអានវាដោយប្រើ \"cmux figma folder\"។"
+        },
         "reply": {
           "description": "ផ្ទាំងឆ្លើយតប",
           "maxMessagesBack": "ចំនួនការឆ្លើយតបដែលគ្មានកំណត់ត្រាមិនទាន់ផ្ញើ ដែលព្រួញថយក្រោយឆ្លងកាត់។ ការឆ្លើយតបដែលមានកំណត់ត្រាមិនទាន់ផ្ញើនៅតែអាចចូលដល់បានជានិច្ច។",
