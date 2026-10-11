@@ -1265,6 +1265,10 @@
         "diffViewer": {
           "defaultLayout": "Default layout for newly opened diff viewers. The toolbar layout toggle persists the user's last choice; an explicit `cmux diff --layout` option overrides both."
         },
+        "figma": {
+          "description": "Figma 設定。",
+          "defaultFolder": "代理程式建立的新設計應儲存到的 Figma 資料夾連結。請使用資料夾頁面上 Figma 網址列中的連結。代理程式透過 \"cmux figma folder\" 讀取此值。"
+        },
         "reply": {
           "description": "回覆面板",
           "maxMessagesBack": "沒有未傳送筆記的回覆中，返回箭頭會經過多少則。帶有未傳送筆記的回覆始終保持可存取。",

@@ -1265,6 +1265,10 @@
         "diffViewer": {
           "defaultLayout": "Default layout for newly opened diff viewers. The toolbar layout toggle persists the user's last choice; an explicit `cmux diff --layout` option overrides both."
         },
+        "figma": {
+          "description": "Figma 설정입니다.",
+          "defaultFolder": "에이전트가 만드는 새 디자인을 저장할 Figma 폴더의 링크입니다. 폴더 페이지에서 Figma 주소 표시줄에 보이는 링크를 사용하세요. 에이전트는 \"cmux figma folder\"로 이 값을 읽습니다."
+        },
         "reply": {
           "description": "답장 패널",
           "maxMessagesBack": "보내지 않은 메모가 없는 답장을 뒤로 화살표가 몇 개까지 거슬러 가는지입니다. 보내지 않은 메모가 있는 답장은 항상 계속 도달할 수 있습니다.",
