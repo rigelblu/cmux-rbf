@@ -190,6 +190,19 @@ Aligned built-in and custom colour rows, since v0.31.0:
 - In Settings → Workspace Colors, built-in and custom color rows share an aligned 5-column layout: semantic labels start at identical coordinates, color pills align, hex values share an aligned 92pt column, and an invisible placeholder preserves the Remove button slot so visibility toggles stay pinned to the right margin.
 - Custom color display name fields align vertically at their top edge with trailing label and hex text fields within 1.0pt.
 
+## 🟠⋯ Organize workspace groups inside larger groups
+
+Since v0.32.0, a workspace group can sit inside another group, to any depth, so one header can hold a whole area of work.
+
+- Right-click a group's header and choose **Move Group to**, then a group, or **Top Level** to take it back out. Dragging a header does not nest it yet.
+- Each depth indents its rows. Collapsing a group hides everything inside it, and its header shows the unread count of all of it.
+- A group that still holds other groups keeps its header when its last own workspace closes. That header shows a dot in the group's colour where its icon was, and a click on its name collapses or expands it.
+- A pinned group inside a group sits among that group's pinned rows, not at the top of the sidebar.
+- The nesting, the row order, and each group's collapsed and pinned state come back after you quit and reopen.
+- From the CLI, `cmux workspace-group list --json` names the group that holds each group in `parent_group_id`.
+- Always on; no setting or migration. An older build opens the same saved file and shows the groups without the nesting.
+- The full rules are in `docs/workspace-groups.md`, under "Groups inside groups".
+
 ## 🟠⋯ Tell a group header from the workspaces inside it at a glance
 
 Every workspace-group header carries a band across its whole row, so the container is visible without hunting for a small folder icon. A coloured group uses its colour; a group with no colour gets a neutral band. Set that colour from the header's **Group Color** menu (below). The active group's band deepens while member workspaces keep their narrow leading strip, so container and contents remain different shapes.
