@@ -94,6 +94,17 @@ Workspace tab and badge colors from Settings > Workspace Colors.
 | `workspaceColors.paletteOverrides` | object | `{}` | Legacy workspace color overrides for built-in palette names. Prefer workspaceColors.colors for new configs. |
 | `workspaceColors.customColors` | array<colorHex> | `[]` | Legacy list of custom workspace colors. Prefer workspaceColors.colors for new configs. |
 
+## workspaceStatuses
+
+Your own list of workspace statuses, in the order the Status menu and Cycle Status use. A top-level array of entries, each with the four fields below.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `workspaceStatuses.id` | string | required | The status's stable id, at least one character, used by `cmux workspace status set`. One of cmux's five ids (`todo`, `working`, `needs-attention`, `review`, `done`) makes that status behave as itself. |
+| `workspaceStatuses.name` | string | required | The name shown for the status, at least one character. |
+| `workspaceStatuses.extends` | `"todo"`, `"working"`, `"needs-attention"`, `"review"` or `"done"` | none | The cmux status this one behaves as. Needed for your own ids; ignored for one of cmux's five. |
+| `workspaceStatuses.color` | string | none | The color setting this status applies, written as the label of one of your workspace colors, a palette or display name, or a hex color such as #1565C0; setting this status replaces the workspace's color with it. No other field is allowed in an entry. |
+
 ## sidebarAppearance
 
 Sidebar tint settings from Settings > Sidebar Appearance.

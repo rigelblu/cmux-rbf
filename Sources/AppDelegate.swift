@@ -568,6 +568,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Owns the process-scoped idle-sleep assertion shared by every local and
     /// mobile entrypoint.
     let caffeineController = CaffeineController()
+    /// The one status list the app works from (#cm-109). Made here, and not yet started: making it reads no file and
+    /// writes no default. `var` so a test can give its own delegate another store.
+    var workspaceStatusListStore = WorkspaceStatusListStore(
+        fileURL: CmuxConfigLocation().userConfigFile,
+        defaults: .standard,
+        resolveColor: { WorkspaceTabColorSettings.resolvedColorHex($0) },
+        paletteFingerprint: { WorkspaceTabColorSettings.paletteCacheFingerprint() },
+        clock: ContinuousClock()
+    )
     /// Composition-root lifetime owner shared by every window's font-size
     /// queue. Window coordinators receive this dependency explicitly; no
     /// coordinator reaches back through `AppDelegate.shared`.
@@ -1577,6 +1586,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let isRunningUnderXCTest = sentryStartupPolicy.isRunningUnderXCTest
         if !isRunningUnderXCTest {
             PostHogAnalytics.shared.recordLaunchIdentity()
+        }
+        // (#cm-109) The status list store reads `cmux.json` from the user's real home, so it is not started under XCTest
+        // (cmux's five stay in use there), as the feature-flag fetch below is not. Runs before any window is restored.
+        if !isRunningUnderXCTest {
+            workspaceStatusListStore.start()
         }
         StartupBreadcrumbLog.append(
             "appDelegate.didFinish.begin",

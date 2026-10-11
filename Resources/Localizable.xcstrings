@@ -121273,55 +121273,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usage: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nShow or pin a workspace's todo lifecycle status. Without arguments prints\nthe effective status, the inferred status, and the override, targeting the\ncaller's workspace by default.\n\nLanes are inferred from live signals (agent needs input > agent running >\nopen PR > all PRs merged/closed > dirty git tree > todo). `set <lane>`\npins a manual lane that auto-clears as soon as the inferred lane changes;\n`set auto` clears the pin immediately. `cycle` advances the manual override\none lane forward (todo → working → needs-attention → review → done → todo).\n\nNote for coding agents: manual status pins belong to the user; the lane\nalready tracks your activity automatically. Do not `set` or `cycle` the\nstatus unless the user explicitly asks you to.\n\nLanes: todo, working, needs-attention, review, done\n\nExamples:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "Usage: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nShow or set a workspace's status. Without arguments prints the effective\nstatus, the inferred status, and the status set by hand, targeting the\ncaller's workspace by default.\n\nStatuses are inferred from live signals (agent needs input > agent running >\nopen PR > all PRs merged/closed > dirty git tree > todo). `set <id>` sets a\nstatus by hand: an id from your status list (see `list`) or one of cmux's own.\n`set auto` clears it and `set none` hides the status. `cycle` moves to the next\nstatus. `list` prints your status list, where it came from, whether statuses\nare on, and any problems in it; it takes no workspace.\n\nA status of your own stays until you change it. A cmux status set by hand stops\nshowing when what cmux detects changes, and shows again when cmux detects the\nsame status again. A cmux status set while an agent waits is gone when that wait ends.\n\nNote for coding agents: manual statuses belong to the user; the status\nalready tracks your activity automatically. Do not `set` or `cycle` the\nstatus unless the user explicitly asks you to.\n\nExamples:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用方法: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nワークスペースの todo ライフサイクルステータスを表示またはピン留めします。引数なしの場合は、\n有効なステータス、推測されたステータス、およびオーバーライドを出力します。デフォルトで\n呼び出し元のワークスペースが対象となります。\n\nレーンはライブシグナルから推測されます（エージェントが要入力を検出 > エージェント実行中 >\nオープンな PR > すべての PR がマージ/クローズ済み > 変更のある git ツリー > todo）。`set <lane>`\nは手動レーンをピン留めし、推測されたレーンが変更されるとすぐに自動クリアされます。\n`set auto` は即座にピン留めをクリアします。`cycle` は手動オーバーライドを\n1つ先のレーンに進めます（todo → working → needs-attention → review → done → todo）。\n\nコーディングエージェントへの注意: 手動のステータスピンはユーザーのものです。レーンは\nすでに自動的にあなたのアクティビティを追跡しています。ユーザーから明示的な\n要求がない限り、ステータスを `set` または `cycle` しないでください。\n\nレーン: todo, working, needs-attention, review, done\n\n例:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "使用方法: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nワークスペースのステータスを表示または設定します。引数なしの場合は、有効なステータス、\n推測されたステータス、手動で設定したステータスを出力します。デフォルトでは\n呼び出し元のワークスペースが対象です。\n\nステータスはライブシグナルから推測されます（エージェントが要入力 > エージェント実行中 >\nオープンな PR > すべての PR がマージ/クローズ済み > 変更のある git ツリー > todo）。`set <id>` は\nステータスを手動で設定します。自分のステータスリストの ID（`list` を参照）か、cmux 標準のものを指定できます。\n`set auto` は手動設定を解除し、`set none` はステータスを非表示にします。`cycle` は次のステータスに進めます。\n`list` は自分のステータスリスト、その取得元、ステータスが有効かどうか、リストの問題を出力します。\nワークスペースは指定しません。\n\n自分のステータスは、変更するまで残ります。手動で設定した cmux のステータスは、cmux の検出結果が\n変わると表示されなくなり、cmux が同じステータスを再び検出すると表示されます。エージェントの\n待機中に設定した cmux のステータスは、その待機が終わると消えます。\n\nコーディングエージェントへの注意: 手動のステータスはユーザーのものです。ステータスは\nすでに自動的にあなたのアクティビティを追跡しています。ユーザーから明示的な\n要求がない限り、ステータスを `set` または `cycle` しないでください。\n\n例:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verwendung: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nZeigt den Todo-Lebenszyklusstatus eines Arbeitsbereichs an oder pinnt ihn. Ohne Argumente werden\nder effektive Status, der abgeleitete Status und die Überschreibung ausgegeben, wobei standardmäßig der\nArbeitsbereich des Aufrufers angepeilt wird.\n\nSpalten werden aus Live-Signalen abgeleitet (Agent benötigt Eingabe > Agent läuft >\noffener PR > alle PRs zusammengeführt/geschlossen > unsauberer Git-Tree > Todo). `set <lane>`\npinnt eine manuelle Spalte, die sich automatisch löscht, sobald sich die abgeleitete Spalte ändert;\n`set auto` löscht den Pin sofort. `cycle` verschiebt die manuelle Überschreibung\neine Spalte weiter (todo → working → needs-attention → review → done → todo).\n\nHinweis für Programmier-Agenten: Manuelle Status-Pins gehören dem Benutzer; die Spalte\nverfolgt Ihre Aktivität bereits automatisch. Verwenden Sie `set` oder `cycle` für den\nStatus nur, wenn der Benutzer Sie ausdrücklich darum bittet.\n\nSpalten: todo, working, needs-attention, review, done\n\nBeispiele:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "Verwendung: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nZeigt den Status eines Arbeitsbereichs an oder setzt ihn. Ohne Argumente werden der effektive Status,\nder abgeleitete Status und der von Hand gesetzte Status ausgegeben; standardmäßig ist der\nArbeitsbereich des Aufrufers das Ziel.\n\nStatus werden aus Live-Signalen abgeleitet (Agent benötigt Eingabe > Agent läuft >\noffener PR > alle PRs zusammengeführt/geschlossen > unsauberer Git-Tree > Todo).\n`set <id>` setzt einen Status von Hand: eine ID aus Ihrer Statusliste (siehe `list`) oder\neinen von cmux. `set auto` hebt ihn auf, `set none` blendet den Status aus. `cycle`\nspringt zum nächsten Status. `list` gibt Ihre Statusliste aus, woher sie stammt, ob\nStatus aktiviert sind und welche Probleme sie hat; es nimmt keinen Arbeitsbereich.\n\nEin eigener Status bleibt, bis Sie ihn ändern. Ein von Hand gesetzter cmux-Status wird nicht mehr angezeigt,\nsobald sich ändert, was cmux erkennt, und wieder, sobald cmux denselben Status erneut erkennt. Ein cmux-Status,\nder gesetzt wurde, während ein Agent wartet, verschwindet, wenn dieses Warten endet.\n\nHinweis für Programmier-Agenten: Manuelle Status gehören dem Benutzer; der Status\nverfolgt Ihre Aktivität bereits automatisch. Verwenden Sie `set` oder `cycle` für den\nStatus nur, wenn der Benutzer Sie ausdrücklich darum bittet.\n\nBeispiele:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utilisation : cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nAffiche ou épingle le statut du cycle de vie todo d'un espace de travail. Sans argument, affiche\nle statut effectif, le statut déduit et la surcharge, en ciblant l'\nespace de travail de l'appelant par défaut.\n\nLes colonnes (lanes) sont déduites de signaux en temps réel (l'agent a besoin d'une entrée > agent en cours d'exécution >\nPR ouverte > toutes les PR fusionnées/fermées > arbre git sale > todo). `set <lane>`\népingle une colonne manuelle qui s'efface automatiquement dès que la colonne déduite change ;\n`set auto` efface l'épinglage immédiatement. `cycle` fait avancer la surcharge manuelle\nd'une colonne (todo → working → needs-attention → review → done → todo).\n\nNote pour les agents de codage : les épinglages manuels de statut appartiennent à l'utilisateur ; la colonne\nsuit déjà automatiquement votre activité. Ne définissez pas (`set`) et ne faites pas défiler (`cycle`) le\nstatut à moins que l'utilisateur ne vous le demande explicitement.\n\nColonnes (lanes) : todo, working, needs-attention, review, done\n\nExemples :\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "Utilisation : cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nAffiche ou définit le statut d'un espace de travail. Sans argument, affiche le statut effectif,\nle statut déduit et le statut défini à la main, en ciblant l'espace de travail de l'appelant\npar défaut.\n\nLes statuts sont déduits de signaux en direct (l'agent attend une saisie > l'agent s'exécute >\nPR ouverte > toutes les PR fusionnées/fermées > arbre git modifié > todo). `set <id>` définit un\nstatut à la main : un identifiant de votre liste de statuts (voir `list`) ou l'un de ceux de cmux.\n`set auto` l'efface et `set none` masque le statut. `cycle` passe au statut suivant. `list` affiche votre\nliste de statuts, son origine, si les statuts sont activés et les problèmes éventuels ; elle ne prend pas\nd'espace de travail.\n\nUn statut qui vous est propre reste jusqu'à ce que vous le changiez. Un statut cmux défini à la main cesse\nde s'afficher quand ce que cmux détecte change, et s'affiche de nouveau quand cmux détecte le même statut.\nUn statut cmux défini pendant qu'un agent attend disparaît quand cette attente se termine.\n\nNote pour les agents de code : les statuts manuels appartiennent à l'utilisateur ; le statut\nsuit déjà votre activité automatiquement. N'utilisez pas `set` ni `cycle` sur le\nstatut sauf si l'utilisateur vous le demande explicitement.\n\nExemples :\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الاستخدام: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nعرض حالة دورة حياة المهام لمساحة عمل أو تثبيتها. بدون وسائط، يطبع\nالحالة الفعلية، والحالة المستنتجة، والتجاوز، مستهدفًا\nمساحة عمل المستدعي افتراضيًا.\n\nيتم استنتاج المسارات من الإشارات الحية (الوكيل بحاجة لمدخلات > الوكيل قيد التشغيل >\nطلب سحب مفتوح > تم دمج/إغلاق جميع طلبات السحب > شجرة git غير نظيفة > مهام للقيام بها). `set <lane>`\nيثبت مسارًا يدويًا يُمحى تلقائيًا بمجرد تغير المسار المستنتج؛\n`set auto` يمحو التثبيت فورًا. `cycle` ينقل التجاوز اليدوي\nمسارًا واحدًا إلى الأمام (مهام للقيام بها ← قيد العمل ← بحاجة لاهتمام ← مراجعة ← منجز ← مهام للقيام بها).\n\nملاحظة لوكلاء البرمجة: تثبيتات الحالة اليدوية تخص المستخدم؛ المسار\nيتتبع نشاطك بالفعل وتلقائيًا. لا تقم بـ `set` أو `cycle` لـ\nالحالة ما لم يطلب منك المستخدم ذلك صراحةً.\n\nالمسارات: todo, working, needs-attention, review, done\n\nأمثلة:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "الاستخدام: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nعرض حالة مساحة عمل أو تعيينها. بدون وسائط، يطبع الحالة الفعلية،\nوالحالة المستنتجة، والحالة المعيّنة يدويًا، مستهدفًا\nمساحة عمل المستدعي افتراضيًا.\n\nتُستنتج الحالات من الإشارات الحية (الوكيل بحاجة لمدخلات > الوكيل قيد\nالتشغيل > طلب سحب مفتوح > كل طلبات السحب مدمجة/مغلقة > شجرة git\nمتسخة > todo). يعيّن `set <id>` حالة يدويًا: معرّفًا من قائمة حالاتك\n(انظر `list`) أو إحدى حالات cmux. يمسحها `set auto` ويخفي `set none`\nالحالة. ينتقل `cycle` إلى الحالة التالية. يطبع `list` قائمة حالاتك\nومصدرها وهل الحالات مفعّلة وأي مشكلات فيها؛ ولا يأخذ مساحة عمل.\n\nتبقى حالتك الخاصة حتى تغيّرها. الحالة المعيّنة يدويًا من cmux تتوقف عن الظهور\nعندما يتغير ما تكتشفه cmux، وتظهر ثانية عندما تكتشف cmux الحالة نفسها\nمرة أخرى. وحالة cmux المعيّنة أثناء انتظار وكيل تزول عند انتهاء ذلك الانتظار.\n\nملاحظة لوكلاء البرمجة: الحالات اليدوية ملك للمستخدم؛ والحالة\nتتتبع نشاطك تلقائيًا بالفعل. لا تستخدم `set` أو `cycle` على\nالحالة إلا إذا طلب المستخدم ذلك صراحةً.\n\nأمثلة:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uso: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|índice>] [--window <id|ref|índice>] [--json]\n\nMuestra o fija el estado del ciclo de vida de tareas pendientes de un espacio de trabajo. Sin argumentos, imprime\nel estado efectivo, el estado inferido y la anulación, dirigiéndose al\nespacio de trabajo del llamador por defecto.\n\nLas etapas se infieren de señales en vivo (el agente necesita entrada > agente en ejecución >\nPR abierta > todas las PR fusionadas/cerradas > árbol de git sucio > todo). `set <lane>`\nfija una etapa manual que se limpia automáticamente tan pronto como la etapa inferida cambie;\n`set auto` limpia la fijación inmediatamente. `cycle` avanza la anulación manual\nuna etapa hacia adelante (todo → working → needs-attention → review → done → todo).\n\nNota para agentes de programación: las fijaciones de estado manuales pertenecen al usuario; la etapa\nya realiza un seguimiento de tu actividad automáticamente. No utilices `set` ni `cycle` para el\nestado a menos que el usuario te lo pida explícitamente.\n\nEtapas: todo, working, needs-attention, review, done\n\nEjemplos:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "Uso: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|índice>] [--window <id|ref|índice>] [--json]\n\nMuestra o establece el estado de un espacio de trabajo. Sin argumentos, imprime el estado efectivo,\nel estado inferido y el estado establecido a mano, dirigiéndose al espacio de trabajo\ndel llamador por defecto.\n\nLos estados se infieren de señales en vivo (el agente necesita entrada > el agente se\nejecuta > PR abierta > todas las PR fusionadas/cerradas > árbol git modificado >\ntodo). `set <id>` establece un estado a mano: un id de tu lista de estados (véase `list`)\no uno de los de cmux. `set auto` lo borra y `set none` oculta el estado. `cycle`\npasa al siguiente estado. `list` imprime tu lista de estados, de dónde viene, si los\nestados están activados y los problemas que tenga; no admite un espacio de trabajo.\n\nUn estado propio se queda hasta que lo cambies. Un estado de cmux establecido a mano deja de mostrarse\ncuando cambia lo que cmux detecta, y vuelve a mostrarse cuando cmux detecta de nuevo el mismo estado.\nUn estado de cmux establecido mientras un agente espera desaparece cuando termina esa espera.\n\nNota para agentes de programación: los estados manuales pertenecen al usuario; el estado\nya sigue tu actividad automáticamente. No uses `set` ni `cycle` sobre el\nestado a menos que el usuario te lo pida explícitamente.\n\nEjemplos:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\n顯示或釘選工作區的待辦生命週期狀態。不帶參數時會列印\n有效狀態、推導狀態以及覆寫狀態，預設目標為\n呼叫端的工作區。\n\n泳道是根據即時訊號推導而來（代理程式需要輸入 > 代理程式執行中 >\n開啟的 PR > 所有 PR 已合併/關閉 > 未提交變更的 git 樹 > 待辦）。`set <lane>`\n會釘選一個手動泳道，在推導泳道變更時該泳道會自動清除；\n`set auto` 會立即清除釘選。`cycle` 會將手動覆寫向\n前推進一個泳道（待辦 → 進行中 → 需要關注 → 審查 → 完成 → 待辦）。\n\n開發代理程式注意事項：手動狀態釘選屬於使用者；泳道\n已自動追蹤您的活動。除非使用者明確要求，否則請勿 `set` 或 `cycle`\n此狀態。\n\n泳道：todo, working, needs-attention, review, done\n\n範例：\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "用法: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\n顯示或設定工作區的狀態。不帶參數時會\n列印有效狀態、推導狀態，以及手動設\n定的狀態，預設目標為呼叫端的工作區。\n\n狀態是根據即時訊號推導而來（代理程式需要輸入 > 代理程式執行中 > 開啟的 PR\n> 所有 PR 已合併/關閉 > 未提交變更的 git 樹 >\n待辦）。`set <id>` 會手動設定狀態：可以是你的狀態清單中的 id（見 `list`），也可以是\ncmux 內建的狀態。`set auto` 會清除它，`set none`\n會隱藏狀態。`cycle` 會切換到下一個狀態。`list`\n會列印你的狀態清單、它的來源、狀態功能是否開啟，以及清單中的問題；它不接受工作區參數。\n\n你自己的狀態會一直保留，直到你變更它。手動設定的 cmux 狀態會在\ncmux 偵測到的狀態改變時停止顯示，並在 cmux\n再次偵測到同一狀態時重新顯示。代理程式等待期間設定的 cmux 狀態，會在該次等待結束時消失。\n\n給程式設計代理程式的注意事項：手動設定的狀態屬於使用者；狀態\n已會自動追蹤你的活動。除非使用者明確要求，否則不要對\n狀態執行 `set` 或 `cycle`。\n\n範例:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\n显示或固定工作区的 todo 生命周期状态。在不带参数时会打印\n生效状态、推断状态和覆盖状态，默认指向\n调用者的工作区。\n\n泳道是通过实时信号推断出的（智能体需要输入 > 智能体运行中 >\n开启的 PR > 所有 PR 已合并/关闭 > dirty git 树 > todo）。`set <lane>`\n会固定一个手动泳道，一旦推断的泳道发生变化就会自动清除；\n`set auto` 会立即清除固定。`cycle` 会将手动覆盖\n向前推进一个泳道（todo → working → needs-attention → review → done → todo）。\n\n编程智能体请注意：手动状态固定属于用户；泳道\n已经自动跟踪您的活动。除非用户明确要求，\n否则请不要 `set` 或 `cycle` 该状态。\n\n泳道：todo, working, needs-attention, review, done\n\n示例：\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "用法: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\n显示或设置工作区的状态。在不带参数时\n会打印生效状态、推断状态，以及手动\n设置的状态，默认指向调用者的工作区。\n\n状态是通过实时信号推断出的（智能体需要输入 > 智能体运行中 > 开启的 PR >\n所有 PR 已合并/关闭 > dirty git 树 > todo）。`set <id>`\n会手动设置状态：可以是你的状态列表中的 id（见 `list`），也可以是\ncmux 内置的状态。`set auto` 会清除它，`set none`\n会隐藏状态。`cycle` 会切换到下一个状态。`list`\n会打印你的状态列表、它的来源、状态功能是否开启，以及列表中的问题；它不接受工作区参数。\n\n你自己的状态会一直保留，直到你更改它。手动设置的 cmux 状态会在\ncmux 检测到的状态变化时停止显示，并在 cmux\n再次检测到同一状态时重新显示。智能体等待期间设置的 cmux 状态，会在该次等待结束时消失。\n\n给编码智能体的说明：手动设置的状态属于用户；状态\n已会自动跟踪你的活动。除非用户明确要求，否则不要对\n状态执行 `set` 或 `cycle`。\n\n示例:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사용법: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\n작업 공간의 할 일 생명주기 상태를 표시하거나 고정합니다. 인자 없이 실행하면\n유효 상태, 추론 상태 및 재정의 상태를 출력하며, 기본적으로 호출자의\n작업 공간을 대상으로 합니다.\n\n단계(lane)는 라이브 신호(에이전트 입력 필요 > 에이전트 실행 중 >\n열려 있는 PR > 모든 PR 병합/종료 > 수정 사항이 있는 git 트리 > 할 일)로부터 추론됩니다. `set <lane>`은(는)\n추론된 단계가 변경되는 즉시 자동으로 해제되는 수동 단계를 고정합니다.\n`set auto`는 고정을 즉시 해제합니다. `cycle`은 수동 재정의를\n한 단계 앞으로 이동시킵니다 (todo → working → needs-attention → review → done → todo).\n\n코딩 에이전트 참고 사항: 수동 상태 고정은 사용자의 소유이며, 단계는\n이미 에이전트의 활동을 자동으로 추적하고 있습니다. 사용자가 명시적으로\n요청하지 않는 한 상태를 `set`하거나 `cycle`하지 마십시오.\n\n단계: todo, working, needs-attention, review, done\n\n예시:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2"
+            "value": "사용법: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\n작업 공간의 상태를 표시하거나 설정합니다. 인자 없이\n실행하면 유효 상태, 추론 상태, 직접 설정한 상태를 출력하며,\n기본적으로 호출자의 작업 공간을 대상으로 합니다.\n\n상태는 라이브 신호(에이전트 입력 필요 > 에이전트 실행 중 > 열려 있는 PR > 모든\nPR 병합/종료 > 수정 사항이 있는 git 트리 > 할 일)로부터 추론됩니다.\n`set <id>`는 상태를 직접 설정합니다. 내 상태 목록의 id(`list` 참고) 또는\ncmux 기본 상태를 쓸 수 있습니다. `set auto`는 설정을 지우고 `set none`은\n상태를 숨깁니다. `cycle`은 다음 상태로 넘깁니다. `list`는 내 상태 목록,\n출처, 상태 기능이 켜져 있는지, 목록의 문제를 출력하며 작업 공간을 받지 않습니다.\n\n내 상태는 바꾸기 전까지 유지됩니다. 직접 설정한 cmux 상태는 cmux가 감지하는\n상태가 바뀌면 표시되지 않고, cmux가 같은 상태를 다시 감지하면 다시\n표시됩니다. 에이전트가 대기하는 동안 설정한 cmux 상태는 그 대기가 끝나면 사라집니다.\n\n코딩 에이전트를 위한 참고: 직접 설정한 상태는 사용자의 것입니다. 상태는\n이미 에이전트의 활동을 자동으로 추적합니다. 사용자가 명시적으로 요청하지 않는 한\n상태에 `set` 또는 `cycle`을 사용하지 마세요.\n\n예시:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status list --json\n  cmux workspace status set auto --workspace workspace:2"
           }
         }
       }
@@ -412968,6 +412968,65 @@
         }
       }
     },
+    "sidebar.status.notInList": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · not in your list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · リストにありません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · 不在你的列表中"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · nicht in Ihrer Liste"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · pas dans votre liste"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · ليس في قائمتك"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · no está en tu lista"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · 不在你的清單中"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · 내 목록에 없음"
+          }
+        }
+      }
+    },
     "sidebar.status.review": {
       "extractionState": "manual",
       "localizations": {
@@ -413259,6 +413318,1131 @@
           "stringUnit": {
             "state": "translated",
             "value": "일하고 있는"
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open cmux.json"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json を開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json 열기"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 cmux.json"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟 cmux.json"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json öffnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir cmux.json"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "فتح cmux.json"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir cmux.json"
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.pill": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld file problem"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld file problems"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ファイルの問題 %lld 件"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "파일 문제 %lld개"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld 个文件问题"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld 個檔案問題"
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Dateiproblem"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Dateiprobleme"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problème de fichier"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld de problèmes de fichier"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problèmes de fichier"
+                }
+              }
+            }
+          }
+        },
+        "ar": {
+          "variations": {
+            "plural": {
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلة في الملف"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مشكلة واحدة في الملف (%lld)"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مشكلتان في الملف (%lld)"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلات في الملف"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلة في الملف"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلة في الملف"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problema de archivo"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld de problemas de archivo"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problemas de archivo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.pill.accessibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problem in cmux.json"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problems in cmux.json"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "cmux.json に問題が %lld 件あります"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "cmux.json에 문제 %lld개"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "cmux.json 中有 %lld 个问题"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "cmux.json 中有 %lld 個問題"
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Problem in cmux.json"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld Probleme in cmux.json"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problème dans cmux.json"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld de problèmes dans cmux.json"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problèmes dans cmux.json"
+                }
+              }
+            }
+          }
+        },
+        "ar": {
+          "variations": {
+            "plural": {
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلة في cmux.json"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مشكلة واحدة في cmux.json (%lld)"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مشكلتان في cmux.json (%lld)"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلات في cmux.json"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلة في cmux.json"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مشكلة في cmux.json"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problema en cmux.json"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld de problemas en cmux.json"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problemas en cmux.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.colorNotInThisApp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” names the color “%2$@”, which this app does not have. Setting this status keeps the workspace’s color."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%1$@」は、このアプリにない色「%2$@」を指定しています。このステータスを設定しても、ワークスペースの色は変わりません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@”이(가) 이 앱에 없는 색 “%2$@”을(를) 지정합니다. 이 상태를 설정해도 작업 공간의 색은 그대로 유지됩니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@”指定的颜色“%2$@”在此应用中不存在。设置此状态时，工作区会保留原来的颜色。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%1$@」指定的顏色「%2$@」在此 App 中不存在。設定此狀態時，工作區會保留原本的顏色。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„%1$@“ nennt die Farbe „%2$@“, die diese App nicht hat. Beim Setzen dieses Status behält der Arbeitsbereich seine Farbe."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "« %1$@ » nomme la couleur « %2$@ », que cette app n’a pas. Définir ce statut conserve la couleur de l’espace de travail."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” يسمّي اللون “%2$@” وهو غير موجود في هذا التطبيق. تعيين هذه الحالة يُبقي لون مساحة العمل كما هو."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«%1$@» nombra el color «%2$@», que esta app no tiene. Definir este estado conserva el color del espacio de trabajo."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.entryNotAnObject": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %lld is not a status entry, so it was skipped."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %lld はステータスの項目ではないため、スキップされました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %lld은(는) 상태 항목이 아니므로 건너뛰었습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 项不是状态条目，已跳过。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 項不是狀態項目，已略過。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %lld ist kein Statuseintrag und wurde übersprungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %lld n’est pas une entrée de statut, elle a donc été ignorée."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %lld ليس إدخال حالة، لذلك تم تخطيه."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %lld no es una entrada de estado, así que se omitió."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.fileNotRead": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json could not be read. Nothing in your status list changed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json を読み込めませんでした。ステータスリストは変更されていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json을 읽을 수 없습니다. 상태 목록은 바뀌지 않았습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 cmux.json。你的状态列表没有任何变化。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法讀取 cmux.json。你的狀態清單沒有任何變更。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json konnte nicht gelesen werden. An Ihrer Statusliste hat sich nichts geändert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire cmux.json. Rien n’a changé dans votre liste de statuts."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّرت قراءة cmux.json. لم يتغيّر شيء في قائمة الحالات لديك."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo leer cmux.json. No cambió nada en tu lista de estados."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.fileNotReadMissing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json is missing. Your status list is kept until the file is back."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json が見つかりません。ファイルが戻るまでステータスリストは保持されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json이 없습니다. 파일이 돌아올 때까지 상태 목록은 유지됩니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 cmux.json。在文件恢复之前，你的状态列表会保留。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 cmux.json。在檔案恢復之前，你的狀態清單會保留。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json fehlt. Ihre Statusliste bleibt erhalten, bis die Datei wieder da ist."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json est introuvable. Votre liste de statuts est conservée jusqu’au retour du fichier."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الملف cmux.json غير موجود. تبقى قائمة الحالات لديك محفوظة إلى أن يعود الملف."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falta cmux.json. Tu lista de estados se conserva hasta que el archivo vuelva."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.noExtends": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %1$lld, “%2$@”, has no “extends”, so it was skipped. Check how the key is spelled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %1$lld「%2$@」には「extends」がないため、スキップされました。キーの綴りを確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %1$lld “%2$@”에 “extends”가 없어 건너뛰었습니다. 키의 철자를 확인하세요."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 项“%2$@”没有“extends”，已跳过。请检查该键的拼写。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 項「%2$@」沒有「extends」，已略過。請檢查該鍵的拼寫。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %1$lld, „%2$@“, hat kein „extends“ und wurde übersprungen. Prüfen Sie, wie der Schlüssel geschrieben ist."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %1$lld, « %2$@ », n’a pas de « extends », elle a donc été ignorée. Vérifiez l’orthographe de la clé."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %1$lld، ‏“%2$@”، بلا “extends”، لذلك تم تخطيه. تحقق من طريقة كتابة المفتاح."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %1$lld, «%2$@», no tiene «extends», así que se omitió. Revisa cómo está escrita la clave."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.noId": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %lld has no id, so it was skipped."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %lld には id がないため、スキップされました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %lld에 id가 없어 건너뛰었습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 项没有 id，已跳过。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 項沒有 id，已略過。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %lld hat keine id und wurde übersprungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %lld n’a pas d’id, elle a donc été ignorée."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %lld بلا id، لذلك تم تخطيه."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %lld no tiene id, así que se omitió."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.noName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %1$lld, “%2$@”, has no name, so it was skipped."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %1$lld「%2$@」には名前がないため、スキップされました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %1$lld “%2$@”에 이름이 없어 건너뛰었습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 项“%2$@”没有名称，已跳过。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 項「%2$@」沒有名稱，已略過。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %1$lld, „%2$@“, hat keinen Namen und wurde übersprungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %1$lld, « %2$@ », n’a pas de nom, elle a donc été ignorée."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %1$lld، ‏“%2$@”، بلا اسم، لذلك تم تخطيه."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %1$lld, «%2$@», no tiene nombre, así que se omitió."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.notAList": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses is not a list. Nothing in your status list changed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses はリストではありません。ステータスリストは変更されていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses가 목록이 아닙니다. 상태 목록은 바뀌지 않았습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses 不是列表。你的状态列表没有任何变化。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses 不是清單。你的狀態清單沒有任何變更。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses ist keine Liste. An Ihrer Statusliste hat sich nichts geändert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses n’est pas une liste. Rien n’a changé dans votre liste de statuts."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses ليست قائمة. لم يتغيّر شيء في قائمة الحالات لديك."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "workspaceStatuses no es una lista. No cambió nada en tu lista de estados."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.repeatedId": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %1$lld repeats the id “%2$@”. The first one is kept, and this one was skipped."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %1$lld は id「%2$@」を繰り返しています。最初のものが使われ、この項目はスキップされました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %1$lld이(가) id “%2$@”을(를) 반복합니다. 첫 번째 항목은 유지되고 이 항목은 건너뛰었습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 项重复了 id “%2$@”。保留第一个，这一项已跳过。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 項重複了 id「%2$@」。保留第一個，這一項已略過。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %1$lld wiederholt die id „%2$@“. Der erste bleibt erhalten, dieser wurde übersprungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %1$lld répète l’id « %2$@ ». La première est conservée, celle-ci a été ignorée."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %1$lld يكرّر المعرّف id ‏“%2$@”. يُحتفظ بالأول، وتم تخطي هذا الإدخال."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %1$lld repite el id «%2$@». Se conserva la primera y esta se omitió."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.reservedId": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %1$lld uses the id “%2$@”, which cmux keeps for itself, so it was skipped."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %1$lld は cmux が予約している id「%2$@」を使っているため、スキップされました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %1$lld이(가) cmux가 예약한 id “%2$@”을(를) 사용하므로 건너뛰었습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 项使用了 cmux 自留的 id “%2$@”，已跳过。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 項使用了 cmux 自行保留的 id「%2$@」，已略過。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %1$lld verwendet die id „%2$@“, die cmux für sich behält, und wurde übersprungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %1$lld utilise l’id « %2$@ », que cmux se réserve, elle a donc été ignorée."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %1$lld يستخدم المعرّف id ‏“%2$@” الذي تحتفظ به cmux لنفسها، لذلك تم تخطيه."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %1$lld usa el id «%2$@», que cmux se reserva, así que se omitió."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.unknownExtends": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %1$lld, “%2$@”, extends “%3$@”, which is not a cmux status, so it was skipped. Use todo, working, needs-attention, review or done."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %1$lld「%2$@」は「%3$@」を拡張していますが、これは cmux のステータスではないため、スキップされました。todo、working、needs-attention、review、done のいずれかを使ってください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %1$lld “%2$@”이(가) cmux 상태가 아닌 “%3$@”을(를) 확장하므로 건너뛰었습니다. todo, working, needs-attention, review, done 중 하나를 사용하세요."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 项“%2$@”扩展了“%3$@”，它不是 cmux 状态，已跳过。请使用 todo、working、needs-attention、review 或 done。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 項「%2$@」擴充了「%3$@」，它不是 cmux 狀態，已略過。請使用 todo、working、needs-attention、review 或 done。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %1$lld, „%2$@“, erweitert „%3$@“, das kein cmux-Status ist, und wurde übersprungen. Verwenden Sie todo, working, needs-attention, review oder done."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %1$lld, « %2$@ », étend « %3$@ », qui n’est pas un statut cmux, elle a donc été ignorée. Utilisez todo, working, needs-attention, review ou done."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %1$lld، ‏“%2$@”، يمتدّ من “%3$@” وهي ليست حالة في cmux، لذلك تم تخطيه. استخدم todo أو working أو needs-attention أو review أو done."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %1$lld, «%2$@», extiende «%3$@», que no es un estado de cmux, así que se omitió. Usa todo, working, needs-attention, review o done."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problems in your status list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ステータスリストの問題"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "상태 목록의 문제"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态列表中的问题"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "狀態清單中的問題"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Probleme in Ihrer Statusliste"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problèmes dans votre liste de statuts"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مشكلات في قائمة الحالات لديك"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problemas en tu lista de estados"
           }
         }
       }

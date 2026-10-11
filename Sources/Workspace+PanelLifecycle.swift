@@ -31,7 +31,10 @@ extension Workspace {
 
     var agentLifecycleStatesByPanelId: [UUID: [String: AgentHibernationLifecycleState]] {
         get { sidebarAgentRuntimeObservation.agentLifecycleStatesByPanelId }
-        set { sidebarAgentRuntimeObservation.setAgentLifecycleStatesByPanelId(newValue) }
+        set {
+            sidebarAgentRuntimeObservation.setAgentLifecycleStatesByPanelId(newValue)
+            endWaitIfNoAgentWaits() // (#cm-109)
+        }
     }
 
     /// Returns exact-session runtime identities that still match their recorded process generation.

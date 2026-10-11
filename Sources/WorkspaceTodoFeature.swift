@@ -52,18 +52,12 @@ enum WorkspaceTodoFeature {
 /// mark the feature used on success.
 @MainActor
 enum WorkspaceTodoActions {
-    /// Applies a manual status override (`nil` returns the status to
-    /// automatic) to every target workspace.
-    static func applyStatusOverride(_ status: WorkspaceTaskStatus?, to workspaces: [Workspace]) {
-        guard WorkspaceTodoFeature.isEnabled else { return }
+    /// Applies what a pick asked for to every target workspace, through the one write path, which also writes the
+    /// status's color. (#cm-109)
+    static func applyStatusOverride(_ action: WorkspaceStatusPickAction, to workspaces: [Workspace]) {
         guard !workspaces.isEmpty else { return }
-        for workspace in workspaces {
-            if let status {
-                workspace.setTaskStatusOverride(status)
-            } else {
-                workspace.clearTaskStatusOverride()
-            }
-        }
+        let result = WorkspaceStatusActions.app().apply(action, to: workspaces, requireControls: true)
+        guard result == .set else { return }
         WorkspaceTodoFeature.markUsed()
     }
 

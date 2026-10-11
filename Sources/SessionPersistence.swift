@@ -1970,6 +1970,8 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
     /// (the `groupId` back-compat pattern); bridging to/from live `WorkspaceTodoState` lives in `SessionPersistence+Todos.swift`.
     var taskStatusOverride: String? = nil
     var taskStatusInferredAtOverride: String? = nil
+    /// His own status id (`workspaceStatuses`), or absent. A cmux status stays in the pair above. (#cm-109)
+    var taskStatusOwnID: String? = nil
     /// `true` when the workspace opted out of the status feature (None); absent for the default (feature engaged), so old manifests decode unchanged.
     var taskStatusHidden: Bool? = nil
     var checklist: [SessionChecklistItemSnapshot]? = nil

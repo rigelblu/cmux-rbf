@@ -17,6 +17,9 @@ final class WorkspaceTodoState: ObservableObject {
     /// Carries the inference recorded at override time so a stale override
     /// auto-expires (see `WorkspaceTaskStatusOverride.effectiveStatus`).
     @Published var statusOverride: WorkspaceTaskStatusOverride?
+    /// One of his own statuses, from the `workspaceStatuses` list, or `nil`. Never set together with
+    /// `statusOverride`, which stays the only home of a cmux status set by hand. (#cm-109)
+    @Published var ownStatus: WorkspaceOwnStatus?
     /// When true, this workspace opts out of the status feature: no glyph is
     /// drawn before the title (a "None" state, distinct from Auto which still
     /// infers and shows a glyph). Selecting Auto or any lane clears it.
