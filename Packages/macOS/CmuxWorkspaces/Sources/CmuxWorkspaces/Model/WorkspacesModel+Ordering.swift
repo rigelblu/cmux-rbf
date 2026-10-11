@@ -310,7 +310,7 @@ extension WorkspacesModel {
         if workspace.isPinned {
             return min(clamped, max(0, pinnedCount - 1))
         }
-        return max(clamped, pinnedCount)
+        return min(max(clamped, pinnedCount), tabs.count - 1) // when every row is pinned, a plain `pinnedCount` is one past the end after the row is taken out
     }
 
     /// The in-group clamp for a non-anchor member reorder, or `nil` when the
