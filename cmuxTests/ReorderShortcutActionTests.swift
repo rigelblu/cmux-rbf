@@ -131,6 +131,23 @@ struct ReorderShortcutActionTests {
         #expect(manager.tabs.map(\.id) == [secondPinned.id, firstPinned.id, secondUnpinned.id, firstUnpinned.id])
     }
 
+    @Test func movingTheWorkspaceBehindAPinnedGroupsNameInAWindowOfOnlyPinnedRowsDoesNotCrash() throws {
+        let manager = TabManager()
+        let loose = manager.tabs[0]
+        manager.setPinned(loose, pinned: true)
+        let groupId = try #require(manager.createWorkspaceGroup(name: "G"))
+        manager.setWorkspaceGroupPinned(groupId: groupId, isPinned: true)
+        let anchorId = try #require(manager.workspaceGroups.first { $0.id == groupId }?.liveAnchorWorkspaceId)
+        let anchor = try #require(manager.tabs.first { $0.id == anchorId })
+        let ids = Set(manager.tabs.map(\.id))
+        manager.selectWorkspace(anchor)
+        #expect(manager.moveSelectedWorkspace(by: 1))
+        #expect(Set(manager.tabs.map(\.id)) == ids)
+        #expect(manager.moveSelectedWorkspace(by: -1))
+        #expect(Set(manager.tabs.map(\.id)) == ids)
+        #expect(manager.selectedTabId == anchorId)
+    }
+
     @Test func movementActionsArePublicAndHaveAlignedCollisionFreeDefaults() throws {
         let actions: [KeyboardShortcutSettings.Action] = [
             .moveSurfaceLeft,
