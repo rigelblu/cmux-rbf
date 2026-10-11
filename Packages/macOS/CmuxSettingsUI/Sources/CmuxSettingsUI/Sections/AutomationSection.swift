@@ -23,6 +23,7 @@ public struct AutomationSection: View {
     @State private var geminiModel: DefaultsValueModel<Bool>
     @State private var kiroModel: DefaultsValueModel<Bool>
     @State private var kiroLevelModel: DefaultsValueModel<String>
+    @State private var figmaFolderModel: JSONValueModel<String>
     @State private var portBaseModel: DefaultsValueModel<Int>
     @State private var portRangeModel: DefaultsValueModel<Int>
     @State private var socketPasswordDraft: String = ""
@@ -72,6 +73,11 @@ public struct AutomationSection: View {
         _geminiModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.integrations.geminiHooksEnabled))
         _kiroModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.integrations.kiroHooksEnabled))
         _kiroLevelModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.integrations.kiroNotificationLevel))
+        _figmaFolderModel = State(initialValue: JSONValueModel(
+            store: jsonStore,
+            key: catalog.figma.defaultFolder,
+            errorLog: errorLog
+        ))
         _portBaseModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.automation.portBase))
         _portRangeModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.automation.portRange))
     }
@@ -93,6 +99,7 @@ public struct AutomationSection: View {
             cursorCard
             geminiCard
             kiroCard
+            figmaCard
             portCard
         }
         .confirmationDialog(
@@ -124,7 +131,7 @@ public struct AutomationSection: View {
                 localized: "settings.automation.openAccess.dialog.message",
                 defaultValue: "This disables ancestry and password checks and opens the socket to all local users. Only enable when you understand the risk."
             ))
-        }.task { startSettingsObservation([socketPasswordModel, modeModel, claudeCodeModel, codexModel, claudePathModel, autoNamingModel, autoNamingAgentModel, autoNamingStatusModel, ripgrepPathModel, suppressSubagentModel, ampModel, cursorModel, geminiModel, kiroModel, kiroLevelModel, portBaseModel, portRangeModel]) }
+        }.task { startSettingsObservation([socketPasswordModel, modeModel, claudeCodeModel, codexModel, claudePathModel, autoNamingModel, autoNamingAgentModel, autoNamingStatusModel, ripgrepPathModel, suppressSubagentModel, ampModel, cursorModel, geminiModel, kiroModel, kiroLevelModel, figmaFolderModel, portBaseModel, portRangeModel]) }
     }
 
     @ViewBuilder
@@ -485,6 +492,15 @@ public struct AutomationSection: View {
             }
             SettingsCardDivider()
             SettingsCardNote(String(localized: "settings.automation.kiro.note", defaultValue: "Hooks must be installed with `cmux hooks kiro install`, then run Kiro with `kiro-cli chat --agent cmux` (or set it as your default agent). They no-op outside cmux terminals."))
+        }
+    }
+
+    /// The card `cm-73.7` later adds its `Figma Profile` row to. It has no title:
+    /// no Settings card has one, and the row titles say "Figma".
+    @ViewBuilder
+    private var figmaCard: some View {
+        SettingsCard {
+            FigmaDefaultFolderRow(model: figmaFolderModel, controlWidth: Self.columnWidth)
         }
     }
 

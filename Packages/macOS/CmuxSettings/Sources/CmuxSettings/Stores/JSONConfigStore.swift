@@ -109,6 +109,46 @@ public actor JSONConfigStore {
         return Value.decodeFromJSON(raw) ?? key.defaultValue
     }
 
+    /// Reads the whole config root straight from disk and says why it could
+    /// not, where ``value(for:)`` and ``snapshotValue(for:)`` answer the key's
+    /// default.
+    ///
+    /// A missing or empty file is an empty root, as it is for every other read.
+    /// A file that cannot be opened throws ``JSONConfigStoreStrictReadError/unreadable(reason:)``
+    /// with the system's reason; one that opens and does not parse as JSON (comments
+    /// allowed), or whose top level is not an object, throws
+    /// ``JSONConfigStoreStrictReadError/notValidJSON``. Like ``snapshotValue(for:)`` it
+    /// reads the file itself, does not use the actor's cache, and follows a
+    /// symlinked `cmux.json` to its target.
+    ///
+    /// An addition beside the existing reads: it changes nothing they return.
+    ///
+    /// A file holding only spaces or line breaks is not valid JSON here, as it is not
+    /// for a write; only a file of zero bytes is an empty root.
+    ///
+    /// - Returns: The parsed top-level object, or an empty object when there is no file
+    ///   or it has zero bytes.
+    /// - Throws: ``JSONConfigStoreStrictReadError/unreadable(reason:)`` when the file
+    ///   cannot be opened, ``JSONConfigStoreStrictReadError/notValidJSON`` when it opens
+    ///   and does not parse to an object.
+    public nonisolated func strictRoot() throws -> [String: Any] {
+        let url = Self.resolvedWriteURL(for: fileURL)
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain
+            && error.code == NSFileReadNoSuchFileError {
+            return [:]
+        } catch {
+            throw JSONConfigStoreStrictReadError.unreadable(reason: error.localizedDescription)
+        }
+        do {
+            return try decodeRoot(data)
+        } catch {
+            throw JSONConfigStoreStrictReadError.notValidJSON
+        }
+    }
+
     /// Writes a value for the key.
     ///
     /// Creates the parent directory and the file if missing.
@@ -277,6 +317,12 @@ public actor JSONConfigStore {
             && error.code == NSFileReadNoSuchFileError {
             return [:]
         }
+        return try decodeRoot(data)
+    }
+
+    /// The part of the read that follows the file's bytes, shared with
+    /// ``strictRoot()`` so the two cannot disagree about what parses.
+    private nonisolated func decodeRoot(_ data: Data) throws -> [String: Any] {
         if data.isEmpty { return [:] }
         let sanitized = try sanitizer.sanitize(data)
         let object = try JSONSerialization.jsonObject(with: sanitized, options: [])

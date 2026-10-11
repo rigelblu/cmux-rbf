@@ -1701,6 +1701,8 @@
 		807300000000000000000003 /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
 		807300000000000000000005 /* FigmaPaneURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000004 /* FigmaPaneURLTests.swift */; };
 		807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000013 /* FigmaFileLinkTests.swift */; };
+		8073000000000000000000F2 /* FigmaDefaultFolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073000000000000000000F1 /* FigmaDefaultFolderTests.swift */; };
+		8073000000000000000000F4 /* FigmaFolderCLITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073000000000000000000F3 /* FigmaFolderCLITests.swift */; };
 		807300000000000000000022 /* FigmaCLIOutputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000021 /* FigmaCLIOutputTests.swift */; };
 		807300000000000000000016 /* FigmaWrapperPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000015 /* FigmaWrapperPageTests.swift */; };
 		807300000000000000000018 /* FigmaCLIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000017 /* FigmaCLIRules.swift */; };
@@ -5629,6 +5631,8 @@
 		80730000000000000000000F /* FigmaFileLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLink.swift; sourceTree = "<group>"; };
 		807300000000000000000004 /* FigmaPaneURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneURLTests.swift; sourceTree = "<group>"; };
 		807300000000000000000013 /* FigmaFileLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLinkTests.swift; sourceTree = "<group>"; };
+		8073000000000000000000F1 /* FigmaDefaultFolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaDefaultFolderTests.swift; sourceTree = "<group>"; };
+		8073000000000000000000F3 /* FigmaFolderCLITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFolderCLITests.swift; sourceTree = "<group>"; };
 		807300000000000000000021 /* FigmaCLIOutputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIOutputTests.swift; sourceTree = "<group>"; };
 		807300000000000000000015 /* FigmaWrapperPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPageTests.swift; sourceTree = "<group>"; };
 		807300000000000000000017 /* FigmaCLIRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIRules.swift; sourceTree = "<group>"; };
@@ -11298,6 +11302,8 @@
 				80730000000000000000000B /* FigmaEditorChromeTests.swift */,
 				807300000000000000000004 /* FigmaPaneURLTests.swift */,
 				807300000000000000000013 /* FigmaFileLinkTests.swift */,
+				8073000000000000000000F1 /* FigmaDefaultFolderTests.swift */,
+				8073000000000000000000F3 /* FigmaFolderCLITests.swift */,
 				807300000000000000000021 /* FigmaCLIOutputTests.swift */,
 				807300000000000000000015 /* FigmaWrapperPageTests.swift */,
 				80730000000000000000001A /* FigmaCLIRulesTests.swift */,
@@ -15766,6 +15772,8 @@
 				807300000000000000000012 /* FigmaFileLink.swift in Sources */,
 				807300000000000000000005 /* FigmaPaneURLTests.swift in Sources */,
 				807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */,
+				8073000000000000000000F2 /* FigmaDefaultFolderTests.swift in Sources */,
+				8073000000000000000000F4 /* FigmaFolderCLITests.swift in Sources */,
 				807300000000000000000022 /* FigmaCLIOutputTests.swift in Sources */,
 				807300000000000000000016 /* FigmaWrapperPageTests.swift in Sources */,
 				807300000000000000000019 /* FigmaCLIRules.swift in Sources */,

@@ -36,6 +36,8 @@ public struct SettingCatalog: SettingCatalogSection {
     public let automation = AutomationCatalogSection()
     /// Settings for the local computer-use MCP integration and its menu-bar UI.
     public let computerUse = ComputerUseCatalogSection()
+    /// Settings for the Figma design pane (the `figma.*` keys).
+    public let figma = FigmaCatalogSection()
     public let browser = BrowserCatalogSection()
     /// Settings for the built-in markdown viewer (the `markdown.*` keys).
     public let markdown = MarkdownCatalogSection()

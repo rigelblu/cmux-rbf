@@ -755,8 +755,8 @@ struct FigmaCLIOutputTests {
         let cases: [(arguments: [String], message: String)] = [
             (["figma", "open"], "cmux figma open requires a Figma file URL"),
             (["figma", "goto"], "cmux figma goto requires a node id"),
-            (["figma"], "cmux figma requires a subcommand: open, goto"),
-            (["figma", "bogus"], "unknown cmux figma subcommand 'bogus' (expected open, goto)"),
+            (["figma"], "cmux figma requires a subcommand: open, goto, folder"),
+            (["figma", "bogus"], "unknown cmux figma subcommand 'bogus' (expected open, goto, folder)"),
             (["figma", "goto", "12-2", "--surface"], "--surface requires a value")
         ]
         for testCase in cases {
@@ -853,7 +853,7 @@ struct FigmaCLIOutputTests {
     func helpPrintsWithNoSocket() throws {
         let run = try drive(["figma", "--help"], listening: false)
         #expect(run.status == 0, "\(run.stderr)")
-        #expect(run.stdout.hasPrefix("cmux figma\n\nUsage: cmux figma <open|goto>"), "\(run.stdout)")
+        #expect(run.stdout.hasPrefix("cmux figma\n\nUsage: cmux figma <open|goto|folder>"), "\(run.stdout)")
         for phrase in ["cmux browser click", "node-id=0-1", "no address bar", "does not count", "--workspace", "12-2", "12:2"] {
             #expect(run.stdout.contains(phrase), "\(phrase)")
         }

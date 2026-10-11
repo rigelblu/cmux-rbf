@@ -1,3 +1,4 @@
+import CmuxSettings
 import Foundation
 
 extension CMUXCLI {
@@ -23,7 +24,7 @@ extension CMUXCLI {
     ) throws {
         var args = commandArgs
         guard !args.isEmpty else {
-            throw CLIError(message: "cmux figma requires a subcommand: open, goto")
+            throw CLIError(message: "cmux figma requires a subcommand: open, goto, folder")
         }
         let subcommand = args.removeFirst().lowercased()
         if ["help", "--help", "-h"].contains(subcommand) {
@@ -32,7 +33,7 @@ extension CMUXCLI {
         }
 
         guard subcommand == "open" || subcommand == "goto" else {
-            throw CLIError(message: "unknown cmux figma subcommand '\(subcommand)' (expected open, goto)")
+            throw CLIError(message: "unknown cmux figma subcommand '\(subcommand)' (expected open, goto, folder)")
         }
         let parsed: FigmaArguments.Parsed
         do {
@@ -57,6 +58,111 @@ extension CMUXCLI {
                 jsonOutput: jsonOutput,
                 idFormat: idFormat
             )
+        }
+    }
+
+    // MARK: - folder
+
+    /// `cmux figma folder`, `folder set <folder-url>` and `folder clear`.
+    ///
+    /// **No socket and no app.** The folder is one string in `cmux.json`, so
+    /// these read and write the file from this process, as
+    /// `cmux window default-display` does, and `run()` dispatches them before it
+    /// resolves a socket. `open` and `goto` still need the app.
+    ///
+    /// **An agent never reads a broken setting as "not set".** The read goes
+    /// through ``JSONConfigStore/strictRoot()``, which says why a file could not
+    /// be read, and a stored value that is not text, or a link that no longer
+    /// passes, is exit 1 with the fix named. `set` writes over a broken value at
+    /// the key, which is what the `Fix it:` line promises, and stops on a file
+    /// that is not valid JSON, because the strict read runs before any write.
+    func runFigmaFolderCommand(commandArgs: [String], jsonOutput: Bool) async throws {
+        let action: FigmaFolderArguments.Action
+        do {
+            action = try FigmaFolderArguments.parse(commandArgs)
+        } catch let failure as FigmaFolderArguments.Failure {
+            throw CLIError(message: failure.message)
+        }
+
+        let store = JSONConfigStore(fileURL: CmuxConfigLocation().userConfigFile)
+        let key = SettingCatalog().figma.defaultFolder
+        let path = store.fileURL.path
+
+        let root: [String: Any]
+        do {
+            root = try store.strictRoot()
+        } catch JSONConfigStoreStrictReadError.notValidJSON {
+            throw CLIError(message: "could not read \(path): it is not valid JSON.")
+        } catch JSONConfigStoreStrictReadError.unreadable(let reason) {
+            throw CLIError(message: "could not read \(path): \(reason)")
+        }
+
+        func folderJSON(_ link: FigmaFolderLink?) -> String {
+            guard let link else { return jsonString(["default_folder": NSNull()]) }
+            return jsonString([
+                "default_folder": [
+                    "project_id": link.projectId,
+                    "plan_key": link.planKey,
+                    "url": link.url
+                ]
+            ])
+        }
+
+        let folder = FigmaDefaultFolder(root: root)
+
+        switch action {
+        case .read:
+            switch folder.state {
+            case .notSet:
+                print(jsonOutput ? folderJSON(nil) : FigmaFolderText.notSet)
+            case .set(let link):
+                print(jsonOutput
+                    ? folderJSON(link)
+                    : FigmaFolderText.read(projectId: link.projectId, planKey: link.planKey, url: link.url))
+            case .refused(let refusal):
+                throw CLIError(message: FigmaFolderText.unusable(reason: FigmaFolderText.reason(refusal)))
+            case .notText:
+                throw CLIError(message: FigmaFolderText.unusable(reason: "it is not text."))
+            }
+
+        case .set(let raw):
+            let link: FigmaFolderLink
+            switch FigmaFolderLink.check(raw) {
+            case .success(let checked): link = checked
+            case .failure(let refusal): throw CLIError(message: FigmaFolderText.refusedSet(refusal))
+            }
+            // The value already stored is not written again: the file keeps its
+            // bytes and its modified time.
+            let stored = key.path.lookup(in: root) as? String
+            if stored != link.url {
+                do {
+                    try await store.set(link.url, for: key)
+                } catch {
+                    throw CLIError(message: "could not save to \(path): \(error.localizedDescription)")
+                }
+            }
+            print(jsonOutput
+                ? folderJSON(link)
+                : FigmaFolderText.set(projectId: link.projectId, planKey: link.planKey))
+
+        case .clear:
+            // Nothing is written unless there is something to remove, so a clear with
+            // nothing set never creates the file or strips the comments of one. A `figma`
+            // that is neither an object nor `null` is removed whole: the key cannot be
+            // removed from inside it, and every read would stay broken.
+            do {
+                switch folder.clearAction {
+                case .nothing:
+                    break
+                case .removeKey:
+                    try await store.reset(key)
+                case .removeFigma:
+                    try await store.reset(JSONKey<String>(id: key.path.components[0], defaultValue: ""))
+                }
+            } catch {
+                throw CLIError(message: "could not save to \(path): \(error.localizedDescription)")
+            }
+            print(jsonOutput ? folderJSON(nil) : FigmaFolderText.cleared)
         }
     }
 

@@ -147,6 +147,14 @@ Reply panel settings — the right sidebar's Reply mode. Top-level rather than u
 |---|---|---|---|
 | `reply.maxMessagesBack` | integer | `5` | How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable. |
 
+## figma
+
+Figma settings — the folder new designs an agent creates should go to. Top-level, like `reply`. Settings > Automation > Figma Default Folder edits it, and `cmux figma folder` reads and writes it with no app running.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `figma.defaultFolder` | string | `""` | Link to the Figma folder where new designs your agent creates should go. Use the link from Figma's address bar on the folder's page. Agents read it with "cmux figma folder". |
+
 ## shortcuts
 
 Keyboard shortcut settings from Settings > Keyboard Shortcuts.

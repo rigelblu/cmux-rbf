@@ -312368,6 +312368,1131 @@
         }
       }
     },
+    "settings.automation.figma.defaultFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مجلد Figma الافتراضي"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zadani Figma folder"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standardmappe i Figma"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma-Standardordner"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma Default Folder"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carpeta predeterminada de Figma"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dossier Figma par défaut"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella Figma predefinita"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma のデフォルトフォルダ"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ថតលំនាំដើមរបស់ Figma"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma 기본 폴더"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standardmappe i Figma"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Domyślny folder Figma"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pasta padrão do Figma"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Папка Figma по умолчанию"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "โฟลเดอร์เริ่มต้นของ Figma"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma Varsayılan Klasörü"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Типова папка Figma"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma 默认文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma 預設資料夾"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الصق رابط مجلد من Figma"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zalijepite link foldera iz Figme"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indsæt et mappelink fra Figma"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordnerlink aus Figma einfügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste a folder link from Figma"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pega un enlace de carpeta de Figma"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collez un lien de dossier depuis Figma"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incolla un link a una cartella di Figma"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma のフォルダのリンクを貼り付け"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បិទភ្ជាប់តំណថតពី Figma"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma 폴더 링크를 붙여넣으세요"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lim inn en mappelenke fra Figma"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wklej link do folderu z Figmy"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cole um link de pasta do Figma"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вставьте ссылку на папку из Figma"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "วางลิงก์โฟลเดอร์จาก Figma"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma'dan bir klasör bağlantısı yapıştırın"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вставте посилання на папку з Figma"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粘贴 Figma 的文件夹链接"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "貼上 Figma 的資料夾連結"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.subtitle.notSet": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "غير محدد. التصاميم الجديدة التي ينشئها وكيلك تُحفظ في مسودات Figma الخاصة بك."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nije postavljeno. Novi dizajni koje vaš agent napravi idu u vaše Figma skice."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke angivet. Nye designs, som din agent opretter, havner i dine Figma-kladder."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht festgelegt. Neue Designs, die dein Agent erstellt, landen in deinen Figma-Entwürfen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not set. New designs your agent creates go to your Figma Drafts."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin definir. Los diseños nuevos que crea tu agente van a tus borradores de Figma."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non défini. Les nouveaux designs créés par votre agent vont dans vos brouillons Figma."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non impostata. I nuovi design creati dal tuo agente vanno nelle tue bozze di Figma."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未設定です。エージェントが作成する新しいデザインは、Figma の下書きに保存されます。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "មិនទាន់កំណត់។ ការរចនាថ្មីដែលភ្នាក់ងាររបស់អ្នកបង្កើតនឹងទៅកាន់ព្រាងរបស់ Figma របស់អ្នក។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정되지 않았습니다. 에이전트가 만드는 새 디자인은 Figma 초안으로 저장됩니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke angitt. Nye design som agenten din oppretter, havner i Figma-utkastene dine."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie ustawiono. Nowe projekty tworzone przez agenta trafiają do Twoich szkiców w Figmie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não definida. Os novos designs que seu agente criar vão para seus rascunhos do Figma."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не задана. Новые дизайны, которые создаёт ваш агент, попадают в черновики Figma."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ยังไม่ได้ตั้งค่า ดีไซน์ใหม่ที่เอเจนต์ของคุณสร้างจะไปอยู่ในฉบับร่างของ Figma"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlanmadı. Aracınızın oluşturduğu yeni tasarımlar Figma Taslaklarınıza gider."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не задано. Нові дизайни, які створює ваш агент, потрапляють у чернетки Figma."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未设置。智能体创建的新设计会保存到你的 Figma 草稿。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未設定。代理程式建立的新設計會儲存到你的 Figma 草稿。"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.subtitle.set": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التصاميم الجديدة التي ينشئها وكيلك تُحفظ في مجلد Figma ‏%@."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novi dizajni koje vaš agent napravi idu u Figma folder %@."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nye designs, som din agent opretter, havner i Figma-mappen %@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neue Designs, die dein Agent erstellt, landen im Figma-Ordner %@."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New designs your agent creates go to Figma folder %@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los diseños nuevos que crea tu agente van a la carpeta de Figma %@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les nouveaux designs créés par votre agent vont dans le dossier Figma %@."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I nuovi design creati dal tuo agente vanno nella cartella Figma %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エージェントが作成する新しいデザインは、Figma フォルダ %@ に保存されます。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ការរចនាថ្មីដែលភ្នាក់ងាររបស់អ្នកបង្កើតនឹងទៅកាន់ថត Figma %@។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "에이전트가 만드는 새 디자인은 Figma 폴더 %@에 저장됩니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nye design som agenten din oppretter, havner i Figma-mappen %@."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nowe projekty tworzone przez agenta trafiają do folderu Figmy %@."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os novos designs que seu agente criar vão para a pasta %@ do Figma."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Новые дизайны, которые создаёт ваш агент, попадают в папку Figma %@."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ดีไซน์ใหม่ที่เอเจนต์ของคุณสร้างจะไปอยู่ในโฟลเดอร์ Figma %@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aracınızın oluşturduğu yeni tasarımlar %@ numaralı Figma klasörüne gider."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нові дизайни, які створює ваш агент, потрапляють у папку Figma %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "智能体创建的新设计会保存到 Figma 文件夹 %@。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理程式建立的新設計會儲存到 Figma 資料夾 %@。"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.subtitle.noTeam": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا يحتوي هذا الرابط على فريق. افتحه في المتصفح وانسخ الرابط من شريط العنوان."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ovaj link ne sadrži tim. Otvorite ga u pregledniku i kopirajte link iz adresne trake."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette link indeholder intet team. Åbn det i din browser, og kopiér linket fra adresselinjen."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Link enthält kein Team. Öffne ihn in deinem Browser und kopiere den Link aus der Adressleiste."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This link has no team in it. Open it in your browser and copy the link from the address bar."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este enlace no incluye un equipo. Ábrelo en tu navegador y copia el enlace de la barra de direcciones."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce lien ne contient pas d'équipe. Ouvrez-le dans votre navigateur et copiez le lien depuis la barre d'adresse."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo link non contiene un team. Aprilo nel browser e copia il link dalla barra degli indirizzi."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリンクにはチームが含まれていません。ブラウザで開き、アドレスバーのリンクをコピーしてください。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "តំណនេះមិនមានក្រុមនៅក្នុងនោះទេ។ បើកវានៅក្នុងកម្មវិធីរុករករបស់អ្នក ហើយចម្លងតំណពីរបារអាសយដ្ឋាន។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 링크에는 팀이 포함되어 있지 않습니다. 브라우저에서 열고 주소 표시줄의 링크를 복사하세요."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne lenken inneholder ikke noe team. Åpne den i nettleseren og kopier lenken fra adressefeltet."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ten link nie zawiera zespołu. Otwórz go w przeglądarce i skopiuj link z paska adresu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este link não tem uma equipe. Abra-o no navegador e copie o link da barra de endereços."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В этой ссылке нет команды. Откройте её в браузере и скопируйте ссылку из адресной строки."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ลิงก์นี้ไม่มีทีมอยู่ในลิงก์ เปิดลิงก์ในเบราว์เซอร์แล้วคัดลอกลิงก์จากแถบที่อยู่"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu bağlantıda ekip yok. Tarayıcınızda açın ve adres çubuğundaki bağlantıyı kopyalayın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У цьому посиланні немає команди. Відкрийте його в браузері та скопіюйте посилання з адресного рядка."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此链接不包含团队。请在浏览器中打开它，并从地址栏复制链接。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此連結不包含團隊。請在瀏覽器中開啟，並從網址列複製連結。"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.subtitle.notAFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذا ليس رابطًا لمجلد في Figma. انسخ الرابط من صفحة المجلد في Figma."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ovo nije link na Figma folder. Kopirajte link sa stranice foldera u Figmi."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er ikke et link til en Figma-mappe. Kopiér linket fra mappens side i Figma."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ist kein Link zu einem Figma-Ordner. Kopiere den Link von der Seite des Ordners in Figma."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is not a link to a Figma folder. Copy the link from the folder's page in Figma."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este no es un enlace a una carpeta de Figma. Copia el enlace desde la página de la carpeta en Figma."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce n'est pas un lien vers un dossier Figma. Copiez le lien depuis la page du dossier dans Figma."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo non è un link a una cartella di Figma. Copia il link dalla pagina della cartella in Figma."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これは Figma フォルダへのリンクではありません。Figma のフォルダのページからリンクをコピーしてください。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "នេះមិនមែនជាតំណទៅកាន់ថត Figma ទេ។ ចម្លងតំណពីទំព័រថតនៅក្នុង Figma។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma 폴더 링크가 아닙니다. Figma의 폴더 페이지에서 링크를 복사하세요."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er ikke en lenke til en Figma-mappe. Kopier lenken fra mappesiden i Figma."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To nie jest link do folderu Figmy. Skopiuj link ze strony folderu w Figmie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este não é um link para uma pasta do Figma. Copie o link da página da pasta no Figma."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Это не ссылка на папку Figma. Скопируйте ссылку со страницы папки в Figma."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "นี่ไม่ใช่ลิงก์ไปยังโฟลเดอร์ Figma คัดลอกลิงก์จากหน้าโฟลเดอร์ใน Figma"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu bir Figma klasörünün bağlantısı değil. Bağlantıyı Figma'da klasörün sayfasından kopyalayın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Це не посилання на папку Figma. Скопіюйте посилання зі сторінки папки у Figma."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这不是 Figma 文件夹的链接。请在 Figma 中从该文件夹的页面复制链接。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這不是 Figma 資料夾的連結。請在 Figma 中從該資料夾的頁面複製連結。"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.subtitle.notSaved.noTeam": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يتم الحفظ. لا يحتوي هذا الرابط على فريق. افتحه في المتصفح وانسخ الرابط من شريط العنوان."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nije sačuvano. Ovaj link ne sadrži tim. Otvorite ga u pregledniku i kopirajte link iz adresne trake."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke gemt. Dette link indeholder intet team. Åbn det i din browser, og kopiér linket fra adresselinjen."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht gespeichert. Dieser Link enthält kein Team. Öffne ihn in deinem Browser und kopiere den Link aus der Adressleiste."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not saved. This link has no team in it. Open it in your browser and copy the link from the address bar."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se guardó. Este enlace no incluye un equipo. Ábrelo en tu navegador y copia el enlace de la barra de direcciones."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non enregistré. Ce lien ne contient pas d'équipe. Ouvrez-le dans votre navigateur et copiez le lien depuis la barre d'adresse."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non salvato. Questo link non contiene un team. Aprilo nel browser e copia il link dalla barra degli indirizzi."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存されませんでした。このリンクにはチームが含まれていません。ブラウザで開き、アドレスバーのリンクをコピーしてください。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "មិនបានរក្សាទុកទេ។ តំណនេះមិនមានក្រុមនៅក្នុងនោះទេ។ បើកវានៅក្នុងកម្មវិធីរុករករបស់អ្នក ហើយចម្លងតំណពីរបារអាសយដ្ឋាន។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장되지 않았습니다. 이 링크에는 팀이 포함되어 있지 않습니다. 브라우저에서 열고 주소 표시줄의 링크를 복사하세요."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke lagret. Denne lenken inneholder ikke noe team. Åpne den i nettleseren og kopier lenken fra adressefeltet."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie zapisano. Ten link nie zawiera zespołu. Otwórz go w przeglądarce i skopiuj link z paska adresu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não salvo. Este link não tem uma equipe. Abra-o no navegador e copie o link da barra de endereços."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не сохранено. В этой ссылке нет команды. Откройте её в браузере и скопируйте ссылку из адресной строки."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไม่ได้บันทึก ลิงก์นี้ไม่มีทีมอยู่ในลิงก์ เปิดลิงก์ในเบราว์เซอร์แล้วคัดลอกลิงก์จากแถบที่อยู่"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydedilmedi. Bu bağlantıda ekip yok. Tarayıcınızda açın ve adres çubuğundaki bağlantıyı kopyalayın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не збережено. У цьому посиланні немає команди. Відкрийте його в браузері та скопіюйте посилання з адресного рядка."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未保存。此链接不包含团队。请在浏览器中打开它，并从地址栏复制链接。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未儲存。此連結不包含團隊。請在瀏覽器中開啟，並從網址列複製連結。"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.subtitle.notSaved.notAFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يتم الحفظ. هذا ليس رابطًا لمجلد في Figma. انسخ الرابط من صفحة المجلد في Figma."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nije sačuvano. Ovo nije link na Figma folder. Kopirajte link sa stranice foldera u Figmi."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke gemt. Dette er ikke et link til en Figma-mappe. Kopiér linket fra mappens side i Figma."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht gespeichert. Das ist kein Link zu einem Figma-Ordner. Kopiere den Link von der Seite des Ordners in Figma."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not saved. This is not a link to a Figma folder. Copy the link from the folder's page in Figma."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se guardó. Este no es un enlace a una carpeta de Figma. Copia el enlace desde la página de la carpeta en Figma."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non enregistré. Ce n'est pas un lien vers un dossier Figma. Copiez le lien depuis la page du dossier dans Figma."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non salvato. Questo non è un link a una cartella di Figma. Copia il link dalla pagina della cartella in Figma."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存されませんでした。これは Figma フォルダへのリンクではありません。Figma のフォルダのページからリンクをコピーしてください。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "មិនបានរក្សាទុកទេ។ នេះមិនមែនជាតំណទៅកាន់ថត Figma ទេ។ ចម្លងតំណពីទំព័រថតនៅក្នុង Figma។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장되지 않았습니다. Figma 폴더 링크가 아닙니다. Figma의 폴더 페이지에서 링크를 복사하세요."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke lagret. Dette er ikke en lenke til en Figma-mappe. Kopier lenken fra mappesiden i Figma."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie zapisano. To nie jest link do folderu Figmy. Skopiuj link ze strony folderu w Figmie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não salvo. Este não é um link para uma pasta do Figma. Copie o link da página da pasta no Figma."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не сохранено. Это не ссылка на папку Figma. Скопируйте ссылку со страницы папки в Figma."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไม่ได้บันทึก นี่ไม่ใช่ลิงก์ไปยังโฟลเดอร์ Figma คัดลอกลิงก์จากหน้าโฟลเดอร์ใน Figma"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydedilmedi. Bu bir Figma klasörünün bağlantısı değil. Bağlantıyı Figma'da klasörün sayfasından kopyalayın."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не збережено. Це не посилання на папку Figma. Скопіюйте посилання зі сторінки папки у Figma."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未保存。这不是 Figma 文件夹的链接。请在 Figma 中从该文件夹的页面复制链接。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未儲存。這不是 Figma 資料夾的連結。請在 Figma 中從該資料夾的頁面複製連結。"
+          }
+        }
+      }
+    },
+    "settings.automation.figma.defaultFolder.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "فتح المجلد في Figma"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otvori folder u Figmi"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åbn mappe i Figma"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordner in Figma öffnen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Folder in Figma"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir carpeta en Figma"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le dossier dans Figma"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri la cartella in Figma"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma でフォルダを開く"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បើកថតក្នុង Figma"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma에서 폴더 열기"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne mappen i Figma"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otwórz folder w Figmie"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir pasta no Figma"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть папку в Figma"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "เปิดโฟลเดอร์ใน Figma"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klasörü Figma'da Aç"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відкрити папку у Figma"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Figma 中打开文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Figma 中開啟資料夾"
+          }
+        }
+      }
+    },
     "settings.automation.claudeCode.customPath": {
       "extractionState": "manual",
       "localizations": {

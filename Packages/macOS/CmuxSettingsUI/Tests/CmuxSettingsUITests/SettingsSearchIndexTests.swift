@@ -109,6 +109,10 @@ struct SettingsSearchIndexTests {
         ("option as alt", "setting:app:terminal-config"),
         ("option", "setting:app:terminal-config"),
         ("environment variables", "setting:app:notification-command"),
+        ("figma", "setting:automation:figma-default-folder"),
+        ("folder", "setting:automation:figma-default-folder"),
+        ("drafts", "setting:automation:figma-default-folder"),
+        ("project", "setting:automation:figma-default-folder"),
     ])
     func searchesFindRealSettingsRows(query: String, expectedID: String) {
         let index = SettingsSearchIndex(catalog: SettingCatalog())
