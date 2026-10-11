@@ -6,6 +6,38 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.32.0 (2026-10-11) — #cm-106.1, #cm-113
+
+*Organize workspace groups inside larger groups while keeping their anchor workspaces.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-11 - feat | organize workspace groups inside larger groups while keeping their anchor workspaces (#cm-106.1). A group header's menu has **Move Group to**, which puts the group inside another group, or back at the top level of the sidebar (**Top Level**). Groups nest to any depth; each depth indents 12 pt more, up to 40% of the sidebar's width. Which group holds which, the order of the rows and each group's collapsed and pinned state come back after a quit and reopen. Full rules: `docs/workspace-groups.md`, "Groups inside groups"
+- A group nests from its menu only. Dragging a header does not put it inside another group; that is a later slice (`#cm-106.2`)
+- A group whose last own workspace closes while it still holds other groups keeps its header. That header draws a dot in the group's color where its icon was, grey with no color, and a click on its name collapses or expands it. The first workspace that joins it becomes its anchor
+- A collapsed parent hides every row inside it at every depth and shows the unread count of all of them. The two **Mark All Workspaces in Group…** commands reach every depth
+
+## 🟠⋯ Changed for End Users
+- A pinned group inside a group sits among that group's pinned rows, not at the top of the sidebar
+- **New Group from Selection** and `⌘⇧G`, given workspaces that sit inside a group, make the new group inside that group. **Remove from Group** moves a workspace up one group
+- The **Delete Group** question counts every workspace that closes, the anchor included, so its number is one higher than before
+- An empty group header that is not pinned now stays after a quit and reopen. Before, only a pinned one did
+
+## 🟠⋯ Fixed for End Users
+- 2026-10-11 - fix | move a pinned group's workspace up or down without the app crashing (#cm-113). **Move Workspace Up** or **Down** on the workspace behind a pinned group's name quit the app when every row in the window was pinned or sat in a pinned group, with two rows or more. The fault is in v0.31.0; versions before it were not checked. A group that holds only its own workspace now goes last among the pinned rows, so **Move Up** on that header can move it down; a group with other workspaces stays where it is. The socket's `workspace.reorder` with `dry_run` no longer reports a `to_index` one past the last row for that case
+
+## 🟠⋯ Improved for Technical Users
+- `cmux workspace-group list --json` gains `parent_group_id`, naming the group that holds each group. `workspace-group create --from`, given workspaces inside a group, makes the new group inside that group, which changes its result for groups that exist today. `workspace-group remove` moves a workspace up one group. `workspace-group delete --close-workspaces` closes every depth
+- Rolling back to an older build keeps every workspace and loses the nesting: groups with a workspace come back at the top level, and a group with no workspace of its own is dropped unless it is pinned. The older build's first save removes the nesting from the saved file. Copy `~/Library/Application Support/cmux/session-<bundle-id>.json` first to keep a file this version can read again
+
+## 🟠⋯ Changed for Developers
+- `make test-packages` runs `swift test` for `CmuxWorkspaces` and `CmuxControlSocket`; `make test` runs neither. `rbf/AGENTS.md`, "Nested workspace groups", lists what nothing runs for you after an upstream sync
+- One upstream test is changed on purpose: `createUnpinnedGroupFromPinnedGroupChildIsMadeInsideThatPinnedGroup` in `cmuxTests/WorkspaceGroupTests.swift`
+
+## 🟠⋯ Not verified in this release
+- Released on Tom's word of 2026-10-11, "Release anyway", with both verification lanes deferred. Of this slice's agent scenarios, 11 pass, 23 ran in part and 10 never ran. Of the eight human scenarios, seven pass on Tom's word in the AppKit sidebar; Scenario 3 failed on 2026-10-06 on a picture of an earlier look, which the dot replaced, and has not been run again
+- Never run: the SwiftUI sidebar list, a Release build, and a drag by hand in the running app. Nobody has reproduced the `#cm-113` crash by hand; Tom ran its one human check on the fixed build on 2026-10-11 and it passed
+- `scripts/check-package-resolved-policy.py` fails on this version and on v0.31.0 with the same single line (`Packages/macOS/Bonsplit/.gitignore`); this release adds no violation (`#cm-118`)
+
 # 🔵⋯ v0.31.0 (2026-10-06) — #cm-112
 
 *See built-in and custom workspace colors in aligned rows.*
