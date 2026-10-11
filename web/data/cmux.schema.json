@@ -1723,6 +1723,21 @@
         }
       }
     },
+    "figma": {
+      "title": "figma",
+      "description": "Figma settings.",
+      "descriptionKey": "schemaDescriptions.figma.description",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultFolder": {
+          "type": "string",
+          "default": "",
+          "description": "Link to the Figma folder where new designs your agent creates should go. Use the link from Figma's address bar on the folder's page. Agents read it with \"cmux figma folder\".",
+          "descriptionKey": "schemaDescriptions.figma.defaultFolder"
+        }
+      }
+    },
     "reply": {
       "title": "reply",
       "description": "Reply panel settings.",

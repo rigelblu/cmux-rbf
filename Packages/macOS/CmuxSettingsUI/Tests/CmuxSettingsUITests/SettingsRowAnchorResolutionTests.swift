@@ -84,6 +84,7 @@ struct SettingsRowAnchorResolutionTests {
         "canvas.snappingEnabled",
         "cloud.beta.machines.enabled",
         "customSidebars.renderer",
+        "figma.defaultFolder",
         "fileEditor.currentLineHighlight",
         "fileEditor.indentGuides",
         "fileEditor.lineNumbers",

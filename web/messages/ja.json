@@ -2425,6 +2425,10 @@
         "diffViewer": {
           "defaultLayout": "新しく開く diff ビューアの既定レイアウトです。ツールバーのレイアウト切り替えはユーザーの最後の選択を保持し、明示的な `cmux diff --layout` オプションはその両方を上書きします。"
         },
+        "figma": {
+          "description": "Figma の設定です。",
+          "defaultFolder": "エージェントが作成する新しいデザインの保存先にする Figma フォルダへのリンクです。フォルダのページで Figma のアドレスバーに表示されるリンクを使用してください。エージェントは \"cmux figma folder\" で読み取ります。"
+        },
         "reply": {
           "description": "返信パネル",
           "maxMessagesBack": "送信されていないメモがない返信を、戻る矢印がいくつ遡るか。送信されていないメモが付いた返信は常に到達可能なままです。",
