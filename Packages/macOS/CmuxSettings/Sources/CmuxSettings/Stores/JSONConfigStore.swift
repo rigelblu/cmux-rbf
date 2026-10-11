@@ -326,8 +326,12 @@ public actor JSONConfigStore {
     /// If the existing file on disk exists but cannot be parsed (corrupt
     /// JSON, malformed JSONC, top-level non-object), the write is refused
     /// — overwriting a corrupt file would silently destroy whatever real
-    /// content the user has in it. The error from
-    /// ``readFromDisk(at:)`` is propagated to the caller.
+    /// content the user has in it. The caller gets the system's file error,
+    /// which names the file; the error from ``readFromDisk(at:)`` is attached
+    /// as its cause.
+    /// cmux-rbf (#cm-119.1): reworded because a parse failure is now wrapped
+    /// (see the read below).
+    /// Reject a revert of this hunk on upstream sync.
     ///
     /// The root must never come from a cache loaded under a different resolved
     /// target, since that would overwrite the new target's contents with the old
@@ -339,7 +343,45 @@ public actor JSONConfigStore {
         // an atomic write is a temp-file + `rename()`, which would replace the
         // link itself with a regular file and break a dotfiles-managed config.
         let writeURL = Self.resolvedWriteURL(for: fileURL)
-        var root = cacheIsCurrent(for: writeURL.path) ? cachedRoot : try readFromDisk(at: writeURL)
+        // cmux-rbf (#cm-119.1): note whether this save creates the file, so it
+        // can be set to 0600 right after the write.
+        // Reject a revert of this hunk on upstream sync.
+        let createsFile = !FileManager.default.fileExists(atPath: writeURL.path)
+        // cmux-rbf (#cm-119.1): a write always reads the file; it no longer
+        // starts from the cache, which is only as fresh as the last file event
+        // and let a save replace a cmux.json that cannot be read. There is one
+        // exception, the rule below the read: a file that is missing or has zero
+        // bytes, while the cache is current and not empty. Re-apply both together.
+        // Reject a revert of this hunk on upstream sync.
+        var root: [String: Any]
+        do {
+            root = try readFromDisk(at: writeURL)
+        } catch {
+            // A file the system already names (no permission) keeps its own error.
+            // Every other read failure becomes the system's "this file is not in
+            // the correct format" error, which names the file. The cause stays
+            // attached as the underlying error.
+            let nsError = error as NSError
+            if nsError.domain == NSCocoaErrorDomain,
+               nsError.userInfo[NSFilePathErrorKey] != nil || nsError.userInfo[NSURLErrorKey] != nil {
+                throw error
+            }
+            throw CocoaError(.fileReadCorruptFile, userInfo: [
+                NSFilePathErrorKey: writeURL.path,
+                NSUnderlyingErrorKey: error,
+            ])
+        }
+        // A file that is missing or has zero bytes reads as an empty root. When
+        // this store still holds a non-empty root it read from the same path, and
+        // has not yet seen the file change, start from that root, as it always
+        // has: a save must not shrink the file to one key because another program
+        // had it empty or gone for an instant.
+        if root.isEmpty, cacheIsCurrent(for: writeURL.path), !cachedRoot.isEmpty {
+            let size = (
+                try? FileManager.default.attributesOfItem(atPath: writeURL.path)[.size] as? NSNumber
+            )?.intValue
+            if size == nil || size == 0 { root = cachedRoot }
+        }
         mutate(&root)
 
         let parent = writeURL.deletingLastPathComponent()
@@ -349,6 +391,13 @@ public actor JSONConfigStore {
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
         try data.write(to: writeURL, options: [.atomic])
+        // cmux-rbf (#cm-119.1): a file this store creates is owner-only; one that
+        // already exists keeps its mode. `try?` on purpose: the setting is saved,
+        // and a failed chmod must not report "Couldn't save setting".
+        // Reject a revert of this hunk on upstream sync.
+        if createsFile {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: writeURL.path)
+        }
 
         // Only commit to cache after the file write succeeded.
         cachedRoot = root
