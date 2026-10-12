@@ -2323,6 +2323,8 @@ extension Workspace {
                     title: snapshot.customTitle ?? snapshot.title ?? deferredPanel.displayTitle,
                     hasCustomTitle: snapshot.customTitle != nil,
                     icon: deferredPanel.displayIcon,
+                    // cmux-rbf `#cm-73.10`: the mark before the tab is shown.
+                    iconImageData: restoredBrowserTabPicture(snapshot),
                     kind: SurfaceKind.browser.rawValue,
                     isDirty: false,
                     showsNotificationBadge: snapshot.isManuallyUnread,
@@ -5111,6 +5113,36 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         refreshBrowserMediaActivity()
     }
 
+    /// The picture a live browser pane's tab is handed: the pane's own icon,
+    /// else Figma's mark when the pane is a Figma pane (``FigmaTabMark``).
+    /// Where a tab is made, restored or moved by this workspace, it asks this
+    /// (or ``restoredBrowserTabPicture(_:)``); the subscription below asks
+    /// ``FigmaTabMark`` with the values it was published. The Dock keeps its own
+    /// writers and does not ask.
+    // cmux-rbf `#cm-73.10`: Figma's mark on a Figma pane's tab.
+    private func browserTabPicture(for browserPanel: BrowserPanel) -> Data? {
+        FigmaTabMark.picture(
+            own: browserPanel.faviconPNGData,
+            address: browserPanel.currentURL,
+            showsAddressBar: browserPanel.isOmnibarVisible
+        )
+    }
+
+    /// The same, for a saved record whose pane is not built yet. Reads the record
+    /// the way the real restore does (`BrowserPanel` restoring a snapshot): the
+    /// older `omnibarVisible` field stands in when `chromeVisibility` is absent.
+    // cmux-rbf `#cm-73.10`: Figma's mark on a Figma pane's tab.
+    private func restoredBrowserTabPicture(_ record: SessionPanelSnapshot) -> Data? {
+        guard let browser = record.browser else { return nil }
+        let chrome = browser.chromeVisibility
+            ?? BrowserChromeVisibility(omnibarVisible: browser.omnibarVisible ?? true)
+        return FigmaTabMark.picture(
+            own: nil,
+            address: browser.urlString.flatMap { URL(string: $0) },
+            showsAddressBar: chrome.isOmnibarVisible
+        )
+    }
+
     private func installBrowserPanelSubscription(_ browserPanel: BrowserPanel) {
         let browserTabState = Publishers.CombineLatest4(
             browserPanel.$pageTitle.removeDuplicates(), browserPanel.$currentURL.removeDuplicates(),
@@ -5120,7 +5152,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         .combineLatest(browserPanel.$isMuted.removeDuplicates())
         .receive(on: DispatchQueue.main)
         .sink { [weak self, weak browserPanel] output in
-            let ((_, _, isLoading, favicon), isMuted) = output
+            // cmux-rbf `#cm-73.10`: binds the address too and names the icon `ownFavicon`; the Figma tab mark below needs both.
+            let ((_, address, isLoading, ownFavicon), isMuted) = output
             guard let self = self,
                   let browserPanel = browserPanel,
                   let tabId = self.surfaceIdFromPanelId(browserPanel.id) else { return }
@@ -5132,6 +5165,14 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             }
             let resolvedTitle = self.resolvedPanelTitle(panelId: browserPanel.id, fallback: nextTitle)
             let titleUpdate: String? = existing.title == resolvedTitle ? nil : resolvedTitle
+            // cmux-rbf `#cm-73.10`: without the mark here, this write replaces it with
+            // nothing one turn after the tab is made. The published icon and address,
+            // not the panel's: this closure runs a turn later.
+            let favicon = FigmaTabMark.picture(
+                own: ownFavicon,
+                address: address,
+                showsAddressBar: browserPanel.isOmnibarVisible
+            )
             let faviconUpdate: Data?? = existing.iconImageData == favicon ? nil : .some(favicon)
             let loadingUpdate: Bool? = existing.isLoading == isLoading ? nil : isLoading
             let mutedUpdate: Bool? = existing.isAudioMuted == isMuted ? nil : isMuted
@@ -5406,6 +5447,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             bonsplitController.updateTab(
                 tabId,
                 icon: .some(browserPanel.displayIcon),
+                // cmux-rbf `#cm-73.10`: the mark once the placeholder is a real pane.
+                iconImageData: .some(browserTabPicture(for: browserPanel)),
                 kind: .some(SurfaceKind.browser.rawValue),
                 isLoading: browserPanel.isLoading,
                 isAudioMuted: browserPanel.isMuted,
@@ -9781,6 +9824,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         let newTab = Bonsplit.Tab(
             title: browserPanel.displayTitle,
             icon: browserPanel.displayIcon,
+            // cmux-rbf `#cm-73.10`: the mark when the tab is made (a split).
+            iconImageData: browserTabPicture(for: browserPanel),
             kind: SurfaceKind.browser.rawValue,
             isDirty: browserPanel.isDirty,
             isLoading: browserPanel.isLoading,
@@ -9901,6 +9946,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         guard let newTabId = bonsplitController.createTab(
             title: browserPanel.displayTitle,
             icon: browserPanel.displayIcon,
+            // cmux-rbf `#cm-73.10`: the mark when the tab is made (a tab in a pane).
+            iconImageData: browserTabPicture(for: browserPanel),
             kind: SurfaceKind.browser.rawValue,
             isDirty: browserPanel.isDirty,
             isLoading: browserPanel.isLoading,
@@ -14089,7 +14136,9 @@ extension Workspace: BonsplitDelegate {
                 panel: panel,
                 title: resolvedPanelTitle(panelId: panelId, fallback: transferFallbackTitle),
                 icon: panel.displayIcon,
-                iconImageData: browserPanel?.faviconPNGData,
+                // cmux-rbf `#cm-73.10`: the mark travels with a Figma tab, live or still a placeholder.
+                iconImageData: browserPanel.flatMap { browserTabPicture(for: $0) }
+                    ?? (panel as? DeferredBrowserPanel).flatMap { restoredBrowserTabPicture($0.sessionPanelSnapshot) },
                 kind: surfaceKind(for: panel),
                 isLoading: browserPanel?.isLoading ?? false,
                 isPinned: pinnedPanelIds.contains(panelId),
