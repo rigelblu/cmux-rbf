@@ -53,6 +53,12 @@ final class CmuxSettingsFileStore {
     private let onWatchedFileReload: @MainActor @Sendable (String) -> Void
     private let stateLock = NSLock()
 
+    // cmux-rbf (#cm-119.2): why the last read of the primary file failed, for
+    // `reload_config`'s answer. Written by `resolveSettings()`, read from any thread
+    // behind `stateLock`. Reject a revert of this hunk on upstream sync.
+    private var lastReadState: CmuxSettingsFileReadState = .read
+    var lastRead: CmuxSettingsFileReadState { synchronized { lastReadState } }
+
     private var watchers: [FileWatcher] = []
     private var watchTasks: [Task<Void, Never>] = []
     private var defaultsCancellable: AnyCancellable?
@@ -316,7 +322,16 @@ final class CmuxSettingsFileStore {
         // A transient missing or malformed file must not restore a potentially broader unmanaged policy.
         let priorSocketMode = synchronized { activeManagedUserDefaults[SocketControlSettings.appStorageKey] }
         let preservedSocketMode = priorSocketMode ?? .string(Self.failClosedSocketMode(defaults: userDefaults).rawValue)
-        switch loadSettings(at: primaryPath) {
+        let primaryResult = loadSettings(at: primaryPath)
+        // cmux-rbf (#cm-119.2): remember why a failed read failed; what is resolved below
+        // does not change. Reject a revert of this hunk on upstream sync.
+        let readState: CmuxSettingsFileReadState
+        switch primaryResult {
+        case .invalid(let failure): readState = .notRead(failure)
+        case .parsed, .missing: readState = .read
+        }
+        synchronized { lastReadState = readState }
+        switch primaryResult {
         case .parsed(var snapshot, let malformedAutomation):
             mergeFallbackSettings(into: &snapshot)
             if malformedAutomation { snapshot.managedUserDefaults[SocketControlSettings.appStorageKey] = preservedSocketMode }
@@ -343,7 +358,8 @@ final class CmuxSettingsFileStore {
 
     private enum LoadResult {
         case missing
-        case invalid
+        // cmux-rbf (#cm-119.2): carries why. Reject a revert of this hunk on upstream sync.
+        case invalid(CmuxSettingsFileReadFailure)
         case parsed(ResolvedSettingsSnapshot, malformedAutomation: Bool)
     }
 
@@ -351,19 +367,27 @@ final class CmuxSettingsFileStore {
         guard fileManager.fileExists(atPath: path) else {
             return .missing
         }
-        guard let data = fileManager.contents(atPath: path), !data.isEmpty else {
-            return .invalid
+        // cmux-rbf (#cm-119.2): zero bytes and bytes that cannot be had were one guard;
+        // the reload command treats them differently. Reject a revert of this hunk on upstream sync.
+        guard let data = fileManager.contents(atPath: path) else {
+            return .invalid(.cannotOpen(path: path))
+        }
+        guard !data.isEmpty else {
+            return .invalid(.empty(path: path))
         }
 
         do {
             let sanitized = try JSONCParser.preprocess(data: data)
             let object = try JSONSerialization.jsonObject(with: sanitized, options: [])
-            guard let root = object as? [String: Any] else { return .invalid }
+            // cmux-rbf (#cm-119.2): carries why. Reject a revert of this hunk on upstream sync.
+            guard let root = object as? [String: Any] else { return .invalid(.notAnObject(path: path)) }
             let malformedAutomation = root["automation"] != nil && !(root["automation"] is [String: Any])
             return .parsed(parseSettingsFile(root: root, sourcePath: path), malformedAutomation: malformedAutomation)
         } catch {
             cmuxSettingsFileStoreLogger.warning("parse error at \(path, privacy: .private(mask: .hash)): \(String(describing: error), privacy: .private(mask: .hash))")
-            return .invalid
+            // cmux-rbf (#cm-119.2): hand the error and the bytes on for the line and the words.
+            // Reject a revert of this hunk on upstream sync.
+            return .invalid(CmuxSettingsFileReadFailure(error: error, data: data, path: path))
         }
     }
 

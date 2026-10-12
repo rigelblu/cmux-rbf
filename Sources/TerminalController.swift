@@ -1506,7 +1506,10 @@ class TerminalController {
         }
         switch reloadResult {
         case .committed:
-            return "OK Reloaded config"
+            // cmux-rbf (#cm-119.2): the terminal config reloaded; say whether the settings
+            // reader could read cmux.json in this reload. `OK Reloaded config` when it could
+            // (or there is none, or it has zero bytes). Reject a revert of this hunk on upstream sync.
+            return KeyboardShortcutSettings.settingsFileStore.lastRead.reloadConfigAnswer
         case .failed:
             return "ERROR: reload_config failed"
         case .busy:

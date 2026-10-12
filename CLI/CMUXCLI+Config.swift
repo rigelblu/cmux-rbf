@@ -351,6 +351,13 @@ extension CMUXCLI {
             )
             defer { client.close() }
             let response = try client.send(command: "reload_config")
+            // cmux-rbf (#cm-119.2): the app reloaded the terminal config and could not read
+            // cmux.json; the font size was applied, so this is not a failed reload. The prefix
+            // is the app's (CmuxSettingsFileReadState.errorAnswerPrefix).
+            // Reject a revert of this hunk on upstream sync.
+            if response.hasPrefix("ERROR: cmux.json can't be read: ") {
+                return ("reloaded", response)
+            }
             if response.hasPrefix("ERROR:") {
                 return ("failed", response)
             }
