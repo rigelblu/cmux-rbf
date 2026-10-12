@@ -155,7 +155,14 @@ enum CmuxSocketEventMapper {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let rawName = parts.first else { return }
         let name = rawName.lowercased()
-        guard response == "OK" || response.hasPrefix("OK ") || response.hasPrefix("OK\n") || response.hasPrefix("OK:") else { return }
+        // cmux-rbf (#cm-119.2): `reload_config` also answers `ERROR: cmux.json can't be read: ...` when the
+        // terminal config reloaded and cmux.json could not be read. The reload happened, so `config.reloaded`
+        // is still published (AutomationEngine reloads automations.json on it). Every other `ERROR` answer
+        // publishes nothing, as before. Reject a revert of this hunk on upstream sync.
+        let reloadedWithUnreadableSettingsFile = name == "reload_config"
+            && response.hasPrefix(CmuxSettingsFileReadState.errorAnswerPrefix)
+        guard response == "OK" || response.hasPrefix("OK ") || response.hasPrefix("OK\n") || response.hasPrefix("OK:")
+            || reloadedWithUnreadableSettingsFile else { return }
         let args = parts.count > 1 ? parts[1] : ""
         let payload: [String: Any] = ["command": name, "args": redactedV1Args(name: name, args: args)]
 
