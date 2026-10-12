@@ -36,16 +36,26 @@ enum FigmaFileLink {
         isFileLink(url, hosts: editorHosts.union([embedHost]))
     }
 
-    private static func isFileLink(_ url: URL, hosts: Set<String>) -> Bool {
-        // The text between `https://` and the next `/`, `?` or `#` has to be one
-        // of the hosts, whole. Asking Foundation for the parts is not enough:
-        // it reports no port for `:9223372036854775808` or for a bare `:`, and
-        // the address built from such a link keeps the text. This one rule also
-        // covers the scheme, the host, and any user name, password or port.
+    /// Whether an address is any page on Figma's editor hosts: `https`, and
+    /// nothing between `https://` and the host or after it. The path is not read.
+    static func isEditorPage(_ url: URL) -> Bool {
+        isOn(url, hosts: editorHosts)
+    }
+
+    /// The text between `https://` and the next `/`, `?` or `#` has to be one
+    /// of the hosts, whole. Asking Foundation for the parts is not enough:
+    /// it reports no port for `:9223372036854775808` or for a bare `:`, and
+    /// the address built from such a link keeps the text. This one rule also
+    /// covers the scheme, the host, and any user name, password or port.
+    private static func isOn(_ url: URL, hosts: Set<String>) -> Bool {
         let text = url.absoluteString
         guard text.lowercased().hasPrefix("https://") else { return false }
         let authority = text.dropFirst("https://".count).prefix { $0 != "/" && $0 != "?" && $0 != "#" }
-        guard hosts.contains(authority.lowercased()) else { return false }
+        return hosts.contains(authority.lowercased())
+    }
+
+    private static func isFileLink(_ url: URL, hosts: Set<String>) -> Bool {
+        guard isOn(url, hosts: hosts) else { return false }
         // `URL.path` is percent-decoded, so `%2e%2e`, `%2e%2e%2f` and `%5C` are caught too.
         let path = url.path
         guard kindPrefixes.contains(where: { path.hasPrefix($0) }) else { return false }
