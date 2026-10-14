@@ -235,6 +235,18 @@ enum TabBarStyling {
         )
     }
 
+    /// cmux-rbf `#cm-73.9`: the name a header button gives assistive tech. An SF Symbol names itself ("Globe") and a
+    /// picture does not, so without this its name is its identifier. The tooltip is the name, as it is on the mouse-down
+    /// path. `nil` leaves the button's own name alone.
+    static func splitActionAccessibilityName(
+        for icon: BonsplitConfiguration.SplitActionButton.Icon,
+        tooltip: String
+    ) -> String? {
+        guard case .imageData = icon else { return nil }
+        let name = tooltip.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+
     static func imageDataShouldRenderAsTemplate(_ data: Data) -> Bool {
         let text = String(decoding: data.prefix(4096), as: UTF8.self)
         let lowercased = text.lowercased()
@@ -1694,6 +1706,13 @@ struct TabBarView: View {
                 performSplitActionButton(button)
             } label: {
                 splitActionButtonIcon(button.icon)
+                    // cmux-rbf `#cm-73.9`: a picture button is named by its tooltip.
+                    .modifier(OptionalAccessibilityName(
+                        name: TabBarStyling.splitActionAccessibilityName(
+                            for: button.icon,
+                            tooltip: splitActionButtonTooltip(button, tooltips: tooltips)
+                        )
+                    ))
             }
             .buttonStyle(SplitActionButtonStyle(appearance: appearance, layout: tabBarLayout))
         }
@@ -1953,6 +1972,20 @@ private final class SplitActionButtonImageCache {
 
         images.setObject(image, forKey: key, cost: max(1, data.count))
         return image
+    }
+}
+
+/// cmux-rbf `#cm-73.9`: sets an accessibility label only when there is one to set.
+private struct OptionalAccessibilityName: ViewModifier {
+    let name: String?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let name {
+            content.accessibilityLabel(name)
+        } else {
+            content
+        }
     }
 }
 

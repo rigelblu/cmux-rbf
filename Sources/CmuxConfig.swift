@@ -510,6 +510,16 @@ enum CmuxButtonIcon: Codable, Sendable, Hashable {
 
     private static let maxImageBytes = 1_000_000
 
+    // cmux-rbf `#cm-73.9`: the shipped Figma image, through the same size and SVG checks as any image file.
+    private static let shippedImageAsset: PreparedImageAsset? = {
+        guard let path = FigmaButtonIcon.shippedPath,
+              let data = FileManager.default.contents(atPath: path),
+              data.count <= maxImageBytes,
+              isSafeSVG(data: data) else { return nil }
+        let fingerprint = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return PreparedImageAsset(data: data, fingerprint: fingerprint, isProjectLocal: false)
+    }()
+
     private static func emojiScale(in container: KeyedDecodingContainer<CodingKeys>) throws -> Double {
         let scale = try container.decodeIfPresent(Double.self, forKey: .scale) ?? 1
         guard scale.isFinite, scale > 0 else {
@@ -565,7 +575,11 @@ enum CmuxButtonIcon: Codable, Sendable, Hashable {
             return nil
         }
 
+        // cmux-rbf `#cm-73.9`: the app's own shipped image counts as global, whichever config file
+        // listed the button. It is compared with the one resolved path of the file in the app's
+        // bundle (`FigmaButtonIcon.isShipped`), so it opens no other path.
         let isGlobal = configSourcePath == nil || configSourcePath == globalConfigPath
+            || FigmaButtonIcon.isShipped(path: trimmed)
         if !isGlobal {
             let expanded = (trimmed as NSString).expandingTildeInPath
             guard !(expanded as NSString).isAbsolutePath,
@@ -605,6 +619,8 @@ enum CmuxButtonIcon: Codable, Sendable, Hashable {
         ) else {
             return nil
         }
+        // cmux-rbf `#cm-73.9`: the app's own shipped image is read, checked and hashed once, and is never the project's.
+        if FigmaButtonIcon.isShipped(path: resolvedPath) { return shippedImageAsset }
         guard let data = FileManager.default.contents(atPath: resolvedPath) else {
             NSLog("[CmuxConfig] icon image does not exist: %@", resolvedPath)
             return nil
@@ -851,13 +867,16 @@ enum CmuxSurfaceTabBarButtonAction: Sendable, Hashable {
     }
 
     var defaultIcon: String {
-        defaultButtonIcon.symbolName
+        // cmux-rbf `#cm-73.9`: Figma's button answers its symbol, not the image's "questionmark.circle".
+        if case .builtIn(let action) = self { return action.defaultIcon }
+        return defaultButtonIcon.symbolName
     }
 
     var defaultButtonIcon: CmuxButtonIcon {
         switch self {
         case .builtIn(let action):
-            return .symbol(action.defaultIcon)
+            // cmux-rbf `#cm-73.9`: Figma's button draws Figma's image; every other built-in a symbol.
+            return action.defaultButtonIcon
         case .command:
             return .symbol("terminal")
         case .agent(let agent, _):
@@ -936,6 +955,8 @@ struct CmuxSurfaceTabBarButton: Codable, Sendable, Hashable, Identifiable {
     static let newTerminal = actionReference(CmuxSurfaceTabBarBuiltInAction.newTerminal.configID)
     static let newBrowser = actionReference(CmuxSurfaceTabBarBuiltInAction.newBrowser.configID)
     static let newSimulator = actionReference(CmuxSurfaceTabBarBuiltInAction.newSimulator.configID)
+    // cmux-rbf `#cm-73.9`: the header's Figma button.
+    static let newFigma = actionReference(CmuxSurfaceTabBarBuiltInAction.newFigma.configID)
     static let splitLeft = actionReference(CmuxSurfaceTabBarBuiltInAction.splitLeft.configID)
     static let splitUp = actionReference(CmuxSurfaceTabBarBuiltInAction.splitUp.configID)
     static let splitRight = actionReference(CmuxSurfaceTabBarBuiltInAction.splitRight.configID)
@@ -946,6 +967,8 @@ struct CmuxSurfaceTabBarButton: Codable, Sendable, Hashable, Identifiable {
     static let defaults: [CmuxSurfaceTabBarButton] = [
         .newTerminal,
         .newBrowser,
+        // cmux-rbf `#cm-73.9`: third, after the globe (Tom, 2026-10-12, Q14).
+        .newFigma,
         .splitRight,
         .splitDown
     ]
@@ -1377,7 +1400,8 @@ struct CmuxResolvedConfigAction: Identifiable, Sendable, Hashable {
             keywords: metadata.keywords,
             palette: true,
             shortcut: nil,
-            icon: .symbol(builtIn.defaultIcon),
+            // cmux-rbf `#cm-73.9`: the built-in's own icon, an image for the Figma button.
+            icon: builtIn.defaultButtonIcon,
             tooltip: nil,
             action: .builtIn(builtIn),
             confirm: nil,
@@ -2068,6 +2092,7 @@ final class CmuxConfigStore: ObservableObject {
         }) ?? [
             .builtIn(.newTerminal),
             .builtIn(.newBrowser),
+            .builtIn(.newFigma), // cmux-rbf `#cm-73.9`
             .builtIn(.splitRight),
             .builtIn(.splitDown)
         ]

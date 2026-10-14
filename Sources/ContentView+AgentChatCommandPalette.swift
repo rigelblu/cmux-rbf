@@ -10,6 +10,9 @@ extension ContentView {
             return CmuxSurfaceTabBarBuiltInAction.newBrowser.configID
         case "palette.newSimulatorPane":
             return CmuxSurfaceTabBarBuiltInAction.newSimulator.configID
+        // cmux-rbf `#cm-73.9`: the Figma tab's palette row runs the built-in action.
+        case "palette.newFigmaTab":
+            return CmuxSurfaceTabBarBuiltInAction.newFigma.configID
         case "palette.newAgentChat":
             return CmuxSurfaceTabBarBuiltInAction.newAgentChat.configID
         case "palette.terminalSplitRight":

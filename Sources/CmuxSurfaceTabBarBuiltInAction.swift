@@ -15,6 +15,8 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
     case splitUp = "cmux.splitUp"
     case splitRight = "cmux.splitRight"
     case splitDown = "cmux.splitDown"
+    // cmux-rbf `#cm-73.9`: the header's Figma button. Every switch below answers it.
+    case newFigma = "cmux.newFigma"
 
     init?(configID: String) {
         switch configID {
@@ -39,6 +41,9 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             self = .newBrowser
         case "cmux.newSimulator", "newSimulator", "new-simulator", "simulator":
             self = .newSimulator
+        case "cmux.newFigma":
+            // cmux-rbf `#cm-73.9`: one spelling only. A name people write in cmux.json can widen later; it cannot narrow.
+            self = .newFigma
         case "cmux.splitLeft", "splitLeft":
             self = .splitLeft
         case "cmux.splitUp", "splitUp":
@@ -79,6 +84,9 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             return (String(localized: "command.newBrowserTab.title", defaultValue: "New Browser Tab"), ["new", "browser", "tab", "surface"])
         case .newSimulator:
             return (String(localized: "command.newSimulatorPane.title", defaultValue: "New Simulator Pane"), ["new", "simulator", "iphone", "ipad", "ios", "surface"])
+        case .newFigma:
+            // cmux-rbf `#cm-73.9`: one string is the button's tooltip and the palette row's title (Tom, Q17).
+            return (String(localized: "command.newFigmaTab.title", defaultValue: "New Tab (Figma)"), ["new", "figma", "tab", "design"])
         case .splitLeft:
             return (String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left"), ["terminal", "split", "left"])
         case .splitUp:
@@ -110,6 +118,9 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             return "globe"
         case .newSimulator:
             return "iphone.gen3"
+        case .newFigma:
+            // cmux-rbf `#cm-73.9`: drawn only where a symbol is all there is; the header draws Figma's image.
+            return "paintpalette"
         case .splitLeft:
             return "rectangle.lefthalf.inset.filled"
         case .splitUp:
@@ -136,6 +147,9 @@ enum CmuxSurfaceTabBarBuiltInAction: String, Codable, Sendable, CaseIterable, Ha
             return .newTerminal
         case .newBrowser:
             return .newBrowser
+        case .newFigma:
+            // cmux-rbf `#cm-73.9`: no Bonsplit action of its own, so the click goes the custom way and carries the clicked pane.
+            return nil
         }
     }
 }
@@ -157,7 +171,8 @@ extension CmuxSurfaceTabBarBuiltInAction {
         case .splitDown: return .splitDown
         case .splitLeft: return .splitLeft
         case .splitUp: return .splitUp
-        case .newAgentChat, .cloudVM, .mobileConnect, .newSimulator: return nil
+        // cmux-rbf `#cm-73.9`: no cmux-owned shortcut for the Figma tab.
+        case .newAgentChat, .cloudVM, .mobileConnect, .newSimulator, .newFigma: return nil
         }
     }
 

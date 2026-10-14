@@ -243,7 +243,10 @@ extension CmuxButtonIcon {
             return Self.contextMenuEmojiImage(value, scale: scale)
         case .imageData(let data):
             guard let image = NSImage(data: data) else { return nil }
-            return Self.normalizedContextMenuImage(image)
+            let normalized = Self.normalizedContextMenuImage(image)
+            // cmux-rbf `#cm-73.9`: an SVG that draws in `currentColor` takes the menu's colour, as the header's button does.
+            normalized.isTemplate = FigmaButtonIcon.drawsAsTemplate(data)
+            return normalized
         }
     }
 
