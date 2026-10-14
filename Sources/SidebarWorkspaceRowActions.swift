@@ -33,7 +33,7 @@ struct SidebarWorkspaceRowActions {
     let reconnectTargets: ([UUID]) -> Void
     let disconnectTargets: ([UUID]) -> Void
     let applyColor: (String?, [UUID]) -> Void
-    let applyTodoStatus: (WorkspaceTaskStatus?, [UUID]) -> Void
+    let applyTodoStatus: (WorkspaceStatusPickAction, [UUID]) -> Void // (#cm-109)
     let hideTodoStatus: ([UUID]) -> Void
     let requestChecklistAdd: () -> Void
     let markRead: ([UUID]) -> Void

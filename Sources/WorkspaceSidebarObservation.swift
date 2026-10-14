@@ -198,6 +198,7 @@ private struct SidebarImmediateObservationState: Equatable {
     let latestSubmittedMessage: String?
     let latestSubmittedAt: Date?
     let taskStatusOverride: WorkspaceTaskStatusOverride?
+    let ownStatus: WorkspaceOwnStatus? // (#cm-109)
     let statusHidden: Bool
     let checklist: [WorkspaceChecklistItem]
 }
@@ -255,8 +256,9 @@ extension Workspace {
         // Todo state is row-affecting (status pill, checklist progress) but
         // lives in its own sub-model, so fold its publishers in here the same
         // way the workspace's own @Published fields are.
-        let todoFields = Publishers.CombineLatest3(
+        let todoFields = Publishers.CombineLatest4( // (#cm-109) one more field: his own status
             todoState.$statusOverride,
+            todoState.$ownStatus,
             todoState.$statusHidden,
             todoState.$checklist
         )
@@ -274,8 +276,9 @@ extension Workspace {
                     latestSubmittedMessage: conversationFields.1,
                     latestSubmittedAt: conversationFields.2,
                     taskStatusOverride: todoFields.0,
-                    statusHidden: todoFields.1,
-                    checklist: todoFields.2
+                    ownStatus: todoFields.1, // (#cm-109)
+                    statusHidden: todoFields.2,
+                    checklist: todoFields.3
                 )
             }
             .removeDuplicates()

@@ -54,15 +54,19 @@ public struct ControlWorkspaceTodoStatusSnapshot: Sendable, Equatable {
     public let overrideInferredAt: String?
     /// The live signals behind the inference.
     public let signals: Signals
+    /// The id of the status set by hand, his or cmux's, or `nil` when none is in effect or held, and under None
+    /// (#cm-109).
+    public let statusID: String?
 
-    /// Creates a status snapshot.
+    /// Creates a status snapshot. `statusID` has a default, so callers and tests written before it compile.
     public init(
         workspaceID: UUID,
         effective: String,
         inferred: String,
         overrideStatus: String?,
         overrideInferredAt: String?,
-        signals: Signals
+        signals: Signals,
+        statusID: String? = nil
     ) {
         self.workspaceID = workspaceID
         self.effective = effective
@@ -70,5 +74,6 @@ public struct ControlWorkspaceTodoStatusSnapshot: Sendable, Equatable {
         self.overrideStatus = overrideStatus
         self.overrideInferredAt = overrideInferredAt
         self.signals = signals
+        self.statusID = statusID
     }
 }

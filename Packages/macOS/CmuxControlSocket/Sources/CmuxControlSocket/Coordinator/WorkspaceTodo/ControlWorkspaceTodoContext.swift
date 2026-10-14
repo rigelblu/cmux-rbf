@@ -56,6 +56,12 @@ public protocol ControlWorkspaceTodoContext: AnyObject {
         workspaceID: UUID?
     ) -> ControlWorkspaceTodoStatusResolution
 
+    /// Reads the list of workspace statuses in use for `workspace.status.list` (#cm-109). It takes no routing and
+    /// no workspace: the list belongs to the app, not to a window.
+    ///
+    /// - Returns: The list, where it came from, whether the controls are on, and its problems.
+    func controlWorkspaceStatusList() -> ControlWorkspaceStatusListSnapshot
+
     /// Reads the checklist for `workspace.todo.list`.
     ///
     /// - Parameters:

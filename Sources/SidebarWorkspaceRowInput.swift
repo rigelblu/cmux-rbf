@@ -99,11 +99,10 @@ struct SidebarWorkspaceRowInput {
                 eligibleGroupTargetIds: targetAggregate.eligibleGroupTargetIds,
                 allEligibleTargetsGroupId: targetAggregate.allEligibleTargetsGroupId,
                 hasGroupedEligibleTarget: targetAggregate.hasGroupedEligibleTarget,
-                todoStatusLanes: WorkspaceTodoStatusLane.lanes(
-                    inferred: inferredTaskStatus,
-                    activeOverride: activeTodoOverride,
-                    isHidden: isTodoStatusHidden
-                ),
+                // (#cm-109) The rows come from the picker's state in the snapshot; a row with none gets no status rows.
+                todoStatusLanes: workspace.taskStatusInput.picker.map {
+                    WorkspaceTodoStatusLane.lanes(picker: $0, colorHexes: workspace.taskStatusInput.colorHexes)
+                } ?? [],
                 canMarkRead: targetAggregate.canMarkRead,
                 canMarkUnread: targetAggregate.canMarkUnread,
                 hasLatestNotification: targetAggregate.hasLatestNotification,

@@ -147,7 +147,7 @@ struct SidebarAppKitRowActions {
     let onEndChecklistItemEdit: (UUID) -> Void
     /// Applies a manual status override to this row's workspace (`nil`
     /// returns the status to automatic).
-    let applyTodoStatus: (WorkspaceTaskStatus?) -> Void
+    let applyTodoStatus: (WorkspaceStatusPickAction) -> Void // (#cm-109)
     /// Opts this row's workspace out of the status feature (None).
     let hideTodoStatus: () -> Void
     let commitRename: (String) -> Void

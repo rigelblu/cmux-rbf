@@ -453,22 +453,16 @@ struct SidebarWorkspaceRowMenuBuilder {
         return targetIds.compactMap { workspaceById[$0] }
     }
 
-    private func addTodoSection(to menu: NSMenu, tabManager: TabManager) {
-        let inferred = tab.inferredTaskStatus
-        let resolution = WorkspaceTaskStatusOverride.effectiveStatus(
-            override: tab.todoState.statusOverride,
-            inferred: inferred
+    /// Internal, not private, so a test can build the Status section under a delegate that holds his list: `build`
+    /// leaves the section out while the status controls are off, as they are in a test host. (#cm-109)
+    func addTodoSection(to menu: NSMenu, tabManager: TabManager) {
+        // (#cm-109) The rows come from one call, built when the menu opens: his list, the colors the app resolved for it
+        // and what this workspace holds. Menu construction is on demand, so reading them here is allowed.
+        let statusLanes = tab.statusMenuLanes(
+            list: AppDelegate.statusListInUse,
+            colorHexes: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:]
         )
-        let activeOverride: WorkspaceTaskStatus? = {
-            guard let override = tab.todoState.statusOverride,
-                  !resolution.shouldClearOverride else { return nil }
-            return override.status
-        }()
-        let statusLanes = WorkspaceTodoStatusLane.lanes(
-            inferred: inferred,
-            activeOverride: activeOverride,
-            isHidden: tab.todoState.statusHidden
-        )
+        let isDarkMenu = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let statusSubmenu = NSMenu()
         statusSubmenu.autoenablesItems = false
         for lane in statusLanes {
@@ -480,13 +474,21 @@ struct SidebarWorkspaceRowMenuBuilder {
                 let targets = SidebarWorkspaceRowMenuBuilder(commands: commands).todoTargetWorkspaces(tabManager)
                 if lane.isNone {
                     WorkspaceTodoActions.hideStatus(for: targets)
-                } else {
-                    WorkspaceTodoActions.applyStatusOverride(lane.status, to: targets)
+                } else if let action = lane.action {
+                    WorkspaceTodoActions.applyStatusOverride(action, to: targets) // (#cm-109)
                 }
             }
             laneItem.state = lane.isSelected ? .on : .off
+            // (#cm-109) The greyed row has no action: a disabled item with its check on.
+            laneItem.isEnabled = lane.action != nil
+            if let hex = lane.colorHex {
+                laneItem.image = SidebarWorkspaceRowMenuBuilder.coloredCircleImage(
+                    color: WorkspaceStatusPresentation.dotColor(hex: hex, isDark: isDarkMenu)
+                )
+            }
             statusSubmenu.addItem(laneItem)
-            if lane.status == nil, !lane.isNone {
+            // The divider after Auto tests the row's action, not its glyph status.
+            if lane.action == .auto {
                 statusSubmenu.addItem(.separator())
             }
         }

@@ -24,6 +24,8 @@ extension ControlWorkspaceTodoContext {
         workspaceID: UUID?
     ) -> ControlWorkspaceTodoStatusResolution { .tabManagerUnavailable }
 
+    func controlWorkspaceStatusList() -> ControlWorkspaceStatusListSnapshot { .empty }
+
     func controlWorkspaceTodoList(
         routing: ControlRoutingSelectors,
         workspaceID: UUID?

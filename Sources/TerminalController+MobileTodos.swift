@@ -1,4 +1,5 @@
 import CmuxControlSocket
+import CmuxWorkspaces
 import Foundation
 
 /// Mobile todo verbs adapted onto the existing control-socket todo coordinator.
@@ -20,7 +21,10 @@ extension TerminalController {
             typedParams["state"] = .string("in-progress")
         }
         let request = ControlRequest(id: .null, method: controlMethod, params: typedParams)
-        guard let result = controlCommandCoordinator.handle(request) else {
+        // (#cm-109) the phone's calls write no color
+        guard let result = WorkspaceStatusOrigin.$current.withValue(.phone, operation: {
+            controlCommandCoordinator.handle(request)
+        }) else {
             return .err(code: "internal", message: "Todo command was not handled", data: nil)
         }
         switch result {

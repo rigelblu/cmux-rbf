@@ -1296,6 +1296,37 @@
         }
       }
     },
+    "workspaceStatuses": {
+      "title": "workspaceStatuses",
+      "description": "Your own list of workspace statuses, in the order the Status menu and Cycle Status use. Each entry has an id, a name, the cmux status it behaves as, and optionally the name of a workspace color that setting it applies.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The status's stable id, used by cmux workspace status set. One of cmux's five ids (todo, working, needs-attention, review, done) makes that status behave as itself."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name shown for the status."
+          },
+          "extends": {
+            "type": "string",
+            "enum": ["todo", "working", "needs-attention", "review", "done"],
+            "description": "The cmux status this one behaves as. Required for your own ids; ignored for one of cmux's five."
+          },
+          "color": {
+            "type": "string",
+            "description": "The color setting this status applies, written as the label of one of your workspace colors, a palette or display name, or a hex color such as #1565C0; setting this status replaces the workspace's color with it."
+          }
+        }
+      }
+    },
     "sidebarAppearance": {
       "title": "sidebarAppearance",
       "description": "Sidebar tint settings from Settings > Sidebar Appearance.",

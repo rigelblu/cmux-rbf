@@ -463,7 +463,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                     hasOverride: true,
                     usesMonochrome: model.isActive,
                     fontScale: model.fontScale,
-                    colorScheme: palette.colorScheme
+                    colorScheme: palette.colorScheme,
+                    name: WorkspaceStatusPresentation.checkedName(in: snapshot.todoStatusMenuModel?.picker) // (#cm-109)
                 ),
                 monochromeColor: palette.secondary(0.8),
                 neutralColor: palette.secondary(0.8)
@@ -975,18 +976,20 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     // MARK: Status popover + compact status menu
 
     private func statusPopoverModel() -> SidebarWorkspaceStatusPopoverModel? {
-        guard let menuModel = model?.snapshot.todoStatusMenuModel else { return nil }
+        // (#cm-109) No popover when the snapshot holds no picker.
+        guard let menuModel = model?.snapshot.todoStatusMenuModel, let picker = menuModel.picker else { return nil }
         return SidebarWorkspaceStatusPopoverModel(
             inferred: menuModel.inferred,
-            activeOverride: menuModel.activeOverride
+            activeOverride: menuModel.activeOverride,
+            picker: picker
         )
     }
 
     private func statusPopoverContent(_ popoverModel: SidebarWorkspaceStatusPopoverModel) -> AnyView {
         AnyView(SidebarWorkspaceStatusPopover(
             model: popoverModel,
-            onSelectLane: { [weak self] status in
-                self?.actions?.applyTodoStatus(status)
+            onSelectLane: { [weak self] action in
+                self?.actions?.applyTodoStatus(action)
             },
             onSelectNone: { [weak self] in
                 self?.actions?.hideTodoStatus()
