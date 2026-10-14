@@ -22,12 +22,25 @@ struct SidebarWorkspaceSnapshotFactory {
     /// that decision is where `#cm-22`'s shipped defect lived. The caller sits
     /// above the sidebar's lazy boundary and already owns store access.
     let todoControlsEnabled: Bool
+    /// The list of statuses in use, passed in as a value, which the glyph's resolution uses (`SidebarWorkspaceTaskStatusSnapshot.resolution(…list:)`). One read
+    /// still reaches the app's store: `workspace.attentionTaskStatus` goes through `effectiveTaskStatus`, which reads
+    /// `AppDelegate.statusListInUse` (`Workspace+Todos.swift:65`). In the app both lists are the same; a test that hands
+    /// this factory a list under a bare delegate gets cmux's five from that one read. cmux's five by default, because
+    /// upstream's tests build the factory without one. (#cm-109)
+    var statusList: WorkspaceStatusList = .cmuxFive
+    /// The color the app resolved for each status of the list, by id, for the rows' dots. (#cm-109)
+    var statusColorHexes: [String: String] = [:]
 
     /// Creates the current immutable presentation snapshot for the workspace row.
     func makeSnapshot() -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         let detailVisibility = settings.visibleAuxiliaryDetails
         let orderedPanelIds = workspace.sidebarOrderedPanelIds()
-        let taskStatusInput = SidebarWorkspaceTaskStatusSnapshot.capture(workspace: workspace, orderedPanelIds: orderedPanelIds)
+        let taskStatusInput = SidebarWorkspaceTaskStatusSnapshot.capture(
+            workspace: workspace,
+            orderedPanelIds: orderedPanelIds,
+            list: statusList,
+            colorHexes: statusColorHexes
+        ) // (#cm-109)
         let compactGitBranchSummaryText: String? = {
             guard detailVisibility.showsBranchDirectory,
                   settings.branchDirectory.branchLayout == .inline,
@@ -60,19 +73,25 @@ struct SidebarWorkspaceSnapshotFactory {
         }()
         let workspaceStatusVisible = todoControlsEnabled && !workspace.todoState.statusHidden
         let inferredTaskStatus = workspaceStatusVisible ? taskStatusInput.inferred : nil
-        let taskStatusResolution: WorkspaceTaskStatusOverride.Resolution? = inferredTaskStatus.map { inferred in
-            WorkspaceTaskStatusOverride.effectiveStatus(
-                override: workspace.todoState.statusOverride,
-                inferred: inferred
-            )
-        }
+        // (#cm-109) What the workspace shows is worked out against the list in use: the glyph shows the status it
+        // behaves as, and a manual status is in effect when the resolution says so, whether it is cmux's or his.
+        let taskStatusResolution = SidebarWorkspaceTaskStatusSnapshot.resolution(
+            of: workspace,
+            inferred: taskStatusInput.inferred,
+            list: statusList
+        )
+        // (#cm-109) A wait is an event, not a status: while an agent waits on a workspace that holds one of his
+        // statuses, the row keeps that status's glyph. The workspace still reports needs-attention and the row stays
+        // in play through `attentionTaskStatus` below.
+        var ownWaitingGlyph: WorkspaceTaskStatus?
+        if case .ownWaiting(let entry) = taskStatusResolution { ownWaitingGlyph = entry.behavesAs }
         let hasManualTaskStatus = workspaceStatusVisible
-            && workspace.todoState.statusOverride != nil
-            && taskStatusResolution?.shouldClearOverride == false
+            && (taskStatusResolution.inEffect != nil || ownWaitingGlyph != nil)
         let todoStatusMenuModel = inferredTaskStatus.map { inferred in
             SidebarWorkspaceCompactStatusMenuModel.resolve(
                 inferred: inferred,
-                override: workspace.todoState.statusOverride
+                override: workspace.todoState.statusOverride,
+                picker: taskStatusInput.picker
             )
         }
         let checklistProgress = workspace.checklistProgressSummary
@@ -135,7 +154,7 @@ struct SidebarWorkspaceSnapshotFactory {
             listeningPorts: detailVisibility.showsPorts ? workspace.listeningPorts : [],
             finderDirectoryPath: WorkspaceFinderDirectoryResolver.path(for: workspace),
             mediaActivity: workspace.browserMediaActivity,
-            taskStatus: taskStatusResolution?.effective,
+            taskStatus: workspaceStatusVisible ? (ownWaitingGlyph ?? taskStatusResolution.effective) : nil, // (#cm-109)
             todoStatusMenuModel: todoStatusMenuModel,
             hasManualTaskStatus: hasManualTaskStatus,
             attentionTaskStatus: attentionTaskStatus,

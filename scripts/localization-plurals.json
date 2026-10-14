@@ -597,6 +597,18 @@
       1
     ]
   },
+  "sidebar.statusFile.pill": {
+    "source": "%lld file problems",
+    "arguments": [
+      1
+    ]
+  },
+  "sidebar.statusFile.pill.accessibility": {
+    "source": "%lld problems in cmux.json",
+    "arguments": [
+      1
+    ]
+  },
   "simulator.accessibility.nodeCount": {
     "source": "Accessibility elements: %lld",
     "arguments": [

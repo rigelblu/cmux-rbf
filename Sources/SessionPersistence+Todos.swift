@@ -128,6 +128,7 @@ extension SessionWorkspaceSnapshot {
         let override = workspace.todoState.statusOverride
         taskStatusOverride = override?.status.rawValue
         taskStatusInferredAtOverride = override?.inferredAtOverride.rawValue
+        taskStatusOwnID = workspace.todoState.ownStatus?.id // (#cm-109)
         taskStatusHidden = workspace.todoState.statusHidden ? true : nil
         let items = workspace.todoState.checklist
         checklist = items.isEmpty ? nil : items.map(SessionChecklistItemSnapshot.init(item:))

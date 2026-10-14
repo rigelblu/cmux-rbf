@@ -151,26 +151,34 @@ private struct WorkspaceTodoPaneContent: View {
         // Pure reads: effective-status resolution never mutates (the
         // expired-override cleanup happens at mutation entry points).
         let inferred = workspace.inferredTaskStatus
-        let resolution = WorkspaceTaskStatusOverride.effectiveStatus(
-            override: todoState.statusOverride,
-            inferred: inferred
-        )
+        // (#cm-109) What the workspace shows is worked out against the list in use. Reading the list here, in the body
+        // of a pane (not a row under the sidebar's list), is how the pane follows the store: the store is `@Observable`.
+        // `statusResolution(list:)` is a pure read.
+        let statusList = AppDelegate.statusListInUse
+        let held = workspace.statusResolution(list: statusList)
         let todoControlsEnabled = WorkspaceTodoFeature.isEnabled
-        let hasOverride = todoControlsEnabled && todoState.statusOverride != nil && !resolution.shouldClearOverride
+        // (#cm-109) The pane's working-out is one pure function (tested): the popover's rows, the footnote's pin and
+        // his word for the status in effect.
+        let pane = WorkspaceStatusPaneState.make(
+            resolution: held, inferred: inferred, list: statusList, controlsEnabled: todoControlsEnabled
+        )
+        let hasOverride = pane.hasOverride
         let progress = todoState.checklist.checklistProgressSummary
         let headerTitle = WorkspaceTodoPaneHeaderTitle.title(paneTitle: paneTitle)
-        let headerStatusLabel = WorkspaceTodoPaneHeaderStatusLabel.displayName(
-            effective: todoControlsEnabled ? resolution.effective : nil,
+        // His word for the status when it has one, else upstream's function (cmux's own name). (#cm-109)
+        let headerStatusLabel = pane.hisWord ?? WorkspaceTodoPaneHeaderStatusLabel.displayName(
+            effective: todoControlsEnabled ? held.effective : nil,
             hasOverride: hasOverride
         )
 
         VStack(alignment: .leading, spacing: 0) {
             header(
                 title: headerTitle,
-                effective: todoControlsEnabled ? resolution.effective : nil,
+                effective: todoControlsEnabled ? held.effective : nil,
                 inferred: inferred,
                 hasOverride: hasOverride,
                 statusLabel: headerStatusLabel,
+                pane: pane, // (#cm-109)
                 progress: progress
             )
             .padding(.horizontal, 14)
@@ -241,6 +249,7 @@ private struct WorkspaceTodoPaneContent: View {
         inferred: WorkspaceTaskStatus,
         hasOverride: Bool,
         statusLabel: String?,
+        pane: WorkspaceStatusPaneState, // (#cm-109)
         progress: WorkspaceChecklistProgressSummary
     ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -254,7 +263,8 @@ private struct WorkspaceTodoPaneContent: View {
                         usesMonochrome: false,
                         monochromeColor: .primary,
                         neutralColor: .secondary,
-                        fontScale: Self.headerGlyphFontScale
+                        fontScale: Self.headerGlyphFontScale,
+                        name: pane.hisWord // (#cm-109) his word for a status in effect; cmux's name otherwise
                     )
                     .contentShape(Rectangle().inset(by: -3))
                 }
@@ -264,7 +274,8 @@ private struct WorkspaceTodoPaneContent: View {
                         isPresented: $isStatusPopoverPresented,
                         model: SidebarWorkspaceStatusPopoverModel(
                             inferred: inferred,
-                            activeOverride: hasOverride ? effective : nil
+                            activeOverride: pane.cmuxOverride, // (#cm-109) only a cmux status in effect pins the footnote
+                            picker: pane.picker
                         ),
                         minWidth: 200,
                         maxHeight: 400,
@@ -272,8 +283,8 @@ private struct WorkspaceTodoPaneContent: View {
                     ) { model, close in
                         SidebarWorkspaceStatusPopover(
                             model: model,
-                            onSelectLane: { [workspace] status in
-                                WorkspaceTodoActions.applyStatusOverride(status, to: [workspace])
+                            onSelectLane: { [workspace] action in
+                                WorkspaceTodoActions.applyStatusOverride(action, to: [workspace])
                             },
                             onSelectNone: { [workspace] in
                                 WorkspaceTodoActions.hideStatus(for: [workspace])
