@@ -4488,6 +4488,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             if builtInAction == .mobileConnect { return CmuxFeatureFlags.shared.isMobileConnectButtonEnabled }
             if builtInAction == .newAgentChat { return CmuxFeatureFlags.shared.isAgentChatUIEnabled }
             if builtInAction == .newSimulator { return CmuxFeatureFlags.shared.isSimulatorEnabled }
+            // cmux-rbf `#cm-73.9`: a Figma tab is a browser tab; the button is not offered while cmux's browser is off.
+            if builtInAction == .newFigma { return owningTabManager?.isBrowserEnabledForHeaders() ?? BrowserAvailabilitySettings.isEnabled() }
             return true
         }
         let executableButtons = Dictionary(
@@ -4567,7 +4569,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         bonsplitController.configuration = configuration
     }
 
-    private func reapplySurfaceTabBarButtonsForFeatureFlags() {
+    // cmux-rbf `#cm-73.9`: not private, so `TabManager` can fan a change of the browser setting out to its workspaces.
+    func reapplySurfaceTabBarButtonsForFeatureFlags() {
         guard let configuration = surfaceTabBarButtonConfiguration else { return }
         applySurfaceTabBarButtons(
             configuration.buttons,
@@ -14733,6 +14736,9 @@ extension Workspace: BonsplitDelegate {
                 _ = newSimulatorSurface(inPane: pane, focus: true)
             case .newTerminal, .newBrowser:
                 break
+            case .newFigma:
+                // cmux-rbf `#cm-73.9`: a Figma tab in the pane whose header was clicked.
+                _ = newFigmaSurface(inPane: pane)
             case .splitLeft, .splitUp, .splitRight, .splitDown:
                 guard let selectedTab = bonsplitController.selectedTab(inPane: pane),
                       let panelId = panelIdFromSurfaceId(selectedTab.id),

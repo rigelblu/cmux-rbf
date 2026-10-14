@@ -7555,6 +7555,8 @@ struct ContentView: View {
                 when: { !$0.bool(CommandPaletteContextKeys.browserDisabled) }
             )
         )
+        // cmux-rbf `#cm-73.9`: the Figma tab's palette row (`ContentView+FigmaCommandPalette.swift`).
+        contributions.append(.newFigmaTab)
         if CmuxFeatureFlags.shared.isSimulatorEnabled {
             contributions.append(.newSimulatorPane)
         }
@@ -8902,6 +8904,8 @@ struct ContentView: View {
             }
         }
         registry.registerNewSimulatorPane(tabManager: tabManager, windowId: windowId)
+        // cmux-rbf `#cm-73.9`: the Figma tab's handler.
+        registry.registerNewFigmaTab(tabManager: tabManager, windowId: windowId)
         registry.register(commandId: "palette.closeTab") {
             if let dockBrowserStore, let browserTarget {
                 guard dockBrowserStore.containsPanel(

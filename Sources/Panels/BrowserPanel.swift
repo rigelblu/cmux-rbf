@@ -4682,7 +4682,10 @@ final class BrowserPanel: Panel, ObservableObject {
                 guard let self, isCurrentObservedWebView(self, webView) else { return }
                 guard !self.isMainFrameProvisionalNavigationActive else { return }
                 self.designModeController.webViewURLDidChange(to: observedURL)
+                // cmux-rbf `#cm-73.9`: Figma opens a file from its file list by changing the address with no page load.
+                let addressBeforeChange = self.currentURL
                 self.currentURL = Self.remoteProxyDisplayURL(for: observedURL) ?? observedURL
+                self.collapseFigmaEditorChromeAfterAddressChange(from: addressBeforeChange, in: webView)
                 self.refreshBackgroundAppearance()
                 GlobalSearchCoordinator.shared.captureBrowserPanel(self)
             }
@@ -4867,6 +4870,19 @@ final class BrowserPanel: Panel, ObservableObject {
         guard FigmaEditorChrome.shouldMinimizeUI(
             paneURL: webView.url,
             isOmnibarVisible: isOmnibarVisible
+        ) else { return }
+        webView.evaluateJavaScript(FigmaEditorChrome.minimizeUIScript(), completionHandler: nil)
+    }
+
+    /// cmux-rbf `#cm-73.9`: the same collapse for an address that changed in place, which
+    /// no navigation-finished hook follows. See
+    /// ``FigmaEditorChrome/shouldMinimizeUI(afterAddressChangeFrom:to:isOmnibarVisible:loadInProgress:)``.
+    private func collapseFigmaEditorChromeAfterAddressChange(from before: URL?, in webView: WKWebView) {
+        guard FigmaEditorChrome.shouldMinimizeUI(
+            afterAddressChangeFrom: before,
+            to: currentURL,
+            isOmnibarVisible: isOmnibarVisible,
+            loadInProgress: webView.isLoading
         ) else { return }
         webView.evaluateJavaScript(FigmaEditorChrome.minimizeUIScript(), completionHandler: nil)
     }

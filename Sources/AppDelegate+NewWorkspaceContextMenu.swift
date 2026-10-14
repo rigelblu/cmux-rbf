@@ -105,7 +105,8 @@ extension AppDelegate {
         case .newCloudWorkspace, .newCloudMachine, .cloudVM:
             return CloudMachinesFeature.isEnabled
                 && AppDelegate.shared?.auth?.accountFlow.isAuthenticated == true
-        case .newBrowser, .newAgentChat:
+        // cmux-rbf `#cm-73.9`: a Figma tab is a browser tab; offered while the browser is on.
+        case .newBrowser, .newAgentChat, .newFigma:
             return BrowserAvailabilitySettings.isEnabled()
         case .newSimulator:
             return CmuxFeatureFlags.shared.isSimulatorEnabled

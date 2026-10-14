@@ -1712,6 +1712,15 @@
 		807310000000000000000004 /* FigmaTabMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000003 /* FigmaTabMarkTests.swift */; };
 		807310000000000000000006 /* FigmaTabMarkWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000005 /* FigmaTabMarkWorkspaceTests.swift */; };
 		807310000000000000000008 /* FigmaMarkAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000007 /* FigmaMarkAssetTests.swift */; };
+		807390000000000000000012 /* FigmaEditorChromeTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */; };
+		807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000F /* FigmaPaletteCommandTests.swift */; };
+		80739000000000000000000E /* FigmaEditorChromeAddressChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000D /* FigmaEditorChromeAddressChangeTests.swift */; };
+		80739000000000000000000C /* FigmaHeaderButtonWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000B /* FigmaHeaderButtonWorkspaceTests.swift */; };
+		80739000000000000000000A /* FigmaHeaderButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000009 /* FigmaHeaderButtonTests.swift */; };
+		807390000000000000000008 /* FigmaOutlineIcon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000007 /* FigmaOutlineIcon.svg */; };
+		807390000000000000000006 /* FigmaButtonIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000005 /* FigmaButtonIcon.swift */; };
+		807390000000000000000004 /* ContentView+FigmaCommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000003 /* ContentView+FigmaCommandPalette.swift */; };
+		807390000000000000000002 /* Workspace+FigmaHeaderButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000001 /* Workspace+FigmaHeaderButton.swift */; };
 		807300000000000000000031 /* FigmaClickRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000030 /* FigmaClickRoute.swift */; };
 		807300000000000000000032 /* FigmaClickRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000030 /* FigmaClickRoute.swift */; };
 		807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000033 /* FigmaClickRouteTests.swift */; };
@@ -5651,6 +5660,15 @@
 		807310000000000000000003 /* FigmaTabMarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkTests.swift; sourceTree = "<group>"; };
 		807310000000000000000005 /* FigmaTabMarkWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkWorkspaceTests.swift; sourceTree = "<group>"; };
 		807310000000000000000007 /* FigmaMarkAssetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaMarkAssetTests.swift; sourceTree = "<group>"; };
+		807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeTriggerTests.swift; sourceTree = "<group>"; };
+		80739000000000000000000F /* FigmaPaletteCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaletteCommandTests.swift; sourceTree = "<group>"; };
+		80739000000000000000000D /* FigmaEditorChromeAddressChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeAddressChangeTests.swift; sourceTree = "<group>"; };
+		80739000000000000000000B /* FigmaHeaderButtonWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaHeaderButtonWorkspaceTests.swift; sourceTree = "<group>"; };
+		807390000000000000000009 /* FigmaHeaderButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaHeaderButtonTests.swift; sourceTree = "<group>"; };
+		807390000000000000000007 /* FigmaOutlineIcon.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = FigmaOutlineIcon.svg; sourceTree = "<group>"; };
+		807390000000000000000005 /* FigmaButtonIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaButtonIcon.swift; sourceTree = "<group>"; };
+		807390000000000000000003 /* ContentView+FigmaCommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+FigmaCommandPalette.swift"; sourceTree = "<group>"; };
+		807390000000000000000001 /* Workspace+FigmaHeaderButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaHeaderButton.swift"; sourceTree = "<group>"; };
 		807300000000000000000006 /* FigmaWrapperPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPage.swift; sourceTree = "<group>"; };
 		B29BA503AF85868C6325335B /* FeedWaiterRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FeedWaiterRegistry.swift"; sourceTree = "<group>"; };
 		7B74E6D94323FE9C5804E0B4 /* FeedWaiterRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedWaiterRegistryTests.swift; sourceTree = "<group>"; };
@@ -8032,6 +8050,7 @@
 			isa = PBXGroup;
 			children = (
 				C0A714100000000000000001 /* ComputerUseHelperIcon.icns */,
+				807390000000000000000007 /* FigmaOutlineIcon.svg */,
 				A11CE0050000000000000001 /* LICENSE */,
 				B2E7294509CC42FE9191870E /* xterm-ghostty */,
 				A5002001 /* THIRD_PARTY_LICENSES.md */,
@@ -9185,6 +9204,8 @@
 				E3B7A400000000000000020B /* Workspace+WorkspaceSurfaceTreeReading.swift */,
 				CA52C0170000000000000000 /* Workspace+SurfaceNavigation.swift */,
 				807300000000000000000036 /* Workspace+FigmaClick.swift */,
+				807390000000000000000003 /* ContentView+FigmaCommandPalette.swift */,
+				807390000000000000000001 /* Workspace+FigmaHeaderButton.swift */,
 				9504A0010000000000000002 /* Workspace+MovingTabSplit.swift */,
 				875200000000000000000004 /* SurfacePaneMovement.swift */,
 				822900000000000000000002 /* Workspace+TerminalResizeInteraction.swift */,
@@ -9983,6 +10004,7 @@
 				807300000000000000000009 /* FigmaEditorChrome.swift */,
 				80730000000000000000001D /* FigmaStayInPane.swift */,
 				807310000000000000000001 /* FigmaTabMark.swift */,
+				807390000000000000000005 /* FigmaButtonIcon.swift */,
 				D7C0DE00000000000000A108 /* BrowserJavaScriptCompletionBridge.swift */,
 				D7C0DE00000000000000A106 /* BrowserOmnibarPageFocusAdapter.swift */,
 				A5001412 /* BrowserPanel.swift */,
@@ -11320,6 +11342,11 @@
 				807310000000000000000003 /* FigmaTabMarkTests.swift */,
 				807310000000000000000005 /* FigmaTabMarkWorkspaceTests.swift */,
 				807310000000000000000007 /* FigmaMarkAssetTests.swift */,
+				807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */,
+				80739000000000000000000F /* FigmaPaletteCommandTests.swift */,
+				80739000000000000000000D /* FigmaEditorChromeAddressChangeTests.swift */,
+				80739000000000000000000B /* FigmaHeaderButtonWorkspaceTests.swift */,
+				807390000000000000000009 /* FigmaHeaderButtonTests.swift */,
 				807300000000000000000033 /* FigmaClickRouteTests.swift */,
 				807300000000000000000038 /* FigmaClickWorkspaceTests.swift */,
 				AC61257DCDCA431A908C55CC /* CLIChildEnvironmentTests.swift */,
@@ -12355,6 +12382,7 @@
 				C0DEC0DE0000000000000011 /* cmux-cua in Resources */,
 				A5001623 /* cmux.sdef in Resources */,
 				C0A714100000000000000002 /* ComputerUseHelperIcon.icns in Resources */,
+				807390000000000000000008 /* FigmaOutlineIcon.svg in Resources */,
 				FEED0A00000000000000F007 /* feed-tui in Resources */,
 				DA7A10CA710E000000000004 /* InfoPlist.xcstrings in Resources */,
 				A11CE0060000000000000001 /* LICENSE in Resources */,
@@ -13508,6 +13536,7 @@
 				80730000000000000000001C /* FigmaPaneURL.swift in Sources */,
 				80730000000000000000001E /* FigmaStayInPane.swift in Sources */,
 				807310000000000000000002 /* FigmaTabMark.swift in Sources */,
+				807390000000000000000006 /* FigmaButtonIcon.swift in Sources */,
 				807300000000000000000035 /* FigmaWrapperPage.swift in Sources */,
 				807300000000000000000031 /* FigmaClickRoute.swift in Sources */,
 				4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */,
@@ -14940,6 +14969,8 @@
 				F9219DE12AF2E4D9CFFC66CF /* Workspace+SurfaceCatalog.swift in Sources */,
 				CA52B0170000000000000000 /* Workspace+SurfaceNavigation.swift in Sources */,
 				807300000000000000000037 /* Workspace+FigmaClick.swift in Sources */,
+				807390000000000000000004 /* ContentView+FigmaCommandPalette.swift in Sources */,
+				807390000000000000000002 /* Workspace+FigmaHeaderButton.swift in Sources */,
 				7DD5BF8AB5B84491BC89EEE9 /* Workspace+SurfaceOwnership.swift in Sources */,
 				85911000000000000000000B /* Workspace+TerminalLinkOpening.swift in Sources */,
 				822900000000000000000001 /* Workspace+TerminalResizeInteraction.swift in Sources */,
@@ -15795,6 +15826,11 @@
 				807310000000000000000004 /* FigmaTabMarkTests.swift in Sources */,
 				807310000000000000000006 /* FigmaTabMarkWorkspaceTests.swift in Sources */,
 				807310000000000000000008 /* FigmaMarkAssetTests.swift in Sources */,
+				807390000000000000000012 /* FigmaEditorChromeTriggerTests.swift in Sources */,
+				807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */,
+				80739000000000000000000E /* FigmaEditorChromeAddressChangeTests.swift in Sources */,
+				80739000000000000000000C /* FigmaHeaderButtonWorkspaceTests.swift in Sources */,
+				80739000000000000000000A /* FigmaHeaderButtonTests.swift in Sources */,
 				807300000000000000000032 /* FigmaClickRoute.swift in Sources */,
 				807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */,
 				807300000000000000000039 /* FigmaClickWorkspaceTests.swift in Sources */,

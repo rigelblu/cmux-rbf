@@ -192,6 +192,16 @@ Cmd+Y creates a workspace on the starred default Cloud machine. New Cloud Machin
 
 When `ui.newWorkspace.contextMenu` is not set, the plus-button menu lists `cmux.newWorkspace` (Cmd+N), `cmux.newCloudWorkspace` (Cmd+Y), `cmux.newCloudMachine` (unbound), `cmux.newTerminal` (Cmd+T), and `cmux.newBrowser` (Cmd+Shift+L). Each row shows its current shortcut, so a rebind in Settings or `cmux.json` appears the next time the menu opens; unbound and chord shortcuts show no hint. Cloud rows appear only when Cloud Machines is enabled. A configured menu keeps your order and still shows hints for built-in rows and for actions with a `shortcut`.
 
+## The Figma button in the pane header
+
+Every pane's header shows a Figma button, third in the default list, after the browser's globe (`cmux.newTerminal`, `cmux.newBrowser`, `cmux.newFigma`, `cmux.splitRight`, `cmux.splitDown`). One click adds a Figma tab in the pane whose header was clicked, on Figma's recent files, with no address bar. Each click adds another tab. It needs cmux's browser to be on; with the browser off the button is not offered. The button follows the Settings toggle at once. A change made from the CLI (`cmux browser disable`) shows the next time cmux becomes active. If a browser URL allowlist leaves `figma.com` out, the click opens the address in your system browser and adds no tab.
+
+`ui.surfaceTabBar.buttons` replaces the default list whole, nothing is merged, so a list you set yourself has no Figma button until it names `cmux.newFigma`. A project's own `.cmux/cmux.json` that sets the list wins over yours. To remove the button, set a list without the id.
+
+`cmux.newFigma` can also be named by an `actions` entry or a shortcut. With no pane clicked, it adds the Figma tab last in the focused pane and focuses it. The command palette has the same command, **New Tab (Figma)**.
+
+<!-- cmux-rbf (#cm-73.9): the section above, on the Figma button, is the fork's. Reject this hunk on upstream sync. -->
+
 ## `terminal.textBoxSubmitActions`
 
 Controls what the TextBox submit button does for new terminal sessions. Active agent sessions such as Claude, Codex, OpenCode, and Pi always use plain Text Entry so prompts go into the running agent instead of launching another command.

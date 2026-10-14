@@ -18162,6 +18162,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
                 onExecuted?()
                 return true
+            case .newFigma:
+                // cmux-rbf `#cm-73.9`: with no pane clicked, the tab goes last in the focused pane and takes focus, as the browser's does.
+                guard context.tabManager.selectedWorkspace?.openFigmaTabInFocusedPane() != nil else { return false }
+                onExecuted?()
+                return true
             case .splitLeft, .splitUp, .splitRight, .splitDown:
                 let direction: SplitDirection
                 switch builtIn {
