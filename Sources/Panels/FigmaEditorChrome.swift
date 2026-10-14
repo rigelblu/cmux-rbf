@@ -41,6 +41,37 @@ enum FigmaEditorChrome {
         return FigmaFileLink.isEditorLink(paneURL)
     }
 
+    /// Whether an address that changed with no page load should collapse Figma's
+    /// panels. Figma opens a file from its file list by changing the address in
+    /// place, so the finished-load hook never runs for it (`cm-73.9`).
+    ///
+    /// The same two conditions as ``shouldMinimizeUI(paneURL:isOmnibarVisible:)``
+    /// for the new address, plus two more:
+    /// - the address before was not a link to the **same file**: a frame added to
+    ///   the file already open leaves the panels as the person left them, and a
+    ///   second collapse would undo an expand;
+    /// - **no load is in progress**: WebKit also changes the address as a load
+    ///   starts, in the page being left, and the finished load collapses on its own.
+    static func shouldMinimizeUI(
+        afterAddressChangeFrom before: URL?,
+        to after: URL?,
+        isOmnibarVisible: Bool,
+        loadInProgress: Bool = false
+    ) -> Bool {
+        guard !loadInProgress,
+              shouldMinimizeUI(paneURL: after, isOmnibarVisible: isOmnibarVisible),
+              let key = fileKey(of: after) else { return false }
+        return fileKey(of: before) != key
+    }
+
+    /// The file key in `/design/<key>/<name>` (or `/file/`, `/board/`, `/slides/`) on
+    /// the editor's hosts, or `nil` for any other address.
+    private static func fileKey(of url: URL?) -> String? {
+        guard let url, FigmaFileLink.isEditorLink(url) else { return nil }
+        let parts = url.path.split(separator: "/")
+        return parts.count >= 2 ? String(parts[1]) : nil
+    }
+
     // MARK: - How it is done
 
     /// Click Figma's own control, rather than sending its keyboard shortcut.
