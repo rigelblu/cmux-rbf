@@ -223,6 +223,21 @@ struct RemoteCLIRelayPolicyTests {
         }
     }
 
+    /// #cm-109: a script's `cmux workspace status list` reads local state a remote host has no use for. The method is
+    /// not on the allowlist and the relay denies it by default; this pins that nothing added it.
+    @Test("workspace.status.list is denied")
+    func deniesWorkspaceStatusList() throws {
+        try withServer { port, unixServer in
+            let exchange = try runPolicyRelayExchange(
+                port: port,
+                relayID: relayID,
+                tokenHex: tokenHex,
+                commandLine: #"{"id":"p30","method":"workspace.status.list","params":{}}"#
+            )
+            expectDenial(exchange, unixServer, "workspace.status.list")
+        }
+    }
+
     @Test("send_text to a live local ID from the alias values is forwarded (fresh-session shape)")
     func allowsAliasedLocalIDValueSendText() throws {
         // Fresh remote sessions carry no distinct remote IDs: the remote

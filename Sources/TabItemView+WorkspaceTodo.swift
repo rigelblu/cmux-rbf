@@ -30,16 +30,18 @@ extension TabItemView {
                     }
                     workspaceTodoStatusMenuButton(
                         title: lane.title,
-                        isSelected: lane.isSelected
+                        isSelected: lane.isSelected,
+                        colorHex: lane.colorHex,
+                        isEnabled: lane.action != nil
                     ) {
                         if lane.isNone {
                             actions.hideTodoStatus(contextMenuWorkspaceIds)
-                        } else {
-                            actions.applyTodoStatus(lane.status, contextMenuWorkspaceIds)
+                        } else if let action = lane.action {
+                            actions.applyTodoStatus(action, contextMenuWorkspaceIds) // (#cm-109)
                         }
                     }
-                    // Divider after the Auto row (first lane, nil status, not None).
-                    if lane.status == nil, !lane.isNone {
+                    // Divider after the Auto row (the row whose action is Auto). (#cm-109)
+                    if lane.action == .auto {
                         Divider()
                     }
                 }
@@ -65,15 +67,35 @@ extension TabItemView {
     private func workspaceTodoStatusMenuButton(
         title: String,
         isSelected: Bool,
+        colorHex: String? = nil, // (#cm-109)
+        isEnabled: Bool = true, // (#cm-109)
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            if isSelected {
+            if let colorHex {
+                // (#cm-109) A row with a color draws its dot the way the Workspace Color menu draws its swatch.
+                Label {
+                    Text(title)
+                } icon: {
+                    HStack(spacing: 3) {
+                        // (#cm-109) As the Workspace Color menu draws its check slot: hidden, not transparent.
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                        } else {
+                            Image(systemName: "checkmark").hidden()
+                        }
+                        Image(nsImage: coloredCircleImage(
+                            color: WorkspaceStatusPresentation.dotColor(hex: colorHex, isDark: colorScheme == .dark)
+                        ))
+                    }
+                }
+            } else if isSelected {
                 Label(title, systemImage: "checkmark")
             } else {
                 Text(title)
             }
         }
+        .disabled(!isEnabled) // (#cm-109) the greyed row cannot be chosen
     }
 }
 
@@ -89,29 +111,20 @@ enum WorkspaceTodoPaletteCommands {
     private static let addChecklistItemCommandId = "palette.addWorkspaceChecklistItem"
     private static let openTodoPaneCommandId = "palette.openWorkspaceTodoPane"
 
-    private static func statusCommandId(_ status: WorkspaceTaskStatus) -> String {
-        "palette.workspaceStatus.\(status.rawValue)"
-    }
-
-    private static func statusTitle(_ status: WorkspaceTaskStatus) -> String {
-        String(
-            format: String(
-                localized: "command.workspaceStatus.title",
-                defaultValue: "Workspace Status: %@"
-            ),
-            locale: .current,
-            status.displayName
-        )
-    }
-
+    /// The command palette's contributions. The status entries are one for each entry of `list` in the file's order
+    /// (cmux's five when the list is cmux's own); `list` and `controlsEnabled` default to the app's, and a test passes
+    /// its own. (#cm-109)
     static func contributions(
-        workspaceSubtitle: @escaping (CommandPaletteContextSnapshot) -> String
+        workspaceSubtitle: @escaping (CommandPaletteContextSnapshot) -> String,
+        list: WorkspaceStatusList? = nil,
+        controlsEnabled: Bool? = nil
     ) -> [CommandPaletteCommandContribution] {
+        let list = list ?? AppDelegate.statusListInUse
         let hasWorkspace: (CommandPaletteContextSnapshot) -> Bool = {
             $0.bool(CommandPaletteContextKeys.hasWorkspace)
         }
         var contributions: [CommandPaletteCommandContribution] = []
-        if WorkspaceTodoFeature.isEnabled {
+        if controlsEnabled ?? WorkspaceTodoFeature.isEnabled {
             contributions.append(
                 CommandPaletteCommandContribution(
                     commandId: statusAutoCommandId,
@@ -126,13 +139,13 @@ enum WorkspaceTodoPaletteCommands {
                     when: hasWorkspace
                 )
             )
-            for status in WorkspaceTaskStatus.allCases {
+            for entry in list.entries {
                 contributions.append(
                     CommandPaletteCommandContribution(
-                        commandId: statusCommandId(status),
-                        title: { _ in statusTitle(status) },
+                        commandId: WorkspaceStatusPresentation.paletteStatusCommandID(entry.id),
+                        title: { _ in WorkspaceStatusPresentation.paletteStatusTitle(entry) },
                         subtitle: workspaceSubtitle,
-                        keywords: ["workspace", "status", "todo", "lane", status.rawValue],
+                        keywords: ["workspace", "status", "todo", "lane", entry.id],
                         when: hasWorkspace
                     )
                 )
@@ -183,10 +196,20 @@ enum WorkspaceTodoPaletteCommands {
         return contributions
     }
 
+    /// Registers the palette's handlers. `list`, `controlsEnabled` and `apply` default to the app's (the list in use,
+    /// the status controls' gate, `WorkspaceTodoActions.applyStatusOverride`); a test passes its own. (#cm-109)
     static func registerHandlers(
         in registry: inout CommandPaletteHandlerRegistry,
-        tabManager: TabManager
+        tabManager: TabManager,
+        list: WorkspaceStatusList? = nil,
+        controlsEnabled: Bool? = nil,
+        apply: ((WorkspaceStatusPickAction, [Workspace]) -> Void)? = nil
     ) {
+        let list = list ?? AppDelegate.statusListInUse
+        let isEnabled: () -> Bool = { controlsEnabled ?? WorkspaceTodoFeature.isEnabled }
+        let applyStatus: (WorkspaceStatusPickAction, [Workspace]) -> Void = apply ?? {
+            WorkspaceTodoActions.applyStatusOverride($0, to: $1)
+        }
         func withSelectedWorkspace(_ body: @escaping (Workspace) -> Void) -> () -> Void {
             {
                 guard let workspace = tabManager.selectedWorkspace else {
@@ -199,33 +222,33 @@ enum WorkspaceTodoPaletteCommands {
         registry.register(
             commandId: statusAutoCommandId,
             handler: withSelectedWorkspace { workspace in
-                guard WorkspaceTodoFeature.isEnabled else {
+                guard isEnabled() else {
                     NSSound.beep()
                     return
                 }
-                WorkspaceTodoActions.applyStatusOverride(nil, to: [workspace])
+                applyStatus(.auto, [workspace])
             }
         )
-        for status in WorkspaceTaskStatus.allCases {
+        for entry in list.entries {
             registry.register(
-                commandId: statusCommandId(status),
+                commandId: WorkspaceStatusPresentation.paletteStatusCommandID(entry.id),
                 handler: withSelectedWorkspace { workspace in
-                    guard WorkspaceTodoFeature.isEnabled else {
+                    guard isEnabled() else {
                         NSSound.beep()
                         return
                     }
-                    WorkspaceTodoActions.applyStatusOverride(status, to: [workspace])
+                    applyStatus(.status(id: entry.id), [workspace])
                 }
             )
         }
         registry.register(
             commandId: markWorkspaceDoneCommandId,
             handler: withSelectedWorkspace { workspace in
-                guard WorkspaceTodoFeature.isEnabled else {
+                guard isEnabled() else {
                     NSSound.beep()
                     return
                 }
-                WorkspaceTodoActions.applyStatusOverride(.done, to: [workspace])
+                applyStatus(.done, [workspace])
             }
         )
         registry.register(

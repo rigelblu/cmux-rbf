@@ -3110,5 +3110,9 @@
       "es": "The standard pixel unit abbreviation px is invariant; the localized entry preserves the numeric placeholder.",
       "ja": "The standard pixel unit abbreviation px is invariant; the localized entry preserves the numeric placeholder."
     }
+  },
+  "workspaceStatuses.store.notAnObjectDetail": {
+    "source": "The top level is not an object.",
+    "class": "technical"
   }
 }

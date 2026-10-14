@@ -49,17 +49,25 @@ extension TerminalController: ControlWorkspaceTodoContext {
     private func todoStatusSnapshot(for workspace: Workspace) -> ControlWorkspaceTodoStatusSnapshot {
         let signals = workspace.taskStatusSignals()
         let inferred = WorkspaceTaskStatus.inferred(from: signals)
-        let override = workspace.todoState.statusOverride
-        let effective = WorkspaceTaskStatusOverride.effectiveStatus(
-            override: override,
-            inferred: inferred
-        ).effective
+        // (#cm-109) `effective`, `override` and `status_id` come from what the workspace holds, worked out against
+        // the list in use (T2's table), not from the stored status: with the read no longer removing a lapsed
+        // status, the stored one would be reported as in effect. `override` is written only when a status set by
+        // hand is in effect; for one of his own it is the cmux status it extends, recorded at the moment of the answer.
+        let resolution = workspace.statusResolution(list: AppDelegate.statusListInUse)
+        let overrideStatus: String?
+        switch resolution {
+        case .cmuxInEffect(let entry, _): overrideStatus = entry.id
+        case .ownInEffect(let entry): overrideStatus = entry.behavesAs.rawValue
+        case .detected, .cmuxLapsed, .ownWaiting, .ownNotListed: overrideStatus = nil
+        }
+        // None hides the id too, also when a restored session still holds one (Decisions, 2026-10-13, answer 5).
+        let statusID = workspace.todoState.statusHidden ? nil : resolution.heldID
         return ControlWorkspaceTodoStatusSnapshot(
             workspaceID: workspace.id,
-            effective: effective.rawValue,
+            effective: resolution.effective.rawValue,
             inferred: inferred.rawValue,
-            overrideStatus: override?.status.rawValue,
-            overrideInferredAt: override?.inferredAtOverride.rawValue,
+            overrideStatus: overrideStatus,
+            overrideInferredAt: overrideStatus == nil ? nil : inferred.rawValue,
             signals: ControlWorkspaceTodoStatusSnapshot.Signals(
                 anyAgentNeedsInput: signals.anyAgentNeedsInput,
                 anyAgentRunning: signals.anyAgentRunning,
@@ -67,7 +75,8 @@ extension TerminalController: ControlWorkspaceTodoContext {
                 hasPullRequests: signals.hasPullRequests,
                 allPullRequestsMergedOrClosed: signals.allPullRequestsMergedOrClosed,
                 isGitDirty: signals.isGitDirty
-            )
+            ),
+            statusID: statusID
         )
     }
 
@@ -124,7 +133,7 @@ extension TerminalController: ControlWorkspaceTodoContext {
         case .notFound:
             return .notFound
         case .found(let tabManager, let workspace):
-            workspace.reconcileExpiredTaskStatusOverride()
+            // (#cm-109) no reconcile here: reading a status changes nothing
             return .resolved(
                 windowID: AppDelegate.shared?.windowId(for: tabManager),
                 status: todoStatusSnapshot(for: workspace)
@@ -147,10 +156,12 @@ extension TerminalController: ControlWorkspaceTodoContext {
                 if statusRaw == "none" {
                     workspace.hideTaskStatus()
                 } else {
-                    guard let status = WorkspaceTaskStatus(rawValue: statusRaw) else {
-                        return .invalidStatus(statusRaw)
+                    // (#cm-109) one write path: it sets the status and writes its color, or refuses the id
+                    if case .unknown(let raw, let accepted) = WorkspaceStatusActions.app().apply(
+                        .status(id: statusRaw), to: [workspace], requireControls: false
+                    ) {
+                        return .unknownStatus(raw, accepted: accepted)
                     }
-                    workspace.setTaskStatusOverride(status)
                 }
             } else {
                 workspace.clearTaskStatusOverride()

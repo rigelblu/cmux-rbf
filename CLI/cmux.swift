@@ -41298,6 +41298,7 @@ export default CMUXSessionRestore;
         return URL(fileURLWithPath: expanded).standardizedFileURL
     }
 
+    // (#cm-109) The `workspace status` line inside this text lists `set <id|auto|none>`, `cycle` and `list`; a comment cannot sit inside the string.
     private func usage() -> String {
         return """
         cmux - control cmux via Unix socket
@@ -41378,7 +41379,7 @@ export default CMUXSessionRestore;
           reorder-workspace --workspace <id|ref|index> (--index <n> | --before <id|ref|index> | --after <id|ref|index>) [--window <id|ref|index>] [--dry-run]
           reorder-workspaces --order <id|ref|index>,<id|ref|index>,... [--window <id|ref|index>] [--dry-run]
           workspace-action --action <name> [--workspace <id|ref|index>] [--window <id|ref|index>] [--title <text>] [--color <name|#hex>] [--description <text>]
-          workspace status [set <lane|auto>] [--workspace <id|ref|index>] [--window <id|ref|index>]
+          workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>]
           todo <add|list|check|uncheck|start|rm|clear> [args] [--workspace <id|ref|index>] [--window <id|ref|index>]
           comments list [--repo <path>] [--all] [--json]
           vault sessions [--agent <id>] [--folder <path>] [--limit <n>] [--json]

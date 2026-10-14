@@ -62,10 +62,7 @@ extension Workspace {
     /// expired-override cleanup happens in
     /// ``reconcileExpiredTaskStatusOverride()`` at mutation/read entry points.
     var effectiveTaskStatus: WorkspaceTaskStatus {
-        WorkspaceTaskStatusOverride.effectiveStatus(
-            override: todoState.statusOverride,
-            inferred: inferredTaskStatus
-        ).effective
+        statusResolution(list: AppDelegate.statusListInUse).effective // (#cm-109)
     }
 
     /// **The** definition of the "attention lane" — the value
@@ -115,6 +112,7 @@ extension Workspace {
     /// the override expires as soon as the live signals change lanes. Picking
     /// a lane re-engages the feature (clears any None opt-out).
     func setTaskStatusOverride(_ status: WorkspaceTaskStatus) {
+        todoState.ownStatus = nil // (#cm-109)
         todoState.statusHidden = false
         todoState.statusOverride = WorkspaceTaskStatusOverride(
             status: status,
@@ -125,6 +123,7 @@ extension Workspace {
     /// Returns the status to automatic by clearing the manual override (and
     /// any None opt-out), so the glyph shows the inferred lane again.
     func clearTaskStatusOverride() {
+        todoState.ownStatus = nil // (#cm-109)
         todoState.statusHidden = false
         todoState.statusOverride = nil
     }
@@ -132,6 +131,7 @@ extension Workspace {
     /// Opts this workspace out of the status feature: no glyph is drawn before
     /// the title (the "None" state, distinct from Auto). Clears any override.
     func hideTaskStatus() {
+        todoState.ownStatus = nil // (#cm-109)
         todoState.statusOverride = nil
         todoState.statusHidden = true
     }
@@ -141,7 +141,7 @@ extension Workspace {
     /// manual override to the lane after the current effective status. Shared
     /// by the `cycleWorkspaceStatus` shortcut and `workspace.status.cycle`.
     func cycleTaskStatus() {
-        setTaskStatusOverride(effectiveTaskStatus.next)
+        cycleStatusThroughList() // (#cm-109)
     }
 
     // MARK: - Checklist entry points (shared by socket, CLI, UI)
@@ -267,6 +267,7 @@ extension Workspace {
     /// so an override or checklist change triggers a save.
     func combineTodoStateIntoSessionAutosaveFingerprint(into hasher: inout Hasher) {
         hasher.combine(todoState.statusOverride)
+        hasher.combine(todoState.ownStatus?.id) // (#cm-109)
         hasher.combine(todoState.statusHidden)
         hasher.combine(todoState.checklist)
     }
@@ -275,6 +276,7 @@ extension Workspace {
     /// from manifests written before this feature, restore to empty state).
     func restoreTodoState(from snapshot: SessionWorkspaceSnapshot) {
         todoState.statusOverride = snapshot.restoredTaskStatusOverride
+        restoreOwnStatus(from: snapshot) // (#cm-109)
         todoState.statusHidden = snapshot.taskStatusHidden ?? false
         todoState.checklist = snapshot.restoredChecklist
     }

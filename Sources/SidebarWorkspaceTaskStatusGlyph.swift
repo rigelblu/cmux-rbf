@@ -87,11 +87,11 @@ struct SidebarWorkspaceTaskStatusGlyphModel: Equatable {
 
     /// The localized tooltip: lane name plus whether it was set manually or
     /// inferred from live signals.
-    static func tooltip(status: WorkspaceTaskStatus, hasOverride: Bool) -> String {
+    static func tooltip(status: WorkspaceTaskStatus, hasOverride: Bool, name: String? = nil) -> String {
         String(
             format: hasOverride ? manualTooltipFormat : inferredTooltipFormat,
             locale: .current,
-            status.displayName
+            name ?? status.displayName // (#cm-109) his name for the status when the row has one
         )
     }
 }
@@ -118,7 +118,7 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
     let status: WorkspaceTaskStatus
     let model: SidebarWorkspaceCompactStatusMenuModel
     let workspaceId: UUID
-    let applyTodoStatus: (WorkspaceTaskStatus?, [UUID]) -> Void
+    let applyTodoStatus: (WorkspaceStatusPickAction, [UUID]) -> Void // (#cm-109)
     let hideTodoStatus: ([UUID]) -> Void
     let usesMonochrome: Bool
     let monochromeColor: Color
@@ -127,8 +127,13 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
 
     @State private var isStatusPopoverPresented = false
 
+    /// His name for the status shown, from the picker's checked row; cmux's own name when the picker has none. (#cm-109)
+    private var statusName: String {
+        WorkspaceStatusPresentation.checkedName(in: model.picker) ?? status.displayName
+    }
+
     private var labelText: String {
-        String(localized: "sidebar.status.compactLabel", defaultValue: "Status: \(status.displayName)")
+        String(localized: "sidebar.status.compactLabel", defaultValue: "Status: \(statusName)")
     }
 
     var body: some View {
@@ -141,19 +146,31 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
                 usesMonochrome: usesMonochrome,
                 monochromeColor: monochromeColor,
                 neutralColor: neutralColor,
-                fontScale: fontScale
+                fontScale: fontScale,
+                name: statusName // (#cm-109)
             )
             .padding(.horizontal, 2)
             .padding(.vertical, 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(
+        .background(statusPopoverHost)
+        .fixedSize(horizontal: true, vertical: true)
+        .safeHelp(String(localized: "sidebar.status.compactTooltip", defaultValue: "Change workspace status"))
+        .accessibilityLabel(labelText)
+        .accessibilityIdentifier("SidebarWorkspaceManualStatusIndicatorMenu")
+    }
+
+    /// The popover's host; a snapshot with no picker has no popover. (#cm-109)
+    @ViewBuilder
+    private var statusPopoverHost: some View {
+        if let picker = model.picker {
             SidebarWorkspaceTodoPopoverHost(
                 isPresented: $isStatusPopoverPresented,
                 model: SidebarWorkspaceStatusPopoverModel(
                     inferred: model.inferred,
-                    activeOverride: model.activeOverride
+                    activeOverride: model.activeOverride,
+                    picker: picker
                 ),
                 minWidth: 200,
                 maxHeight: 400,
@@ -161,8 +178,8 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
             ) { model, close in
                 SidebarWorkspaceStatusPopover(
                     model: model,
-                    onSelectLane: { status in
-                        applyTodoStatus(status, [workspaceId])
+                    onSelectLane: { action in
+                        applyTodoStatus(action, [workspaceId])
                     },
                     onSelectNone: {
                         hideTodoStatus([workspaceId])
@@ -170,11 +187,7 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
                     onClose: close
                 )
             }
-        )
-        .fixedSize(horizontal: true, vertical: true)
-        .safeHelp(String(localized: "sidebar.status.compactTooltip", defaultValue: "Change workspace status"))
-        .accessibilityLabel(labelText)
-        .accessibilityIdentifier("SidebarWorkspaceManualStatusIndicatorMenu")
+        }
     }
 }
 
@@ -198,6 +211,8 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     /// The secondary color used for the todo outline.
     let neutralColor: Color
     let fontScale: CGFloat
+    /// His name for the status, for the tooltip; cmux's own name when `nil`. (#cm-109)
+    var name: String? = nil
 
     private static let baseSize: CGFloat = 9
     private static let slotWidth: CGFloat = 11
@@ -232,7 +247,7 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
 
     var body: some View {
         let size = Self.baseSize * fontScale
-        let tooltip = SidebarWorkspaceTaskStatusGlyphModel.tooltip(status: status, hasOverride: hasOverride)
+        let tooltip = SidebarWorkspaceTaskStatusGlyphModel.tooltip(status: status, hasOverride: hasOverride, name: name)
         ZStack {
             Circle()
                 .stroke(statusColor, lineWidth: strokeWidth)

@@ -19,6 +19,8 @@ extension ControlCommandCoordinator {
             return workspaceStatusSet(request.params)
         case "workspace.status.cycle":
             return workspaceStatusCycle(request.params)
+        case "workspace.status.list": // (#cm-109) the list in use, its colors and its problems
+            return workspaceStatusList(request.params)
         case "workspace.todo.list":
             return workspaceTodoList(request.params)
         case "workspace.todo.add":
@@ -68,6 +70,7 @@ extension ControlCommandCoordinator {
             "effective": .string(status.effective),
             "inferred": .string(status.inferred),
             "override": overridePayload,
+            "status_id": orNull(status.statusID), // (#cm-109) the id of the status held, his own or cmux's
             "signals": .object([
                 "any_agent_needs_input": .bool(status.signals.anyAgentNeedsInput),
                 "any_agent_running": .bool(status.signals.anyAgentRunning),
@@ -181,6 +184,15 @@ extension ControlCommandCoordinator {
                 code: "invalid_params",
                 message: "status must be one of: todo, working, needs-attention, review, done, auto",
                 data: .object(["status": .string(raw)])
+            )
+        case .unknownStatus(let raw, let accepted): // (#cm-109) the refusal names the ids of the list in use
+            return .err(
+                code: "invalid_params",
+                message: "status must be one of: \(accepted.joined(separator: ", "))",
+                data: .object([
+                    "status": .string(raw),
+                    "accepted": .array(accepted.map { .string($0) }),
+                ])
             )
         case .resolved(let windowID, let status):
             return .ok(workspaceTodoStatusPayload(windowID: windowID, status: status))

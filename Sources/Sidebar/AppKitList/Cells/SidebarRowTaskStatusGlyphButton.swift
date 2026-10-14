@@ -17,6 +17,8 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         let usesMonochrome: Bool
         let fontScale: CGFloat
         let colorScheme: ColorScheme
+        /// His name for the status, for the label and tooltip; cmux's own name when `nil`. (#cm-109)
+        var name: String? = nil
     }
 
     private static let baseSize: CGFloat = 9
@@ -41,12 +43,13 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         self.neutralColor = neutralColor
         toolTip = SidebarWorkspaceTaskStatusGlyphModel.tooltip(
             status: model.status,
-            hasOverride: model.hasOverride
+            hasOverride: model.hasOverride,
+            name: model.name
         )
         setAccessibilityRole(.button)
         setAccessibilityLabel(String(
             localized: "sidebar.status.compactLabel",
-            defaultValue: "Status: \(model.status.displayName)"
+            defaultValue: "Status: \(model.name ?? model.status.displayName)"
         ))
         setAccessibilityIdentifier("SidebarWorkspaceManualStatusIndicatorMenu")
         if changed {

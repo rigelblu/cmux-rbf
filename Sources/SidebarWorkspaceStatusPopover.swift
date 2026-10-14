@@ -11,34 +11,52 @@ import SwiftUI
 /// rows may expose this list from the compact manual-status glyph, but automatic
 /// status stays out of row chrome.
 struct WorkspaceTodoStatusLane: Equatable, Identifiable {
-    /// The lane to pin, or `nil` for Auto (clear the override) and for None.
+    /// The cmux status the row's glyph draws, or `nil` for Auto, None and a greyed row that has none. After #cm-109
+    /// it is for the glyph only: what a pick applies is `action`.
     let status: WorkspaceTaskStatus?
     let title: String
     let isSelected: Bool
+    /// What a pick applies: Auto, None or a status by id. Empty for the greyed row, which cannot be chosen. No
+    /// default, so a row cannot be made without saying. (#cm-109)
+    let action: WorkspaceStatusPickAction?
     /// The None row: opt the workspace out of the feature (hide the glyph).
     var isNone: Bool = false
+    /// The color the app resolved for the row's status, for its dot; `nil` when it has none. (#cm-109)
+    var colorHex: String? = nil
 
-    var id: String { isNone ? "none" : (status?.rawValue ?? "auto") }
+    /// The row's id reads its action; the greyed row has the picker's own id for it. (#cm-109)
+    var id: String {
+        switch action {
+        case .auto: "auto"
+        case .hide: "none"
+        case .status(let id): id
+        case nil: WorkspaceStatusPickerRow.heldRowID
+        }
+    }
 }
 
 struct SidebarWorkspaceCompactStatusMenuModel: Equatable {
     let inferred: WorkspaceTaskStatus
     let activeOverride: WorkspaceTaskStatus?
+    /// The rows a picker draws, against the list in use; optional because upstream's tests build this model without
+    /// one. (#cm-109)
+    var picker: WorkspaceStatusPickerState? = nil
 }
 
 extension SidebarWorkspaceCompactStatusMenuModel {
     static func resolve(
         inferred: WorkspaceTaskStatus,
-        override: WorkspaceTaskStatusOverride?
+        override: WorkspaceTaskStatusOverride?,
+        picker: WorkspaceStatusPickerState? = nil // (#cm-109)
     ) -> Self {
         let resolution = WorkspaceTaskStatusOverride.effectiveStatus(
             override: override,
             inferred: inferred
         )
         guard let override, !resolution.shouldClearOverride else {
-            return Self(inferred: inferred, activeOverride: nil)
+            return Self(inferred: inferred, activeOverride: nil, picker: picker)
         }
-        return Self(inferred: inferred, activeOverride: override.status)
+        return Self(inferred: inferred, activeOverride: override.status, picker: picker)
     }
 }
 
@@ -57,19 +75,22 @@ extension WorkspaceTodoStatusLane {
         var lanes = [WorkspaceTodoStatusLane(
             status: nil,
             title: autoTitle(inferred: inferred, hasOverride: activeOverride != nil),
-            isSelected: activeOverride == nil && !isHidden
+            isSelected: activeOverride == nil && !isHidden,
+            action: .auto // (#cm-109)
         )]
         lanes += WorkspaceTaskStatus.allCases.map { status in
             WorkspaceTodoStatusLane(
                 status: status,
                 title: status.displayName,
-                isSelected: !isHidden && activeOverride == status
+                isSelected: !isHidden && activeOverride == status,
+                action: .status(id: status.rawValue) // (#cm-109)
             )
         }
         lanes.append(WorkspaceTodoStatusLane(
             status: nil,
             title: String(localized: "sidebar.status.none", defaultValue: "None (hide status)"),
             isSelected: isHidden,
+            action: .hide, // (#cm-109)
             isNone: true
         ))
         return lanes
@@ -108,6 +129,8 @@ struct SidebarWorkspaceStatusPopoverModel: Equatable {
     let inferred: WorkspaceTaskStatus
     /// The pinned lane, or `nil` while automatic.
     let activeOverride: WorkspaceTaskStatus?
+    /// The rows the popover draws, against the list in use. No default, so each host must pass one. (#cm-109)
+    let picker: WorkspaceStatusPickerState
     /// Whether the workspace is opted out (None active).
     var isHidden: Bool = false
 }
@@ -121,8 +144,8 @@ struct SidebarWorkspaceStatusPopoverModel: Equatable {
 /// and a lane's first letter jumps.
 struct SidebarWorkspaceStatusPopover: View {
     let model: SidebarWorkspaceStatusPopoverModel
-    /// Applies a lane (`nil` = Auto) through the shared status action path.
-    let onSelectLane: @MainActor (WorkspaceTaskStatus?) -> Void
+    /// Applies a row's action through the shared status action path. (#cm-109)
+    let onSelectLane: @MainActor (WorkspaceStatusPickAction) -> Void
     /// Opts the workspace out (None): hide the status glyph.
     let onSelectNone: @MainActor () -> Void
     let onClose: @MainActor () -> Void
@@ -135,7 +158,7 @@ struct SidebarWorkspaceStatusPopover: View {
 
     init(
         model: SidebarWorkspaceStatusPopoverModel,
-        onSelectLane: @escaping @MainActor (WorkspaceTaskStatus?) -> Void,
+        onSelectLane: @escaping @MainActor (WorkspaceStatusPickAction) -> Void,
         onSelectNone: @escaping @MainActor () -> Void,
         onClose: @escaping @MainActor () -> Void
     ) {
@@ -143,20 +166,13 @@ struct SidebarWorkspaceStatusPopover: View {
         self.onSelectLane = onSelectLane
         self.onSelectNone = onSelectNone
         self.onClose = onClose
-        let lanes = WorkspaceTodoStatusLane.lanes(
-            inferred: model.inferred,
-            activeOverride: model.activeOverride,
-            isHidden: model.isHidden
-        )
-        _highlightedIndex = State(initialValue: lanes.firstIndex(where: \.isSelected) ?? 0)
+        let lanes = WorkspaceTodoStatusLane.lanes(picker: model.picker) // (#cm-109)
+        // The highlight starts on the first checked row that can be chosen, and on Auto when there is none.
+        _highlightedIndex = State(initialValue: lanes.firstIndex(where: { $0.isSelected && $0.action != nil }) ?? 0)
     }
 
     private var lanes: [WorkspaceTodoStatusLane] {
-        WorkspaceTodoStatusLane.lanes(
-            inferred: model.inferred,
-            activeOverride: model.activeOverride,
-            isHidden: model.isHidden
-        )
+        WorkspaceTodoStatusLane.lanes(picker: model.picker) // (#cm-109)
     }
 
     var body: some View {
@@ -246,8 +262,9 @@ struct SidebarWorkspaceStatusPopover: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(lane.action == nil) // (#cm-109) the greyed row cannot be chosen
         .onHover { hovering in
-            if hovering { highlightedIndex = index }
+            if hovering, lane.action != nil { highlightedIndex = index } // (#cm-109)
         }
         .accessibilityIdentifier("SidebarWorkspaceStatusPopoverLane.\(lane.id)")
     }
@@ -255,10 +272,11 @@ struct SidebarWorkspaceStatusPopover: View {
     /// Applies a lane through the shared status path, then dismisses like a
     /// standard menu selection.
     private func apply(_ lane: WorkspaceTodoStatusLane) {
+        guard let action = lane.action else { return } // (#cm-109) a row with no action does nothing
         if lane.isNone {
             onSelectNone()
         } else {
-            onSelectLane(lane.status)
+            onSelectLane(action)
         }
         onClose()
     }
@@ -270,7 +288,15 @@ struct SidebarWorkspaceStatusPopover: View {
 
     private func moveHighlight(_ delta: Int, laneCount: Int) {
         guard laneCount > 0 else { return }
-        highlightedIndex = (highlightedIndex + delta + laneCount) % laneCount
+        // (#cm-109) arrows skip a row with no action
+        var next = highlightedIndex
+        for _ in 0..<laneCount {
+            next = (next + delta + laneCount) % laneCount
+            if lanes[next].action != nil {
+                highlightedIndex = next
+                return
+            }
+        }
     }
 
     /// Jumps the highlight to the first lane whose title starts with the
@@ -278,7 +304,7 @@ struct SidebarWorkspaceStatusPopover: View {
     private func jumpToLane(startingWith characters: String, lanes: [WorkspaceTodoStatusLane]) -> Bool {
         let typed = characters.lowercased()
         guard !typed.isEmpty, typed.rangeOfCharacter(from: .alphanumerics) != nil else { return false }
-        guard let index = lanes.firstIndex(where: { $0.title.lowercased().hasPrefix(typed) }) else {
+        guard let index = lanes.firstIndex(where: { $0.action != nil && $0.title.lowercased().hasPrefix(typed) }) else { // (#cm-109)
             return false
         }
         highlightedIndex = index

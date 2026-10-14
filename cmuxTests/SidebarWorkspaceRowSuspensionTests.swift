@@ -47,7 +47,20 @@ struct SidebarWorkspaceRowSuspensionTests {
             todoStatusMenuModel: manualTaskStatus.map {
                 SidebarWorkspaceCompactStatusMenuModel(
                     inferred: $0,
-                    activeOverride: $0
+                    activeOverride: $0,
+                    // (#cm-109) A row with no picker gets no popover, so the helper passes cmux's five, built the way
+                    // `SidebarWorkspaceTaskStatusSnapshot.capture` builds the picker.
+                    picker: WorkspaceStatusPicker().rows(
+                        resolution: WorkspaceStatusResolution.resolve(
+                            override: WorkspaceTaskStatusOverride(status: $0, inferredAtOverride: $0),
+                            own: nil,
+                            inferred: $0,
+                            list: .cmuxFive
+                        ),
+                        inferred: $0,
+                        isHidden: false,
+                        list: .cmuxFive
+                    )
                 )
             },
             hasManualTaskStatus: manualTaskStatus != nil,

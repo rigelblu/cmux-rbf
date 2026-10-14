@@ -5684,6 +5684,9 @@ struct ContentView: View {
         var hasher = Hasher()
         hasher.combine(commandsContext.snapshot.fingerprint())
         hasher.combine(cmuxConfigStore.configRevision)
+        // (#cm-109) The palette's status commands are built from the status list; the store has its own watcher, so the
+        // key must know when the list changed.
+        hasher.combine(AppDelegate.shared?.workspaceStatusListStore.revision ?? 0)
         if let workflowTarget = commandPaletteJustRBFWorkflowTarget {
             hasher.combine(true)
             hasher.combine(workflowTarget.host)
@@ -12266,6 +12269,14 @@ struct VerticalTabsSidebar: View, Equatable {
         }
         .accessibilityIdentifier("Sidebar")
         .ignoresSafeArea()
+        // (#cm-109) A change of the status list (or of the app's colors, which the store folds into its revision)
+        // rebuilds every row's snapshot, in both sidebars: the cached snapshot holds the picker's rows. It sits on the
+        // chain that is built for every sidebar, so a change while a custom sidebar shows also refreshes the cached
+        // snapshots, and it is not gated on `isPresented`. The store is read here, in the sidebar's parent; no row reads
+        // it. The action runs from `onChange`, never from the body.
+        .onChange(of: workspaceStatusListRevision) { _, _ in
+            refreshWorkspaceSnapshots(workspaceIds: Set(tabManager.tabs.map(\.id)))
+        }
         .overlay(alignment: .trailing) {
             WindowChromeBorder(
                 orientation: .vertical,
@@ -12336,6 +12347,12 @@ struct VerticalTabsSidebar: View, Equatable {
             frozenShortcutHintsTabId = nil
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// The status list store's revision, read in this parent's body so that a change of the list runs the modifier
+    /// below (the store is `@Observable`). Read here and nowhere under the list. (#cm-109)
+    private var workspaceStatusListRevision: Int {
+        AppDelegate.shared?.workspaceStatusListStore.revision ?? 0
     }
 
     private func workspaceScrollArea(renderContext: WorkspaceListRenderContext) -> some View {
@@ -13495,7 +13512,9 @@ struct VerticalTabsSidebar: View, Equatable {
             workspace: workspace,
             settings: settings,
             showsAgentActivity: showsAgentActivity,
-            todoControlsEnabled: WorkspaceTodoFeature.isEnabled
+            todoControlsEnabled: WorkspaceTodoFeature.isEnabled,
+            statusList: AppDelegate.statusListInUse, // (#cm-109) the list is read here, in the sidebar's parent
+            statusColorHexes: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:] // (#cm-109)
         ).makeSnapshot()
     }
 
@@ -15962,7 +15981,9 @@ struct SidebarFooterButtons: View {
                 .background(TitlebarControlAnchorView { extensionBrowserAnchorView = $0 })
             }
             if shows(.update), let updateActionsHost = AppDelegate.shared {
-                UpdatePill(model: updateViewModel, accent: cmuxAccentColor(), actions: updateActionsHost)
+                WorkspaceStatusFooterPills { // (#cm-109) shows the status-file pill in place of the update pill
+                    UpdatePill(model: updateViewModel, accent: cmuxAccentColor(), actions: updateActionsHost)
+                } // (#cm-109)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

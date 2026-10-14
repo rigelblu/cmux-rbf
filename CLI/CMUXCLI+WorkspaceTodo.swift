@@ -46,7 +46,7 @@ extension CMUXCLI {
 
     // MARK: - workspace status
 
-    /// `cmux workspace status` / `cmux workspace status set <lane|auto>`.
+    /// `cmux workspace status` / `set <id|auto|none>` / `cycle` / `list`.
     func runWorkspaceStatusCommand(
         commandArgs: [String],
         client: SocketClient,
@@ -58,6 +58,12 @@ extension CMUXCLI {
             print(Self.workspaceStatusUsage)
             return
         }
+        // (#cm-109) `list` reads the app's status list and takes no workspace, so it is read before one is resolved:
+        // a stale CMUX_WORKSPACE_ID cannot fail it.
+        if commandArgs.first?.lowercased() == "list" {
+            try runWorkspaceStatusList(commandArgs: Array(commandArgs.dropFirst()), client: client, jsonOutput: jsonOutput, idFormat: idFormat)
+            return
+        }
         let (params, rest) = try workspaceTodoTarget(
             commandArgs, client: client, windowOverride: windowOverride
         )
@@ -67,7 +73,7 @@ extension CMUXCLI {
             printWorkspaceStatusPayload(payload, jsonOutput: jsonOutput, idFormat: idFormat)
         case "set":
             guard rest.count >= 2 else {
-                throw CLIError(message: "Usage: cmux workspace status set <todo|working|needs-attention|review|done|auto|none>")
+                throw CLIError(message: "Usage: cmux workspace status set <id|auto|none>  (ids: cmux workspace status list)")
             }
             var setParams = params
             setParams["status"] = rest[1]
@@ -76,8 +82,53 @@ extension CMUXCLI {
         case "cycle":
             let payload = try client.sendV2(method: "workspace.status.cycle", params: params)
             printWorkspaceStatusPayload(payload, jsonOutput: jsonOutput, idFormat: idFormat)
+        case "list":
+            // (#cm-109) `list` after a workspace flag: that workspace was resolved first (a wrong ref fails here), and
+            // the list takes no workspace, so it is ignored.
+            try runWorkspaceStatusList(
+                commandArgs: Array(rest.dropFirst()), client: client, jsonOutput: jsonOutput, idFormat: idFormat
+            )
         case .some(let sub):
-            throw CLIError(message: "Unknown workspace status subcommand: \(sub). Try: cmux workspace status [set <lane|auto> | cycle]")
+            throw CLIError(message: "Unknown workspace status subcommand: \(sub). Try: cmux workspace status [set <id|auto|none> | cycle | list]")
+        }
+    }
+
+    /// `cmux workspace status list`: the list of statuses in use, where it came from, whether the controls are on, and
+    /// its problems. Plain English and tab-separated, in the shape `workspace-color list` prints. (#cm-109)
+    private func runWorkspaceStatusList(
+        commandArgs: [String],
+        client: SocketClient,
+        jsonOutput: Bool,
+        idFormat: CLIIDFormat
+    ) throws {
+        if let unknown = commandArgs.first(where: { $0.hasPrefix("--") && $0 != "--json" }) {
+            throw CLIError(message: "workspace status list: unknown flag '\(unknown)' (list takes no workspace)")
+        }
+        let payload = try client.sendV2(method: "workspace.status.list", params: [:])
+        if jsonOutput || hasFlag(commandArgs, name: "--json") {
+            print(jsonString(formatIDs(payload, mode: idFormat)))
+            return
+        }
+        let cell: (Any?) -> String = { value in
+            guard let text = value as? String, !text.isEmpty else { return "-" }
+            return text
+        }
+        let enabled = payload["controls_enabled"] as? Bool ?? false
+        print("statuses: \(enabled ? "on" : "off")")
+        print("list: \(payload["source"] as? String ?? "cmux")")
+        print("ID\tNAME\tEXTENDS\tCOLOR\tHEX")
+        for status in payload["statuses"] as? [[String: Any]] ?? [] {
+            print([
+                cell(status["id"]), cell(status["name"]), cell(status["extends"]),
+                cell(status["color"]), cell(status["color_hex"]),
+            ].joined(separator: "\t"))
+        }
+        let problems = payload["problems"] as? [[String: Any]] ?? []
+        print("problems: \(problems.count)")
+        for problem in problems {
+            let entry = (problem["entry"] as? Int).map { "entry=\($0)" } ?? "-"
+            let id = (problem["id"] as? String).map { "id=\($0)" } ?? "-"
+            print("  \(cell(problem["code"]))\t\(entry)\t\(id)\t\(cell(problem["message"]))")
         }
     }
 
@@ -88,10 +139,20 @@ extension CMUXCLI {
     ) {
         let effective = payload["effective"] as? String ?? "todo"
         let inferred = payload["inferred"] as? String ?? "todo"
+        // (#cm-109) One line for each state. A cmux status set by hand is the `override:` line; one of his own is a
+        // `status:` line in its place; nothing set, and None, is `override: none (auto)`.
+        let cmuxIDs: Set<String> = ["todo", "working", "needs-attention", "review", "done"]
+        let override = payload["override"] as? [String: Any]
         let overrideLine: String
-        if let override = payload["override"] as? [String: Any],
-           let status = override["status"] as? String {
-            overrideLine = "override: \(status) (auto-clears when inferred moves off \(override["inferred_at_override"] as? String ?? inferred))"
+        if let statusID = payload["status_id"] as? String, !cmuxIDs.contains(statusID) {
+            if let extended = override?["status"] as? String {
+                overrideLine = "status: \(statusID) (extends \(extended); stays until you change it)"
+            } else {
+                overrideLine = "status: \(statusID) (held, not in effect)"
+            }
+        } else if let status = override?["status"] as? String {
+            let at = override?["inferred_at_override"] as? String ?? inferred
+            overrideLine = "override: \(status) (stops showing when inferred moves off \(at); shows again when it returns)"
         } else {
             overrideLine = "override: none (auto)"
         }
@@ -322,28 +383,32 @@ extension CMUXCLI {
     """)
 
     static let workspaceStatusUsage = String(localized: "cli.workspace.status.usage", defaultValue: """
-    Usage: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]
+    Usage: cmux workspace status [set <id|auto|none> | cycle | list] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]
 
-    Show or pin a workspace's todo lifecycle status. Without arguments prints
-    the effective status, the inferred status, and the override, targeting the
+    Show or set a workspace's status. Without arguments prints the effective
+    status, the inferred status, and the status set by hand, targeting the
     caller's workspace by default.
 
-    Lanes are inferred from live signals (agent needs input > agent running >
-    open PR > all PRs merged/closed > dirty git tree > todo). `set <lane>`
-    pins a manual lane that auto-clears as soon as the inferred lane changes;
-    `set auto` clears the pin immediately. `cycle` advances the manual override
-    one lane forward (todo → working → needs-attention → review → done → todo).
+    Statuses are inferred from live signals (agent needs input > agent running >
+    open PR > all PRs merged/closed > dirty git tree > todo). `set <id>` sets a
+    status by hand: an id from your status list (see `list`) or one of cmux's own.
+    `set auto` clears it and `set none` hides the status. `cycle` moves to the next
+    status. `list` prints your status list, where it came from, whether statuses
+    are on, and any problems in it; it takes no workspace.
 
-    Note for coding agents: manual status pins belong to the user; the lane
+    A status of your own stays until you change it. A cmux status set by hand stops
+    showing when what cmux detects changes, and shows again when cmux detects the
+    same status again. A cmux status set while an agent waits is gone when that wait ends.
+
+    Note for coding agents: manual statuses belong to the user; the status
     already tracks your activity automatically. Do not `set` or `cycle` the
     status unless the user explicitly asks you to.
-
-    Lanes: todo, working, needs-attention, review, done
 
     Examples:
       cmux workspace status
       cmux workspace status set review
       cmux workspace status cycle
+      cmux workspace status list --json
       cmux workspace status set auto --workspace workspace:2
     """)
 
