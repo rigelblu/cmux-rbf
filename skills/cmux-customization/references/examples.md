@@ -154,6 +154,7 @@ Agent buttons alongside the default terminal and browser buttons.
       "buttons": [
         "cmux.newTerminal",
         "cmux.newBrowser",
+        "cmux.newFigma",
         { "action": "codex-new-tab", "title": "Codex" },
         { "action": "claude-new-tab", "title": "Claude" }
       ]
@@ -161,6 +162,8 @@ Agent buttons alongside the default terminal and browser buttons.
   }
 }
 ```
+
+<!-- cmux-rbf (#cm-73.9): the `cmux.newFigma` line in the example above is the fork's, since the fork's default header list has the Figma button. Reject this hunk on upstream sync. -->
 
 ## CI Watch
 

@@ -70,4 +70,19 @@ struct FigmaStayInPaneTests {
         #expect(!stays(target: "https://www.figma.com/file/../community"))
         #expect(!stays(target: "https://embed.figma.com/design/KEY/slug"))
     }
+
+    @Test("the file list: Figma's recent files page is not the read view, so no link from it stays in the pane (cm-73.9 holds the rule as built)")
+    func theFileListStaysOutOfThePane() {
+        let fileList = URL(string: "https://www.figma.com/files/team/1/recents-and-sharing/recently-viewed")
+        let file = "https://www.figma.com/design/KEY/a"
+        // Rows 1 and 2 of Scenario 86, restated beside the new ones.
+        #expect(stays(target: file))
+        #expect(!stays(pane: URL(string: file), target: "https://www.figma.com/design/OTHER/b"))
+        // Row 3: the file list, no address bar, a file.
+        #expect(!stays(pane: fileList, target: file))
+        // Row 4: the file list, address bar shown, a file.
+        #expect(!stays(pane: fileList, omnibarVisible: true, target: file))
+        // Row 5: the file list, no address bar, a help page.
+        #expect(!stays(pane: fileList, target: "https://help.figma.com/hc"))
+    }
 }

@@ -791,6 +791,14 @@ class TabManager: ObservableObject {
                 self?.refreshWindowTitle()
             }
         })
+        // cmux-rbf `#cm-73.9`: the other two signals of a change in the browser setting (see `refreshBrowserAvailability`).
+        lastBrowserEnabled = isBrowserEnabledForHeaders()
+        observeBrowserDefaults()
+        for name in [BrowserAvailabilitySettings.didChangeNotification, NSApplication.didBecomeActiveNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshBrowserAvailability() }
+            })
+        }
 #if DEBUG
         setupUITestFocusShortcutsIfNeeded()
         setupSplitCloseRightUITestIfNeeded()
@@ -819,6 +827,8 @@ class TabManager: ObservableObject {
         for observer in observers {
             NotificationCenter.default.removeObserver(observer)
         }
+        // cmux-rbf `#cm-73.9`
+        if let browserDefaultsObserver { NotificationCenter.default.removeObserver(browserDefaultsObserver) }
         observers.removeAll()
         agentPIDSweepTimer?.cancel()
         // The sidebar git/PR services cancel their own poll, probe, snapshot,
@@ -858,6 +868,47 @@ class TabManager: ObservableObject {
         guard includesPanesAndTabs != lastFocusHistoryIncludesPanesAndTabs else { return }
         lastFocusHistoryIncludesPanesAndTabs = includesPanesAndTabs
         focusHistoryRevisionDidChange()
+    }
+
+    // cmux-rbf `#cm-73.9`: whether cmux's browser is on, for the header's Figma button, which a Figma tab (a browser tab)
+    // needs. Two seams, both only a test sets, so a test never flips the shared setting: the defaults the setting is
+    // written to (watched by `object:`, so a write to other defaults is not a signal), and a closure that answers in
+    // their place for the signals that carry no write.
+    var browserDefaults: UserDefaults = .standard {
+        didSet { observeBrowserDefaults() }
+    }
+    var browserEnabledProvider: (@MainActor () -> Bool)? {
+        didSet { lastBrowserEnabled = isBrowserEnabledForHeaders() }
+    }
+    private var browserDefaultsObserver: NSObjectProtocol?
+
+    func isBrowserEnabledForHeaders() -> Bool {
+        browserEnabledProvider?() ?? BrowserAvailabilitySettings.isEnabled(defaults: browserDefaults)
+    }
+
+    private func observeBrowserDefaults() {
+        if let browserDefaultsObserver { NotificationCenter.default.removeObserver(browserDefaultsObserver) }
+        browserDefaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: browserDefaults, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshBrowserAvailability() }
+        }
+    }
+
+    /// Last browser enablement fanned out to the workspaces' headers; gates the
+    /// `UserDefaults.didChangeNotification` firehose to actual transitions.
+    private var lastBrowserEnabled: Bool?
+
+    /// cmux-rbf `#cm-73.9`: builds every workspace's header list again when the browser setting changes. The setting changes
+    /// from several entrypoints that signal differently: the palette and policy post `didChangeNotification`, the Settings toggle
+    /// writes defaults, and the CLI writes from another process, which shows when the app next becomes active.
+    private func refreshBrowserAvailability() {
+        let enabled = isBrowserEnabledForHeaders()
+        guard enabled != lastBrowserEnabled else { return }
+        lastBrowserEnabled = enabled
+        for tab in tabs {
+            tab.reapplySurfaceTabBarButtonsForFeatureFlags()
+        }
     }
 
     /// Last ports-visibility enablement fanned out to remote sessions; gates
