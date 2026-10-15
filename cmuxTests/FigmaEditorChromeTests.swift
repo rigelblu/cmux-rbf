@@ -107,7 +107,7 @@ struct FigmaEditorChromeTests {
         document = { querySelector: function () { return null; } };
         setTimeout = function (callback) { queued.push(callback); };
         """)
-        context.evaluateScript(FigmaEditorChrome.minimizeUIScript())
+        context.evaluateScript("(function () { \(FigmaEditorChrome.minimizeUIScript()) })()")
         #expect(context.evaluateScript("warned.length").toInt32() == 0, "nothing is logged before the deadline")
         context.evaluateScript("now = 20001; queued.shift()();")
         #expect(

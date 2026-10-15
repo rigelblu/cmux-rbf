@@ -1265,6 +1265,9 @@ final class WindowBrowserSlotView: NSView {
     private var searchOverlayHostingView: NSHostingView<BrowserSearchOverlay>?
     private var designComposerHostingView: BrowserDesignModeComposerHostingView?
     private var designComposerPanelId: UUID?
+    // cmux-rbf (#cm-73.11): the loading line on a Figma pane's top edge is hosted here, not in SwiftUI, so it layers above the portal-hosted web view. Reject a revert of this hunk on upstream sync.
+    private var figmaLoadBarHostingView: FigmaLoadBarHostingView?
+    private var currentFigmaLoadBarConfiguration: FigmaLoadBarConfiguration?
     private var omnibarSuggestionsHostingView: BrowserPortalOmnibarSuggestionsHostingView?
     private weak var hostedWebView: WKWebView?
     private var hostedWebViewConstraints: [NSLayoutConstraint] = []
@@ -1559,6 +1562,43 @@ final class WindowBrowserSlotView: NSView {
         bringInteractionLayersToFrontIfNeeded()
     }
 
+    // cmux-rbf (#cm-73.11): pinned to the slot's top edge, 2 pt tall, taking no hits, as the search overlay is mounted. Reject a revert of this hunk on upstream sync.
+    func setFigmaLoadBar(_ configuration: FigmaLoadBarConfiguration?) {
+        guard let configuration else {
+            figmaLoadBarHostingView?.removeFromSuperview()
+            figmaLoadBarHostingView = nil
+            currentFigmaLoadBarConfiguration = nil
+            return
+        }
+        guard configuration != currentFigmaLoadBarConfiguration || figmaLoadBarHostingView?.superview !== self else { return }
+        currentFigmaLoadBarConfiguration = configuration
+        let rootView = FigmaLoadBarView(configuration: configuration)
+        if let view = figmaLoadBarHostingView {
+            view.rootView = rootView
+            if view.superview !== self {
+                view.removeFromSuperview()
+                addFigmaLoadBarView(view)
+            }
+            bringInteractionLayersToFrontIfNeeded()
+            return
+        }
+        let view = FigmaLoadBarHostingView(rootView: rootView)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        addFigmaLoadBarView(view)
+        figmaLoadBarHostingView = view
+        bringInteractionLayersToFrontIfNeeded()
+    }
+
+    private func addFigmaLoadBarView(_ view: FigmaLoadBarHostingView) {
+        addSubview(view)
+        NSLayoutConstraint.activate([
+            view.topAnchor.constraint(equalTo: topAnchor),
+            view.leadingAnchor.constraint(equalTo: leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: trailingAnchor),
+            view.heightAnchor.constraint(equalToConstant: FigmaLoadBarView.height),
+        ])
+    }
+
     private static func makeDesignComposerRootView(
         configuration: BrowserPortalDesignComposerConfiguration,
         overlay: BrowserDesignModeComposerHostingView
@@ -1837,6 +1877,8 @@ final class WindowBrowserSlotView: NSView {
         if view === omnibarSuggestionsHostingView { return 3 }
         if view === searchOverlayHostingView { return 2 }
         if view === designComposerHostingView { return 1 }
+        // cmux-rbf (#cm-73.11): the loading line shares the design composer's rank: above the web view, below the search overlay. Reject a revert of this hunk on upstream sync.
+        if view === figmaLoadBarHostingView { return 1 }
         return 0
     }
 
@@ -1926,6 +1968,8 @@ final class WindowBrowserPortal: NSObject {
         var paneDropContext: BrowserPaneDropContext?
         var searchOverlay: BrowserPortalSearchOverlayConfiguration?
         var designComposer: BrowserPortalDesignComposerConfiguration?
+        // cmux-rbf (#cm-73.11): the loading line's configuration, carried like the search overlay's. Reject a revert of this hunk on upstream sync.
+        var figmaLoadBar: FigmaLoadBarConfiguration?
         var omnibarSuggestions: BrowserPortalOmnibarSuggestionsConfiguration?
         var paneTopChromeHeight: CGFloat
         var transientRecoveryReason: String?
@@ -2257,6 +2301,14 @@ final class WindowBrowserPortal: NSObject {
         }
     }
 
+    // cmux-rbf (#cm-73.11): equivalence for the loading line: the configuration is a value. Reject a revert of this hunk on upstream sync.
+    private static func figmaLoadBarConfigurationsEquivalent(
+        _ lhs: FigmaLoadBarConfiguration?,
+        _ rhs: FigmaLoadBarConfiguration?
+    ) -> Bool {
+        lhs == rhs
+    }
+
     private static func omnibarSuggestionsConfigurationsEquivalent(
         _ lhs: BrowserPortalOmnibarSuggestionsConfiguration?,
         _ rhs: BrowserPortalOmnibarSuggestionsConfiguration?
@@ -2515,6 +2567,7 @@ final class WindowBrowserPortal: NSObject {
             }
             existing.setSearchOverlay(entry.searchOverlay)
             existing.setDesignComposer(entry.designComposer)
+            existing.setFigmaLoadBar(entry.figmaLoadBar) // cmux-rbf (#cm-73.11): re-applied with the slot. Reject a revert of this hunk on upstream sync.
             existing.setOmnibarSuggestions(entry.omnibarSuggestions)
             existing.setPaneTopChromeHeight(entry.paneTopChromeHeight)
             return existing
@@ -2525,6 +2578,7 @@ final class WindowBrowserPortal: NSObject {
         }
         created.setSearchOverlay(entry.searchOverlay)
         created.setDesignComposer(entry.designComposer)
+        created.setFigmaLoadBar(entry.figmaLoadBar) // cmux-rbf (#cm-73.11): re-applied with the slot. Reject a revert of this hunk on upstream sync.
         created.setOmnibarSuggestions(entry.omnibarSuggestions)
         created.setPaneTopChromeHeight(entry.paneTopChromeHeight)
 #if DEBUG
@@ -3033,6 +3087,18 @@ final class WindowBrowserPortal: NSObject {
         entry.containerView?.setDesignComposer(configuration)
     }
 
+    // cmux-rbf (#cm-73.11): the loading line, beside updateDesignComposer. Reject a revert of this hunk on upstream sync.
+    func updateFigmaLoadBar(
+        forWebViewId webViewId: ObjectIdentifier,
+        configuration: FigmaLoadBarConfiguration?
+    ) {
+        guard var entry = entriesByWebViewId[webViewId] else { return }
+        guard !Self.figmaLoadBarConfigurationsEquivalent(entry.figmaLoadBar, configuration) else { return }
+        entry.figmaLoadBar = configuration
+        entriesByWebViewId[webViewId] = entry
+        entry.containerView?.setFigmaLoadBar(configuration)
+    }
+
     func updateOmnibarSuggestions(
         forWebViewId webViewId: ObjectIdentifier,
         configuration: BrowserPortalOmnibarSuggestionsConfiguration?
@@ -3137,6 +3203,8 @@ final class WindowBrowserPortal: NSObject {
                 paneDropContext: nil,
                 searchOverlay: nil,
                 designComposer: nil,
+                // cmux-rbf (#cm-73.11): blank entry. Reject a revert of this hunk on upstream sync.
+                figmaLoadBar: nil,
                 omnibarSuggestions: nil,
                 paneTopChromeHeight: 0,
                 transientRecoveryReason: nil,
@@ -3178,6 +3246,8 @@ final class WindowBrowserPortal: NSObject {
             paneDropContext: resolvedPaneDropContext,
             searchOverlay: previousEntry?.searchOverlay,
             designComposer: previousEntry?.designComposer,
+            // cmux-rbf (#cm-73.11): a re-bind rebuilds the entry; a field left out would default to nil and the line would vanish. Reject a revert of this hunk on upstream sync.
+            figmaLoadBar: previousEntry?.figmaLoadBar,
             omnibarSuggestions: previousEntry?.omnibarSuggestions,
             paneTopChromeHeight: previousEntry?.paneTopChromeHeight ?? 0,
             transientRecoveryReason: previousEntry?.transientRecoveryReason,
@@ -3384,6 +3454,7 @@ final class WindowBrowserPortal: NSObject {
             containerView.setPaneTopChromeHeight(0)
             containerView.setSearchOverlay(nil)
             containerView.setDesignComposer(nil)
+            containerView.setFigmaLoadBar(nil) // cmux-rbf (#cm-73.11): a hidden slot draws no line. Reject a revert of this hunk on upstream sync.
             containerView.setOmnibarSuggestions(nil)
             if entry.visibleInUI {
                 containerView.setPaneDropContext(nil)
@@ -3828,6 +3899,7 @@ final class WindowBrowserPortal: NSObject {
         containerView.setPaneTopChromeHeight(shouldHide ? 0 : entry.paneTopChromeHeight)
         containerView.setSearchOverlay(shouldHide ? nil : entry.searchOverlay)
         containerView.setDesignComposer(shouldHide ? nil : entry.designComposer)
+        containerView.setFigmaLoadBar(shouldHide ? nil : entry.figmaLoadBar) // cmux-rbf (#cm-73.11): visibility sync. Reject a revert of this hunk on upstream sync.
         containerView.setOmnibarSuggestions(shouldHide ? nil : entry.omnibarSuggestions)
         if containerView.isHidden {
             if entry.visibleInUI {
@@ -4261,6 +4333,17 @@ enum BrowserWindowPortalRegistry {
         guard let windowId = webViewToWindowId[webViewId],
               let portal = portalsByWindowId[windowId] else { return }
         portal.updateDesignComposer(forWebViewId: webViewId, configuration: configuration)
+    }
+
+    // cmux-rbf (#cm-73.11): the loading line, beside updateDesignComposer. Reject a revert of this hunk on upstream sync.
+    static func updateFigmaLoadBar(
+        for webView: WKWebView,
+        configuration: FigmaLoadBarConfiguration?
+    ) {
+        let webViewId = ObjectIdentifier(webView)
+        guard let windowId = webViewToWindowId[webViewId],
+              let portal = portalsByWindowId[windowId] else { return }
+        portal.updateFigmaLoadBar(forWebViewId: webViewId, configuration: configuration)
     }
 
     static func updateOmnibarSuggestions(
