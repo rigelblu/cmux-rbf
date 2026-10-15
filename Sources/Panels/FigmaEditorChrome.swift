@@ -100,22 +100,27 @@ enum FigmaEditorChrome {
         pollMilliseconds: Int = 250
     ) -> String {
         """
-        (function () {
+        return new Promise(function (resolve) {
           var deadline = Date.now() + \(timeoutMilliseconds);
           function tick() {
             var control = document.querySelector('\(selector)');
-            if (control) { control.click(); return; }
+            if (control) {
+              control.click();
+              resolve("found");
+              return;
+            }
             if (Date.now() > deadline) {
               // Say so rather than failing silently: a control that never
               // appeared and a click that never landed look identical from
               // outside, and this pane is often not on screen.
               console.warn('[cmux] figma: no minimize control after \(timeoutMilliseconds)ms');
+              resolve("timeout");
               return;
             }
             setTimeout(tick, \(pollMilliseconds));
           }
           tick();
-        })();
+        });
         """
     }
 }
