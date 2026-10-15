@@ -1961,7 +1961,9 @@ struct BrowserPanelView: View {
                         controller: panel.designModeController
                     ),
                     omnibarSuggestions: portalOmnibarSuggestions,
-                    paneTopChromeHeight: chromeState.isOmnibarVisible ? addressBarHeight : 0
+                    paneTopChromeHeight: chromeState.isOmnibarVisible ? addressBarHeight : 0,
+                    // cmux-rbf (#cm-73.11): the loading line's configuration, recomputed whenever the panel changes, then sent to the portal. Reject a revert of this hunk on upstream sync.
+                    figmaLoadBar: panel.figmaLoadBarConfiguration
                 )
                 .accessibilityIdentifier("BrowserWebViewSurface")
                 // Keep the host stable for normal pane churn, but force a remount when
@@ -5592,6 +5594,8 @@ struct WebViewRepresentable: NSViewRepresentable {
     let designComposer: BrowserPortalDesignComposerConfiguration?
     let omnibarSuggestions: BrowserPortalOmnibarSuggestionsConfiguration?
     let paneTopChromeHeight: CGFloat
+    // cmux-rbf (#cm-73.11): defaulted, so the callers that build this by hand (tests) stay as they are. Reject a revert of this hunk on upstream sync.
+    var figmaLoadBar: FigmaLoadBarConfiguration? = nil
 
     final class Coordinator {
         weak var panel: BrowserPanel?
@@ -7486,6 +7490,7 @@ struct WebViewRepresentable: NSViewRepresentable {
         host.setWindowPortalHosting(false)
         let slotView = host.ensureLocalInlineSlotView()
         slotView.setDesignComposer(designComposer)
+        slotView.setFigmaLoadBar(figmaLoadBar) // cmux-rbf (#cm-73.11): a Figma pane on the canvas takes this local inline path, not the window portal. Reject a revert of this hunk on upstream sync.
         let isAlreadyInLocalHost = host.containsManagedLocalInlineContent(webView)
         let shouldPreserveExternalFullscreenHost = Self.shouldPreserveExternalFullscreenHost(
             for: webView,
@@ -7699,6 +7704,7 @@ struct WebViewRepresentable: NSViewRepresentable {
         let activePaneDropContext = coordinator.desiredPortalVisibleInUI ? paneDropContext : nil
         let activeSearchOverlay = coordinator.desiredPortalVisibleInUI ? searchOverlay : nil
         let activeDesignComposer = coordinator.desiredPortalVisibleInUI ? designComposer : nil
+        let activeFigmaLoadBar = coordinator.desiredPortalVisibleInUI ? figmaLoadBar : nil // cmux-rbf (#cm-73.11): the loading line. Reject a revert of this hunk on upstream sync.
         let portalAnchorView = panel.portalAnchorView
         let portalHideReason = !isCurrentPaneOwner ? "lostPaneOwnership" : "hidden"
         let didReleasePortalHost: Bool
@@ -7787,6 +7793,7 @@ struct WebViewRepresentable: NSViewRepresentable {
             BrowserWindowPortalRegistry.updatePaneDropContext(for: webView, context: currentPaneDropContext)
             BrowserWindowPortalRegistry.updateSearchOverlay(for: webView, configuration: activeSearchOverlay)
             BrowserWindowPortalRegistry.updateDesignComposer(for: webView, configuration: activeDesignComposer)
+            BrowserWindowPortalRegistry.updateFigmaLoadBar(for: webView, configuration: activeFigmaLoadBar) // cmux-rbf (#cm-73.11): the loading line. Reject a revert of this hunk on upstream sync.
             BrowserWindowPortalRegistry.updateOmnibarSuggestions(for: webView, configuration: activeOmnibarSuggestions)
             coordinator.lastPortalHostId = ObjectIdentifier(host)
             coordinator.lastSynchronizedHostGeometryRevision = host.geometryRevision
@@ -7826,6 +7833,7 @@ struct WebViewRepresentable: NSViewRepresentable {
                 BrowserWindowPortalRegistry.updatePaneDropContext(for: webView, context: currentPaneDropContext)
                 BrowserWindowPortalRegistry.updateSearchOverlay(for: webView, configuration: activeSearchOverlay)
                 BrowserWindowPortalRegistry.updateDesignComposer(for: webView, configuration: activeDesignComposer)
+                BrowserWindowPortalRegistry.updateFigmaLoadBar(for: webView, configuration: activeFigmaLoadBar) // cmux-rbf (#cm-73.11): the loading line. Reject a revert of this hunk on upstream sync.
                 BrowserWindowPortalRegistry.updateOmnibarSuggestions(for: webView, configuration: activeOmnibarSuggestions)
                 coordinator.lastPortalHostId = hostId
             }
@@ -7876,6 +7884,7 @@ struct WebViewRepresentable: NSViewRepresentable {
             )
             BrowserWindowPortalRegistry.updateSearchOverlay(for: webView, configuration: activeSearchOverlay)
             BrowserWindowPortalRegistry.updateDesignComposer(for: webView, configuration: activeDesignComposer)
+            BrowserWindowPortalRegistry.updateFigmaLoadBar(for: webView, configuration: activeFigmaLoadBar) // cmux-rbf (#cm-73.11): the loading line. Reject a revert of this hunk on upstream sync.
             BrowserWindowPortalRegistry.updateOmnibarSuggestions(for: webView, configuration: activeOmnibarSuggestions)
             if !shouldBindNow,
                coordinator.lastSynchronizedHostGeometryRevision != geometryRevision {
@@ -7908,6 +7917,7 @@ struct WebViewRepresentable: NSViewRepresentable {
             )
             BrowserWindowPortalRegistry.updateSearchOverlay(for: webView, configuration: activeSearchOverlay)
             BrowserWindowPortalRegistry.updateDesignComposer(for: webView, configuration: activeDesignComposer)
+            BrowserWindowPortalRegistry.updateFigmaLoadBar(for: webView, configuration: activeFigmaLoadBar) // cmux-rbf (#cm-73.11): the loading line. Reject a revert of this hunk on upstream sync.
             BrowserWindowPortalRegistry.updateOmnibarSuggestions(for: webView, configuration: activeOmnibarSuggestions)
         }
 
