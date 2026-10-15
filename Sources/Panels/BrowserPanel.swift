@@ -2242,6 +2242,16 @@ final class BrowserPanel: Panel, ObservableObject {
         }
     }
 
+    // cmux-rbf (#cm-73.11): the loading line's state; a change tells the panel's views to redraw. Reject a revert of this hunk on upstream sync.
+    private(set) lazy var figmaLoadBar = FigmaLoadBarState(changed: { [weak self] in self?.objectWillChange.send() })
+
+    // cmux-rbf (#cm-73.11): the timeout for Figma's Minimize UI script and the Swift deadline. Reject a revert of this hunk on upstream sync.
+    var figmaMinimizeTimeoutMilliseconds: Int = 20_000 {
+        didSet {
+            figmaLoadBar.deadlineSeconds = Double(figmaMinimizeTimeoutMilliseconds) / 1000.0 + 2.0
+        }
+    }
+
     /// Increment to request a UI-only flash highlight (e.g. from a keyboard shortcut).
     @Published private(set) var focusFlashToken: Int = 0
 
@@ -3256,6 +3266,7 @@ final class BrowserPanel: Panel, ObservableObject {
                         ?? self.navigationDelegate?.lastAttemptedURL
                 )
                 self.cloudAccess.didStart(url: self.navigationDelegate?.lastAttemptedURL)
+                self.figmaLoadBar.begin(target: self.navigationDelegate?.lastAttemptedURL, isErrorPage: self.navigationDelegate?.activeErrorPageDisplayURL != nil) // cmux-rbf (#cm-73.11): a load started. Reject a revert of this hunk on upstream sync.
                 self.isMainFrameProvisionalNavigationActive = true
                 self.refreshBackgroundAppearance()
                 self.applyMuteState(to: webView, reason: "navigationStart")
@@ -3308,6 +3319,12 @@ final class BrowserPanel: Panel, ObservableObject {
                 self.applyCurrentAppWebTheme(to: webView)
                 // Keep find-in-page open through load completion and refresh matches for the new DOM.
                 self.restoreFindStateAfterNavigation(replaySearch: true)
+                // cmux-rbf (#cm-73.11): the loading line: a load finished. Reject a revert of this hunk on upstream sync.
+                self.figmaLoadBar.finished(
+                    url: webView.url,
+                    isOmnibarVisible: self.isOmnibarVisible,
+                    isErrorPage: self.navigationDelegate?.activeErrorPageDisplayURL != nil
+                )
                 // cmux-rbf `#cm-73`: Figma's editor is mostly fixed-width panels, so a cmux Figma
                 // pane has to collapse them or the design is not visible. The
                 // collapsed state is page state and dies with the document, so
@@ -3325,6 +3342,7 @@ final class BrowserPanel: Panel, ObservableObject {
                     message: failureMessage
                 )
                 self.isMainFrameProvisionalNavigationActive = false
+                self.figmaLoadBar.failed() // cmux-rbf (#cm-73.11): the load failed; cmux's error page must not draw the line again. Reject a revert of this hunk on upstream sync.
                 if let url = URL(string: failedURL) {
                     self.currentURL = Self.remoteProxyDisplayURL(for: url) ?? url
                 }
@@ -3386,6 +3404,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 )
                 let isRestoreBookkeepingNavigation = self.isDiscardRestoreBookkeepingNavigation(cancelledNavigation)
                 self.isMainFrameProvisionalNavigationActive = false
+                self.figmaLoadBar.cancelled() // cmux-rbf (#cm-73.11): the load was cancelled. Reject a revert of this hunk on upstream sync.
                 if isRestoreBookkeepingNavigation {
                     self.navigationDelegate?.clearAttemptedRequest()
                 }
@@ -4866,25 +4885,51 @@ final class BrowserPanel: Panel, ObservableObject {
     /// panels — see ``FigmaEditorChrome/shouldMinimizeUI(paneURL:isOmnibarVisible:)``.
     /// The script polls, because Figma's control does not exist until its app
     /// has booted and navigation-finished is well before that.
+    // cmux-rbf (#cm-73.11): calls the minimize UI script as a promise and notifies figmaLoadBar when answered. Reject a revert of this hunk on upstream sync.
     private func collapseFigmaEditorChromeIfNeeded(in webView: WKWebView) {
         guard FigmaEditorChrome.shouldMinimizeUI(
             paneURL: webView.url,
             isOmnibarVisible: isOmnibarVisible
         ) else { return }
-        webView.evaluateJavaScript(FigmaEditorChrome.minimizeUIScript(), completionHandler: nil)
+        runFigmaMinimizeScript(in: webView)
     }
 
     /// cmux-rbf `#cm-73.9`: the same collapse for an address that changed in place, which
     /// no navigation-finished hook follows. See
     /// ``FigmaEditorChrome/shouldMinimizeUI(afterAddressChangeFrom:to:isOmnibarVisible:loadInProgress:)``.
+    // cmux-rbf (#cm-73.11): in-place move to a non-editor page ends any running wait. Reject a revert of this hunk on upstream sync.
     private func collapseFigmaEditorChromeAfterAddressChange(from before: URL?, in webView: WKWebView) {
+        if !FigmaLoadBar.hasMinimizeControl(currentURL) {
+            figmaLoadBar.inPlaceNonEditorOpened()
+        }
         guard FigmaEditorChrome.shouldMinimizeUI(
             afterAddressChangeFrom: before,
             to: currentURL,
             isOmnibarVisible: isOmnibarVisible,
             loadInProgress: webView.isLoading
         ) else { return }
-        webView.evaluateJavaScript(FigmaEditorChrome.minimizeUIScript(), completionHandler: nil)
+        // cmux-rbf (#cm-73.11): starts phase 2 sliding wait on in-place editor open. Reject a revert of this hunk on upstream sync.
+        if FigmaLoadBar.hasMinimizeControl(currentURL) {
+            figmaLoadBar.inPlaceEditorOpened()
+        }
+        runFigmaMinimizeScript(in: webView)
+    }
+
+    // cmux-rbf (#cm-73.11): runs the minimize UI script as a promise and notifies figmaLoadBar when answered. Reject a revert of this hunk on upstream sync.
+    private func runFigmaMinimizeScript(in webView: WKWebView) {
+        let waitID = figmaLoadBar.currentWaitID ?? 0
+        let script = FigmaEditorChrome.minimizeUIScript(timeoutMilliseconds: figmaMinimizeTimeoutMilliseconds)
+        webView.callAsyncJavaScript(
+            script,
+            arguments: [:],
+            in: nil,
+            in: .page
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.figmaLoadBar.scriptAnswered(waitID: waitID)
+            }
+        }
     }
 
     /// Configures the live webview's background for the current Ghostty theme.
