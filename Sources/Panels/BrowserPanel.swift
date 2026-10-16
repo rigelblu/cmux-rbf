@@ -6062,7 +6062,7 @@ extension BrowserPanel: BrowserHiddenWebViewDiscardManagerDelegate {
     }
 
     var hiddenWebViewDiscardKeepLoaded: Bool {
-        keepLoaded
+        keepLoaded || isFigmaPaneForHiddenUnload // cmux-rbf (#cm-73.14): a Figma pane is kept loaded while hidden, as Keep Page Loaded keeps a pane. Reject a revert of this hunk on upstream sync.
     }
 
     func hiddenWebViewDiscardManagerDidRequestDiscard(
