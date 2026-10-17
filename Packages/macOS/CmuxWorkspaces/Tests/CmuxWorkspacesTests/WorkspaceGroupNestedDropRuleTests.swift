@@ -229,7 +229,7 @@ struct WorkspaceGroupNestedDropRuleTests {
                 tabId: plan.draggedWorkspaceId, toIndex: index,
                 isDragOperation: true, usesTopLevelRows: topLevel, explicitGroupId: group
             )
-        case .crossWindow, .colorSection:
+        case .crossWindow, .colorSection, .statusGroupMove, .reorderStatusGroup, .moveStatusesArea, .statusGroupDrop, .statusAreaBoundaryDrop: // (#cm-110.1)
             return false
         }
     }

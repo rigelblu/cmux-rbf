@@ -1,4 +1,4 @@
-import CmuxWorkspaces
+import CmuxWorkspaces // (#cm-110.1)
 import CmuxSettings
 import Combine
 import CoreGraphics
@@ -12,25 +12,35 @@ final class SidebarState: ObservableObject {
     /// they're meant to share one collapsed state — expanding either
     /// expands both. Not an oversight; don't key this on section id.
     @Published private(set) var collapsedColorSectionHexes: Set<String>
+    @Published private(set) var statusGroups: WorkspaceStatusGroupsState? // (#cm-110.1)
+    var statusGroupFoldSeedSource: Set<String>? // (#cm-110.1)
     private var visibilityWillChangeOwnerId: UUID?
     private var visibilityWillChange: ((Bool) -> Void)?
 
     init(
         isVisible: Bool = true,
         persistedWidth: CGFloat = CGFloat(SessionPersistencePolicy.defaultSidebarWidth),
-        collapsedColorSectionHexes: Set<String> = []
+        collapsedColorSectionHexes: Set<String> = [], // (#cm-110.1)
+        statusGroups: WorkspaceStatusGroupsState? = WorkspaceStatusGroupsState() // (#cm-110.1)
     ) {
         self.isVisible = isVisible
+        self.statusGroups = statusGroups // (#cm-110.1)
         let sanitized = SessionPersistencePolicy.sanitizedSidebarWidth(Double(persistedWidth))
         self.persistedWidth = CGFloat(sanitized)
         self.collapsedColorSectionHexes = Set(
             collapsedColorSectionHexes.compactMap(WorkspaceColorHex.normalized)
         )
+        statusGroupRecordDidChange() // (#cm-110.1)
     }
 
     func toggle() {
         setVisible(!isVisible)
     }
+
+    func setStatusGroups(_ value: WorkspaceStatusGroupsState?) { // (#cm-110.1)
+        statusGroups = value // (#cm-110.1)
+        statusGroupRecordDidChange() // (#cm-110.1)
+    } // (#cm-110.1)
 
     func setVisible(_ nextValue: Bool) {
         guard nextValue != isVisible else { return }
@@ -43,6 +53,7 @@ final class SidebarState: ObservableObject {
         if collapsedColorSectionHexes.remove(normalized) == nil {
             collapsedColorSectionHexes.insert(normalized)
         }
+        statusGroupColorFoldWasToggled(hex: normalized) // (#cm-110.1)
     }
 
     @MainActor
@@ -59,6 +70,7 @@ final class SidebarState: ObservableObject {
 
     func restoreCollapsedColorSections(_ rawHexes: [String]?) {
         collapsedColorSectionHexes = Set((rawHexes ?? []).compactMap(WorkspaceColorHex.normalized))
+        statusGroupRecordDidChange() // (#cm-110.1)
     }
 
     func installVisibilityWillChangeHandler(

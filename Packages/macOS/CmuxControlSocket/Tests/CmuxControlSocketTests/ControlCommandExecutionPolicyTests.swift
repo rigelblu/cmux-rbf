@@ -115,6 +115,17 @@ struct ControlCommandExecutionPolicyTests {
         }
     }
 
+    /// `debug.sidebar.rows` has its case in the socket worker's switch, so the policy must send it there; on the main lane // (#cm-110.1)
+    /// the running app answered `method_not_found`. It is DEBUG-only like the case. (#cm-110.1)
+    @Test func theDebugSidebarRowsMethodRunsOnTheWorkerInDebugBuildsOnly() { // (#cm-110.1)
+        let policy = ControlCommandExecutionPolicy(forMethod: "debug.sidebar.rows") // (#cm-110.1)
+#if DEBUG // (#cm-110.1)
+        #expect(policy == .socketWorker(mainThreadCallable: false)) // (#cm-110.1)
+#else // (#cm-110.1)
+        #expect(policy == .mainActor) // (#cm-110.1)
+#endif // (#cm-110.1)
+    } // (#cm-110.1)
+
     @Test func v2ResolutionReadsRunOnTheWorkerAndAreMainThreadCallable() {
         // Tranche D (issue #5757): the implicit handle-normalization reads.
         // One controlResolveOnMain hop (refresh + witness + ref minting),

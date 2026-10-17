@@ -8,12 +8,12 @@ import SwiftUI
 /// Main-actor owner of the default sidebar table lifecycle and its AppKit interactions.
 @MainActor
 final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
-    private struct DeferredRowClick {
+    struct DeferredRowClick { // (#cm-110.1) internal so a test can click a row
         let rowId: SidebarWorkspaceRenderItemID
         let modifiers: NSEvent.ModifierFlags
     }
 
-    private enum RowClickDispatchOutcome {
+    enum RowClickDispatchOutcome { // (#cm-110.1)
         case dispatched
         case awaitingActions
         case invalid
@@ -983,7 +983,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         }
     }
 
-    private func dispatchRowClick(_ click: DeferredRowClick) -> RowClickDispatchOutcome {
+    func dispatchRowClick(_ click: DeferredRowClick) -> RowClickDispatchOutcome { // (#cm-110.1)
         guard let row = rows.firstIndex(where: { $0.id == click.rowId }) else {
             return .invalid
         }
@@ -1000,6 +1000,10 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             return .dispatched
         }
         if let headerActions = configuration.appKitGroupHeaderActions {
+            if configuration.statusHeaderKind != nil { // (#cm-110.1)
+                // Status headers have no anchor workspace, selection, or preview (#cm-110.1)
+                return .dispatched // (#cm-110.1)
+            } // (#cm-110.1)
             previewSelection(row: row, modifiers: click.modifiers, hitView: nil)
             dispatchSelection(modifiers: click.modifiers) {
                 headerActions.onFocusAnchor(click.modifiers)
@@ -1143,14 +1147,16 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // Group headers intentionally mint their anchor payload: anchor drags
         // route to top-level whole-group plans and are rejected cross-window.
         _ = tableView
-        guard rows.indices.contains(row), !rows[row].isColorSectionHeader, let actions else { return nil }
+        guard rows.indices.contains(row), !rows[row].isColorSectionHeader, let actions else { return nil } // (#cm-110.1)
         let rowConfiguration = rows[row]
         // Group headers resolve through the live anchor map captured for the
         // drag. A missing anchor fails closed; workspace rows retain the
         // optional feature resolver for compatibility with older action
         // bundles and fall back to their rendered workspace id.
         let workspaceId: UUID?
-        if rowConfiguration.isGroupHeader {
+        if let kind = rowConfiguration.statusHeaderKind { // (#cm-110.1)
+            workspaceId = SidebarStatusHeaderIdentity.uuid(for: kind) // (#cm-110.1)
+        } else if rowConfiguration.isGroupHeader { // (#cm-110.1)
             workspaceId = workspaceIdForDrag(rowConfiguration, actions: actions)
         } else {
             workspaceId = actions.workspaceIdForDrag?(
@@ -1180,6 +1186,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             controller: self,
             provisionalToken: workspaceDragWriterOwnership.makeToken()
         )
+        writer.statusSourceRowId = rowConfiguration.id // (#cm-110.1)
         pendingWorkspaceDragActions = actions
         // Keep the latest writer identity even while an older native session is
         // latched. A subsequent `willBeginAt` can then recover the new row's
@@ -1243,6 +1250,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 return pendingWorkspaceDragWorkspaceId
             }
             let rowConfiguration = rows[sourceRow]
+            if let kind = rowConfiguration.statusHeaderKind { return SidebarStatusHeaderIdentity.uuid(for: kind) } // (#cm-110.1)
             if rowConfiguration.isGroupHeader {
                 return workspaceIdForDrag(
                     rowConfiguration,
@@ -1299,7 +1307,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             if pendingWorkspaceDragSessionId == nil
                 || pendingWorkspaceDragSessionId != currentSessionId
                 || !pendingBelongsToWorkspace {
-                actionBundle.beginWorkspaceDrag(workspaceId)
+                let sourceRowId = sourceWriter != nil ? sourceWriter?.statusSourceRowId : draggedRows.first.flatMap { rows.indices.contains($0) ? rows[$0].id : nil } // (#cm-110.1)
+                SidebarStatusGroupDragSource.begin(workspaceId: workspaceId, rowId: sourceRowId, actions: actionBundle) // (#cm-110.1)
                 pendingWorkspaceDragSessionId = actionBundle.nativeWorkspaceDragLifecycle?.currentSessionId()
                 pendingWorkspaceDragWorkspaceId = workspaceId
             }
@@ -1343,7 +1352,9 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             let rowConfiguration = rows[row]
             let actionBundle = activeWorkspaceDragActions ?? actions ?? pendingWorkspaceDragActions
             let workspaceId: UUID?
-            if rowConfiguration.isGroupHeader {
+            if let kind = rowConfiguration.statusHeaderKind { // (#cm-110.1)
+                workspaceId = SidebarStatusHeaderIdentity.uuid(for: kind) // (#cm-110.1)
+            } else if rowConfiguration.isGroupHeader { // (#cm-110.1)
                 workspaceId = workspaceIdForDrag(rowConfiguration, actions: actionBundle)
             } else {
                 workspaceId = actionBundle?.workspaceIdForDrag?(
@@ -1690,10 +1701,11 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
     /// drag session. Group members keep their own workspace identity; only a
     /// group-header row maps through its stable group id. A missing live anchor
     /// fails closed instead of falling back to a closed workspace id.
-    private func workspaceIdForDrag(
+    func workspaceIdForDrag( // (#cm-110.1) internal so a test can ask a row for its drag identity
         _ row: SidebarWorkspaceTableRowConfiguration,
         actions: SidebarWorkspaceTableActions?
     ) -> UUID? {
+        if let kind = row.statusHeaderKind { return SidebarStatusHeaderIdentity.uuid(for: kind) } // (#cm-110.1)
         guard row.isGroupHeader else {
             return row.workspaceId
         }
@@ -1792,7 +1804,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             retireReorderIndicator()
             return false
         }
-        let targets = refreshReorderDropTargets()
+        let targets = refreshReorderDropTargets(includeHeaders: (self.actions ?? self.activeWorkspaceDragActions ?? self.pendingWorkspaceDragActions)?.usesStatusHeaderDropTargets() ?? false) // (#cm-110.1)
         return updateReorderDrag(
             point: dropView.convert(windowPoint, from: nil),
             targets: targets,
@@ -1834,7 +1846,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         lastAcceptedReorderDropPlan = update.plan
         appKitDropIndicatorLevel = update.level // (#cm-106)
         enforceReorderIndicatorPaintOnVisibleCells()
-        setAppKitDropIndicator(update.indicator, scope: update.scope, includeRowTargets: false)
+        let external = SidebarStatusHeaderDropAdapter.externalIndicator(painter: reorderIndicatorPainter, rows: rows) // (#cm-110.1)
+        setAppKitDropIndicator(external ?? update.indicator, scope: update.scope, includeRowTargets: external != nil) // (#cm-110.1)
         reorderDragWindowPoint = windowPoint
         return true
     }
@@ -1866,17 +1879,18 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         _ painter: SidebarWorkspaceTableReorderIndicatorPainter?
     ) {
         guard let table = containerView?.tableView else { return }
+        let cellPainter = SidebarStatusHeaderDropAdapter.cellPainter(painter, rows: rows) // (#cm-110.1)
         let visible = table.rows(in: table.visibleRect)
         guard visible.length > 0 else { return }
         for row in visible.lowerBound..<(visible.lowerBound + visible.length)
         where rows.indices.contains(row) {
-            let paint = painter?.paint(forRowWorkspaceId: rows[row].workspaceId)
+            let paint = cellPainter?.paint(forRowWorkspaceId: rows[row].headerDropIdentity) // (#cm-110.1)
                 ?? (top: false, bottom: false)
             switch table.view(atColumn: 0, row: row, makeIfNecessary: false) {
             case let cell as SidebarWorkspaceRowTableCellView:
-                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter?.level)
+                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: cellPainter?.level) // (#cm-110.1)
             case let cell as SidebarGroupHeaderTableCellView:
-                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter?.level)
+                cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: cellPainter?.level) // (#cm-110.1)
             default:
                 break
             }
@@ -1885,7 +1899,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
 
     /// Refreshes visible-row targets in the overlay's coordinate space.
     @discardableResult
-    private func refreshReorderDropTargets() -> [SidebarWorkspaceReorderDropOverlay.Target] {
+    func refreshReorderDropTargets(includeHeaders: Bool = false) -> [SidebarWorkspaceReorderDropOverlay.Target] { // Shared measured geometry; callers explicitly choose header or workspace admission. // (#cm-110.1)
         guard let container = containerView else { return [] }
         let table = container.tableView
         let visibleRange = table.rows(in: table.visibleRect)
@@ -1899,21 +1913,29 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             clearReorderDropTargets()
             return []
         }
-        // Color-section headers duplicate a member workspace ID and are not drag targets.
+        // Workspace drags retain their exclusions; header drags measure complete visible blocks. // (#cm-110.1)
         let targets: [SidebarWorkspaceReorderDropOverlay.Target] = (lower..<upper).compactMap { row in
             let configuration = rows[row]
-            guard !configuration.isColorSectionHeader else { return nil }
+            guard SidebarStatusHeaderDropAdapter.includesInMeasurement(configuration, includeHeaders: includeHeaders) else { return nil } // (#cm-110.1)
             return SidebarWorkspaceReorderDropOverlay.Target(
-                workspaceId: configuration.workspaceId,
+                workspaceId: configuration.headerDropIdentity, // (#cm-110.1)
                 groupId: configuration.groupId,
                 isGroupHeader: configuration.isGroupHeader,
-                frame: table.convert(table.rect(ofRow: row), to: container.reorderDropView)
+                frame: table.convert(table.rect(ofRow: row), to: container.reorderDropView), // (#cm-110.1)
+                renderItemId: configuration.id, // (#cm-110.1)
+                statusContentFrame: VerticalTabsSidebar.workspaceStatusContentFrame(table: table, row: row, overlay: container.reorderDropView) // (#cm-110.1)
             )
         }
         container.reorderDropView.targets = targets
         container.reorderDropView.targetsDidUpdate()
         return targets
     }
+
+#if DEBUG // (#cm-110.1)
+    func debugPerformSidebarDrop(_ request: SidebarDebugDropRequest) -> SidebarDebugDropResult? { // (#cm-110.1)
+        actions?.debugPerformSidebarDrop?(request, refreshReorderDropTargets(includeHeaders: true)) // (#cm-110.1)
+    } // (#cm-110.1)
+#endif // (#cm-110.1)
 
     private func clearReorderDropTargets() {
         guard let reorderDropView = containerView?.reorderDropView else { return }
@@ -1953,6 +1975,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             guard let workspaceCell else { return }
             if let hitView, workspaceCell.selectionPreviewShouldIgnore(hitView) { return }
         } else if rows[row].appKitGroupHeaderModel != nil {
+            if rows[row].statusHeaderKind != nil { return } // (#cm-110.1)
             // A header with no workspace of its own is never active and a click on it selects nothing: no preview (#cm-106).
             if rows[row].appKitGroupHeaderModel?.hasOwnWorkspace == false { return }
             guard let headerCell else { return }
@@ -2053,7 +2076,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // it is excluded here just as the SwiftUI sidebar accepts only .workspace
         // rows. Group lifecycle runs through the header's own menu (Ungroup /
         // Delete Group), not a middle-click on the header.
-        guard rows.indices.contains(row), !rows[row].isGroupHeader, !rows[row].isColorSectionHeader else { return }
+        guard rows.indices.contains(row), !rows[row].isGroupHeader, !rows[row].isColorSectionHeader, rows[row].statusHeaderKind == nil else { return } // (#cm-110.1)
         actions?.closeWorkspace(rows[row].workspaceId)
     }
 
@@ -2509,8 +2532,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // configure() resets the drop lines from the model (always false
         // during a reorder drag); recycled/reconfigured cells must re-apply
         // the controller-owned paint or scrolling mid-drag drops the line.
-        if let painter = reorderIndicatorPainter {
-            let paint = painter.paint(forRowWorkspaceId: configuration.workspaceId)
+        if let painter = SidebarStatusHeaderDropAdapter.cellPainter(reorderIndicatorPainter, rows: rows) { // (#cm-110.1)
+            let paint = painter.paint(forRowWorkspaceId: configuration.headerDropIdentity) // (#cm-110.1)
             cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter.level)
         }
     }
@@ -2737,8 +2760,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         )
         // Same recycled-cell rule as configure(workspaceCell:): re-apply the
         // controller-owned drop line after the model reset it.
-        if let painter = reorderIndicatorPainter {
-            let paint = painter.paint(forRowWorkspaceId: configuration.workspaceId)
+        if let painter = SidebarStatusHeaderDropAdapter.cellPainter(reorderIndicatorPainter, rows: rows) { // (#cm-110.1)
+            let paint = painter.paint(forRowWorkspaceId: configuration.headerDropIdentity) // (#cm-110.1)
             cell.paintControllerDropIndicator(top: paint.top, bottom: paint.bottom, level: painter.level)
         }
     }
@@ -2798,7 +2821,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         }
         reorder.updateDrag = { [weak self, weak reorder] point, _ in
             guard let self, let reorder else { return false }
-            let targets = self.refreshReorderDropTargets()
+            let targets = self.refreshReorderDropTargets(includeHeaders: (self.actions ?? self.activeWorkspaceDragActions ?? self.pendingWorkspaceDragActions)?.usesStatusHeaderDropTargets() ?? false) // (#cm-110.1)
             return self.updateReorderDrag(
                 point: point,
                 targets: targets,
@@ -2810,13 +2833,13 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             guard let self else { return false }
             return self.performReorderDrop(
                 point: point,
-                targets: self.refreshReorderDropTargets(),
+                targets: self.refreshReorderDropTargets(includeHeaders: (self.actions ?? self.activeWorkspaceDragActions ?? self.pendingWorkspaceDragActions)?.usesStatusHeaderDropTargets() ?? false), // (#cm-110.1)
                 payloadWorkspaceId: livePayloadWorkspaceId()
             )
         }
         reorder.performPendingDropAtPoint = { [weak self] pendingDrop, _ in
             guard let self else { return false }
-            let targets = self.refreshReorderDropTargets()
+            let targets = self.refreshReorderDropTargets(includeHeaders: (self.actions ?? self.activeWorkspaceDragActions ?? self.pendingWorkspaceDragActions)?.usesStatusHeaderDropTargets() ?? false) // (#cm-110.1)
             if let performPendingWorkspaceDrop = actions.performPendingWorkspaceDrop {
                 return performPendingWorkspaceDrop(pendingDrop, targets)
             }
@@ -2826,10 +2849,11 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             self?.reorderDropDragExited()
         }
         reorder.setWorkspaceDropTargetCollectionActive = { [weak self] isActive in
+            guard let self else { return } // (#cm-110.1)
             if isActive {
-                self?.refreshReorderDropTargets()
+                self.refreshReorderDropTargets(includeHeaders: (self.actions ?? self.activeWorkspaceDragActions ?? self.pendingWorkspaceDragActions)?.usesStatusHeaderDropTargets() ?? false) // (#cm-110.1)
             } else {
-                self?.clearReorderDropTargets()
+                self.clearReorderDropTargets() // (#cm-110.1)
             }
         }
 
@@ -2895,7 +2919,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // would clear the past-the-end overlay on every apply.
         if let painter = reorderIndicatorPainter {
             appKitDropIndicatorLevel = painter.level // (#cm-106)
-            setAppKitDropIndicator(painter.indicator, scope: painter.scope, includeRowTargets: false)
+            let external = SidebarStatusHeaderDropAdapter.externalIndicator(painter: painter, rows: rows) // (#cm-110.1)
+            setAppKitDropIndicator(external ?? painter.indicator, scope: painter.scope, includeRowTargets: external != nil) // (#cm-110.1)
             return
         }
         let current = actions.currentDropIndicator()
@@ -2923,7 +2948,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             if includeRowTargets { return true }
             guard !scope.isGroup else { return false }
             if indicator.tabId == nil { return true }
-            return indicator.edge == .bottom && rows.last?.workspaceId == indicator.tabId
+            return indicator.edge == .bottom && rows.last?.headerDropIdentity == indicator.tabId // (#cm-110.1)
         }()
         appKitDropIndicator = shouldDisplay ? indicator : nil
         appKitDropIndicatorScope = scope
@@ -2935,7 +2960,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
     private func positionAppKitDropIndicator() {
         guard let indicator = appKitDropIndicator, let container = containerView else { return }
         let targetRow = indicator.tabId.flatMap { tabId in
-            rows.firstIndex { $0.workspaceId == tabId }
+            rows.firstIndex { $0.headerDropIdentity == tabId } // (#cm-110.1)
         }
         if indicator.tabId != nil, targetRow == nil {
             container.emptyDropIndicatorView.isHidden = true
@@ -2961,7 +2986,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         }
         let leadingIndent: CGFloat = {
             // A reorder drop in a window with a nested group indents the line to the level the drop lands at (#cm-106).
-            if !appKitDropIndicatorIncludesRowTargets, let level = appKitDropIndicatorLevel {
+            if let level = appKitDropIndicatorLevel, !appKitDropIndicatorIncludesRowTargets || reorderIndicatorPainter != nil { // (#cm-110.1)
                 return SidebarNestedIndent.points(levels: level, availableWidth: container.bounds.width)
             }
             guard appKitDropIndicatorIncludesRowTargets,

@@ -189,6 +189,8 @@ struct WorkspaceGroupNestedScenario45Tests {
             case .groupHeader(let groupId, _): return "header \(names[groupId] ?? "?")"
             case .workspace(let id): return "workspace in \(manager.tabs.first { $0.id == id }?.groupId.flatMap { names[$0] } ?? "top")"
             case .colorSectionHeader: return "color"
+            case .statusesHeader: return "statuses" // (#cm-110.1)
+            case .statusGroupHeader(let statusId): return "status(\(statusId))" // (#cm-110.1)
             }
         }
         return groups + ["--"] + rows

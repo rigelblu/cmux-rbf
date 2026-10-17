@@ -1,5 +1,6 @@
 import AppKit
 import CmuxFoundation
+import CmuxWorkspaces // (#cm-110.1)
 import SwiftUI
 
 /// Pure-AppKit group header cell for the sidebar workspace table.
@@ -13,6 +14,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("SidebarGroupHeaderTableCellView")
 
     private let backgroundView = NSView()
+    private let hairlineView = NSView() // (#cm-110.1)
     private let pinImageView = NSImageView()
     private let chevronButton = SidebarHeaderGlyphButton()
     private let iconImageView = NSImageView()
@@ -34,6 +36,13 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     private var contextMenuDidClose: (() -> Void)?
 
     override var isFlipped: Bool { true }
+
+    override func accessibilityPerformPress() -> Bool { // (#cm-110.1)
+        guard model?.statusHeaderKind != nil else { return super.accessibilityPerformPress() } // (#cm-110.1)
+        guard let actions else { return false } // (#cm-110.1)
+        actions.onToggleCollapsed() // (#cm-110.1)
+        return true // (#cm-110.1)
+    } // (#cm-110.1)
 
     override func setFrameSize(_ newSize: NSSize) {
         let changed = newSize != frame.size
@@ -57,6 +66,10 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         backgroundView.layer?.cornerRadius = 4
         backgroundView.layer?.cornerCurve = .continuous
         addSubview(backgroundView)
+
+        hairlineView.wantsLayer = true // (#cm-110.1)
+        hairlineView.isHidden = true // (#cm-110.1)
+        addSubview(hairlineView) // (#cm-110.1)
 
         pinImageView.imageScaling = .scaleProportionallyDown
         addSubview(pinImageView)
@@ -105,7 +118,9 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         super.prepareForReuse()
         suspendPresentation()
         model = nil
+        hairlineView.isHidden = true // (#cm-110.1)
         hintPill.resetForReuse()
+        resetStatusHeaderLook() // (#cm-110.1)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -161,6 +176,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
+        if model.statusHeaderKind != nil { applyStatusHeader(model); return } // (#cm-110.1) the status headers draw in the extension at the end of this file
         let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale)
         let percent = model.globalFontMagnificationPercent
         let headerPalette = bandPalette(for: model)
@@ -345,6 +361,10 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
 #endif
 
     private func updatePlusVisibility() {
+        if model?.statusHeaderKind != nil { // (#cm-110.1)
+            plusButton.setRevealed(false) // (#cm-110.1)
+            return // (#cm-110.1)
+        } // (#cm-110.1)
         let showsHint = model?.shortcutHintText != nil
         plusButton.setRevealed(isPointerHovering && !contextMenuVisible && !showsHint)
     }
@@ -362,6 +382,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     /// instantly (group clicks focus the anchor workspace); the next
     /// authoritative configure reconciles.
     func showOptimisticAnchorActive() {
+        guard model?.statusHeaderKind == nil else { return } // (#cm-110.1)
         guard let model, !model.isAnchorActive else { return }
         let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
         let labelColor = SidebarAppearanceColorResolver().resolvedColor(.labelColor, for: colorScheme)
@@ -378,6 +399,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     /// Modifier-click preview: paints the same dim membership tint as an
     /// unfocused multi-selected workspace row.
     func showOptimisticMultiSelection() {
+        guard model?.statusHeaderKind == nil else { return } // (#cm-110.1)
         guard let model, !model.isAnchorActive, !model.isMultiSelected else { return }
         let palette = bandPalette(for: model, isMultiSelected: true)
         CATransaction.begin()
@@ -392,6 +414,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     /// Plain-click counterpart: clears active and multi-selected header paint
     /// while the authoritative single selection is applied.
     func showOptimisticDeselection() {
+        guard model?.statusHeaderKind == nil else { return } // (#cm-110.1)
         guard let model, model.isAnchorActive || model.isMultiSelected else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -443,7 +466,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     /// True when a press at this view should not repaint selection (chevron
     /// toggles collapse, plus creates a workspace — neither selects).
     func selectionPreviewShouldIgnore(_ hitView: NSView) -> Bool {
-        hitView === chevronButton || hitView.isDescendant(of: chevronButton)
+        if model?.statusHeaderKind != nil { return true } // (#cm-110.1)
+        return hitView === chevronButton || hitView.isDescendant(of: chevronButton) // (#cm-110.1)
             || hitView === plusButton || hitView.isDescendant(of: plusButton)
     }
 
@@ -494,8 +518,10 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         let plusSide = metrics.plusFrame
         plusButton.frame = NSRect(x: contentMaxX - plusSide, y: midY - plusSide / 2, width: plusSide, height: plusSide)
 
-        iconImageView.frame = centered(metrics.iconFrame)
-        x = iconImageView.frame.maxX + 6
+        if !iconImageView.isHidden { // (#cm-110.1)
+            iconImageView.frame = centered(metrics.iconFrame) // (#cm-110.1)
+            x = iconImageView.frame.maxX + 6 // (#cm-110.1)
+        } // (#cm-110.1)
 
         var badgeSize = NSSize.zero
         if !unreadBadgeView.isHidden {
@@ -529,6 +555,15 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             unreadBadgeView.needsDisplay = true
         }
 
+        if !hairlineView.isHidden { // (#cm-110.1)
+            hairlineView.frame = NSRect( // (#cm-110.1)
+                x: outerPad, // (#cm-110.1)
+                y: 0, // (#cm-110.1)
+                width: bounds.width - outerPad * 2, // (#cm-110.1)
+                height: 1 // (#cm-110.1)
+            ) // (#cm-110.1)
+        } // (#cm-110.1)
+
         let topOffset: CGFloat = model.isFirstRow ? 0 : -(model.rowSpacing / 2)
         let lineInsets = dropLineLeadingInsets(width: bounds.width) // (#cm-106)
         topDropIndicator.position(in: bounds, at: topOffset, leadingInset: lineInsets.top)
@@ -557,6 +592,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     // toggle (add then remove) and made header multi-selection impossible.
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        if model?.statusHeaderKind != nil { return nil } // (#cm-110.1)
         let point = convert(event.locationInWindow, from: nil)
         if plusButton.frame.contains(point), !plusButton.isHidden {
             return makePlusMenu()
@@ -985,3 +1021,121 @@ final class SidebarShortcutHintPillView: NSView {
         CATransaction.commit()
     }
 }
+
+// MARK: Status headers (#cm-110.1)
+
+/// The `Statuses` header and a status group's header. They are drawn here, not in `applyModel`, so upstream's group (#cm-110.1)
+/// header code stays as it is; `applyModel` hands a model with a `statusHeaderKind` to `applyStatusHeader`. (#cm-110.1)
+extension SidebarGroupHeaderTableCellView { // (#cm-110.1)
+    /// A reused cell resets its accessibility role, disclosure level and expanded state to what a fresh cell reports. // (#cm-110.1)
+    /// The group branch of `applyModel` sets its level and expanded state on every apply; the status branch sets neither. // (#cm-110.1)
+    func resetStatusHeaderLook() { // (#cm-110.1)
+        setAccessibilityRole(.unknown) // what a fresh cell reports; nil would clear it // (#cm-110.1)
+        setAccessibilityDisclosureLevel(0) // (#cm-110.1)
+        setAccessibilityExpanded(false) // (#cm-110.1)
+    } // (#cm-110.1)
+
+    func applyStatusHeader(_ model: SidebarGroupHeaderRowModel) { // (#cm-110.1)
+        guard let kind = model.statusHeaderKind else { return } // (#cm-110.1)
+        CATransaction.begin() // (#cm-110.1)
+        CATransaction.setDisableActions(true) // (#cm-110.1)
+        defer { CATransaction.commit() } // (#cm-110.1)
+        let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale) // (#cm-110.1)
+        let percent = model.globalFontMagnificationPercent // (#cm-110.1)
+        let headerPalette = bandPalette(for: model) // (#cm-110.1)
+        let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light // (#cm-110.1)
+        let colorResolver = SidebarAppearanceColorResolver() // (#cm-110.1)
+
+        pinImageView.isHidden = true // (#cm-110.1)
+        chevronButton.glyphImage = RenderableSystemSymbol.configuredAppKitImage( // (#cm-110.1)
+            systemName: model.isCollapsed ? "chevron.right" : "chevron.down", // (#cm-110.1)
+            pointSize: GlobalFontMagnification.scaledSize(metrics.chevronFontSize, percent: percent), // (#cm-110.1)
+            weight: .semibold // (#cm-110.1)
+        ) // (#cm-110.1)
+        chevronButton.contentTintColor = colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme) // (#cm-110.1)
+        chevronButton.setAccessibilityLabel(SidebarStatusHeaderText.chevronLabel(kind: kind, isCollapsed: model.isCollapsed)) // (#cm-110.1)
+
+        switch kind { // (#cm-110.1)
+        case .statusesArea: // (#cm-110.1)
+            iconImageView.isHidden = true // (#cm-110.1)
+            iconImageView.image = nil // (#cm-110.1)
+        case .statusGroup: // (#cm-110.1)
+            iconImageView.isHidden = false // (#cm-110.1)
+            iconImageView.image = SidebarStatusHeaderGlyphImage.make( // (#cm-110.1)
+                presentation: SidebarStatusGroupPresentation( // (#cm-110.1)
+                    name: model.name, // (#cm-110.1)
+                    tintHex: model.tintHex, // (#cm-110.1)
+                    glyph: model.statusGlyph, // (#cm-110.1)
+                    behavesAs: model.statusBehavesAs // (#cm-110.1)
+                ), // (#cm-110.1)
+                fontScale: model.fontScale, // (#cm-110.1)
+                colorScheme: colorScheme, // (#cm-110.1)
+                nameColor: nameTextColor(model, palette: headerPalette), // (#cm-110.1)
+                tickColor: headerPalette.compositedBandColor // (#cm-110.1)
+            ) // (#cm-110.1)
+        } // (#cm-110.1)
+        iconImageView.contentTintColor = nil // (#cm-110.1)
+
+        nameField.stringValue = model.name // (#cm-110.1)
+        nameField.font = .systemFont( // (#cm-110.1)
+            ofSize: GlobalFontMagnification.scaledSize(metrics.nameFontSize, percent: percent), // (#cm-110.1)
+            weight: .semibold // (#cm-110.1)
+        ) // (#cm-110.1)
+        nameField.textColor = kind == .statusesArea // (#cm-110.1)
+            ? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme) // (#cm-110.1)
+            : nameTextColor(model, palette: headerPalette) // (#cm-110.1)
+
+        let showsBadge = model.anchorUnreadCount > 0 // (#cm-110.1)
+        unreadBadgeView.isHidden = !showsBadge // (#cm-110.1)
+        if showsBadge { // (#cm-110.1)
+            unreadBadgeFont = .systemFont( // (#cm-110.1)
+                ofSize: GlobalFontMagnification.scaledSize(metrics.unreadFontSize, percent: percent), // (#cm-110.1)
+                weight: .semibold // (#cm-110.1)
+            ) // (#cm-110.1)
+            unreadBadgeView.configure( // (#cm-110.1)
+                count: model.anchorUnreadCount, // (#cm-110.1)
+                fillColor: .controlAccentColor, // (#cm-110.1)
+                textColor: .white, // (#cm-110.1)
+                font: unreadBadgeFont // (#cm-110.1)
+            ) // (#cm-110.1)
+            unreadBadgeView.setAccessibilityLabel(String.localizedStringWithFormat( // (#cm-110.1)
+                String(localized: "workspaceGroup.unread.a11y", defaultValue: "%lld unread"), // (#cm-110.1)
+                model.anchorUnreadCount // (#cm-110.1)
+            )) // (#cm-110.1)
+        } // (#cm-110.1)
+
+        backgroundView.layer?.cornerRadius = 4 // (#cm-110.1)
+        if kind == .statusesArea { // (#cm-110.1)
+            // No band: a hairline above the name. (#cm-110.1)
+            backgroundView.layer?.backgroundColor = NSColor.clear.cgColor // (#cm-110.1)
+            hairlineView.isHidden = false // (#cm-110.1)
+            hairlineView.layer?.backgroundColor = colorResolver.resolvedColor(.separatorColor, for: colorScheme).cgColor // (#cm-110.1)
+        } else { // (#cm-110.1)
+            hairlineView.isHidden = true // (#cm-110.1)
+            backgroundView.layer?.backgroundColor = headerPalette.bandColor // (#cm-110.1)
+                .withAlphaComponent(headerPalette.bandOpacity).cgColor // (#cm-110.1)
+        } // (#cm-110.1)
+
+        let accent = cmuxAccentNSColor(for: colorScheme) // (#cm-110.1)
+        topDropIndicator.layer?.backgroundColor = accent.cgColor // (#cm-110.1)
+        bottomDropIndicator.layer?.backgroundColor = accent.cgColor // (#cm-110.1)
+        topDropIndicator.isHidden = !model.topDropIndicatorVisible // (#cm-110.1)
+        bottomDropIndicator.isHidden = !model.bottomDropIndicatorVisible // (#cm-110.1)
+        hintPill.isHidden = true // (#cm-110.1)
+        alphaValue = model.isBeingDragged ? 0.6 : 1 // (#cm-110.1)
+        updatePlusVisibility() // (#cm-110.1)
+
+        switch kind { // (#cm-110.1)
+        case .statusesArea: // (#cm-110.1)
+            setAccessibilityIdentifier("sidebarStatusesArea") // (#cm-110.1)
+            setAccessibilityLabel(SidebarStatusHeaderText.statusesAreaLabel(groupCount: model.memberCount, isCollapsed: model.isCollapsed)) // (#cm-110.1)
+        case .statusGroup(let statusId): // (#cm-110.1)
+            setAccessibilityIdentifier("sidebarStatusGroup.\(statusId)") // (#cm-110.1)
+            setAccessibilityLabel(SidebarStatusHeaderText.statusGroupLabel(name: model.name, memberCount: model.memberCount, isCollapsed: model.isCollapsed)) // (#cm-110.1)
+        } // (#cm-110.1)
+        // A button whose label says its state. A workspace group's disclosure level, value and help do not apply. (#cm-110.1)
+        setAccessibilityRole(.button) // (#cm-110.1)
+        setAccessibilityValue(nil) // (#cm-110.1)
+        setAccessibilityHelp(nil) // (#cm-110.1)
+    } // (#cm-110.1)
+} // (#cm-110.1)

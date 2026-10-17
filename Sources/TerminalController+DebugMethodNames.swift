@@ -49,6 +49,8 @@ extension TerminalController {
         "debug.cloudtree.gallery",
         "debug.terminal.simulate_file_drop",
         "debug.sidebar.simulate_drag",
+        "debug.sidebar.rows", // (#cm-110.1)
+        "debug.sidebar.drop", // (#cm-110.1)
         "debug.mobile.transport.disconnect",
         "debug.mobile.transport.reconnect_loop",
         "mobile.dev_stack_auth.configure",

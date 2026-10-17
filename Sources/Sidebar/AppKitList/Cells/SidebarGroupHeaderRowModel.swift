@@ -59,6 +59,12 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     var isFoldedOverSelection: Bool = false
     /// Whether a group sits inside this one; a pinned group that holds only groups is still offered Ungroup (#cm-106).
     var holdsGroups: Bool = false
+    /// Distinguishes status-related headers from upstream workspace group headers (#cm-110.1).
+    var statusHeaderKind: SidebarStatusHeaderKind? = nil // (#cm-110.1)
+    /// Status glyph icon for status group header drawing (#cm-110.1).
+    var statusGlyph: WorkspaceStatusGlyph? = nil // (#cm-110.1)
+    /// The cmux status his entry extends: the glyph drawn when the entry names no icon of its own (#cm-110.1).
+    var statusBehavesAs: WorkspaceTaskStatus = .working // (#cm-110.1)
 }
 
 /// Behavior bundle for one group header row; recreated per apply and excluded

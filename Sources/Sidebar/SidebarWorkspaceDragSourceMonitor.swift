@@ -4,7 +4,7 @@ import AppKit
 @MainActor
 final class SidebarWorkspaceDragSourceMonitor {
     typealias BeginDrag = @MainActor (
-        _ workspaceId: UUID,
+        _ candidate: SidebarWorkspaceDragCandidate, // (#cm-110.1)
         _ sourceView: NSView,
         _ mouseDownEvent: NSEvent,
         _ draggingFrame: NSRect,
@@ -127,7 +127,7 @@ final class SidebarWorkspaceDragSourceMonitor {
             return event
         }
         let didBegin = onBeginDrag(
-            pendingDrag.candidate.workspaceId,
+            pendingDrag.candidate, // (#cm-110.1)
             hostView,
             pendingDrag.mouseDownEvent,
             representation.frame,

@@ -14,6 +14,7 @@ public struct SidebarWorkspaceReorderDropTarget: Equatable, Sendable {
 
     /// The row frame in the drop overlay's coordinate space.
     public let frame: CGRect
+    public let kind: SidebarWorkspaceReorderDropTargetKind // (#cm-110.1)
 
     /// Creates a visible row target for sidebar reorder planning.
     ///
@@ -22,10 +23,11 @@ public struct SidebarWorkspaceReorderDropTarget: Equatable, Sendable {
     ///   - groupId: The workspace group represented by or containing the row, if any.
     ///   - isGroupHeader: Whether the row is a workspace group header.
     ///   - frame: The row frame in the drop overlay's coordinate space.
-    public init(workspaceId: UUID, groupId: UUID?, isGroupHeader: Bool, frame: CGRect) {
+    public init(workspaceId: UUID, groupId: UUID?, isGroupHeader: Bool, frame: CGRect, kind: SidebarWorkspaceReorderDropTargetKind = .workspace) { // (#cm-110.1)
         self.workspaceId = workspaceId
         self.groupId = groupId
         self.isGroupHeader = isGroupHeader
         self.frame = frame
+        self.kind = kind // (#cm-110.1)
     }
 }

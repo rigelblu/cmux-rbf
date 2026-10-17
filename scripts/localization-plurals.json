@@ -734,5 +734,17 @@
     "arguments": [
       2
     ]
+  },
+  "sidebar.statusGroup.workspaceCount": {
+    "source": "%lld workspaces",
+    "arguments": [
+      1
+    ]
+  },
+  "sidebar.statusesArea.groupCount": {
+    "source": "%lld status groups",
+    "arguments": [
+      1
+    ]
   }
 }

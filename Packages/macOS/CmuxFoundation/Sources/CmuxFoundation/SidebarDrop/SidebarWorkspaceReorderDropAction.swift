@@ -23,4 +23,21 @@ public enum SidebarWorkspaceReorderDropAction: Equatable, Sendable {
         insertBefore: Bool,
         memberWorkspaceIds: [UUID]
     )
+
+    /// Reorder a status header in this window under its original opaque drag generation. // (#cm-110.1)
+    case reorderStatusGroup(targetStatusId: String, insertBefore: Bool, sessionId: UUID) // (#cm-110.1)
+    /// Move the complete Statuses area among whole top-level items. // (#cm-110.1)
+    case moveStatusesArea(aboveRow: String, belowRow: String?, last: Bool, sessionId: UUID) // (#cm-110.1)
+
+    case statusGroupDrop(plan: SidebarStatusGroupWorkspaceDropPlan, sessionId: UUID) // (#cm-110.1)
+    case statusAreaBoundaryDrop(plan: SidebarStatusAreaBoundaryDropPlan, sessionId: UUID) // (#cm-110.1)
+
+    // (#cm-110.1)
+    /// Permute only the ungrouped members of one status group. (#cm-110.1)
+    case statusGroupMove( // (#cm-110.1)
+        statusId: String, // (#cm-110.1)
+        targetWorkspaceId: UUID, // (#cm-110.1)
+        insertBefore: Bool, // (#cm-110.1)
+        memberWorkspaceIds: [UUID] // (#cm-110.1)
+    ) // (#cm-110.1)
 }

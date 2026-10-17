@@ -235,24 +235,28 @@ struct SessionSidebarSnapshot: Codable, Sendable {
     var selection: SessionSidebarSelection
     var width: Double?
     var colorSectionCollapsedHexes: [String]? = nil
+    var statusGroups: WorkspaceStatusGroupsState? = nil // (#cm-110.1)
 
     private enum CodingKeys: String, CodingKey {
         case isVisible
         case selection
         case width
         case colorSectionCollapsedHexes
+        case statusGroups // (#cm-110.1)
     }
 
     init(
         isVisible: Bool,
         selection: SessionSidebarSelection,
         width: Double?,
-        colorSectionCollapsedHexes: [String]? = nil
+        colorSectionCollapsedHexes: [String]? = nil, // (#cm-110.1)
+        statusGroups: WorkspaceStatusGroupsState? = nil // (#cm-110.1)
     ) {
         self.isVisible = isVisible
         self.selection = selection
         self.width = width
         self.colorSectionCollapsedHexes = colorSectionCollapsedHexes
+        self.statusGroups = statusGroups // (#cm-110.1)
     }
 
     init(from decoder: Decoder) throws {
@@ -264,6 +268,7 @@ struct SessionSidebarSnapshot: Codable, Sendable {
             [String].self,
             forKey: .colorSectionCollapsedHexes
         )
+        statusGroups = try container.decodeIfPresent(WorkspaceStatusGroupsState.self, forKey: .statusGroups) // (#cm-110.1)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -272,6 +277,7 @@ struct SessionSidebarSnapshot: Codable, Sendable {
         try container.encode(selection, forKey: .selection)
         try container.encodeIfPresent(width, forKey: .width)
         try container.encodeIfPresent(colorSectionCollapsedHexes, forKey: .colorSectionCollapsedHexes)
+        try container.encodeIfPresent(statusGroups, forKey: .statusGroups) // (#cm-110.1)
     }
 }
 

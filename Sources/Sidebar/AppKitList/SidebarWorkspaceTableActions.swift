@@ -45,6 +45,7 @@ struct SidebarWorkspaceTableActions {
     let createWorkspaceAtEnd: () -> Void
     let createEmptyWorkspaceGroup: () -> Void
     let beginWorkspaceDrag: (UUID) -> Void
+    var beginWorkspaceDragFromRow: ((UUID, SidebarWorkspaceRenderItemID?) -> Void)? = nil // (#cm-110.1)
     let movingWorkspaceCount: ((UUID) -> Int)?
     let endWorkspaceDrag: () -> Void
     let isValidWorkspaceDrag: () -> Bool
@@ -75,6 +76,10 @@ struct SidebarWorkspaceTableActions {
     /// headers use the durable group id; grouped members keep their workspace
     /// id so member drags never accidentally move the anchor.
     let workspaceIdForDrag: ((SidebarWorkspaceRenderItemID, UUID) -> UUID)?
+    var usesStatusHeaderDropTargets: () -> Bool = { false } // (#cm-110.1)
+#if DEBUG // (#cm-110.1)
+    var debugPerformSidebarDrop: ((SidebarDebugDropRequest, [SidebarWorkspaceReorderDropOverlay.Target]) -> SidebarDebugDropResult?)? = nil // (#cm-110.1)
+#endif // (#cm-110.1)
     /// Native source ownership, when this bundle supports tokenized completion.
     let nativeWorkspaceDragLifecycle: NativeWorkspaceDragLifecycle?
 

@@ -1,6 +1,269 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "sidebar.drop.error.invalidArguments": {
+      "comment": "cmux-rbf #cm-110.1: DEBUG sidebar drop error.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid sidebar drop arguments."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "وسائط إسقاط الشريط الجانبي غير صالحة."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neispravni argumenti za ispuštanje u bočnu traku."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ugyldige argumenter til slip i sidepanelet."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ungültige Argumente für das Ablegen in der Seitenleiste."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Argumentos no válidos para soltar en la barra lateral."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arguments non valides pour le dépôt dans la barre latérale."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Argomenti non validi per il rilascio nella barra laterale."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サイドバーへのドロップの引数が無効です。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "អាគុយម៉ង់សម្រាប់ការទម្លាក់ក្នុងរបារចំហៀងមិនត្រឹមត្រូវ។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사이드바에 놓기 인수가 올바르지 않습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ugyldige argumenter for slipp i sidepanelet."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nieprawidłowe argumenty upuszczania na pasku bocznym."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Argumentos inválidos para soltar na barra lateral."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Недопустимые аргументы перетаскивания на боковую панель."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "อาร์กิวเมนต์สำหรับการวางในแถบด้านข้างไม่ถูกต้อง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kenar çubuğuna bırakma bağımsız değişkenleri geçersiz."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Недійсні аргументи перетягування на бічну панель."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "侧边栏拖放参数无效。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "側邊欄拖放參數無效。"
+          }
+        }
+      }
+    },
+    "sidebar.drop.error.unavailable": {
+      "comment": "cmux-rbf #cm-110.1: DEBUG sidebar drop error.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidebar drop is unavailable."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إسقاط الشريط الجانبي غير متاح."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ispuštanje u bočnu traku nije dostupno."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slip i sidepanelet er ikke tilgængeligt."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ablegen in der Seitenleiste ist nicht verfügbar."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se puede soltar en la barra lateral."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le dépôt dans la barre latérale est indisponible."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il rilascio nella barra laterale non è disponibile."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サイドバーへのドロップは利用できません。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "មិនអាចទម្លាក់ក្នុងរបារចំហៀងបានទេ។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사이드바에 놓기를 사용할 수 없습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slipp i sidepanelet er utilgjengelig."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upuszczanie na pasku bocznym jest niedostępne."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não é possível soltar na barra lateral."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перетаскивание на боковую панель недоступно."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไม่สามารถวางในแถบด้านข้างได้"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kenar çubuğuna bırakma kullanılamıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перетягування на бічну панель недоступне."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法在侧边栏中拖放。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法在側邊欄中拖放。"
+          }
+        }
+      }
+    },
+    "sidebar.statusGroup.accessibility": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"مجموعة الحالة، %1$@، %2$@، %3$@"}},"bs":{"stringUnit":{"state":"translated","value":"Statusna grupa, %1$@, %2$@, %3$@"}},"da":{"stringUnit":{"state":"translated","value":"Statusgruppe, %1$@, %2$@, %3$@"}},"de":{"stringUnit":{"state":"translated","value":"Statusgruppe, %1$@, %2$@, %3$@"}},"en":{"stringUnit":{"state":"translated","value":"Status group, %1$@, %2$@, %3$@"}},"es":{"stringUnit":{"state":"translated","value":"Grupo de estados, %1$@, %2$@, %3$@"}},"fr":{"stringUnit":{"state":"translated","value":"Groupe de statuts, %1$@, %2$@, %3$@"}},"it":{"stringUnit":{"state":"translated","value":"Gruppo di stati, %1$@, %2$@, %3$@"}},"ja":{"stringUnit":{"state":"translated","value":"ステータスグループ、%1$@、%2$@、%3$@"}},"km":{"stringUnit":{"state":"translated","value":"ក្រុមស្ថានភាព, %1$@, %2$@, %3$@"}},"ko":{"stringUnit":{"state":"translated","value":"상태 그룹, %1$@, %2$@, %3$@"}},"nb":{"stringUnit":{"state":"translated","value":"Statusgruppe, %1$@, %2$@, %3$@"}},"pl":{"stringUnit":{"state":"translated","value":"Grupa statusów, %1$@, %2$@, %3$@"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Grupo de status, %1$@, %2$@, %3$@"}},"ru":{"stringUnit":{"state":"translated","value":"Группа статусов, %1$@, %2$@, %3$@"}},"th":{"stringUnit":{"state":"translated","value":"กลุ่มสถานะ, %1$@, %2$@, %3$@"}},"tr":{"stringUnit":{"state":"translated","value":"Durum grubu, %1$@, %2$@, %3$@"}},"uk":{"stringUnit":{"state":"translated","value":"Група статусів, %1$@, %2$@, %3$@"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"状态组，%1$@，%2$@，%3$@"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"狀態群組，%1$@，%2$@，%3$@"}}}},
+    "sidebar.statusGroup.collapsed": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"مطوي"}},"bs":{"stringUnit":{"state":"translated","value":"skupljeno"}},"da":{"stringUnit":{"state":"translated","value":"skjult"}},"de":{"stringUnit":{"state":"translated","value":"eingeklappt"}},"en":{"stringUnit":{"state":"translated","value":"collapsed"}},"es":{"stringUnit":{"state":"translated","value":"contraído"}},"fr":{"stringUnit":{"state":"translated","value":"réduit"}},"it":{"stringUnit":{"state":"translated","value":"compresso"}},"ja":{"stringUnit":{"state":"translated","value":"折りたたまれています"}},"km":{"stringUnit":{"state":"translated","value":"បង្រួម"}},"ko":{"stringUnit":{"state":"translated","value":"축소됨"}},"nb":{"stringUnit":{"state":"translated","value":"skjult"}},"pl":{"stringUnit":{"state":"translated","value":"zwinięte"}},"pt-BR":{"stringUnit":{"state":"translated","value":"recolhido"}},"ru":{"stringUnit":{"state":"translated","value":"свернуто"}},"th":{"stringUnit":{"state":"translated","value":"ยุบแล้ว"}},"tr":{"stringUnit":{"state":"translated","value":"daraltılmış"}},"uk":{"stringUnit":{"state":"translated","value":"згорнуто"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已折叠"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"已收合"}}}},
+    "sidebar.statusGroup.expanded": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"موسع"}},"bs":{"stringUnit":{"state":"translated","value":"prošireno"}},"da":{"stringUnit":{"state":"translated","value":"udvidet"}},"de":{"stringUnit":{"state":"translated","value":"ausgeklappt"}},"en":{"stringUnit":{"state":"translated","value":"expanded"}},"es":{"stringUnit":{"state":"translated","value":"expandido"}},"fr":{"stringUnit":{"state":"translated","value":"développé"}},"it":{"stringUnit":{"state":"translated","value":"espanso"}},"ja":{"stringUnit":{"state":"translated","value":"展開されています"}},"km":{"stringUnit":{"state":"translated","value":"ពង្រីក"}},"ko":{"stringUnit":{"state":"translated","value":"확장됨"}},"nb":{"stringUnit":{"state":"translated","value":"utvidet"}},"pl":{"stringUnit":{"state":"translated","value":"rozwinięte"}},"pt-BR":{"stringUnit":{"state":"translated","value":"expandido"}},"ru":{"stringUnit":{"state":"translated","value":"развернуто"}},"th":{"stringUnit":{"state":"translated","value":"ขยายแล้ว"}},"tr":{"stringUnit":{"state":"translated","value":"genişletilmiş"}},"uk":{"stringUnit":{"state":"translated","value":"розгорнуто"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已展开"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"已展開"}}}},
+    "sidebar.statusesArea.accessibility": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"الحالات، %1$@، %2$@"}},"bs":{"stringUnit":{"state":"translated","value":"Statusi, %1$@, %2$@"}},"da":{"stringUnit":{"state":"translated","value":"Statusser, %1$@, %2$@"}},"de":{"stringUnit":{"state":"translated","value":"Status, %1$@, %2$@"}},"en":{"stringUnit":{"state":"translated","value":"Statuses, %1$@, %2$@"}},"es":{"stringUnit":{"state":"translated","value":"Estados, %1$@, %2$@"}},"fr":{"stringUnit":{"state":"translated","value":"Statuts, %1$@, %2$@"}},"it":{"stringUnit":{"state":"translated","value":"Stati, %1$@, %2$@"}},"ja":{"stringUnit":{"state":"translated","value":"ステータス、%1$@、%2$@"}},"km":{"stringUnit":{"state":"translated","value":"ស្ថានភាព, %1$@, %2$@"}},"ko":{"stringUnit":{"state":"translated","value":"상태, %1$@, %2$@"}},"nb":{"stringUnit":{"state":"translated","value":"Statuser, %1$@, %2$@"}},"pl":{"stringUnit":{"state":"translated","value":"Statusy, %1$@, %2$@"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Status, %1$@, %2$@"}},"ru":{"stringUnit":{"state":"translated","value":"Статусы, %1$@, %2$@"}},"th":{"stringUnit":{"state":"translated","value":"สถานะ, %1$@, %2$@"}},"tr":{"stringUnit":{"state":"translated","value":"Durumlar, %1$@, %2$@"}},"uk":{"stringUnit":{"state":"translated","value":"Статуси, %1$@, %2$@"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"状态，%1$@，%2$@"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"狀態，%1$@，%2$@"}}}},
+    "sidebar.statusesArea.title": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"الحالات"}},"bs":{"stringUnit":{"state":"translated","value":"Statusi"}},"da":{"stringUnit":{"state":"translated","value":"Statusser"}},"de":{"stringUnit":{"state":"translated","value":"Status"}},"en":{"stringUnit":{"state":"translated","value":"Statuses"}},"es":{"stringUnit":{"state":"translated","value":"Estados"}},"fr":{"stringUnit":{"state":"translated","value":"Statuts"}},"it":{"stringUnit":{"state":"translated","value":"Stati"}},"ja":{"stringUnit":{"state":"translated","value":"ステータス"}},"km":{"stringUnit":{"state":"translated","value":"ស្ថានភាព"}},"ko":{"stringUnit":{"state":"translated","value":"상태"}},"nb":{"stringUnit":{"state":"translated","value":"Statuser"}},"pl":{"stringUnit":{"state":"translated","value":"Statusy"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Status"}},"ru":{"stringUnit":{"state":"translated","value":"Статусы"}},"th":{"stringUnit":{"state":"translated","value":"สถานะ"}},"tr":{"stringUnit":{"state":"translated","value":"Durumlar"}},"uk":{"stringUnit":{"state":"translated","value":"Статуси"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"状态"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"狀態"}}}},
+    "sidebar.statusGroup.workspaceCount": {"extractionState":"manual","localizations":{"ar":{"variations":{"plural":{"zero":{"stringUnit":{"state":"translated","value":"%lld مساحة عمل"}},"one":{"stringUnit":{"state":"translated","value":"%lld مساحة عمل"}},"two":{"stringUnit":{"state":"translated","value":"%lld مساحة عمل"}},"few":{"stringUnit":{"state":"translated","value":"%lld مساحات عمل"}},"many":{"stringUnit":{"state":"translated","value":"%lld مساحة عمل"}},"other":{"stringUnit":{"state":"translated","value":"%lld مساحة عمل"}}}}},"bs":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld radni prostor"}},"few":{"stringUnit":{"state":"translated","value":"%lld radna prostora"}},"other":{"stringUnit":{"state":"translated","value":"%lld radnih prostora"}}}}},"da":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld arbejdsområde"}},"other":{"stringUnit":{"state":"translated","value":"%lld arbejdsområder"}}}}},"de":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld Arbeitsbereich"}},"other":{"stringUnit":{"state":"translated","value":"%lld Arbeitsbereiche"}}}}},"en":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld workspace"}},"other":{"stringUnit":{"state":"translated","value":"%lld workspaces"}}}}},"es":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld espacio de trabajo"}},"many":{"stringUnit":{"state":"translated","value":"%lld de espacios de trabajo"}},"other":{"stringUnit":{"state":"translated","value":"%lld espacios de trabajo"}}}}},"fr":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld espace de travail"}},"many":{"stringUnit":{"state":"translated","value":"%lld d’espaces de travail"}},"other":{"stringUnit":{"state":"translated","value":"%lld espaces de travail"}}}}},"it":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld spazio di lavoro"}},"many":{"stringUnit":{"state":"translated","value":"%lld di spazi di lavoro"}},"other":{"stringUnit":{"state":"translated","value":"%lld spazi di lavoro"}}}}},"ja":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld 個のワークスペース"}}}}},"km":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld កន្លែងធ្វើការ"}},"other":{"stringUnit":{"state":"translated","value":"%lld កន្លែងធ្វើការ"}}}}},"ko":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld개 워크스페이스"}}}}},"nb":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld arbeidsområde"}},"other":{"stringUnit":{"state":"translated","value":"%lld arbeidsområder"}}}}},"pl":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld obszar roboczy"}},"few":{"stringUnit":{"state":"translated","value":"%lld obszary robocze"}},"many":{"stringUnit":{"state":"translated","value":"%lld obszarów roboczych"}},"other":{"stringUnit":{"state":"translated","value":"%lld obszaru roboczego"}}}}},"pt-BR":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld espaço de trabalho"}},"many":{"stringUnit":{"state":"translated","value":"%lld de espaços de trabalho"}},"other":{"stringUnit":{"state":"translated","value":"%lld espaços de trabalho"}}}}},"ru":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld рабочая область"}},"few":{"stringUnit":{"state":"translated","value":"%lld рабочие области"}},"many":{"stringUnit":{"state":"translated","value":"%lld рабочих областей"}},"other":{"stringUnit":{"state":"translated","value":"%lld рабочей области"}}}}},"th":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld พื้นที่ทำงาน"}},"other":{"stringUnit":{"state":"translated","value":"%lld พื้นที่ทำงาน"}}}}},"tr":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld çalışma alanı"}},"other":{"stringUnit":{"state":"translated","value":"%lld çalışma alanı"}}}}},"uk":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld робоча область"}},"few":{"stringUnit":{"state":"translated","value":"%lld робочі області"}},"many":{"stringUnit":{"state":"translated","value":"%lld робочих областей"}},"other":{"stringUnit":{"state":"translated","value":"%lld робочої області"}}}}},"zh-Hans":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld 个工作区"}}}}},"zh-Hant":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld 個工作區"}}}}}}},
+    "sidebar.statusesArea.groupCount": {"extractionState":"manual","localizations":{"ar":{"variations":{"plural":{"zero":{"stringUnit":{"state":"translated","value":"%lld مجموعة حالة"}},"one":{"stringUnit":{"state":"translated","value":"%lld مجموعة حالة"}},"two":{"stringUnit":{"state":"translated","value":"%lld مجموعة حالة"}},"few":{"stringUnit":{"state":"translated","value":"%lld مجموعات حالة"}},"many":{"stringUnit":{"state":"translated","value":"%lld مجموعة حالة"}},"other":{"stringUnit":{"state":"translated","value":"%lld مجموعة حالة"}}}}},"bs":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld statusna grupa"}},"few":{"stringUnit":{"state":"translated","value":"%lld statusne grupe"}},"other":{"stringUnit":{"state":"translated","value":"%lld statusnih grupa"}}}}},"da":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld statusgruppe"}},"other":{"stringUnit":{"state":"translated","value":"%lld statusgrupper"}}}}},"de":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld Statusgruppe"}},"other":{"stringUnit":{"state":"translated","value":"%lld Statusgruppen"}}}}},"en":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld status group"}},"other":{"stringUnit":{"state":"translated","value":"%lld status groups"}}}}},"es":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld grupo de estados"}},"many":{"stringUnit":{"state":"translated","value":"%lld de grupos de estados"}},"other":{"stringUnit":{"state":"translated","value":"%lld grupos de estados"}}}}},"fr":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld groupe de statuts"}},"many":{"stringUnit":{"state":"translated","value":"%lld de groupes de statuts"}},"other":{"stringUnit":{"state":"translated","value":"%lld groupes de statuts"}}}}},"it":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld gruppo di stati"}},"many":{"stringUnit":{"state":"translated","value":"%lld di gruppi di stati"}},"other":{"stringUnit":{"state":"translated","value":"%lld gruppi di stati"}}}}},"ja":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld 個のステータスグループ"}}}}},"km":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld ក្រុមស្ថានភាព"}},"other":{"stringUnit":{"state":"translated","value":"%lld ក្រុមស្ថានភាព"}}}}},"ko":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld개 상태 그룹"}}}}},"nb":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld statusgruppe"}},"other":{"stringUnit":{"state":"translated","value":"%lld statusgrupper"}}}}},"pl":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld grupa statusów"}},"few":{"stringUnit":{"state":"translated","value":"%lld grupy statusów"}},"many":{"stringUnit":{"state":"translated","value":"%lld grup statusów"}},"other":{"stringUnit":{"state":"translated","value":"%lld grupy statusów"}}}}},"pt-BR":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld grupo de status"}},"many":{"stringUnit":{"state":"translated","value":"%lld de grupos de status"}},"other":{"stringUnit":{"state":"translated","value":"%lld grupos de status"}}}}},"ru":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld группа статусов"}},"few":{"stringUnit":{"state":"translated","value":"%lld группы статусов"}},"many":{"stringUnit":{"state":"translated","value":"%lld групп статусов"}},"other":{"stringUnit":{"state":"translated","value":"%lld группы статусов"}}}}},"th":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld กลุ่มสถานะ"}},"other":{"stringUnit":{"state":"translated","value":"%lld กลุ่มสถานะ"}}}}},"tr":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld durum grubu"}},"other":{"stringUnit":{"state":"translated","value":"%lld durum grubu"}}}}},"uk":{"variations":{"plural":{"one":{"stringUnit":{"state":"translated","value":"%lld група статусів"}},"few":{"stringUnit":{"state":"translated","value":"%lld групи статусів"}},"many":{"stringUnit":{"state":"translated","value":"%lld груп статусів"}},"other":{"stringUnit":{"state":"translated","value":"%lld групи статусів"}}}}},"zh-Hans":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld 个状态组"}}}}},"zh-Hant":{"variations":{"plural":{"other":{"stringUnit":{"state":"translated","value":"%lld 個狀態群組"}}}}}}},
+    "sidebar.statusGroup.chevron.expand": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"توسيع مجموعة الحالة"}},"bs":{"stringUnit":{"state":"translated","value":"Proširi statusnu grupu"}},"da":{"stringUnit":{"state":"translated","value":"Vis statusgruppe"}},"de":{"stringUnit":{"state":"translated","value":"Statusgruppe ausklappen"}},"en":{"stringUnit":{"state":"translated","value":"Expand status group"}},"es":{"stringUnit":{"state":"translated","value":"Expandir grupo de estados"}},"fr":{"stringUnit":{"state":"translated","value":"Développer le groupe de statuts"}},"it":{"stringUnit":{"state":"translated","value":"Espandi gruppo di stati"}},"ja":{"stringUnit":{"state":"translated","value":"ステータスグループを展開"}},"km":{"stringUnit":{"state":"translated","value":"ពង្រីកក្រុមស្ថានភាព"}},"ko":{"stringUnit":{"state":"translated","value":"상태 그룹 펼치기"}},"nb":{"stringUnit":{"state":"translated","value":"Utvid statusgruppe"}},"pl":{"stringUnit":{"state":"translated","value":"Rozwiń grupę statusów"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Expandir grupo de status"}},"ru":{"stringUnit":{"state":"translated","value":"Развернуть группу статусов"}},"th":{"stringUnit":{"state":"translated","value":"ขยายกลุ่มสถานะ"}},"tr":{"stringUnit":{"state":"translated","value":"Durum Grubunu Genişlet"}},"uk":{"stringUnit":{"state":"translated","value":"Розгорнути групу статусів"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"展开状态组"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"展開狀態群組"}}}},
+    "sidebar.statusGroup.chevron.collapse": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"طي مجموعة الحالة"}},"bs":{"stringUnit":{"state":"translated","value":"Sažmi statusnu grupu"}},"da":{"stringUnit":{"state":"translated","value":"Skjul statusgruppe"}},"de":{"stringUnit":{"state":"translated","value":"Statusgruppe einklappen"}},"en":{"stringUnit":{"state":"translated","value":"Collapse status group"}},"es":{"stringUnit":{"state":"translated","value":"Contraer grupo de estados"}},"fr":{"stringUnit":{"state":"translated","value":"Réduire le groupe de statuts"}},"it":{"stringUnit":{"state":"translated","value":"Comprimi gruppo di stati"}},"ja":{"stringUnit":{"state":"translated","value":"ステータスグループを折りたたむ"}},"km":{"stringUnit":{"state":"translated","value":"បង្រួមក្រុមស្ថានភាព"}},"ko":{"stringUnit":{"state":"translated","value":"상태 그룹 접기"}},"nb":{"stringUnit":{"state":"translated","value":"Skjul statusgruppe"}},"pl":{"stringUnit":{"state":"translated","value":"Zwiń grupę statusów"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Recolher grupo de status"}},"ru":{"stringUnit":{"state":"translated","value":"Свернуть группу статусов"}},"th":{"stringUnit":{"state":"translated","value":"ยุบกลุ่มสถานะ"}},"tr":{"stringUnit":{"state":"translated","value":"Durum Grubunu Daralt"}},"uk":{"stringUnit":{"state":"translated","value":"Згорнути групу статусів"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"折叠状态组"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"收合狀態群組"}}}},
+    "sidebar.statusesArea.chevron.expand": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"توسيع قسم الحالات"}},"bs":{"stringUnit":{"state":"translated","value":"Proširi područje statusa"}},"da":{"stringUnit":{"state":"translated","value":"Vis statusområde"}},"de":{"stringUnit":{"state":"translated","value":"Statusbereich ausklappen"}},"en":{"stringUnit":{"state":"translated","value":"Expand statuses area"}},"es":{"stringUnit":{"state":"translated","value":"Expandir área de estados"}},"fr":{"stringUnit":{"state":"translated","value":"Développer la zone des statuts"}},"it":{"stringUnit":{"state":"translated","value":"Espandi area degli stati"}},"ja":{"stringUnit":{"state":"translated","value":"ステータス領域を展開"}},"km":{"stringUnit":{"state":"translated","value":"ពង្រីកផ្នែកស្ថានភាព"}},"ko":{"stringUnit":{"state":"translated","value":"상태 영역 펼치기"}},"nb":{"stringUnit":{"state":"translated","value":"Utvid statusområde"}},"pl":{"stringUnit":{"state":"translated","value":"Rozwiń obszar statusów"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Expandir área de status"}},"ru":{"stringUnit":{"state":"translated","value":"Развернуть область статусов"}},"th":{"stringUnit":{"state":"translated","value":"ขยายพื้นที่สถานะ"}},"tr":{"stringUnit":{"state":"translated","value":"Durumlar Alanını Genişlet"}},"uk":{"stringUnit":{"state":"translated","value":"Розгорнути область статусів"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"展开状态区域"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"展開狀態區域"}}}},
+    "sidebar.statusesArea.chevron.collapse": {"extractionState":"manual","localizations":{"ar":{"stringUnit":{"state":"translated","value":"طي قسم الحالات"}},"bs":{"stringUnit":{"state":"translated","value":"Sažmi područje statusa"}},"da":{"stringUnit":{"state":"translated","value":"Skjul statusområde"}},"de":{"stringUnit":{"state":"translated","value":"Statusbereich einklappen"}},"en":{"stringUnit":{"state":"translated","value":"Collapse statuses area"}},"es":{"stringUnit":{"state":"translated","value":"Contraer área de estados"}},"fr":{"stringUnit":{"state":"translated","value":"Réduire la zone des statuts"}},"it":{"stringUnit":{"state":"translated","value":"Comprimi area degli stati"}},"ja":{"stringUnit":{"state":"translated","value":"ステータス領域を折りたたむ"}},"km":{"stringUnit":{"state":"translated","value":"បង្រួមផ្នែកស្ថានភាព"}},"ko":{"stringUnit":{"state":"translated","value":"상태 영역 접기"}},"nb":{"stringUnit":{"state":"translated","value":"Skjul statusområde"}},"pl":{"stringUnit":{"state":"translated","value":"Zwiń obszar statusów"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Recolher área de status"}},"ru":{"stringUnit":{"state":"translated","value":"Свернуть область статусов"}},"th":{"stringUnit":{"state":"translated","value":"ยุบพื้นที่สถานะ"}},"tr":{"stringUnit":{"state":"translated","value":"Durumlar Alanını Daralt"}},"uk":{"stringUnit":{"state":"translated","value":"Згорнути область статусів"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"折叠状态区域"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"收合狀態區域"}}}},
     "figma.page.preview": {
       "extractionState": "manual",
       "localizations": {

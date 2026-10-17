@@ -18,6 +18,8 @@ enum SidebarWorkspaceRenderItem {
     case groupHeader(groupId: UUID, anchorWorkspaceId: UUID)
     case colorSectionHeader(section: SidebarWorkspaceColorSection)
     case workspace(workspaceId: UUID)
+    case statusesHeader // (#cm-110.1)
+    case statusGroupHeader(statusId: String) // (#cm-110.1)
 
     var id: SidebarWorkspaceRenderItemID {
         switch self {
@@ -27,6 +29,10 @@ enum SidebarWorkspaceRenderItem {
             return .colorSection(section.id)
         case .workspace(let workspaceId):
             return .workspace(workspaceId)
+        case .statusesHeader: // (#cm-110.1)
+            return .statusesArea() // (#cm-110.1)
+        case .statusGroupHeader(let statusId): // (#cm-110.1)
+            return .statusGroup(statusId) // (#cm-110.1)
         }
     }
 
@@ -42,6 +48,8 @@ enum SidebarWorkspaceRenderItem {
             return section.memberWorkspaceIds.first
         case .workspace(let workspaceId):
             return workspaceId
+        case .statusesHeader, .statusGroupHeader: // (#cm-110.1)
+            return nil // (#cm-110.1)
         }
     }
 
@@ -175,6 +183,8 @@ enum SidebarWorkspaceRenderItem {
                         return !group.isPinned
                     }
                     return !workspace.isPinned
+                case .statusesHeader, .statusGroupHeader: // (#cm-110.1)
+                    return true // Statuses area is unpinned by definition (#cm-110.1)
                 }
             } ?? rendered.count
             rendered.insert(contentsOf: trailingPinned.map {
@@ -209,6 +219,8 @@ enum SidebarWorkspaceRenderItem {
     ) -> [UUID] {
         renderItems.compactMap { item in
             if case .colorSectionHeader = item { return nil }
+            if case .statusesHeader = item { return nil } // (#cm-110.1)
+            if case .statusGroupHeader = item { return nil } // (#cm-110.1)
             return item.rowWorkspaceId
         }
     }
@@ -480,7 +492,9 @@ struct SidebarWorkspaceColorSectionProjection {
     static func project(
         workspaces: [SidebarWorkspaceColorSectionWorkspaceSnapshot],
         paletteEntries: [WorkspaceColorPaletteEntry],
-        collapsedHexes: Set<String>
+        collapsedHexes: Set<String>, // (#cm-110.1)
+        excludedWorkspaceIds: Set<UUID> = [], // (#cm-110.1)
+        unpinnedExcludedHexes: Set<String> = [] // (#cm-110.1)
     ) -> SidebarWorkspaceColorSectionProjection {
         var firstTitleByHex: [String: String] = [:]
         firstTitleByHex.reserveCapacity(paletteEntries.count)
@@ -498,9 +512,11 @@ struct SidebarWorkspaceColorSectionProjection {
         order.reserveCapacity(min(workspaces.count, paletteEntries.count))
         for workspace in workspaces {
             workspaceVisitCount += 1
+            guard !excludedWorkspaceIds.contains(workspace.id) else { continue } // (#cm-110.1)
             guard workspace.groupId == nil,
                   let rawColor = workspace.customColor,
                   let hex = WorkspaceColorHex.normalized(rawColor) else { continue }
+            if !workspace.isPinned && unpinnedExcludedHexes.contains(hex) { continue } // (#cm-110.1)
             let id = SidebarWorkspaceColorSectionID(
                 normalizedHex: hex,
                 pinTier: workspace.isPinned ? .pinned : .unpinned

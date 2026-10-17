@@ -2631,7 +2631,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         self.notificationStore = notificationStore
         self.sidebarState = sidebarState
         tabManager.revealSelectedWorkspaceInSidebar = { [weak sidebarState] workspace in
-            sidebarState?.expandColorSection(containing: workspace)
+            sidebarState?.prepareStatusGroupsForSelection(selectedWorkspace: workspace) // (#cm-110.1)
         }
         self.auth = auth
         self.cloudWorkspaceCoordinator = cloudWorkspaceCoordinator
@@ -4583,9 +4583,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             SessionPersistencePolicy.sanitizedSidebarWidth(snapshot.sidebar.width)
         )
         context.sidebarState.restoreCollapsedColorSections(snapshot.sidebar.colorSectionCollapsedHexes)
-        if let selected = context.tabManager.selectedTab {
-            context.sidebarState.expandColorSection(containing: selected)
-        }
+        context.sidebarState.setStatusGroups(snapshot.sidebar.statusGroups) // (#cm-110.1)
+        context.sidebarState.prepareStatusGroupsForSelection(selectedWorkspace: context.tabManager.selectedTab) // (#cm-110.1)
         context.sidebarSelectionState.selection = snapshot.sidebar.selection.sidebarSelection
 
         if let restoredFrame = resolvedWindowFrame(from: snapshot), let window {
@@ -5826,7 +5825,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 isVisible: route.sidebar.isVisible,
                 selection: SessionSidebarSelection(selection: route.sidebarSelection.selection),
                 width: SessionPersistencePolicy.sanitizedSidebarWidth(Double(route.sidebar.persistedWidth)),
-                colorSectionCollapsedHexes: route.sidebar.collapsedColorSectionHexes.sorted()
+                colorSectionCollapsedHexes: route.sidebar.collapsedColorSectionHexes.sorted(), // (#cm-110.1)
+                statusGroups: route.sidebar.statusGroupsForSnapshot(tabManager: route.tabManager) // (#cm-110.1)
             ),
             configFrames: windowConfigFrames[route.windowId]?.entries,
             dock: route.dock?.sessionSnapshot(
@@ -5845,7 +5845,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             selection: SessionSidebarSelection(selection: context.sidebarSelectionState.selection),
             width: SessionPersistencePolicy.sanitizedSidebarWidth(
                 Double(context.sidebarState.persistedWidth)
-            )
+            ), // (#cm-110.1)
+            statusGroups: context.sidebarState.statusGroupsForSnapshot(tabManager: context.tabManager) // (#cm-110.1)
         )
     }
 
@@ -10661,13 +10662,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             persistedWidth: CGFloat(sidebarWidth),
             collapsedColorSectionHexes: Set(
                 sessionWindowSnapshot?.sidebar.colorSectionCollapsedHexes ?? []
-            )
+            ), // (#cm-110.1)
+            statusGroups: sessionWindowSnapshot == nil ? WorkspaceStatusGroupsState() : sessionWindowSnapshot?.sidebar.statusGroups // (#cm-110.1)
         )
-        if let selected = tabManager.selectedTab {
-            sidebarState.expandColorSection(containing: selected)
-        }
+        sidebarState.prepareStatusGroupsForSelection(selectedWorkspace: tabManager.selectedTab) // (#cm-110.1)
         tabManager.revealSelectedWorkspaceInSidebar = { [weak sidebarState] workspace in
-            sidebarState?.expandColorSection(containing: workspace)
+            sidebarState?.prepareStatusGroupsForSelection(selectedWorkspace: workspace) // (#cm-110.1)
         }
         let sidebarSelectionState = SidebarSelectionState(
             selection: sessionWindowSnapshot?.sidebar.selection.sidebarSelection ?? .tabs

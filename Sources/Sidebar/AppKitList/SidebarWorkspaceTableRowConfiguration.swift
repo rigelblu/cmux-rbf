@@ -19,6 +19,7 @@ struct SidebarWorkspaceTableRowConfiguration {
     let groupId: UUID?
     let isGroupHeader: Bool
     let isColorSectionHeader: Bool
+    let statusHeaderKind: SidebarStatusHeaderKind? // (#cm-110.1)
     let isPinned: Bool
     let colorSectionToggle: (@MainActor () -> Void)?
     let makeContent: ContentFactory
@@ -51,6 +52,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         groupId: UUID?,
         isGroupHeader: Bool,
         isColorSectionHeader: Bool = false,
+        statusHeaderKind: SidebarStatusHeaderKind? = nil, // (#cm-110.1)
         isPinned: Bool,
         makeContent: @escaping ContentFactory,
         appKitGroupHeaderModel: SidebarGroupHeaderRowModel?,
@@ -65,6 +67,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.groupId = groupId
         self.isGroupHeader = isGroupHeader
         self.isColorSectionHeader = isColorSectionHeader
+        self.statusHeaderKind = statusHeaderKind // (#cm-110.1)
         self.isPinned = isPinned
         self.colorSectionToggle = nil
         self.makeContent = makeContent
@@ -99,6 +102,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.groupId = groupId
         self.isGroupHeader = isGroupHeader
         self.isColorSectionHeader = colorSectionToggle != nil
+        self.statusHeaderKind = nil // (#cm-110.1)
         self.isPinned = isPinned
         self.colorSectionToggle = colorSectionToggle
         self.environment = environment
@@ -132,6 +136,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.groupId = groupHeaderModel.groupId
         self.isGroupHeader = true
         self.isColorSectionHeader = false
+        self.statusHeaderKind = nil // (#cm-110.1)
         self.isPinned = groupHeaderModel.isPinned
         self.colorSectionToggle = nil
         self.environment = environment
@@ -168,6 +173,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         self.groupId = groupId
         self.isGroupHeader = false
         self.isColorSectionHeader = false
+        self.statusHeaderKind = nil // (#cm-110.1)
         self.isPinned = isPinned
         self.colorSectionToggle = nil
         self.environment = environment
@@ -227,6 +233,17 @@ struct SidebarWorkspaceTableRowConfiguration {
            let actions = appKitGroupHeaderActions {
             let model = rebuild(snapshot)
             guard model != appKitGroupHeaderModel else { return self }
+            if let statusHeaderKind { // (#cm-110.1)
+                return Self( // (#cm-110.1)
+                    statusHeaderModel: model, // (#cm-110.1)
+                    statusHeaderKind: statusHeaderKind, // (#cm-110.1)
+                    actions: actions, // (#cm-110.1)
+                    colorSectionToggle: colorSectionToggle, // (#cm-110.1)
+                    environment: environment, // (#cm-110.1)
+                    unreadDependencyWorkspaceIds: appKitUnreadDependencyWorkspaceIds, // (#cm-110.1)
+                    unreadRebuild: rebuild // (#cm-110.1)
+                ) // (#cm-110.1)
+            } // (#cm-110.1)
             return Self(
                 groupHeaderModel: model,
                 actions: actions,
@@ -247,6 +264,7 @@ struct SidebarWorkspaceTableRowConfiguration {
             groupId: groupId,
             isGroupHeader: isGroupHeader,
             isColorSectionHeader: isColorSectionHeader,
+            statusHeaderKind: statusHeaderKind, // (#cm-110.1)
             isPinned: isPinned,
             makeContent: { _, _ in AnyView(EmptyView()) },
             appKitGroupHeaderModel: appKitGroupHeaderModel,
@@ -261,7 +279,7 @@ struct SidebarWorkspaceTableRowConfiguration {
         if isColorSectionHeader { return 26 }
         let fontScale = CGFloat(environment.globalFontMagnificationPercent) / 100
         let calculator = SidebarWorkspaceTableRowHeightCalculator()
-        if isGroupHeader {
+        if isGroupHeader || statusHeaderKind != nil { // (#cm-110.1)
             return calculator.estimatedGroupHeaderHeight(fontScale: fontScale)
         }
         return calculator.estimatedWorkspaceHeight(
@@ -271,3 +289,56 @@ struct SidebarWorkspaceTableRowConfiguration {
         )
     }
 }
+
+// MARK: Status headers (#cm-110.1)
+
+/// The row of a status header (the `Statuses` header or a status group's header): a group header's row with the status (#cm-110.1)
+/// kind set. It has no group id and is not a group header or a color section header; its id and workspace id are made (#cm-110.1)
+/// from the status. It sits here, as a pure addition, because the stored properties are private to this file. (#cm-110.1)
+extension SidebarWorkspaceTableRowConfiguration { // (#cm-110.1)
+    init( // (#cm-110.1)
+        statusHeaderModel: SidebarGroupHeaderRowModel, // (#cm-110.1)
+        statusHeaderKind: SidebarStatusHeaderKind, // (#cm-110.1)
+        actions: SidebarGroupHeaderRowActions, // (#cm-110.1)
+        colorSectionToggle: (@MainActor () -> Void)? = nil, // (#cm-110.1)
+        environment: SidebarWorkspaceTableEnvironmentSnapshot, // (#cm-110.1)
+        unreadDependencyWorkspaceIds: Set<UUID> = [], // (#cm-110.1)
+        unreadRebuild: (@MainActor (SidebarUnreadSnapshot) -> SidebarGroupHeaderRowModel)? = nil // (#cm-110.1)
+    ) { // (#cm-110.1)
+        let syntheticUUID: UUID // (#cm-110.1)
+        let rowId: SidebarWorkspaceRenderItemID // (#cm-110.1)
+        switch statusHeaderKind { // (#cm-110.1)
+        case .statusGroup(let statusId): // (#cm-110.1)
+            syntheticUUID = SidebarStatusHeaderIdentity.uuid(forStatusId: statusId) // (#cm-110.1)
+            rowId = .statusGroup(statusId) // (#cm-110.1)
+        case .statusesArea: // (#cm-110.1)
+            syntheticUUID = SidebarStatusHeaderIdentity.statusesAreaUUID // (#cm-110.1)
+            rowId = .statusesArea() // (#cm-110.1)
+        } // (#cm-110.1)
+        self.id = rowId // (#cm-110.1)
+        self.workspaceId = syntheticUUID // (#cm-110.1)
+        self.groupId = nil // (#cm-110.1)
+        self.isGroupHeader = false // (#cm-110.1)
+        self.isColorSectionHeader = false // (#cm-110.1)
+        self.statusHeaderKind = statusHeaderKind // (#cm-110.1)
+        self.isPinned = false // (#cm-110.1)
+        self.colorSectionToggle = colorSectionToggle // (#cm-110.1)
+        self.environment = environment // (#cm-110.1)
+        self.makeContent = { _, _ in AnyView(EmptyView()) } // (#cm-110.1)
+        self.appKitGroupHeaderModel = statusHeaderModel // (#cm-110.1)
+        self.appKitGroupHeaderActions = actions.settingStatusHeaderToggle(colorSectionToggle) // (#cm-110.1)
+        self.appKitWorkspaceRowModel = nil // (#cm-110.1)
+        self.appKitWorkspaceRowActions = nil // (#cm-110.1)
+        self.appKitWorkspaceRowWorkspace = nil // (#cm-110.1)
+        self.appKitWorkspaceRowRebuild = nil // (#cm-110.1)
+        self.appKitUnreadDependencyWorkspaceIds = unreadDependencyWorkspaceIds // (#cm-110.1)
+        self.appKitWorkspaceUnreadRebuild = nil // (#cm-110.1)
+        self.appKitGroupHeaderUnreadRebuild = unreadRebuild // (#cm-110.1)
+        self.equivalenceValue = statusHeaderModel // (#cm-110.1)
+        self.isEquivalentValue = { value in // (#cm-110.1)
+            guard let value = value as? SidebarGroupHeaderRowModel else { return false } // (#cm-110.1)
+            return value == statusHeaderModel // (#cm-110.1)
+        } // (#cm-110.1)
+        self.isHeightEquivalentValue = self.isEquivalentValue // (#cm-110.1)
+    } // (#cm-110.1)
+} // (#cm-110.1)
