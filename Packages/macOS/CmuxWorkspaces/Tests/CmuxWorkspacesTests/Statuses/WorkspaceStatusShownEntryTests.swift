@@ -9,12 +9,12 @@ import Testing
     /// His list with an icon on every entry, so the entry a glyph draws is told apart by more than its id. `todo` and
     /// `needs-attention` are cmux ids under his words, as `todo` is his Future in the verification setup.
     private static let withIcons = WorkspaceStatusList(entries: [
-        WorkspaceStatusEntry(id: "done", name: "Done", color: "1: DONE", icon: .check),
-        WorkspaceStatusEntry(id: "review", name: "Review", icon: .threeQuarters),
-        WorkspaceStatusEntry(id: "needs-attention", name: "Stuck", icon: .half),
-        WorkspaceStatusEntry(id: "paused", name: "Paused", extends: .todo, icon: .ring),
-        WorkspaceStatusEntry(id: "doing", name: "Doing", extends: .working, icon: .quarter),
-        WorkspaceStatusEntry(id: "todo", name: "Future", icon: .dottedRing),
+        WorkspaceStatusEntry(id: "done", name: "Done", color: "1: DONE", icon: .shape(.check)),
+        WorkspaceStatusEntry(id: "review", name: "Review", icon: .shape(.threeQuarters)),
+        WorkspaceStatusEntry(id: "needs-attention", name: "Stuck", icon: .shape(.half)),
+        WorkspaceStatusEntry(id: "paused", name: "Paused", extends: .todo, icon: .shape(.ring)),
+        WorkspaceStatusEntry(id: "doing", name: "Doing", extends: .working, icon: .shape(.quarter)),
+        WorkspaceStatusEntry(id: "todo", name: "Future", icon: .shape(.dottedRing)),
     ], source: .file)
     private var list: WorkspaceStatusList { Self.withIcons }
 
@@ -27,9 +27,9 @@ import Testing
     }
 
     @Test func aWorkspaceOnAutoShowsTheEntryWhoseIDIsWhatCmuxDetects() {
-        #expect(resolve(inferred: .todo).shownEntry(list: list)?.icon == .dottedRing)
-        #expect(resolve(inferred: .review).shownEntry(list: list)?.icon == .threeQuarters)
-        #expect(resolve(inferred: .needsAttention).shownEntry(list: list)?.icon == .half)
+        #expect(resolve(inferred: .todo).shownEntry(list: list)?.icon == .shape(.dottedRing))
+        #expect(resolve(inferred: .review).shownEntry(list: list)?.icon == .shape(.threeQuarters))
+        #expect(resolve(inferred: .needsAttention).shownEntry(list: list)?.icon == .shape(.half))
     }
 
     @Test func aDetectedStatusTheListHasNoEntryForShowsNoEntry() {
@@ -45,7 +45,7 @@ import Testing
 
     @Test func aCmuxStatusInEffectShowsItsEntry() {
         let done = resolve(override: F.override(.done, at: .todo), inferred: .todo)
-        #expect(done.shownEntry(list: list)?.icon == .check)
+        #expect(done.shownEntry(list: list)?.icon == .shape(.check))
     }
 
     @Test func aCmuxStatusTheListLeavesOutShowsCmuxsOwnEntryWithNoIconAndNoColor() {
@@ -57,7 +57,7 @@ import Testing
 
     @Test func aStatusOfHisInEffectShowsItsEntry() {
         let own = resolve(own: WorkspaceOwnStatus(id: "doing"), inferred: .todo)
-        #expect(own.shownEntry(list: list)?.icon == .quarter)
+        #expect(own.shownEntry(list: list)?.icon == .shape(.quarter))
     }
 
     /// While an agent waits the workspace reports needs-attention, whose entry has another icon; the glyph keeps the
@@ -66,12 +66,12 @@ import Testing
         let waiting = resolve(own: WorkspaceOwnStatus(id: "paused"), inferred: .needsAttention)
         #expect(waiting == .ownInEffect(list.entry(id: "paused") ?? F.x))
         #expect(waiting.effective == .todo)
-        #expect(waiting.shownEntry(list: list)?.icon == .ring)
+        #expect(waiting.shownEntry(list: list)?.icon == .shape(.ring))
     }
 
     @Test func aStatusOfHisThatIsNotListedShowsWhatCmuxDetects() {
         let gone = resolve(own: WorkspaceOwnStatus(id: "gone"), inferred: .review)
-        #expect(gone.shownEntry(list: list)?.icon == .threeQuarters)
+        #expect(gone.shownEntry(list: list)?.icon == .shape(.threeQuarters))
     }
 
     /// The row's glyph and the picker's checked row are two reads of one list. Wherever the picker checks an entry row,

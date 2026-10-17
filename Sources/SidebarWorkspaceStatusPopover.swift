@@ -23,9 +23,8 @@ struct WorkspaceTodoStatusLane: Equatable, Identifiable {
     var isNone: Bool = false
     /// The color the app resolved for the row's status, for its dot; `nil` when it has none. (#cm-109)
     var colorHex: String? = nil
-    /// The shape the row's entry names, for its glyph; `nil` on Auto, None, the greyed row and an entry with no icon.
-    /// (#cm-109.3)
-    var icon: WorkspaceStatusIcon? = nil
+    /// The shape or symbol the row's entry names, for its glyph; `nil` on Auto, None, the greyed row and an entry with no icon. (#cm-109.3)
+    var icon: WorkspaceStatusGlyph? = nil // (#cm-109.6)
 
     /// The row's id reads its action; the greyed row has the picker's own id for it. (#cm-109)
     var id: String {

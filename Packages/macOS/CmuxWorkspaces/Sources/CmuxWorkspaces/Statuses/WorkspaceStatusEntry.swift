@@ -17,9 +17,9 @@ public struct WorkspaceStatusEntry: Equatable, Sendable, Encodable {
     public let extends: WorkspaceTaskStatus?
     /// The color as typed. It is resolved when a status is set, never here.
     public let color: String?
-    /// The shape this entry draws, or `nil` when none was named: it then draws the glyph of the cmux status it
+    /// The glyph this entry draws, or `nil` when none was named: it then draws the glyph of the cmux status it
     /// extends. It belongs to the status, never to a workspace.
-    public let icon: WorkspaceStatusIcon?
+    public let icon: WorkspaceStatusGlyph?
 
     /// Creates an entry.
     public init(
@@ -27,7 +27,7 @@ public struct WorkspaceStatusEntry: Equatable, Sendable, Encodable {
         name: String?,
         extends: WorkspaceTaskStatus? = nil,
         color: String? = nil,
-        icon: WorkspaceStatusIcon? = nil
+        icon: WorkspaceStatusGlyph? = nil
     ) {
         self.id = id
         self.name = name

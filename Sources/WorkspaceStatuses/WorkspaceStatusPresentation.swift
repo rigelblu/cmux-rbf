@@ -95,8 +95,8 @@ struct WorkspaceStatusPaneState: Equatable {
     let hisWord: String?
     /// The rows the popover draws.
     let picker: WorkspaceStatusPickerState
-    /// The shape of the entry the header's glyph draws, or `nil` for the glyph of the cmux status. (#cm-109.3)
-    var icon: WorkspaceStatusIcon? = nil
+    /// The shape or symbol of the entry the header's glyph draws, or `nil` for the glyph of the cmux status. (#cm-109.3)
+    var icon: WorkspaceStatusGlyph? = nil
     /// The color the app resolved for that entry, or `nil` for the cmux status's own color. (#cm-109.3)
     var colorHex: String? = nil
     /// The color the app resolved for each status of the list, by id, for the popover's lanes. (#cm-109.3)

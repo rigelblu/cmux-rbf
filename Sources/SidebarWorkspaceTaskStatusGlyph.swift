@@ -222,15 +222,19 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     let fontScale: CGFloat
     /// His name for the status, for the tooltip; cmux's own name when `nil`. (#cm-109)
     var name: String? = nil
-    /// The shape his entry names, or `nil` to draw the glyph of `status`. (#cm-109.3)
-    var icon: WorkspaceStatusIcon? = nil
+    /// The shape or symbol his entry names, or `nil` to draw the glyph of `status`. (#cm-109.3)
+    var icon: WorkspaceStatusGlyph? = nil // (#cm-109.6)
     /// The color the app resolved for his entry, or `nil` to use `status`'s color role. (#cm-109.3)
     var colorHex: String? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
     private static let baseSize: CGFloat = 9
-    private static let slotWidth: CGFloat = 11
+    static let slotWidth: CGFloat = 11 // (#cm-109.6)
+    static func symbolCanvasBounds(fontScale: CGFloat) -> CGRect { // (#cm-109.6)
+        let side = slotWidth * fontScale // (#cm-109.6)
+        return CGRect(x: 0, y: 0, width: side, height: side) // (#cm-109.6)
+    } // (#cm-109.6)
     private static let strokeWidth: CGFloat = 1
     private static let attentionStrokeWidth: CGFloat = 1.4
 
@@ -285,41 +289,81 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
         if let icon {
             let color = statusColor
             let tick = checkmarkColor
-            Canvas { context, canvasSize in
-                let environment = context.environment
-                let resolved = color.resolve(in: environment).cgColor
-                let tickResolved = tick.resolve(in: environment).cgColor
-                context.withCGContext { cgContext in
-                    WorkspaceStatusIconDrawing.draw(
-                        icon,
-                        in: cgContext,
-                        box: CGRect(origin: .zero, size: canvasSize),
-                        color: resolved,
-                        tickColor: tickResolved
-                    )
-                }
-            }
-        } else {
-            ZStack {
-                Circle()
-                    .stroke(statusColor, lineWidth: strokeWidth)
-                if model.fillFraction >= 1 {
-                    Circle()
-                        .fill(statusColor)
-                } else if model.fillFraction > 0 {
-                    SidebarStatusPieShape(fraction: model.fillFraction)
-                        .fill(statusColor)
-                }
-                if model.showsCheckmark {
-                    SidebarStatusCheckmarkShape()
-                        .stroke(
-                            checkmarkColor,
-                            style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
+            let size = Self.baseSize * fontScale // (#cm-109.6)
+            switch icon { // (#cm-109.6)
+            case .shape(let shape): // (#cm-109.6)
+                Canvas { context, canvasSize in
+                    let environment = context.environment
+                    let resolved = color.resolve(in: environment).cgColor
+                    let tickResolved = tick.resolve(in: environment).cgColor
+                    context.withCGContext { cgContext in
+                        WorkspaceStatusIconDrawing.draw(
+                            shape, // (#cm-109.6)
+                            in: cgContext,
+                            box: CGRect(origin: .zero, size: canvasSize),
+                            color: resolved,
+                            tickColor: tickResolved
                         )
+                    }
                 }
-            }
+            case .symbol: // (#cm-109.6)
+                if let symbolMask = WorkspaceStatusIconDrawing.symbolMask(for: icon, fontScale: fontScale) { // (#cm-109.6)
+                    let slot = Self.slotWidth * fontScale // (#cm-109.6)
+                    let canvasBounds = Self.symbolCanvasBounds(fontScale: fontScale) // (#cm-109.6)
+                    Color.clear // (#cm-109.6)
+                        .frame(width: size, height: size) // (#cm-109.6)
+                        .overlay { // (#cm-109.6)
+                            Canvas { context, canvasSize in // (#cm-109.6)
+                                let resolved = color.resolve(in: context.environment).cgColor // (#cm-109.6)
+                                context.withCGContext { cgContext in // (#cm-109.6)
+                                    let box = CGRect( // (#cm-109.6)
+                                        x: (canvasSize.width - size) / 2, // (#cm-109.6)
+                                        y: (canvasSize.height - size) / 2, // (#cm-109.6)
+                                        width: size, // (#cm-109.6)
+                                        height: size // (#cm-109.6)
+                                    ) // (#cm-109.6)
+                                    WorkspaceStatusIconDrawing.drawSymbol( // (#cm-109.6)
+                                        symbolMask, // (#cm-109.6)
+                                        in: cgContext, // (#cm-109.6)
+                                        box: box, // (#cm-109.6)
+                                        slot: slot, // (#cm-109.6)
+                                        color: resolved, // (#cm-109.6)
+                                        bounds: CGRect(origin: .zero, size: canvasSize) // (#cm-109.6)
+                                    ) // (#cm-109.6)
+                                } // (#cm-109.6)
+                            } // (#cm-109.6)
+                            .frame(width: canvasBounds.width, height: canvasBounds.height) // (#cm-109.6)
+                        } // (#cm-109.6)
+                } else { // (#cm-109.6)
+                    fallbackGlyph // (#cm-109.6)
+                } // (#cm-109.6)
+            } // (#cm-109.6)
+        } else {
+            fallbackGlyph // (#cm-109.6)
         }
     }
+
+    @ViewBuilder // (#cm-109.6)
+    private var fallbackGlyph: some View { // (#cm-109.6)
+        ZStack { // (#cm-109.6)
+            Circle() // (#cm-109.6)
+                .stroke(statusColor, lineWidth: strokeWidth) // (#cm-109.6)
+            if model.fillFraction >= 1 { // (#cm-109.6)
+                Circle() // (#cm-109.6)
+                    .fill(statusColor) // (#cm-109.6)
+            } else if model.fillFraction > 0 { // (#cm-109.6)
+                SidebarStatusPieShape(fraction: model.fillFraction) // (#cm-109.6)
+                    .fill(statusColor) // (#cm-109.6)
+            } // (#cm-109.6)
+            if model.showsCheckmark { // (#cm-109.6)
+                SidebarStatusCheckmarkShape() // (#cm-109.6)
+                    .stroke( // (#cm-109.6)
+                        checkmarkColor, // (#cm-109.6)
+                        style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round) // (#cm-109.6)
+                    ) // (#cm-109.6)
+            } // (#cm-109.6)
+        } // (#cm-109.6)
+    } // (#cm-109.6)
 
     private var checkmarkColor: Color {
         usesMonochrome ? Color.black.opacity(0.7) : Color.white

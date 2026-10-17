@@ -76,7 +76,7 @@ enum WorkspaceStatusProblemWords {
         case .unknownIcon(let entry, let id, let value):
             return String(
                 localized: "sidebar.statusFile.problem.unknownIcon",
-                defaultValue: "Entry \(entry), “\(id)”, names the icon “\(value)”, which cmux does not have, so it is drawn as if it named none. Use dotted-ring, ring, quarter, half, three-quarters, full, check or pause." // (#cm-109.3)
+                defaultValue: "Entry \(entry), “\(id)”, names the icon “\(value)”, which is neither one of cmux's shapes nor an SF Symbol on this Mac, so it is drawn as if it named none. Use dotted-ring, ring, quarter, half, three-quarters, full, check or pause, or an SF Symbol's name in lowercase, such as moon.zzz.fill." // (#cm-109.6)
             )
         case .colorNotInThisApp(let id, let color):
             return String(

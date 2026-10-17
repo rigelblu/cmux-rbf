@@ -70,13 +70,13 @@ extension TabItemView {
         title: String,
         isSelected: Bool,
         status: WorkspaceTaskStatus? = nil, // (#cm-109.3)
-        icon: WorkspaceStatusIcon? = nil, // (#cm-109.3)
+        icon: WorkspaceStatusGlyph? = nil, // (#cm-109.6)
         colorHex: String? = nil, // (#cm-109)
         isEnabled: Bool = true, // (#cm-109)
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            if let status, WorkspaceStatusMenuImage.shows(icon: icon, colorHex: colorHex) {
+            if let status, WorkspaceStatusMenuImage.shows(icon: icon, colorHex: colorHex) { // (#cm-109.6)
                 // (#cm-109) A row with a color draws a mark the way the Workspace Color menu draws its swatch.
                 // (#cm-109.3) The mark is the glyph of the status, with his icon when it names one: it takes the dot's place.
                 Label {
@@ -90,7 +90,7 @@ extension TabItemView {
                             Image(systemName: "checkmark").hidden()
                         }
                         Image(nsImage: WorkspaceStatusMenuImage.make( // (#cm-109.3)
-                            status: status, icon: icon, colorHex: colorHex, isDark: colorScheme == .dark // (#cm-109.3)
+                            status: status, icon: icon, colorHex: colorHex, isDark: colorScheme == .dark // (#cm-109.6)
                         )) // (#cm-109.3)
                     }
                 }
