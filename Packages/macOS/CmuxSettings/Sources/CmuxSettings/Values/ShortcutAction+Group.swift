@@ -37,7 +37,8 @@ extension ShortcutAction {
         case .focusLeft, .focusRight, .focusUp, .focusDown,
              .focusPreviousPane, .focusNextPane,
              .splitLeft, .splitRight, .splitUp, .splitDown,
-             .toggleSplitZoom, .increaseWorkspaceTerminalFontSize,
+             // cmux-rbf #cm-73.2a
+             .toggleSplitZoom, .toggleDesignFocus, .flipDesignFocusLayout, .increaseWorkspaceTerminalFontSize,
              .decreaseWorkspaceTerminalFontSize, .resetWorkspaceTerminalFontSize,
              .equalizeSplits, .equalizeSplitWidths, .equalizeSplitHeights,
              .resizePaneLeft, .resizePaneRight, .resizePaneUp, .resizePaneDown,

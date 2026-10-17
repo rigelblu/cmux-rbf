@@ -119,6 +119,10 @@ extension ShortcutAction {
             return String(localized: "shortcut.splitUp.label", defaultValue: "Split Up")
         case .splitDown: return "Split Down"
         case .toggleSplitZoom: return "Toggle Pane Zoom"
+        // cmux-rbf #cm-73.2a
+        case .toggleDesignFocus: return "Toggle Design Focus"
+        // cmux-rbf #cm-73.2a
+        case .flipDesignFocusLayout: return "Flip Design Focus Layout"
         case .increaseWorkspaceTerminalFontSize:
             return String(
                 localized: "shortcut.increaseWorkspaceTerminalFontSize.label",

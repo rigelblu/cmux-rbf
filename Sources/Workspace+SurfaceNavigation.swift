@@ -49,6 +49,10 @@ extension Workspace {
         to movement: SurfacePaneMovement,
         allowMissingDestinationSplit: Bool = true
     ) -> Bool {
+        // cmux-rbf #cm-73.2a
+        if isDesignFocusActive {
+            exitDesignFocus(reason: "moveFocusedSurface")
+        }
         guard let panelId = focusedPanelId else { return false }
         return moveSurface(
             panelId: panelId,
@@ -84,8 +88,9 @@ extension Workspace {
         }
 
         let zoomedPaneId = bonsplitController.zoomedPaneId
-        if zoomedPaneId != nil {
-            clearSplitZoom()
+        // cmux-rbf #cm-73.2a
+        if isDesignFocusActive || zoomedPaneId != nil {
+            clearSplitZoom(reason: "moveSurface")
         }
 
         let didMove: Bool

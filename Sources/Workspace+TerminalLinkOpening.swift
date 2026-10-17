@@ -56,13 +56,47 @@ extension Workspace: TerminalLinkOpenContainer {
             page: figmaClickEnvironment.page,
             defaults: figmaClickEnvironment.defaults
         ) { return true }
+        // cmux-rbf #cm-73.2a
+        let wasDesignFocusActive = isDesignFocusActive
         if let targetPane = preferredRightSideTargetPane(fromPanelId: target.containerPanelID) {
-            return newBrowserSurface(inPane: targetPane, url: url, focus: true) != nil
+            if newBrowserSurface(inPane: targetPane, url: url, focus: true) != nil {
+                return true
+            }
+            if wasDesignFocusActive {
+                let outcome = DesignFocusRouting.decide(
+                    url: url,
+                    showsAddressBar: true,
+                    target: .newTab,
+                    asker: .user,
+                    wantsFocus: true,
+                    modeEnabled: true
+                )
+                if outcome == .externalBrowser {
+                    return true
+                }
+            }
+            return false
         }
-        return newBrowserSplit(
+        if newBrowserSplit(
             from: target.containerPanelID,
             orientation: .horizontal,
             url: url
-        ) != nil
+        ) != nil {
+            return true
+        }
+        if wasDesignFocusActive {
+            let outcome = DesignFocusRouting.decide(
+                url: url,
+                showsAddressBar: true,
+                target: .newSplit,
+                asker: .user,
+                wantsFocus: true,
+                modeEnabled: true
+            )
+            if outcome == .externalBrowser {
+                return true
+            }
+        }
+        return false
     }
 }

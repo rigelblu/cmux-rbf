@@ -155,7 +155,9 @@ enum BrowserSplitContainer {
                 creationPolicy: .automationPreload,
                 chromeVisibility: request.chromeVisibility,
                 transparentBackground: request.transparentBackground,
-                bypassRemoteProxy: request.bypassRemoteProxy
+                bypassRemoteProxy: request.bypassRemoteProxy,
+                // cmux-rbf #cm-73.2a
+                designFocusAsker: request.designFocusAsker
             )
         case .dock(let dock):
             guard let panelID = dock.newSurface(
@@ -193,7 +195,9 @@ enum BrowserSplitContainer {
                 creationPolicy: .automationPreload,
                 chromeVisibility: request.chromeVisibility,
                 transparentBackground: request.transparentBackground,
-                bypassRemoteProxy: request.bypassRemoteProxy
+                bypassRemoteProxy: request.bypassRemoteProxy,
+                // cmux-rbf #cm-73.2a
+                designFocusAsker: request.designFocusAsker
             )
         case .dock(let dock):
             guard let panelID = dock.newSplit(

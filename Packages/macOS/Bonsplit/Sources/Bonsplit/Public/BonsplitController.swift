@@ -216,7 +216,8 @@ public final class BonsplitController {
         isAudioPlaying: Bool = false,
         isPinned: Bool = false,
         showsRemoteIndicator: Bool = false,
-        inPane pane: PaneID? = nil
+        inPane pane: PaneID? = nil,
+        fromSocket: Bool = false // cmux-rbf #cm-73.2a
     ) -> TabID? {
         let tabId = TabID()
         let tab = Tab(
@@ -276,7 +277,16 @@ public final class BonsplitController {
             isPinned: isPinned,
             showsRemoteIndicator: showsRemoteIndicator
         )
-        internalController.addTab(tabItem, toPane: PaneID(id: targetPane.id), atIndex: insertIndex)
+        // cmux-rbf #cm-73.2a
+        let shouldSelect: Bool
+        if fromSocket && internalController.isPairZoomed,
+           let pairPanes = internalController.pairZoomPanes,
+           (targetPane == pairPanes.first || targetPane == pairPanes.second) {
+            shouldSelect = false
+        } else {
+            shouldSelect = true
+        }
+        internalController.addTab(tabItem, toPane: PaneID(id: targetPane.id), atIndex: insertIndex, select: shouldSelect)
 
         // Notify delegate
         delegate?.splitTabBar(self, didCreateTab: tab, inPane: targetPane)
@@ -465,8 +475,15 @@ public final class BonsplitController {
     ///   - targetPaneId: Destination pane.
     ///   - index: Optional destination index. When nil, appends at the end.
     /// - Returns: true if moved.
+    // cmux-rbf #cm-73.2a
     @discardableResult
-    public func moveTab(_ tabId: TabID, toPane targetPaneId: PaneID, atIndex index: Int? = nil) -> Bool {
+    public func moveTab(
+        _ tabId: TabID,
+        toPane targetPaneId: PaneID,
+        atIndex index: Int? = nil,
+        select: Bool = true,
+        focus: Bool = true
+    ) -> Bool {
         guard let (sourcePane, sourceIndex) = findTabInternal(tabId) else { return false }
         guard let targetPane = internalController.paneState(for: targetPaneId) else { return false }
 
@@ -483,7 +500,15 @@ public final class BonsplitController {
         }
 
         guard configuration.allowCrossPaneTabMove else { return false }
-        internalController.moveTab(tabItem, from: sourcePaneId, to: targetPane.id, atIndex: index)
+        // cmux-rbf #cm-73.2a
+        internalController.moveTab(
+            tabItem,
+            from: sourcePaneId,
+            to: targetPane.id,
+            atIndex: index,
+            select: select,
+            focus: focus
+        )
         delegate?.splitTabBar(self, didMoveTab: movedTab, fromPane: sourcePaneId, toPane: targetPane.id)
         notifyGeometryChange()
         return true
@@ -539,12 +564,14 @@ public final class BonsplitController {
     ///   - orientation: Direction to split (horizontal = side-by-side, vertical = stacked)
     ///   - tab: Optional tab to add to the new pane
     /// - Returns: The new pane ID, or nil if vetoed by delegate
+    // cmux-rbf #cm-73.2a
     @discardableResult
     public func splitPane(
         _ paneId: PaneID? = nil,
         orientation: SplitOrientation,
         withTab tab: Tab? = nil,
-        initialDividerPosition: CGFloat? = nil
+        initialDividerPosition: CGFloat? = nil,
+        fromSocket: Bool = false
     ) -> PaneID? {
         guard configuration.allowSplits else { return nil }
 
@@ -584,7 +611,8 @@ public final class BonsplitController {
             PaneID(id: targetPaneId.id),
             orientation: orientation,
             with: internalTab,
-            initialDividerPosition: dividerPosition
+            initialDividerPosition: dividerPosition,
+            fromSocket: fromSocket // cmux-rbf #cm-73.2a
         )
 
         // Find new pane (will be focused after split)
@@ -609,13 +637,15 @@ public final class BonsplitController {
     ///   - tab: The tab to add to the new pane.
     ///   - insertFirst: If true, insert the new pane first (left/top). Otherwise insert second (right/bottom).
     /// - Returns: The new pane ID, or nil if vetoed by delegate.
+    // cmux-rbf #cm-73.2a
     @discardableResult
     public func splitPane(
         _ paneId: PaneID? = nil,
         orientation: SplitOrientation,
         withTab tab: Tab,
         insertFirst: Bool,
-        initialDividerPosition: CGFloat? = nil
+        initialDividerPosition: CGFloat? = nil,
+        fromSocket: Bool = false
     ) -> PaneID? {
         guard configuration.allowSplits else { return nil }
 
@@ -651,7 +681,8 @@ public final class BonsplitController {
             orientation: orientation,
             tab: internalTab,
             insertFirst: insertFirst,
-            initialDividerPosition: dividerPosition
+            initialDividerPosition: dividerPosition,
+            fromSocket: fromSocket // cmux-rbf #cm-73.2a
         )
 
         let newPaneId = focusedPaneId!
@@ -836,6 +867,71 @@ public final class BonsplitController {
             return onTabZoomToggleRequest(tabId, paneId)
         }
         return togglePaneZoom(inPane: paneId)
+    }
+
+    // MARK: - Pair Zoom (#cm-73.2a)
+
+    // cmux-rbf #cm-73.2a
+    public var isPairZoomed: Bool {
+        internalController.isPairZoomed
+    }
+
+    // cmux-rbf #cm-73.2a
+    public var pairZoomPanes: (first: PaneID, second: PaneID)? {
+        internalController.pairZoomPanes
+    }
+
+    // cmux-rbf #cm-73.2a
+    public var pairZoomOrientation: SplitOrientation? {
+        internalController.pairZoomOrientation
+    }
+
+    // cmux-rbf #cm-73.2a
+    @ObservationIgnored public var onPairZoomChange: (() -> Void)? {
+        didSet { internalController.onPairZoomChange = onPairZoomChange }
+    }
+
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    public func setPairZoom(firstPane: PaneID, secondPane: PaneID, orientation: SplitOrientation) -> Bool {
+        internalController.setPairZoom(firstPane: firstPane, secondPane: secondPane, orientation: orientation)
+    }
+
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    public func clearPairZoom() -> Bool {
+        internalController.clearPairZoom()
+    }
+
+    // cmux-rbf #cm-73.2a
+    public func setPairZoomOrientation(_ orientation: SplitOrientation) {
+        internalController.setPairZoomOrientation(orientation)
+    }
+
+    // cmux-rbf #cm-73.2a
+    public var pairZoomDividerPosition: CGFloat? {
+        internalController.pairZoomDividerPosition
+    }
+
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    public func setPairZoomDividerPosition(_ position: CGFloat) -> Bool {
+        let range = configuration.dividerPositionRange
+        let clamped = min(max(position, range.lowerBound), range.upperBound)
+        return internalController.setPairZoomDividerPosition(clamped)
+    }
+
+    /// cmux-rbf #cm-73.2a: the segmented control chose `orientation`. Tells the host only when it differs from the
+    /// arrangement showing; choosing the selected segment does nothing.
+    public func requestPairArrangement(_ orientation: SplitOrientation) {
+        guard let current = internalController.pairZoomOrientation, current != orientation else { return }
+        delegate?.splitTabBar(self, didChoosePairArrangement: orientation)
+    }
+
+    /// cmux-rbf #cm-73.2a: the 50/50 button. The host owns what equalizing the pair means.
+    public func requestPairEqualize() {
+        guard internalController.isPairZoomed else { return }
+        delegate?.splitTabBarDidRequestEqualizePair(self)
     }
 
     // MARK: - Full Width Tab Mode

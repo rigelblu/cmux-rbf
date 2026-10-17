@@ -243,7 +243,9 @@ struct SplitContainerView<Content: View, EmptyContent: View>: NSViewRepresentabl
 #else
         let splitView = ThemedSplitView()
 #endif
-        splitView.customDividerColor = TabBarColors.nsColorSeparator(for: appearance)
+        // cmux-rbf #cm-73.2a
+        let dividerColor = controller.isPairZoomed ? NSColor.clear : TabBarColors.nsColorSeparator(for: appearance)
+        splitView.customDividerColor = dividerColor
         splitView.customDividerThickness = TabBarMetrics.resolvedDividerThickness(appearance.dividerThickness)
         splitView.customDividerHitExpansion = appearance.dividerHitExpansion
         splitView.stampedInternalController = controller
@@ -508,7 +510,9 @@ struct SplitContainerView<Content: View, EmptyContent: View>: NSViewRepresentabl
         splitView.wantsLayer = true
         splitView.layer?.backgroundColor = NSColor.clear.cgColor
         splitView.layer?.isOpaque = false
-        (splitView as? ThemedSplitView)?.customDividerColor = TabBarColors.nsColorSeparator(for: appearance)
+        // cmux-rbf #cm-73.2a
+        let dividerColor = controller.isPairZoomed ? NSColor.clear : TabBarColors.nsColorSeparator(for: appearance)
+        (splitView as? ThemedSplitView)?.customDividerColor = dividerColor
         let resolvedThickness = TabBarMetrics.resolvedDividerThickness(appearance.dividerThickness)
         let dividerThicknessChanged = (splitView as? ThemedSplitView)?.customDividerThickness != resolvedThickness
         (splitView as? ThemedSplitView)?.customDividerThickness = resolvedThickness

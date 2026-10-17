@@ -36,6 +36,10 @@ public enum TabBarVisibility: Sendable, Equatable {
     /// only when there are multiple tabs to switch between.
     case adaptive
 
+    // cmux-rbf #cm-73.2a
+    /// Present the selected tab as a caption at any tab count >= 1, or empty at 0.
+    case caption
+
     func presentation(
         tabCount: Int,
         isFullWidthTabMode: Bool = false
@@ -59,6 +63,9 @@ public enum TabBarVisibility: Sendable, Equatable {
             default:
                 return .tabs
             }
+        // cmux-rbf #cm-73.2a
+        case .caption:
+            return normalizedTabCount == 0 ? .empty : .caption
         }
     }
 
@@ -461,6 +468,12 @@ extension BonsplitConfiguration {
         public var newBrowser: String
         public var splitRight: String
         public var splitDown: String
+        // cmux-rbf #cm-73.2a
+        public var pairSideBySide: String
+        // cmux-rbf #cm-73.2a
+        public var pairStacked: String
+        // cmux-rbf #cm-73.2a
+        public var pairEqualize: String
 
         public static let `default` = SplitButtonTooltips()
 
@@ -468,12 +481,18 @@ extension BonsplitConfiguration {
             newTerminal: String = "New Terminal",
             newBrowser: String = "New Browser",
             splitRight: String = "Split Right",
-            splitDown: String = "Split Down"
+            splitDown: String = "Split Down", // cmux-rbf #cm-73.2a
+            pairSideBySide: String = "Side by Side", // cmux-rbf #cm-73.2a
+            pairStacked: String = "Stacked", // cmux-rbf #cm-73.2a
+            pairEqualize: String = "Equalize Splits" // cmux-rbf #cm-73.2a
         ) {
             self.newTerminal = newTerminal
             self.newBrowser = newBrowser
             self.splitRight = splitRight
             self.splitDown = splitDown
+            self.pairSideBySide = pairSideBySide // cmux-rbf #cm-73.2a
+            self.pairStacked = pairStacked // cmux-rbf #cm-73.2a
+            self.pairEqualize = pairEqualize // cmux-rbf #cm-73.2a
         }
     }
 

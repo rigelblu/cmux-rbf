@@ -31,6 +31,12 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     public static let workspaceHasSplits = CommandPaletteContextKeys(rawValue: "workspace.hasSplits")
     /// Whether the workspace uses the canvas layout mode.
     public static let workspaceCanvasLayout = CommandPaletteContextKeys(rawValue: "workspace.canvasLayout")
+    // cmux-rbf #cm-73.2a
+    /// Whether the workspace can toggle design focus (or is currently in design focus).
+    public static let workspaceCanToggleDesignFocus = CommandPaletteContextKeys(rawValue: "workspace.canToggleDesignFocus")
+    // cmux-rbf #cm-73.2a
+    /// Whether the workspace currently has Design Focus active.
+    public static let workspaceIsDesignFocusActive = CommandPaletteContextKeys(rawValue: "workspace.isDesignFocusActive")
     /// Whether the workspace has sibling workspaces.
     public static let workspaceHasPeers = CommandPaletteContextKeys(rawValue: "workspace.hasPeers")
     /// Whether a workspace exists above the selection.

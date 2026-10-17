@@ -7255,6 +7255,16 @@ struct ContentView: View {
                 CommandPaletteContextKeys.workspaceCanvasLayout,
                 workspace.layoutMode == .canvas
             )
+            // cmux-rbf #cm-73.2a
+            snapshot.setBool(
+                CommandPaletteContextKeys.workspaceCanToggleDesignFocus,
+                workspace.canToggleDesignFocus
+            )
+            // cmux-rbf #cm-73.2a
+            snapshot.setBool(
+                CommandPaletteContextKeys.workspaceIsDesignFocusActive,
+                workspace.isDesignFocusActive
+            )
             let workspaceIndex = tabManager.tabs.firstIndex { $0.id == workspace.id }
             snapshot.setBool(CommandPaletteContextKeys.workspaceHasPeers, tabManager.tabs.count > 1)
             snapshot.setBool(CommandPaletteContextKeys.workspaceHasAbove, (workspaceIndex ?? 0) > 0)
@@ -8613,6 +8623,33 @@ struct ContentView: View {
                 }
             )
         )
+        // cmux-rbf #cm-73.2a
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.toggleDesignFocus",
+                title: constant(String(localized: "command.toggleDesignFocus.title", defaultValue: "Toggle Design Focus")),
+                subtitle: constant(String(localized: "command.toggleSplitZoom.subtitle", defaultValue: "Terminal Layout")),
+                keywords: ["design", "focus", "figma", "terminal", "pair"],
+                when: { context in
+                    context.bool(CommandPaletteContextKeys.hasWorkspace)
+                },
+                enablement: { context in
+                    context.bool(CommandPaletteContextKeys.workspaceCanToggleDesignFocus)
+                }
+            )
+        )
+        // cmux-rbf #cm-73.2a
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.flipDesignFocusLayout",
+                title: constant(String(localized: "command.flipDesignFocusLayout.title", defaultValue: "Flip Design Focus Layout")),
+                subtitle: constant(String(localized: "command.toggleSplitZoom.subtitle", defaultValue: "Terminal Layout")),
+                keywords: ["design", "focus", "flip", "figma", "terminal", "pair", "layout"],
+                when: { context in
+                    context.bool(CommandPaletteContextKeys.workspaceIsDesignFocusActive)
+                }
+            )
+        )
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.toggleFullWidthTab",
@@ -9495,6 +9532,18 @@ struct ContentView: View {
         }
         registry.register(commandId: "palette.toggleSplitZoom") {
             if !tabManager.toggleFocusedSplitZoom() {
+                NSSound.beep()
+            }
+        }
+        // cmux-rbf #cm-73.2a
+        registry.register(commandId: "palette.toggleDesignFocus") {
+            if !tabManager.toggleDesignFocus() {
+                NSSound.beep()
+            }
+        }
+        // cmux-rbf #cm-73.2a
+        registry.register(commandId: "palette.flipDesignFocusLayout") {
+            if !tabManager.flipDesignFocusLayout() {
                 NSSound.beep()
             }
         }

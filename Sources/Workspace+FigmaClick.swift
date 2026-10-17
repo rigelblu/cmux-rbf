@@ -53,7 +53,8 @@ extension Workspace {
                 // The two flags that make the pane chrome-free, as `open` sends them.
                 chromeVisibility: BrowserChromeVisibility(omnibarVisible: false),
                 transparentBackground: true,
-                bypassRemoteProxy: false
+                bypassRemoteProxy: false,
+                designFocusAsker: .user // cmux-rbf #cm-73.2a
             )
             guard BrowserSplitContainer.workspace(self).openBrowserToRight(
                 of: sourcePanelId,
@@ -63,6 +64,10 @@ extension Workspace {
             return true
 
         case .move(let paneId, let node):
+            // cmux-rbf #cm-73.2a
+            if isDesignFocusActive, let targetPane = self.paneId(forPanelId: paneId) {
+                makeDesignFocusFigmaSide(paneId: targetPane)
+            }
             guard let address = panes.first(where: { $0.id == paneId })?.address,
                   let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: page),
                   let destination = figmaClickDestination(for: document, node: node, page: page, defaults: defaults)
@@ -76,6 +81,10 @@ extension Workspace {
             return true
 
         case .bringForward(let paneId):
+            // cmux-rbf #cm-73.2a
+            if isDesignFocusActive, let targetPane = self.paneId(forPanelId: paneId) {
+                makeDesignFocusFigmaSide(paneId: targetPane)
+            }
             focusPanel(paneId)
             return true
         }

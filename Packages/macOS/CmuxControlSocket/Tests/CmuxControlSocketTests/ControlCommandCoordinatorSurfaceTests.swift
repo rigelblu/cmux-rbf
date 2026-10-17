@@ -800,4 +800,102 @@ struct ControlCommandCoordinatorSurfaceTests {
         #expect(payload["branch"] == .null)
         #expect(payload["cleared"] == .bool(true))
     }
+
+    // cmux-rbf #cm-73.2a
+    @Test func surfaceCreateBrowserOpenedExternallyPayload() {
+        let context = FakeSurfaceControlCommandContext()
+        let windowID = UUID()
+        let workspaceID = UUID()
+        let url = "https://example.com"
+        context.createResolution = .browserOpenedExternally(
+            windowID: windowID,
+            workspaceID: workspaceID,
+            url: url
+        )
+        let coordinator = ControlCommandCoordinator(context: context)
+        let result = coordinator.handle(ControlRequest(
+            id: .int(1),
+            method: "surface.create",
+            params: [
+                "type": .string("browser"),
+                "url": .string(url)
+            ]
+        ))
+        guard case .ok(.object(let payload)) = result else {
+            Issue.record("expected ok payload")
+            return
+        }
+        #expect(payload["opened_externally"] == .bool(true))
+        #expect(payload["placement_strategy"] == .string("external"))
+        #expect(payload["created_split"] == .bool(false))
+        #expect(payload["url"] == .string(url))
+        #expect(payload["window_id"] == .string(windowID.uuidString))
+        #expect(payload["workspace_id"] == .string(workspaceID.uuidString))
+    }
+
+    // cmux-rbf #cm-73.2a
+    @Test func surfaceSplitBrowserOpenedExternallyPayload() {
+        let context = FakeSurfaceControlCommandContext()
+        let windowID = UUID()
+        let workspaceID = UUID()
+        let url = "https://example.com"
+        context.splitResolution = .browserOpenedExternally(
+            windowID: windowID,
+            workspaceID: workspaceID,
+            url: url
+        )
+        let coordinator = ControlCommandCoordinator(context: context)
+        let result = coordinator.handle(ControlRequest(
+            id: .int(1),
+            method: "surface.split",
+            params: [
+                "type": .string("browser"),
+                "direction": .string("right"),
+                "url": .string(url)
+            ]
+        ))
+        guard case .ok(.object(let payload)) = result else {
+            Issue.record("expected ok payload")
+            return
+        }
+        #expect(payload["opened_externally"] == .bool(true))
+        #expect(payload["placement_strategy"] == .string("external"))
+        #expect(payload["created_split"] == .bool(false))
+        #expect(payload["url"] == .string(url))
+        #expect(payload["window_id"] == .string(windowID.uuidString))
+        #expect(payload["workspace_id"] == .string(workspaceID.uuidString))
+    }
+
+    // cmux-rbf #cm-73.2a
+    @Test func paneCreateBrowserOpenedExternallyPayload() {
+        let context = FakeSurfaceControlCommandContext()
+        let windowID = UUID()
+        let workspaceID = UUID()
+        let url = "https://example.com"
+        context.paneCreateResolution = .browserOpenedExternally(
+            windowID: windowID,
+            workspaceID: workspaceID,
+            url: url
+        )
+        let coordinator = ControlCommandCoordinator(context: context)
+        let result = coordinator.handle(ControlRequest(
+            id: .int(1),
+            method: "pane.create",
+            params: [
+                "type": .string("browser"),
+                "direction": .string("right"),
+                "url": .string(url)
+            ]
+        ))
+        guard case .ok(.object(let payload)) = result else {
+            Issue.record("expected ok payload")
+            return
+        }
+        #expect(payload["opened_externally"] == .bool(true))
+        #expect(payload["placement_strategy"] == .string("external"))
+        #expect(payload["created_split"] == .bool(false))
+        #expect(payload["url"] == .string(url))
+        #expect(payload["window_id"] == .string(windowID.uuidString))
+        #expect(payload["workspace_id"] == .string(workspaceID.uuidString))
+    }
 }
