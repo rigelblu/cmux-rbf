@@ -3,7 +3,8 @@ import Foundation
 /// Checks the value under `workspaceStatuses` in `cmux.json` and builds the list from what passes.
 ///
 /// It takes the value as `JSONSerialization` gives it, so the package reads no file. One pass, top to bottom.
-/// A bad entry is skipped with one problem, the first rule it breaks, and the rest are kept.
+/// A bad entry is skipped with one problem, the first rule it breaks, and the rest are kept. A kept entry whose
+/// `icon` is none of the eight names is kept with one problem too.
 public struct WorkspaceStatusListParser: Sendable {
     /// Creates a parser.
     public init() {}
@@ -22,7 +23,9 @@ public struct WorkspaceStatusListParser: Sendable {
         for (index, raw) in rawEntries.enumerated() {
             let place = index + 1
             switch check(raw, place: place, taken: entries) {
-            case .kept(let entry): entries.append(entry)
+            case .kept(let entry, let problem):
+                entries.append(entry)
+                if let problem { problems.append(problem) }
             case .skipped(let problem): problems.append(problem)
             }
         }
@@ -30,7 +33,8 @@ public struct WorkspaceStatusListParser: Sendable {
     }
 
     private enum Checked {
-        case kept(WorkspaceStatusEntry)
+        /// The kept entry and, for a kept entry that has something wrong, the one problem.
+        case kept(WorkspaceStatusEntry, problem: WorkspaceStatusListProblem?)
         case skipped(WorkspaceStatusListProblem)
     }
 
@@ -50,10 +54,16 @@ public struct WorkspaceStatusListParser: Sendable {
         guard let name = trimmedText(object["name"]) else { return .skipped(.noName(entry: place, id: id)) }
 
         let color = asTyped(object["color"])
+        // Its problem is returned only with a kept entry, so an entry skipped for another reason gets that problem only.
+        // It is read on both return paths below: an icon on one of cmux's five applies, unlike `extends`.
+        let (icon, iconProblem) = checkIcon(object["icon"], place: place, id: id)
 
         // One of cmux's five behaves as itself: its `extends` is ignored, whatever it holds.
         if WorkspaceTaskStatus(rawValue: id) != nil {
-            return .kept(WorkspaceStatusEntry(id: id, name: name, extends: nil, color: color))
+            return .kept(
+                WorkspaceStatusEntry(id: id, name: name, extends: nil, color: color, icon: icon),
+                problem: iconProblem
+            )
         }
 
         // A missing `extends`, and one that is only blank, are both "not given".
@@ -63,7 +73,23 @@ public struct WorkspaceStatusListParser: Sendable {
         guard let text = trimmedText(rawExtends), let extends = WorkspaceTaskStatus(rawValue: text) else {
             return .skipped(.unknownExtends(entry: place, id: id, value: typed(rawExtends)))
         }
-        return .kept(WorkspaceStatusEntry(id: id, name: name, extends: extends, color: color))
+        return .kept(
+            WorkspaceStatusEntry(id: id, name: name, extends: extends, color: color, icon: icon),
+            problem: iconProblem
+        )
+    }
+
+    /// The icon a value names. A missing key, `null` and blank text are all "not given": no icon, no problem.
+    /// Text that, trimmed, is exactly one of the eight names gives that icon. Anything else, a number included,
+    /// gives no icon and one problem that shows the value as he typed it.
+    private func checkIcon(
+        _ value: Any?,
+        place: Int,
+        id: String
+    ) -> (icon: WorkspaceStatusIcon?, problem: WorkspaceStatusListProblem?) {
+        guard let value, !(value is NSNull), !isBlankText(value) else { return (nil, nil) }
+        if let text = trimmedText(value), let icon = WorkspaceStatusIcon(rawValue: text) { return (icon, nil) }
+        return (nil, .unknownIcon(entry: place, id: id, value: typed(value)))
     }
 
     /// The text of a JSON string, trimmed, or `nil` when the value is not text or is empty once trimmed.

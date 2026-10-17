@@ -6,10 +6,15 @@ import Foundation
 extension Workspace {
     /// What the workspace shows, worked out from what it holds, for this list. Pure: it changes nothing.
     func statusResolution(list: WorkspaceStatusList) -> WorkspaceStatusResolution {
+        statusResolution(list: list, inferred: inferredTaskStatus(list: list))
+    }
+
+    /// What the workspace shows, worked out from what it holds, for this list and inferred status.
+    func statusResolution(list: WorkspaceStatusList, inferred: WorkspaceTaskStatus) -> WorkspaceStatusResolution {
         WorkspaceStatusResolution.resolve(
             override: todoState.statusOverride,
             own: todoState.ownStatus,
-            inferred: inferredTaskStatus,
+            inferred: inferred,
             list: list
         )
     }
@@ -20,7 +25,7 @@ extension Workspace {
     func statusMenuLanes(list: WorkspaceStatusList, colorHexes: [String: String]) -> [WorkspaceTodoStatusLane] {
         let picker = WorkspaceStatusPicker().rows(
             resolution: statusResolution(list: list),
-            inferred: inferredTaskStatus,
+            inferred: inferredTaskStatus(list: list),
             isHidden: todoState.statusHidden,
             list: list
         )
@@ -33,13 +38,18 @@ extension Workspace {
     /// Picked while cmux detects a waiting agent, the status is held through that wait.
     @discardableResult
     func setOwnStatus(_ entry: WorkspaceStatusEntry) -> Bool {
+        setOwnStatus(entry, list: AppDelegate.statusListInUse)
+    }
+
+    @discardableResult
+    func setOwnStatus(
+        _ entry: WorkspaceStatusEntry,
+        list: WorkspaceStatusList
+    ) -> Bool {
         guard !entry.isCmuxOwn else { return false }
         todoState.statusHidden = false
         todoState.statusOverride = nil
-        todoState.ownStatus = WorkspaceOwnStatus(
-            id: entry.id,
-            heldThroughWait: inferredTaskStatus == .needsAttention
-        )
+        todoState.ownStatus = WorkspaceOwnStatus(id: entry.id)
         return true
     }
 
@@ -48,27 +58,34 @@ extension Workspace {
     func cycleStatusThroughList(actions given: WorkspaceStatusActions? = nil) {
         let actions = given ?? .app()
         let resolution = statusResolution(list: actions.list)
-        guard let target = WorkspaceStatusCycle().target(resolution: resolution, list: actions.list) else { return }
+        guard let target = WorkspaceStatusCycle().target(
+            resolution: resolution,
+            list: actions.list,
+            signals: taskStatusSignals()
+        ) else { return }
         switch target {
         case .entry(let entry):
             actions.apply(.status(id: entry.id), to: [self], requireControls: false)
         case .cmux(let status):
             // The list has no entry for it, so there is no color to write (Decisions, 2026-10-12, point 13).
-            setTaskStatusOverride(status)
+            setTaskStatusOverride(status, list: actions.list)
         }
     }
 
     /// Runs after every write of an agent's state. Reads no signal unless something waits to be cleared.
     ///
-    /// When no agent waits any longer it clears `heldThroughWait` and removes a cmux status that was set during the
-    /// wait. One of his own statuses stays. It writes no color.
+    /// When no agent waits any longer it removes a cmux status that was set during the wait. One of his own statuses
+    /// stays. It writes no color.
     func endWaitIfNoAgentWaits() {
-        let heldOwn = todoState.ownStatus?.heldThroughWait == true
+        endWaitIfNoAgentWaits(list: AppDelegate.statusListInUse)
+    }
+
+    func endWaitIfNoAgentWaits(list: WorkspaceStatusList) {
+        guard list.source == .cmux else { return }
         let setDuringWait = todoState.statusOverride?.inferredAtOverride == .needsAttention
-        guard heldOwn || setDuringWait else { return }
-        guard inferredTaskStatus != .needsAttention else { return }
-        if heldOwn { todoState.ownStatus?.heldThroughWait = false }
-        if setDuringWait { todoState.statusOverride = nil }
+        guard setDuringWait else { return }
+        guard inferredTaskStatus(list: list) != .needsAttention else { return }
+        todoState.statusOverride = nil
     }
 
     /// Restores his own status from a saved session. An id equal to one of cmux's five is dropped, and his id wins

@@ -31,7 +31,9 @@ extension TabItemView {
                     workspaceTodoStatusMenuButton(
                         title: lane.title,
                         isSelected: lane.isSelected,
-                        colorHex: lane.colorHex,
+                        status: lane.status, // (#cm-109.3)
+                        icon: lane.icon, // (#cm-109.3)
+                        colorHex: lane.colorHex, // (#cm-109.3)
                         isEnabled: lane.action != nil
                     ) {
                         if lane.isNone {
@@ -67,13 +69,16 @@ extension TabItemView {
     private func workspaceTodoStatusMenuButton(
         title: String,
         isSelected: Bool,
+        status: WorkspaceTaskStatus? = nil, // (#cm-109.3)
+        icon: WorkspaceStatusIcon? = nil, // (#cm-109.3)
         colorHex: String? = nil, // (#cm-109)
         isEnabled: Bool = true, // (#cm-109)
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            if let colorHex {
-                // (#cm-109) A row with a color draws its dot the way the Workspace Color menu draws its swatch.
+            if let status, WorkspaceStatusMenuImage.shows(icon: icon, colorHex: colorHex) {
+                // (#cm-109) A row with a color draws a mark the way the Workspace Color menu draws its swatch.
+                // (#cm-109.3) The mark is the glyph of the status, with his icon when it names one: it takes the dot's place.
                 Label {
                     Text(title)
                 } icon: {
@@ -84,9 +89,9 @@ extension TabItemView {
                         } else {
                             Image(systemName: "checkmark").hidden()
                         }
-                        Image(nsImage: coloredCircleImage(
-                            color: WorkspaceStatusPresentation.dotColor(hex: colorHex, isDark: colorScheme == .dark)
-                        ))
+                        Image(nsImage: WorkspaceStatusMenuImage.make( // (#cm-109.3)
+                            status: status, icon: icon, colorHex: colorHex, isDark: colorScheme == .dark // (#cm-109.3)
+                        )) // (#cm-109.3)
                     }
                 }
             } else if isSelected {

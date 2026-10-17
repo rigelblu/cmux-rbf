@@ -108,11 +108,10 @@ public struct WorkspaceStatusPicker: Sendable {
         ))
 
         for entry in list.entries {
-            let waiting = resolution.held == .waiting && resolution.heldID == entry.id
             rows.append(WorkspaceStatusPickerRow(
                 id: entry.id,
                 kind: .status(entry),
-                isChecked: !isHidden && (resolution.inEffect?.id == entry.id || waiting)
+                isChecked: !isHidden && resolution.inEffect?.id == entry.id
             ))
         }
 
