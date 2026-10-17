@@ -257,9 +257,9 @@ struct ControlCommandCoordinatorWorkspaceStatusTests {
                 "code": .string("unknown_icon"), "entry": .int(9), "id": .string("parked"),
                 "value": .string("Half"),
                 "message": .string(
-                    "Entry 9, \"parked\", names the icon \"Half\", which cmux does not have, so it is kept "
-                        + "and drawn as if it named no icon; the icons are dotted-ring, ring, quarter, half, "
-                        + "three-quarters, full, check and pause." // (#cm-109.3)
+                    "Entry 9, \"parked\", names the icon \"Half\", which is neither one of cmux's shapes "
+                        + "nor an SF Symbol on this Mac, so it is drawn as if it named none. Use dotted-ring, ring, quarter, "
+                        + "half, three-quarters, full, check or pause, or an SF Symbol's name in lowercase, such as moon.zzz.fill." // (#cm-109.6)
                 ),
             ])),
             (P(code: "color_not_in_this_app", entry: nil, id: "parked", value: "Mauve"), .object([
