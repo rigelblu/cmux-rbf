@@ -23,6 +23,9 @@ struct WorkspaceTodoStatusLane: Equatable, Identifiable {
     var isNone: Bool = false
     /// The color the app resolved for the row's status, for its dot; `nil` when it has none. (#cm-109)
     var colorHex: String? = nil
+    /// The shape the row's entry names, for its glyph; `nil` on Auto, None, the greyed row and an entry with no icon.
+    /// (#cm-109.3)
+    var icon: WorkspaceStatusIcon? = nil
 
     /// The row's id reads its action; the greyed row has the picker's own id for it. (#cm-109)
     var id: String {
@@ -41,22 +44,41 @@ struct SidebarWorkspaceCompactStatusMenuModel: Equatable {
     /// The rows a picker draws, against the list in use; optional because upstream's tests build this model without
     /// one. (#cm-109)
     var picker: WorkspaceStatusPickerState? = nil
+    /// The color the app resolved for each status of the list, by id, for the glyph's color. `[:]` by default, since
+    /// upstream's tests build this model. (#cm-109.3)
+    var colorHexes: [String: String] = [:]
 }
 
 extension SidebarWorkspaceCompactStatusMenuModel {
+    // (#cm-109.4) Resolves the menu model with an active override directly
+    static func resolve( // (#cm-109.4)
+        inferred: WorkspaceTaskStatus, // (#cm-109.4)
+        activeOverride: WorkspaceTaskStatus?, // (#cm-109.4)
+        picker: WorkspaceStatusPickerState? = nil, // (#cm-109.4)
+        colorHexes: [String: String] = [:] // (#cm-109.4)
+    ) -> Self { // (#cm-109.4)
+        Self( // (#cm-109.4)
+            inferred: inferred, // (#cm-109.4)
+            activeOverride: activeOverride, // (#cm-109.4)
+            picker: picker, // (#cm-109.4)
+            colorHexes: colorHexes // (#cm-109.4)
+        ) // (#cm-109.4)
+    } // (#cm-109.4)
+
     static func resolve(
         inferred: WorkspaceTaskStatus,
         override: WorkspaceTaskStatusOverride?,
-        picker: WorkspaceStatusPickerState? = nil // (#cm-109)
+        picker: WorkspaceStatusPickerState? = nil, // (#cm-109)
+        colorHexes: [String: String] = [:] // (#cm-109.3)
     ) -> Self {
         let resolution = WorkspaceTaskStatusOverride.effectiveStatus(
             override: override,
             inferred: inferred
         )
         guard let override, !resolution.shouldClearOverride else {
-            return Self(inferred: inferred, activeOverride: nil, picker: picker)
+            return Self(inferred: inferred, activeOverride: nil, picker: picker, colorHexes: colorHexes) // (#cm-109.3)
         }
-        return Self(inferred: inferred, activeOverride: override.status, picker: picker)
+        return Self(inferred: inferred, activeOverride: override.status, picker: picker, colorHexes: colorHexes) // (#cm-109.3)
     }
 }
 
@@ -131,6 +153,9 @@ struct SidebarWorkspaceStatusPopoverModel: Equatable {
     let activeOverride: WorkspaceTaskStatus?
     /// The rows the popover draws, against the list in use. No default, so each host must pass one. (#cm-109)
     let picker: WorkspaceStatusPickerState
+    /// The color the app resolved for each status of the list, by id, for the lanes' glyphs. No default, as `picker`
+    /// has none: each host must pass them. (#cm-109.3)
+    let colorHexes: [String: String]
     /// Whether the workspace is opted out (None active).
     var isHidden: Bool = false
 }
@@ -166,13 +191,13 @@ struct SidebarWorkspaceStatusPopover: View {
         self.onSelectLane = onSelectLane
         self.onSelectNone = onSelectNone
         self.onClose = onClose
-        let lanes = WorkspaceTodoStatusLane.lanes(picker: model.picker) // (#cm-109)
+        let lanes = WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109)
         // The highlight starts on the first checked row that can be chosen, and on Auto when there is none.
         _highlightedIndex = State(initialValue: lanes.firstIndex(where: { $0.isSelected && $0.action != nil }) ?? 0)
     }
 
     private var lanes: [WorkspaceTodoStatusLane] {
-        WorkspaceTodoStatusLane.lanes(picker: model.picker) // (#cm-109)
+        WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109)
     }
 
     var body: some View {
@@ -237,7 +262,9 @@ struct SidebarWorkspaceStatusPopover: View {
                         usesMonochrome: false,
                         monochromeColor: .primary,
                         neutralColor: .secondary,
-                        fontScale: Self.glyphFontScale
+                        fontScale: Self.glyphFontScale,
+                        icon: lane.icon, // (#cm-109.3)
+                        colorHex: lane.colorHex // (#cm-109.3)
                     )
                 } else {
                     Color.clear

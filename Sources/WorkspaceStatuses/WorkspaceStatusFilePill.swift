@@ -73,6 +73,11 @@ enum WorkspaceStatusProblemWords {
                 localized: "sidebar.statusFile.problem.unknownExtends",
                 defaultValue: "Entry \(entry), “\(id)”, extends “\(value)”, which is not a cmux status, so it was skipped. Use todo, working, needs-attention, review or done."
             )
+        case .unknownIcon(let entry, let id, let value):
+            return String(
+                localized: "sidebar.statusFile.problem.unknownIcon",
+                defaultValue: "Entry \(entry), “\(id)”, names the icon “\(value)”, which cmux does not have, so it is drawn as if it named none. Use dotted-ring, ring, quarter, half, three-quarters, full, check or pause." // (#cm-109.3)
+            )
         case .colorNotInThisApp(let id, let color):
             return String(
                 localized: "sidebar.statusFile.problem.colorNotInThisApp",

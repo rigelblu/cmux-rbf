@@ -23,7 +23,7 @@ struct SidebarWorkspaceLeadingStatusSlot: View {
                     fillColor: badgeFillColor,
                     textColor: badgeTextColor
                 )
-                .opacity(showsSpinner ? 0 : 1)
+                // (#cm-109.3) upstream's `.opacity(showsSpinner ? 0 : 1)` is removed: one resolution never asks for the badge and the spinner together
             }
             if showsSpinner {
                 SidebarWorkspaceLoadingSpinner(

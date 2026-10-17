@@ -203,7 +203,7 @@ struct ControlCommandCoordinatorWorkspaceStatusTests {
         #expect(list == .err(code: "unavailable", message: "TabManager not available", data: nil))
     }
 
-    /// Each of the ten codes: all four fields and the sentence, pinned with fixed text. The sentences are third
+    /// Each of the eleven codes: all four fields and the sentence, pinned with fixed text. The sentences are third
     /// person and one for each code.
     @Test func aProblemAnswersItsCodeEntryIDValueAndMessage() throws {
         typealias P = ListSnapshot.Problem
@@ -253,6 +253,15 @@ struct ControlCommandCoordinatorWorkspaceStatusTests {
                         + "the cmux statuses are todo, working, needs-attention, review and done."
                 ),
             ])),
+            (P(code: "unknown_icon", entry: 9, id: "parked", value: "Half"), .object([
+                "code": .string("unknown_icon"), "entry": .int(9), "id": .string("parked"),
+                "value": .string("Half"),
+                "message": .string(
+                    "Entry 9, \"parked\", names the icon \"Half\", which cmux does not have, so it is kept "
+                        + "and drawn as if it named no icon; the icons are dotted-ring, ring, quarter, half, "
+                        + "three-quarters, full, check and pause." // (#cm-109.3)
+                ),
+            ])),
             (P(code: "color_not_in_this_app", entry: nil, id: "parked", value: "Mauve"), .object([
                 "code": .string("color_not_in_this_app"), "entry": .null, "id": .string("parked"),
                 "value": .string("Mauve"),
@@ -268,7 +277,7 @@ struct ControlCommandCoordinatorWorkspaceStatusTests {
         )
         let answer = try payload(coordinator.handle(request("workspace.status.list")))
         #expect(answer["problems"] == .array(rows.map(\.1)), "the problems came back as \(String(describing: answer["problems"]))")
-        // Ten codes, eleven rows: `file_not_read` has two sentences.
-        #expect(Set(rows.map(\.0.code)).count == 10)
+        // Eleven codes, twelve rows: `file_not_read` has two sentences.
+        #expect(Set(rows.map(\.0.code)).count == 11)
     }
 }

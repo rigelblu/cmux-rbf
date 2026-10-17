@@ -348,21 +348,26 @@ struct WorkspaceStatusActionsTests {
         Self.expectHolds(workspace, override: nil, own: "doing", hidden: false, "a press from parked")
     }
 
-    /// In a wait the press gives his `review` entry when the list has one, with its color (Decisions, 2026-10-12,
-    /// point 13), and cmux's Review with no color when it has none.
-    @Test func aPressDuringAWaitGivesHisReviewEntryWithItsColorOrCmuxsWithNone() throws {
-        for (list, expectedColor) in [
-            (Self.hisList, "#333333"),
-            (WorkspaceStatusList(entries: Array(Self.hisEntries.prefix(3)), source: .file), "#ABCDEF"),
-        ] {
-            let workspace = Workspace()
-            workspace.setCustomColor("#ABCDEF")
-            let panelId = try #require(workspace.focusedPanelId)
-            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
-            workspace.cycleStatusThroughList(actions: Self.actions(list))
-            Self.expectHolds(workspace, override: .review, own: nil, hidden: false, "a press in a wait")
-            #expect(workspace.customColor == expectedColor)
-        }
+    /// In a wait under his list, detection without states is .todo, so the press starts from .todo and gives his `parked` via firstExtending(.todo) (19_technical-system.md:435).
+    @Test func aPressDuringAWaitGivesHisParkedEntryWithItsColor() throws {
+        let workspace = Workspace()
+        workspace.setCustomColor("#ABCDEF")
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+        workspace.cycleStatusThroughList(actions: Self.actions(Self.hisList))
+        Self.expectHolds(workspace, override: nil, own: "parked", hidden: false, "a press in a wait gives parked via firstExtending(.todo)")
+        #expect(workspace.customColor == "#555555")
+    }
+
+    /// cmuxFive twin: under .cmuxFive, detection in a wait is .needsAttention, and the press gives cmux's Review with no color.
+    @Test func aPressDuringAWaitGivesCmuxsReviewUnderCmuxFive() throws {
+        let workspace = Workspace()
+        workspace.setCustomColor("#ABCDEF")
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+        workspace.cycleStatusThroughList(actions: Self.actions(.cmuxFive))
+        Self.expectHolds(workspace, override: .review, own: nil, hidden: false, "a press in a wait gives Review under cmuxFive")
+        #expect(workspace.customColor == "#ABCDEF")
     }
 
     @Test func anEmptyListChangesNothingOnAPress() {

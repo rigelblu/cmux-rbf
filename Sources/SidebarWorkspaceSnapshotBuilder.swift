@@ -80,6 +80,8 @@ struct SidebarWorkspaceSnapshotBuilder {
         let checklistTotalCount: Int
         let checklistFirstUncheckedText: String?
         var taskStatusInput = SidebarWorkspaceTaskStatusSnapshot()
+        /// Whether the raised hand indicator should show. (#cm-109.3)
+        var showsRaisedHand: Bool = false // (#cm-109.3)
 
         func accessibilityLabel(index: Int, workspaceCount: Int) -> String {
             let position = String(

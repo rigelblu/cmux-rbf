@@ -481,9 +481,11 @@ struct SidebarWorkspaceRowMenuBuilder {
             laneItem.state = lane.isSelected ? .on : .off
             // (#cm-109) The greyed row has no action: a disabled item with its check on.
             laneItem.isEnabled = lane.action != nil
-            if let hex = lane.colorHex {
-                laneItem.image = SidebarWorkspaceRowMenuBuilder.coloredCircleImage(
-                    color: WorkspaceStatusPresentation.dotColor(hex: hex, isDark: isDarkMenu)
+            // (#cm-109.3) The mark takes the dot's place: a row with a color, or an entry that names an icon, shows the
+            // glyph of its status, in his color and with his icon when it has them. A row with neither has no image.
+            if let status = lane.status, WorkspaceStatusMenuImage.shows(icon: lane.icon, colorHex: lane.colorHex) {
+                laneItem.image = WorkspaceStatusMenuImage.make(
+                    status: status, icon: lane.icon, colorHex: lane.colorHex, isDark: isDarkMenu
                 )
             }
             statusSubmenu.addItem(laneItem)

@@ -69,6 +69,79 @@ import Testing
         let signals = WorkspaceTaskStatusSignals(isGitDirty: true)
         #expect(WorkspaceTaskStatus.inferred(from: signals) == .working)
     }
+
+    @Test func detectionWithoutStatesForSignalCombinations() {
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: WorkspaceTaskStatusSignals()) == .todo)
+
+        // States (waiting, running, dirty tree) are ignored.
+        let waitOnly = WorkspaceTaskStatusSignals(anyAgentNeedsInput: true)
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: waitOnly) == .todo)
+
+        let runningOnly = WorkspaceTaskStatusSignals(anyAgentRunning: true)
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: runningOnly) == .todo)
+
+        let dirtyOnly = WorkspaceTaskStatusSignals(isGitDirty: true)
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: dirtyOnly) == .todo)
+
+        let allStates = WorkspaceTaskStatusSignals(
+            anyAgentNeedsInput: true,
+            anyAgentRunning: true,
+            isGitDirty: true
+        )
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: allStates) == .todo)
+
+        // Open pull request gives review, even with states present.
+        let openPRWithStates = WorkspaceTaskStatusSignals(
+            anyAgentNeedsInput: true,
+            anyAgentRunning: true,
+            anyOpenPullRequest: true,
+            hasPullRequests: true,
+            isGitDirty: true
+        )
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: openPRWithStates) == .review)
+
+        // Merged/closed pull requests give done, even with states present.
+        let mergedPRWithStates = WorkspaceTaskStatusSignals(
+            anyAgentNeedsInput: true,
+            anyAgentRunning: true,
+            hasPullRequests: true,
+            allPullRequestsMergedOrClosed: true,
+            isGitDirty: true
+        )
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: mergedPRWithStates) == .done)
+
+        // Open pull request wins over merged set.
+        let openAndMerged = WorkspaceTaskStatusSignals(
+            anyOpenPullRequest: true,
+            hasPullRequests: true,
+            allPullRequestsMergedOrClosed: true
+        )
+        #expect(WorkspaceTaskStatus.inferredWithoutStates(from: openAndMerged) == .review)
+    }
+
+    @Test func selectorChoosesBetweenUpstreamAndWithoutStates() {
+        let dirtyRunning = WorkspaceTaskStatusSignals(anyAgentRunning: true, isGitDirty: true)
+        let waiting = WorkspaceTaskStatusSignals(anyAgentNeedsInput: true)
+        let openPR = WorkspaceTaskStatusSignals(anyAgentRunning: true, anyOpenPullRequest: true, hasPullRequests: true)
+
+        // With no status list: upstream detection applies.
+        #expect(WorkspaceTaskStatus.resolveInferred(from: dirtyRunning, hasStatusList: false, decidingStatus: nil) == .working)
+        #expect(WorkspaceTaskStatus.resolveInferred(from: waiting, hasStatusList: false, decidingStatus: nil) == .needsAttention)
+
+        // With a status list: decidingStatus working or needsAttention uses upstream detection.
+        #expect(WorkspaceTaskStatus.resolveInferred(from: dirtyRunning, hasStatusList: true, decidingStatus: .working) == .working)
+        #expect(WorkspaceTaskStatus.resolveInferred(from: waiting, hasStatusList: true, decidingStatus: .needsAttention) == .needsAttention)
+
+        // With a status list: decidingStatus nil (e.g. Auto or own status) uses detection without states.
+        #expect(WorkspaceTaskStatus.resolveInferred(from: dirtyRunning, hasStatusList: true, decidingStatus: nil) == .todo)
+        #expect(WorkspaceTaskStatus.resolveInferred(from: waiting, hasStatusList: true, decidingStatus: nil) == .todo)
+        #expect(WorkspaceTaskStatus.resolveInferred(from: openPR, hasStatusList: true, decidingStatus: nil) == .review)
+
+        // With a status list: decidingStatus todo, review, or done uses detection without states.
+        #expect(WorkspaceTaskStatus.resolveInferred(from: dirtyRunning, hasStatusList: true, decidingStatus: .todo) == .todo)
+        #expect(WorkspaceTaskStatus.resolveInferred(from: dirtyRunning, hasStatusList: true, decidingStatus: .review) == .todo)
+        #expect(WorkspaceTaskStatus.resolveInferred(from: dirtyRunning, hasStatusList: true, decidingStatus: .done) == .todo)
+    }
 }
 
 @Suite struct WorkspaceTaskStatusOverrideTests {

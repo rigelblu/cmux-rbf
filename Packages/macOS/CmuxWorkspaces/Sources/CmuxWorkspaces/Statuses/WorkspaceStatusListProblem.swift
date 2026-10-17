@@ -15,6 +15,8 @@ public enum WorkspaceStatusListProblem: Equatable, Sendable {
     /// One of his own with no `extends`. A misspelt key lands here.
     case noExtends(entry: Int, id: String)
     case unknownExtends(entry: Int, id: String, value: String)
+    /// The `icon` is none of the eight names. The entry is kept and draws as if it named no icon.
+    case unknownIcon(entry: Int, id: String, value: String)
     /// The color names nothing this app has. Found by the app, never by the parser.
     case colorNotInThisApp(id: String, color: String)
 
@@ -30,6 +32,7 @@ public enum WorkspaceStatusListProblem: Equatable, Sendable {
         case .noName: "no_name"
         case .noExtends: "no_extends"
         case .unknownExtends: "unknown_extends"
+        case .unknownIcon: "unknown_icon"
         case .colorNotInThisApp: "color_not_in_this_app"
         }
     }
@@ -40,7 +43,7 @@ public enum WorkspaceStatusListProblem: Equatable, Sendable {
         case .fileNotRead, .notAList, .colorNotInThisApp: nil
         case .entryNotAnObject(let entry), .noID(let entry): entry
         case .reservedID(let entry, _), .repeatedID(let entry, _), .noName(let entry, _), .noExtends(let entry, _),
-             .unknownExtends(let entry, _, _): entry
+             .unknownExtends(let entry, _, _), .unknownIcon(let entry, _, _): entry
         }
     }
 
@@ -49,15 +52,15 @@ public enum WorkspaceStatusListProblem: Equatable, Sendable {
         switch self {
         case .fileNotRead, .notAList, .entryNotAnObject, .noID: nil
         case .reservedID(_, let id), .repeatedID(_, let id), .noName(_, let id), .noExtends(_, let id),
-             .unknownExtends(_, let id, _), .colorNotInThisApp(let id, _): id
+             .unknownExtends(_, let id, _), .unknownIcon(_, let id, _), .colorNotInThisApp(let id, _): id
         }
     }
 
-    /// The text that was refused, for `unknown_extends` and `color_not_in_this_app`; `nil` for every other case,
-    /// `fileNotRead`'s detail included. The sentence a person reads is not the package's.
+    /// The text that was refused, for `unknown_extends`, `unknown_icon` and `color_not_in_this_app`; `nil` for every
+    /// other case, `fileNotRead`'s detail included. The sentence a person reads is not the package's.
     public var value: String? {
         switch self {
-        case .unknownExtends(_, _, let value): value
+        case .unknownExtends(_, _, let value), .unknownIcon(_, _, let value): value
         case .colorNotInThisApp(_, let color): color
         case .fileNotRead, .notAList, .entryNotAnObject, .noID, .reservedID, .repeatedID, .noName, .noExtends: nil
         }

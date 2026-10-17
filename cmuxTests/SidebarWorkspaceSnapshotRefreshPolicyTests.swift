@@ -193,6 +193,35 @@ import Testing
         #expect(decision.pendingWorkspaceSnapshot == next)
         #expect(decision.hasDeferredWorkspaceObservationInvalidation)
     }
+    @Test func agentWaitingChangeAppliesImmediatelyWhileContextMenuIsOpen() {
+        let current = Self.snapshot(
+            remoteConnectionStatusText: "Connected",
+            latestConversationMessage: "old message",
+            listeningPorts: [3000],
+            showsRaisedHand: false
+        )
+        let next = Self.snapshot(
+            remoteConnectionStatusText: "Disconnected",
+            latestConversationMessage: "new message",
+            listeningPorts: [3000, 4000],
+            showsRaisedHand: true
+        )
+
+        let decision = SidebarWorkspaceSnapshotRefreshPolicy().decision(
+            current: current,
+            next: next,
+            force: false,
+            contextMenuVisible: true
+        )
+
+        #expect(decision.workspaceSnapshotStorage?.showsRaisedHand == true)
+        #expect(decision.workspaceSnapshotStorage?.remoteConnectionStatusText == "Connected")
+        #expect(decision.workspaceSnapshotStorage?.latestConversationMessage == "old message")
+        #expect(decision.workspaceSnapshotStorage?.listeningPorts == [3000])
+        #expect(decision.pendingWorkspaceSnapshot == next)
+        #expect(decision.hasDeferredWorkspaceObservationInvalidation)
+    }
+
     @Test func closedContextMenuStoresNextAndClearsPending() {
         let current = Self.snapshot(title: "old", isPinned: false)
         let next = Self.snapshot(title: "new", isPinned: true)
@@ -221,9 +250,10 @@ import Testing
         finderDirectoryPath: String? = nil,
         mediaActivity: BrowserMediaActivity = BrowserMediaActivity(),
         activeCodingAgentCount: Int = 0,
-        attentionTaskStatus: WorkspaceTaskStatus? = nil
+        attentionTaskStatus: WorkspaceTaskStatus? = nil,
+        showsRaisedHand: Bool = false
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
-        SidebarWorkspaceSnapshotBuilder.Snapshot(
+        var s = SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey ?? Self.presentationKey(),
             title: title,
             customDescription: customDescription,
@@ -260,6 +290,8 @@ import Testing
             checklistTotalCount: 0,
             checklistFirstUncheckedText: nil
         )
+        s.showsRaisedHand = showsRaisedHand
+        return s
     }
 
     static func presentationKey(

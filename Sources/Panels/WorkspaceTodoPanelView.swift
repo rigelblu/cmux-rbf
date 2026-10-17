@@ -159,8 +159,12 @@ private struct WorkspaceTodoPaneContent: View {
         let todoControlsEnabled = WorkspaceTodoFeature.isEnabled
         // (#cm-109) The pane's working-out is one pure function (tested): the popover's rows, the footnote's pin and
         // his word for the status in effect.
+        // (#cm-109.3) The colors the app resolved for the list are read here too, as the list is, so the header's glyph
+        // and the popover's lanes follow a change of a color.
+        let statusColorHexes = AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:]
         let pane = WorkspaceStatusPaneState.make(
-            resolution: held, inferred: inferred, list: statusList, controlsEnabled: todoControlsEnabled
+            resolution: held, inferred: inferred, list: statusList, controlsEnabled: todoControlsEnabled, // (#cm-109.3)
+            colorHexes: statusColorHexes // (#cm-109.3)
         )
         let hasOverride = pane.hasOverride
         let progress = todoState.checklist.checklistProgressSummary
@@ -264,7 +268,9 @@ private struct WorkspaceTodoPaneContent: View {
                         monochromeColor: .primary,
                         neutralColor: .secondary,
                         fontScale: Self.headerGlyphFontScale,
-                        name: pane.hisWord // (#cm-109) his word for a status in effect; cmux's name otherwise
+                        name: pane.hisWord, // (#cm-109) his word for a status in effect; cmux's name otherwise
+                        icon: pane.icon, // (#cm-109.3)
+                        colorHex: pane.colorHex // (#cm-109.3)
                     )
                     .contentShape(Rectangle().inset(by: -3))
                 }
@@ -275,7 +281,8 @@ private struct WorkspaceTodoPaneContent: View {
                         model: SidebarWorkspaceStatusPopoverModel(
                             inferred: inferred,
                             activeOverride: pane.cmuxOverride, // (#cm-109) only a cmux status in effect pins the footnote
-                            picker: pane.picker
+                            picker: pane.picker,
+                            colorHexes: pane.colorHexes // (#cm-109.3)
                         ),
                         minWidth: 200,
                         maxHeight: 400,

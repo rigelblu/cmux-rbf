@@ -48,17 +48,18 @@ extension TerminalController: ControlWorkspaceTodoContext {
 
     private func todoStatusSnapshot(for workspace: Workspace) -> ControlWorkspaceTodoStatusSnapshot {
         let signals = workspace.taskStatusSignals()
-        let inferred = WorkspaceTaskStatus.inferred(from: signals)
+        let list = AppDelegate.statusListInUse // (#cm-109.4)
+        let inferred = workspace.inferredTaskStatus(list: list, signals: signals) // (#cm-109.4)
         // (#cm-109) `effective`, `override` and `status_id` come from what the workspace holds, worked out against
         // the list in use (T2's table), not from the stored status: with the read no longer removing a lapsed
         // status, the stored one would be reported as in effect. `override` is written only when a status set by
         // hand is in effect; for one of his own it is the cmux status it extends, recorded at the moment of the answer.
-        let resolution = workspace.statusResolution(list: AppDelegate.statusListInUse)
+        let resolution = workspace.statusResolution(list: list, inferred: inferred) // (#cm-109.4)
         let overrideStatus: String?
         switch resolution {
         case .cmuxInEffect(let entry, _): overrideStatus = entry.id
         case .ownInEffect(let entry): overrideStatus = entry.behavesAs.rawValue
-        case .detected, .cmuxLapsed, .ownWaiting, .ownNotListed: overrideStatus = nil
+        case .detected, .cmuxLapsed, .ownNotListed: overrideStatus = nil // (#cm-109.4)
         }
         // None hides the id too, also when a restored session still holds one (Decisions, 2026-10-13, answer 5).
         let statusID = workspace.todoState.statusHidden ? nil : resolution.heldID

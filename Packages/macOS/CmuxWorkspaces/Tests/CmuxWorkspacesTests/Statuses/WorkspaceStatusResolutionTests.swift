@@ -25,13 +25,53 @@ import Testing
     }
 
     @Test func aCmuxStatusInHisListIsInEffectUnderHisName() {
-        let resolution = resolve(override: F.override(.done, at: .working), inferred: .working)
+        let resolution = resolve(override: F.override(.done, at: .todo), inferred: .todo)
         #expect(resolution == .cmuxInEffect(F.done, offered: true))
         #expect(resolution.effective == .done)
         #expect(resolution.inEffect == F.done)
         #expect(resolution.held == .inEffect)
         #expect(resolution.heldID == "done")
         #expect(!resolution.shouldClearOverride)
+    }
+
+    /// Sub-step 3c. A pre-release record naming a state (.working or .needsAttention) for .done, .review, or .todo
+    /// is compared as if it had recorded .todo when a list is in use, so it stays in effect while detection without
+    /// states is .todo and lapses when a pull request makes it .review. Under .cmuxFive, upstream's behavior applies.
+    @Test func aPreReleaseRecordNamingAStateIsComparedAsIfItHadRecordedTodo() {
+        let atWorking = F.override(.done, at: .working)
+        let atNeedsAttention = F.override(.done, at: .needsAttention)
+
+        // With a list in use: compared as if it recorded .todo.
+        // Detection without states .todo -> in effect:
+        #expect(resolve(override: atWorking, inferred: .todo) == .cmuxInEffect(F.done, offered: true))
+        #expect(resolve(override: atNeedsAttention, inferred: .todo) == .cmuxInEffect(F.done, offered: true))
+
+        // When detection without states moves to .review (open PR) -> lapsed:
+        #expect(resolve(override: atWorking, inferred: .review) == .cmuxLapsed(detected: .review))
+
+        // Under .cmuxFive: compared against actual inferredAtOverride (.working):
+        let cmuxDone = WorkspaceStatusList.cmuxFive.entry(id: "done") ?? F.done
+        #expect(resolve(override: atWorking, inferred: .working, list: .cmuxFive) == .cmuxInEffect(cmuxDone, offered: true))
+        #expect(resolve(override: atWorking, inferred: .todo, list: .cmuxFive) == .cmuxLapsed(detected: .todo))
+    }
+
+    /// O5: A .todo (Future) record at .working is compared as if it had recorded .todo when a list is in use.
+    @Test func aPreReleaseTodoRecordAtWorkingIsComparedAsIfItHadRecordedTodo() {
+        let atWorking = F.override(.todo, at: .working)
+
+        // With his list: compared as if it recorded .todo. With inferred .todo, it stays in effect.
+        // His list does not offer cmux's "todo" id directly, so offered is false:
+        let todoEntry = WorkspaceStatusEntry(id: "todo", name: nil)
+        #expect(resolve(override: atWorking, inferred: .todo) == .cmuxInEffect(todoEntry, offered: false))
+        #expect(resolve(override: atWorking, inferred: .todo).effective == .todo)
+
+        // When detection without states moves to .review (open PR), it lapses:
+        #expect(resolve(override: atWorking, inferred: .review) == .cmuxLapsed(detected: .review))
+
+        // Under .cmuxFive: compared against actual inferredAtOverride (.working):
+        let cmuxTodo = WorkspaceStatusList.cmuxFive.entry(id: "todo") ?? todoEntry
+        #expect(resolve(override: atWorking, inferred: .working, list: .cmuxFive) == .cmuxInEffect(cmuxTodo, offered: true))
+        #expect(resolve(override: atWorking, inferred: .todo, list: .cmuxFive) == .cmuxLapsed(detected: .todo))
     }
 
     @Test func aCmuxStatusHisListLeavesOutIsInEffectAsCmuxsOwnEntryAndNotOffered() {
@@ -79,13 +119,6 @@ import Testing
         #expect(doing.heldID == "doing-primary")
     }
 
-    @Test func theHeldFlagChangesNothingWhenNoAgentWaits() {
-        let held = resolve(own: WorkspaceOwnStatus(id: "paused", heldThroughWait: true), inferred: .todo)
-        let plain = resolve(own: WorkspaceOwnStatus(id: "paused"), inferred: .todo)
-        #expect(held == plain)
-        #expect(held == .ownInEffect(F.paused))
-    }
-
     /// A cmux status his list leaves out lapses like any other when detection moves: it is not "not offered".
     @Test func aCmuxStatusHisListLeavesOutLapsesWhenDetectionMoves() {
         let resolution = resolve(override: F.override(.working, at: .needsAttention), inferred: .review)
@@ -95,10 +128,11 @@ import Testing
         #expect(resolution.shouldClearOverride)
     }
 
-    /// A cmux status set during a wait is still in effect in that wait: detection has not moved since it was set.
+    /// A cmux status set during a wait is still in effect in that wait under cmux's five: detection has not moved since it was set.
     @Test func aCmuxStatusSetDuringAWaitStaysInEffectInThatWait() {
-        let listed = resolve(override: F.override(.review, at: .needsAttention), inferred: .needsAttention)
-        #expect(listed == .cmuxInEffect(F.review, offered: true))
+        let cmuxReview = WorkspaceStatusList.cmuxFive.entry(id: "review") ?? F.review
+        let listed = resolve(override: F.override(.review, at: .needsAttention), inferred: .needsAttention, list: .cmuxFive)
+        #expect(listed == .cmuxInEffect(cmuxReview, offered: true))
         #expect(listed.effective == .review)
         #expect(listed.heldID == "review")
         #expect(!listed.shouldClearOverride)
@@ -108,29 +142,18 @@ import Testing
         #expect(leftOut.held == .notOffered)
         #expect(leftOut.effective == .working)
         // When the wait ends, detection moved: it lapses like any other.
-        let ended = resolve(override: F.override(.review, at: .needsAttention), inferred: .todo)
+        let ended = resolve(override: F.override(.review, at: .needsAttention), inferred: .todo, list: .cmuxFive)
         #expect(ended == .cmuxLapsed(detected: .todo))
     }
 
-    @Test func oneOfHisOwnWhileAnAgentWaitsShowsNeedsAttentionAndHoldsItsID() {
+    @Test func oneOfHisOwnWhileAnAgentWaitsIsInEffectAndHoldsItsID() {
         let resolution = resolve(own: WorkspaceOwnStatus(id: "parked"), inferred: .needsAttention)
-        #expect(resolution == .ownWaiting(F.parked))
-        #expect(resolution.effective == .needsAttention)
-        #expect(resolution.inEffect == nil)
-        #expect(resolution.held == .waiting)
-        #expect(resolution.heldID == "parked")
-        #expect(!resolution.shouldClearOverride)
-    }
-
-    @Test func oneOfHisOwnPickedDuringAWaitStaysInEffectThroughIt() {
-        let resolution = resolve(
-            own: WorkspaceOwnStatus(id: "parked", heldThroughWait: true), inferred: .needsAttention
-        )
         #expect(resolution == .ownInEffect(F.parked))
         #expect(resolution.effective == .todo)
         #expect(resolution.inEffect == F.parked)
         #expect(resolution.held == .inEffect)
         #expect(resolution.heldID == "parked")
+        #expect(!resolution.shouldClearOverride)
     }
 
     @Test func oneOfHisOwnThatTheListLacksShowsWhatAutoShowsAndHoldsItsID() {
@@ -152,18 +175,16 @@ import Testing
     @Test func noInputGivesLapsedForOneOfHisOwn() {
         for inferred in WorkspaceTaskStatus.allCases {
             for id in ["paused", "parked", "retired", "doing-primary"] {
-                for heldThroughWait in [false, true] {
-                    for list in [F.toms, F.other, WorkspaceStatusList.cmuxFive] {
-                        for override in [nil, F.override(.done, at: .todo), F.override(.review, at: .needsAttention)] {
-                            let resolution = resolve(
-                                override: override,
-                                own: WorkspaceOwnStatus(id: id, heldThroughWait: heldThroughWait),
-                                inferred: inferred,
-                                list: list
-                            )
-                            #expect(!resolution.shouldClearOverride, "\(id) \(inferred) \(list.source)")
-                            #expect(resolution.heldID == id)
-                        }
+                for list in [F.toms, F.other, WorkspaceStatusList.cmuxFive] {
+                    for override in [nil, F.override(.done, at: .todo), F.override(.review, at: .needsAttention)] {
+                        let resolution = resolve(
+                            override: override,
+                            own: WorkspaceOwnStatus(id: id),
+                            inferred: inferred,
+                            list: list
+                        )
+                        #expect(!resolution.shouldClearOverride, "\(id) \(inferred) \(list.source)")
+                        #expect(resolution.heldID == id)
                     }
                 }
             }
