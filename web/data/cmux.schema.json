@@ -1298,7 +1298,7 @@
     },
     "workspaceStatuses": {
       "title": "workspaceStatuses",
-      "description": "Your own list of workspace statuses, in the order the Status menu and Cycle Status use. Each entry has an id, a name, the cmux status it behaves as, and optionally the name of a workspace color that setting it applies.",
+      "description": "Your own list of workspace statuses, in the order the Status menu and Cycle Status use. Each entry has an id, a name, the cmux status it behaves as, and optionally an icon and the name of a workspace color that setting it applies.",
       "type": "array",
       "items": {
         "type": "object",
@@ -1323,6 +1323,11 @@
           "color": {
             "type": "string",
             "description": "The color setting this status applies, written as the label of one of your workspace colors, a palette or display name, or a hex color such as #1565C0; setting this status replaces the workspace's color with it."
+          },
+          "icon": {
+            "type": ["string", "null"],
+            "enum": ["dotted-ring", "ring", "quarter", "half", "three-quarters", "full", "check", "pause", null],
+            "description": "The shape drawn for this status: dotted-ring, a ring of twelve dashes; ring; quarter, half, three-quarters or full, a ring with a pie filled that far; check, a filled disc with a tick; or pause, a ring with two vertical bars inside. Leave it out, or write null, and the status draws the glyph of the cmux status it extends."
           }
         }
       }

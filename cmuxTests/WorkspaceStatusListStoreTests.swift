@@ -593,6 +593,38 @@ struct WorkspaceStatusListStoreTests {
         #expect(again.list == WorkspaceStatusList(entries: hisEntries, source: .stored))
     }
 
+    /// cm-109.3: the stored copy keeps `icon` the way it keeps `color`, and an icon the parser did not know is written
+    /// as no icon: the store refuses a copy that reads back with a problem, so the typed text must never reach it.
+    @Test func theStoredCopyKeepsTheIconsTheParserFoundAndNeverATypedBadOne() throws {
+        let rig = try StoreRig()
+        defer { rig.cleanUp() }
+        rig.write("""
+        { "workspaceStatuses": [
+          { "id": "done", "name": "Done", "icon": "check", "color": "1: DONE" },
+          { "id": "paused", "name": "Paused", "extends": "todo", "icon": "ring" },
+          { "id": "odd", "name": "Odd", "extends": "working", "icon": "bogus" }
+        ] }
+        """)
+        let store = rig.makeStore()
+        store.load()
+        let expected = [
+            Entry(id: "done", name: "Done", color: "1: DONE", icon: .check),
+            Entry(id: "paused", name: "Paused", extends: .todo, icon: .ring),
+            Entry(id: "odd", name: "Odd", extends: .working),
+        ]
+        #expect(store.list == WorkspaceStatusList(entries: expected, source: .file))
+        #expect(store.problems == [.unknownIcon(entry: 3, id: "odd", value: "bogus")])
+        let copy = try #require(rig.storedCopy)
+        let written = try #require(try JSONSerialization.jsonObject(with: copy) as? [[String: Any]])
+        #expect(written.map { $0["icon"] as? String } == ["check", "ring", nil])
+
+        let restarted = rig.makeStore()
+        rig.write("{")
+        restarted.load()
+        #expect(restarted.list == WorkspaceStatusList(entries: expected, source: .stored))
+        #expect(!restarted.problems.contains { $0.code == "unknown_icon" })
+    }
+
     // MARK: - Reviewed: a problem goes when its cause goes
 
     /// Nothing but cmux's five in use and the file gone: the problem of the broken file goes with it.

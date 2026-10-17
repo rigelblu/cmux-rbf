@@ -32,6 +32,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     // Title line
     private let leadingBadge = SidebarRowUnreadBadgeView()
     private var leadingSpinner: GPUSpinnerNSView?
+    private var handImageView: NSImageView? // (#cm-109.3)
     private let pinImageView = NSImageView()
     private let muteImageView = NSImageView()
     private let mediaAudioView = NSImageView()
@@ -457,6 +458,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             && snapshot.taskStatus != nil
         statusGlyphButton.isHidden = !showsStatusGlyph
         if showsStatusGlyph, let taskStatus = snapshot.taskStatus {
+            // (#cm-109.3) His entry for the status shown: the picker's checked entry row, as the glyph's name is.
+            let checkedEntry = WorkspaceStatusPresentation.checkedEntry(in: snapshot.todoStatusMenuModel?.picker)
             statusGlyphButton.configure(
                 model: .init(
                     status: taskStatus,
@@ -464,7 +467,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                     usesMonochrome: model.isActive,
                     fontScale: model.fontScale,
                     colorScheme: palette.colorScheme,
-                    name: WorkspaceStatusPresentation.checkedName(in: snapshot.todoStatusMenuModel?.picker) // (#cm-109)
+                    name: WorkspaceStatusPresentation.checkedName(in: snapshot.todoStatusMenuModel?.picker), // (#cm-109)
+                    icon: checkedEntry?.icon, // (#cm-109.3)
+                    colorHex: checkedEntry.flatMap { snapshot.todoStatusMenuModel?.colorHexes[$0.id] } // (#cm-109.3)
                 ),
                 monochromeColor: palette.secondary(0.8),
                 neutralColor: palette.secondary(0.8)
@@ -666,6 +671,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
     /// Where the row's title is laid out, in the cell's own coordinates: the content's indent shows as its x (#cm-106).
     var titleFrameForTesting: NSRect { titleView.frame }
+    var statusGlyphButtonForTesting: NSView { statusGlyphButton } // (#cm-109.3)
+    var handForTesting: NSImageView? { handImageView } // (#cm-109.3)
+    var leadingSpinnerForTesting: GPUSpinnerNSView? { leadingSpinner } // (#cm-109.3)
+    var trailingSpinnerForTesting: GPUSpinnerNSView? { trailingSpinner } // (#cm-109.3)
+    var leadingBadgeForTesting: SidebarRowUnreadBadgeView { leadingBadge } // (#cm-109.3)
+    var trailingBadgeForTesting: SidebarRowUnreadBadgeView { trailingBadge } // (#cm-109.3)
 #endif
 
     private func configureStatusSlot(
@@ -678,13 +689,21 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let badgeText = palette.visual.badgeTextColor
         let badgeFont = NSFont.systemFont(ofSize: model.scaled(9), weight: .semibold)
 
-        let leadingBadgeVisible = badgeVisible && model.settings.notificationBadgePosition == .leading
-        let trailingBadgeVisible = badgeVisible && model.settings.notificationBadgePosition == .trailing
-        let leadingSpinnerVisible = spinnerVisible && model.settings.loadingSpinnerPosition == .leading
-        let trailingSpinnerVisible = spinnerVisible && model.settings.loadingSpinnerPosition == .trailing
+        let slotResolution = SidebarWorkspaceSlotResolution.resolve( // (#cm-109.3)
+            showsHand: model.snapshot.showsRaisedHand, // (#cm-109.3)
+            showsSpinner: spinnerVisible, // (#cm-109.3)
+            unreadCount: model.unreadCount, // (#cm-109.3)
+            loadingSpinnerPosition: model.settings.loadingSpinnerPosition, // (#cm-109.3)
+            notificationBadgePosition: model.settings.notificationBadgePosition, // (#cm-109.3)
+            showsCloseButton: showsCloseNow // (#cm-109.3)
+        ) // (#cm-109.3)
 
-        leadingBadge.isHidden = !leadingBadgeVisible || leadingSpinnerVisible
-        trailingBadge.isHidden = !trailingBadgeVisible || trailingSpinnerVisible || showsCloseNow
+        let leadingBadgeVisible = slotResolution.leading == .badge // (#cm-109.3)
+        let trailingBadgeVisible = slotResolution.trailing == .badge // (#cm-109.3)
+        let leadingSpinnerVisible = slotResolution.leading == .spinner // (#cm-109.3)
+        let trailingSpinnerVisible = slotResolution.trailing == .spinner // (#cm-109.3)
+        leadingBadge.isHidden = !leadingBadgeVisible // (#cm-109.3)
+        trailingBadge.isHidden = !trailingBadgeVisible // (#cm-109.3)
         if !leadingBadge.isHidden {
             leadingBadge.configure(count: model.unreadCount, fillColor: badgeFill, textColor: badgeText, font: badgeFont)
         }
@@ -718,6 +737,44 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             )
         leadingSpinner?.toolTip = tooltip
         trailingSpinner?.toolTip = tooltip
+
+        let handVisible = slotResolution.showsHand // (#cm-109.3)
+        let waitingTooltip = handVisible ? String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer") : "" // (#cm-109.3)
+        handImageView = Self.updateHand( // (#cm-109.3)
+            existing: handImageView, // (#cm-109.3)
+            visible: handVisible, // (#cm-109.3)
+            color: spinnerColor, // (#cm-109.3)
+            tooltip: waitingTooltip, // (#cm-109.3)
+            in: contentContainer // (#cm-109.3)
+        ) // (#cm-109.3)
+    }
+
+    private static func updateHand( // (#cm-109.3)
+        existing: NSImageView?, // (#cm-109.3)
+        visible: Bool, // (#cm-109.3)
+        color: NSColor, // (#cm-109.3)
+        tooltip: String, // (#cm-109.3)
+        in container: NSView // (#cm-109.3)
+    ) -> NSImageView? { // (#cm-109.3)
+        if !visible { // (#cm-109.3)
+            existing?.isHidden = true // (#cm-109.3)
+            return existing // (#cm-109.3)
+        } // (#cm-109.3)
+        let view: NSImageView // (#cm-109.3)
+        if let existing { // (#cm-109.3)
+            view = existing // (#cm-109.3)
+        } else { // (#cm-109.3)
+            let iv = NSImageView() // (#cm-109.3)
+            iv.imageScaling = .scaleProportionallyDown // (#cm-109.3)
+            container.addSubview(iv) // (#cm-109.3)
+            view = iv // (#cm-109.3)
+        } // (#cm-109.3)
+        view.isHidden = false // (#cm-109.3)
+        view.image = NSImage(systemSymbolName: "hand.raised.fill", accessibilityDescription: tooltip) // (#cm-109.3)
+        view.contentTintColor = color // (#cm-109.3)
+        view.toolTip = tooltip // (#cm-109.3)
+        view.setAccessibilityLabel(tooltip) // (#cm-109.3)
+        return view // (#cm-109.3)
     }
 
     private static func updateSpinner(
@@ -981,7 +1038,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         return SidebarWorkspaceStatusPopoverModel(
             inferred: menuModel.inferred,
             activeOverride: menuModel.activeOverride,
-            picker: picker
+            picker: picker,
+            colorHexes: menuModel.colorHexes // (#cm-109.3)
         )
     }
 
@@ -1140,8 +1198,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let spacing: CGFloat = 4
 
         // Title line
+        let leadingSpinnerActive = leadingSpinner?.isHidden == false // (#cm-109.3)
         let titleRowSpacing: CGFloat = (model.settings.loadingSpinnerPosition == .leading
-            && model.showsAgentActivity && model.snapshot.activeCodingAgentCount > 0) ? 6 : 8
+            && leadingSpinnerActive) ? 6 : 8 // (#cm-109.3)
         var x = leading
         let badgeSide = 16 * model.fontScale
         let spinnerSide = max(10, 12 * model.fontScale)
@@ -1155,7 +1214,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             )
         }
 
-        let leadingSlotActive = (!leadingBadge.isHidden) || (leadingSpinner?.isHidden == false)
+        let leadingSlotActive = (!leadingBadge.isHidden) || leadingSpinnerActive // (#cm-109.3)
         if leadingSlotActive {
             let side = !leadingBadge.isHidden ? badgeSide : spinnerSide
             if !leadingBadge.isHidden {
@@ -1186,6 +1245,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             place(statusGlyphButton, size: glyphSize, centerY: firstLineCenter)
             x += glyphSize.width + titleRowSpacing
         }
+        if let hand = handImageView, !hand.isHidden { // (#cm-109.3)
+            place(hand, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter) // (#cm-109.3)
+            x += spinnerSide + titleRowSpacing // (#cm-109.3)
+        } // (#cm-109.3)
 
         x = cloudImageView.layoutLeadingSidebarWorkspaceAccessory(
             minX: x, centerY: firstLineCenter, side: model.scaled(10) + 4, spacing: titleRowSpacing, apply: apply
@@ -1193,7 +1256,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         // Trailing slot
         let closeHit = max(16, 16 * model.fontScale)
         let closeWidth = max(16, closeHit)
-        let trailingSlotActive = !trailingBadge.isHidden || (trailingSpinner?.isHidden == false) || model.canCloseWorkspace
+        let trailingSpinnerActive = trailingSpinner?.isHidden == false // (#cm-109.3)
+        let trailingSlotActive = !trailingBadge.isHidden || trailingSpinnerActive || model.canCloseWorkspace // (#cm-109.3)
         let titleMaxX = trailingSlotActive ? (trailing - closeWidth - titleRowSpacing) : trailing
         let titleWidth = max(10, titleMaxX - x)
         let renameField = renameSession?.field

@@ -7,9 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */; };
-		807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000001 /* FigmaPaneBackTests.swift */; };
-		807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807333000000000000000001 /* FigmaPageSwitchTests.swift */; };
 		A11CE0040000000000000001 /* AboutLicenseContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0030000000000000001 /* AboutLicenseContent.swift */; };
 		A11CE0010000000000000001 /* AboutLicensesResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */; };
 		A5C017000000000000000001 /* AccountSignInFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C017000000000000000002 /* AccountSignInFlow.swift */; };
@@ -1708,6 +1705,7 @@
 		4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29BA503AF85868C6325335B /* FeedWaiterRegistry.swift */; };
 		330A15CE33CDB525DE207F7F /* FeedWaiterRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B74E6D94323FE9C5804E0B4 /* FeedWaiterRegistryTests.swift */; };
 		807312000000000000000102 /* FigmaBoardLayoutBinding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807312000000000000000101 /* FigmaBoardLayoutBinding.swift */; };
+		807312000000000000000902 /* FigmaBoardLayoutWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807312000000000000000901 /* FigmaBoardLayoutWorkspaceTests.swift */; }; // cmux-rbf #cm-73.12
 		807390000000000000000006 /* FigmaButtonIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000005 /* FigmaButtonIcon.swift */; };
 		807316000000000000001702 /* FigmaButtonMenuItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000001701 /* FigmaButtonMenuItem.swift */; };
 		807316000000000000000202 /* FigmaButtonMenuModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000201 /* FigmaButtonMenuModel.swift */; };
@@ -1726,7 +1724,6 @@
 		807317000000000000000502 /* FigmaDesignHandOffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807317000000000000000501 /* FigmaDesignHandOffTests.swift */; }; // cmux-rbf #cm-73.17
 		807317000000000000000302 /* FigmaDesignSkill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807317000000000000000301 /* FigmaDesignSkill.swift */; }; // cmux-rbf #cm-73.17
 		807317000000000000000602 /* FigmaDesignSkillTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807317000000000000000601 /* FigmaDesignSkillTests.swift */; }; // cmux-rbf #cm-73.17
-		807312000000000000000902 /* FigmaBoardLayoutWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807312000000000000000901 /* FigmaBoardLayoutWorkspaceTests.swift */; }; // cmux-rbf #cm-73.12
 		80730000000000000000000A /* FigmaEditorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000009 /* FigmaEditorChrome.swift */; };
 		80739000000000000000000E /* FigmaEditorChromeAddressChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000D /* FigmaEditorChromeAddressChangeTests.swift */; };
 		80730000000000000000000C /* FigmaEditorChromeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000B /* FigmaEditorChromeTests.swift */; };
@@ -1734,16 +1731,16 @@
 		807300000000000000000010 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
 		807300000000000000000011 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
 		807300000000000000000012 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
-		8073B0000000000000000002 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
-		8073B0000000000000000003 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
-		8073B0000000000000000004 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
-		8073B0000000000000000006 /* FigmaFitOnLoad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000005 /* FigmaFitOnLoad.swift */; };
 		807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000013 /* FigmaFileLinkTests.swift */; };
 		807316000000000000000002 /* FigmaFileList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000001 /* FigmaFileList.swift */; };
 		807316000000000000000D02 /* FigmaFileListPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000D01 /* FigmaFileListPersistenceTests.swift */; };
 		807316000000000000000302 /* FigmaFileListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000301 /* FigmaFileListTests.swift */; };
 		807316000000000000000C02 /* FigmaFileRecordingWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000C01 /* FigmaFileRecordingWorkspaceTests.swift */; };
 		807316000000000000001502 /* FigmaFileSubscriptionWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000001501 /* FigmaFileSubscriptionWorkspaceTests.swift */; };
+		8073B0000000000000000002 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
+		8073B0000000000000000003 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
+		8073B0000000000000000004 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
+		8073B0000000000000000006 /* FigmaFitOnLoad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000005 /* FigmaFitOnLoad.swift */; };
 		8073000000000000000000F4 /* FigmaFolderCLITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073000000000000000000F3 /* FigmaFolderCLITests.swift */; };
 		80739000000000000000000A /* FigmaHeaderButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000009 /* FigmaHeaderButtonTests.swift */; };
 		80739000000000000000000C /* FigmaHeaderButtonWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000B /* FigmaHeaderButtonWorkspaceTests.swift */; };
@@ -1759,13 +1756,16 @@
 		807316000000000000000102 /* FigmaNewFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000101 /* FigmaNewFileLink.swift */; };
 		807316000000000000000402 /* FigmaNewFileLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000401 /* FigmaNewFileLinkTests.swift */; };
 		807390000000000000000008 /* FigmaOutlineIcon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000007 /* FigmaOutlineIcon.svg */; };
+		807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */; };
+		807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807333000000000000000001 /* FigmaPageSwitchTests.swift */; };
 		807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000F /* FigmaPaletteCommandTests.swift */; };
+		807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000001 /* FigmaPaneBackTests.swift */; };
+		807335000000000000000004 /* FigmaPaneHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000003 /* FigmaPaneHistory.swift */; };
 		807300000000000000000002 /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
 		807300000000000000000003 /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
 		80730000000000000000001C /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
 		807300000000000000000005 /* FigmaPaneURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000004 /* FigmaPaneURLTests.swift */; };
 		80730000000000000000001E /* FigmaStayInPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001D /* FigmaStayInPane.swift */; };
-		807335000000000000000004 /* FigmaPaneHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000003 /* FigmaPaneHistory.swift */; };
 		807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001F /* FigmaStayInPaneTests.swift */; };
 		807310000000000000000002 /* FigmaTabMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000001 /* FigmaTabMark.swift */; };
 		807310000000000000000004 /* FigmaTabMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000003 /* FigmaTabMarkTests.swift */; };
@@ -3050,6 +3050,7 @@
 		ACCE20000000000000000001 /* SidebarWorkspaceRowVisualPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACCE20000000000000000002 /* SidebarWorkspaceRowVisualPalette.swift */; };
 		C9A57505C9A57505C9A57505 /* SidebarWorkspaceScrollLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A57506C9A57506C9A57506 /* SidebarWorkspaceScrollLayoutTests.swift */; };
 		C0DE56010000000000000001 /* SidebarWorkspaceSelectionAnchorPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE56010000000000000002 /* SidebarWorkspaceSelectionAnchorPolicyTests.swift */; };
+			C10900000000000000000141 /* SidebarWorkspaceSlotResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000140 /* SidebarWorkspaceSlotResolution.swift */; };
 		A6AC73040000000000000001 /* SidebarWorkspaceSnapshotAgentActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AC73040000000000000002 /* SidebarWorkspaceSnapshotAgentActivityTests.swift */; };
 		F7216005000000000000001 /* SidebarWorkspaceSnapshotBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7216005000000000000002 /* SidebarWorkspaceSnapshotBuilder.swift */; };
 		6707F0016707F0016707F001 /* SidebarWorkspaceSnapshotFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6707F0026707F0026707F002 /* SidebarWorkspaceSnapshotFactory.swift */; };
@@ -3430,6 +3431,7 @@
 		C0DE00000000000000000E93 /* TerminalController+WorkspaceCreateWorkingDirectoryValidationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000E92 /* TerminalController+WorkspaceCreateWorkingDirectoryValidationService.swift */; };
 		C0DE00000000000000000C8B /* TerminalController+WorkspaceGroupAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000C8A /* TerminalController+WorkspaceGroupAction.swift */; };
 		C0DE00000000000000000C89 /* TerminalController+WorkspaceMove.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000C88 /* TerminalController+WorkspaceMove.swift */; };
+		C10900000000000000000072 /* TerminalController+WorkspaceStatusList.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000071 /* TerminalController+WorkspaceStatusList.swift */; };
 		A5001007 /* TerminalController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001019 /* TerminalController.swift */; };
 		C0DE00000000000000000C32 /* TerminalControllerControlCommandContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000C31 /* TerminalControllerControlCommandContext.swift */; };
 		C7A50A000000000000000002 /* TerminalControllerPaneResizeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A50A000000000000000001 /* TerminalControllerPaneResizeSupport.swift */; };
@@ -3829,6 +3831,7 @@
 		C51A710000000000000000C1 /* Workspace+SimulatorPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51A710000000000000000C2 /* Workspace+SimulatorPane.swift */; };
 		C51A740000000000000000C1 /* Workspace+SimulatorSessionPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51A740000000000000000C2 /* Workspace+SimulatorSessionPersistence.swift */; };
 		8300A0040000000000000004 /* Workspace+SSHConnectionBroker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8300A0030000000000000003 /* Workspace+SSHConnectionBroker.swift */; };
+		C109000000000000000000F2 /* Workspace+Statuses.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000F1 /* Workspace+Statuses.swift */; };
 		F9219DE12AF2E4D9CFFC66CF /* Workspace+SurfaceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BBA1A8703756FDDFD53CF3 /* Workspace+SurfaceCatalog.swift */; };
 		CA52B0170000000000000000 /* Workspace+SurfaceNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA52C0170000000000000000 /* Workspace+SurfaceNavigation.swift */; };
 		7DD5BF8AB5B84491BC89EEE9 /* Workspace+SurfaceOwnership.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7305B43543CF4AF29D9966C8 /* Workspace+SurfaceOwnership.swift */; };
@@ -3942,6 +3945,22 @@
 		F0F0A001A1B2C3D4E5F60718 /* WorkspaceSidebarScrollUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F0A002A1B2C3D4E5F60718 /* WorkspaceSidebarScrollUITests.swift */; };
 		6B524A0CB34FD46A771335AB /* WorkspaceSplitStartupCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F8ED92A4B55D34BE6A0668 /* WorkspaceSplitStartupCommandTests.swift */; };
 		F6120000A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6120001A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift */; };
+		C109000000000000000000E2 /* WorkspaceStatusActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000E1 /* WorkspaceStatusActions.swift */; };
+		C10900000000000000000082 /* WorkspaceStatusActionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000081 /* WorkspaceStatusActionsTests.swift */; };
+		C109000000000000000000BA /* WorkspaceStatusEntrancesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B9 /* WorkspaceStatusEntrancesTests.swift */; };
+		C10900000000000000000102 /* WorkspaceStatusFilePill.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000101 /* WorkspaceStatusFilePill.swift */; };
+		C109000000000000000000B6 /* WorkspaceStatusHandOverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B5 /* WorkspaceStatusHandOverTests.swift */; };
+		C10900000000000000000121 /* WorkspaceStatusIconDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000120 /* WorkspaceStatusIconDrawing.swift */; };
+		C10900000000000000000131 /* WorkspaceStatusIconDrawingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000130 /* WorkspaceStatusIconDrawingTests.swift */; };
+		C109000000000000000000C2 /* WorkspaceStatusListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000C1 /* WorkspaceStatusListStore.swift */; };
+		C109000000000000000000D2 /* WorkspaceStatusListStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000D1 /* WorkspaceStatusListStoreTests.swift */; };
+		C109000000000000000000AA /* WorkspaceStatusPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000A9 /* WorkspaceStatusPresentation.swift */; };
+		C10900000000000000000111 /* WorkspaceStatusProblemWordsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000110 /* WorkspaceStatusProblemWordsTests.swift */; };
+		C109000000000000000000A6 /* WorkspaceStatusRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000A5 /* WorkspaceStatusRestoreTests.swift */; };
+		C109000000000000000000A2 /* WorkspaceStatusSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000A1 /* WorkspaceStatusSessionTests.swift */; };
+		C109000000000000000000B8 /* WorkspaceStatusSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B7 /* WorkspaceStatusSocketTests.swift */; };
+		C10900000000000000000092 /* WorkspaceStatusWaitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000091 /* WorkspaceStatusWaitTests.swift */; };
+		C109000000000000000000B2 /* WorkspaceStatusWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B1 /* WorkspaceStatusWriteTests.swift */; };
 		FA000000A1B2C3D4E5F60718 /* WorkspaceStressProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA000001A1B2C3D4E5F60718 /* WorkspaceStressProfileTests.swift */; };
 		D7AB34400000000000000001 /* WorkspaceSurfaceConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AB34400000000000000002 /* WorkspaceSurfaceConfig.swift */; };
 		C0DE32470000000000000003 /* WorkspaceSurfaceIdentifierClipboardText.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE32470000000000000004 /* WorkspaceSurfaceIdentifierClipboardText.swift */; };
@@ -4013,21 +4032,6 @@
 		78F17D618B657B6CF929E327 /* WorkspaceTodoPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8311EFDE1BC83CBAB1F21B6F /* WorkspaceTodoPanelView.swift */; };
 		41ECF85FFD13D233A0AC75A6 /* WorkspaceTodoSidebarModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F007352E96022D7EFBE73C9 /* WorkspaceTodoSidebarModelTests.swift */; };
 		5B38DFE53BE108F4DA2BDBB7 /* WorkspaceTodoSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5C9824B98FFC44A2C44F47 /* WorkspaceTodoSnapshotTests.swift */; };
-		C109000000000000000000A2 /* WorkspaceStatusSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000A1 /* WorkspaceStatusSessionTests.swift */; };
-		C109000000000000000000B2 /* WorkspaceStatusWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B1 /* WorkspaceStatusWriteTests.swift */; };
-		C109000000000000000000C2 /* WorkspaceStatusListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000C1 /* WorkspaceStatusListStore.swift */; };
-		C109000000000000000000D2 /* WorkspaceStatusListStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000D1 /* WorkspaceStatusListStoreTests.swift */; };
-		C109000000000000000000E2 /* WorkspaceStatusActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000E1 /* WorkspaceStatusActions.swift */; };
-		C109000000000000000000AA /* WorkspaceStatusPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000A9 /* WorkspaceStatusPresentation.swift */; };
-		C10900000000000000000102 /* WorkspaceStatusFilePill.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000101 /* WorkspaceStatusFilePill.swift */; };
-		C109000000000000000000F2 /* Workspace+Statuses.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000F1 /* Workspace+Statuses.swift */; };
-		C10900000000000000000072 /* TerminalController+WorkspaceStatusList.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000071 /* TerminalController+WorkspaceStatusList.swift */; };
-		C10900000000000000000082 /* WorkspaceStatusActionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000081 /* WorkspaceStatusActionsTests.swift */; };
-		C10900000000000000000092 /* WorkspaceStatusWaitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000091 /* WorkspaceStatusWaitTests.swift */; };
-		C109000000000000000000A6 /* WorkspaceStatusRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000A5 /* WorkspaceStatusRestoreTests.swift */; };
-		C109000000000000000000B6 /* WorkspaceStatusHandOverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B5 /* WorkspaceStatusHandOverTests.swift */; };
-		C109000000000000000000BA /* WorkspaceStatusEntrancesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B9 /* WorkspaceStatusEntrancesTests.swift */; };
-		C109000000000000000000B8 /* WorkspaceStatusSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B7 /* WorkspaceStatusSocketTests.swift */; };
 		39EF42EF23A2F751429718CE /* WorkspaceTodoState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A243534CEB9E9A49B44453 /* WorkspaceTodoState.swift */; };
 		6B524A0BA34FD46A771335AB /* WorkspaceUnitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F8ED91A4B55D34BE6A0668 /* WorkspaceUnitTests.swift */; };
 		B95EC019F70D4F23BD3C8D1D /* WorkspaceWorkingDirectorySpawnUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81464EB0D515022903F26DD8 /* WorkspaceWorkingDirectorySpawnUITests.swift */; };
@@ -4134,9 +4138,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSessionRestoreTests.swift; sourceTree = "<group>"; };
-		807335000000000000000001 /* FigmaPaneBackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneBackTests.swift; sourceTree = "<group>"; };
-		807333000000000000000001 /* FigmaPageSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSwitchTests.swift; sourceTree = "<group>"; };
 		A11CE0030000000000000001 /* AboutLicenseContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicenseContent.swift; sourceTree = "<group>"; };
 		A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicensesResourceTests.swift; sourceTree = "<group>"; };
 		A5C017000000000000000002 /* AccountSignInFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSignInFlow.swift; sourceTree = "<group>"; };
@@ -5717,6 +5718,7 @@
 		B29BA503AF85868C6325335B /* FeedWaiterRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FeedWaiterRegistry.swift"; sourceTree = "<group>"; };
 		7B74E6D94323FE9C5804E0B4 /* FeedWaiterRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedWaiterRegistryTests.swift; sourceTree = "<group>"; };
 		807312000000000000000101 /* FigmaBoardLayoutBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FigmaBoardLayoutBinding.swift"; sourceTree = "<group>"; };
+		807312000000000000000901 /* FigmaBoardLayoutWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaBoardLayoutWorkspaceTests.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-73.12
 		807390000000000000000005 /* FigmaButtonIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaButtonIcon.swift; sourceTree = "<group>"; };
 		807316000000000000001701 /* FigmaButtonMenuItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaButtonMenuItem.swift; sourceTree = "<group>"; };
 		807316000000000000000201 /* FigmaButtonMenuModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaButtonMenuModel.swift; sourceTree = "<group>"; };
@@ -5733,20 +5735,19 @@
 		807317000000000000000501 /* FigmaDesignHandOffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaDesignHandOffTests.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-73.17
 		807317000000000000000301 /* FigmaDesignSkill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaDesignSkill.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-73.17
 		807317000000000000000601 /* FigmaDesignSkillTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaDesignSkillTests.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-73.17
-		807312000000000000000901 /* FigmaBoardLayoutWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaBoardLayoutWorkspaceTests.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-73.12
 		807300000000000000000009 /* FigmaEditorChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaEditorChrome.swift; sourceTree = "<group>"; };
 		80739000000000000000000D /* FigmaEditorChromeAddressChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeAddressChangeTests.swift; sourceTree = "<group>"; };
 		80730000000000000000000B /* FigmaEditorChromeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeTests.swift; sourceTree = "<group>"; };
 		807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeTriggerTests.swift; sourceTree = "<group>"; };
 		80730000000000000000000F /* FigmaFileLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLink.swift; sourceTree = "<group>"; };
-		8073B0000000000000000001 /* FigmaFit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFit.swift; sourceTree = "<group>"; };
-		8073B0000000000000000005 /* FigmaFitOnLoad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaFitOnLoad.swift; sourceTree = "<group>"; };
 		807300000000000000000013 /* FigmaFileLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLinkTests.swift; sourceTree = "<group>"; };
 		807316000000000000000001 /* FigmaFileList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileList.swift; sourceTree = "<group>"; };
 		807316000000000000000D01 /* FigmaFileListPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileListPersistenceTests.swift; sourceTree = "<group>"; };
 		807316000000000000000301 /* FigmaFileListTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileListTests.swift; sourceTree = "<group>"; };
 		807316000000000000000C01 /* FigmaFileRecordingWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileRecordingWorkspaceTests.swift; sourceTree = "<group>"; };
 		807316000000000000001501 /* FigmaFileSubscriptionWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FigmaFileSubscriptionWorkspaceTests.swift"; sourceTree = "<group>"; };
+		8073B0000000000000000001 /* FigmaFit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFit.swift; sourceTree = "<group>"; };
+		8073B0000000000000000005 /* FigmaFitOnLoad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaFitOnLoad.swift; sourceTree = "<group>"; };
 		8073000000000000000000F3 /* FigmaFolderCLITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFolderCLITests.swift; sourceTree = "<group>"; };
 		807390000000000000000009 /* FigmaHeaderButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaHeaderButtonTests.swift; sourceTree = "<group>"; };
 		80739000000000000000000B /* FigmaHeaderButtonWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaHeaderButtonWorkspaceTests.swift; sourceTree = "<group>"; };
@@ -5762,11 +5763,14 @@
 		807316000000000000000101 /* FigmaNewFileLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaNewFileLink.swift; sourceTree = "<group>"; };
 		807316000000000000000401 /* FigmaNewFileLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaNewFileLinkTests.swift; sourceTree = "<group>"; };
 		807390000000000000000007 /* FigmaOutlineIcon.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = FigmaOutlineIcon.svg; sourceTree = "<group>"; };
+		807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSessionRestoreTests.swift; sourceTree = "<group>"; };
+		807333000000000000000001 /* FigmaPageSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSwitchTests.swift; sourceTree = "<group>"; };
 		80739000000000000000000F /* FigmaPaletteCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaletteCommandTests.swift; sourceTree = "<group>"; };
+		807335000000000000000001 /* FigmaPaneBackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneBackTests.swift; sourceTree = "<group>"; };
+		807335000000000000000003 /* FigmaPaneHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaPaneHistory.swift; sourceTree = "<group>"; };
 		807300000000000000000001 /* FigmaPaneURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneURL.swift; sourceTree = "<group>"; };
 		807300000000000000000004 /* FigmaPaneURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneURLTests.swift; sourceTree = "<group>"; };
 		80730000000000000000001D /* FigmaStayInPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaStayInPane.swift; sourceTree = "<group>"; };
-		807335000000000000000003 /* FigmaPaneHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaPaneHistory.swift; sourceTree = "<group>"; };
 		80730000000000000000001F /* FigmaStayInPaneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaStayInPaneTests.swift; sourceTree = "<group>"; };
 		807310000000000000000001 /* FigmaTabMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaTabMark.swift; sourceTree = "<group>"; };
 		807310000000000000000003 /* FigmaTabMarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkTests.swift; sourceTree = "<group>"; };
@@ -7034,6 +7038,7 @@
 		ACCE20000000000000000002 /* SidebarWorkspaceRowVisualPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarWorkspaceRowVisualPalette.swift; sourceTree = "<group>"; };
 		C9A57506C9A57506C9A57506 /* SidebarWorkspaceScrollLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWorkspaceScrollLayoutTests.swift; sourceTree = "<group>"; };
 		C0DE56010000000000000002 /* SidebarWorkspaceSelectionAnchorPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWorkspaceSelectionAnchorPolicyTests.swift; sourceTree = "<group>"; };
+			C10900000000000000000140 /* SidebarWorkspaceSlotResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarWorkspaceSlotResolution.swift; sourceTree = "<group>"; };
 		A6AC73040000000000000002 /* SidebarWorkspaceSnapshotAgentActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWorkspaceSnapshotAgentActivityTests.swift; sourceTree = "<group>"; };
 		F7216005000000000000002 /* SidebarWorkspaceSnapshotBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWorkspaceSnapshotBuilder.swift; sourceTree = "<group>"; };
 		6707F0026707F0026707F002 /* SidebarWorkspaceSnapshotFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWorkspaceSnapshotFactory.swift; sourceTree = "<group>"; };
@@ -7406,6 +7411,7 @@
 		C0DE00000000000000000E92 /* TerminalController+WorkspaceCreateWorkingDirectoryValidationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+WorkspaceCreateWorkingDirectoryValidationService.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000C8A /* TerminalController+WorkspaceGroupAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+WorkspaceGroupAction.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000C88 /* TerminalController+WorkspaceMove.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+WorkspaceMove.swift"; sourceTree = "<group>"; };
+		C10900000000000000000071 /* TerminalController+WorkspaceStatusList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceStatuses/TerminalController+WorkspaceStatusList.swift"; sourceTree = "<group>"; };
 		A5001019 /* TerminalController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalController.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000C31 /* TerminalControllerControlCommandContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalControllerControlCommandContext.swift; sourceTree = "<group>"; };
 		C7A50A000000000000000001 /* TerminalControllerPaneResizeSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalControllerPaneResizeSupport.swift; sourceTree = "<group>"; };
@@ -7801,6 +7807,7 @@
 		C51A710000000000000000C2 /* Workspace+SimulatorPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+SimulatorPane.swift"; sourceTree = "<group>"; };
 		C51A740000000000000000C2 /* Workspace+SimulatorSessionPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+SimulatorSessionPersistence.swift"; sourceTree = "<group>"; };
 		8300A0030000000000000003 /* Workspace+SSHConnectionBroker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+SSHConnectionBroker.swift"; sourceTree = "<group>"; };
+		C109000000000000000000F1 /* Workspace+Statuses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceStatuses/Workspace+Statuses.swift"; sourceTree = "<group>"; };
 		47BBA1A8703756FDDFD53CF3 /* Workspace+SurfaceCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Workspace+SurfaceCatalog.swift"; sourceTree = "<group>"; };
 		CA52C0170000000000000000 /* Workspace+SurfaceNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+SurfaceNavigation.swift"; sourceTree = "<group>"; };
 		7305B43543CF4AF29D9966C8 /* Workspace+SurfaceOwnership.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+SurfaceOwnership.swift"; sourceTree = "<group>"; };
@@ -7914,6 +7921,22 @@
 		F0F0A002A1B2C3D4E5F60718 /* WorkspaceSidebarScrollUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSidebarScrollUITests.swift; sourceTree = "<group>"; };
 		71F8ED92A4B55D34BE6A0668 /* WorkspaceSplitStartupCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSplitStartupCommandTests.swift; sourceTree = "<group>"; };
 		F6120001A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSSHFishShellTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000E1 /* WorkspaceStatusActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusActions.swift; sourceTree = "<group>"; };
+		C10900000000000000000081 /* WorkspaceStatusActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusActionsTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000B9 /* WorkspaceStatusEntrancesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusEntrancesTests.swift; sourceTree = "<group>"; };
+		C10900000000000000000101 /* WorkspaceStatusFilePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusFilePill.swift; sourceTree = "<group>"; };
+		C109000000000000000000B5 /* WorkspaceStatusHandOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusHandOverTests.swift; sourceTree = "<group>"; };
+		C10900000000000000000120 /* WorkspaceStatusIconDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusIconDrawing.swift; sourceTree = "<group>"; };
+		C10900000000000000000130 /* WorkspaceStatusIconDrawingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusIconDrawingTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000C1 /* WorkspaceStatusListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusListStore.swift; sourceTree = "<group>"; };
+		C109000000000000000000D1 /* WorkspaceStatusListStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusListStoreTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000A9 /* WorkspaceStatusPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusPresentation.swift; sourceTree = "<group>"; };
+		C10900000000000000000110 /* WorkspaceStatusProblemWordsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusProblemWordsTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000A5 /* WorkspaceStatusRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusRestoreTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000A1 /* WorkspaceStatusSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusSessionTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000B7 /* WorkspaceStatusSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusSocketTests.swift; sourceTree = "<group>"; };
+		C10900000000000000000091 /* WorkspaceStatusWaitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusWaitTests.swift; sourceTree = "<group>"; };
+		C109000000000000000000B1 /* WorkspaceStatusWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusWriteTests.swift; sourceTree = "<group>"; };
 		FA000001A1B2C3D4E5F60718 /* WorkspaceStressProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStressProfileTests.swift; sourceTree = "<group>"; };
 		D7AB34400000000000000002 /* WorkspaceSurfaceConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSurfaceConfig.swift; sourceTree = "<group>"; };
 		C0DE32470000000000000004 /* WorkspaceSurfaceIdentifierClipboardText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSurfaceIdentifierClipboardText.swift; sourceTree = "<group>"; };
@@ -7985,21 +8008,6 @@
 		8311EFDE1BC83CBAB1F21B6F /* WorkspaceTodoPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/WorkspaceTodoPanelView.swift; sourceTree = "<group>"; };
 		9F007352E96022D7EFBE73C9 /* WorkspaceTodoSidebarModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceTodoSidebarModelTests.swift; sourceTree = "<group>"; };
 		9C5C9824B98FFC44A2C44F47 /* WorkspaceTodoSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceTodoSnapshotTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000A1 /* WorkspaceStatusSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusSessionTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000B1 /* WorkspaceStatusWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusWriteTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000C1 /* WorkspaceStatusListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusListStore.swift; sourceTree = "<group>"; };
-		C109000000000000000000D1 /* WorkspaceStatusListStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusListStoreTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000E1 /* WorkspaceStatusActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusActions.swift; sourceTree = "<group>"; };
-		C109000000000000000000A9 /* WorkspaceStatusPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusPresentation.swift; sourceTree = "<group>"; };
-		C10900000000000000000101 /* WorkspaceStatusFilePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusFilePill.swift; sourceTree = "<group>"; };
-		C109000000000000000000F1 /* Workspace+Statuses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceStatuses/Workspace+Statuses.swift"; sourceTree = "<group>"; };
-		C10900000000000000000071 /* TerminalController+WorkspaceStatusList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceStatuses/TerminalController+WorkspaceStatusList.swift"; sourceTree = "<group>"; };
-		C10900000000000000000081 /* WorkspaceStatusActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusActionsTests.swift; sourceTree = "<group>"; };
-		C10900000000000000000091 /* WorkspaceStatusWaitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusWaitTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000A5 /* WorkspaceStatusRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusRestoreTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000B5 /* WorkspaceStatusHandOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusHandOverTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000B9 /* WorkspaceStatusEntrancesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusEntrancesTests.swift; sourceTree = "<group>"; };
-		C109000000000000000000B7 /* WorkspaceStatusSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusSocketTests.swift; sourceTree = "<group>"; };
 		E9A243534CEB9E9A49B44453 /* WorkspaceTodoState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceTodoState.swift; sourceTree = "<group>"; };
 		71F8ED91A4B55D34BE6A0668 /* WorkspaceUnitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceUnitTests.swift; sourceTree = "<group>"; };
 		81464EB0D515022903F26DD8 /* WorkspaceWorkingDirectorySpawnUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceWorkingDirectorySpawnUITests.swift; sourceTree = "<group>"; };
@@ -8819,63 +8827,61 @@
 				D37777070000000000000002 /* SettingsWindowNavigationDelivery.swift */,
 				D37777040000000000000002 /* AppDelegateSettingsPresentation.swift */,
 				D36090010000000000000002 /* SettingsWindowPresenter.swift */,
-					D36090020000000000000002 /* NSWindow+CmuxPeerWindow.swift */,
-					C0DE35860000000000000002 /* BackgroundWorkspacePrimeCoordinator.swift */,
-					A5001012 /* ContentView.swift */,
-					C51A740000000000000000B2 /* ContentView+SidebarSurfaceKind.swift */,
-					C0DE86060000000000000002 /* CommandPaletteFocusRestoreCoordinator.swift */,
-					C0DE86060000000000000004 /* CommandPaletteRestoreFocusTarget.swift */,
-					F7216001000000000000002 /* VerticalTabsSidebar+EmptyAreasAndFooter.swift */,
-
-
-					8430B0030000000000000003 /* SidebarTabItemSettingsSnapshot.swift */,
-					8430B0010000000000000001 /* SidebarWorkspaceBranchDirectorySettings.swift */,
-					8430B0020000000000000002 /* SidebarWorkspaceDetailSettings.swift */,
-					F7216005000000000000002 /* SidebarWorkspaceSnapshotBuilder.swift */,
-					A12481500000000000000002 /* SidebarWorkspaceTaskStatusSnapshot.swift */,
-					69EF4F23B8E9406D9821E930 /* SidebarCloudWorkspaceBadgeView.swift */,
-					21111C055F1D46288E928B8C /* NSImageView+SidebarWorkspaceAccessory.swift */,
-					6707F0026707F0026707F002 /* SidebarWorkspaceSnapshotFactory.swift */,
-					6707F0166707F0166707F016 /* SidebarWorkspaceSnapshotRefreshCoalescer.swift */,
-					6707F0046707F0046707F004 /* SidebarWorkspaceContextMenuSnapshot.swift */,
-					6707F0206707F0206707F020 /* SidebarWorkspaceContextMenuTargetAggregate.swift */,
-					6707F0066707F0066707F006 /* SidebarWorkspaceGroupRowView.swift */,
-					6707F0106707F0106707F010 /* SidebarWorkspaceGroupRowSnapshot.swift */,
-					6707F0086707F0086707F008 /* SidebarWorkspaceRowActions.swift */,
-					6707F0126707F0126707F012 /* SidebarWorkspaceRowInput.swift */,
-					6707F00A6707F00A6707F00A /* SidebarWorkspaceRowSnapshot.swift */,
-					6707F00C6707F00C6707F00C /* SidebarWorkspaceRowView.swift */,
-					6707F0146707F0146707F014 /* SidebarWorkspaceRowsSnapshot.swift */,
-					6707F0226707F0226707F022 /* SidebarWorkspaceNotificationIndex.swift */,
-					6707F00E6707F00E6707F00E /* SidebarWorkspaceWindowMoveTarget.swift */,
-					F7216006000000000000002 /* SidebarTabItemContextMenuState.swift */,
-					A5F100000000000000000006 /* TabItemView+WorkspaceNotificationsMenu.swift */,
-					D75280040000000000000002 /* DynamicTracingSignpostInterval.swift */,
-					D75280010000000000000002 /* ProfilingSignposts.swift */,
-					D75280020000000000000002 /* SidebarProfilingSignposts.swift */,
-					075FE2249C36416D9712FADD /* WorkspaceSwitchActiveTransaction.swift */,
-					10E71C4BDB96436184B07803 /* WorkspaceSwitchContentKind.swift */,
-					9F9218CC05134C6A9253EFED /* WorkspaceSwitchCoordinator.swift */,
-					044CDD67AEF44642882E1C9C /* WorkspaceSwitchFrameObservation.swift */,
-					D92310030000000000000002 /* WorkspaceHandoffRetirementGate.swift */,
-					D92310060000000000000002 /* WorkspaceSwitchPortalSignalRouter.swift */,
-					FA9DC44D98F24BB5AAFB434F /* WorkspaceSwitchPresentationTarget.swift */,
-					2EC4E80DA41D4B20B9C3FDC1 /* WorkspaceSwitchReadiness.swift */,
-					D92310010000000000000002 /* WorkspaceSwitchSignposts.swift */,
-					5732B0015732B0015732B001 /* MinimalModeInvalidationProbe.swift */,
-					5732B0085732B0085732B008 /* MinimalModeInvalidationProbeKey.swift */,
-					5732B0095732B0095732B009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift */,
-					5732B0115732B0115732B011 /* SidebarLazyContractProbe.swift */,
-					5732B0125732B0125732B012 /* SidebarLazyContractProbeKey.swift */,
-					5732B0135732B0135732B013 /* EnvironmentValues+SidebarLazyContractProbe.swift */,
-					5732B0025732B0025732B002 /* MinimalModeSidebarTitlebarControlsOverlay.swift */,
-					5732B0035732B0035732B003 /* MinimalModeTitlebarEventSurfaceLayer.swift */,
-					5732B0045732B0045732B004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift */,
-					5732B0055732B0055732B005 /* WorkspacePresentationModeChangeObserver.swift */,
-					5732B0065732B0065732B006 /* WorkspacePresentationModeContentTopPaddingModifier.swift */,
-					5732B0105732B0105732B010 /* WorkspacePresentationModeRuntimeCache.swift */,
-					5732B0075732B0075732B007 /* WorkspaceTitlebarModeLayer.swift */,
-					C0DE46010000000000000002 /* CMUXInstalledExtensionSidebarHostView.swift */,
+				D36090020000000000000002 /* NSWindow+CmuxPeerWindow.swift */,
+				C0DE35860000000000000002 /* BackgroundWorkspacePrimeCoordinator.swift */,
+				A5001012 /* ContentView.swift */,
+				C51A740000000000000000B2 /* ContentView+SidebarSurfaceKind.swift */,
+				C0DE86060000000000000002 /* CommandPaletteFocusRestoreCoordinator.swift */,
+				C0DE86060000000000000004 /* CommandPaletteRestoreFocusTarget.swift */,
+				F7216001000000000000002 /* VerticalTabsSidebar+EmptyAreasAndFooter.swift */,
+				8430B0030000000000000003 /* SidebarTabItemSettingsSnapshot.swift */,
+				8430B0010000000000000001 /* SidebarWorkspaceBranchDirectorySettings.swift */,
+				8430B0020000000000000002 /* SidebarWorkspaceDetailSettings.swift */,
+				F7216005000000000000002 /* SidebarWorkspaceSnapshotBuilder.swift */,
+				A12481500000000000000002 /* SidebarWorkspaceTaskStatusSnapshot.swift */,
+				69EF4F23B8E9406D9821E930 /* SidebarCloudWorkspaceBadgeView.swift */,
+				21111C055F1D46288E928B8C /* NSImageView+SidebarWorkspaceAccessory.swift */,
+				6707F0026707F0026707F002 /* SidebarWorkspaceSnapshotFactory.swift */,
+				6707F0166707F0166707F016 /* SidebarWorkspaceSnapshotRefreshCoalescer.swift */,
+				6707F0046707F0046707F004 /* SidebarWorkspaceContextMenuSnapshot.swift */,
+				6707F0206707F0206707F020 /* SidebarWorkspaceContextMenuTargetAggregate.swift */,
+				6707F0066707F0066707F006 /* SidebarWorkspaceGroupRowView.swift */,
+				6707F0106707F0106707F010 /* SidebarWorkspaceGroupRowSnapshot.swift */,
+				6707F0086707F0086707F008 /* SidebarWorkspaceRowActions.swift */,
+				6707F0126707F0126707F012 /* SidebarWorkspaceRowInput.swift */,
+				6707F00A6707F00A6707F00A /* SidebarWorkspaceRowSnapshot.swift */,
+				6707F00C6707F00C6707F00C /* SidebarWorkspaceRowView.swift */,
+				6707F0146707F0146707F014 /* SidebarWorkspaceRowsSnapshot.swift */,
+				6707F0226707F0226707F022 /* SidebarWorkspaceNotificationIndex.swift */,
+				6707F00E6707F00E6707F00E /* SidebarWorkspaceWindowMoveTarget.swift */,
+				F7216006000000000000002 /* SidebarTabItemContextMenuState.swift */,
+				A5F100000000000000000006 /* TabItemView+WorkspaceNotificationsMenu.swift */,
+				D75280040000000000000002 /* DynamicTracingSignpostInterval.swift */,
+				D75280010000000000000002 /* ProfilingSignposts.swift */,
+				D75280020000000000000002 /* SidebarProfilingSignposts.swift */,
+				075FE2249C36416D9712FADD /* WorkspaceSwitchActiveTransaction.swift */,
+				10E71C4BDB96436184B07803 /* WorkspaceSwitchContentKind.swift */,
+				9F9218CC05134C6A9253EFED /* WorkspaceSwitchCoordinator.swift */,
+				044CDD67AEF44642882E1C9C /* WorkspaceSwitchFrameObservation.swift */,
+				D92310030000000000000002 /* WorkspaceHandoffRetirementGate.swift */,
+				D92310060000000000000002 /* WorkspaceSwitchPortalSignalRouter.swift */,
+				FA9DC44D98F24BB5AAFB434F /* WorkspaceSwitchPresentationTarget.swift */,
+				2EC4E80DA41D4B20B9C3FDC1 /* WorkspaceSwitchReadiness.swift */,
+				D92310010000000000000002 /* WorkspaceSwitchSignposts.swift */,
+				5732B0015732B0015732B001 /* MinimalModeInvalidationProbe.swift */,
+				5732B0085732B0085732B008 /* MinimalModeInvalidationProbeKey.swift */,
+				5732B0095732B0095732B009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift */,
+				5732B0115732B0115732B011 /* SidebarLazyContractProbe.swift */,
+				5732B0125732B0125732B012 /* SidebarLazyContractProbeKey.swift */,
+				5732B0135732B0135732B013 /* EnvironmentValues+SidebarLazyContractProbe.swift */,
+				5732B0025732B0025732B002 /* MinimalModeSidebarTitlebarControlsOverlay.swift */,
+				5732B0035732B0035732B003 /* MinimalModeTitlebarEventSurfaceLayer.swift */,
+				5732B0045732B0045732B004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift */,
+				5732B0055732B0055732B005 /* WorkspacePresentationModeChangeObserver.swift */,
+				5732B0065732B0065732B006 /* WorkspacePresentationModeContentTopPaddingModifier.swift */,
+				5732B0105732B0105732B010 /* WorkspacePresentationModeRuntimeCache.swift */,
+				5732B0075732B0075732B007 /* WorkspaceTitlebarModeLayer.swift */,
+				C0DE46010000000000000002 /* CMUXInstalledExtensionSidebarHostView.swift */,
 				C0DE46030000000000000002 /* CMUXSidebarExtensionBrowserPanel.swift */,
 				E4C001000000000000000002 /* ExtensionSidebarWorkspaceRowView.swift */,
 				E4C001000000000000000004 /* ExtensionWorktreePrototype.swift */,
@@ -8985,20 +8991,20 @@
 				7490D00A7490D00A7490D00A /* MemoryPressureSnapshot.swift */,
 				7490D00B7490D00B7490D00B /* MemoryPressureStateEvaluation.swift */,
 				7490D00C7490D00C7490D00C /* MemoryPressureStateTracker.swift */,
-					7490D00D7490D00D7490D00D /* NotificationCacheMemoryPressureResponder.swift */,
-					D36A00040000000000000002 /* RendererRealizationController.swift */,
-						A6AC71030000000000000001 /* SidebarAgentActivityIndicator.swift */,
-						A6AC73F20000000000000002 /* SidebarMediaActivityIndicators.swift */,
-						A6AC73F10000000000000002 /* SidebarTitleFirstLineCenterAlignment.swift */,
-						A6AC73310000000000000002 /* SidebarWorkspaceLeadingStatusSlot.swift */,
-						A6AC73320000000000000002 /* SidebarWorkspaceLoadingSpinner.swift */,
-						A6AC73010000000000000002 /* SidebarWorkspaceStatusSlots.swift */,
-						A6AC73330000000000000002 /* SidebarWorkspaceTrailingStatusSlot.swift */,
-						A6AC73340000000000000002 /* SidebarWorkspaceUnreadBadge.swift */,
-						5B11E5A100000000000000B2 /* GPUSpinner.swift */,
-					A6AC72010000000000000002 /* GPUSpinnerNSView.swift */,
-					A6AC72020000000000000002 /* GPUSpinnerStyle.swift */,
-					A6AC71050000000000000001 /* SidebarAgentActivitySummary.swift */,
+				7490D00D7490D00D7490D00D /* NotificationCacheMemoryPressureResponder.swift */,
+				D36A00040000000000000002 /* RendererRealizationController.swift */,
+				A6AC71030000000000000001 /* SidebarAgentActivityIndicator.swift */,
+				A6AC73F20000000000000002 /* SidebarMediaActivityIndicators.swift */,
+				A6AC73F10000000000000002 /* SidebarTitleFirstLineCenterAlignment.swift */,
+				A6AC73310000000000000002 /* SidebarWorkspaceLeadingStatusSlot.swift */,
+				A6AC73320000000000000002 /* SidebarWorkspaceLoadingSpinner.swift */,
+				A6AC73010000000000000002 /* SidebarWorkspaceStatusSlots.swift */,
+				A6AC73330000000000000002 /* SidebarWorkspaceTrailingStatusSlot.swift */,
+				A6AC73340000000000000002 /* SidebarWorkspaceUnreadBadge.swift */,
+				5B11E5A100000000000000B2 /* GPUSpinner.swift */,
+				A6AC72010000000000000002 /* GPUSpinnerNSView.swift */,
+				A6AC72020000000000000002 /* GPUSpinnerStyle.swift */,
+				A6AC71050000000000000001 /* SidebarAgentActivitySummary.swift */,
 				7490D00E7490D00E7490D00E /* RendererRealizationMemoryPressureResponder.swift */,
 				D36A00060000000000000002 /* RendererRealizationPlanner.swift */,
 				D36A00070000000000000002 /* RendererRealizationReclaimTrigger.swift */,
@@ -9136,28 +9142,28 @@
 				604500100000000000000002 /* WindowTitleTemplate.swift */,
 				AB7F2E9143904957AAA70726 /* ShortcutBareStartRouting.swift */,
 				D5AAB5856FF095F610EB565D /* AppDelegate+VisibleGlobalSearchShortcutRouting.swift */,
-					E5C0F1A1E5C0F1A1E5C0F1A1 /* TerminalFindEscapeRouting.swift */,
-					C7934BB35B66491B1BCA8064 /* MenuBarExtraController.swift */,
-					C0A7101A0000000000000001 /* ComputerUseAppDragSource.swift */,
-					D11965050000000000000001 /* ComputerUseOnboardingCoordinator.swift */,
-					C0A7101B0000000000000001 /* ComputerUseAppDragSourceView.swift */,
-					C0A710090000000000000001 /* ComputerUseMenuBarController.swift */,
-					C0A710FF0000000000000001 /* ComputerUseLiveSettingRepository.swift */,
-					C0A710180000000000000001 /* ComputerUseMenuBarRefreshPolicy.swift */,
-					C0A710060000000000000001 /* ComputerUseMenuBarRow.swift */,
-					C0A710170000000000000001 /* ComputerUseMenuBarScanResult.swift */,
-					C0A710070000000000000001 /* ComputerUseMenuBarSnapshot.swift */,
-					C0A710080000000000000001 /* ComputerUseMenuBarSnapshotStore.swift */,
-					C0A710020000000000000001 /* ComputerUseCuaState.swift */,
-					C0A710C50000000000000001 /* ComputerUseDaemonReadiness.swift */,
-					C0A710C40000000000000001 /* ComputerUseDaemonProfile.swift */,
-					C0A711200000000000000001 /* ComputerUseOnboardingStep.swift */,
-					C0A712400000000000000001 /* ComputerUseOnboardingHostingView.swift */,
-					C0A711300000000000000001 /* ComputerUsePermissionRowAction.swift */,
-					C0A710100000000000000001 /* ComputerUseOnboardingView.swift */,
-					C0A710110000000000000001 /* ComputerUseOnboardingWindowController.swift */,
-					C0A711210000000000000001 /* ComputerUseOnboardingWindowPlacement.swift */,
-					C0A712500000000000000001 /* ExternalApplicationWindowTracker.swift */,
+				E5C0F1A1E5C0F1A1E5C0F1A1 /* TerminalFindEscapeRouting.swift */,
+				C7934BB35B66491B1BCA8064 /* MenuBarExtraController.swift */,
+				C0A7101A0000000000000001 /* ComputerUseAppDragSource.swift */,
+				D11965050000000000000001 /* ComputerUseOnboardingCoordinator.swift */,
+				C0A7101B0000000000000001 /* ComputerUseAppDragSourceView.swift */,
+				C0A710090000000000000001 /* ComputerUseMenuBarController.swift */,
+				C0A710FF0000000000000001 /* ComputerUseLiveSettingRepository.swift */,
+				C0A710180000000000000001 /* ComputerUseMenuBarRefreshPolicy.swift */,
+				C0A710060000000000000001 /* ComputerUseMenuBarRow.swift */,
+				C0A710170000000000000001 /* ComputerUseMenuBarScanResult.swift */,
+				C0A710070000000000000001 /* ComputerUseMenuBarSnapshot.swift */,
+				C0A710080000000000000001 /* ComputerUseMenuBarSnapshotStore.swift */,
+				C0A710020000000000000001 /* ComputerUseCuaState.swift */,
+				C0A710C50000000000000001 /* ComputerUseDaemonReadiness.swift */,
+				C0A710C40000000000000001 /* ComputerUseDaemonProfile.swift */,
+				C0A711200000000000000001 /* ComputerUseOnboardingStep.swift */,
+				C0A712400000000000000001 /* ComputerUseOnboardingHostingView.swift */,
+				C0A711300000000000000001 /* ComputerUsePermissionRowAction.swift */,
+				C0A710100000000000000001 /* ComputerUseOnboardingView.swift */,
+				C0A710110000000000000001 /* ComputerUseOnboardingWindowController.swift */,
+				C0A711210000000000000001 /* ComputerUseOnboardingWindowPlacement.swift */,
+				C0A712500000000000000001 /* ExternalApplicationWindowTracker.swift */,
 				C0A717030000000000000001 /* ExternalApplicationWindowDependencies.swift */,
 				C0A717020000000000000001 /* ExternalApplicationWindowEvent.swift */,
 				C0A717010000000000000001 /* ExternalApplicationWindowSnapshot.swift */,
@@ -9165,36 +9171,36 @@
 				C0A716930000000000000001 /* ContentView+CommandPalettePresentation.swift */,
 				C0A716920000000000000001 /* AppDelegate+ComputerUseOnboarding.swift */,
 				C0A716910000000000000001 /* ExternalWindowSamplingService.swift */,
-					C0A712510000000000000001 /* ExternalWindowCompanionPresenter.swift */,
-					C0A710190000000000000001 /* ComputerUseWindowDragRegion.swift */,
-					C0A710C20000000000000001 /* ComputerUseHelperLaunchConfiguration.swift */,
-					C0A713020000000000000001 /* ComputerUseLiveDriverSession.swift */,
-					C0A713030000000000000001 /* ComputerUseLiveSessionProjection.swift */,
-					C0A713000000000000000001 /* ComputerUsePermissionRequestOutcome.swift */,
-					C0A710C30000000000000001 /* ComputerUsePermissionStatus.swift */,
-					C0A710C10000000000000001 /* ComputerUseRuntimePaths.swift */,
-					D1F00A110000000000000001 /* ComputerUseRuntimePermissionPhase.swift */,
-					C0A710010000000000000001 /* ComputerUseRuntimeService.swift */,
-					C0A710030000000000000001 /* ComputerUseSessionScope.swift */,
-					D1F00A120000000000000001 /* ComputerUseSessionPresentationController.swift */,
-					C0A710050000000000000001 /* ComputerUseStateRepository.swift */,
-					C0A710A10000000000000001 /* AgentCursorPointerView.swift */,
-					C0A710A00000000000000001 /* ComputerUseCursorOverlayController.swift */,
-					C0A713010000000000000001 /* ComputerUseWatchTargetActivity.swift */,
-					D1F00A100000000000000001 /* ComputerUseWatchTargetController.swift */,
-					C0A710040000000000000001 /* ComputerUseStateScan.swift */,
-					C0A710160000000000000001 /* ComputerUseTargetIdentity.swift */,
-					C0A710130000000000000001 /* ComputerUseUXCoordinator.swift */,
-					C0A710140000000000000001 /* RestorableAgentSession+ComputerUse.swift */,
-					C0DE70510000000000000001 /* MenuBarProfilingLauncher.swift */,
-					C0DE70550000000000000001 /* MenuBarProfilingMenuItem.swift */,
-					C0DE70540000000000000001 /* MenuBarProfilingMenuItemTarget.swift */,
-					C0DE70560000000000000001 /* MenuBarProfilingProgressWindowController.swift */,
-					C0DE70570000000000000001 /* MenuBarProfilingProfilePreview.swift */,
-					C0DE705A0000000000000001 /* MenuBarProfilingProcessLogs.swift */,
-					C0DE70580000000000000001 /* MenuBarProfilingProgressWindowLayout.swift */,
-					C0DE70590000000000000001 /* MenuBarProfilingSubmissionActions.swift */,
-					2F0C07000000000000000001 /* CmuxMainWindow.swift */,
+				C0A712510000000000000001 /* ExternalWindowCompanionPresenter.swift */,
+				C0A710190000000000000001 /* ComputerUseWindowDragRegion.swift */,
+				C0A710C20000000000000001 /* ComputerUseHelperLaunchConfiguration.swift */,
+				C0A713020000000000000001 /* ComputerUseLiveDriverSession.swift */,
+				C0A713030000000000000001 /* ComputerUseLiveSessionProjection.swift */,
+				C0A713000000000000000001 /* ComputerUsePermissionRequestOutcome.swift */,
+				C0A710C30000000000000001 /* ComputerUsePermissionStatus.swift */,
+				C0A710C10000000000000001 /* ComputerUseRuntimePaths.swift */,
+				D1F00A110000000000000001 /* ComputerUseRuntimePermissionPhase.swift */,
+				C0A710010000000000000001 /* ComputerUseRuntimeService.swift */,
+				C0A710030000000000000001 /* ComputerUseSessionScope.swift */,
+				D1F00A120000000000000001 /* ComputerUseSessionPresentationController.swift */,
+				C0A710050000000000000001 /* ComputerUseStateRepository.swift */,
+				C0A710A10000000000000001 /* AgentCursorPointerView.swift */,
+				C0A710A00000000000000001 /* ComputerUseCursorOverlayController.swift */,
+				C0A713010000000000000001 /* ComputerUseWatchTargetActivity.swift */,
+				D1F00A100000000000000001 /* ComputerUseWatchTargetController.swift */,
+				C0A710040000000000000001 /* ComputerUseStateScan.swift */,
+				C0A710160000000000000001 /* ComputerUseTargetIdentity.swift */,
+				C0A710130000000000000001 /* ComputerUseUXCoordinator.swift */,
+				C0A710140000000000000001 /* RestorableAgentSession+ComputerUse.swift */,
+				C0DE70510000000000000001 /* MenuBarProfilingLauncher.swift */,
+				C0DE70550000000000000001 /* MenuBarProfilingMenuItem.swift */,
+				C0DE70540000000000000001 /* MenuBarProfilingMenuItemTarget.swift */,
+				C0DE70560000000000000001 /* MenuBarProfilingProgressWindowController.swift */,
+				C0DE70570000000000000001 /* MenuBarProfilingProfilePreview.swift */,
+				C0DE705A0000000000000001 /* MenuBarProfilingProcessLogs.swift */,
+				C0DE70580000000000000001 /* MenuBarProfilingProgressWindowLayout.swift */,
+				C0DE70590000000000000001 /* MenuBarProfilingSubmissionActions.swift */,
+				2F0C07000000000000000001 /* CmuxMainWindow.swift */,
 				AA5269A0C0DE0001FACE0001 /* ForeignFirstResponderPolicy.swift */,
 				A6D1F0200000000000000001 /* WindowCloseObserver.swift */,
 				A6D1F0300000000000000001 /* MainWindowVisibilityController+Lifecycle.swift */,
@@ -9784,19 +9790,19 @@
 				B35750000000000000000003 /* CmuxTopProcessArguments.swift */,
 				C7A508000000000000000001 /* CmuxTopSnapshotScopeCache.swift */,
 				C7A50D000000000000000001 /* CmuxTopProcessCPUTracker.swift */,
-					C7A50E000000000000000001 /* CmuxTopProcessDetails.swift */,
-					C7A502000000000000000001 /* TaskManagerWindowController.swift */,
-					5B11E5A100000000000000A2 /* SpinnerGalleryDebugWindowController.swift */,
-					A6AC72060000000000000002 /* SpinnerGalleryRootView.swift */,
-					A6AC72070000000000000002 /* SpinnerSpec.swift */,
-					A6AC72090000000000000002 /* SpinnerEnergy.swift */,
-					A6AC72050000000000000002 /* SpinnerCard.swift */,
-					A6AC72040000000000000002 /* OverlayComparison.swift */,
-					A6AC72030000000000000002 /* NativeSpinner.swift */,
-					C7B0000000000000000000A1 /* SleepyModeController.swift */,
-					CAFE00000000000000000001 /* CaffeineController.swift */,
-					CAFE00000000000000000003 /* TerminalController+Caffeine.swift */,
-					C12813000000000000000502 /* TerminalController+RemoteSessionParked.swift */,
+				C7A50E000000000000000001 /* CmuxTopProcessDetails.swift */,
+				C7A502000000000000000001 /* TaskManagerWindowController.swift */,
+				5B11E5A100000000000000A2 /* SpinnerGalleryDebugWindowController.swift */,
+				A6AC72060000000000000002 /* SpinnerGalleryRootView.swift */,
+				A6AC72070000000000000002 /* SpinnerSpec.swift */,
+				A6AC72090000000000000002 /* SpinnerEnergy.swift */,
+				A6AC72050000000000000002 /* SpinnerCard.swift */,
+				A6AC72040000000000000002 /* OverlayComparison.swift */,
+				A6AC72030000000000000002 /* NativeSpinner.swift */,
+				C7B0000000000000000000A1 /* SleepyModeController.swift */,
+				CAFE00000000000000000001 /* CaffeineController.swift */,
+				CAFE00000000000000000003 /* TerminalController+Caffeine.swift */,
+				C12813000000000000000502 /* TerminalController+RemoteSessionParked.swift */,
 				C7B000000000000000000101 /* SleepyPowerControls.swift */,
 				C7B0000000000000000000F1 /* SleepyAgentCensus.swift */,
 				C7B0000000000000000000B1 /* SleepyFaceView.swift */,
@@ -10138,11 +10144,11 @@
 				807316000000000000000001 /* FigmaFileList.swift */,
 				807316000000000000000101 /* FigmaNewFileLink.swift */,
 				807316000000000000000201 /* FigmaButtonMenuModel.swift */,
-				807317000000000000000301 /* FigmaDesignSkill.swift */, // cmux-rbf #cm-73.17
+				807317000000000000000301 /* FigmaDesignSkill.swift */,
 				807317000000000000000201 /* FigmaDesignHandOff.swift */,
 				807312000000000000000201 /* Workspace+FigmaBoardLayout.swift */,
-				807312000000000000000101 /* FigmaBoardLayoutBinding.swift */, // cmux-rbf #cm-73.12
-				807317000000000000000401 /* AgentPaneChoice.swift */, // cmux-rbf #cm-73.17
+				807312000000000000000101 /* FigmaBoardLayoutBinding.swift */,
+				807317000000000000000401 /* AgentPaneChoice.swift */,
 				807316200000000000000007 /* FigmaKindIcon.swift */,
 				807316000000000000000A01 /* SessionFigmaFileSnapshot.swift */,
 				807316000000000000000B01 /* Workspace+FigmaFileRecording.swift */,
@@ -10282,7 +10288,6 @@
 				A9E01000000000000000000C /* AgentSessionWebRendererSession.swift */,
 				A9E01000000000000000000D /* AgentSessionWebTheme.swift */,
 				A9E010000000000000000004 /* AgentSessionPanelView.swift */,
-
 				B0A501000000000000000002 /* BrowserOmnibarAppKitBridge.swift */,
 				B0A500000000000000000002 /* BrowserOmnibarPerformanceSupport.swift */,
 				B7380101B7380101B7380101 /* BrowserPortalOmnibarSuggestionsConfiguration.swift */,
@@ -10447,11 +10452,11 @@
 				883700000000000000000002 /* SurfaceResumeApprovalSigningSecretResolution.swift */,
 				F27B00000000000000000002 /* SurfaceResumeRunPromptBatch.swift */,
 				769F7D1FD3622B7D06998B0F /* SessionPersistence+Todos.swift */,
-		C54860090000000000000002 /* SessionRestoreIdentityExclusions.swift */,
-		A7477001000000000000000A /* SessionPersistencePolicy+ConfigFrames.swift */,
-		A5F100000000000000000010 /* SessionNotificationSnapshot.swift */,
+				C54860090000000000000002 /* SessionRestoreIdentityExclusions.swift */,
+				A7477001000000000000000A /* SessionPersistencePolicy+ConfigFrames.swift */,
+				A5F100000000000000000010 /* SessionNotificationSnapshot.swift */,
 				C65930020000000000000001 /* SessionPersistencePolicy+CrashStorage.swift */,
-					FCE03473FCBD453C7DA78A09 /* RemoteTmuxWindowMirror.swift */,
+				FCE03473FCBD453C7DA78A09 /* RemoteTmuxWindowMirror.swift */,
 				7738D0017738D0017738D001 /* RemoteTmuxControlPane.swift */,
 				7738D0067738D0067738D006 /* RemoteTmuxWindowMirror+ControlMutations.swift */,
 				7738D0027738D0027738D002 /* RemoteTmuxWindowMirror+ControlTopology.swift */,
@@ -10459,44 +10464,44 @@
 				7738D0077738D0077738D007 /* TerminalController+RemoteTmuxControlMutations.swift */,
 				7738D0047738D0047738D004 /* TerminalController+RemoteTmuxControlTopology.swift */,
 				7738D0087738D0087738D008 /* TerminalController+RemoteTmuxControlRefs.swift */,
-					740600000000000000000003 /* RemoteTmuxWindowMirror+Bonsplit.swift */,
-					740600000000000000000005 /* RemoteTmuxWindowMirror+BonsplitLayout.swift */,
-					793800000000000000000001 /* RemoteTmuxWindowMirror+SizingTransaction.swift */,
-					793800000000000000000003 /* RemoteTmuxSessionMirror+Sizing.swift */,
-					740600000000000000000014 /* RemoteTmuxWindowMirror+DividerSizing.swift */,
-					740600000000000000000016 /* RemoteTmuxWindowMirror+Configuration.swift */,
-					9007B0019007B0019007B001 /* RemoteTmuxWindowMirror+FocusNavigation.swift */,
-					74060000000000000000001A /* BonsplitConfiguration+RemoteTmuxEmbedded.swift */,
-					4AFCBA6217C0EB912342F0A5 /* RemoteTmuxWindowMirrorSizingSnapshot.swift */,
-					740600000000000000000007 /* RemoteTmuxWindowMirrorSplitView.swift */,
-					F2A6C8E40D5B17293C8F6A42 /* TerminalPanelCreationOutcome.swift */,
-					ECC3E71775CDB8C4B79BBABD /* TerminalSplitActionExecutor.swift */,
-					6D94A1102F724AFC8D1B0011 /* TerminalSplitActionSource.swift */,
-					6D94A1102F724AFC8D1B0012 /* TerminalSplitUnsupportedReason.swift */,
-					6D94A1102F724AFC8D1B0013 /* TerminalSplitActionResult.swift */,
-					D7D5CC45BBE157F3EF880936 /* RemoteTmuxSessionMirror.swift */,
-					7F023A000000000000007023 /* RemoteTmuxSessionMirror+Helpers.swift */,
-					7990B0057990B0057990B005 /* RemoteTmuxSessionMirror+OutputRouting.swift */,
-					7833D0037833D0037833D003 /* RemoteTmuxControlPaneLocation.swift */,
-					7833D0047833D0047833D004 /* RemoteTmuxControlPaneMutationOwner.swift */,
-					7833D0057833D0057833D005 /* RemoteTmuxControlKeySendResult.swift */,
-					9251A0019251A0019251A001 /* RemoteTmuxKeyName.swift */,
-					9251A0039251A0039251A003 /* RemoteTmuxPaneInputForwarder.swift */,
-					7833D0017833D0017833D001 /* RemoteTmuxSessionMirror+ControlTopology.swift */,
-					9251A0059251A0059251A005 /* RemoteTmuxSessionMirror+Input.swift */,
-					7833D0027833D0027833D002 /* RemoteTmuxSessionMirror+WindowReconciliation.swift */,
-					602197314BF2C4CC53565BBC /* RemoteTmuxControlConnection.swift */,
+				740600000000000000000003 /* RemoteTmuxWindowMirror+Bonsplit.swift */,
+				740600000000000000000005 /* RemoteTmuxWindowMirror+BonsplitLayout.swift */,
+				793800000000000000000001 /* RemoteTmuxWindowMirror+SizingTransaction.swift */,
+				793800000000000000000003 /* RemoteTmuxSessionMirror+Sizing.swift */,
+				740600000000000000000014 /* RemoteTmuxWindowMirror+DividerSizing.swift */,
+				740600000000000000000016 /* RemoteTmuxWindowMirror+Configuration.swift */,
+				9007B0019007B0019007B001 /* RemoteTmuxWindowMirror+FocusNavigation.swift */,
+				74060000000000000000001A /* BonsplitConfiguration+RemoteTmuxEmbedded.swift */,
+				4AFCBA6217C0EB912342F0A5 /* RemoteTmuxWindowMirrorSizingSnapshot.swift */,
+				740600000000000000000007 /* RemoteTmuxWindowMirrorSplitView.swift */,
+				F2A6C8E40D5B17293C8F6A42 /* TerminalPanelCreationOutcome.swift */,
+				ECC3E71775CDB8C4B79BBABD /* TerminalSplitActionExecutor.swift */,
+				6D94A1102F724AFC8D1B0011 /* TerminalSplitActionSource.swift */,
+				6D94A1102F724AFC8D1B0012 /* TerminalSplitUnsupportedReason.swift */,
+				6D94A1102F724AFC8D1B0013 /* TerminalSplitActionResult.swift */,
+				D7D5CC45BBE157F3EF880936 /* RemoteTmuxSessionMirror.swift */,
+				7F023A000000000000007023 /* RemoteTmuxSessionMirror+Helpers.swift */,
+				7990B0057990B0057990B005 /* RemoteTmuxSessionMirror+OutputRouting.swift */,
+				7833D0037833D0037833D003 /* RemoteTmuxControlPaneLocation.swift */,
+				7833D0047833D0047833D004 /* RemoteTmuxControlPaneMutationOwner.swift */,
+				7833D0057833D0057833D005 /* RemoteTmuxControlKeySendResult.swift */,
+				9251A0019251A0019251A001 /* RemoteTmuxKeyName.swift */,
+				9251A0039251A0039251A003 /* RemoteTmuxPaneInputForwarder.swift */,
+				7833D0017833D0017833D001 /* RemoteTmuxSessionMirror+ControlTopology.swift */,
+				9251A0059251A0059251A005 /* RemoteTmuxSessionMirror+Input.swift */,
+				7833D0027833D0027833D002 /* RemoteTmuxSessionMirror+WindowReconciliation.swift */,
+				602197314BF2C4CC53565BBC /* RemoteTmuxControlConnection.swift */,
 				919E2D0DAC80E2DAB13BD782 /* RemoteTmuxControlConnection+CommandResults.swift */,
 				D77330020000000000000001 /* RemoteTmuxControlConnection+Commands.swift */,
 				7990B0027990B0027990B002 /* RemoteTmuxControlConnection+PaneSeed.swift */,
 				7990B0037990B0037990B003 /* RemoteTmuxPaneSeed.swift */,
 				7990B0047990B0047990B004 /* RemoteTmuxPendingPaneSeed.swift */,
-					2781B9ABDA90796E4EEBACBA /* RemoteTmuxControlConnection+LayoutPublication.swift */,
-					737100000000000000000006 /* RemoteTmuxControlConnection+Observation.swift */,
-					BACF539E41CB537E0363E93D /* RemoteTmuxControlConnection+PaneSubscriptions.swift */,
-					05663199C0335662D0736AFA /* RemoteTmuxControlConnection+Sizing.swift */,
-					79380000000000000000000D /* RemoteTmuxControlConnection+Diagnostics.swift */,
-					79380000000000000000000F /* RemoteTmuxControlConnection+TestSupport.swift */,
+				2781B9ABDA90796E4EEBACBA /* RemoteTmuxControlConnection+LayoutPublication.swift */,
+				737100000000000000000006 /* RemoteTmuxControlConnection+Observation.swift */,
+				BACF539E41CB537E0363E93D /* RemoteTmuxControlConnection+PaneSubscriptions.swift */,
+				05663199C0335662D0736AFA /* RemoteTmuxControlConnection+Sizing.swift */,
+				79380000000000000000000D /* RemoteTmuxControlConnection+Diagnostics.swift */,
+				79380000000000000000000F /* RemoteTmuxControlConnection+TestSupport.swift */,
 				AAAD58EFBF501E599E6D9E9A /* RemoteTmuxControlCommandKind.swift */,
 				2587F4E278EFECB84E2ED34B /* RemoteTmuxControlConnectionSnapshot.swift */,
 				9420A497CBC16357FF3F2C9A /* RemoteTmuxControlPipeWriter.swift */,
@@ -10524,14 +10529,14 @@
 				8382D0018382D0018382D001 /* RemoteTmuxSplitFocusIntent.swift */,
 				CE24906539C19AB10E4C1C71 /* RemoteTmuxPostAttachAction.swift */,
 				59B80C0A6FC64A59BD274E1E /* RemoteTmuxProcessCancellation.swift */,
-					95B11974CF8937E165A3FAEE /* TerminalController+RemoteTmux.swift */,
-					1CCFC650BD590101D445C4A0 /* TerminalController+RemoteTmuxTestSupport.swift */,
-					793800000000000000000005 /* TerminalWindowPortal+DebugDiagnostics.swift */,
-					793800000000000000000007 /* GhosttyTerminalView+Sizing.swift */,
-					50FE16F529BD6FBA4FBDECFC /* RemoteTmuxController.swift */,
-					740600000000000000000001 /* RemoteTmuxController+Attach.swift */,
-					740600000000000000000010 /* RemoteTmuxAttachWindowTarget.swift */,
-					736200000000000000000001 /* RemoteTmuxController+Decisions.swift */,
+				95B11974CF8937E165A3FAEE /* TerminalController+RemoteTmux.swift */,
+				1CCFC650BD590101D445C4A0 /* TerminalController+RemoteTmuxTestSupport.swift */,
+				793800000000000000000005 /* TerminalWindowPortal+DebugDiagnostics.swift */,
+				793800000000000000000007 /* GhosttyTerminalView+Sizing.swift */,
+				50FE16F529BD6FBA4FBDECFC /* RemoteTmuxController.swift */,
+				740600000000000000000001 /* RemoteTmuxController+Attach.swift */,
+				740600000000000000000010 /* RemoteTmuxAttachWindowTarget.swift */,
+				736200000000000000000001 /* RemoteTmuxController+Decisions.swift */,
 				0E17C0DE0E17C0DE0E17C001 /* RemoteTmuxTransportRegistry.swift */,
 				0F17C0DE0F17C0DE0F17C001 /* RemoteTmuxWindowRegistry.swift */,
 				E8F5DB43CBC1B7DF31B7A0C9 /* RemoteTmuxSSHTransport.swift */,
@@ -10588,17 +10593,17 @@
 				C51A740000000000000000C2 /* Workspace+SimulatorSessionPersistence.swift */,
 				C0DEF0A10000000000000002 /* CmuxConfigUI.swift */,
 				E30750000000000000000003 /* CmuxWorkspaceDefinition.swift */,
-					A5001653 /* CmuxConfigExecutor.swift */,
-					A5FB120C /* CmuxConfigExecutor+WorkspaceLaunch.swift */,
-					A5FB120A /* CmuxConfigActionDefinition.swift */,
-					A5FB1202 /* CmuxConfigActionSaver.swift */,
-					A5FB1204 /* WorkspaceConfigActionCapture.swift */,
-					A5001655 /* CmuxActionTrust.swift */,
-					FE5996010000000000000001 /* FileExplorerCellView.swift */,
-					FE5996080000000000000001 /* FileExplorerExternalOpenMenuItems.swift */,
-					FE5996090000000000000001 /* FileExplorerExternalOpenRequest.swift */,
-					FE5996020000000000000001 /* FileExplorerHeaderView.swift */,
-					828800020000000000000001 /* FileExplorerPalette.swift */,
+				A5001653 /* CmuxConfigExecutor.swift */,
+				A5FB120C /* CmuxConfigExecutor+WorkspaceLaunch.swift */,
+				A5FB120A /* CmuxConfigActionDefinition.swift */,
+				A5FB1202 /* CmuxConfigActionSaver.swift */,
+				A5FB1204 /* WorkspaceConfigActionCapture.swift */,
+				A5001655 /* CmuxActionTrust.swift */,
+				FE5996010000000000000001 /* FileExplorerCellView.swift */,
+				FE5996080000000000000001 /* FileExplorerExternalOpenMenuItems.swift */,
+				FE5996090000000000000001 /* FileExplorerExternalOpenRequest.swift */,
+				FE5996020000000000000001 /* FileExplorerHeaderView.swift */,
+				828800020000000000000001 /* FileExplorerPalette.swift */,
 				FE001005 /* FileExplorerKeyboardShortcuts.swift */,
 				FE5996030000000000000001 /* FileExplorerNSOutlineView.swift */,
 				FE5996040000000000000001 /* FileExplorerRowView.swift */,
@@ -10774,6 +10779,8 @@
 				B2EFC94293EC97FE78539D9E /* NotificationTextSanitizer.swift */,
 				0581DFBCDBEE482A8D4CDB6C /* CloudVMLoadingPanelView.swift */,
 				9720CD7F02C94F41A07E193D /* CloudTerminalCreationCoordinator.swift */,
+				C10900000000000000000140 /* SidebarWorkspaceSlotResolution.swift */,
+				C10900000000000000000120 /* WorkspaceStatusIconDrawing.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -11082,27 +11089,27 @@
 				A11EAF000000000000000001 /* GhosttyNotificationDispatcherTests.swift */,
 				A59170000000000000000002 /* WindowAppearanceSnapshotPaneBackgroundTests.swift */,
 				F4200001A1B2C3D4E5F60718 /* WindowAppearanceSnapshotTests.swift */,
-					F4100001A1B2C3D4E5F60718 /* PortScannerTests.swift */,
-					B79500300000000000000002 /* PortScannerPublicationTests.swift */,
-					F11294000000000000000002 /* PortRetirementPublicationRegressionTests.swift */,
-					F83620010000000000000002 /* PortScannerTTYFreshnessTests.swift */,
-					B79500320000000000000002 /* PortScannerIdentityContinuityTests.swift */,
-					F6572003A1B2C3D4E5F60718 /* SessionPersistenceResumeBindingTests.swift */,
-					7989A0027989A0027989A002 /* RemoteResumeBindingTests.swift */,
+				F4100001A1B2C3D4E5F60718 /* PortScannerTests.swift */,
+				B79500300000000000000002 /* PortScannerPublicationTests.swift */,
+				F11294000000000000000002 /* PortRetirementPublicationRegressionTests.swift */,
+				F83620010000000000000002 /* PortScannerTTYFreshnessTests.swift */,
+				B79500320000000000000002 /* PortScannerIdentityContinuityTests.swift */,
+				F6572003A1B2C3D4E5F60718 /* SessionPersistenceResumeBindingTests.swift */,
+				7989A0027989A0027989A002 /* RemoteResumeBindingTests.swift */,
 				812600000000000000000004 /* SessionRemoteWorkspaceMoshRestoreTests.swift */,
-					F6572013A1B2C3D4E5F60718 /* SurfaceResumeBindingCodexUpdateCheckTests.swift */,
-					F6572023A1B2C3D4E5F60718 /* SurfaceResumeRestoreClaimTests.swift */,
-					F6572033A1B2C3D4E5F60718 /* SurfaceResumeAgentHookDowngradeTests.swift */,
-					F6572043A1B2C3D4E5F60718 /* RestoredAgentShellActivityLivenessTests.swift */,
-					F5000001A1B2C3D4E5F60718 /* SessionPersistenceTests.swift */,
-					851500000000000000000002 /* TerminalFontZoomSessionPersistenceTests.swift */,
+				F6572013A1B2C3D4E5F60718 /* SurfaceResumeBindingCodexUpdateCheckTests.swift */,
+				F6572023A1B2C3D4E5F60718 /* SurfaceResumeRestoreClaimTests.swift */,
+				F6572033A1B2C3D4E5F60718 /* SurfaceResumeAgentHookDowngradeTests.swift */,
+				F6572043A1B2C3D4E5F60718 /* RestoredAgentShellActivityLivenessTests.swift */,
+				F5000001A1B2C3D4E5F60718 /* SessionPersistenceTests.swift */,
+				851500000000000000000002 /* TerminalFontZoomSessionPersistenceTests.swift */,
 				A10557080000000000000002 /* TerminalConfigurationPresentationMetricsTests.swift */,
-					806600000000000000000001 /* SessionRestorableAgentSnapshotPermissionModeTests.swift */,
-					F17F00000000000000000002 /* FullWidthTabPersistenceTests.swift */,
-					FD21AD844E5D4D50A6DFC442 /* AppDelegateWindowFrameReconcileTests.swift */,
-					895500000000000000000002 /* AppDelegateFullScreenFrameRestoreTests.swift */,
-					A1B2C3D4E5F600000000CF02 /* AppDelegateDisplayConfigRestoreTests.swift */,
-					793800000000000000000009 /* AppDelegateOversizedFrameRestoreTests.swift */,
+				806600000000000000000001 /* SessionRestorableAgentSnapshotPermissionModeTests.swift */,
+				F17F00000000000000000002 /* FullWidthTabPersistenceTests.swift */,
+				FD21AD844E5D4D50A6DFC442 /* AppDelegateWindowFrameReconcileTests.swift */,
+				895500000000000000000002 /* AppDelegateFullScreenFrameRestoreTests.swift */,
+				A1B2C3D4E5F600000000CF02 /* AppDelegateDisplayConfigRestoreTests.swift */,
+				793800000000000000000009 /* AppDelegateOversizedFrameRestoreTests.swift */,
 				9758A0000000000000000001 /* AmpVaultRegistrationTests.swift */,
 				B35750000000000000000009 /* PiVaultAgentPersistenceTests.swift */,
 				937700010000000000000001 /* GrokVaultAgentPersistenceTests.swift */,
@@ -11198,7 +11205,6 @@
 				5C0C4A1E0000000000000006 /* RCChannelSuiteTests.swift */,
 				7A0CE1000000000000000105 /* CloudTunnelBackendSelectorTests.swift */,
 				7A0CE1000000000000000103 /* CloudTunnelCoordinatorTests.swift */,
-
 				D01100800000000000000007 /* CmuxTuiSurfaceProviderRegistryDiscoveryTests.swift */,
 				7A1D4C000000000000000103 /* CloudTunnelLaunchGateTests.swift */,
 				7A1D4C000000000000000101 /* CloudActivationPolicyTests.swift */,
@@ -11335,20 +11341,20 @@
 				58C7B1B978620BE162CC057E /* BrowserPanelTests.swift */,
 				905200000000000000000002 /* BrowserUserAgentPolicyWebKitTests.swift */,
 				C42660040000000000000002 /* BrowserPDFPreviewActionRegressionTests.swift */,
-					C42660050000000000000002 /* BrowserPDFPreviewActionUnitTests.swift */,
-					C0DE78950000000000000002 /* BrowserPortalFirstRevealScrollTests.swift */,
-					C0DE62600000000000000002 /* BrowserWindowPortalRegistryNotificationTests.swift */,
-					19D536229C6194FD62B44503 /* BrowserHistorySuggestionCacheTests.swift */,
-					48D6AE11906A4DF3BEB8CDFE /* OmnibarSubmitDecisionTests.swift */,
-					D0B1000DA1B2C3D4E5F60001 /* CmuxWebViewDragRoutingTests.swift */,
-					D7632004A1B2C3D4E5F60718 /* BrowserPaneFileDropUploadRegressionTests.swift */,
-					D0B1000FA1B2C3D4E5F60001 /* BrowserPaneDropRoutingTests.swift */,
-					469200014692000146920002 /* VaultPaneDropRoutingTests.swift */,
-					469200064692000146920002 /* VaultPaneDropTestSupport.swift */,
-					469200044692000146920002 /* VaultPaneTransferLifecycleTests.swift */,
-					06880917B87678F2857EC8FB /* FileExplorerOpenedTabDragSourceTests.swift */,
-					469200054692000146920002 /* VaultNativeDragSourceTests.swift */,
-					D3052001000000000000002 /* TerminalSurfaceResizePolicyTests.swift */,
+				C42660050000000000000002 /* BrowserPDFPreviewActionUnitTests.swift */,
+				C0DE78950000000000000002 /* BrowserPortalFirstRevealScrollTests.swift */,
+				C0DE62600000000000000002 /* BrowserWindowPortalRegistryNotificationTests.swift */,
+				19D536229C6194FD62B44503 /* BrowserHistorySuggestionCacheTests.swift */,
+				48D6AE11906A4DF3BEB8CDFE /* OmnibarSubmitDecisionTests.swift */,
+				D0B1000DA1B2C3D4E5F60001 /* CmuxWebViewDragRoutingTests.swift */,
+				D7632004A1B2C3D4E5F60718 /* BrowserPaneFileDropUploadRegressionTests.swift */,
+				D0B1000FA1B2C3D4E5F60001 /* BrowserPaneDropRoutingTests.swift */,
+				469200014692000146920002 /* VaultPaneDropRoutingTests.swift */,
+				469200064692000146920002 /* VaultPaneDropTestSupport.swift */,
+				469200044692000146920002 /* VaultPaneTransferLifecycleTests.swift */,
+				06880917B87678F2857EC8FB /* FileExplorerOpenedTabDragSourceTests.swift */,
+				469200054692000146920002 /* VaultNativeDragSourceTests.swift */,
+				D3052001000000000000002 /* TerminalSurfaceResizePolicyTests.swift */,
 				EC010C02 /* TerminalUploadCommandTests.swift */,
 				02FC74F2C27127CC565B3E8C /* TerminalAndGhosttyTests.swift */,
 				B88350000000000000000002 /* TerminalImageTransferConcurrencyTests.swift */,
@@ -11507,10 +11513,10 @@
 				807316000000000000000301 /* FigmaFileListTests.swift */,
 				807316000000000000000401 /* FigmaNewFileLinkTests.swift */,
 				807316000000000000000501 /* FigmaButtonMenuModelTests.swift */,
-				807317000000000000000601 /* FigmaDesignSkillTests.swift */, // cmux-rbf #cm-73.17
-				807312000000000000000901 /* FigmaBoardLayoutWorkspaceTests.swift */, // cmux-rbf #cm-73.12
-				807317000000000000000501 /* FigmaDesignHandOffTests.swift */, // cmux-rbf #cm-73.17
-				807317000000000000000701 /* AgentPaneChoiceTests.swift */, // cmux-rbf #cm-73.17
+				807317000000000000000601 /* FigmaDesignSkillTests.swift */,
+				807312000000000000000901 /* FigmaBoardLayoutWorkspaceTests.swift */,
+				807317000000000000000501 /* FigmaDesignHandOffTests.swift */,
+				807317000000000000000701 /* AgentPaneChoiceTests.swift */,
 				807316000000000000000C01 /* FigmaFileRecordingWorkspaceTests.swift */,
 				807316000000000000000D01 /* FigmaFileListPersistenceTests.swift */,
 				807316000000000000001501 /* FigmaFileSubscriptionWorkspaceTests.swift */,
@@ -11534,14 +11540,14 @@
 				112950000000000000000011 /* CMUXCLIForkLegacyFallbackTests.swift */,
 				C0DE64950000000000000006 /* CMUXCLISessionsListTests.swift */,
 				C0DE6495000000000000000A /* CMUXCLISessionsListForkDiagnosticsTests.swift */,
-					C0DE64970000000000000002 /* CMUXCLISessionsListOpenCodeTrustTests.swift */,
-					C0DE64970000000000000004 /* CMUXCLISessionsListProcessArgumentTests.swift */,
-					C0DE6495000000000000000C /* CMUXCLISessionsListTranscriptPidTests.swift */,
-					C0DE64950000000000000004 /* CMUXCLITestAssertions.swift */,
-					C12985000000000000000003 /* CMUXCLISentryTelemetryRegressionTests.swift */,
-					827300000000000000000003 /* KimiHookConfigLocationTests.swift */,
-					858200000000000000000001 /* KimiRestorableAgentTests.swift */,
-					8582A1000000000000000001 /* KimiResumeReviewRegressionTests.swift */,
+				C0DE64970000000000000002 /* CMUXCLISessionsListOpenCodeTrustTests.swift */,
+				C0DE64970000000000000004 /* CMUXCLISessionsListProcessArgumentTests.swift */,
+				C0DE6495000000000000000C /* CMUXCLISessionsListTranscriptPidTests.swift */,
+				C0DE64950000000000000004 /* CMUXCLITestAssertions.swift */,
+				C12985000000000000000003 /* CMUXCLISentryTelemetryRegressionTests.swift */,
+				827300000000000000000003 /* KimiHookConfigLocationTests.swift */,
+				858200000000000000000001 /* KimiRestorableAgentTests.swift */,
+				8582A1000000000000000001 /* KimiResumeReviewRegressionTests.swift */,
 				C47110010000000000000002 /* ProcessPipeReadCrashRegressionTests.swift */,
 				F50030040000000000000002 /* TitlebarInteractiveControlTests.swift */,
 				9212B0069212B0069212B006 /* SidebarEmptyAreaWindowDragTests.swift */,
@@ -11602,17 +11608,17 @@
 				F2EE0C080FF0FCCE8A8CA930 /* LastSurfaceClosePreferenceTests.swift */,
 				17C9F5BA0DD14EDC8C3E5002 /* MainWindowVisibilityControllerTests.swift */,
 				A6D1F0100000000000000001 /* MainWindowVisibilityLifecycleTests.swift */,
-					A6D1F0400000000000000001 /* ReleasingWindowControllerTests.swift */,
-					CAFE00000000000000000005 /* CaffeineControllerTests.swift */,
-					A7206E020000000000000001 /* AppIconAppearanceObserverTests.swift */,
-					A11EAA000000000000000001 /* AppearanceSettingsTests.swift */,
-					A7206B020000000000000001 /* SystemAppearanceObserverTests.swift */,
-					6313FACE0000000000000001 /* PaneMemoryGuardrailTests.swift */,
-					7490A0027490A0027490A002 /* MemoryPressureMonitorTests.swift */,
+				A6D1F0400000000000000001 /* ReleasingWindowControllerTests.swift */,
+				CAFE00000000000000000005 /* CaffeineControllerTests.swift */,
+				A7206E020000000000000001 /* AppIconAppearanceObserverTests.swift */,
+				A11EAA000000000000000001 /* AppearanceSettingsTests.swift */,
+				A7206B020000000000000001 /* SystemAppearanceObserverTests.swift */,
+				6313FACE0000000000000001 /* PaneMemoryGuardrailTests.swift */,
+				7490A0027490A0027490A002 /* MemoryPressureMonitorTests.swift */,
 				B11371000000000000000012 /* OwnedAgentDescendantLifecycleTests.swift */,
 				B11371000000000000000002 /* AggregateMemoryRetentionTests.swift */,
-					126510000000000000000002 /* MemoryPressureNotificationTests.swift */,
-					C0DE10510000000000000002 /* MobileHostServiceSettingsTests.swift */,
+				126510000000000000000002 /* MemoryPressureNotificationTests.swift */,
+				C0DE10510000000000000002 /* MobileHostServiceSettingsTests.swift */,
 				46438523E2764A18B697CC4B /* ManagedPolicySettingsImportTests.swift */,
 				F0128D58A0B34955A144D263 /* ManagedPolicyRemoteControlTests.swift */,
 				224F615BB3A34C66A999EACF /* ManagedPolicyBrowserGateTests.swift */,
@@ -11687,11 +11693,11 @@
 				86544CEFA1CA33CA9225FB6E /* MobileWorkspaceListFidelityTests.swift */,
 				1055FA010000000000000002 /* MobileSurfaceKindMappingTests.swift */,
 				645645000000000000000001 /* NumberedShortcutSwapTests.swift */,
-					B09C007F42697761B5F1A2AB /* OmnibarAndToolsTests.swift */,
-					D2C075029771815DD5DA1332 /* NotificationAndMenuBarTests.swift */,
-					C0DE70520000000000000001 /* MenuBarProfilingLauncherTests.swift */,
-					596100000000000000000002 /* NativeNotificationFallbackCommandTests.swift */,
-					C0DEFEE50000000000000002 /* NotificationFeedHistoryTests.swift */,
+				B09C007F42697761B5F1A2AB /* OmnibarAndToolsTests.swift */,
+				D2C075029771815DD5DA1332 /* NotificationAndMenuBarTests.swift */,
+				C0DE70520000000000000001 /* MenuBarProfilingLauncherTests.swift */,
+				596100000000000000000002 /* NativeNotificationFallbackCommandTests.swift */,
+				C0DEFEE50000000000000002 /* NotificationFeedHistoryTests.swift */,
 				596100000000000000000006 /* TerminalNotificationStore+NativeNotificationDeliveryTesting.swift */,
 				D7AB00000000000000B020 /* NotificationDismissSyncTests.swift */,
 				4E5F60720000000000000002 /* NotificationSoundSettingsTests.swift */,
@@ -11782,18 +11788,18 @@
 				5F5553CB5553CB5553CB0002 /* RightSidebarRemoteCommandTests.swift */,
 				5FAC71D5AC71D5AC71D50002 /* AgentChatChildRunTests.swift */,
 				3F704ED4F177122D7DCD0BCC /* RemoteTmuxSessionListParserTests.swift */,
-					0A17C0DE0A17C0DE0A17CA01 /* RemoteTmuxVersionTests.swift */,
-					3F704ED4F177122D7DCD0B01 /* RemoteTmuxSessionRenameTitleTests.swift */,
-					B3FAA194471B7BA157FB4660 /* AppHostWindowReleaseGuardTests.swift */,
-					EA9B442F20273D64D2BA1FC5 /* CmuxTestWindowReleaseGuard.m */,
-					736200000000000000000005 /* RemoteTmuxMirrorLifecycleTests.swift */,
-					0DBAA681DEE6F9121D289ABE /* RemoteTmuxMirrorCloseDetachTests.swift */,
-					736200000000000000000007 /* RemoteTmuxMirrorTargetingTests.swift */,
-					838000000000000000000001 /* RemoteTmuxMirrorRenameTests.swift */,
-					838000000000000000000003 /* RemoteTmuxMirrorRenameHarness.swift */,
-					31FFFE3EFCDCCD6BDF405370 /* RemoteTmuxSessionSnapshotTests.swift */,
-					B8E2A4C1D5F3096871A2B3C4 /* RemoteTmuxNativeMirrorLayoutFuzzTests.swift */,
-					B8E2A4C1D5F3096871A2B4A2 /* RemoteTmuxBonsplitImpositionRenderTests.swift */,
+				0A17C0DE0A17C0DE0A17CA01 /* RemoteTmuxVersionTests.swift */,
+				3F704ED4F177122D7DCD0B01 /* RemoteTmuxSessionRenameTitleTests.swift */,
+				B3FAA194471B7BA157FB4660 /* AppHostWindowReleaseGuardTests.swift */,
+				EA9B442F20273D64D2BA1FC5 /* CmuxTestWindowReleaseGuard.m */,
+				736200000000000000000005 /* RemoteTmuxMirrorLifecycleTests.swift */,
+				0DBAA681DEE6F9121D289ABE /* RemoteTmuxMirrorCloseDetachTests.swift */,
+				736200000000000000000007 /* RemoteTmuxMirrorTargetingTests.swift */,
+				838000000000000000000001 /* RemoteTmuxMirrorRenameTests.swift */,
+				838000000000000000000003 /* RemoteTmuxMirrorRenameHarness.swift */,
+				31FFFE3EFCDCCD6BDF405370 /* RemoteTmuxSessionSnapshotTests.swift */,
+				B8E2A4C1D5F3096871A2B3C4 /* RemoteTmuxNativeMirrorLayoutFuzzTests.swift */,
+				B8E2A4C1D5F3096871A2B4A2 /* RemoteTmuxBonsplitImpositionRenderTests.swift */,
 				08850489C70ECFACA540C2F3 /* WorkspaceTerminalWorkingDirectoryFallbackTests.swift */,
 				9D3084DF49224DFF2DF4C376 /* WorkspaceCreationWorkingDirectorySpawnPolicyTests.swift */,
 				B561A95C6DC21BA9C4B2BCDD /* WorkspaceEnvironmentTests.swift */,
@@ -11845,7 +11851,6 @@
 				A0560002A0560002A0560002 /* SidebarWorkspaceColorSectionTests.swift */,
 				C9A57306C9A57306C9A57306 /* SidebarWorkspaceReorderDropOverlayHitTestingTests.swift */,
 				51D800000000000000000002 /* SidebarIdentifierFormattingTests.swift */,
-
 				C7A507000000000000000001 /* TaskManagerResourcesTests.swift */,
 				C7A507000000000000004530 /* TaskManagerViewSnapshotBoundaryTests.swift */,
 				C7A507000000000000005795 /* NotificationRowSnapshotBoundaryTests.swift */,
@@ -12079,6 +12084,8 @@
 				9A1261600000000000000003 /* CloudDesktopAccessTests.swift */,
 				A6D3896BB28B4549B3D33A83 /* CloudPortAccessLateCoordinatorTests.swift */,
 				C51600000000000000000002 /* CLIExecInheritedSignalStateTests.swift */,
+				C10900000000000000000110 /* WorkspaceStatusProblemWordsTests.swift */,
+				C10900000000000000000130 /* WorkspaceStatusIconDrawingTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -12778,10 +12785,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-
-
-
-
 				A11CE0040000000000000001 /* AboutLicenseContent.swift in Sources */,
 				A5C017000000000000000001 /* AccountSignInFlow.swift in Sources */,
 				A5C017000000000000000003 /* AccountSignInModel.swift in Sources */,
@@ -12790,19 +12793,19 @@
 				A5C017000000000000000007 /* AccountSignInView.swift in Sources */,
 				C7AF10000000000000000005 /* AgentChatArtifactGalleryBuilder.swift in Sources */,
 				C7AF10000000000000000001 /* AgentChatArtifactIndex.swift in Sources */,
-					C7A52E000000000000000002 /* AgentChatEndedTranscriptListabilityCache.swift in Sources */,
+				C7A52E000000000000000002 /* AgentChatEndedTranscriptListabilityCache.swift in Sources */,
 				C7A53F000000000000000002 /* AgentChatFallbackTranscriptResolutionCoordinator.swift in Sources */,
 				ACA7C4A70000000000000003 /* AgentChatHookSessionStore.swift in Sources */,
 				C7A531000000000000000002 /* AgentChatObservationHandle.swift in Sources */,
 				C7A532000000000000000002 /* AgentChatObservationInFlight.swift in Sources */,
 				C7A530000000000000000002 /* AgentChatObservationScope.swift in Sources */,
-					ACA7C4A70000000000000001 /* AgentChatSessionRecord.swift in Sources */,
-					C7A52D100000000000000012 /* AgentChatSessionRegistry+ChildRuns.swift in Sources */,
-					C8711A000000000000000002 /* AgentChatSessionRegistry+CodexRolloutFiles.swift in Sources */,
-					C7A52D100000000000000002 /* AgentChatSessionRegistry+Lifecycle.swift in Sources */,
-					C7A52D200000000000000002 /* AgentChatSessionRegistry+LiveAgentPID.swift in Sources */,
-					C7A52D000000000000000002 /* AgentChatSessionRegistry+ObserveScan.swift in Sources */,
-					ACA7C4A70000000000000007 /* AgentChatSessionRegistry.swift in Sources */,
+				ACA7C4A70000000000000001 /* AgentChatSessionRecord.swift in Sources */,
+				C7A52D100000000000000012 /* AgentChatSessionRegistry+ChildRuns.swift in Sources */,
+				C8711A000000000000000002 /* AgentChatSessionRegistry+CodexRolloutFiles.swift in Sources */,
+				C7A52D100000000000000002 /* AgentChatSessionRegistry+Lifecycle.swift in Sources */,
+				C7A52D200000000000000002 /* AgentChatSessionRegistry+LiveAgentPID.swift in Sources */,
+				C7A52D000000000000000002 /* AgentChatSessionRegistry+ObserveScan.swift in Sources */,
+				ACA7C4A70000000000000007 /* AgentChatSessionRegistry.swift in Sources */,
 				C0DE71A00000000000000001 /* AgentChatThemeSync.swift in Sources */,
 				ACA7C4A70000000000000005 /* AgentChatTranscriptResolver.swift in Sources */,
 				992300019923000199230008 /* AgentChatTranscriptResumeIntentRecorder.swift in Sources */,
@@ -12810,7 +12813,7 @@
 				C7A52F000000000000000002 /* AgentChatTranscriptService+Wire.swift in Sources */,
 				ACA7C4A7000000000000000B /* AgentChatTranscriptService.swift in Sources */,
 				ACA7C4A70000000000000009 /* AgentChatTranscriptTailer.swift in Sources */,
-					C0A710A10000000000000002 /* AgentCursorPointerView.swift in Sources */,
+				C0A710A10000000000000002 /* AgentCursorPointerView.swift in Sources */,
 				79390005AA11BB22CC33DD05 /* AgentDeliveryTargetResolution.swift in Sources */,
 				A9F200000000000000000001 /* AgentExecutableResolver.swift in Sources */,
 				A9F200000000000000000002 /* AgentExecutableResolverError.swift in Sources */,
@@ -12875,7 +12878,7 @@
 				E506942F7E8A3C80F94EA4EB /* AgentNotificationAdmissionWaiters.swift in Sources */,
 				0A1107110000000000000010 /* AgentNotificationDelivery.swift in Sources */,
 				A5D41234A1B2C3D4E5F60718 /* AgentNotificationGate.swift in Sources */,
-				807317000000000000000402 /* AgentPaneChoice.swift in Sources */, // cmux-rbf #cm-73.17
+				807317000000000000000402 /* AgentPaneChoice.swift in Sources */,
 				C3744E030000000000000001 /* AgentPIDProcessIdentity.swift in Sources */,
 				B79500130000000000000001 /* AgentPortPublicationHistory.swift in Sources */,
 				B79500120000000000000001 /* AgentPortRootIdentity.swift in Sources */,
@@ -12984,7 +12987,7 @@
 				A5001A02A1B2C3D4E5F60718 /* AppWindowBackdropControllerDependencies.swift in Sources */,
 				A5001A00A1B2C3D4E5F60718 /* AppWindowChromeComposition.swift in Sources */,
 				961300000000000000000003 /* AttributedString+SidebarRowLinks.swift in Sources */,
-					D9FEC58D5BACCF76459F1BBE /* AuthEnvironment.swift in Sources */,
+				D9FEC58D5BACCF76459F1BBE /* AuthEnvironment.swift in Sources */,
 				A10649160000000000000001 /* AutomationActionExecutionResult.swift in Sources */,
 				A10649250000000000000001 /* AutomationConfigMutationCoordinator.swift in Sources */,
 				A10649050000000000000001 /* AutomationConfigStore.swift in Sources */,
@@ -12998,10 +13001,10 @@
 				A10649020000000000000001 /* AutomationRule.swift in Sources */,
 				A10649310000000000000001 /* AutomationWebhookPolicy.swift in Sources */,
 				A10649370000000000000001 /* AutomationWebhookRedirectDelegate.swift in Sources */,
-					C0DE35860000000000000001 /* BackgroundWorkspacePrimeCoordinator.swift in Sources */,
-					A50012F1 /* Backport.swift in Sources */,
+				C0DE35860000000000000001 /* BackgroundWorkspacePrimeCoordinator.swift in Sources */,
+				A50012F1 /* Backport.swift in Sources */,
 				74060000000000000000001B /* BonsplitConfiguration+RemoteTmuxEmbedded.swift in Sources */,
-					D0B10010A1B2C3D4E5F60001 /* BonsplitTabBarDebug.swift in Sources */,
+				D0B10010A1B2C3D4E5F60001 /* BonsplitTabBarDebug.swift in Sources */,
 				D0B10002A1B2C3D4E5F60001 /* BonsplitTabBarPassThrough.swift in Sources */,
 				986900080000000000000001 /* BrowserAction.swift in Sources */,
 				986900020000000000000001 /* BrowserActionDispatcher.swift in Sources */,
@@ -13238,7 +13241,8 @@
 				5EDE6BFD28BE4BD58EF84889 /* CloudFeatureAvailabilityObserver.swift in Sources */,
 				00034889FEF18E9AE0AFDEEC /* CloudFileDelivery.swift in Sources */,
 				D0110080000000000000000A /* CloudHubConnection.swift in Sources */,
-				E58AA0A516704DF28E795531 /* CloudHubConnector.swift in Sources */,				7A0CE100000000000000070E /* CloudHubDialing.swift in Sources */,
+				E58AA0A516704DF28E795531 /* CloudHubConnector.swift in Sources */,
+				7A0CE100000000000000070E /* CloudHubDialing.swift in Sources */,
 				7A0CE100000000000000071A /* CloudHubPortForwarder.swift in Sources */,
 				7A0CE100000000000000070C /* CloudHubSocketClaim.swift in Sources */,
 				124760000000000000000005 /* CloudImagePasteError.swift in Sources */,
@@ -13529,9 +13533,9 @@
 				175CFE773740410786E08A2B /* CmuxTuiSurfaceProviderRegistry+Production.swift in Sources */,
 				A1B2C3D4E5F6071827364961 /* CmuxTuiSurfaceProviderRegistry.swift in Sources */,
 				036359ABDB1F58B489D378A4 /* CmuxTuiSurfaceProviders.swift in Sources */,
-					9520A0029520A0029520A002 /* CmuxVaultAgentRegistration+Hermes.swift in Sources */,
+				9520A0029520A0029520A002 /* CmuxVaultAgentRegistration+Hermes.swift in Sources */,
 				858200000000000000000006 /* CmuxVaultAgentRegistration+RegisteredResumeKind.swift in Sources */,
-					9520A0059520A0059520A005 /* CmuxVaultAgentRegistry+ProcessMatching.swift in Sources */,
+				9520A0059520A0059520A005 /* CmuxVaultAgentRegistry+ProcessMatching.swift in Sources */,
 				9758D0139758D0139758D013 /* CmuxVaultHookSessionStore.swift in Sources */,
 				D7C0DE00000000000000A101 /* CmuxWebView+ContextMenuLinkCapture.swift in Sources */,
 				D7AB00000000000000000009 /* CmuxWebView+MoveTabToNewWorkspace.swift in Sources */,
@@ -13547,8 +13551,8 @@
 				C0DE60C0000000000000A012 /* CoderouterSocketCommands.swift in Sources */,
 				A9F200000000000000000016 /* CodexAppServerQueuedInput.swift in Sources */,
 				A9E02000000000000000000E /* CodexAppServerSession.swift in Sources */,
-					C8711C000000000000000002 /* CodexRolloutIdentity.swift in Sources */,
-					C8711D000000000000000002 /* CodexRolloutIdentityResolver.swift in Sources */,
+				C8711C000000000000000002 /* CodexRolloutIdentity.swift in Sources */,
+				C8711D000000000000000002 /* CodexRolloutIdentityResolver.swift in Sources */,
 				A10240030000000000000001 /* CodexTeamsAppServerProcess.swift in Sources */,
 				A10240100000000000000001 /* CodexTeamsPOSIXSupport.swift in Sources */,
 				C4041001000000000000001B /* CommandClickFileOpenRouter.swift in Sources */,
@@ -13557,43 +13561,43 @@
 				C0DE86060000000000000003 /* CommandPaletteRestoreFocusTarget.swift in Sources */,
 				C0DEF4110000000000000001 /* CommandPaletteSettingsToggle.swift in Sources */,
 				C1713002C1713002C1713002 /* CommandPaletteShortcutRouting.swift in Sources */,
-					C0A7101A0000000000000002 /* ComputerUseAppDragSource.swift in Sources */,
-					C0A7101B0000000000000002 /* ComputerUseAppDragSourceView.swift in Sources */,
-					C0A710020000000000000002 /* ComputerUseCuaState.swift in Sources */,
-					C0A710A00000000000000002 /* ComputerUseCursorOverlayController.swift in Sources */,
-					C0A710C40000000000000002 /* ComputerUseDaemonProfile.swift in Sources */,
-					C0A710C50000000000000002 /* ComputerUseDaemonReadiness.swift in Sources */,
-					C0A710C20000000000000002 /* ComputerUseHelperLaunchConfiguration.swift in Sources */,
-					C0A713020000000000000002 /* ComputerUseLiveDriverSession.swift in Sources */,
-					C0A713030000000000000002 /* ComputerUseLiveSessionProjection.swift in Sources */,
-					C0A710FF0000000000000002 /* ComputerUseLiveSettingRepository.swift in Sources */,
-					C0A710090000000000000002 /* ComputerUseMenuBarController.swift in Sources */,
-					C0A710180000000000000002 /* ComputerUseMenuBarRefreshPolicy.swift in Sources */,
-					C0A710060000000000000002 /* ComputerUseMenuBarRow.swift in Sources */,
-					C0A710170000000000000002 /* ComputerUseMenuBarScanResult.swift in Sources */,
-					C0A710070000000000000002 /* ComputerUseMenuBarSnapshot.swift in Sources */,
-					C0A710080000000000000002 /* ComputerUseMenuBarSnapshotStore.swift in Sources */,
-					D11965050000000000000002 /* ComputerUseOnboardingCoordinator.swift in Sources */,
-					C0A712400000000000000002 /* ComputerUseOnboardingHostingView.swift in Sources */,
-					C0A711200000000000000002 /* ComputerUseOnboardingStep.swift in Sources */,
-					C0A710100000000000000002 /* ComputerUseOnboardingView.swift in Sources */,
-					C0A710110000000000000002 /* ComputerUseOnboardingWindowController.swift in Sources */,
-					C0A711210000000000000002 /* ComputerUseOnboardingWindowPlacement.swift in Sources */,
-					C0A713000000000000000002 /* ComputerUsePermissionRequestOutcome.swift in Sources */,
-					C0A711300000000000000002 /* ComputerUsePermissionRowAction.swift in Sources */,
-					C0A710C30000000000000002 /* ComputerUsePermissionStatus.swift in Sources */,
-					C0A710C10000000000000002 /* ComputerUseRuntimePaths.swift in Sources */,
-					D1F00A110000000000000002 /* ComputerUseRuntimePermissionPhase.swift in Sources */,
-					C0A710010000000000000002 /* ComputerUseRuntimeService.swift in Sources */,
-					D1F00A120000000000000002 /* ComputerUseSessionPresentationController.swift in Sources */,
-					C0A710030000000000000002 /* ComputerUseSessionScope.swift in Sources */,
-					C0A710050000000000000002 /* ComputerUseStateRepository.swift in Sources */,
-					C0A710040000000000000002 /* ComputerUseStateScan.swift in Sources */,
-					C0A710160000000000000002 /* ComputerUseTargetIdentity.swift in Sources */,
-					C0A710130000000000000002 /* ComputerUseUXCoordinator.swift in Sources */,
-					C0A713010000000000000002 /* ComputerUseWatchTargetActivity.swift in Sources */,
-					D1F00A100000000000000002 /* ComputerUseWatchTargetController.swift in Sources */,
-					C0A710190000000000000002 /* ComputerUseWindowDragRegion.swift in Sources */,
+				C0A7101A0000000000000002 /* ComputerUseAppDragSource.swift in Sources */,
+				C0A7101B0000000000000002 /* ComputerUseAppDragSourceView.swift in Sources */,
+				C0A710020000000000000002 /* ComputerUseCuaState.swift in Sources */,
+				C0A710A00000000000000002 /* ComputerUseCursorOverlayController.swift in Sources */,
+				C0A710C40000000000000002 /* ComputerUseDaemonProfile.swift in Sources */,
+				C0A710C50000000000000002 /* ComputerUseDaemonReadiness.swift in Sources */,
+				C0A710C20000000000000002 /* ComputerUseHelperLaunchConfiguration.swift in Sources */,
+				C0A713020000000000000002 /* ComputerUseLiveDriverSession.swift in Sources */,
+				C0A713030000000000000002 /* ComputerUseLiveSessionProjection.swift in Sources */,
+				C0A710FF0000000000000002 /* ComputerUseLiveSettingRepository.swift in Sources */,
+				C0A710090000000000000002 /* ComputerUseMenuBarController.swift in Sources */,
+				C0A710180000000000000002 /* ComputerUseMenuBarRefreshPolicy.swift in Sources */,
+				C0A710060000000000000002 /* ComputerUseMenuBarRow.swift in Sources */,
+				C0A710170000000000000002 /* ComputerUseMenuBarScanResult.swift in Sources */,
+				C0A710070000000000000002 /* ComputerUseMenuBarSnapshot.swift in Sources */,
+				C0A710080000000000000002 /* ComputerUseMenuBarSnapshotStore.swift in Sources */,
+				D11965050000000000000002 /* ComputerUseOnboardingCoordinator.swift in Sources */,
+				C0A712400000000000000002 /* ComputerUseOnboardingHostingView.swift in Sources */,
+				C0A711200000000000000002 /* ComputerUseOnboardingStep.swift in Sources */,
+				C0A710100000000000000002 /* ComputerUseOnboardingView.swift in Sources */,
+				C0A710110000000000000002 /* ComputerUseOnboardingWindowController.swift in Sources */,
+				C0A711210000000000000002 /* ComputerUseOnboardingWindowPlacement.swift in Sources */,
+				C0A713000000000000000002 /* ComputerUsePermissionRequestOutcome.swift in Sources */,
+				C0A711300000000000000002 /* ComputerUsePermissionRowAction.swift in Sources */,
+				C0A710C30000000000000002 /* ComputerUsePermissionStatus.swift in Sources */,
+				C0A710C10000000000000002 /* ComputerUseRuntimePaths.swift in Sources */,
+				D1F00A110000000000000002 /* ComputerUseRuntimePermissionPhase.swift in Sources */,
+				C0A710010000000000000002 /* ComputerUseRuntimeService.swift in Sources */,
+				D1F00A120000000000000002 /* ComputerUseSessionPresentationController.swift in Sources */,
+				C0A710030000000000000002 /* ComputerUseSessionScope.swift in Sources */,
+				C0A710050000000000000002 /* ComputerUseStateRepository.swift in Sources */,
+				C0A710040000000000000002 /* ComputerUseStateScan.swift in Sources */,
+				C0A710160000000000000002 /* ComputerUseTargetIdentity.swift in Sources */,
+				C0A710130000000000000002 /* ComputerUseUXCoordinator.swift in Sources */,
+				C0A713010000000000000002 /* ComputerUseWatchTargetActivity.swift in Sources */,
+				D1F00A100000000000000002 /* ComputerUseWatchTargetController.swift in Sources */,
+				C0A710190000000000000002 /* ComputerUseWindowDragRegion.swift in Sources */,
 				3023A1013023A1013023A101 /* ConfigSettingsView.swift in Sources */,
 				3023A1003023A1003023A100 /* ConfigSource.swift in Sources */,
 				D1F0A01100000000000000B1 /* ConnectivityInvalidationSubscriberCoordinator.swift in Sources */,
@@ -13687,12 +13691,6 @@
 				245DB362C72D443A96DDC9C3 /* DockSplitStore+TransferTitle.swift in Sources */,
 				D86861000000000000000001 /* DockSplitStore+WorkingDirectory.swift in Sources */,
 				DCDC0000000000000000A001 /* DockSplitStore.swift in Sources */,
-				C109000000000000000000C2 /* WorkspaceStatusListStore.swift in Sources */,
-				C109000000000000000000E2 /* WorkspaceStatusActions.swift in Sources */,
-				C109000000000000000000AA /* WorkspaceStatusPresentation.swift in Sources */,
-				C10900000000000000000102 /* WorkspaceStatusFilePill.swift in Sources */,
-				C109000000000000000000F2 /* Workspace+Statuses.swift in Sources */,
-				C10900000000000000000072 /* TerminalController+WorkspaceStatusList.swift in Sources */,
 				DCDC1000000000000000B00D /* DockSurfaceKind.swift in Sources */,
 				DCDC1000000000000000B00F /* DockTrustRequest.swift in Sources */,
 				904090409040904090409041 /* DockUnreadPanelProjection.swift in Sources */,
@@ -13701,15 +13699,15 @@
 				D10799040000000000000001 /* DragPasteboardCapabilityCleaner.swift in Sources */,
 				D75280040000000000000001 /* DynamicTracingSignpostInterval.swift in Sources */,
 				A7206C010000000000000001 /* EffectiveAppearanceObservation.swift in Sources */,
-					5732A0095732A0095732A009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift in Sources */,
-					5732A0135732A0135732A013 /* EnvironmentValues+SidebarLazyContractProbe.swift in Sources */,
+				5732A0095732A0095732A009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift in Sources */,
+				5732A0135732A0135732A013 /* EnvironmentValues+SidebarLazyContractProbe.swift in Sources */,
 				E4C001000000000000000001 /* ExtensionSidebarWorkspaceRowView.swift in Sources */,
 				E4C001000000000000000003 /* ExtensionWorktreePrototype.swift in Sources */,
 				C0A717030000000000000002 /* ExternalApplicationWindowDependencies.swift in Sources */,
 				C0A717020000000000000002 /* ExternalApplicationWindowEvent.swift in Sources */,
 				C0A717010000000000000002 /* ExternalApplicationWindowSnapshot.swift in Sources */,
-					C0A712500000000000000002 /* ExternalApplicationWindowTracker.swift in Sources */,
-					C0A712510000000000000002 /* ExternalWindowCompanionPresenter.swift in Sources */,
+				C0A712500000000000000002 /* ExternalApplicationWindowTracker.swift in Sources */,
+				C0A712510000000000000002 /* ExternalWindowCompanionPresenter.swift in Sources */,
 				C0A717000000000000000002 /* ExternalWindowSample.swift in Sources */,
 				C0A716910000000000000002 /* ExternalWindowSamplingService.swift in Sources */,
 				C0DEA7710000000000000007 /* FeatureFlags.swift in Sources */,
@@ -13731,24 +13729,24 @@
 				FEED0000000000000000F00B /* FeedPreviewWindowController.swift in Sources */,
 				FEED0000000000000000F00F /* FeedTextEditorDebugWindowController.swift in Sources */,
 				4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */,
-				807312000000000000000102 /* FigmaBoardLayoutBinding.swift in Sources */, // cmux-rbf #cm-73.12
+				807312000000000000000102 /* FigmaBoardLayoutBinding.swift in Sources */,
 				807390000000000000000006 /* FigmaButtonIcon.swift in Sources */,
 				807316000000000000001702 /* FigmaButtonMenuItem.swift in Sources */,
 				807316000000000000000202 /* FigmaButtonMenuModel.swift in Sources */,
 				807300000000000000000031 /* FigmaClickRoute.swift in Sources */,
 				807317000000000000000202 /* FigmaDesignHandOff.swift in Sources */,
-				807317000000000000000302 /* FigmaDesignSkill.swift in Sources */, // cmux-rbf #cm-73.17
+				807317000000000000000302 /* FigmaDesignSkill.swift in Sources */,
 				80730000000000000000000A /* FigmaEditorChrome.swift in Sources */,
 				807300000000000000000011 /* FigmaFileLink.swift in Sources */,
+				807316000000000000000002 /* FigmaFileList.swift in Sources */,
 				8073B0000000000000000002 /* FigmaFit.swift in Sources */,
 				8073B0000000000000000006 /* FigmaFitOnLoad.swift in Sources */,
-				807316000000000000000002 /* FigmaFileList.swift in Sources */,
 				807316200000000000000008 /* FigmaKindIcon.swift in Sources */,
 				807311000000000000000002 /* FigmaLoadBar.swift in Sources */,
 				807316000000000000000102 /* FigmaNewFileLink.swift in Sources */,
+				807335000000000000000004 /* FigmaPaneHistory.swift in Sources */,
 				80730000000000000000001C /* FigmaPaneURL.swift in Sources */,
 				80730000000000000000001E /* FigmaStayInPane.swift in Sources */,
-				807335000000000000000004 /* FigmaPaneHistory.swift in Sources */,
 				807310000000000000000002 /* FigmaTabMark.swift in Sources */,
 				807300000000000000000035 /* FigmaWrapperPage.swift in Sources */,
 				10200F1E0000000000000007 /* FileContentChangeCoordinator+Entry.swift in Sources */,
@@ -13778,8 +13776,8 @@
 				FE001104 /* FileExplorerTerminalPathInsertion.swift in Sources */,
 				FE001102 /* FileExplorerView.swift in Sources */,
 				A5001441A5001441A5001441 /* FileOpenSocketSupport.swift in Sources */,
-					C01E00060000000000000001 /* FilePreviewEditorChromeOverlay.swift in Sources */,
-					C01E00010000000000000001 /* FilePreviewEditorSettings.swift in Sources */,
+				C01E00060000000000000001 /* FilePreviewEditorChromeOverlay.swift in Sources */,
+				C01E00010000000000000001 /* FilePreviewEditorSettings.swift in Sources */,
 				C0DE8652000000000000000F /* FilePreviewFileState.swift in Sources */,
 				A5001432A5001432A5001432 /* FilePreviewFocusCoordinator.swift in Sources */,
 				C0DE86520000000000000101 /* FilePreviewImageLoadResult.swift in Sources */,
@@ -13787,7 +13785,7 @@
 				C0DE86520000000000000009 /* FilePreviewImageView.swift in Sources */,
 				C0DE8652000000000000000B /* FilePreviewLatestLoadCoordinator.swift in Sources */,
 				C0DE8652000000000000000D /* FilePreviewLatestRequestState.swift in Sources */,
-					C01E00050000000000000001 /* FilePreviewLineNumberGutterView.swift in Sources */,
+				C01E00050000000000000001 /* FilePreviewLineNumberGutterView.swift in Sources */,
 				A5001447A5001447A5001447 /* FilePreviewMagnifyingPDFView.swift in Sources */,
 				287C15EFC945CE9D560600E3 /* FilePreviewMediaSession.swift in Sources */,
 				C0DE86520000000000000103 /* FilePreviewMediaView.swift in Sources */,
@@ -13818,18 +13816,18 @@
 				DD62AFF1D95A1D5D1850AC10 /* FilePreviewQuickLookSession.swift in Sources */,
 				C0DE8652000000000000010F /* FilePreviewQuickLookViewCoordinator.swift in Sources */,
 				C0DE86520000000000000111 /* FilePreviewRevision.swift in Sources */,
-					C01E00040000000000000001 /* FilePreviewSyntaxStyler.swift in Sources */,
+				C01E00040000000000000001 /* FilePreviewSyntaxStyler.swift in Sources */,
 				C0DE97470000000000000001 /* FilePreviewTabMetadata.swift in Sources */,
 				C0DE97470000000000000003 /* FilePreviewTabMetadataHost.swift in Sources */,
 				D0B10016A1B2C3D4E5F60001 /* FilePreviewTextEditor.swift in Sources */,
 				C0DE86520000000000000113 /* FilePreviewViewport.swift in Sources */,
-					F11E52270000000000005227 /* FilePreviewWordWrapSettings.swift in Sources */,
+				F11E52270000000000005227 /* FilePreviewWordWrapSettings.swift in Sources */,
 				A5001445A5001445A5001445 /* FilePreviewWorkspaceOpenSupport.swift in Sources */,
 				F1A0C0DE0000000000000002 /* FindTextFieldSupport.swift in Sources */,
 				F0C05170000000000000002 /* FocusHistory.swift in Sources */,
 				C416CA160000000000000001 /* FocusHistoryMenuInvalidator.swift in Sources */,
 				5E55400000000000000000D1 /* FocusStealingResponderConformances.swift in Sources */,
-					C0DEFB100000000000000001 /* FocusSurfaceBroadcaster.swift in Sources */,
+				C0DEFB100000000000000001 /* FocusSurfaceBroadcaster.swift in Sources */,
 				AA5269A0C0DE0002FACE0002 /* ForeignFirstResponderPolicy.swift in Sources */,
 				85510001A1B2C3D4E5F60001 /* GhosttyApp+ChildExitPolicy.swift in Sources */,
 				A10557070000000000000001 /* GhosttyApp+ConfigurationApply.swift in Sources */,
@@ -13889,16 +13887,16 @@
 				46814000000000000000000B /* GhosttyTitleUpdateSurfaceState.swift in Sources */,
 				FE001107 /* GitFileStatus.swift in Sources */,
 				FE001106 /* GitStatusProvider.swift in Sources */,
-					3865A0023865A0023865A002 /* GlobalSearchCoordinator.swift in Sources */,
+				3865A0023865A0023865A002 /* GlobalSearchCoordinator.swift in Sources */,
 				3865A0073865A0073865A007 /* GlobalSearchDocuments.swift in Sources */,
-					8561A0058561A0058561A005 /* GlobalSearchKeyEvent+QueryEditing.swift in Sources */,
-					3865A0083865A0083865A008 /* GlobalSearchPanelCaptureManager.swift in Sources */,
+				8561A0058561A0058561A005 /* GlobalSearchKeyEvent+QueryEditing.swift in Sources */,
+				3865A0083865A0083865A008 /* GlobalSearchPanelCaptureManager.swift in Sources */,
 				CC2639000000000000000001 /* GotoSplitCycleUITestSupport.swift in Sources */,
-					5B11E5A100000000000000B1 /* GPUSpinner.swift in Sources */,
-					A6AC72010000000000000001 /* GPUSpinnerNSView.swift in Sources */,
-					A6AC72020000000000000001 /* GPUSpinnerStyle.swift in Sources */,
-					A93770010000000000000002 /* GrokSessionLocator+ProcessDiscovery.swift in Sources */,
-					F5320000A1B2C3D4E5F60718 /* HermesAgentIndex.swift in Sources */,
+				5B11E5A100000000000000B1 /* GPUSpinner.swift in Sources */,
+				A6AC72010000000000000001 /* GPUSpinnerNSView.swift in Sources */,
+				A6AC72020000000000000001 /* GPUSpinnerStyle.swift in Sources */,
+				A93770010000000000000002 /* GrokSessionLocator+ProcessDiscovery.swift in Sources */,
+				F5320000A1B2C3D4E5F60718 /* HermesAgentIndex.swift in Sources */,
 				A10348010000000000000001 /* HistoryMenuActions.swift in Sources */,
 				C4160A020000000000000001 /* HistoryMenuCoordinator.swift in Sources */,
 				A10348020000000000000001 /* HistoryMenuState.swift in Sources */,
@@ -13997,7 +13995,7 @@
 				F5168A060000000000000001 /* MarkdownTypographyDefaults.swift in Sources */,
 				A50014F3 /* MarkdownViewerAssets.swift in Sources */,
 				A50014F5 /* MarkdownWebRenderer.swift in Sources */,
-					A50014F9 /* MarkdownWebSupport.swift in Sources */,
+				A50014F9 /* MarkdownWebSupport.swift in Sources */,
 				A42100010000000000000003 /* MemoryPressureAggregatePolicy.swift in Sources */,
 				A42100010000000000000005 /* MemoryPressureAggregateSampler.swift in Sources */,
 				7490C0027490C0027490C002 /* MemoryPressureFootprintSampling.swift in Sources */,
@@ -14015,21 +14013,21 @@
 				245D4C3B2B2DBD1C392C9CAE /* MemoryResourceDiagnostics.swift in Sources */,
 				5DDDF128422900EFBE313152 /* MemoryResourceSample.swift in Sources */,
 				57A7A46D4F2C181AC80D3BBB /* MemoryResourceViewCounts.swift in Sources */,
-					1A8BEE693C9E4C3190CB7F20 /* MenuBarExtraController.swift in Sources */,
-					C0DE70510000000000000002 /* MenuBarProfilingLauncher.swift in Sources */,
-					C0DE70550000000000000002 /* MenuBarProfilingMenuItem.swift in Sources */,
-					C0DE70540000000000000002 /* MenuBarProfilingMenuItemTarget.swift in Sources */,
-					C0DE705A0000000000000002 /* MenuBarProfilingProcessLogs.swift in Sources */,
-					C0DE70570000000000000002 /* MenuBarProfilingProfilePreview.swift in Sources */,
-					C0DE70560000000000000002 /* MenuBarProfilingProgressWindowController.swift in Sources */,
-					C0DE70580000000000000002 /* MenuBarProfilingProgressWindowLayout.swift in Sources */,
-					C0DE70590000000000000002 /* MenuBarProfilingSubmissionActions.swift in Sources */,
-					3865A0033865A0033865A003 /* MenubarSearchPopover.swift in Sources */,
-					5732A0015732A0015732A001 /* MinimalModeInvalidationProbe.swift in Sources */,
-					5732A0085732A0085732A008 /* MinimalModeInvalidationProbeKey.swift in Sources */,
+				1A8BEE693C9E4C3190CB7F20 /* MenuBarExtraController.swift in Sources */,
+				C0DE70510000000000000002 /* MenuBarProfilingLauncher.swift in Sources */,
+				C0DE70550000000000000002 /* MenuBarProfilingMenuItem.swift in Sources */,
+				C0DE70540000000000000002 /* MenuBarProfilingMenuItemTarget.swift in Sources */,
+				C0DE705A0000000000000002 /* MenuBarProfilingProcessLogs.swift in Sources */,
+				C0DE70570000000000000002 /* MenuBarProfilingProfilePreview.swift in Sources */,
+				C0DE70560000000000000002 /* MenuBarProfilingProgressWindowController.swift in Sources */,
+				C0DE70580000000000000002 /* MenuBarProfilingProgressWindowLayout.swift in Sources */,
+				C0DE70590000000000000002 /* MenuBarProfilingSubmissionActions.swift in Sources */,
+				3865A0033865A0033865A003 /* MenubarSearchPopover.swift in Sources */,
+				5732A0015732A0015732A001 /* MinimalModeInvalidationProbe.swift in Sources */,
+				5732A0085732A0085732A008 /* MinimalModeInvalidationProbeKey.swift in Sources */,
 				C0DE3150A00000000000001 /* MinimalModeSidebarControls.swift in Sources */,
-					5732A0025732A0025732A002 /* MinimalModeSidebarTitlebarControlsOverlay.swift in Sources */,
-					5732A0035732A0035732A003 /* MinimalModeTitlebarEventSurfaceLayer.swift in Sources */,
+				5732A0025732A0025732A002 /* MinimalModeSidebarTitlebarControlsOverlay.swift in Sources */,
+				5732A0035732A0035732A003 /* MinimalModeTitlebarEventSurfaceLayer.swift in Sources */,
 				A7C0F0030000000000000001 /* MobileAttachTarget.swift in Sources */,
 				284FD21ACF8BD1ED6AEBD7A0 /* MobileAttachTicketStore.swift in Sources */,
 				F21000000000000000000004 /* MobileBrowserContinuousClock.swift in Sources */,
@@ -14105,7 +14103,7 @@
 				00C3AA443F6DA8D94E28CE17 /* MobileWorkspaceListObserver.swift in Sources */,
 				D75280030000000000000001 /* MobileWorkspaceObserverSignposts.swift in Sources */,
 				596100000000000000000003 /* NativeNotificationDeliveryHooks.swift in Sources */,
-					A6AC72030000000000000001 /* NativeSpinner.swift in Sources */,
+				A6AC72030000000000000001 /* NativeSpinner.swift in Sources */,
 				A1002000000000000000000F /* NativeTextSurfaceSelectionReader.swift in Sources */,
 				7A0CE1000000000000000041 /* NetworkExtensionTunnelController.swift in Sources */,
 				5CA1AFB486DF86FAF22509F2 /* NewMachineModel.swift in Sources */,
@@ -14170,7 +14168,7 @@
 				A9F200000000000000000019 /* OpenCodeProcessOutputDisposition.swift in Sources */,
 				ODBG00010000000000000001 /* OpenDiffViewerAgentBaselineLookup.swift in Sources */,
 				ODBG00020000000000000001 /* OpenDiffViewerAgentContextRequest.swift in Sources */,
-					A6AC72040000000000000001 /* OverlayComparison.swift in Sources */,
+				A6AC72040000000000000001 /* OverlayComparison.swift in Sources */,
 				E3B7A4000000000000000021 /* PaneChromeSettings.swift in Sources */,
 				C51A73000000000000000201 /* PaneDropContainer.swift in Sources */,
 				D0B752900000000000000002 /* PaneDropRoutingRegistration.swift in Sources */,
@@ -14234,18 +14232,18 @@
 				C0DEA771000000000000000B /* ProBadgeStyle.swift in Sources */,
 				F0ACC0DE000000000000000D /* ProcessDetectedResumeIndexes.swift in Sources */,
 				D75280010000000000000001 /* ProfilingSignposts.swift in Sources */,
-					A5C0DE0000000000000000BA /* ProjectBuildSettingsTabView.swift in Sources */,
-					A5C0DE0000000000000000B6 /* ProjectFilesTabView.swift in Sources */,
-					A5C0DE0000000000000000B2 /* ProjectPanel.swift in Sources */,
-					A5C0DE0000000000000000B4 /* ProjectPanelView.swift in Sources */,
-					A5C0DE0000000000000000BC /* ProjectSchemesTabView.swift in Sources */,
-					A5C0DE0000000000000000B8 /* ProjectTargetsTabView.swift in Sources */,
+				A5C0DE0000000000000000BA /* ProjectBuildSettingsTabView.swift in Sources */,
+				A5C0DE0000000000000000B6 /* ProjectFilesTabView.swift in Sources */,
+				A5C0DE0000000000000000B2 /* ProjectPanel.swift in Sources */,
+				A5C0DE0000000000000000B4 /* ProjectPanelView.swift in Sources */,
+				A5C0DE0000000000000000BC /* ProjectSchemesTabView.swift in Sources */,
+				A5C0DE0000000000000000B8 /* ProjectTargetsTabView.swift in Sources */,
 				0A110711000000000000001A /* PromptTurnNotificationHandler.swift in Sources */,
 				C986A0050000000000000001 /* ProvisionalDragWriterOwnership.swift in Sources */,
 				C986A00E0000000000000001 /* ProvisionalDragWriterOwnershipToken.swift in Sources */,
 				C0DEA771000000000000000F /* ProWelcomeChecklist.swift in Sources */,
 				C0DE86520000000000000115 /* QuickLookPreviewView.swift in Sources */,
-					A64610010000000000000001 /* QuitConfirmationAlertPresenter.swift in Sources */,
+				A64610010000000000000001 /* QuitConfirmationAlertPresenter.swift in Sources */,
 				A500RG01 /* ReactGrab.swift in Sources */,
 				9666B0019666B0019666B001 /* RecoverableMainWindowRoute.swift in Sources */,
 				C8349011C8349011C8349011 /* RecoverableMainWindowRouteOwnerRegistration.swift in Sources */,
@@ -14436,7 +14434,7 @@
 				850000000000000000000025 /* SessionIndexTableRowID.swift in Sources */,
 				850000000000000000000026 /* SessionIndexTableView.swift in Sources */,
 				FE003102 /* SessionIndexView.swift in Sources */,
-		A5F10000000000000000000F /* SessionNotificationSnapshot.swift in Sources */,
+				A5F10000000000000000000F /* SessionNotificationSnapshot.swift in Sources */,
 				0A1208090000000000000001 /* SessionPersistedVaultAgentRegistration.swift in Sources */,
 				481D7BF878AB38DA5642D1C9 /* SessionPersistence+Todos.swift in Sources */,
 				A5001610 /* SessionPersistence.swift in Sources */,
@@ -14562,8 +14560,8 @@
 				C9A57109C9A57109C9A57109 /* SidebarWorkspaceGroupingMetrics.swift in Sources */,
 				6707F00F6707F00F6707F00F /* SidebarWorkspaceGroupRowSnapshot.swift in Sources */,
 				6707F0056707F0056707F005 /* SidebarWorkspaceGroupRowView.swift in Sources */,
-					A6AC73310000000000000001 /* SidebarWorkspaceLeadingStatusSlot.swift in Sources */,
-					A6AC73320000000000000001 /* SidebarWorkspaceLoadingSpinner.swift in Sources */,
+				A6AC73310000000000000001 /* SidebarWorkspaceLeadingStatusSlot.swift in Sources */,
+				A6AC73320000000000000001 /* SidebarWorkspaceLoadingSpinner.swift in Sources */,
 				6707F0216707F0216707F021 /* SidebarWorkspaceNotificationIndex.swift in Sources */,
 				9521A0040000000000000001 /* SidebarWorkspacePendingDrag.swift in Sources */,
 				C9A57201C9A57201C9A57201 /* SidebarWorkspaceRenderItem.swift in Sources */,
@@ -14586,6 +14584,7 @@
 				B804A02A000000000000002A /* SidebarWorkspaceRowTodoViews.swift in Sources */,
 				6707F00B6707F00B6707F00B /* SidebarWorkspaceRowView.swift in Sources */,
 				ACCE20000000000000000001 /* SidebarWorkspaceRowVisualPalette.swift in Sources */,
+				C10900000000000000000141 /* SidebarWorkspaceSlotResolution.swift in Sources */,
 				F7216005000000000000001 /* SidebarWorkspaceSnapshotBuilder.swift in Sources */,
 				6707F0016707F0016707F001 /* SidebarWorkspaceSnapshotFactory.swift in Sources */,
 				6707F0156707F0156707F015 /* SidebarWorkspaceSnapshotRefreshCoalescer.swift in Sources */,
@@ -14647,16 +14646,16 @@
 				C7B0FACE0000000000000018 /* SleepyStatusProviding.swift in Sources */,
 				C7B0FACE0000000000000016 /* SleepyStatusSample.swift in Sources */,
 				5830CA11BAC0000000000004 /* SocketCallbackAwaiter.swift in Sources */,
-					A5001226 /* SocketControlMode+Display.swift in Sources */,
+				A5001226 /* SocketControlMode+Display.swift in Sources */,
 				F87920000000000000000001 /* SocketReloadConfigurationWaiterAdmission.swift in Sources */,
 				F87920000000000000000003 /* SocketReloadConfigurationWaiterLease.swift in Sources */,
 				7A0CE100000000000000070A /* SocksV5Client.swift in Sources */,
-					A6AC72050000000000000001 /* SpinnerCard.swift in Sources */,
-					A6AC72090000000000000001 /* SpinnerEnergy.swift in Sources */,
-					5B11E5A100000000000000A1 /* SpinnerGalleryDebugWindowController.swift in Sources */,
-					A6AC72060000000000000001 /* SpinnerGalleryRootView.swift in Sources */,
-					A6AC72070000000000000001 /* SpinnerSpec.swift in Sources */,
-					E30780000000000000000012 /* SSHPTYAttachStartupCommandBuilder.swift in Sources */,
+				A6AC72050000000000000001 /* SpinnerCard.swift in Sources */,
+				A6AC72090000000000000001 /* SpinnerEnergy.swift in Sources */,
+				5B11E5A100000000000000A1 /* SpinnerGalleryDebugWindowController.swift in Sources */,
+				A6AC72060000000000000001 /* SpinnerGalleryRootView.swift in Sources */,
+				A6AC72070000000000000001 /* SpinnerSpec.swift in Sources */,
+				E30780000000000000000012 /* SSHPTYAttachStartupCommandBuilder.swift in Sources */,
 				A11C00020000000000000001 /* StackAccountAvatarImageLoader.swift in Sources */,
 				A5C017000000000000000005 /* StackAccountAvatarView.swift in Sources */,
 				D35B71010000000000000001 /* StartupBreadcrumbLog.swift in Sources */,
@@ -14881,6 +14880,7 @@
 				C0DE00000000000000000E93 /* TerminalController+WorkspaceCreateWorkingDirectoryValidationService.swift in Sources */,
 				C0DE00000000000000000C8B /* TerminalController+WorkspaceGroupAction.swift in Sources */,
 				C0DE00000000000000000C89 /* TerminalController+WorkspaceMove.swift in Sources */,
+				C10900000000000000000072 /* TerminalController+WorkspaceStatusList.swift in Sources */,
 				A5001007 /* TerminalController.swift in Sources */,
 				C0DE00000000000000000C32 /* TerminalControllerControlCommandContext.swift in Sources */,
 				C7A50A000000000000000002 /* TerminalControllerPaneResizeSupport.swift in Sources */,
@@ -15038,9 +15038,9 @@
 				C0DE5A420000000000000001 /* TextBoxSubmitAvailability.swift in Sources */,
 				D79030000000000000000001 /* TextBoxSubmitSurfaceControlling.swift in Sources */,
 				F50030050000000000000001 /* TitlebarAccessoryContainerView.swift in Sources */,
-					F50030060000000000000001 /* TitlebarAccessoryHostingView.swift in Sources */,
-					C4160A060000000000000001 /* TitlebarChromeGeometryReporting.swift in Sources */,
-					F50030020000000000000001 /* TitlebarInteractiveControlModifier.swift in Sources */,
+				F50030060000000000000001 /* TitlebarAccessoryHostingView.swift in Sources */,
+				C4160A060000000000000001 /* TitlebarChromeGeometryReporting.swift in Sources */,
+				F50030020000000000000001 /* TitlebarInteractiveControlModifier.swift in Sources */,
 				C4160A070000000000000001 /* TitlebarLayoutDebugWindow.swift in Sources */,
 				C10D00110000000000000011 /* TitlebarNewWorkspaceSplitButton.swift in Sources */,
 				E30760030000000000000002 /* TmuxOverlayExperimentSettings.swift in Sources */,
@@ -15048,7 +15048,7 @@
 				B35751000000000000000002 /* TmuxResumeParser.swift in Sources */,
 				E30760050000000000000002 /* TmuxWorkspacePaneOverlayRenderState.swift in Sources */,
 				E30760000000000000000002 /* TmuxWorkspacePaneOverlayView.swift in Sources */,
-					C01E00020000000000000001 /* TokenTheme+AppKit.swift in Sources */,
+				C01E00020000000000000001 /* TokenTheme+AppKit.swift in Sources */,
 				A5001501 /* UITestRecorder.swift in Sources */,
 				A500120D /* UpdateLogStore.swift in Sources */,
 				A5001208 /* UpdateTitlebarAccessory.swift in Sources */,
@@ -15063,9 +15063,9 @@
 				B35750000000000000000012 /* VaultAgentProcessScannerDetectRules.swift in Sources */,
 				B35750000000000000000010 /* VaultAgentProcessScannerSessionDirectories.swift in Sources */,
 				9758D0159758D0159758D015 /* VaultAgentRegistry+Amp.swift in Sources */,
-					B3575000000000000000000E /* VaultAgentRegistry+Campfire.swift in Sources */,
-					858200000000000000000004 /* VaultAgentRegistry+Kimi.swift in Sources */,
-					B35750000000000000000002 /* VaultAgentRegistry.swift in Sources */,
+				B3575000000000000000000E /* VaultAgentRegistry+Campfire.swift in Sources */,
+				858200000000000000000004 /* VaultAgentRegistry+Kimi.swift in Sources */,
+				B35750000000000000000002 /* VaultAgentRegistry.swift in Sources */,
 				58A9932D36B3423F90031CB8 /* VaultAllSessionsBar.swift in Sources */,
 				112F421D5BA34A11BB7B8334 /* VaultCheckpointFork.swift in Sources */,
 				4DE577DECC1641C5903007E2 /* VaultCheckpointHarness.swift in Sources */,
@@ -15182,6 +15182,7 @@
 				C51A710000000000000000C1 /* Workspace+SimulatorPane.swift in Sources */,
 				C51A740000000000000000C1 /* Workspace+SimulatorSessionPersistence.swift in Sources */,
 				8300A0040000000000000004 /* Workspace+SSHConnectionBroker.swift in Sources */,
+				C109000000000000000000F2 /* Workspace+Statuses.swift in Sources */,
 				F9219DE12AF2E4D9CFFC66CF /* Workspace+SurfaceCatalog.swift in Sources */,
 				CA52B0170000000000000000 /* Workspace+SurfaceNavigation.swift in Sources */,
 				7DD5BF8AB5B84491BC89EEE9 /* Workspace+SurfaceOwnership.swift in Sources */,
@@ -15205,7 +15206,7 @@
 				D7AB3605C10DEF0000000003 /* WorkspaceCloseTabsBatching.swift in Sources */,
 				ED4BE012ED4BE012ED4BE012 /* WorkspaceCloudBindingState.swift in Sources */,
 				A5FB1203 /* WorkspaceConfigActionCapture.swift in Sources */,
-					5732A0045732A0045732A004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift in Sources */,
+				5732A0045732A0045732A004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift in Sources */,
 				DFAAE6D5B2C449C4BC3AC238 /* WorkspaceContentView+PanelVisibility.swift in Sources */,
 				A5001407 /* WorkspaceContentView.swift in Sources */,
 				C0DE36230000000000000001 /* WorkspaceFinderDirectoryResolver.swift in Sources */,
@@ -15219,9 +15220,9 @@
 				C061E0170000000000000002 /* WorkspacePaletteColorEditCoordinator.swift in Sources */,
 				E3B7A4000000000000000005 /* WorkspacePlacement+Resolution.swift in Sources */,
 				D0B10004A1B2C3D4E5F60001 /* WorkspacePortalPaneDrop.swift in Sources */,
-					5732A0055732A0055732A005 /* WorkspacePresentationModeChangeObserver.swift in Sources */,
-					5732A0065732A0065732A006 /* WorkspacePresentationModeContentTopPaddingModifier.swift in Sources */,
-					5732A0105732A0105732A010 /* WorkspacePresentationModeRuntimeCache.swift in Sources */,
+				5732A0055732A0055732A005 /* WorkspacePresentationModeChangeObserver.swift in Sources */,
+				5732A0065732A0065732A006 /* WorkspacePresentationModeContentTopPaddingModifier.swift in Sources */,
+				5732A0105732A0105732A010 /* WorkspacePresentationModeRuntimeCache.swift in Sources */,
 				1A1B2C3D4E5F607180000001 /* WorkspacePromptSubmit.swift in Sources */,
 				E307B0000000000000000002 /* WorkspaceRemoteHostProbeOutcome.swift in Sources */,
 				E30790000000000000000002 /* WorkspaceRemoteReconnectPolicy.swift in Sources */,
@@ -15234,6 +15235,11 @@
 				5659B0015659B0015659B001 /* WorkspaceSidebarLogEntryLimitProvider.swift in Sources */,
 				5659A0015659A0015659A001 /* WorkspaceSidebarObservation.swift in Sources */,
 				4CC1722A934F4D8B99FC64C5 /* WorkspaceSidebarProcessTitleObservationModel.swift in Sources */,
+				C109000000000000000000E2 /* WorkspaceStatusActions.swift in Sources */,
+				C10900000000000000000102 /* WorkspaceStatusFilePill.swift in Sources */,
+				C10900000000000000000121 /* WorkspaceStatusIconDrawing.swift in Sources */,
+				C109000000000000000000C2 /* WorkspaceStatusListStore.swift in Sources */,
+				C109000000000000000000AA /* WorkspaceStatusPresentation.swift in Sources */,
 				D7AB34400000000000000001 /* WorkspaceSurfaceConfig.swift in Sources */,
 				C0DE32470000000000000003 /* WorkspaceSurfaceIdentifierClipboardText.swift in Sources */,
 				F90070010000000000000001 /* WorkspaceSurfaceOwnershipTarget.swift in Sources */,
@@ -15288,7 +15294,7 @@
 				F87920000000000000000045 /* WorkspaceTerminalFontSizeWeakWorkspaceReference.swift in Sources */,
 				F87920000000000000000047 /* WorkspaceTerminalFontSizeWindowDockSlot.swift in Sources */,
 				99230001992300019923000A /* WorkspaceTerminalStartupRestoreCommitOwner.swift in Sources */,
-					5732A0075732A0075732A007 /* WorkspaceTitlebarModeLayer.swift in Sources */,
+				5732A0075732A0075732A007 /* WorkspaceTitlebarModeLayer.swift in Sources */,
 				7D7D087CAACD917D8163F844 /* WorkspaceTodoFeature.swift in Sources */,
 				249969F7EAC03A99E20C753B /* WorkspaceTodoPanel.swift in Sources */,
 				78F17D618B657B6CF929E327 /* WorkspaceTodoPanelView.swift in Sources */,
@@ -15596,9 +15602,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-
-
-
 				A11CE0010000000000000001 /* AboutLicensesResourceTests.swift in Sources */,
 				A5C01700000000000000000F /* AccountSignInModelTests.swift in Sources */,
 				5FAC71D5AC71D5AC71D50001 /* AgentChatChildRunTests.swift in Sources */,
@@ -15628,7 +15631,7 @@
 				F65760080000000000000001 /* AgentHibernationTranscriptGuardScanTests.swift in Sources */,
 				F65760040000000000000001 /* AgentHibernationTranscriptGuardTests.swift in Sources */,
 				F65760250000000000000001 /* AgentHibernationTranscriptSnapshotRaceTests.swift in Sources */,
-					C85350000000000000000103 /* AgentHookDeliveryQueueTests.swift in Sources */,
+				C85350000000000000000103 /* AgentHookDeliveryQueueTests.swift in Sources */,
 				A76110010000000000000003 /* AgentHookNotificationPolicy.swift in Sources */,
 				A76110020000000000000001 /* AgentHookNotificationPolicyTests.swift in Sources */,
 				751AA9D65BBB1979C7957BAE /* AgentHookTestNotificationPipeline.swift in Sources */,
@@ -15638,7 +15641,7 @@
 				79390003AA11BB22CC33DD03 /* AgentNotificationLiveRetargetTests.swift in Sources */,
 				7939000FAA11BB22CC33DD0F /* AgentNotificationMoveRaceTests.swift in Sources */,
 				79460001AA11BB22CC33EE01 /* AgentNotificationMutationBoundaryTests.swift in Sources */,
-				807317000000000000000702 /* AgentPaneChoiceTests.swift in Sources */, // cmux-rbf #cm-73.17
+				807317000000000000000702 /* AgentPaneChoiceTests.swift in Sources */,
 				93840005AA11BB22CC33EE05 /* AgentRelayTTYOwnershipTests.swift in Sources */,
 				110430011104300111043001 /* AgentRestoreLiveOwnerAdmissionTests.swift in Sources */,
 				E8DF7FD45DA2E55E4DA65B38 /* AgentResumeLaunchGuardTests.swift in Sources */,
@@ -15758,11 +15761,11 @@
 				CE7000000000000000000001 /* ClaudeWrapperResumeEnvironmentTests.swift in Sources */,
 				9758A0000000000000000004 /* CLIAmpLifecycleIntegrationTests.swift in Sources */,
 				A5D4120DA1B2C3D4E5F60718 /* CLIAuthAliasTests.swift in Sources */,
-					805500000000000000000001 /* CLIBrowserEvalOutputTests.swift in Sources */,
-					CA11E4D0FA017DE500000B101 /* CLICallerWorkspaceDefaultTests.swift in Sources */,
-					964F2AF080DB48D8A2A2C186 /* CLIChildEnvironment.swift in Sources */,
-					2E931B5728B0478CB9B4937F /* CLIChildEnvironmentTests.swift in Sources */,
-					C85350000000000000000101 /* CLIClaudeHookTimeoutRegressionTests.swift in Sources */,
+				805500000000000000000001 /* CLIBrowserEvalOutputTests.swift in Sources */,
+				CA11E4D0FA017DE500000B101 /* CLICallerWorkspaceDefaultTests.swift in Sources */,
+				964F2AF080DB48D8A2A2C186 /* CLIChildEnvironment.swift in Sources */,
+				2E931B5728B0478CB9B4937F /* CLIChildEnvironmentTests.swift in Sources */,
+				C85350000000000000000101 /* CLIClaudeHookTimeoutRegressionTests.swift in Sources */,
 				C0DE60C0000000000000A036 /* CLICoderouterBootstrapTests.swift in Sources */,
 				C0DE60C0000000000000A032 /* CLICoderouterCommandTests.swift in Sources */,
 				C0D3F1F30000000000000103 /* CLICodexHookPathQuotingRegressionTests.swift in Sources */,
@@ -15774,7 +15777,7 @@
 				C0D3F1F20000000000000103 /* CLICodexYoloResumePersistenceTests.swift in Sources */,
 				C11218000000000000000053 /* CLIError.swift in Sources */,
 				C51600000000000000000001 /* CLIExecInheritedSignalStateTests.swift in Sources */,
-					E295EA3753206FE3FFCA6C0A /* CLIExplicitSurfaceRoutingTests.swift in Sources */,
+				E295EA3753206FE3FFCA6C0A /* CLIExplicitSurfaceRoutingTests.swift in Sources */,
 				C46790000000000000000001 /* CLIForwardingLaunchArgumentTests.swift in Sources */,
 				A5D41207A1B2C3D4E5F60718 /* CLIGenericHookPersistenceTests.swift in Sources */,
 				A76110030000000000000001 /* CLIGrokNotificationNoiseTests.swift in Sources */,
@@ -15793,11 +15796,11 @@
 				A5D41205A1B2C3D4E5F60718 /* CLINotifyProcessTestSupport.swift in Sources */,
 				89930001AABBCCDDEEFF0001 /* CLIOmpHookBindingTests.swift in Sources */,
 				89930006AABBCCDDEEFF0001 /* CLIOmpSupersededCleanupTests.swift in Sources */,
-					C85350000000000000000107 /* CLIRelayQueuedHookRegressionTests.swift in Sources */,
+				C85350000000000000000107 /* CLIRelayQueuedHookRegressionTests.swift in Sources */,
 				C0F16B000000000000000001 /* CLIRemoteShellStartupPerformanceTests.swift in Sources */,
-					A5D41209A1B2C3D4E5F60718 /* CLIRovoDevHookPersistenceTests.swift in Sources */,
-					FE89827F4FAB9F7524A38B41 /* CLISendQueuedOutputTests.swift in Sources */,
-					B900004CA1B2C3D4E5F60719 /* CLISocketPathResolver.swift in Sources */,
+				A5D41209A1B2C3D4E5F60718 /* CLIRovoDevHookPersistenceTests.swift in Sources */,
+				FE89827F4FAB9F7524A38B41 /* CLISendQueuedOutputTests.swift in Sources */,
+				B900004CA1B2C3D4E5F60719 /* CLISocketPathResolver.swift in Sources */,
 				D0F102000000000000000102 /* CLISSHPTYAttachBridgeServer.swift in Sources */,
 				A8D837B3AA85F4353C493DE1 /* CLISSHPTYAttachProbeReplyRegressionTests.swift in Sources */,
 				FF8EDBAA6179422795D83912 /* CLISSHPTYAttachReplayBoundaryTests.swift in Sources */,
@@ -15814,12 +15817,12 @@
 				84ED8B0271A2FD801E8F280C /* CLIVMDevTests.swift in Sources */,
 				C78951D0E70B3BF25DFABD26 /* CLIVMLayoutEnvTests.swift in Sources */,
 				A5D4120DA1B2C3D4E5F60F01 /* CLIVMTransferTests.swift in Sources */,
-					773600000000000000000001 /* CLIWindowCommandMockServer.swift in Sources */,
-					773600000000000000000003 /* CLIWindowHandleRoutingTests.swift in Sources */,
-					846600000000000000000001 /* CLIWorkspaceGroupSafetyMockServer.swift in Sources */,
-					846600000000000000000003 /* CLIWorkspaceGroupSafetyTests.swift in Sources */,
-					799100000000000000000001 /* CLIWorkspaceStableIDMockServer.swift in Sources */,
-					799100000000000000000003 /* CLIWorkspaceStableIDTests.swift in Sources */,
+				773600000000000000000001 /* CLIWindowCommandMockServer.swift in Sources */,
+				773600000000000000000003 /* CLIWindowHandleRoutingTests.swift in Sources */,
+				846600000000000000000001 /* CLIWorkspaceGroupSafetyMockServer.swift in Sources */,
+				846600000000000000000003 /* CLIWorkspaceGroupSafetyTests.swift in Sources */,
+				799100000000000000000001 /* CLIWorkspaceStableIDMockServer.swift in Sources */,
+				799100000000000000000003 /* CLIWorkspaceStableIDTests.swift in Sources */,
 				7375A0037375A0037375A003 /* ClosedMainWindowRoutingTests.swift in Sources */,
 				D15E75C8E60487168BA7E9DF /* CloudActivationPolicyTests.swift in Sources */,
 				C6D4C5A38097BB05AB98E460 /* CloudAgentSkillLauncherTests.swift in Sources */,
@@ -15917,18 +15920,18 @@
 				C0DE43000000000000000009 /* CmuxAgentChatConfigTests.swift in Sources */,
 				8295A0058295A0058295A005 /* CmuxAlertContentTests.swift in Sources */,
 				947194719471947194719472 /* CmuxBundledBinPathIntegrationTests.swift in Sources */,
-					0CB4E9797AD54D3BB9CF06F9 /* CMUXCLI+AutoNaming.swift in Sources */,
-					C0DE31390000000000000105 /* CMUXCLIErrorOutputRegressionTests.swift in Sources */,
-					112950000000000000000012 /* CMUXCLIForkLegacyFallbackTests.swift in Sources */,
-					112950000000000000000002 /* CMUXCLIForkVerbRegressionTests.swift in Sources */,
-					906900000000000000000004 /* CMUXCLIMemoryAttributionTests.swift in Sources */,
-					C12985000000000000000004 /* CMUXCLISentryTelemetryRegressionTests.swift in Sources */,
-					C0DE64950000000000000009 /* CMUXCLISessionsListForkDiagnosticsTests.swift in Sources */,
-					C0DE64970000000000000001 /* CMUXCLISessionsListOpenCodeTrustTests.swift in Sources */,
-					C0DE64970000000000000003 /* CMUXCLISessionsListProcessArgumentTests.swift in Sources */,
-					C0DE64950000000000000005 /* CMUXCLISessionsListTests.swift in Sources */,
-					C0DE6495000000000000000B /* CMUXCLISessionsListTranscriptPidTests.swift in Sources */,
-					C0DE64950000000000000003 /* CMUXCLITestAssertions.swift in Sources */,
+				0CB4E9797AD54D3BB9CF06F9 /* CMUXCLI+AutoNaming.swift in Sources */,
+				C0DE31390000000000000105 /* CMUXCLIErrorOutputRegressionTests.swift in Sources */,
+				112950000000000000000012 /* CMUXCLIForkLegacyFallbackTests.swift in Sources */,
+				112950000000000000000002 /* CMUXCLIForkVerbRegressionTests.swift in Sources */,
+				906900000000000000000004 /* CMUXCLIMemoryAttributionTests.swift in Sources */,
+				C12985000000000000000004 /* CMUXCLISentryTelemetryRegressionTests.swift in Sources */,
+				C0DE64950000000000000009 /* CMUXCLISessionsListForkDiagnosticsTests.swift in Sources */,
+				C0DE64970000000000000001 /* CMUXCLISessionsListOpenCodeTrustTests.swift in Sources */,
+				C0DE64970000000000000003 /* CMUXCLISessionsListProcessArgumentTests.swift in Sources */,
+				C0DE64950000000000000005 /* CMUXCLISessionsListTests.swift in Sources */,
+				C0DE6495000000000000000B /* CMUXCLISessionsListTranscriptPidTests.swift in Sources */,
+				C0DE64950000000000000003 /* CMUXCLITestAssertions.swift in Sources */,
 				A5FB1305 /* CmuxConfigActionSaverTests.swift in Sources */,
 				C0DEF0A40000000000000001 /* CmuxConfigContextMenuTests.swift in Sources */,
 				E30750000000000000000006 /* CmuxConfigNamedColorTests.swift in Sources */,
@@ -15940,20 +15943,20 @@
 				E7E000000000000000000003 /* CmuxEventBusTests.swift in Sources */,
 				A11C00040000000000000001 /* CmuxHostedSystemSymbolImageTests.swift in Sources */,
 				D36090010000000000000005 /* CmuxMainWindowConstrainFrameTests.swift in Sources */,
-					D36090020000000000000005 /* CmuxMainWindowFullScreenCapabilityTests.swift in Sources */,
-					C54860030000000000000001 /* CmuxNavigationTargetResolverTests.swift in Sources */,
+				D36090020000000000000005 /* CmuxMainWindowFullScreenCapabilityTests.swift in Sources */,
+				C54860030000000000000001 /* CmuxNavigationTargetResolverTests.swift in Sources */,
 				468100000000000000000001 /* CmuxNotificationHookCacheTests.swift in Sources */,
 				C85390050000000000000001 /* CMUXOpenCommandLocationTests.swift in Sources */,
 				C0DE31390000000000000101 /* CMUXOpenCommandTests.swift in Sources */,
-					C0DE31390000000000000111 /* CMUXOpenHTMLFocusTests.swift in Sources */,
+				C0DE31390000000000000111 /* CMUXOpenHTMLFocusTests.swift in Sources */,
 				7837E0017837E0017837E001 /* CmuxSocketEventMapperTests.swift in Sources */,
 				C3677001000000000000001 /* CmuxSSHURLRequestTests.swift in Sources */,
 				A2977C204AD69CF268D38EE3 /* CmuxTestWindowReleaseGuard.m in Sources */,
-					906900000000000000000002 /* CmuxTopMemoryAttributionTests.swift in Sources */,
-					C7A50C000000000000000003 /* CmuxTopProcessArgumentsTests.swift in Sources */,
-					C7A50C000000000000000002 /* CmuxTopProcessCPUTests.swift in Sources */,
-					C7A5090000000000000005A2 /* CmuxTopSnapshotScopeCacheTests.swift in Sources */,
-					C7A509000000000000000002 /* CmuxTopSnapshotScopeTests.swift in Sources */,
+				906900000000000000000002 /* CmuxTopMemoryAttributionTests.swift in Sources */,
+				C7A50C000000000000000003 /* CmuxTopProcessArgumentsTests.swift in Sources */,
+				C7A50C000000000000000002 /* CmuxTopProcessCPUTests.swift in Sources */,
+				C7A5090000000000000005A2 /* CmuxTopSnapshotScopeCacheTests.swift in Sources */,
+				C7A509000000000000000002 /* CmuxTopSnapshotScopeTests.swift in Sources */,
 				D01100800000000000000008 /* CmuxTuiSurfaceProviderRegistryDiscoveryTests.swift in Sources */,
 				B08C0F1B2E7682FA68AFB96F /* CmuxTuiSurfaceProviderRegistryPollingTests.swift in Sources */,
 				44909912C73D2B3DB8C715F4 /* CmuxTuiSurfaceProviderTests+LinkCancellation.swift in Sources */,
@@ -15963,7 +15966,7 @@
 				C0DE58990000000000000004 /* CmuxWebViewKeyDownReentryTests.swift in Sources */,
 				7D5DA4DC51454ECDBF9AC978 /* CmuxWebViewMouseNavigationButtonTests.swift in Sources */,
 				C0DE58990000000000000014 /* CmuxWebViewWebContentUndoTests.swift in Sources */,
-					A6AC72080000000000000001 /* CMUXWorkspaceLoadingCLIRegressionTests.swift in Sources */,
+				A6AC72080000000000000001 /* CMUXWorkspaceLoadingCLIRegressionTests.swift in Sources */,
 				AAE06C3AEC68484DA33D42A1 /* CoalesceLatestPublisherDemandTests.swift in Sources */,
 				A9E040000000000000000002 /* CodexAppServerSessionTests.swift in Sources */,
 				B6F143F6E02543F3899F1E02 /* CodexAutoresumeChainTests.swift in Sources */,
@@ -16033,6 +16036,7 @@
 				FEEDC1A50000000000000003 /* FeedEventClassifier.swift in Sources */,
 				FEEDC0DEC0DEC0DEC0DE0003 /* FeedJumpResolverTests.swift in Sources */,
 				330A15CE33CDB525DE207F7F /* FeedWaiterRegistryTests.swift in Sources */,
+				807312000000000000000902 /* FigmaBoardLayoutWorkspaceTests.swift in Sources */,
 				807316000000000000000502 /* FigmaButtonMenuModelTests.swift in Sources */,
 				807316000000000000001602 /* FigmaButtonMenuWorkspaceTests.swift in Sources */,
 				807300000000000000000032 /* FigmaClickRoute.swift in Sources */,
@@ -16042,31 +16046,30 @@
 				807300000000000000000019 /* FigmaCLIRules.swift in Sources */,
 				80730000000000000000001B /* FigmaCLIRulesTests.swift in Sources */,
 				8073000000000000000000F2 /* FigmaDefaultFolderTests.swift in Sources */,
-				807317000000000000000502 /* FigmaDesignHandOffTests.swift in Sources */, // cmux-rbf #cm-73.17
-				807317000000000000000602 /* FigmaDesignSkillTests.swift in Sources */, // cmux-rbf #cm-73.17
-				807312000000000000000902 /* FigmaBoardLayoutWorkspaceTests.swift in Sources */, // cmux-rbf #cm-73.12
+				807317000000000000000502 /* FigmaDesignHandOffTests.swift in Sources */,
+				807317000000000000000602 /* FigmaDesignSkillTests.swift in Sources */,
 				80739000000000000000000E /* FigmaEditorChromeAddressChangeTests.swift in Sources */,
 				80730000000000000000000C /* FigmaEditorChromeTests.swift in Sources */,
 				807390000000000000000012 /* FigmaEditorChromeTriggerTests.swift in Sources */,
 				807300000000000000000012 /* FigmaFileLink.swift in Sources */,
-				8073B0000000000000000004 /* FigmaFit.swift in Sources */,
 				807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */,
 				807316000000000000000D02 /* FigmaFileListPersistenceTests.swift in Sources */,
 				807316000000000000000302 /* FigmaFileListTests.swift in Sources */,
 				807316000000000000000C02 /* FigmaFileRecordingWorkspaceTests.swift in Sources */,
 				807316000000000000001502 /* FigmaFileSubscriptionWorkspaceTests.swift in Sources */,
+				8073B0000000000000000004 /* FigmaFit.swift in Sources */,
 				8073000000000000000000F4 /* FigmaFolderCLITests.swift in Sources */,
 				80739000000000000000000A /* FigmaHeaderButtonTests.swift in Sources */,
 				80739000000000000000000C /* FigmaHeaderButtonWorkspaceTests.swift in Sources */,
-				807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */,
-				807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */,
-				807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */,
 				807314000000000000000004 /* FigmaHiddenUnloadTests.swift in Sources */,
 				807311000000000000000006 /* FigmaLoadBarSignalTests.swift in Sources */,
 				807311000000000000000004 /* FigmaLoadBarTests.swift in Sources */,
 				807310000000000000000008 /* FigmaMarkAssetTests.swift in Sources */,
 				807316000000000000000402 /* FigmaNewFileLinkTests.swift in Sources */,
+				807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */,
+				807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */,
 				807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */,
+				807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */,
 				807300000000000000000003 /* FigmaPaneURL.swift in Sources */,
 				807300000000000000000005 /* FigmaPaneURLTests.swift in Sources */,
 				807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */,
@@ -16141,7 +16144,7 @@
 				8561A0048561A0048561A004 /* GlobalSearchShortcutSettingsModelTests.swift in Sources */,
 				3865A0053865A0053865A005 /* GlobalSearchShortcutSettingsTests.swift in Sources */,
 				8561A0038561A0038561A003 /* GlobalSearchVisiblePopoverShortcutTests.swift in Sources */,
-					937700020000000000000001 /* GrokVaultAgentPersistenceTests.swift in Sources */,
+				937700020000000000000001 /* GrokVaultAgentPersistenceTests.swift in Sources */,
 				9520A0019520A0019520A001 /* HermesFirstClassSupportTests.swift in Sources */,
 				4931A11B0000000000000002 /* HiddenRightSidebarContentMountingTests.swift in Sources */,
 				A10348030000000000000001 /* HistoryMenuCoordinatorTests.swift in Sources */,
@@ -16197,10 +16200,10 @@
 				D3664002D3664002D3664002 /* MarkdownPanelTests.swift in Sources */,
 				D7750002D7750002D7750002 /* MarkdownReplyLineBreakTests.swift in Sources */,
 				D7470012D7470012D7470012 /* MarkdownYMDShellTests.swift in Sources */,
-					7490A0017490A0017490A001 /* MemoryPressureMonitorTests.swift in Sources */,
-					126510000000000000000001 /* MemoryPressureNotificationTests.swift in Sources */,
+				7490A0017490A0017490A001 /* MemoryPressureMonitorTests.swift in Sources */,
+				126510000000000000000001 /* MemoryPressureNotificationTests.swift in Sources */,
 				606500010000000000000001 /* MenuBarOnlyActivationPolicyTests.swift in Sources */,
-					C0DE70520000000000000002 /* MenuBarProfilingLauncherTests.swift in Sources */,
+				C0DE70520000000000000002 /* MenuBarProfilingLauncherTests.swift in Sources */,
 				6AA2F2E8BEB19ED6B8E125DB /* MobileHostAuthorizationTests.swift in Sources */,
 				C1A071000000000000000002 /* MobileHostConnectionEventLaneTests.swift in Sources */,
 				C1A071000000000000000003 /* MobileHostConnectionLifecycleTests.swift in Sources */,
@@ -16248,14 +16251,14 @@
 				29694FC4AD416A43C96FED5B /* PaneFocusFindResponderTests.swift in Sources */,
 				C2921FC48AE4BDA2BF67A845 /* PaneFocusTestWindow.swift in Sources */,
 				CM14B1C2D3E4F5A60718293B /* PanelGlobalMagnificationObserverTests.swift in Sources */,
-					C44550000000000000000001 /* PanelOwnedNativeViewSessionTests.swift in Sources */,
-					6313FACE0000000000000000 /* PaneMemoryGuardrailTests.swift in Sources */,
+				C44550000000000000000001 /* PanelOwnedNativeViewSessionTests.swift in Sources */,
+				6313FACE0000000000000000 /* PaneMemoryGuardrailTests.swift in Sources */,
 				1F567ED5887A4EA9AB100001 /* PaneResizeShortcutTests.swift in Sources */,
 				C12813000000000000000211 /* ParkedReconnectRecordingRunner.swift in Sources */,
 				B88350000000000000000003 /* PasteboardThreadSignalingDataProvider.swift in Sources */,
 				B8835700000000000000000B /* PastePreparationFailureProbe.swift in Sources */,
-					D1F0A00300000000000000C1 /* PhonePushPresenceGateTests.swift in Sources */,
-					D1F0A00400000000000000C1 /* PhonePushSerialDeliveryQueueTests.swift in Sources */,
+				D1F0A00300000000000000C1 /* PhonePushPresenceGateTests.swift in Sources */,
+				D1F0A00400000000000000C1 /* PhonePushSerialDeliveryQueueTests.swift in Sources */,
 				8672F0038672F0038672F003 /* PiFeedDecodeErrorPrivacyTests.swift in Sources */,
 				8672D0058672D0058672D005 /* PiFeedDockOwnershipTests.swift in Sources */,
 				8672F0088672F0088672F008 /* PiFeedEventRecorder.swift in Sources */,
@@ -16264,13 +16267,13 @@
 				8672F0068672F0068672F006 /* PiFeedV2CallResultBox.swift in Sources */,
 				B3575000000000000000000A /* PiVaultAgentPersistenceTests.swift in Sources */,
 				5B0C00010000000000000005 /* PortalDividerCursorOcclusionTests.swift in Sources */,
-					B1D5CEE0407545B6B57E3B0E /* PortalHitTestingPerformanceTests.swift in Sources */,
-					D0B10008A1B2C3D4E5F60001 /* PortalTabDragRoutingTests.swift in Sources */,
-					F11294000000000000000001 /* PortRetirementPublicationRegressionTests.swift in Sources */,
-					B79500320000000000000001 /* PortScannerIdentityContinuityTests.swift in Sources */,
-					B79500300000000000000001 /* PortScannerPublicationTests.swift in Sources */,
-					F4100000A1B2C3D4E5F60718 /* PortScannerTests.swift in Sources */,
-					F83620010000000000000001 /* PortScannerTTYFreshnessTests.swift in Sources */,
+				B1D5CEE0407545B6B57E3B0E /* PortalHitTestingPerformanceTests.swift in Sources */,
+				D0B10008A1B2C3D4E5F60001 /* PortalTabDragRoutingTests.swift in Sources */,
+				F11294000000000000000001 /* PortRetirementPublicationRegressionTests.swift in Sources */,
+				B79500320000000000000001 /* PortScannerIdentityContinuityTests.swift in Sources */,
+				B79500300000000000000001 /* PortScannerPublicationTests.swift in Sources */,
+				F4100000A1B2C3D4E5F60718 /* PortScannerTests.swift in Sources */,
+				F83620010000000000000001 /* PortScannerTTYFreshnessTests.swift in Sources */,
 				B8E9500A0000000000000001 /* PostHogAnalyticsPropertiesTests.swift in Sources */,
 				DE71CE00000000000000000A /* PresenceHeartbeatClientTests.swift in Sources */,
 				C47110010000000000000001 /* ProcessPipeReadCrashRegressionTests.swift in Sources */,
@@ -16352,14 +16355,14 @@
 				D8890004D8890004D8890004 /* ReplyTerminalFindTests.swift in Sources */,
 				C05400000000000000000009 /* RestartAllowlistedCommandTests.swift in Sources */,
 				C09630000000000000000004 /* RestartCommandPaneProjectionTests.swift in Sources */,
-					F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */,
-					F5410000A1B2C3D4E5F60718 /* RestorableAgentHookProviderResumeTests.swift in Sources */,
-					F5410002A1B2C3D4E5F60718 /* RestorableAgentNonInteractiveTests.swift in Sources */,
+				F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */,
+				F5410000A1B2C3D4E5F60718 /* RestorableAgentHookProviderResumeTests.swift in Sources */,
+				F5410002A1B2C3D4E5F60718 /* RestorableAgentNonInteractiveTests.swift in Sources */,
 				842300000000000000000005 /* RestorableAgentProcessGenerationTests.swift in Sources */,
-					C6711A020000000000000001 /* RestorableAgentSessionIndexCodexWeakRecordTests.swift in Sources */,
-					F5410006A1B2C3D4E5F60718 /* RestorableAgentSessionIndexTests.swift in Sources */,
-					F54100A0A1B2C3D4E5F60718 /* RestorableAgentSessionStalePIDTests.swift in Sources */,
-					F54100B0A1B2C3D4E5F60718 /* RestorableCodexForkTagTests.swift in Sources */,
+				C6711A020000000000000001 /* RestorableAgentSessionIndexCodexWeakRecordTests.swift in Sources */,
+				F5410006A1B2C3D4E5F60718 /* RestorableAgentSessionIndexTests.swift in Sources */,
+				F54100A0A1B2C3D4E5F60718 /* RestorableAgentSessionStalePIDTests.swift in Sources */,
+				F54100B0A1B2C3D4E5F60718 /* RestorableCodexForkTagTests.swift in Sources */,
 				F6572062A1B2C3D4E5F60718 /* RestoreAdmissionRetryTests.swift in Sources */,
 				F6572042A1B2C3D4E5F60718 /* RestoredAgentShellActivityLivenessTests.swift in Sources */,
 				A54730000000000000000004 /* RestoredStartupInputResendTests.swift in Sources */,
@@ -16448,8 +16451,8 @@
 				B8624C020000000000000002 /* SidebarWorkspaceRowSuspensionTests.swift in Sources */,
 				C9A57505C9A57505C9A57505 /* SidebarWorkspaceScrollLayoutTests.swift in Sources */,
 				C0DE56010000000000000001 /* SidebarWorkspaceSelectionAnchorPolicyTests.swift in Sources */,
-					A6AC73040000000000000001 /* SidebarWorkspaceSnapshotAgentActivityTests.swift in Sources */,
-					62270F3DCECB4787D789CCE3 /* SidebarWorkspaceSnapshotRefreshPolicyTests.swift in Sources */,
+				A6AC73040000000000000001 /* SidebarWorkspaceSnapshotAgentActivityTests.swift in Sources */,
+				62270F3DCECB4787D789CCE3 /* SidebarWorkspaceSnapshotRefreshPolicyTests.swift in Sources */,
 				961200010000000000000001 /* SidebarWorkspaceSwitchLayoutFaultTests.swift in Sources */,
 				B8624C030000000000000003 /* SidebarWorkspaceTableSuspensionTests.swift in Sources */,
 				B804C0010000000000000001 /* SidebarWorkspaceTableTests.swift in Sources */,
@@ -16459,8 +16462,8 @@
 				A79840010000000000000001 /* SocketACLReloadRegressionTests.swift in Sources */,
 				5830CA11BAC0000000000002 /* SocketCallbackAwaiterMainThreadTests.swift in Sources */,
 				A7984AD10000000000000001 /* SocketConfigurationLifecycleTests.swift in Sources */,
-						F8000000A1B2C3D4E5F60718 /* SocketControlPasswordStoreTests.swift in Sources */,
-					93300001A1B2C3D4E5F60718 /* SocketTerminalBindingRegressionTests.swift in Sources */,
+				F8000000A1B2C3D4E5F60718 /* SocketControlPasswordStoreTests.swift in Sources */,
+				93300001A1B2C3D4E5F60718 /* SocketTerminalBindingRegressionTests.swift in Sources */,
 				7A0CE100000000000000072A /* SocksV5ClientTests.swift in Sources */,
 				80732A00000000000000000C /* SplitDividerOverlayTests.swift in Sources */,
 				BB778780CAC943B89A7D904E /* SSHConfiguredRemoteCommandHostTests+Harness.swift in Sources */,
@@ -16468,15 +16471,15 @@
 				797800040000000000000001 /* SSHDeepSleepReattachTests.swift in Sources */,
 				8410A0020000000000000002 /* SSHForegroundAuthenticationMarkerCleanupTests.swift in Sources */,
 				797800050000000000000001 /* SSHPersistentPTYRetryLifecycleTests.swift in Sources */,
-						C77070000000000000000006 /* SSHPTYAttachExitCodeClassifierTests.swift in Sources */,
+				C77070000000000000000006 /* SSHPTYAttachExitCodeClassifierTests.swift in Sources */,
 				A87500010000000000000001 /* SSHPTYAttachNoProgressRetryTests.swift in Sources */,
 				C12813000000000000000311 /* SSHPTYAttachParkedSessionCLITests.swift in Sources */,
-						6E8B6A69A468EF938B9AD8C2 /* SSHPTYAttachReconnectInputFilter.swift in Sources */,
-						E60610200000000000000003 /* SSHPTYAttachReconnectInputFilterControl.swift in Sources */,
-						E60610400000000000000003 /* SSHPTYAttachReconnectInputFilterPumpIO.swift in Sources */,
-						E60610100000000000000003 /* SSHPTYAttachReconnectInputFilterSequenceMatch.swift in Sources */,
-						E60610300000000000000003 /* SSHPTYAttachReconnectInputFilterState.swift in Sources */,
-						B6285B71BA6F82AF8F945E00 /* SSHPTYAttachReconnectInputFilterTests.swift in Sources */,
+				6E8B6A69A468EF938B9AD8C2 /* SSHPTYAttachReconnectInputFilter.swift in Sources */,
+				E60610200000000000000003 /* SSHPTYAttachReconnectInputFilterControl.swift in Sources */,
+				E60610400000000000000003 /* SSHPTYAttachReconnectInputFilterPumpIO.swift in Sources */,
+				E60610100000000000000003 /* SSHPTYAttachReconnectInputFilterSequenceMatch.swift in Sources */,
+				E60610300000000000000003 /* SSHPTYAttachReconnectInputFilterState.swift in Sources */,
+				B6285B71BA6F82AF8F945E00 /* SSHPTYAttachReconnectInputFilterTests.swift in Sources */,
 				873200000000000000000002 /* SSHRemoteCommandChainingTests.swift in Sources */,
 				FCB4880428BE4BB3990BCD51 /* SSHRemoteCommandCLIIntegrationTests.swift in Sources */,
 				D7AB1204800000000000000A /* SSHRemoteCWDRegressionTests.swift in Sources */,
@@ -16663,6 +16666,17 @@
 				A1F4B4A6F4F043FCB3288A3D /* WorkspaceSidebarProcessTitleObservationTests.swift in Sources */,
 				6B524A0CB34FD46A771335AB /* WorkspaceSplitStartupCommandTests.swift in Sources */,
 				F6120000A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift in Sources */,
+				C10900000000000000000082 /* WorkspaceStatusActionsTests.swift in Sources */,
+				C109000000000000000000BA /* WorkspaceStatusEntrancesTests.swift in Sources */,
+				C109000000000000000000B6 /* WorkspaceStatusHandOverTests.swift in Sources */,
+				C10900000000000000000131 /* WorkspaceStatusIconDrawingTests.swift in Sources */,
+				C109000000000000000000D2 /* WorkspaceStatusListStoreTests.swift in Sources */,
+				C10900000000000000000111 /* WorkspaceStatusProblemWordsTests.swift in Sources */,
+				C109000000000000000000A6 /* WorkspaceStatusRestoreTests.swift in Sources */,
+				C109000000000000000000A2 /* WorkspaceStatusSessionTests.swift in Sources */,
+				C109000000000000000000B8 /* WorkspaceStatusSocketTests.swift in Sources */,
+				C10900000000000000000092 /* WorkspaceStatusWaitTests.swift in Sources */,
+				C109000000000000000000B2 /* WorkspaceStatusWriteTests.swift in Sources */,
 				FA000000A1B2C3D4E5F60718 /* WorkspaceStressProfileTests.swift in Sources */,
 				D92310080000000000000001 /* WorkspaceSwitchBrowserTests.swift in Sources */,
 				0C42BCB86C8645B3AF6389C4 /* WorkspaceSwitchCoordinatorTests.swift in Sources */,
@@ -16676,15 +16690,6 @@
 				AB12CD340000000000000001 /* WorkspaceTodoNotificationRegressionTests.swift in Sources */,
 				41ECF85FFD13D233A0AC75A6 /* WorkspaceTodoSidebarModelTests.swift in Sources */,
 				5B38DFE53BE108F4DA2BDBB7 /* WorkspaceTodoSnapshotTests.swift in Sources */,
-				C109000000000000000000A2 /* WorkspaceStatusSessionTests.swift in Sources */,
-				C109000000000000000000B2 /* WorkspaceStatusWriteTests.swift in Sources */,
-				C109000000000000000000D2 /* WorkspaceStatusListStoreTests.swift in Sources */,
-				C10900000000000000000082 /* WorkspaceStatusActionsTests.swift in Sources */,
-				C10900000000000000000092 /* WorkspaceStatusWaitTests.swift in Sources */,
-				C109000000000000000000A6 /* WorkspaceStatusRestoreTests.swift in Sources */,
-				C109000000000000000000B6 /* WorkspaceStatusHandOverTests.swift in Sources */,
-				C109000000000000000000BA /* WorkspaceStatusEntrancesTests.swift in Sources */,
-				C109000000000000000000B8 /* WorkspaceStatusSocketTests.swift in Sources */,
 				6B524A0BA34FD46A771335AB /* WorkspaceUnitTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

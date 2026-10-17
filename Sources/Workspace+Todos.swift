@@ -51,10 +51,23 @@ extension Workspace {
 
     // MARK: - Status resolution
 
-    /// The status inferred from the current live signals.
-    var inferredTaskStatus: WorkspaceTaskStatus {
-        WorkspaceTaskStatus.inferred(from: taskStatusSignals())
-    }
+    /// The status inferred from live signals against `list`. (#cm-109.4)
+    func inferredTaskStatus( // (#cm-109.4)
+        list: WorkspaceStatusList, // (#cm-109.4)
+        signals: WorkspaceTaskStatusSignals? = nil, // (#cm-109.4)
+        decidingStatus: WorkspaceTaskStatus? = nil // (#cm-109.4)
+    ) -> WorkspaceTaskStatus { // (#cm-109.4)
+        WorkspaceTaskStatus.resolveInferred( // (#cm-109.4)
+            from: signals ?? taskStatusSignals(), // (#cm-109.4)
+            hasStatusList: list.source != .cmux, // (#cm-109.4)
+            decidingStatus: decidingStatus ?? todoState.statusOverride?.status // (#cm-109.4)
+        ) // (#cm-109.4)
+    } // (#cm-109.4)
+
+    /// The status inferred from the current live signals. // (#cm-109.4)
+    var inferredTaskStatus: WorkspaceTaskStatus { // (#cm-109.4)
+        inferredTaskStatus(list: AppDelegate.statusListInUse) // (#cm-109.4)
+    } // (#cm-109.4)
 
     /// The status to display and report: the manual override while its
     /// recorded inference still matches, otherwise the live inference. Pure
@@ -93,8 +106,24 @@ extension Workspace {
     /// factory silently), then on the row *palette* — a type that resolves
     /// colours from an immutable snapshot and never called this at all.
     func attentionTaskStatus(todoControlsEnabled: Bool) -> WorkspaceTaskStatus? {
-        todoControlsEnabled ? effectiveTaskStatus : nil
+        attentionTaskStatus(todoControlsEnabled: todoControlsEnabled, list: AppDelegate.statusListInUse) // (#cm-109.4)
     }
+
+    func attentionTaskStatus( // (#cm-109.4)
+        todoControlsEnabled: Bool, // (#cm-109.4)
+        list: WorkspaceStatusList // (#cm-109.4)
+    ) -> WorkspaceTaskStatus? { // (#cm-109.4)
+        guard todoControlsEnabled else { return nil } // (#cm-109.4)
+        let signals = taskStatusSignals() // (#cm-109.4)
+        let inferred = inferredTaskStatus(list: list, signals: signals) // (#cm-109.4)
+        let effective = statusResolution(list: list, inferred: inferred).effective // (#cm-109.4)
+        if list.source != .cmux { // (#cm-109.4)
+            if (effective == .todo || effective == .done) && signals.anyAgentNeedsInput { // (#cm-109.4)
+                return .needsAttention // (#cm-109.4)
+            } // (#cm-109.4)
+        } // (#cm-109.4)
+        return effective // (#cm-109.4)
+    } // (#cm-109.4)
 
     /// Clears the stored override when the live inference has moved away from
     /// what it was at override time (anti-rot). Call from explicit entry
@@ -111,14 +140,19 @@ extension Workspace {
     /// Applies a manual status override, recording the current inference so
     /// the override expires as soon as the live signals change lanes. Picking
     /// a lane re-engages the feature (clears any None opt-out).
-    func setTaskStatusOverride(_ status: WorkspaceTaskStatus) {
+    func setTaskStatusOverride(_ status: WorkspaceTaskStatus) { // (#cm-109.4)
+        setTaskStatusOverride(status, list: AppDelegate.statusListInUse) // (#cm-109.4)
+    } // (#cm-109.4)
+
+    func setTaskStatusOverride(_ status: WorkspaceTaskStatus, list: WorkspaceStatusList) { // (#cm-109.4)
         todoState.ownStatus = nil // (#cm-109)
-        todoState.statusHidden = false
-        todoState.statusOverride = WorkspaceTaskStatusOverride(
-            status: status,
-            inferredAtOverride: inferredTaskStatus
-        )
-    }
+        todoState.statusHidden = false // (#cm-109.4)
+        let inferred = inferredTaskStatus(list: list, decidingStatus: status) // (#cm-109.4)
+        todoState.statusOverride = WorkspaceTaskStatusOverride( // (#cm-109.4)
+            status: status, // (#cm-109.4)
+            inferredAtOverride: inferred // (#cm-109.4)
+        ) // (#cm-109.4)
+    } // (#cm-109.4)
 
     /// Returns the status to automatic by clearing the manual override (and
     /// any None opt-out), so the glyph shows the inferred lane again.

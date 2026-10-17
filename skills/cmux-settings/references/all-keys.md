@@ -96,14 +96,15 @@ Workspace tab and badge colors from Settings > Workspace Colors.
 
 ## workspaceStatuses
 
-Your own list of workspace statuses, in the order the Status menu and Cycle Status use. A top-level array of entries, each with the four fields below.
+Your own list of workspace statuses, in the order the Status menu and Cycle Status use. A top-level array of entries, each with the five fields below.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `workspaceStatuses.id` | string | required | The status's stable id, at least one character, used by `cmux workspace status set`. One of cmux's five ids (`todo`, `working`, `needs-attention`, `review`, `done`) makes that status behave as itself. |
 | `workspaceStatuses.name` | string | required | The name shown for the status, at least one character. |
 | `workspaceStatuses.extends` | `"todo"`, `"working"`, `"needs-attention"`, `"review"` or `"done"` | none | The cmux status this one behaves as. Needed for your own ids; ignored for one of cmux's five. |
-| `workspaceStatuses.color` | string | none | The color setting this status applies, written as the label of one of your workspace colors, a palette or display name, or a hex color such as #1565C0; setting this status replaces the workspace's color with it. No other field is allowed in an entry. |
+| `workspaceStatuses.color` | string | none | The color setting this status applies, written as the label of one of your workspace colors, a palette or display name, or a hex color such as #1565C0; setting this status replaces the workspace's color with it. |
+| `workspaceStatuses.icon` | `"dotted-ring"`, `"ring"`, `"quarter"`, `"half"`, `"three-quarters"`, `"full"`, `"check"`, `"pause"` or `null` | none | The shape drawn for this status: `dotted-ring` is a ring of twelve dashes, `ring` a plain ring, `quarter`, `half`, `three-quarters` and `full` a ring with a pie filled that far, `check` a filled disc with a tick, and `pause` a ring with two vertical bars inside. With none, or `null`, the status draws the glyph of the cmux status it extends. A name that is none of the eight keeps the entry and shows a problem in cmux's status-list notice. No other field is allowed in an entry. |
 
 ## sidebarAppearance
 

@@ -40,17 +40,17 @@ enum WorkspaceStatusPresentation {
     /// The name of the status a workspace shows, for the glyph's label and tooltip: the name on the picker's checked
     /// row of an entry (his word, or cmux's own name for a cmux status), or `nil` when no entry row is checked.
     static func checkedName(in picker: WorkspaceStatusPickerState?) -> String? {
-        guard let picker else { return nil }
-        for row in picker.rows where row.isChecked {
-            if case .status(let entry) = row.kind { return text(entry.label) }
-        }
-        return nil
+        checkedEntry(in: picker).map { text($0.label) }
     }
 
-    /// The color of a row's dot, worked out the way the Workspace Color menu works out its swatch.
-    static func dotColor(hex: String, isDark: Bool) -> NSColor {
-        WorkspaceTabColorSettings.displayNSColor(hex: hex, colorScheme: isDark ? .dark : .light, forceBright: false)
-            ?? NSColor(hex: hex) ?? .gray
+    /// The entry on the picker's checked entry row, or `nil` when no entry row is checked (the greyed row and Auto
+    /// have no entry). The glyph's name, icon and color are all read from it. (#cm-109.3)
+    static func checkedEntry(in picker: WorkspaceStatusPickerState?) -> WorkspaceStatusEntry? {
+        guard let picker else { return nil }
+        for row in picker.rows where row.isChecked {
+            if case .status(let entry) = row.kind { return entry }
+        }
+        return nil
     }
 
     /// The greyed row's words: a status a workspace holds that the list does not have.
@@ -95,15 +95,24 @@ struct WorkspaceStatusPaneState: Equatable {
     let hisWord: String?
     /// The rows the popover draws.
     let picker: WorkspaceStatusPickerState
+    /// The shape of the entry the header's glyph draws, or `nil` for the glyph of the cmux status. (#cm-109.3)
+    var icon: WorkspaceStatusIcon? = nil
+    /// The color the app resolved for that entry, or `nil` for the cmux status's own color. (#cm-109.3)
+    var colorHex: String? = nil
+    /// The color the app resolved for each status of the list, by id, for the popover's lanes. (#cm-109.3)
+    var colorHexes: [String: String] = [:]
 
     static func make(
         resolution: WorkspaceStatusResolution,
         inferred: WorkspaceTaskStatus,
         list: WorkspaceStatusList,
-        controlsEnabled: Bool
+        controlsEnabled: Bool,
+        colorHexes: [String: String] = [:]
     ) -> Self {
         let cmuxOverride: WorkspaceTaskStatus?
         if case .cmuxInEffect(let entry, _) = resolution { cmuxOverride = entry.behavesAs } else { cmuxOverride = nil }
+        // (#cm-109.3) The header draws his entry for the status in effect or, on Auto, for what cmux detects.
+        let shown = resolution.shownEntry(list: list)
         let hisWord: String?
         if controlsEnabled, let entry = resolution.inEffect, case .named(let word) = entry.label {
             hisWord = word
@@ -114,7 +123,10 @@ struct WorkspaceStatusPaneState: Equatable {
             hasOverride: controlsEnabled && resolution.inEffect != nil,
             cmuxOverride: cmuxOverride,
             hisWord: hisWord,
-            picker: WorkspaceStatusPicker().rows(resolution: resolution, inferred: inferred, isHidden: false, list: list)
+            picker: WorkspaceStatusPicker().rows(resolution: resolution, inferred: inferred, isHidden: false, list: list),
+            icon: shown?.icon,
+            colorHex: shown.flatMap { colorHexes[$0.id] },
+            colorHexes: colorHexes
         )
     }
 }
@@ -142,7 +154,8 @@ extension WorkspaceTodoStatusLane {
                     title: WorkspaceStatusPresentation.text(entry.label),
                     isSelected: row.isChecked,
                     action: row.action,
-                    colorHex: colorHexes[entry.id]
+                    colorHex: colorHexes[entry.id],
+                    icon: entry.icon // (#cm-109.3)
                 )
             case .held(let label, _):
                 return WorkspaceTodoStatusLane(

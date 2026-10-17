@@ -132,6 +132,12 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
         WorkspaceStatusPresentation.checkedName(in: model.picker) ?? status.displayName
     }
 
+    /// His entry for the status shown: the picker's checked entry row. `nil` for a status the list leaves out, which
+    /// draws today's glyph. (#cm-109.3)
+    private var checkedEntry: WorkspaceStatusEntry? {
+        WorkspaceStatusPresentation.checkedEntry(in: model.picker)
+    }
+
     private var labelText: String {
         String(localized: "sidebar.status.compactLabel", defaultValue: "Status: \(statusName)")
     }
@@ -147,7 +153,9 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
                 monochromeColor: monochromeColor,
                 neutralColor: neutralColor,
                 fontScale: fontScale,
-                name: statusName // (#cm-109)
+                name: statusName, // (#cm-109)
+                icon: checkedEntry?.icon, // (#cm-109.3)
+                colorHex: checkedEntry.flatMap { model.colorHexes[$0.id] } // (#cm-109.3)
             )
             .padding(.horizontal, 2)
             .padding(.vertical, 2)
@@ -170,7 +178,8 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
                 model: SidebarWorkspaceStatusPopoverModel(
                     inferred: model.inferred,
                     activeOverride: model.activeOverride,
-                    picker: picker
+                    picker: picker,
+                    colorHexes: model.colorHexes // (#cm-109.3)
                 ),
                 minWidth: 200,
                 maxHeight: 400,
@@ -213,6 +222,12 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     let fontScale: CGFloat
     /// His name for the status, for the tooltip; cmux's own name when `nil`. (#cm-109)
     var name: String? = nil
+    /// The shape his entry names, or `nil` to draw the glyph of `status`. (#cm-109.3)
+    var icon: WorkspaceStatusIcon? = nil
+    /// The color the app resolved for his entry, or `nil` to use `status`'s color role. (#cm-109.3)
+    var colorHex: String? = nil
+
+    @Environment(\.colorScheme) private var colorScheme
 
     private static let baseSize: CGFloat = 9
     private static let slotWidth: CGFloat = 11
@@ -225,6 +240,12 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
 
     private var statusColor: Color {
         if usesMonochrome { return monochromeColor }
+        // (#cm-109.3) His color for the status first, worked out as the Status menu's dot is (as stored in Light,
+        // brightened in Dark).
+        if let colorHex,
+           let color = WorkspaceTabColorSettings.displayNSColor(hex: colorHex, colorScheme: colorScheme, forceBright: false) {
+            return Color(nsColor: color)
+        }
         switch model.colorRole {
         case .neutral:
             return neutralColor
@@ -248,30 +269,56 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     var body: some View {
         let size = Self.baseSize * fontScale
         let tooltip = SidebarWorkspaceTaskStatusGlyphModel.tooltip(status: status, hasOverride: hasOverride, name: name)
-        ZStack {
-            Circle()
-                .stroke(statusColor, lineWidth: strokeWidth)
-            if model.fillFraction >= 1 {
-                Circle()
-                    .fill(statusColor)
-            } else if model.fillFraction > 0 {
-                SidebarStatusPieShape(fraction: model.fillFraction)
-                    .fill(statusColor)
-            }
-            if model.showsCheckmark {
-                SidebarStatusCheckmarkShape()
-                    .stroke(
-                        checkmarkColor,
-                        style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
-                    )
-            }
-        }
+        glyphBody // (#cm-109.3)
         .frame(width: size, height: size)
         // Fixed-width slot so titles align whether or not the pie is drawn
         // wider by the attention stroke.
         .frame(width: Self.slotWidth * fontScale, alignment: .center)
         .safeHelp(tooltip)
         .accessibilityLabel(tooltip)
+    }
+
+    /// The drawn shape: a named icon through the one drawing function, in a `Canvas`; otherwise upstream's circle,
+    /// pie and checkmark. (#cm-109.3)
+    @ViewBuilder
+    private var glyphBody: some View {
+        if let icon {
+            let color = statusColor
+            let tick = checkmarkColor
+            Canvas { context, canvasSize in
+                let environment = context.environment
+                let resolved = color.resolve(in: environment).cgColor
+                let tickResolved = tick.resolve(in: environment).cgColor
+                context.withCGContext { cgContext in
+                    WorkspaceStatusIconDrawing.draw(
+                        icon,
+                        in: cgContext,
+                        box: CGRect(origin: .zero, size: canvasSize),
+                        color: resolved,
+                        tickColor: tickResolved
+                    )
+                }
+            }
+        } else {
+            ZStack {
+                Circle()
+                    .stroke(statusColor, lineWidth: strokeWidth)
+                if model.fillFraction >= 1 {
+                    Circle()
+                        .fill(statusColor)
+                } else if model.fillFraction > 0 {
+                    SidebarStatusPieShape(fraction: model.fillFraction)
+                        .fill(statusColor)
+                }
+                if model.showsCheckmark {
+                    SidebarStatusCheckmarkShape()
+                        .stroke(
+                            checkmarkColor,
+                            style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
+                        )
+                }
+            }
+        }
     }
 
     private var checkmarkColor: Color {

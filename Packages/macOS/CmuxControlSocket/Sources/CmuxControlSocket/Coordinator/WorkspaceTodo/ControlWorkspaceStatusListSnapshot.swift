@@ -41,14 +41,14 @@ public struct ControlWorkspaceStatusListSnapshot: Sendable, Equatable {
     /// One problem the list has. `code` is a fixed word; the sentence is built from it in the coordinator.
     public struct Problem: Sendable, Equatable {
         /// `file_not_read`, `not_a_list`, `entry_not_an_object`, `no_id`, `reserved_id`, `repeated_id`, `no_name`,
-        /// `no_extends`, `unknown_extends` or `color_not_in_this_app`.
+        /// `no_extends`, `unknown_extends`, `unknown_icon` or `color_not_in_this_app`.
         public let code: String
         /// The 1-based place of the entry in the file, or `nil`.
         public let entry: Int?
         /// The entry's id, or `nil`.
         public let id: String?
-        /// The text that was refused (`unknown_extends`, `color_not_in_this_app`), or the reader's detail for
-        /// `file_not_read`; `nil` when there is none.
+        /// The text that was refused (`unknown_extends`, `unknown_icon`, `color_not_in_this_app`), or the reader's
+        /// detail for `file_not_read`; `nil` when there is none.
         public let value: String?
         /// For `file_not_read`: whether the file is missing. It changes the sentence and is not a field of the
         /// answer.

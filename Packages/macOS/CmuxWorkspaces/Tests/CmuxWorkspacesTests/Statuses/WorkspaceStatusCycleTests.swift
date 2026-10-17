@@ -46,10 +46,6 @@ import Testing
         #expect(target(.ownInEffect(F.x), list: F.other) == .entry(F.z))
     }
 
-    @Test func row4AnOwnStatusThatWaitsGoesUpToo() {
-        #expect(target(.ownWaiting(F.parked), list: F.toms) == .entry(F.upcoming))
-    }
-
     @Test func row4ACmuxStatusTheListHasGoesUpToo() {
         #expect(target(.cmuxInEffect(F.done, offered: true), list: F.toms) == .entry(F.dogfood))
     }
@@ -132,5 +128,33 @@ import Testing
         // Nothing in `other` is `done` or extends it; cmux's next after done is todo.
         #expect(autoTarget(inferred: .done, list: F.other) == .cmux(.todo))
         #expect(autoTarget(inferred: .needsAttention, list: F.other) == .cmux(.review))
+    }
+
+    @Test func todoWithRunningAgentOrDirtyGitStartsCycleAtWorking() {
+        let running = WorkspaceTaskStatusSignals(anyAgentRunning: true)
+        let dirty = WorkspaceTaskStatusSignals(isGitDirty: true)
+        let clean = WorkspaceTaskStatusSignals()
+        #expect(WorkspaceStatusCycle().target(resolution: .detected(.todo), list: F.toms, signals: running) == .entry(F.doingPrimary))
+        #expect(WorkspaceStatusCycle().target(resolution: .detected(.todo), list: F.toms, signals: dirty) == .entry(F.doingPrimary))
+        #expect(WorkspaceStatusCycle().target(resolution: .detected(.todo), list: F.toms, signals: clean) == .entry(F.paused))
+    }
+
+    /// O5: Cycle-hint negatives: detected .review + running gives no hint (starts at .review); a wait alone gives no hint.
+    @Test func cycleHintNegativesDetectedReviewOrWaitAloneGiveNoHint() {
+        let running = WorkspaceTaskStatusSignals(anyAgentRunning: true)
+        let waitAlone = WorkspaceTaskStatusSignals(anyAgentNeedsInput: true)
+        // .detected(.review) + running -> no hint, stays at .review:
+        #expect(WorkspaceStatusCycle().target(resolution: .detected(.review), list: F.toms, signals: running) == .entry(F.review))
+        // .detected(.todo) + wait alone -> no hint, stays at .todo (F.paused):
+        #expect(WorkspaceStatusCycle().target(resolution: .detected(.todo), list: F.toms, signals: waitAlone) == .entry(F.paused))
+        // Override in effect + running -> no hint:
+        let todoOverride = WorkspaceStatusEntry(id: "todo", name: nil)
+        #expect(
+            WorkspaceStatusCycle().target(
+                resolution: .cmuxInEffect(todoOverride, offered: false),
+                list: F.toms,
+                signals: running
+            ) == .entry(F.paused)
+        )
     }
 }
