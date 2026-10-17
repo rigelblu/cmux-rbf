@@ -32,7 +32,7 @@ struct WorkspaceStatusEntrancesTests {
         Entry(id: "doing", name: "Doing", extends: .working, color: "#112233"),
         Entry(id: "blocked", name: "Blocked", extends: .needsAttention, color: "Mauve"),
         Entry(id: "waiting", name: "Waiting", extends: .needsAttention),
-        Entry(id: "review", name: "Reviewing", icon: .threeQuarters),
+        Entry(id: "review", name: "Reviewing", icon: .shape(.threeQuarters)),
         Entry(id: "qa", name: "QA", extends: .review, color: "#334455"),
         Entry(id: "shipped", name: "Shipped", extends: .done, color: "#00AA00"),
         Entry(id: "done", name: "Done"),
@@ -358,7 +358,7 @@ struct WorkspaceStatusEntrancesTests {
         let snapshot = factory(workspace, list: Self.hisList, hexes: hexes, settings: settings).makeSnapshot()
         #expect(snapshot.todoStatusMenuModel?.colorHexes == hexes)
         let checked = try #require(WorkspaceStatusPresentation.checkedEntry(in: snapshot.todoStatusMenuModel?.picker))
-        #expect(checked.icon == .threeQuarters)
+        #expect(checked.icon == .shape(.threeQuarters))
     }
 
     // MARK: - Entrance rows 13 and 19

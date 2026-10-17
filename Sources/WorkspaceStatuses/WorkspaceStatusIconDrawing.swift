@@ -38,7 +38,7 @@ struct WorkspaceStatusIconGeometry: Equatable {
     var pauseBars: [CGRect]? // (#cm-109.3)
 }
 
-/// Draws the eight icons. One function for every place a status icon appears: the AppKit button, the SwiftUI glyph and
+/// Draws the eight icons and system symbols. One function for every place a status icon appears: the AppKit button, the SwiftUI glyph and
 /// the Status menu's image all call it, so no second copy of the shapes exists.
 enum WorkspaceStatusIconDrawing {
     /// Positions in points for a 9 pt box.
@@ -177,6 +177,144 @@ enum WorkspaceStatusIconDrawing {
             } // (#cm-109.3)
         } // (#cm-109.3)
     }
+
+    /// Arithmetic for positioning and scaling a symbol in a box (#cm-109.6).
+    /// Pure: numbers go in, rect comes out, so a test can read it without a bitmap.
+    static func symbolRect(
+        inkRect: CGRect,
+        imageSize: CGSize,
+        box: CGRect,
+        slot: CGFloat,
+        bounds: CGRect
+    ) -> CGRect {
+        guard inkRect.width > 0, inkRect.height > 0 else {
+            return CGRect(origin: box.origin, size: imageSize)
+        }
+        let maxInkWidth = min(slot, 2 * max(0, min(box.midX - bounds.minX, bounds.maxX - box.midX)))
+        let maxInkHeight = min(slot, 2 * max(0, min(box.midY - bounds.minY, bounds.maxY - box.midY)))
+        let scaleX = maxInkWidth / inkRect.width
+        let scaleY = maxInkHeight / inkRect.height
+        let k = min(1, scaleX, scaleY)
+        let w = imageSize.width * k
+        let h = imageSize.height * k
+        let inkCenter = CGPoint(x: inkRect.midX * k, y: inkRect.midY * k)
+        return CGRect(
+            x: box.midX - inkCenter.x,
+            y: box.midY - inkCenter.y,
+            width: w,
+            height: h
+        )
+    }
+
+    private struct MaskCacheKey: Hashable {
+        let name: String
+        let pointSize: CGFloat
+    }
+
+    struct SymbolMask: Sendable {
+        let mask: CGImage
+        let inkRect: CGRect
+        let imageSize: CGSize
+    }
+
+    @MainActor
+    private static var maskCache: [MaskCacheKey: SymbolMask] = [:]
+
+    static func bitmap2x(of image: NSImage) -> CGImage? {
+        let rep2x = image.representations.compactMap { $0 as? NSBitmapImageRep }.first(where: {
+            $0.pixelsWide >= Int(ceil(image.size.width * 2))
+        })
+        return rep2x?.cgImage ?? image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    }
+
+    @MainActor
+    static func maskAndInk(name: String, pointSize: CGFloat) -> SymbolMask? {
+        let key = MaskCacheKey(name: name, pointSize: pointSize)
+        if let cached = maskCache[key] {
+            return cached
+        }
+        guard let image = RenderableSystemSymbol.configuredAppKitImage(
+            systemName: name,
+            pointSize: pointSize,
+            weight: .regular
+        ) else {
+            return nil
+        }
+        guard let cgImage = bitmap2x(of: image) else {
+            return nil
+        }
+        let ink = measureInkRect(cgImage, imageSize: image.size)
+        let result = SymbolMask(mask: cgImage, inkRect: ink, imageSize: image.size)
+        maskCache[key] = result
+        return result
+    }
+
+    @MainActor
+    static func symbolMask(for icon: WorkspaceStatusGlyph?, fontScale: CGFloat) -> SymbolMask? {
+        guard case .symbol(let name) = icon else { return nil }
+        return maskAndInk(name: name, pointSize: baseSide * fontScale)
+    }
+
+    static func measureInkRect(_ cgImage: CGImage, imageSize: CGSize) -> CGRect {
+        let w = cgImage.width
+        let h = cgImage.height
+        guard w > 0, h > 0 else { return .zero }
+        var data = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(
+            data: &data,
+            width: w,
+            height: h,
+            bitsPerComponent: 8,
+            bytesPerRow: w * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return .zero }
+        ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var minX = w
+        var minY = h
+        var maxX = -1
+        var maxY = -1
+        for y in 0..<h {
+            for x in 0..<w where data[(y * w + x) * 4 + 3] > 0 {
+                minX = min(minX, x)
+                maxX = max(maxX, x)
+                minY = min(minY, y)
+                maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return .zero }
+        let scale = CGFloat(w) / imageSize.width
+        return CGRect(
+            x: CGFloat(minX) / scale,
+            y: CGFloat(minY) / scale,
+            width: CGFloat(maxX - minX + 1) / scale,
+            height: CGFloat(maxY - minY + 1) / scale
+        )
+    }
+
+    static func drawSymbol(
+        _ mask: SymbolMask,
+        in context: CGContext,
+        box: CGRect,
+        slot: CGFloat,
+        color: CGColor,
+        bounds: CGRect
+    ) {
+        let r = symbolRect(
+            inkRect: mask.inkRect,
+            imageSize: mask.imageSize,
+            box: box,
+            slot: slot,
+            bounds: bounds
+        )
+        context.saveGState()
+        context.translateBy(x: 0, y: r.minY + r.maxY)
+        context.scaleBy(x: 1, y: -1)
+        context.clip(to: r, mask: mask.mask)
+        context.setFillColor(color)
+        context.fill(r)
+        context.restoreGState()
+    }
 }
 
 /// The image the Status menu shows beside a row of his, in both sidebar renderers (#cm-109.3). It takes the dot's
@@ -187,9 +325,9 @@ enum WorkspaceStatusMenuImage {
     /// The image is two points larger than the 12 pt box, so upstream's 1.4 pt attention stroke on the box's edge falls inside it.
     static let side: CGFloat = 14
 
-    /// Whether a row gets an image: the dot's rule widened to an icon. A row with a color, or an entry that names an
+    /// Whether a row gets an image: the dot's rule widened to an icon or symbol. A row with a color, or an entry that names an
     /// icon; a row with neither keeps today's look.
-    static func shows(icon: WorkspaceStatusIcon?, colorHex: String?) -> Bool {
+    static func shows(icon: WorkspaceStatusGlyph?, colorHex: String?) -> Bool {
         icon != nil || colorHex != nil
     }
 
@@ -198,7 +336,7 @@ enum WorkspaceStatusMenuImage {
     @MainActor
     static func make(
         status: WorkspaceTaskStatus,
-        icon: WorkspaceStatusIcon?,
+        icon: WorkspaceStatusGlyph?,
         colorHex: String?,
         isDark: Bool
     ) -> NSImage {
@@ -221,9 +359,17 @@ enum WorkspaceStatusMenuImage {
             ).cgColor
         }
         let tick = SidebarRowTaskStatusGlyphButton.tickColor(model: model).cgColor
+        let symbolMask = WorkspaceStatusIconDrawing.symbolMask(for: icon, fontScale: glyphScale)
         return NSImage(size: NSSize(width: side, height: side), flipped: true) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
-            SidebarRowTaskStatusGlyphButton.drawGlyph(model: model, color: color, tickColor: tick, in: context, bounds: rect)
+            SidebarRowTaskStatusGlyphButton.drawGlyph(
+                model: model,
+                symbolMask: symbolMask,
+                color: color,
+                tickColor: tick,
+                in: context,
+                bounds: rect
+            )
             return true
         }
     }

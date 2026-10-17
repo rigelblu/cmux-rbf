@@ -4,10 +4,14 @@ import Foundation
 ///
 /// It takes the value as `JSONSerialization` gives it, so the package reads no file. One pass, top to bottom.
 /// A bad entry is skipped with one problem, the first rule it breaks, and the rest are kept. A kept entry whose
-/// `icon` is none of the eight names is kept with one problem too.
+/// `icon` is neither one of the eight names nor a known SF Symbol is kept with one problem too.
 public struct WorkspaceStatusListParser: Sendable {
-    /// Creates a parser.
-    public init() {}
+    private let symbolExists: @Sendable (String) -> Bool
+
+    /// Creates a parser. The default `symbolExists` check knows no symbols.
+    public init(symbolExists: @escaping @Sendable (String) -> Bool = { _ in false }) {
+        self.symbolExists = symbolExists
+    }
 
     /// Checks the value under the key.
     ///
@@ -80,15 +84,19 @@ public struct WorkspaceStatusListParser: Sendable {
     }
 
     /// The icon a value names. A missing key, `null` and blank text are all "not given": no icon, no problem.
-    /// Text that, trimmed, is exactly one of the eight names gives that icon. Anything else, a number included,
-    /// gives no icon and one problem that shows the value as he typed it.
+    /// Text that, trimmed, is exactly one of the eight names gives that shape. Text that `symbolExists` knows
+    /// gives that symbol. Anything else, a number included, gives no icon and one problem that shows the value as
+    /// he typed it.
     private func checkIcon(
         _ value: Any?,
         place: Int,
         id: String
-    ) -> (icon: WorkspaceStatusIcon?, problem: WorkspaceStatusListProblem?) {
+    ) -> (icon: WorkspaceStatusGlyph?, problem: WorkspaceStatusListProblem?) {
         guard let value, !(value is NSNull), !isBlankText(value) else { return (nil, nil) }
-        if let text = trimmedText(value), let icon = WorkspaceStatusIcon(rawValue: text) { return (icon, nil) }
+        if let text = trimmedText(value) {
+            if let icon = WorkspaceStatusIcon(rawValue: text) { return (.shape(icon), nil) }
+            if symbolExists(text) { return (.symbol(text), nil) }
+        }
         return (nil, .unknownIcon(entry: place, id: id, value: typed(value)))
     }
 

@@ -15,7 +15,7 @@ public enum WorkspaceStatusListProblem: Equatable, Sendable {
     /// One of his own with no `extends`. A misspelt key lands here.
     case noExtends(entry: Int, id: String)
     case unknownExtends(entry: Int, id: String, value: String)
-    /// The `icon` is none of the eight names. The entry is kept and draws as if it named no icon.
+    /// The `icon` is neither one of the eight names nor a known SF Symbol. The entry is kept and draws as if it named no icon.
     case unknownIcon(entry: Int, id: String, value: String)
     /// The color names nothing this app has. Found by the app, never by the parser.
     case colorNotInThisApp(id: String, color: String)

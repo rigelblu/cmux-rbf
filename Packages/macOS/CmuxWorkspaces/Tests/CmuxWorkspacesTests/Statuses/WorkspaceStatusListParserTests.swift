@@ -240,7 +240,7 @@ import Testing
     @Test func pauseIconParsesAndIsNotAnUnknownIcon() { // (#cm-109.3)
         let result = parser.parse([icon("a", "pause")] as [Any]) // (#cm-109.3)
         #expect(result.problems.isEmpty) // (#cm-109.3)
-        #expect(result.list?.entries.first?.icon?.rawValue == "pause") // (#cm-109.3)
+        #expect(result.list?.entries.first?.icon == .shape(.pause)) // (#cm-109.3)
     } // (#cm-109.3)
 
     @Test func eachOfTheEightNamesParsesToItsIcon() { // (#cm-109.3)
@@ -251,13 +251,13 @@ import Testing
         #expect(Set(names.map(\.1)) == Set(WorkspaceStatusIcon.allCases))
         let result = parser.parse(names.enumerated().map { icon("s\($0.offset)", $0.element.0) } as [Any])
         #expect(result.problems.isEmpty)
-        #expect(result.list?.entries.map(\.icon) == names.map { Optional($0.1) })
+        #expect(result.list?.entries.map(\.icon) == names.map { Optional(WorkspaceStatusGlyph.shape($0.1)) })
     }
 
     @Test func aNameWithSpacesRoundItIsReadTrimmed() {
         let result = parser.parse([icon("a", "  half\n")] as [Any])
         #expect(result.problems.isEmpty)
-        #expect(result.list?.entries.map(\.icon) == [.half])
+        #expect(result.list?.entries.map(\.icon) == [.shape(.half)])
     }
 
     @Test func aMissingKeyNullAndBlankTextAreNotGiven() throws {
@@ -302,7 +302,7 @@ import Testing
         let future = icon("todo", "dotted-ring", extends: nil)
         let bad = icon("working", "bogus", extends: nil)
         let result = parser.parse([done, review, future, bad] as [Any])
-        #expect(result.list?.entries.map(\.icon) == [.check, .threeQuarters, .dottedRing, nil])
+        #expect(result.list?.entries.map(\.icon) == [.shape(.check), .shape(.threeQuarters), .shape(.dottedRing), nil])
         #expect(result.list?.entries.map(\.isCmuxOwn) == [true, true, true, true])
         #expect(result.problems == [.unknownIcon(entry: 4, id: "working", value: "bogus")])
     }
@@ -339,13 +339,55 @@ import Testing
         let first = parser.parse(try json(text))
         #expect(first.problems == [.unknownIcon(entry: 3, id: "bad", value: "bogus")])
         guard let list = first.list else { Issue.record("no list"); return }
-        #expect(list.entries.map(\.icon) == [.check, .ring, nil, nil])
+        #expect(list.entries.map(\.icon) == [.shape(.check), .shape(.ring), nil, nil])
         let data = try JSONEncoder().encode(list.entries)
         let second = parser.parse(try JSONSerialization.jsonObject(with: data))
         #expect(second.problems.isEmpty)
         #expect(second.list?.entries == list.entries)
         let written = try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
         #expect(written.map { $0["icon"] as? String } == ["check", "ring", nil, nil])
+    }
+
+    // MARK: - `icon` from SF Symbols (cm-109.6)
+
+    @Test func aNameTheCheckKnowsGivesSymbol() {
+        let parser = WorkspaceStatusListParser(symbolExists: { $0 == "moon.zzz.fill" || $0 == "eye.fill" })
+        let result = parser.parse([icon("a", "moon.zzz.fill"), icon("b", "eye.fill")] as [Any])
+        #expect(result.problems.isEmpty)
+        #expect(result.list?.entries.map(\.icon) == [.symbol("moon.zzz.fill"), .symbol("eye.fill")])
+    }
+
+    @Test func ringAndPauseGiveShapesEvenWhenTheCheckKnowsThem() {
+        let parser = WorkspaceStatusListParser(symbolExists: { _ in true })
+        let result = parser.parse([icon("a", "ring"), icon("b", "pause")] as [Any])
+        #expect(result.problems.isEmpty)
+        #expect(result.list?.entries.map(\.icon) == [.shape(.ring), .shape(.pause)])
+    }
+
+    @Test func zzzWithACheckThatKnowsOnlyLowerZzzGivesOneUnknownIcon() {
+        let parser = WorkspaceStatusListParser(symbolExists: { $0 == "zzz" })
+        let result = parser.parse([icon("a", "Zzz")] as [Any])
+        #expect(result.list?.entries.map(\.icon) == [nil])
+        #expect(result.problems == [.unknownIcon(entry: 1, id: "a", value: "Zzz")])
+    }
+
+    @Test func aSymbolEntryEncodesToItsNameAndParsesBack() throws {
+        let parser = WorkspaceStatusListParser(symbolExists: { $0 == "moon.zzz.fill" })
+        let original = [
+            WorkspaceStatusEntry(id: "snooze", name: "Snooze", extends: .todo, color: "3: SNOOZE", icon: .symbol("moon.zzz.fill"))
+        ]
+        let data = try JSONEncoder().encode(original)
+        let written = try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        #expect(written.first?["icon"] as? String == "moon.zzz.fill")
+        let parsed = parser.parse(written)
+        #expect(parsed.problems.isEmpty)
+        #expect(parsed.list?.entries == original)
+    }
+
+    @Test func aSymbolWithNoCheckKeepsTheEntryWithNoIconAndGivesOneUnknownIcon() {
+        let result = parser.parse([icon("a", "moon.zzz.fill")] as [Any])
+        #expect(result.list?.entries.map(\.icon) == [nil])
+        #expect(result.problems == [.unknownIcon(entry: 1, id: "a", value: "moon.zzz.fill")])
     }
 
     @Test func aFieldTheParserDoesNotKnowIsIgnored() {

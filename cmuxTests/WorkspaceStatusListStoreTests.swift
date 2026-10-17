@@ -608,8 +608,8 @@ struct WorkspaceStatusListStoreTests {
         let store = rig.makeStore()
         store.load()
         let expected = [
-            Entry(id: "done", name: "Done", color: "1: DONE", icon: .check),
-            Entry(id: "paused", name: "Paused", extends: .todo, icon: .ring),
+            Entry(id: "done", name: "Done", color: "1: DONE", icon: .shape(.check)),
+            Entry(id: "paused", name: "Paused", extends: .todo, icon: .shape(.ring)),
             Entry(id: "odd", name: "Odd", extends: .working),
         ]
         #expect(store.list == WorkspaceStatusList(entries: expected, source: .file))

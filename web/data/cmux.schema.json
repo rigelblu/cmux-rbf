@@ -1326,8 +1326,16 @@
           },
           "icon": {
             "type": ["string", "null"],
-            "enum": ["dotted-ring", "ring", "quarter", "half", "three-quarters", "full", "check", "pause", null],
-            "description": "The shape drawn for this status: dotted-ring, a ring of twelve dashes; ring; quarter, half, three-quarters or full, a ring with a pie filled that far; check, a filled disc with a tick; or pause, a ring with two vertical bars inside. Leave it out, or write null, and the status draws the glyph of the cmux status it extends."
+            "anyOf": [
+              {
+                "enum": ["dotted-ring", "ring", "quarter", "half", "three-quarters", "full", "check", "pause", null]
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(\\.[a-z0-9]+)*$"
+              }
+            ],
+            "description": "The shape or symbol drawn for this status: one of cmux's shapes (dotted-ring, ring, quarter, half, three-quarters, full, check, pause), or the lowercase name of an SF Symbol on this Mac, such as moon.zzz.fill. An editor flags uppercase letters (such as Zzz) and emoji (such as 💤). Leave it out, or write null, and the status draws the glyph of the cmux status it extends."
           }
         }
       }

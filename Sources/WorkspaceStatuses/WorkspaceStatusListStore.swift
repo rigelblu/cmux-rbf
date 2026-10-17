@@ -1,3 +1,4 @@
+import AppKit
 import CmuxFoundation
 import CmuxWorkspaces
 import Foundation
@@ -33,7 +34,9 @@ final class WorkspaceStatusListStore {
     @ObservationIgnored private let resolveColor: (String) -> String?
     @ObservationIgnored private let paletteFingerprint: () -> String
     @ObservationIgnored private let clock: any Clock<Duration>
-    @ObservationIgnored private let parser = WorkspaceStatusListParser()
+    @ObservationIgnored private let parser = WorkspaceStatusListParser(
+        symbolExists: { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil }
+    )
 
     /// What the last load found, without the color problems.
     @ObservationIgnored private var loadProblems: [WorkspaceStatusListProblem] = []

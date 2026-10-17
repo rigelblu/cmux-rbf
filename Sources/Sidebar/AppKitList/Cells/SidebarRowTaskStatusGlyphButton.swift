@@ -19,14 +19,14 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         let colorScheme: ColorScheme
         /// His name for the status, for the label and tooltip; cmux's own name when `nil`. (#cm-109)
         var name: String? = nil
-        /// The shape his entry names, or `nil` to draw the glyph of `status`. (#cm-109.3)
-        var icon: WorkspaceStatusIcon? = nil
+        /// The shape or symbol his entry names, or `nil` to draw the glyph of `status`. (#cm-109.3)
+        var icon: WorkspaceStatusGlyph? = nil // (#cm-109.6)
         /// The color the app resolved for his entry, or `nil` to use `status`'s color role. (#cm-109.3)
         var colorHex: String? = nil
     }
 
     private nonisolated static let baseSize: CGFloat = 9 // (#cm-109.3)
-    private static let slotWidth: CGFloat = 11
+    private nonisolated static let slotWidth: CGFloat = 11 // (#cm-109.6)
     private nonisolated static let strokeWidth: CGFloat = 1 // (#cm-109.3)
     private nonisolated static let attentionStrokeWidth: CGFloat = 1.4 // (#cm-109.3)
     private static let padding: CGFloat = 2
@@ -101,8 +101,10 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let model, let context = NSGraphicsContext.current?.cgContext else { return }
+        let symbolMask = WorkspaceStatusIconDrawing.symbolMask(for: model.icon, fontScale: model.fontScale) // (#cm-109.6)
         Self.drawGlyph(
             model: model,
+            symbolMask: symbolMask, // (#cm-109.6)
             color: Self.statusColor(model: model, monochromeColor: monochromeColor, neutralColor: neutralColor).cgColor,
             tickColor: Self.tickColor(model: model).cgColor,
             in: context,
@@ -114,6 +116,7 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
     /// context, a rect and the model, so the Status menu's image draws what the row draws. (#cm-109.3)
     nonisolated static func drawGlyph( // (#cm-109.3)
         model: Model,
+        symbolMask: WorkspaceStatusIconDrawing.SymbolMask? = nil, // (#cm-109.6)
         color: CGColor,
         tickColor: CGColor,
         in context: CGContext,
@@ -126,10 +129,26 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
             width: size,
             height: size
         )
-        // (#cm-109.3) A named icon draws its own shape; anything else draws upstream's, below.
+        // (#cm-109.3) A named icon draws its own shape; a symbol draws its mask; anything else draws upstream's, below. (#cm-109.6)
         if let icon = model.icon { // (#cm-109.3)
-            WorkspaceStatusIconDrawing.draw(icon, in: context, box: circleRect, color: color, tickColor: tickColor) // (#cm-109.3)
-            return // (#cm-109.3)
+            switch icon { // (#cm-109.6)
+            case .shape(let shape): // (#cm-109.6)
+                WorkspaceStatusIconDrawing.draw(shape, in: context, box: circleRect, color: color, tickColor: tickColor) // (#cm-109.6)
+                return // (#cm-109.6)
+            case .symbol: // (#cm-109.6)
+                if let symbolMask { // (#cm-109.6)
+                    let slot = slotWidth * model.fontScale // (#cm-109.6)
+                    WorkspaceStatusIconDrawing.drawSymbol( // (#cm-109.6)
+                        symbolMask, // (#cm-109.6)
+                        in: context, // (#cm-109.6)
+                        box: circleRect, // (#cm-109.6)
+                        slot: slot, // (#cm-109.6)
+                        color: color, // (#cm-109.6)
+                        bounds: bounds // (#cm-109.6)
+                    ) // (#cm-109.6)
+                    return // (#cm-109.6)
+                } // (#cm-109.6)
+            } // (#cm-109.6)
         } // (#cm-109.3)
         let glyph = SidebarWorkspaceTaskStatusGlyphModel(status: model.status)
         let strokeWidth = glyph.colorRole == .attention ? attentionStrokeWidth : Self.strokeWidth

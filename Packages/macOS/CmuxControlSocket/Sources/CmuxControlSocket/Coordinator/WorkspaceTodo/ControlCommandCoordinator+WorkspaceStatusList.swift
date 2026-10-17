@@ -61,9 +61,9 @@ extension ControlCommandCoordinator {
             return "Entry \(entry), \"\(id)\", extends \"\(value)\", which is not a cmux status, so it was skipped; "
                 + "the cmux statuses are todo, working, needs-attention, review and done."
         case "unknown_icon":
-            return "Entry \(entry), \"\(id)\", names the icon \"\(value)\", which cmux does not have, so it is kept "
-                + "and drawn as if it named no icon; the icons are dotted-ring, ring, quarter, half, three-quarters, "
-                + "full, check and pause." // (#cm-109.3)
+            return "Entry \(entry), \"\(id)\", names the icon \"\(value)\", which is neither one of cmux's shapes "
+                + "nor an SF Symbol on this Mac, so it is drawn as if it named none. Use dotted-ring, ring, quarter, "
+                + "half, three-quarters, full, check or pause, or an SF Symbol's name in lowercase, such as moon.zzz.fill." // (#cm-109.6)
         case "color_not_in_this_app":
             return "The status \"\(id)\" names the color \"\(value)\", which this app does not have, "
                 + "so setting it keeps the workspace's color."
