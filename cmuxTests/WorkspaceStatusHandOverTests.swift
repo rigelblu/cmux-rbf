@@ -142,25 +142,54 @@ struct WorkspaceStatusHandOverTests {
         }
     }
 
-    /// S5. A cmux status set during a wait is removed when the wait ends, and the removal writes no color. The color
-    /// the menu chose after the pick must still be there: a removal that called the write path would put Done's
-    /// color back, through the app's own writer, and this reads the workspace and the store.
+    /// S5. With cmux's five, a cmux status set during a wait is removed when the wait ends, and the removal writes no
+    /// color. The color the menu chose after the pick must still be there.
     @Test func theEndOfAWaitWritesNoColorThroughTheAppsWriter() throws {
-        try underHisList {
-            try inATabManager { manager, workspace, customizations in
-                let panelId = try #require(workspace.focusedPanelId)
+        try inATabManager { manager, workspace, customizations in
+            let panelId = try #require(workspace.focusedPanelId)
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+            WorkspaceStatusActions.app(list: .cmuxFive).apply(.done, to: [workspace], requireControls: false)
+            #expect(workspace.todoState.statusOverride?.status == .done)
+            manager.applyWorkspaceColor("#ABCDEF", to: [workspace])
+            #expect(workspace.customColor == "#ABCDEF")
+            #expect(recordedColor(customizations, workspace) == "#ABCDEF")
+
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .running)
+            #expect(workspace.todoState.statusOverride == nil, "the status set during the wait is still stored")
+            #expect(workspace.customColor == "#ABCDEF", "the end of the wait wrote a color")
+            #expect(recordedColor(customizations, workspace) == "#ABCDEF")
+        }
+    }
+
+    /// Sub-step 3f. Under his list, status set during wait is kept after wait ends; with .cmuxFive, it is cleared.
+    @Test func statusSetDuringWaitIsKeptUnderHisListAndClearedWithCmuxFive() throws {
+        try inATabManager { manager, workspace, _ in
+            let panelId = try #require(workspace.focusedPanelId)
+
+            // 1. Under his list: status set during wait is kept after wait ends.
+            try underHisList {
                 workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
                 WorkspaceStatusActions.app().apply(.done, to: [workspace], requireControls: false)
+                workspace.todoState.statusOverride = WorkspaceTaskStatusOverride(
+                    status: .done,
+                    inferredAtOverride: .needsAttention
+                )
                 #expect(workspace.todoState.statusOverride?.status == .done)
-                #expect(workspace.customColor == "#778899")
-                #expect(recordedColor(customizations, workspace) == "#778899")
-                manager.applyWorkspaceColor("#ABCDEF", to: [workspace])
 
                 workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .running)
-                #expect(workspace.todoState.statusOverride == nil, "the status set during the wait is still stored")
-                #expect(workspace.customColor == "#ABCDEF", "the end of the wait wrote a color")
-                #expect(recordedColor(customizations, workspace) == "#ABCDEF")
+                #expect(workspace.todoState.statusOverride != nil, "status set during wait is kept under his list")
+                #expect(workspace.todoState.statusOverride?.status == .done)
             }
+
+            // 2. With .cmuxFive: status set during wait is cleared when wait ends.
+            workspace.todoState.statusOverride = nil
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+            WorkspaceStatusActions.app(list: .cmuxFive).apply(.done, to: [workspace], requireControls: false)
+            #expect(workspace.todoState.statusOverride?.status == .done)
+            #expect(workspace.todoState.statusOverride?.inferredAtOverride == .needsAttention)
+
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .running)
+            #expect(workspace.todoState.statusOverride == nil, "status set during wait is cleared with cmuxFive")
         }
     }
 

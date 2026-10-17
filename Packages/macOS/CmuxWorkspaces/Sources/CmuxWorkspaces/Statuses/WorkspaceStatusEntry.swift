@@ -17,13 +17,23 @@ public struct WorkspaceStatusEntry: Equatable, Sendable, Encodable {
     public let extends: WorkspaceTaskStatus?
     /// The color as typed. It is resolved when a status is set, never here.
     public let color: String?
+    /// The shape this entry draws, or `nil` when none was named: it then draws the glyph of the cmux status it
+    /// extends. It belongs to the status, never to a workspace.
+    public let icon: WorkspaceStatusIcon?
 
     /// Creates an entry.
-    public init(id: String, name: String?, extends: WorkspaceTaskStatus? = nil, color: String? = nil) {
+    public init(
+        id: String,
+        name: String?,
+        extends: WorkspaceTaskStatus? = nil,
+        color: String? = nil,
+        icon: WorkspaceStatusIcon? = nil
+    ) {
         self.id = id
         self.name = name
         self.extends = extends
         self.color = color
+        self.icon = icon
     }
 
     /// What to draw for this entry: his word when it has one, else cmux's own name for the status it behaves as.

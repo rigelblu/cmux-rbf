@@ -43,7 +43,7 @@ struct WorkspaceStatusRestoreTests {
         #expect(again.taskStatusOwnID == "parked")
         let restored = Workspace()
         restored.restoreTodoState(from: again)
-        #expect(restored.todoState.ownStatus == WorkspaceOwnStatus(id: "parked", heldThroughWait: false))
+        #expect(restored.todoState.ownStatus == WorkspaceOwnStatus(id: "parked"))
         #expect(restored.todoState.statusOverride == nil)
         #expect(!restored.todoState.statusHidden)
     }
@@ -124,17 +124,16 @@ struct WorkspaceStatusRestoreTests {
         #expect(restored.todoState.statusOverride == nil)
     }
 
-    @Test func theWaitFlagIsNotSaved() throws {
+    @Test func hisStatusIsSavedAndRestored() throws {
         let workspace = Workspace()
         let panelId = try #require(workspace.focusedPanelId)
         workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
         A.actions().apply(.status(id: "parked"), to: [workspace], requireControls: false)
-        #expect(workspace.todoState.ownStatus?.heldThroughWait == true)
         var snapshot = blankSnapshot()
         snapshot.captureTodoState(from: workspace)
         let restored = Workspace()
         restored.restoreTodoState(from: try roundTripped(snapshot))
-        #expect(restored.todoState.ownStatus == WorkspaceOwnStatus(id: "parked", heldThroughWait: false))
+        #expect(restored.todoState.ownStatus == WorkspaceOwnStatus(id: "parked"))
     }
 
     @Test func aChangeOfHisStatusChangesTheAutosaveFingerprint() {

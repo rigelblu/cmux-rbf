@@ -220,6 +220,134 @@ import Testing
         #expect(result.list?.entries.map(\.color) == ["2: REVIEW", "#ff8800", nil, nil, nil, nil, "  2: REVIEW \n"])
     }
 
+    /// `cm-109.3`: a kept entry with an `icon` the parser does not know reports `unknown_icon`. Written to compile
+    /// before the field exists, so it is the one test of the slice that can be seen failing on the unchanged code.
+    @Test func aBogusIconOnAKeptEntryGivesOneUnknownIconProblem() {
+        var entry = good("a"); entry["icon"] = "bogus"
+        let result = parser.parse([entry] as [Any])
+        #expect(result.list?.entries.map(\.id) == ["a"])
+        #expect(result.problems.map(\.code) == ["unknown_icon"])
+    }
+
+    // MARK: - `icon` (cm-109.3)
+
+    private func icon(_ id: String, _ icon: Any?, extends: String? = "todo") -> [String: Any] {
+        var entry = good(id, extends: extends)
+        if let icon { entry["icon"] = icon }
+        return entry
+    }
+
+    @Test func pauseIconParsesAndIsNotAnUnknownIcon() { // (#cm-109.3)
+        let result = parser.parse([icon("a", "pause")] as [Any]) // (#cm-109.3)
+        #expect(result.problems.isEmpty) // (#cm-109.3)
+        #expect(result.list?.entries.first?.icon?.rawValue == "pause") // (#cm-109.3)
+    } // (#cm-109.3)
+
+    @Test func eachOfTheEightNamesParsesToItsIcon() { // (#cm-109.3)
+        let names: [(String, WorkspaceStatusIcon)] = [
+            ("dotted-ring", .dottedRing), ("ring", .ring), ("quarter", .quarter), ("half", .half),
+            ("three-quarters", .threeQuarters), ("full", .full), ("check", .check), ("pause", .pause) // (#cm-109.3)
+        ]
+        #expect(Set(names.map(\.1)) == Set(WorkspaceStatusIcon.allCases))
+        let result = parser.parse(names.enumerated().map { icon("s\($0.offset)", $0.element.0) } as [Any])
+        #expect(result.problems.isEmpty)
+        #expect(result.list?.entries.map(\.icon) == names.map { Optional($0.1) })
+    }
+
+    @Test func aNameWithSpacesRoundItIsReadTrimmed() {
+        let result = parser.parse([icon("a", "  half\n")] as [Any])
+        #expect(result.problems.isEmpty)
+        #expect(result.list?.entries.map(\.icon) == [.half])
+    }
+
+    @Test func aMissingKeyNullAndBlankTextAreNotGiven() throws {
+        // `JSONSerialization` gives `null` as `NSNull`.
+        let null = try #require(try json("[{ \"id\": \"b\", \"name\": \"B\", \"extends\": \"todo\", \"icon\": null }]") as? [Any])
+        let result = parser.parse([icon("a", nil), null[0], icon("c", ""), icon("d", "  \n ")] as [Any])
+        #expect(result.problems.isEmpty)
+        #expect(result.list?.entries.map(\.id) == ["a", "b", "c", "d"])
+        #expect(result.list?.entries.map(\.icon) == [nil, nil, nil, nil])
+    }
+
+    @Test func anIconThatIsNotOneOfTheSevenKeepsTheEntryWithNoIconAndGivesOneProblem() throws {
+        let text = """
+        [
+          { "id": "a", "name": "A", "extends": "todo", "icon": "bogus" },
+          { "id": "b", "name": "B", "extends": "todo", "icon": "Half" },
+          { "id": "c", "name": "C", "extends": "todo", "icon": 5 },
+          { "id": "d", "name": "D", "extends": "todo", "icon": true },
+          { "id": "e", "name": "E", "extends": "todo", "icon": " Ring " },
+          { "id": "f", "name": "F", "extends": "todo", "icon": ["half"] }
+        ]
+        """
+        let result = parser.parse(try json(text))
+        #expect(result.list?.entries.map(\.id) == ["a", "b", "c", "d", "e", "f"])
+        #expect(result.list?.entries.map(\.icon) == [nil, nil, nil, nil, nil, nil])
+        #expect(result.problems == [
+            .unknownIcon(entry: 1, id: "a", value: "bogus"),
+            .unknownIcon(entry: 2, id: "b", value: "Half"),
+            .unknownIcon(entry: 3, id: "c", value: "5"),
+            .unknownIcon(entry: 4, id: "d", value: "true"),
+            .unknownIcon(entry: 5, id: "e", value: " Ring "),
+            .unknownIcon(entry: 6, id: "f", value: "[\"half\"]"),
+        ])
+        #expect(result.problems.map(\.code) == Array(repeating: "unknown_icon", count: 6))
+    }
+
+    /// His Done, Review and Future name `check`, `three-quarters` and `dotted-ring`; the first two are cmux's own ids,
+    /// which return early, where `extends` is ignored. An icon is read there too.
+    @Test func anIconOnOneOfCmuxsFiveIsKeptAndAWrongOneIsReported() {
+        let done = icon("done", "check", extends: nil)
+        let review = icon("review", "three-quarters", extends: "todo")
+        let future = icon("todo", "dotted-ring", extends: nil)
+        let bad = icon("working", "bogus", extends: nil)
+        let result = parser.parse([done, review, future, bad] as [Any])
+        #expect(result.list?.entries.map(\.icon) == [.check, .threeQuarters, .dottedRing, nil])
+        #expect(result.list?.entries.map(\.isCmuxOwn) == [true, true, true, true])
+        #expect(result.problems == [.unknownIcon(entry: 4, id: "working", value: "bogus")])
+    }
+
+    /// An entry skipped for another reason gets that problem only, even with a bad icon.
+    @Test func anEntrySkippedForAnotherReasonGetsNoIconProblem() {
+        let noName: [String: Any] = ["id": "a", "extends": "todo", "icon": "bogus"]
+        let noExtends: [String: Any] = ["id": "b", "name": "B", "icon": "bogus"]
+        let badExtends = icon("c", "bogus", extends: "paused")
+        let noID: [String: Any] = ["name": "D", "extends": "todo", "icon": "bogus"]
+        let repeated = icon("e", "bogus")
+        let result = parser.parse([good("e"), noName, noExtends, badExtends, noID, repeated] as [Any])
+        #expect(result.list?.entries.map(\.id) == ["e"])
+        #expect(result.problems == [
+            .noName(entry: 2, id: "a"),
+            .noExtends(entry: 3, id: "b"),
+            .unknownExtends(entry: 4, id: "c", value: "paused"),
+            .noID(entry: 5),
+            .repeatedID(entry: 6, id: "e"),
+        ])
+    }
+
+    /// The stored copy is written with `JSONEncoder` from the entries and read back through this parser, and the store
+    /// refuses a copy that reads back with any problem. The copy keeps the icon the parser found, never the text.
+    @Test func entriesEncodedAndParsedAgainAreEqualWithNoProblem() throws {
+        let text = """
+        [
+          { "id": "done", "name": "Done", "icon": "check", "color": "1: DONE" },
+          { "id": "paused", "name": "Paused", "extends": "todo", "icon": "ring" },
+          { "id": "bad", "name": "Bad", "extends": "working", "icon": "bogus" },
+          { "id": "none-given", "name": "None given", "extends": "review", "icon": null }
+        ]
+        """
+        let first = parser.parse(try json(text))
+        #expect(first.problems == [.unknownIcon(entry: 3, id: "bad", value: "bogus")])
+        guard let list = first.list else { Issue.record("no list"); return }
+        #expect(list.entries.map(\.icon) == [.check, .ring, nil, nil])
+        let data = try JSONEncoder().encode(list.entries)
+        let second = parser.parse(try JSONSerialization.jsonObject(with: data))
+        #expect(second.problems.isEmpty)
+        #expect(second.list?.entries == list.entries)
+        let written = try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        #expect(written.map { $0["icon"] as? String } == ["check", "ring", nil, nil])
+    }
+
     @Test func aFieldTheParserDoesNotKnowIsIgnored() {
         var entry = good("a"); entry["hidden"] = true; entry["whatever"] = ["x": 1]
         let result = parser.parse([entry] as [Any])

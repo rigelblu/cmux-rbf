@@ -60,6 +60,10 @@ extension ControlCommandCoordinator {
         case "unknown_extends":
             return "Entry \(entry), \"\(id)\", extends \"\(value)\", which is not a cmux status, so it was skipped; "
                 + "the cmux statuses are todo, working, needs-attention, review and done."
+        case "unknown_icon":
+            return "Entry \(entry), \"\(id)\", names the icon \"\(value)\", which cmux does not have, so it is kept "
+                + "and drawn as if it named no icon; the icons are dotted-ring, ring, quarter, half, three-quarters, "
+                + "full, check and pause." // (#cm-109.3)
         case "color_not_in_this_app":
             return "The status \"\(id)\" names the color \"\(value)\", which this app does not have, "
                 + "so setting it keeps the workspace's color."

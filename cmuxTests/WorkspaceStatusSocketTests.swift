@@ -1,4 +1,5 @@
 import CmuxControlSocket
+import CmuxSidebar
 import CmuxWorkspaces
 import Foundation
 import Testing
@@ -289,8 +290,32 @@ struct WorkspaceStatusSocketTests {
         }
     }
 
+    /// A cmux status set by hand lapses when detection without states moves away (e.g. PR opened) (11_expected-results.md:98, 19_technical-system.md:432).
     @Test func aLapsedCmuxStatusIsNotInEffectAndStaysStored() throws {
         try underList(Self.hisText) {
+            try inATabManager { _, workspace, _ in
+                let panelId = try #require(workspace.focusedPanelId)
+                workspace.setTaskStatusOverride(.done)
+                workspace.panelGitBranches[panelId] = SidebarGitBranchState(branch: "feature/pr", isDirty: false)
+                workspace.panelPullRequests[panelId] = SidebarPullRequestState(
+                    number: 1,
+                    label: "PR #1",
+                    url: try #require(URL(string: "https://example.com/pr/1")),
+                    status: .open,
+                    branch: "feature/pr"
+                )
+                let answer = try read(workspace)
+                #expect(answer.effective == "review")
+                #expect(answer.overrideStatus == nil && answer.overrideInferredAt == nil)
+                #expect(answer.statusID == nil)
+                #expect(workspace.todoState.statusOverride?.status == .done, "the read removed the lapsed status")
+            }
+        }
+    }
+
+    /// cmuxFive twin: under cmuxFive with no list, running an agent lapses Done.
+    @Test func aLapsedCmuxStatusIsNotInEffectAndStaysStoredUnderCmuxFive() throws {
+        try underList("{}") {
             try inATabManager { _, workspace, _ in
                 let panelId = try #require(workspace.focusedPanelId)
                 workspace.setTaskStatusOverride(.done)
@@ -299,7 +324,7 @@ struct WorkspaceStatusSocketTests {
                 #expect(answer.effective == "working")
                 #expect(answer.overrideStatus == nil && answer.overrideInferredAt == nil)
                 #expect(answer.statusID == nil)
-                #expect(workspace.todoState.statusOverride?.status == .done, "the read removed the lapsed status")
+                #expect(workspace.todoState.statusOverride?.status == .done)
             }
         }
     }
@@ -317,20 +342,23 @@ struct WorkspaceStatusSocketTests {
         }
     }
 
-    @Test func oneOfHisOwnWhileAnAgentWaitsIsHeldAndNotInEffect() throws {
+    /// With his list, detection without states in a wait is .todo, so doing (which extends working) stays in effect (19_technical-system.md:435).
+    @Test func oneOfHisOwnWhileAnAgentWaitsStaysInEffect() throws {
         try underList(Self.hisText) {
             try inATabManager { _, workspace, _ in
                 let panelId = try #require(workspace.focusedPanelId)
                 workspace.setOwnStatus(A.hisEntries[0])
                 workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
                 let answer = try read(workspace)
-                #expect(answer.effective == "needs-attention")
-                #expect(answer.overrideStatus == nil && answer.overrideInferredAt == nil)
+                #expect(answer.effective == "working")
+                #expect(answer.overrideStatus == "working")
+                #expect(answer.overrideInferredAt == "todo")
                 #expect(answer.statusID == "doing")
             }
         }
     }
 
+    /// One of his own picked during a wait is in effect, and overrideInferredAt reports detection without states (.todo) (19_technical-system.md:435).
     @Test func oneOfHisOwnPickedDuringAWaitIsInEffectInThatWait() throws {
         try underList(Self.hisText) {
             try inATabManager { _, workspace, _ in
@@ -340,11 +368,12 @@ struct WorkspaceStatusSocketTests {
                 let answer = try read(workspace)
                 #expect(answer.effective == "todo")
                 #expect(answer.overrideStatus == "todo")
-                #expect(answer.overrideInferredAt == "needs-attention")
+                #expect(answer.overrideInferredAt == "todo")
                 #expect(answer.statusID == "parked")
             }
         }
     }
+
 
     @Test func oneOfHisOwnThatTheListLacksIsHeldAndNotInEffect() throws {
         try underList(Self.hisText) {

@@ -13,10 +13,48 @@ import Testing
 /// never through `effectiveTaskStatus` in a bare test host, where it reads Needs Attention in both waits whether the
 /// hold works or not.
 @MainActor
-@Suite("Workspace status and the end of a wait")
+@Suite("Workspace status and the end of a wait", .serialized)
 struct WorkspaceStatusWaitTests {
     private typealias A = WorkspaceStatusActionsTests
     private let key = "claude_code"
+    private struct NoDefaultsSuite: Error {}
+
+    /// Runs `body` with `AppDelegate.shared` holding a store that has loaded his list.
+    private func underHisList(_ body: () throws -> Void) throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WorkspaceStatusWaitTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("cmux.json")
+        let hisText = """
+        { "workspaceStatuses": [
+          { "id": "doing", "name": "Doing", "extends": "working", "color": "#112233" },
+          { "id": "parked", "name": "Parked", "extends": "todo", "color": "#445566" },
+          { "id": "review", "name": "Review", "color": "#333333" },
+          { "id": "done", "name": "Done", "color": "#778899" }
+        ] }
+        """
+        try hisText.write(to: file, atomically: true, encoding: .utf8)
+        let suite = "WorkspaceStatusWaitTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else { throw NoDefaultsSuite() }
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let store = WorkspaceStatusListStore(
+            fileURL: file,
+            defaults: defaults,
+            resolveColor: { _ in nil },
+            paletteFingerprint: { "fixed" },
+            clock: ContinuousClock()
+        )
+        store.load()
+        let previous = AppDelegate.shared
+        let delegate = AppDelegate()
+        delegate.workspaceStatusListStore = store
+        AppDelegate.shared = delegate
+        defer { AppDelegate.shared = previous }
+        try body()
+    }
 
     private func panel(_ workspace: Workspace) throws -> UUID {
         try #require(workspace.focusedPanelId)
@@ -27,7 +65,8 @@ struct WorkspaceStatusWaitTests {
         let panelId = try panel(workspace)
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)
         let writes = A.Writes()
-        A.actions(writes: writes).apply(.done, to: [workspace], requireControls: false)
+        let cmuxList = WorkspaceStatusList(entries: A.hisEntries, source: .cmux)
+        A.actions(cmuxList, writes: writes).apply(.done, to: [workspace], requireControls: false)
         #expect(workspace.todoState.statusOverride?.status == .done)
         #expect(workspace.customColor == "#222222")
         #expect(writes.all.count == 1)
@@ -54,48 +93,66 @@ struct WorkspaceStatusWaitTests {
         #expect(workspace.statusResolution(list: .cmuxFive).effective == .done)
     }
 
-    /// One of his own picked during a wait is held through it, stays after it, and shows Needs Attention at the next.
-    @Test func oneOfHisOwnPickedDuringAWaitStaysAfterItAndShowsNeedsAttentionAtTheNext() throws {
+    /// With a list in use, one of his own picked during a wait is kept through it and stays in effect after it,
+    /// and stays in effect at the next wait (11_expected-results.md:67, 71, 19_technical-system.md:435).
+    @Test func oneOfHisOwnPickedDuringAWaitStaysAfterItAndStaysInEffectAtTheNext() throws {
         let workspace = Workspace()
         let panelId = try panel(workspace)
         let list = A.hisList
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)
         A.actions().apply(.status(id: "parked"), to: [workspace], requireControls: false)
-        #expect(workspace.todoState.ownStatus == WorkspaceOwnStatus(id: "parked", heldThroughWait: true))
+        #expect(workspace.todoState.ownStatus == WorkspaceOwnStatus(id: "parked"))
         let held = workspace.statusResolution(list: list)
         #expect(held.held == .inEffect)
         #expect(held.effective == .todo)
 
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .running)
-        #expect(workspace.todoState.ownStatus == WorkspaceOwnStatus(id: "parked", heldThroughWait: false))
+        #expect(workspace.todoState.ownStatus == WorkspaceOwnStatus(id: "parked"))
         #expect(workspace.statusResolution(list: list).held == .inEffect)
 
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)
         let next = workspace.statusResolution(list: list)
-        #expect(next.held == .waiting, "the status held through the first wait also held through the second")
-        #expect(next.effective == .needsAttention)
+        #expect(next.held == .inEffect, "with his list, detection without states is .todo so it stays in effect")
+        #expect(next.effective == .todo)
     }
 
-    /// The control: one picked while idle is never held, so it shows Needs Attention in the wait that follows.
-    @Test func oneOfHisOwnPickedWhileIdleShowsNeedsAttentionInTheNextWait() throws {
+    /// With a list in use, one picked while idle is kept and stays in effect in the next wait because detection without states is .todo (11_expected-results.md:67, 71, 19_technical-system.md:435).
+    @Test func oneOfHisOwnPickedWhileIdleStaysInEffectInTheNextWait() throws {
         let workspace = Workspace()
         let panelId = try panel(workspace)
         A.actions().apply(.status(id: "parked"), to: [workspace], requireControls: false)
-        #expect(workspace.todoState.ownStatus == WorkspaceOwnStatus(id: "parked", heldThroughWait: false))
+        #expect(workspace.todoState.ownStatus == WorkspaceOwnStatus(id: "parked"))
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)
-        #expect(workspace.statusResolution(list: A.hisList).held == .waiting)
+        #expect(workspace.statusResolution(list: A.hisList).held == .inEffect)
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .running)
         #expect(workspace.statusResolution(list: A.hisList).held == .inEffect)
         #expect(workspace.todoState.ownStatus?.id == "parked")
     }
 
-    /// A cmux status set during a wait stays in effect in that wait.
+    /// Under his list, Review set by hand during a wait records detection without states (.todo) and stays in effect in that wait.
     @Test func aCmuxStatusSetDuringAWaitIsInEffectInThatWait() throws {
+        try underHisList {
+            let workspace = Workspace()
+            let panelId = try panel(workspace)
+            workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)
+            let actions = A.actions()
+            actions.apply(.status(id: "review"), to: [workspace], requireControls: false)
+            #expect(workspace.todoState.statusOverride?.status == .review)
+            #expect(workspace.todoState.statusOverride?.inferredAtOverride == .todo)
+            #expect(workspace.statusResolution(list: A.hisList).effective == .review)
+        }
+    }
+
+    /// In a bare test host with no list loaded in AppDelegate, applying a cmux status through actions with his list
+    /// passes the actions' list to setTaskStatusOverride, recording detection without states (.todo).
+    @Test func actionsPassesItsListToSetTaskStatusOverrideInBareHost() throws {
         let workspace = Workspace()
         let panelId = try panel(workspace)
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)
-        workspace.setTaskStatusOverride(.review)
-        #expect(workspace.statusResolution(list: A.hisList).effective == .review)
+        let actions = A.actions()
+        actions.apply(.status(id: "review"), to: [workspace], requireControls: false)
+        #expect(workspace.todoState.statusOverride?.status == .review)
+        #expect(workspace.todoState.statusOverride?.inferredAtOverride == .todo)
     }
 
     /// Two agents wait; the wait ends only when the second stops.
@@ -113,25 +170,13 @@ struct WorkspaceStatusWaitTests {
         #expect(workspace.todoState.statusOverride == nil)
     }
 
-    @Test func theFlagOfOneOfHisOwnClearsOnlyWhenTheLastAgentStopsWaiting() throws {
-        let workspace = Workspace()
-        let first = try panel(workspace)
-        let second = try #require(workspace.newTerminalSplit(from: first, orientation: .horizontal, focus: false)).id
-        workspace.setAgentLifecycle(key: key, panelId: first, lifecycle: .needsInput)
-        workspace.setAgentLifecycle(key: key, panelId: second, lifecycle: .needsInput)
-        A.actions().apply(.status(id: "parked"), to: [workspace], requireControls: false)
-        workspace.setAgentLifecycle(key: key, panelId: first, lifecycle: .running)
-        #expect(workspace.todoState.ownStatus?.heldThroughWait == true)
-        workspace.setAgentLifecycle(key: key, panelId: second, lifecycle: .running)
-        #expect(workspace.todoState.ownStatus == WorkspaceOwnStatus(id: "parked", heldThroughWait: false))
-    }
-
     /// The table after the end of a wait.
     @Test func theTableHoldsAfterTheEndOfAWait() throws {
         let workspace = Workspace()
         let panelId = try panel(workspace)
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)
-        A.actions().apply(.done, to: [workspace], requireControls: false)
+        let cmuxList = WorkspaceStatusList(entries: A.hisEntries, source: .cmux)
+        A.actions(cmuxList).apply(.done, to: [workspace], requireControls: false)
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .idle)
         A.expectHolds(workspace, override: nil, own: nil, hidden: false, "the end of a wait")
         workspace.setAgentLifecycle(key: key, panelId: panelId, lifecycle: .needsInput)

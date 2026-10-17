@@ -52,10 +52,6 @@ import Testing
         #expect(checked(state(.cmuxInEffect(F.done, offered: true), inferred: .todo)) == ["done"])
     }
 
-    @Test func oneOfHisOwnThatWaitsIsCheckedAndAutoIsNot() {
-        #expect(checked(state(.ownWaiting(F.parked), inferred: .needsAttention)) == ["parked"])
-    }
-
     @Test func noneIsCheckedOnlyWhenHidden() {
         #expect(checked(state(.detected(.todo), inferred: .todo, isHidden: true)) == ["none"])
         #expect(checked(state(.detected(.todo), inferred: .todo)).contains("none") == false)
@@ -64,7 +60,7 @@ import Testing
     /// Today's rows are gated by None: with None on, no row for a status is checked.
     @Test func withNoneOnNoStatusRowIsChecked() {
         let held: [WorkspaceStatusResolution] = [
-            .ownInEffect(F.parked), .ownWaiting(F.parked), .cmuxInEffect(F.done, offered: true),
+            .ownInEffect(F.parked), .cmuxInEffect(F.done, offered: true),
         ]
         for resolution in held {
             let rows = state(resolution, inferred: .needsAttention, isHidden: true).rows
@@ -112,7 +108,6 @@ import Testing
             .cmuxInEffect(F.done, offered: true),
             .cmuxLapsed(detected: .working),
             .ownInEffect(F.parked),
-            .ownWaiting(F.parked),
         ]
         for resolution in resolutions {
             let ids = state(resolution, inferred: .todo).rows.map(\.id)
@@ -149,7 +144,6 @@ import Testing
         let notInEffect: [WorkspaceStatusResolution] = [
             .detected(.todo),
             .cmuxLapsed(detected: .todo),
-            .ownWaiting(F.parked),
             .ownNotListed(id: "retired", detected: .todo),
         ]
         for resolution in inEffect {
@@ -209,9 +203,9 @@ import Testing
         // A cmux status the list leaves out, in effect, then after detection moved.
         #expect(checked(rows(override: F.override(.working, at: .review), inferred: .review)) == [" held"])
         #expect(checked(rows(override: F.override(.working, at: .review), inferred: .done)) == ["auto"])
-        // A cmux status the list has, set while an agent waits and still in that wait.
-        #expect(checked(rows(override: F.override(.done, at: .working), inferred: .working)) == ["done"])
-        #expect(checked(rows(override: F.override(.review, at: .needsAttention), inferred: .needsAttention)) == ["review"])
+        // A cmux status the list has: set at a state before release, stays in effect under detection without states .todo.
+        #expect(checked(rows(override: F.override(.done, at: .working), inferred: .todo)) == ["done"])
+        #expect(checked(rows(override: F.override(.review, at: .needsAttention), inferred: .todo)) == ["review"])
         // None.
         #expect(checked(rows(inferred: .todo, isHidden: true)) == ["none"])
         // A list that is not his: x, y and z. Review is left out of it.
@@ -219,10 +213,10 @@ import Testing
         #expect(rows(inferred: .todo, list: other).rows.map(\.id) == ["auto", "x", "y", "z", "none"])
         #expect(checked(rows(own: WorkspaceOwnStatus(id: "y"), inferred: .needsAttention, list: other)) == ["y"])
         #expect(
-            checked(rows(override: F.override(.review, at: .needsAttention), inferred: .needsAttention, list: other))
+            checked(rows(override: F.override(.review, at: .needsAttention), inferred: .todo, list: other))
                 == [" held"]
         )
-        #expect(checked(rows(override: F.override(.review, at: .needsAttention), inferred: .todo, list: other)) == ["auto"])
+        #expect(checked(rows(override: F.override(.review, at: .needsAttention), inferred: .review, list: other)) == ["auto"])
     }
 
     /// With None on, only None is checked: the greyed row is checked like an entry's row, only when None is off.
@@ -281,9 +275,7 @@ import Testing
             }
         }
         for id in ["parked", "paused", "retired"] {
-            for flag in [false, true] {
-                held.append(("own \(id) held \(flag)", nil, WorkspaceOwnStatus(id: id, heldThroughWait: flag)))
-            }
+            held.append(("own \(id)", nil, WorkspaceOwnStatus(id: id)))
         }
 
         var cases = 0
@@ -307,6 +299,6 @@ import Testing
                 }
             }
         }
-        #expect(cases == 7 * (1 + 25 + 6) * 5 * 2)
+        #expect(cases == 7 * (1 + 25 + 3) * 5 * 2)
     }
 }

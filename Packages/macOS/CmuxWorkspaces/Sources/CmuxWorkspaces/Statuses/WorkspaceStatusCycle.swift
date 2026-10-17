@@ -21,7 +21,8 @@ public struct WorkspaceStatusCycle: Sendable {
     ///   - list: The list in use.
     public func target(
         resolution: WorkspaceStatusResolution,
-        list: WorkspaceStatusList
+        list: WorkspaceStatusList,
+        signals: WorkspaceTaskStatusSignals? = nil
     ) -> Target? {
         // Row 1: cmux's five in use, so the press is cmux's own.
         if list.source == .cmux { return .cmux(resolution.effective.next) }
@@ -39,7 +40,10 @@ public struct WorkspaceStatusCycle: Sendable {
         }
 
         // Row 5: anything else starts from the status in effect.
-        let start = resolution.effective
+        var start = resolution.effective
+        if start == .todo && resolution.inEffect == nil, let signals, signals.anyAgentRunning || signals.isGitDirty {
+            start = .working
+        }
         // Row 6: an entry whose id is that status.
         if let entry = list.entry(id: start.rawValue) { return .entry(entry) }
         // Row 7: else the first entry from the top that extends it.

@@ -399859,6 +399859,125 @@
         }
       }
     },
+    "sidebar.agentWaiting.tooltip": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "وكيل ينتظر إجابتك"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent čeka na vaš odgovor"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En agent venter på dit svar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Agent wartet auf Ihre Antwort"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An agent is waiting for your answer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un agente está esperando tu respuesta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un agent attend votre réponse"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un agente sta aspettando la tua risposta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エージェントがあなたの返答を待っています"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "에이전트가 답변을 기다리고 있습니다"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En agent venter på svaret ditt"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent czeka na Twoją odpowiedź"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um agente está aguardando sua resposta"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Агент ожидает вашего ответа"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "เอเจนต์กำลังรอคำตอบของคุณ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir aracı yanıtınızı bekliyor"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Агент очікує на вашу відповідь"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理正在等待您的答复"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理程式正在等待您的回覆"
+          }
+        }
+      }
+    },
     "sidebar.browserStack.closeGroup": {
       "extractionState": "manual",
       "localizations": {
@@ -414860,6 +414979,65 @@
           "stringUnit": {
             "state": "translated",
             "value": "La entrada %1$lld, «%2$@», extiende «%3$@», que no es un estado de cmux, así que se omitió. Usa todo, working, needs-attention, review o done."
+          }
+        }
+      }
+    },
+    "sidebar.statusFile.problem.unknownIcon": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإدخال %1$lld، ‏“%2$@”، يسمّي الأيقونة “%3$@” وهي غير موجودة في cmux، لذلك يُرسم كما لو لم يسمِّ أي أيقونة. استخدم dotted-ring أو ring أو quarter أو half أو three-quarters أو full أو check أو pause."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eintrag %1$lld, „%2$@“, nennt das Symbol „%3$@“, das cmux nicht kennt, und wird daher so gezeichnet, als hätte er keines genannt. Verwenden Sie dotted-ring, ring, quarter, half, three-quarters, full, check oder pause."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entry %1$lld, “%2$@”, names the icon “%3$@”, which cmux does not have, so it is drawn as if it named none. Use dotted-ring, ring, quarter, half, three-quarters, full, check or pause."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada %1$lld, «%2$@», nombra el icono «%3$@», que cmux no tiene, así que se dibuja como si no nombrara ninguno. Usa dotted-ring, ring, quarter, half, three-quarters, full, check o pause."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’entrée %1$lld, « %2$@ », nomme l’icône « %3$@ », que cmux ne connaît pas ; elle est donc dessinée comme si elle n’en nommait aucune. Utilisez dotted-ring, ring, quarter, half, three-quarters, full, check ou pause."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目 %1$lld「%2$@」のアイコン「%3$@」は cmux にないため、アイコンなしとして描画されます。dotted-ring、ring、quarter、half、three-quarters、full、check、pause のいずれかを使ってください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "항목 %1$lld “%2$@”의 아이콘 “%3$@”이(가) cmux에 없으므로 아이콘이 없는 것처럼 표시됩니다. dotted-ring, ring, quarter, half, three-quarters, full, check, pause 중 하나를 사용하세요."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 项“%2$@”指定的图标“%3$@”不在 cmux 中，将按未指定图标绘制。请使用 dotted-ring、ring、quarter、half、three-quarters、full、check 或 pause。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 項「%2$@」指定的圖示「%3$@」不在 cmux 中，將依未指定圖示繪製。請使用 dotted-ring、ring、quarter、half、three-quarters、full、check 或 pause。"
           }
         }
       }

@@ -13,6 +13,8 @@ struct SidebarWorkspaceTaskStatusSnapshot: Equatable {
     /// The color the app resolved for each status of the list, by id, for the rows' dots. Taken from the store by the
     /// parent that builds the snapshot; a row never reads the store. (#cm-109)
     var colorHexes: [String: String] = [:]
+    /// Whether an agent in this workspace needs input (waiting on human). Captured from live signals. (#cm-109.4)
+    var isAgentWaiting: Bool = false // (#cm-109.4)
 
     /// What a workspace shows against `list`, worked out from what it holds and what cmux detects. One function for
     /// the factory and for `capture`, so the glyph and the picker's rows come from one read of the list. (#cm-109)
@@ -33,21 +35,27 @@ struct SidebarWorkspaceTaskStatusSnapshot: Equatable {
         list: WorkspaceStatusList,
         colorHexes: [String: String] = [:]
     ) -> Self {
-        let inferred = WorkspaceTaskStatus.inferred(from: workspace.taskStatusSignals(orderedPanelIds: orderedPanelIds))
-        let override = workspace.todoState.statusOverride
-        let resolution = WorkspaceTaskStatusOverride.effectiveStatus(override: override, inferred: inferred)
+        let signals = workspace.taskStatusSignals(orderedPanelIds: orderedPanelIds) // (#cm-109.4)
+        let inferred = workspace.inferredTaskStatus(list: list, signals: signals) // (#cm-109.4)
         let held = Self.resolution(of: workspace, inferred: inferred, list: list) // (#cm-109)
-        return Self(
-            inferred: inferred,
-            activeOverride: resolution.shouldClearOverride ? nil : override?.status,
-            isHidden: workspace.todoState.statusHidden,
-            picker: WorkspaceStatusPicker().rows(
-                resolution: held,
-                inferred: inferred,
-                isHidden: workspace.todoState.statusHidden,
-                list: list
-            ),
-            colorHexes: colorHexes
-        )
+        let activeOverride: WorkspaceTaskStatus? // (#cm-109.4)
+        if case .cmuxInEffect(let entry, _) = held { // (#cm-109.4)
+            activeOverride = entry.behavesAs // (#cm-109.4)
+        } else { // (#cm-109.4)
+            activeOverride = nil // (#cm-109.4)
+        } // (#cm-109.4)
+        return Self( // (#cm-109.4)
+            inferred: inferred, // (#cm-109.4)
+            activeOverride: activeOverride, // (#cm-109.4)
+            isHidden: workspace.todoState.statusHidden, // (#cm-109.4)
+            picker: WorkspaceStatusPicker().rows( // (#cm-109.4)
+                resolution: held, // (#cm-109.4)
+                inferred: inferred, // (#cm-109.4)
+                isHidden: workspace.todoState.statusHidden, // (#cm-109.4)
+                list: list // (#cm-109.4)
+            ), // (#cm-109.4)
+            colorHexes: colorHexes, // (#cm-109.4)
+            isAgentWaiting: signals.anyAgentNeedsInput // (#cm-109.4)
+        ) // (#cm-109.4)
     }
 }

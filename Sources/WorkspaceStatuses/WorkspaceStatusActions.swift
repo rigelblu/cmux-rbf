@@ -72,9 +72,9 @@ struct WorkspaceStatusActions {
             for workspace in workspaces {
                 // A cmux id is never stored as one of his own (Decisions, 2026-10-12, point 19).
                 if let cmux {
-                    workspace.setTaskStatusOverride(cmux)
+                    workspace.setTaskStatusOverride(cmux, list: list) // (#cm-109.4)
                 } else if let entry {
-                    workspace.setOwnStatus(entry)
+                    workspace.setOwnStatus(entry, list: list)
                 }
                 writeColorIfAny(of: entry, to: workspace)
             }

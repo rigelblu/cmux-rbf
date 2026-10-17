@@ -16603,13 +16603,18 @@ struct TabItemView: View, Equatable {
         )
 
         let showsLoadingSpinner = showsAgentActivity && workspaceSnapshot.activeCodingAgentCount > 0
-        let badgeOnLeading = unreadCount > 0 && settings.notificationBadgePosition == .leading
-        let badgeOnTrailing = unreadCount > 0 && settings.notificationBadgePosition == .trailing
-        let spinnerOnLeading = showsLoadingSpinner && settings.loadingSpinnerPosition == .leading
-        let spinnerOnTrailing = showsLoadingSpinner && settings.loadingSpinnerPosition == .trailing
-        let leadingSlotActive = badgeOnLeading || spinnerOnLeading
-        let trailingStatusActive = badgeOnTrailing || spinnerOnTrailing
-        let titleRowSpacing: CGFloat = spinnerOnLeading ? 6 : 8
+        let showsHand = workspaceSnapshot.showsRaisedHand // (#cm-109.3)
+        let slotResolution = SidebarWorkspaceSlotResolution.resolve( // (#cm-109.3)
+            showsHand: showsHand, // (#cm-109.3)
+            showsSpinner: showsLoadingSpinner, // (#cm-109.3)
+            unreadCount: unreadCount, // (#cm-109.3)
+            loadingSpinnerPosition: settings.loadingSpinnerPosition, // (#cm-109.3)
+            notificationBadgePosition: settings.notificationBadgePosition, // (#cm-109.3)
+            showsCloseButton: false // (#cm-109.3)
+        ) // (#cm-109.3)
+        let leadingSlotActive = slotResolution.leading != .none // (#cm-109.3)
+        let trailingStatusActive = slotResolution.trailing != .none // (#cm-109.3)
+        let titleRowSpacing: CGFloat = slotResolution.leading == .spinner ? 6 : 8 // (#cm-109.3)
         let badgeFont = magnifiedFont(scaledFontSize(9), weight: .semibold)
         let spinnerTooltip = SidebarWorkspaceLoadingTooltip.text(count: workspaceSnapshot.activeCodingAgentCount)
         // Must match the AppKit cell, which derives this from the palette's
@@ -16621,7 +16626,13 @@ struct TabItemView: View, Equatable {
             HStack(alignment: .sidebarTitleFirstLineCenter, spacing: titleRowSpacing) {
 
                 if leadingSlotActive {
-                    SidebarWorkspaceLeadingStatusSlot(showsBadge: badgeOnLeading, showsSpinner: spinnerOnLeading, unreadCount: unreadCount, side: badgeOnLeading ? scaledUnreadBadgeSize : scaledLoadingSpinnerSize, spinnerSide: scaledLoadingSpinnerSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip)
+                    let badgeOnLeading = unreadCount > 0 && settings.notificationBadgePosition == .leading // (#cm-109.4)
+                    let leadingSlotSide = SidebarWorkspaceSlotResolution.leadingSlotSide( // (#cm-109.4)
+                        leadingBadgeCandidate: badgeOnLeading, // (#cm-109.3)
+                        scaledUnreadBadgeSize: scaledUnreadBadgeSize, // (#cm-109.4)
+                        scaledLoadingSpinnerSize: scaledLoadingSpinnerSize // (#cm-109.4)
+                    ) // (#cm-109.4)
+                    SidebarWorkspaceLeadingStatusSlot(showsBadge: slotResolution.leading == .badge, showsSpinner: slotResolution.leading == .spinner, unreadCount: unreadCount, side: leadingSlotSide, spinnerSide: scaledLoadingSpinnerSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip) // (#cm-109.3)
                 }
 
                 if workspaceSnapshot.isPinned {
@@ -16667,6 +16678,18 @@ struct TabItemView: View, Equatable {
                     .transition(.opacity)
                 }
 
+                if slotResolution.showsHand { // (#cm-109.3)
+                    CmuxSystemSymbolImage( // (#cm-109.3)
+                        systemName: "hand.raised.fill", // (#cm-109.3)
+                        pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.3)
+                        tint: Color(nsColor: spinnerColor) // (#cm-109.3)
+                    ) // (#cm-109.3)
+                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
+                    .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                    .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
+                } // (#cm-109.3)
+
                 SidebarCloudWorkspaceBadgeView(label: workspaceSnapshot.cloudWorkspaceLabel, pointSize: scaledFontSize(10), tint: activeSecondaryColor(0.7))
 
                 if isEditing {
@@ -16711,7 +16734,7 @@ struct TabItemView: View, Equatable {
                 }
 
                 if trailingStatusActive || canCloseWorkspace {
-                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: spinnerOnTrailing, showsBadge: badgeOnTrailing, unreadCount: unreadCount, side: scaledUnreadBadgeSize, width: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace)
+                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, side: scaledUnreadBadgeSize, width: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace) // (#cm-109.3)
                 }
             }
 

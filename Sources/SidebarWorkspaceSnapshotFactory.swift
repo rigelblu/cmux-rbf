@@ -22,11 +22,9 @@ struct SidebarWorkspaceSnapshotFactory {
     /// that decision is where `#cm-22`'s shipped defect lived. The caller sits
     /// above the sidebar's lazy boundary and already owns store access.
     let todoControlsEnabled: Bool
-    /// The list of statuses in use, passed in as a value, which the glyph's resolution uses (`SidebarWorkspaceTaskStatusSnapshot.resolution(…list:)`). One read
-    /// still reaches the app's store: `workspace.attentionTaskStatus` goes through `effectiveTaskStatus`, which reads
-    /// `AppDelegate.statusListInUse` (`Workspace+Todos.swift:65`). In the app both lists are the same; a test that hands
-    /// this factory a list under a bare delegate gets cmux's five from that one read. cmux's five by default, because
-    /// upstream's tests build the factory without one. (#cm-109)
+    /// The list of statuses in use, passed in as a value, which the glyph's resolution uses
+    /// (`SidebarWorkspaceTaskStatusSnapshot.resolution(…list:)`) and which `attentionTaskStatus(todoControlsEnabled:list:)`
+    /// receives. cmux's five by default, because upstream's tests build the factory without one. (#cm-109)
     var statusList: WorkspaceStatusList = .cmuxFive
     /// The color the app resolved for each status of the list, by id, for the rows' dots. (#cm-109)
     var statusColorHexes: [String: String] = [:]
@@ -80,19 +78,21 @@ struct SidebarWorkspaceSnapshotFactory {
             inferred: taskStatusInput.inferred,
             list: statusList
         )
-        // (#cm-109) A wait is an event, not a status: while an agent waits on a workspace that holds one of his
-        // statuses, the row keeps that status's glyph. The workspace still reports needs-attention and the row stays
-        // in play through `attentionTaskStatus` below.
-        var ownWaitingGlyph: WorkspaceTaskStatus?
-        if case .ownWaiting(let entry) = taskStatusResolution { ownWaitingGlyph = entry.behavesAs }
-        let hasManualTaskStatus = workspaceStatusVisible
-            && (taskStatusResolution.inEffect != nil || ownWaitingGlyph != nil)
-        let todoStatusMenuModel = inferredTaskStatus.map { inferred in
-            SidebarWorkspaceCompactStatusMenuModel.resolve(
-                inferred: inferred,
-                override: workspace.todoState.statusOverride,
-                picker: taskStatusInput.picker
-            )
+        let hasManualTaskStatus = workspaceStatusVisible // (#cm-109.3)
+            && taskStatusResolution.inEffect != nil // (#cm-109.3)
+        let menuActiveOverride: WorkspaceTaskStatus? // (#cm-109.4)
+        if case .cmuxInEffect(let entry, _) = taskStatusResolution { // (#cm-109.4)
+            menuActiveOverride = entry.behavesAs // (#cm-109.4)
+        } else { // (#cm-109.4)
+            menuActiveOverride = nil // (#cm-109.4)
+        } // (#cm-109.4)
+        let todoStatusMenuModel = inferredTaskStatus.map { inferred in // (#cm-109.4)
+            SidebarWorkspaceCompactStatusMenuModel.resolve( // (#cm-109.4)
+                inferred: inferred, // (#cm-109.4)
+                activeOverride: menuActiveOverride, // (#cm-109.4)
+                picker: taskStatusInput.picker, // (#cm-109.4)
+                colorHexes: taskStatusInput.colorHexes // (#cm-109.3)
+            ) // (#cm-109.4)
         }
         let checklistProgress = workspace.checklistProgressSummary
         // Suppression asks "is this workspace parked?", which is not the same
@@ -108,8 +108,12 @@ struct SidebarWorkspaceSnapshotFactory {
         // cached and rebuilt on refresh rather than per frame, so that is the
         // cheaper half of the trade against two definitions.
         let attentionTaskStatus = workspace.attentionTaskStatus(
-            todoControlsEnabled: todoControlsEnabled
+            todoControlsEnabled: todoControlsEnabled, // (#cm-109.4)
+            list: statusList // (#cm-109.4)
         )
+        let isAgentWaiting = taskStatusInput.isAgentWaiting // (#cm-109.3)
+        let hasStatusList = statusList.source != .cmux // (#cm-109.3)
+        let showsRaisedHand = hasStatusList && isAgentWaiting && settings.details.showAgentActivity // (#cm-109.3)
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
             title: workspace.title,
@@ -154,7 +158,7 @@ struct SidebarWorkspaceSnapshotFactory {
             listeningPorts: detailVisibility.showsPorts ? workspace.listeningPorts : [],
             finderDirectoryPath: WorkspaceFinderDirectoryResolver.path(for: workspace),
             mediaActivity: workspace.browserMediaActivity,
-            taskStatus: workspaceStatusVisible ? (ownWaitingGlyph ?? taskStatusResolution.effective) : nil, // (#cm-109)
+            taskStatus: workspaceStatusVisible ? taskStatusResolution.effective : nil, // (#cm-109)
             todoStatusMenuModel: todoStatusMenuModel,
             hasManualTaskStatus: hasManualTaskStatus,
             attentionTaskStatus: attentionTaskStatus,
@@ -162,7 +166,8 @@ struct SidebarWorkspaceSnapshotFactory {
             checklistCompletedCount: checklistProgress.completedCount,
             checklistTotalCount: checklistProgress.totalCount,
             checklistFirstUncheckedText: checklistProgress.firstUncheckedText,
-            taskStatusInput: taskStatusInput
+            taskStatusInput: taskStatusInput,
+            showsRaisedHand: showsRaisedHand // (#cm-109.3)
         )
     }
 

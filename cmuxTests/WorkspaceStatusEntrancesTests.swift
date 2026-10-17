@@ -1,5 +1,10 @@
 import AppKit
+import SwiftUI
+import CmuxAppKitSupportUI
 import CmuxCommandPalette
+import CmuxControlSocket
+import CmuxSettings
+import CmuxSidebar
 import CmuxWorkspaces
 import Combine
 import Foundation
@@ -27,7 +32,7 @@ struct WorkspaceStatusEntrancesTests {
         Entry(id: "doing", name: "Doing", extends: .working, color: "#112233"),
         Entry(id: "blocked", name: "Blocked", extends: .needsAttention, color: "Mauve"),
         Entry(id: "waiting", name: "Waiting", extends: .needsAttention),
-        Entry(id: "review", name: "Reviewing"),
+        Entry(id: "review", name: "Reviewing", icon: .threeQuarters),
         Entry(id: "qa", name: "QA", extends: .review, color: "#334455"),
         Entry(id: "shipped", name: "Shipped", extends: .done, color: "#00AA00"),
         Entry(id: "done", name: "Done"),
@@ -49,9 +54,13 @@ struct WorkspaceStatusEntrancesTests {
         }
     }
 
-    private func settings() -> (SidebarTabItemSettingsSnapshot, () -> Void) {
+    private func settings(showAgentActivity: Bool = true) -> (SidebarTabItemSettingsSnapshot, () -> Void) {
         let suite = "WorkspaceStatusEntrancesTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
+        if !showAgentActivity {
+            defaults.set(false, forKey: "sidebarShowAgentActivity")
+            defaults.set(false, forKey: "sidebar.showAgentActivity")
+        }
         return (SidebarTabItemSettingsSnapshot(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
     }
 
@@ -59,10 +68,11 @@ struct WorkspaceStatusEntrancesTests {
         _ workspace: Workspace,
         list: WorkspaceStatusList,
         hexes: [String: String] = [:],
-        settings: SidebarTabItemSettingsSnapshot
+        settings: SidebarTabItemSettingsSnapshot,
+        showsAgentActivity: Bool = false
     ) -> SidebarWorkspaceSnapshotFactory {
         SidebarWorkspaceSnapshotFactory(
-            workspace: workspace, settings: settings, showsAgentActivity: false, todoControlsEnabled: true,
+            workspace: workspace, settings: settings, showsAgentActivity: showsAgentActivity, todoControlsEnabled: true,
             statusList: list, statusColorHexes: hexes
         )
     }
@@ -337,6 +347,20 @@ struct WorkspaceStatusEntrancesTests {
         #expect(snapshot.attentionTaskStatus == .needsAttention, "the row is no longer in play during the wait")
     }
 
+    /// Entrance row: the snapshot factory passes the status color hexes to the compact status menu model, and the
+    /// picker's checked entry carries Review's icon (#cm-109.3).
+    @Test func theSnapshotFactoryPassesColorHexesAndIconToTheCompactMenuModel() throws {
+        let (settings, cleanUp) = settings()
+        defer { cleanUp() }
+        let workspace = Workspace()
+        workspace.setTaskStatusOverride(.review)
+        let hexes = ["review": "#336699"]
+        let snapshot = factory(workspace, list: Self.hisList, hexes: hexes, settings: settings).makeSnapshot()
+        #expect(snapshot.todoStatusMenuModel?.colorHexes == hexes)
+        let checked = try #require(WorkspaceStatusPresentation.checkedEntry(in: snapshot.todoStatusMenuModel?.picker))
+        #expect(checked.icon == .threeQuarters)
+    }
+
     // MARK: - Entrance rows 13 and 19
 
     #if DEBUG
@@ -390,12 +414,12 @@ struct WorkspaceStatusEntrancesTests {
     }
 
     /// The pane's working-out over every resolution: whether a status shows as set, what pins the footnote, his word for
-    /// the glyph's tooltip and the header, and the rows. His word is only for a status in effect: a status of his that
-    /// waits behind a waiting agent is held, not shown (the tooltip must not name it).
+    /// the glyph's tooltip and the header, and the rows. His word is for a status in effect; a status of his stays
+    /// in effect even while an agent waits.
     @Test func thePaneStateOverTheSixResolutions() {
         let expected: [(hasOverride: Bool, cmux: WorkspaceTaskStatus?, word: String?)] = [
             (false, nil, nil), (true, .review, "Reviewing"), (true, .working, nil), (false, nil, nil),
-            (true, nil, "Doing"), (false, nil, nil), (false, nil, nil),
+            (true, nil, "Doing"), (true, nil, "Parked"), (false, nil, nil),
         ]
         for ((name, resolution), want) in zip(sixResolutions(), expected) {
             let inferred = resolution.effective
@@ -551,4 +575,855 @@ struct WorkspaceStatusEntrancesTests {
             #expect(rows[13].isEnabled == false && rows[13].isOn)
         }
     }
+
+    // MARK: - Sub-step 3b: Detection without states callers
+
+    /// Sub-step 3b. When a list is in use, detection without states applies across the three entrances
+    /// (`inferredTaskStatus`, sidebar capture, and control socket status): an agent running or waiting
+    /// yields `.todo` (not `.working` or `.needsAttention`), while with `.cmuxFive` upstream's detection applies.
+    @Test func threePlacesWorkOutDetectionWithoutStatesWhenListIsInUse() throws {
+        try underHisList {
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            let workspace = try #require(manager.selectedWorkspace)
+            let panelID = try #require(workspace.focusedPanelId)
+            workspace.agentLifecycleStatesByPanelId[panelID] = ["agent": .running]
+
+            // 1. Workspace inference: detection without states yields .todo with his list,
+            // while .cmuxFive yields upstream's live inference .working.
+            #expect(workspace.inferredTaskStatus(list: Self.hisList) == .todo)
+            #expect(workspace.inferredTaskStatus(list: .cmuxFive) == .working)
+            #expect(workspace.inferredTaskStatus == .todo)
+
+            // 2. Sidebar snapshot capture yields .todo for his list, .working for .cmuxFive.
+            let sidebarHis = SidebarWorkspaceTaskStatusSnapshot.capture(
+                workspace: workspace,
+                orderedPanelIds: [panelID],
+                list: Self.hisList
+            )
+            #expect(sidebarHis.inferred == .todo)
+            let sidebarCmux = SidebarWorkspaceTaskStatusSnapshot.capture(
+                workspace: workspace,
+                orderedPanelIds: [panelID],
+                list: .cmuxFive
+            )
+            #expect(sidebarCmux.inferred == .working)
+
+            // 3. Control socket snapshot read reports .todo for inferred under his list.
+            let delegate = try #require(AppDelegate.shared)
+            let windowId = delegate.registerMainWindowContextForTesting(tabManager: manager)
+            defer { delegate.unregisterMainWindowContextForTesting(windowId: windowId) }
+            let routing = ControlRoutingSelectors(
+                hasWindowIDParam: false,
+                windowID: nil,
+                groupID: nil,
+                workspaceID: nil,
+                surfaceID: nil,
+                paneID: nil
+            )
+            let resolution = TerminalController.shared.controlWorkspaceTaskStatus(
+                routing: routing,
+                workspaceID: workspace.id
+            )
+            guard case .resolved(_, let status) = resolution else {
+                Issue.record("controlWorkspaceTaskStatus did not resolve")
+                return
+            }
+            #expect(status.inferred == WorkspaceTaskStatus.todo.rawValue)
+        }
+    }
+
+    /// Sub-step 3b (Change 2). Setting Working by hand while an agent runs records `inferredAtOverride == .working`
+    /// (the status being set decides, preserving upstream's inference on write) and stays in effect
+    /// (`effectiveTaskStatus == .working`) while the agent runs, even with a status list in use.
+    @Test func workingSetByHandRecordsUpstreamInferenceOnWrite() throws {
+        try underHisList {
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            let workspace = try #require(manager.selectedWorkspace)
+            let panelID = try #require(workspace.focusedPanelId)
+            workspace.agentLifecycleStatesByPanelId[panelID] = ["agent": .running]
+
+            // Setting .working while an agent runs:
+            workspace.setTaskStatusOverride(.working)
+            #expect(workspace.todoState.statusOverride?.inferredAtOverride == .working)
+            #expect(workspace.effectiveTaskStatus == .working)
+            guard case .cmuxInEffect = workspace.statusResolution(list: Self.hisList) else {
+                Issue.record("override should be in effect while agent is running")
+                return
+            }
+
+            // When the agent stops (now idle):
+            workspace.agentLifecycleStatesByPanelId[panelID] = ["agent": .idle]
+            // When the agent stops, upstream detection becomes idle (.todo), so the override lapses, as today.
+            #expect(workspace.effectiveTaskStatus == .todo)
+
+            // Setting .working while idle records .todo:
+            workspace.setTaskStatusOverride(.working)
+            #expect(workspace.todoState.statusOverride?.inferredAtOverride == .todo)
+            #expect(workspace.effectiveTaskStatus == .working)
+        }
+    }
+
+    /// Sub-step 3e. Quiet rows on Auto or Done get strip & ⌘-number when waiting agent is present;
+    /// running agent on Auto stays quiet; no-list .cmuxFive keeps upstream behavior.
+    @Test func quietRowsOnAutoOrDoneGetStripAndCommandNumberWhenWaitingAgentIsPresent() throws {
+        let (settings, cleanUp) = settings()
+        defer { cleanUp() }
+        let manager = TabManager(autoWelcomeIfNeeded: false)
+        let workspace = try #require(manager.selectedWorkspace)
+        let panelId = try #require(workspace.focusedPanelId)
+
+        func check(list: WorkspaceStatusList) -> (attention: WorkspaceTaskStatus?, suppressesStrip: Bool, hasCommandDigit: Bool) {
+            let snapshot = factory(workspace, list: list, settings: settings).makeSnapshot()
+            let attention = snapshot.attentionTaskStatus
+            let suppresses = SidebarWorkspaceRowVisualPalette.suppressesAccentStrip(attentionTaskStatus: attention)
+            let eligibility = WorkspaceShortcutEligibility.resolve(candidates: [
+                WorkspaceShortcutEligibility.Candidate(
+                    isGroupAnchor: false,
+                    isInCollapsedGroup: false,
+                    attentionTaskStatus: attention
+                ),
+                WorkspaceShortcutEligibility.Candidate(
+                    isGroupAnchor: false,
+                    isInCollapsedGroup: false,
+                    attentionTaskStatus: .working
+                )
+            ])
+            let hasDigit = eligibility.position(forFlatIndex: 0) != nil
+            return (attention, suppresses, hasDigit)
+        }
+
+        // 1. Auto with waiting agent under his list: quiet row (effective .todo) is elevated to .needsAttention.
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .needsInput]
+        let autoWaiting = check(list: Self.hisList)
+        #expect(autoWaiting.attention == .needsAttention)
+        #expect(!autoWaiting.suppressesStrip, "strip should not be suppressed when waiting")
+        #expect(autoWaiting.hasCommandDigit, "should carry command digit when waiting")
+
+        // 2. Done with waiting agent under his list: effective .done is elevated to .needsAttention.
+        workspace.setTaskStatusOverride(.done)
+        let doneWaiting = check(list: Self.hisList)
+        #expect(doneWaiting.attention == .needsAttention)
+        #expect(!doneWaiting.suppressesStrip)
+        #expect(doneWaiting.hasCommandDigit)
+
+        // 3. Auto with running agent under his list: stays quiet (effective .todo).
+        workspace.todoState.statusOverride = nil
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .running]
+        let autoRunning = check(list: Self.hisList)
+        #expect(autoRunning.attention == .todo)
+        #expect(autoRunning.suppressesStrip, "running agent on Auto stays quiet")
+        #expect(!autoRunning.hasCommandDigit, "running agent on Auto does not get a digit when another row is in play")
+
+        // 4. No-list (.cmuxFive) keeps upstream behavior.
+        // Under .cmuxFive with running agent: upstream detects .working, so attention is .working (strip shown).
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .running]
+        let cmuxRunning = check(list: .cmuxFive)
+        #expect(cmuxRunning.attention == .working)
+        #expect(!cmuxRunning.suppressesStrip, "upstream cmuxFive gives strip to running agent on Auto")
+        #expect(cmuxRunning.hasCommandDigit)
+
+        // Under .cmuxFive with idle agent: upstream detects .todo, so attention is .todo (strip suppressed).
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .idle]
+        let cmuxIdle = check(list: .cmuxFive)
+        #expect(cmuxIdle.attention == .todo)
+        #expect(cmuxIdle.suppressesStrip)
+        #expect(!cmuxIdle.hasCommandDigit)
+    }
+
+    /// O5: Under his list with an open PR and a running agent, setting Done records inferredAtOverride == .review, Done in effect.
+    @Test func doneSetWithOpenPrAndRunningAgentRecordsReviewAndStaysInEffect() throws {
+        try underHisList {
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            let workspace = try #require(manager.selectedWorkspace)
+            let panelId = try #require(workspace.focusedPanelId)
+
+            workspace.panelGitBranches[panelId] = SidebarGitBranchState(branch: "feature/pr", isDirty: false)
+            workspace.panelPullRequests[panelId] = SidebarPullRequestState(
+                number: 1,
+                label: "PR #1",
+                url: try #require(URL(string: "https://example.com/pr/1")),
+                status: .open,
+                branch: "feature/pr"
+            )
+            workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .running]
+
+            // Setting Done:
+            workspace.setTaskStatusOverride(.done)
+            #expect(workspace.todoState.statusOverride?.inferredAtOverride == .review)
+            #expect(workspace.effectiveTaskStatus == .done)
+            guard case .cmuxInEffect(let entry, _) = workspace.statusResolution(list: Self.hisList) else {
+                Issue.record("Done override should be in effect")
+                return
+            }
+            #expect(entry.id == "done")
+
+            // Stop the agent: Done remains in effect under his list with open PR
+            workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .idle]
+            #expect(workspace.effectiveTaskStatus == .done)
+            guard case .cmuxInEffect(let entryAfterStop, _) = workspace.statusResolution(list: Self.hisList) else {
+                Issue.record("Done override should still be in effect after agent stops")
+                return
+            }
+            #expect(entryAfterStop.id == "done")
+        }
+    }
+
+    /// O5: A waiting Auto workspace with an open PR reads Review in all three places under his list.
+    @Test func waitingAutoWorkspaceWithOpenPullRequestReadsReviewInAllThreePlaces() throws {
+        try underHisList {
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            let workspace = try #require(manager.selectedWorkspace)
+            let panelId = try #require(workspace.focusedPanelId)
+
+            workspace.panelGitBranches[panelId] = SidebarGitBranchState(branch: "feature/pr", isDirty: false)
+            workspace.panelPullRequests[panelId] = SidebarPullRequestState(
+                number: 1,
+                label: "PR #1",
+                url: try #require(URL(string: "https://example.com/pr/1")),
+                status: .open,
+                branch: "feature/pr"
+            )
+            workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .needsInput]
+
+            // 1. Workspace inference: detection without states yields .review with his list;
+            // .cmuxFive yields upstream's live inference .needsAttention.
+            #expect(workspace.inferredTaskStatus(list: Self.hisList) == .review)
+            #expect(workspace.inferredTaskStatus(list: .cmuxFive) == .needsAttention)
+            #expect(workspace.inferredTaskStatus == .review)
+
+            // 2. Sidebar snapshot capture yields .review for his list, .needsAttention for .cmuxFive.
+            let sidebarHis = SidebarWorkspaceTaskStatusSnapshot.capture(
+                workspace: workspace,
+                orderedPanelIds: [panelId],
+                list: Self.hisList
+            )
+            #expect(sidebarHis.inferred == .review)
+            let sidebarCmux = SidebarWorkspaceTaskStatusSnapshot.capture(
+                workspace: workspace,
+                orderedPanelIds: [panelId],
+                list: .cmuxFive
+            )
+            #expect(sidebarCmux.inferred == .needsAttention)
+
+            // 3. Control socket snapshot read reports .review for inferred under his list.
+            let delegate = try #require(AppDelegate.shared)
+            let windowId = delegate.registerMainWindowContextForTesting(tabManager: manager)
+            defer { delegate.unregisterMainWindowContextForTesting(windowId: windowId) }
+            let routing = ControlRoutingSelectors(
+                hasWindowIDParam: false,
+                windowID: nil,
+                groupID: nil,
+                workspaceID: nil,
+                surfaceID: nil,
+                paneID: nil
+            )
+            let resolution = TerminalController.shared.controlWorkspaceTaskStatus(
+                routing: routing,
+                workspaceID: workspace.id
+            )
+            guard case .resolved(_, let status) = resolution else {
+                Issue.record("controlWorkspaceTaskStatus did not resolve")
+                return
+            }
+            #expect(status.inferred == WorkspaceTaskStatus.review.rawValue)
+        }
+    }
+
+    /// O1: Under his list, Done recorded at .working with detection .todo gives snapshot.todoStatusMenuModel?.activeOverride == .done.
+    @Test func doneRecordedAtWorkingWithDetectionTodoGivesActiveOverrideInMenuModel() throws {
+        let (settings, cleanUp) = settings()
+        defer { cleanUp() }
+        let workspace = Workspace()
+        workspace.todoState.statusHidden = false
+        workspace.todoState.statusOverride = WorkspaceTaskStatusOverride(
+            status: .done,
+            inferredAtOverride: .working
+        )
+        let snapshot = factory(workspace, list: Self.hisList, settings: settings).makeSnapshot()
+        #expect(snapshot.todoStatusMenuModel?.activeOverride == .done)
+    }
+
+    /// Piece 4 (#cm-109.4, review #6): In SidebarWorkspaceTaskStatusSnapshot.capture, a pre-release
+    /// Done record naming a state (.working) under a status list where live detection is .todo
+    /// maintains activeOverride agreeing with held (.done).
+    @Test func preReleaseDoneRecordWithWorkingStateMaintainsActiveOverrideMatchingHeld() throws {
+        let workspace = Workspace()
+        workspace.todoState.statusHidden = false
+        workspace.todoState.statusOverride = WorkspaceTaskStatusOverride(
+            status: .done,
+            inferredAtOverride: .working
+        )
+        let taskSnapshot = SidebarWorkspaceTaskStatusSnapshot.capture(
+            workspace: workspace,
+            orderedPanelIds: [],
+            list: Self.hisList
+        )
+        #expect(taskSnapshot.activeOverride == .done)
+    }
+
+
+    /// Piece 4 (#cm-109.4): Slot resolution gives hand priority over spinner and badge,
+    /// spinner priority over badge, and trailing close button suppresses all trailing slot items.
+    @Test func slotResolutionPicksHandOverSpinnerAndBadgeAndRespectsCloseButton() {
+        // 1. No hand, no spinner, no badge
+        let empty = SidebarWorkspaceSlotResolution.resolve(
+            showsHand: false,
+            showsSpinner: false,
+            unreadCount: 0,
+            loadingSpinnerPosition: .leading,
+            notificationBadgePosition: .leading,
+            showsCloseButton: false
+        )
+        #expect(empty == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: false)) // (#cm-109.3)
+
+        // 2. Badge in leading slot
+        let badgeLeading = SidebarWorkspaceSlotResolution.resolve(
+            showsHand: false,
+            showsSpinner: false,
+            unreadCount: 3,
+            loadingSpinnerPosition: .leading,
+            notificationBadgePosition: .leading,
+            showsCloseButton: false
+        )
+        #expect(badgeLeading == SidebarWorkspaceSlotResolution(leading: .badge, trailing: .none, showsHand: false)) // (#cm-109.3)
+
+        // 3. Spinner beats badge in leading slot
+        let spinnerLeading = SidebarWorkspaceSlotResolution.resolve(
+            showsHand: false,
+            showsSpinner: true,
+            unreadCount: 3,
+            loadingSpinnerPosition: .leading,
+            notificationBadgePosition: .leading,
+            showsCloseButton: false
+        )
+        #expect(spinnerLeading == SidebarWorkspaceSlotResolution(leading: .spinner, trailing: .none, showsHand: false)) // (#cm-109.3)
+
+        // 4. Hand suppresses spinner and badge in slots; showsHand is true (#cm-109.3)
+        let handLeading = SidebarWorkspaceSlotResolution.resolve(
+            showsHand: true,
+            showsSpinner: true,
+            unreadCount: 3,
+            loadingSpinnerPosition: .leading,
+            notificationBadgePosition: .leading,
+            showsCloseButton: false
+        )
+        #expect(handLeading == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
+
+        // 5. Hand suppresses spinner and badge when loadingSpinnerPosition is trailing (#cm-109.3)
+        let handTrailing = SidebarWorkspaceSlotResolution.resolve(
+            showsHand: true,
+            showsSpinner: true,
+            unreadCount: 3,
+            loadingSpinnerPosition: .trailing,
+            notificationBadgePosition: .trailing,
+            showsCloseButton: false
+        )
+        #expect(handTrailing == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
+
+        // 6. Close button with hand: slots empty, showsHand is true (#cm-109.3)
+        let handTrailingClosed = SidebarWorkspaceSlotResolution.resolve(
+            showsHand: true,
+            showsSpinner: true,
+            unreadCount: 3,
+            loadingSpinnerPosition: .trailing,
+            notificationBadgePosition: .trailing,
+            showsCloseButton: true
+        )
+        #expect(handTrailingClosed == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
+
+        // 7. Close button does not suppress hand; slots remain empty (#cm-109.3)
+        let handLeadingClosed = SidebarWorkspaceSlotResolution.resolve(
+            showsHand: true,
+            showsSpinner: true,
+            unreadCount: 3,
+            loadingSpinnerPosition: .leading,
+            notificationBadgePosition: .trailing,
+            showsCloseButton: true
+        )
+        #expect(handLeadingClosed == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
+
+        // 8. Hand on with spinner and badge on opposite sides and close button off -> both slots .none (#cm-109.3)
+        let handOppositeSides = SidebarWorkspaceSlotResolution.resolve( // (#cm-109.3)
+            showsHand: true, // (#cm-109.3)
+            showsSpinner: true, // (#cm-109.3)
+            unreadCount: 3, // (#cm-109.3)
+            loadingSpinnerPosition: .trailing, // (#cm-109.3)
+            notificationBadgePosition: .leading, // (#cm-109.3)
+            showsCloseButton: false // (#cm-109.3)
+        ) // (#cm-109.3)
+        #expect(handOppositeSides == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
+    }
+
+    /// Piece 4 (#cm-109.4): Snapshot and ContextMenuImmediateFields capture showsRaisedHand.
+    @Test func snapshotAndContextMenuImmediateFieldsCaptureShowsRaisedHand() throws {
+        let (settings, cleanUp) = settings()
+        defer { cleanUp() }
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+
+        // Case A: Waiting agent with his list and showsAgentActivity on -> showsRaisedHand == true
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .needsInput]
+        let taskSnapshot = SidebarWorkspaceTaskStatusSnapshot.capture(
+            workspace: workspace,
+            orderedPanelIds: [panelId],
+            list: Self.hisList
+        )
+        #expect(taskSnapshot.isAgentWaiting == true)
+
+        let snapshotWithList = factory(workspace, list: Self.hisList, settings: settings, showsAgentActivity: true).makeSnapshot()
+        #expect(snapshotWithList.showsRaisedHand == true)
+        #expect(snapshotWithList.contextMenuImmediateFields.showsRaisedHand == true)
+
+        // Case B: Waiting agent with default list (.cmuxFive) -> showsRaisedHand == false
+        let snapshotDefaultList = factory(workspace, list: .cmuxFive, settings: settings, showsAgentActivity: true).makeSnapshot()
+        #expect(snapshotDefaultList.showsRaisedHand == false)
+        #expect(snapshotDefaultList.contextMenuImmediateFields.showsRaisedHand == false)
+
+        // Case C: Running (not waiting) agent with his list -> showsRaisedHand == false
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .running]
+        let runningSnapshot = factory(workspace, list: Self.hisList, settings: settings, showsAgentActivity: true).makeSnapshot()
+        #expect(runningSnapshot.showsRaisedHand == false)
+        #expect(runningSnapshot.contextMenuImmediateFields.showsRaisedHand == false)
+
+        // Case D: Waiting agent with his list, but showAgentActivity setting is false -> showsRaisedHand == false
+        let (settingsOff, cleanUpOff) = self.settings(showAgentActivity: false)
+        defer { cleanUpOff() }
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .needsInput]
+        let activityOffSnapshot = factory(workspace, list: Self.hisList, settings: settingsOff, showsAgentActivity: false).makeSnapshot()
+        #expect(activityOffSnapshot.showsRaisedHand == false)
+        #expect(activityOffSnapshot.contextMenuImmediateFields.showsRaisedHand == false)
+    }
+
+    /// Piece 4 (#cm-109.4): Factory test: with a list in use, an agent waiting, settings.details.showAgentActivity == true
+    /// and showsAgentActivity == false (experiment flag off), showsRaisedHand must be true.
+    @Test func factoryShowsRaisedHandWhenAgentWaitingAndSettingEnabledEvenIfSpinnerFlagDisabled() throws {
+        let (settings, cleanUp) = settings()
+        defer { cleanUp() }
+        #expect(settings.details.showAgentActivity == true)
+
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .needsInput]
+
+        let snapshot = factory(
+            workspace,
+            list: Self.hisList,
+            settings: settings,
+            showsAgentActivity: false
+        ).makeSnapshot()
+
+        #expect(snapshot.showsRaisedHand == true)
+        #expect(snapshot.contextMenuImmediateFields.showsRaisedHand == true)
+    }
+
+    /// Piece 4 (#cm-109.4): Factory test: with a list in use, an agent waiting, and settings.details.showAgentActivity == false,
+    /// showsRaisedHand must be false.
+    @Test func factoryHidesRaisedHandWhenAgentWaitingAndSettingDisabled() throws {
+        let (settings, cleanUp) = settings(showAgentActivity: false)
+        defer { cleanUp() }
+        #expect(settings.details.showAgentActivity == false)
+
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .needsInput]
+
+        let snapshot = factory(
+            workspace,
+            list: Self.hisList,
+            settings: settings,
+            showsAgentActivity: false
+        ).makeSnapshot()
+
+        #expect(snapshot.showsRaisedHand == false)
+        #expect(snapshot.contextMenuImmediateFields.showsRaisedHand == false)
+    }
+
+    /// Piece 4 (#cm-109.4): AppKit sidebar row renders hand.raised.fill when agent is waiting under a status list,
+    /// winning over the spinner and badge.
+    @Test func appKitSidebarRowShowsRaisedHandDuringWaitAndWinsOverSpinnerAndBadge() throws {
+        let (settings, cleanUp) = settings()
+        defer { cleanUp() }
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.agentLifecycleStatesByPanelId[panelId] = [
+            "runner": .running,
+            "waiter": .needsInput
+        ]
+
+        // 1. Without a status list (.cmuxFive), the spinner shows and the hand does not.
+        let defaultListSnapshot = factory(
+            workspace,
+            list: .cmuxFive,
+            settings: settings,
+            showsAgentActivity: true
+        ).makeSnapshot()
+        #expect(defaultListSnapshot.activeCodingAgentCount == 1)
+        #expect(defaultListSnapshot.showsRaisedHand == false)
+
+        let initialModel = SidebarWorkspaceRowModel(
+            workspaceId: workspace.id,
+            index: 0,
+            snapshot: defaultListSnapshot,
+            settings: settings,
+            isActive: false,
+            isMultiSelected: false,
+            hasUserCustomTitle: false,
+            canCloseWorkspace: false,
+            accessibilityWorkspaceCount: 1,
+            unreadCount: 5,
+            latestNotificationText: nil,
+            showsAgentActivity: true,
+            rowSpacing: 8,
+            isBeingDragged: false,
+            topDropIndicatorVisible: false,
+            bottomDropIndicatorVisible: false,
+            isGrouped: false,
+            isColorSectionMember: false,
+            isFirstRow: true,
+            shortcutHintText: nil,
+            showsShortcutHints: false,
+            colorSchemeIsDark: true,
+            globalFontMagnificationPercent: 100,
+            isChecklistExpanded: false,
+            checklistAddFieldActivationToken: 0,
+            isChecklistPopoverPresented: false,
+            editingChecklistItemId: nil,
+            todoControlsEnabled: true,
+            isMetadataExpanded: false,
+            isMarkdownExpanded: false
+        )
+
+        let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40))
+        cell.configurePresentation(model: initialModel)
+        #expect(cell.leadingSpinnerForTesting?.isHidden == false)
+        #expect(cell.handForTesting?.isHidden != false) // (#cm-109.3)
+
+        // 2. Under his list, hand becomes active, winning over the existing spinner and badge.
+        let hisListSnapshot = factory(
+            workspace,
+            list: Self.hisList,
+            settings: settings,
+            showsAgentActivity: true
+        ).makeSnapshot()
+        #expect(hisListSnapshot.activeCodingAgentCount == 1)
+        #expect(hisListSnapshot.showsRaisedHand == true)
+
+        let waitingModel = SidebarWorkspaceRowModel(
+            workspaceId: workspace.id,
+            index: 0,
+            snapshot: hisListSnapshot,
+            settings: settings,
+            isActive: false,
+            isMultiSelected: false,
+            hasUserCustomTitle: false,
+            canCloseWorkspace: false,
+            accessibilityWorkspaceCount: 1,
+            unreadCount: 5,
+            latestNotificationText: nil,
+            showsAgentActivity: true,
+            rowSpacing: 8,
+            isBeingDragged: false,
+            topDropIndicatorVisible: false,
+            bottomDropIndicatorVisible: false,
+            isGrouped: false,
+            isColorSectionMember: false,
+            isFirstRow: true,
+            shortcutHintText: nil,
+            showsShortcutHints: false,
+            colorSchemeIsDark: true,
+            globalFontMagnificationPercent: 100,
+            isChecklistExpanded: false,
+            checklistAddFieldActivationToken: 0,
+            isChecklistPopoverPresented: false,
+            editingChecklistItemId: nil,
+            todoControlsEnabled: true,
+            isMetadataExpanded: false,
+            isMarkdownExpanded: false
+        )
+
+        cell.configurePresentation(model: waitingModel)
+        cell.layout()
+
+        let hand = try #require(cell.handForTesting) // (#cm-109.3)
+        #expect(hand.isHidden == false)
+        #expect(cell.leadingSpinnerForTesting?.isHidden == true)
+        #expect(cell.leadingBadgeForTesting.isHidden == true)
+        let standardSpinnerSide = max(10, 12 * waitingModel.fontScale)
+        #expect(abs(hand.frame.size.width - standardSpinnerSide) < 0.001)
+        #expect(abs(hand.frame.size.height - standardSpinnerSide) < 0.001)
+
+        let expectedTooltip = String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")
+        #expect(hand.toolTip == expectedTooltip)
+        #expect(hand.accessibilityLabel() == expectedTooltip)
+        #expect(hand.image?.accessibilityDescription == expectedTooltip)
+
+        // 3. Test at scaled font scale (sidebarFontSize: 18 pt -> fontScale: 1.44 -> spinnerSide: 17.28 pt)
+        let suite = "WorkspaceStatusEntrancesTests.scaled.\(UUID().uuidString)"
+        let scaledDefaults = UserDefaults(suiteName: suite)!
+        defer { scaledDefaults.removePersistentDomain(forName: suite) }
+        let scaledSettings = SidebarTabItemSettingsSnapshot(defaults: scaledDefaults, sidebarFontSize: 18)
+        let scaledSnapshot = factory(
+            workspace,
+            list: Self.hisList,
+            settings: scaledSettings,
+            showsAgentActivity: true
+        ).makeSnapshot()
+        let scaledModel = SidebarWorkspaceRowModel(
+            workspaceId: workspace.id,
+            index: 0,
+            snapshot: scaledSnapshot,
+            settings: scaledSettings,
+            isActive: false,
+            isMultiSelected: false,
+            hasUserCustomTitle: false,
+            canCloseWorkspace: false,
+            accessibilityWorkspaceCount: 1,
+            unreadCount: 5,
+            latestNotificationText: nil,
+            showsAgentActivity: true,
+            rowSpacing: 8,
+            isBeingDragged: false,
+            topDropIndicatorVisible: false,
+            bottomDropIndicatorVisible: false,
+            isGrouped: false,
+            isColorSectionMember: false,
+            isFirstRow: true,
+            shortcutHintText: nil,
+            showsShortcutHints: false,
+            colorSchemeIsDark: true,
+            globalFontMagnificationPercent: 100,
+            isChecklistExpanded: false,
+            checklistAddFieldActivationToken: 0,
+            isChecklistPopoverPresented: false,
+            editingChecklistItemId: nil,
+            todoControlsEnabled: true,
+            isMetadataExpanded: false,
+            isMarkdownExpanded: false
+        )
+        cell.configurePresentation(model: scaledModel)
+        cell.layout()
+        let scaledHand = try #require(cell.handForTesting) // (#cm-109.3)
+        #expect(scaledHand.isHidden == false)
+        let scaledSpinnerSide = max(10, 12 * scaledModel.fontScale)
+        #expect(abs(scaledHand.frame.size.width - scaledSpinnerSide) < 0.001)
+        #expect(abs(scaledHand.frame.size.height - scaledSpinnerSide) < 0.001)
+    }
+
+    /// Change A (#cm-109.3): The raised hand draws right after the status glyph, before the title,
+    /// in both spinner settings. With no glyph (Auto), the hand still sits before the title.
+    @Test func appKitSidebarRowDrawsRaisedHandImmediatelyAfterStatusGlyphBeforeTitle() throws { // (#cm-109.3)
+        let (settings, cleanUp) = settings() // (#cm-109.3)
+        defer { cleanUp() } // (#cm-109.3)
+        let workspace = Workspace() // (#cm-109.3)
+        let panelId = try #require(workspace.focusedPanelId) // (#cm-109.3)
+        workspace.agentLifecycleStatesByPanelId[panelId] = [ // (#cm-109.3)
+            "waiter": .needsInput // (#cm-109.3)
+        ] // (#cm-109.3)
+        workspace.setTaskStatusOverride(.review) // (#cm-109.3)
+
+        for spinnerPos in [SidebarIndicatorPosition.leading, SidebarIndicatorPosition.trailing] { // (#cm-109.3)
+            let suite = "WorkspaceStatusEntrancesTests.layout.\(UUID().uuidString)" // (#cm-109.3)
+            let defaults = UserDefaults(suiteName: suite)! // (#cm-109.3)
+            defer { defaults.removePersistentDomain(forName: suite) } // (#cm-109.3)
+            defaults.set(spinnerPos.rawValue, forKey: "sidebarLoadingSpinnerPosition") // (#cm-109.3)
+            let rowSettings = SidebarTabItemSettingsSnapshot(defaults: defaults) // (#cm-109.3)
+            #expect(rowSettings.loadingSpinnerPosition == spinnerPos) // (#cm-109.3)
+            let snapshot = factory( // (#cm-109.3)
+                workspace, // (#cm-109.3)
+                list: Self.hisList, // (#cm-109.3)
+                settings: rowSettings, // (#cm-109.3)
+                showsAgentActivity: true // (#cm-109.3)
+            ).makeSnapshot() // (#cm-109.3)
+            #expect(snapshot.showsRaisedHand == true) // (#cm-109.3)
+
+            let model = SidebarWorkspaceRowModel( // (#cm-109.3)
+                workspaceId: workspace.id, // (#cm-109.3)
+                index: 0, // (#cm-109.3)
+                snapshot: snapshot, // (#cm-109.3)
+                settings: rowSettings, // (#cm-109.3)
+                isActive: false, // (#cm-109.3)
+                isMultiSelected: false, // (#cm-109.3)
+                hasUserCustomTitle: false, // (#cm-109.3)
+                canCloseWorkspace: false, // (#cm-109.3)
+                accessibilityWorkspaceCount: 1, // (#cm-109.3)
+                unreadCount: 0, // (#cm-109.3)
+                latestNotificationText: nil, // (#cm-109.3)
+                showsAgentActivity: true, // (#cm-109.3)
+                rowSpacing: 8, // (#cm-109.3)
+                isBeingDragged: false, // (#cm-109.3)
+                topDropIndicatorVisible: false, // (#cm-109.3)
+                bottomDropIndicatorVisible: false, // (#cm-109.3)
+                isGrouped: false, // (#cm-109.3)
+                isColorSectionMember: false, // (#cm-109.3)
+                isFirstRow: true, // (#cm-109.3)
+                shortcutHintText: nil, // (#cm-109.3)
+                showsShortcutHints: false, // (#cm-109.3)
+                colorSchemeIsDark: true, // (#cm-109.3)
+                globalFontMagnificationPercent: 100, // (#cm-109.3)
+                isChecklistExpanded: false, // (#cm-109.3)
+                checklistAddFieldActivationToken: 0, // (#cm-109.3)
+                isChecklistPopoverPresented: false, // (#cm-109.3)
+                editingChecklistItemId: nil, // (#cm-109.3)
+                todoControlsEnabled: true, // (#cm-109.3)
+                isMetadataExpanded: false, // (#cm-109.3)
+                isMarkdownExpanded: false // (#cm-109.3)
+            ) // (#cm-109.3)
+
+            let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40)) // (#cm-109.3)
+            cell.configurePresentation(model: model) // (#cm-109.3)
+            cell.layout() // (#cm-109.3)
+
+            let glyph = cell.statusGlyphButtonForTesting // (#cm-109.3)
+            #expect(!glyph.isHidden, "glyph is showing for .review") // (#cm-109.3)
+            let hand = try #require(cell.handForTesting) // (#cm-109.3)
+            #expect(!hand.isHidden, "hand is showing") // (#cm-109.3)
+            let titleFrame = cell.titleFrameForTesting // (#cm-109.3)
+
+            #expect(hand.frame.minX >= glyph.frame.maxX, "spinnerPos \(spinnerPos): hand minX (\(hand.frame.minX)) >= glyph maxX (\(glyph.frame.maxX))") // (#cm-109.3)
+            #expect(titleFrame.minX >= hand.frame.maxX, "spinnerPos \(spinnerPos): title minX (\(titleFrame.minX)) >= hand maxX (\(hand.frame.maxX))") // (#cm-109.3)
+        } // (#cm-109.3)
+
+        // With no glyph (Auto), the hand still sits before the title.
+        workspace.clearTaskStatusOverride() // (#cm-109.3)
+        let autoSnapshot = factory( // (#cm-109.3)
+            workspace, // (#cm-109.3)
+            list: Self.hisList, // (#cm-109.3)
+            settings: settings, // (#cm-109.3)
+            showsAgentActivity: true // (#cm-109.3)
+        ).makeSnapshot() // (#cm-109.3)
+        #expect(autoSnapshot.showsRaisedHand == true) // (#cm-109.3)
+        let autoModel = SidebarWorkspaceRowModel( // (#cm-109.3)
+            workspaceId: workspace.id, // (#cm-109.3)
+            index: 0, // (#cm-109.3)
+            snapshot: autoSnapshot, // (#cm-109.3)
+            settings: settings, // (#cm-109.3)
+            isActive: false, // (#cm-109.3)
+            isMultiSelected: false, // (#cm-109.3)
+            hasUserCustomTitle: false, // (#cm-109.3)
+            canCloseWorkspace: false, // (#cm-109.3)
+            accessibilityWorkspaceCount: 1, // (#cm-109.3)
+            unreadCount: 0, // (#cm-109.3)
+            latestNotificationText: nil, // (#cm-109.3)
+            showsAgentActivity: true, // (#cm-109.3)
+            rowSpacing: 8, // (#cm-109.3)
+            isBeingDragged: false, // (#cm-109.3)
+            topDropIndicatorVisible: false, // (#cm-109.3)
+            bottomDropIndicatorVisible: false, // (#cm-109.3)
+            isGrouped: false, // (#cm-109.3)
+            isColorSectionMember: false, // (#cm-109.3)
+            isFirstRow: true, // (#cm-109.3)
+            shortcutHintText: nil, // (#cm-109.3)
+            showsShortcutHints: false, // (#cm-109.3)
+            colorSchemeIsDark: true, // (#cm-109.3)
+            globalFontMagnificationPercent: 100, // (#cm-109.3)
+            isChecklistExpanded: false, // (#cm-109.3)
+            checklistAddFieldActivationToken: 0, // (#cm-109.3)
+            isChecklistPopoverPresented: false, // (#cm-109.3)
+            editingChecklistItemId: nil, // (#cm-109.3)
+            todoControlsEnabled: true, // (#cm-109.3)
+            isMetadataExpanded: false, // (#cm-109.3)
+            isMarkdownExpanded: false // (#cm-109.3)
+        ) // (#cm-109.3)
+        let autoCell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40)) // (#cm-109.3)
+        autoCell.configurePresentation(model: autoModel) // (#cm-109.3)
+        autoCell.layout() // (#cm-109.3)
+        let autoGlyph = autoCell.statusGlyphButtonForTesting // (#cm-109.3)
+        #expect(autoGlyph.isHidden, "glyph is hidden on Auto") // (#cm-109.3)
+        let autoHand = try #require(autoCell.handForTesting) // (#cm-109.3)
+        #expect(!autoHand.isHidden, "hand is showing on Auto") // (#cm-109.3)
+        let autoTitleFrame = autoCell.titleFrameForTesting // (#cm-109.3)
+        #expect(autoTitleFrame.minX >= autoHand.frame.maxX, "title minX (\(autoTitleFrame.minX)) >= hand maxX (\(autoHand.frame.maxX))") // (#cm-109.3)
+    } // (#cm-109.3)
+
+    private static func descendants<T: NSView>(ofType type: T.Type, in root: NSView) -> [T] {
+        var matches: [T] = []
+        if let match = root as? T {
+            matches.append(match)
+        }
+        for subview in root.subviews {
+            matches.append(contentsOf: descendants(ofType: type, in: subview))
+        }
+        return matches
+    }
+
+    private static func renderedHandSize(in host: NSView) throws -> CGSize {
+        let iconViews = descendants(ofType: CmuxResolvedIconImageView.self, in: host)
+        guard let iconView = iconViews.first else {
+            Issue.record("CmuxResolvedIconImageView not found in hosted view hierarchy")
+            struct MissingIconViewError: Error {}
+            throw MissingIconViewError()
+        }
+        return iconView.frame.size
+    }
+
+    @Test func swiftUISidebarSlotsShowRaisedHandNoLargerThanSpinnerSide() throws { // (#cm-109.3)
+        for fontSize in stride(from: 10.0, through: 20.0, by: 0.5) { // (#cm-109.3)
+            let fontScale = fontSize / 12.5 // (#cm-109.3)
+            let spinnerSide = max(10, 12 * fontScale) // (#cm-109.3)
+            let handView = CmuxSystemSymbolImage( // (#cm-109.3)
+                systemName: "hand.raised.fill", // (#cm-109.3)
+                pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: spinnerSide), // (#cm-109.3)
+                tint: .secondary // (#cm-109.3)
+            ) // (#cm-109.3)
+            .frame(width: spinnerSide, height: spinnerSide) // (#cm-109.3)
+            let host = NSHostingView(rootView: handView) // (#cm-109.3)
+            host.frame = NSRect(x: 0, y: 0, width: 100, height: 100) // (#cm-109.3)
+            let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false) // (#cm-109.3)
+            window.contentView = host // (#cm-109.3)
+            host.layoutSubtreeIfNeeded() // (#cm-109.3)
+            window.displayIfNeeded() // (#cm-109.3)
+ // (#cm-109.3)
+            let handSize = try Self.renderedHandSize(in: host) // (#cm-109.3)
+            #expect(handSize.width <= spinnerSide + 0.001, "hand width \(handSize.width) exceeds spinnerSide \(spinnerSide) at font \(fontSize)") // (#cm-109.3)
+            #expect(handSize.height <= spinnerSide + 0.001, "hand height \(handSize.height) exceeds spinnerSide \(spinnerSide) at font \(fontSize)") // (#cm-109.3)
+            #expect(handSize.width >= spinnerSide * 0.75, "hand width \(handSize.width) is smaller than 75% of spinnerSide \(spinnerSide) at font \(fontSize)") // (#cm-109.3)
+            #expect(handSize.height >= spinnerSide * 0.75, "hand height \(handSize.height) is smaller than 75% of spinnerSide \(spinnerSide) at font \(fontSize)") // (#cm-109.3)
+        } // (#cm-109.3)
+    } // (#cm-109.3)
+
+    /// Piece 4 (#cm-109.4, review #3): A leading slot with an active spinner and a leading badge
+    /// candidate under no list preserves upstream's 16·fs unread badge width, preventing title shift.
+    @Test func swiftUISlotWidthPreservesUnreadBadgeWidthWhenSpinnerIsLeadingWithoutHand() throws {
+        for fontSize in stride(from: 10.0, through: 20.0, by: 0.5) {
+            let fontScale = fontSize / 12.5
+            let scaledUnreadBadgeSize = 16 * fontScale
+            let scaledLoadingSpinnerSize = max(10, 12 * fontScale)
+            let resolution = SidebarWorkspaceSlotResolution.resolve(
+                showsHand: false,
+                showsSpinner: true,
+                unreadCount: 3,
+                loadingSpinnerPosition: .leading,
+                notificationBadgePosition: .leading,
+                showsCloseButton: false
+            )
+            #expect(resolution.leading == .spinner)
+            let side = SidebarWorkspaceSlotResolution.leadingSlotSide( // (#cm-109.3)
+                leadingBadgeCandidate: true, // (#cm-109.3)
+                scaledUnreadBadgeSize: scaledUnreadBadgeSize, // (#cm-109.3)
+                scaledLoadingSpinnerSize: scaledLoadingSpinnerSize // (#cm-109.3)
+            ) // (#cm-109.3)
+            #expect(abs(side - scaledUnreadBadgeSize) < 0.001, "leading slot side \(side) must preserve upstream badge width \(scaledUnreadBadgeSize) at font size \(fontSize)")
+
+            let leadingSlot = SidebarWorkspaceLeadingStatusSlot( // (#cm-109.3)
+                showsBadge: resolution.leading == .badge, // (#cm-109.3)
+                showsSpinner: resolution.leading == .spinner, // (#cm-109.3)
+                unreadCount: 3,
+                side: side,
+                spinnerSide: scaledLoadingSpinnerSize,
+                badgeFont: .system(size: 9 * fontScale),
+                badgeFillColor: .blue,
+                badgeTextColor: .white,
+                spinnerColor: .secondaryLabelColor,
+                spinnerTooltip: ""
+            )
+            let host = NSHostingView(rootView: leadingSlot)
+            host.frame = NSRect(x: 0, y: 0, width: 100, height: 100)
+            let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
+            #expect(abs(host.fittingSize.width - scaledUnreadBadgeSize) < 0.5, "hosted slot width \(host.fittingSize.width) must equal badge size \(scaledUnreadBadgeSize)")
+        }
+    }
 }
+

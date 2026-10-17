@@ -112,7 +112,7 @@ import Testing
         #expect(all.acceptedIDs == ["done", "parked", "todo", "review", "working", "needs-attention", "auto", "none"])
     }
 
-    /// A problem answers the four fields a script reads. `value` is the refused text for two cases and `nil` for the
+    /// A problem answers the four fields a script reads. `value` is the refused text for three cases and `nil` for the
     /// rest; `fileNotRead`'s detail is not a value.
     @Test func aProblemAnswersItsCodeEntryIDAndValue() {
         typealias P = WorkspaceStatusListProblem
@@ -127,6 +127,7 @@ import Testing
             (.noName(entry: 7, id: "b"), "no_name", 7, "b", nil),
             (.noExtends(entry: 8, id: "c"), "no_extends", 8, "c", nil),
             (.unknownExtends(entry: 9, id: "d", value: " Paused "), "unknown_extends", 9, "d", " Paused "),
+            (.unknownIcon(entry: 10, id: "f", value: "Half"), "unknown_icon", 10, "f", "Half"),
             (.colorNotInThisApp(id: "e", color: "7: NOPE"), "color_not_in_this_app", nil, "e", "7: NOPE"),
         ]
         for (problem, code, entry, id, value) in rows {
@@ -135,8 +136,8 @@ import Testing
             #expect(problem.id == id, "\(problem)")
             #expect(problem.value == value, "\(problem)")
         }
-        // Ten cases, ten different words.
-        #expect(Set(rows.map(\.0.code)).count == 10)
+        // Eleven cases, eleven different words.
+        #expect(Set(rows.map(\.0.code)).count == 11)
     }
 
     @Test func markDoneIsCmuxsDoneByID() {
@@ -148,9 +149,5 @@ import Testing
         WorkspaceStatusOrigin.$current.withValue(.phone) {
             #expect(WorkspaceStatusOrigin.current == .phone)
         }
-    }
-
-    @Test func aHeldOwnStatusDefaultsToNotHeldThroughAWait() {
-        #expect(WorkspaceOwnStatus(id: "parked").heldThroughWait == false)
     }
 }
