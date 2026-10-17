@@ -1,4 +1,5 @@
 import AppKit
+import CmuxAppKitSupportUI // (#cm-109.7)
 import CmuxWorkspaces
 import SwiftUI
 
@@ -23,6 +24,10 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         var icon: WorkspaceStatusGlyph? = nil // (#cm-109.6)
         /// The color the app resolved for his entry, or `nil` to use `status`'s color role. (#cm-109.3)
         var colorHex: String? = nil
+        /// What the glyph sits on, opaque, so the color can be floored to 3:1 against it; `nil` leaves the color as it was. (#cm-109.7)
+        var contrastBackground: NSColor? = nil // (#cm-109.7)
+        /// The alpha the row draws its content at (Done dims it), which the floor measures at. (#cm-109.7)
+        var drawnAlpha: CGFloat = 1 // (#cm-109.7)
     }
 
     private nonisolated static let baseSize: CGFloat = 9 // (#cm-109.3)
@@ -33,6 +38,7 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
 
     var onClick: (() -> Void)?
     private var model: Model?
+    var currentModelForTesting: Model? { model } // (#cm-109.7)
     private var monochromeColor: NSColor = .secondaryLabelColor
     private var neutralColor: NSColor = .secondaryLabelColor
 
@@ -70,33 +76,52 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         )
     }
 
+    /// (#cm-109.7) The color the glyph starts from, before any contrast floor: the one color in one-color mode, else his
+    /// color for the status, else `status`'s own role. The SwiftUI glyph reads this too, so the two draw the same color. (#cm-109.7)
+    static func rawBaseColor(model: Model, monochromeColor: NSColor, neutralColor: NSColor) -> NSColor { // (#cm-109.7)
+        if model.usesMonochrome { return monochromeColor } // (#cm-109.7)
+        if let hex = model.colorHex, // (#cm-109.7)
+           let color = WorkspaceTabColorSettings.displayNSColor(hex: hex, colorScheme: model.colorScheme, forceBright: false) { // (#cm-109.7)
+            return color // (#cm-109.7)
+        } // (#cm-109.7)
+        switch SidebarWorkspaceTaskStatusGlyphModel(status: model.status).colorRole { // (#cm-109.7)
+        case .neutral: // (#cm-109.7)
+            return neutralColor // (#cm-109.7)
+        case .working: // (#cm-109.7)
+            return cmuxAccentNSColor(for: model.colorScheme) // (#cm-109.7)
+        case .attention: // (#cm-109.7)
+            // (#cm-109.7) Loudest lane: full-strength attention accent between orange and red.
+            return NSColor(srgbRed: 1.0, green: 0.42, blue: 0.2, alpha: 1) // (#cm-109.7)
+        case .review: // (#cm-109.7)
+            return .systemGreen // (#cm-109.7)
+        case .done: // (#cm-109.7)
+            // (#cm-109.7) Muted gray-green so finished rows read as settled, not celebratory.
+            return NSColor(srgbRed: 0.45, green: 0.62, blue: 0.5, alpha: 1) // (#cm-109.7)
+        } // (#cm-109.7)
+    } // (#cm-109.7)
+
     /// The color a glyph draws in: the one color while `usesMonochrome` is on, else his color for the status, as the
     /// Status menu's dot has it worked out (as stored in Light, brightened in Dark), else `status`'s own role. (#cm-109.3)
+    /// (#cm-109.7) With a `contrastBackground` the result is an opaque color that reaches 3:1 against it as drawn at
+    /// `drawnAlpha`; without one it is the color as it was. (#cm-109.7)
     static func statusColor(model: Model, monochromeColor: NSColor, neutralColor: NSColor) -> NSColor {
-        if model.usesMonochrome { return monochromeColor }
-        if let hex = model.colorHex, // (#cm-109.3)
-           let color = WorkspaceTabColorSettings.displayNSColor(hex: hex, colorScheme: model.colorScheme, forceBright: false) { // (#cm-109.3)
-            return color // (#cm-109.3)
-        } // (#cm-109.3)
-        switch SidebarWorkspaceTaskStatusGlyphModel(status: model.status).colorRole {
-        case .neutral:
-            return neutralColor
-        case .working:
-            return cmuxAccentNSColor(for: model.colorScheme)
-        case .attention:
-            // Loudest lane: full-strength attention accent between orange and red.
-            return NSColor(srgbRed: 1.0, green: 0.42, blue: 0.2, alpha: 1)
-        case .review:
-            return .systemGreen
-        case .done:
-            // Muted gray-green so finished rows read as settled, not celebratory.
-            return NSColor(srgbRed: 0.45, green: 0.62, blue: 0.5, alpha: 1)
-        }
+        let baseColor = rawBaseColor(model: model, monochromeColor: monochromeColor, neutralColor: neutralColor) // (#cm-109.7)
+        guard let contrastBackground = model.contrastBackground else { return baseColor } // (#cm-109.7)
+        return cmuxFlooredGlyphColors( // (#cm-109.7)
+            base: baseColor, colorScheme: model.colorScheme, background: contrastBackground, drawnAlpha: model.drawnAlpha // (#cm-109.7)
+        ).fill // (#cm-109.7)
     }
 
-    // (#cm-109.3) The check's tick: white, and black at 0.7 in the one-color mode.
-    static func tickColor(model: Model) -> NSColor { // (#cm-109.3)
-        model.usesMonochrome ? NSColor.black.withAlphaComponent(0.7) : .white // (#cm-109.3)
+    /// (#cm-109.3) The check's tick: black at 0.7 in the one-color mode; else white.
+    /// (#cm-109.7) Where the contrast floor brightened the fill it is the row's own color, so the tick stays readable on
+    /// it. `neutralColor` is the button's own, as for the fill. (#cm-109.7)
+    static func tickColor(model: Model, neutralColor: NSColor = .secondaryLabelColor) -> NSColor { // (#cm-109.3)
+        if model.usesMonochrome { return NSColor.black.withAlphaComponent(0.7) } // (#cm-109.3)
+        guard let contrastBackground = model.contrastBackground else { return .white } // (#cm-109.7)
+        return cmuxFlooredGlyphColors( // (#cm-109.7)
+            base: rawBaseColor(model: model, monochromeColor: .white, neutralColor: neutralColor), // (#cm-109.7)
+            colorScheme: model.colorScheme, background: contrastBackground, drawnAlpha: model.drawnAlpha // (#cm-109.7)
+        ).tick // (#cm-109.7)
     } // (#cm-109.3)
 
     override func draw(_ dirtyRect: NSRect) {
@@ -106,7 +131,7 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
             model: model,
             symbolMask: symbolMask, // (#cm-109.6)
             color: Self.statusColor(model: model, monochromeColor: monochromeColor, neutralColor: neutralColor).cgColor,
-            tickColor: Self.tickColor(model: model).cgColor,
+            tickColor: Self.tickColor(model: model, neutralColor: neutralColor).cgColor, // (#cm-109.7)
             in: context,
             bounds: bounds
         )

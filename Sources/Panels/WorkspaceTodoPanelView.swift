@@ -141,6 +141,7 @@ private struct WorkspaceTodoPaneContent: View {
     /// toggles it.
     @State private var highlightedItemId: UUID?
     @FocusState private var itemsFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme // (#cm-109.7)
 
     private static let itemFontSize: CGFloat = 13
     private static let checkboxPointSize: CGFloat = 13
@@ -268,6 +269,7 @@ private struct WorkspaceTodoPaneContent: View {
                         monochromeColor: .primary,
                         neutralColor: .secondary,
                         fontScale: Self.headerGlyphFontScale,
+                        contrastBackground: WindowAppearanceSnapshot.resolvedColor(.windowBackgroundColor, for: colorScheme), // (#cm-109.7)
                         name: pane.hisWord, // (#cm-109) his word for a status in effect; cmux's name otherwise
                         icon: pane.icon, // (#cm-109.3)
                         colorHex: pane.colorHex // (#cm-109.3)
