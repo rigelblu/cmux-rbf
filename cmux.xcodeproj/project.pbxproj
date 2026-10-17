@@ -3947,6 +3947,8 @@
 		F6120000A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6120001A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift */; };
 		C109000000000000000000E2 /* WorkspaceStatusActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000E1 /* WorkspaceStatusActions.swift */; };
 		C10900000000000000000082 /* WorkspaceStatusActionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000081 /* WorkspaceStatusActionsTests.swift */; };
+		C10900000000000000000151 /* WorkspaceStatusContrast.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000150 /* WorkspaceStatusContrast.swift */; };
+		C10900000000000000000161 /* WorkspaceStatusContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000160 /* WorkspaceStatusContrastTests.swift */; };
 		C109000000000000000000BA /* WorkspaceStatusEntrancesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B9 /* WorkspaceStatusEntrancesTests.swift */; };
 		C10900000000000000000102 /* WorkspaceStatusFilePill.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10900000000000000000101 /* WorkspaceStatusFilePill.swift */; };
 		C109000000000000000000B6 /* WorkspaceStatusHandOverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C109000000000000000000B5 /* WorkspaceStatusHandOverTests.swift */; };
@@ -7923,6 +7925,8 @@
 		F6120001A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSSHFishShellTests.swift; sourceTree = "<group>"; };
 		C109000000000000000000E1 /* WorkspaceStatusActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusActions.swift; sourceTree = "<group>"; };
 		C10900000000000000000081 /* WorkspaceStatusActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusActionsTests.swift; sourceTree = "<group>"; };
+		C10900000000000000000150 /* WorkspaceStatusContrast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusContrast.swift; sourceTree = "<group>"; };
+		C10900000000000000000160 /* WorkspaceStatusContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusContrastTests.swift; sourceTree = "<group>"; };
 		C109000000000000000000B9 /* WorkspaceStatusEntrancesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusEntrancesTests.swift; sourceTree = "<group>"; };
 		C10900000000000000000101 /* WorkspaceStatusFilePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatuses/WorkspaceStatusFilePill.swift; sourceTree = "<group>"; };
 		C109000000000000000000B5 /* WorkspaceStatusHandOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStatusHandOverTests.swift; sourceTree = "<group>"; };
@@ -10781,6 +10785,7 @@
 				9720CD7F02C94F41A07E193D /* CloudTerminalCreationCoordinator.swift */,
 				C10900000000000000000140 /* SidebarWorkspaceSlotResolution.swift */,
 				C10900000000000000000120 /* WorkspaceStatusIconDrawing.swift */,
+				C10900000000000000000150 /* WorkspaceStatusContrast.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -12086,6 +12091,7 @@
 				C51600000000000000000002 /* CLIExecInheritedSignalStateTests.swift */,
 				C10900000000000000000110 /* WorkspaceStatusProblemWordsTests.swift */,
 				C10900000000000000000130 /* WorkspaceStatusIconDrawingTests.swift */,
+				C10900000000000000000160 /* WorkspaceStatusContrastTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -15236,6 +15242,7 @@
 				5659A0015659A0015659A001 /* WorkspaceSidebarObservation.swift in Sources */,
 				4CC1722A934F4D8B99FC64C5 /* WorkspaceSidebarProcessTitleObservationModel.swift in Sources */,
 				C109000000000000000000E2 /* WorkspaceStatusActions.swift in Sources */,
+				C10900000000000000000151 /* WorkspaceStatusContrast.swift in Sources */,
 				C10900000000000000000102 /* WorkspaceStatusFilePill.swift in Sources */,
 				C10900000000000000000121 /* WorkspaceStatusIconDrawing.swift in Sources */,
 				C109000000000000000000C2 /* WorkspaceStatusListStore.swift in Sources */,
@@ -16667,6 +16674,7 @@
 				6B524A0CB34FD46A771335AB /* WorkspaceSplitStartupCommandTests.swift in Sources */,
 				F6120000A1B2C3D4E5F60718 /* WorkspaceSSHFishShellTests.swift in Sources */,
 				C10900000000000000000082 /* WorkspaceStatusActionsTests.swift in Sources */,
+				C10900000000000000000161 /* WorkspaceStatusContrastTests.swift in Sources */,
 				C109000000000000000000BA /* WorkspaceStatusEntrancesTests.swift in Sources */,
 				C109000000000000000000B6 /* WorkspaceStatusHandOverTests.swift in Sources */,
 				C10900000000000000000131 /* WorkspaceStatusIconDrawingTests.swift in Sources */,
