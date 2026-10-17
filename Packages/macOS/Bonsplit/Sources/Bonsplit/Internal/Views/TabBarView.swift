@@ -1012,10 +1012,13 @@ struct TabBarView: View {
             isEnabled: appearance.showsCaptionPaneFocusIndicator,
             presentation: presentation,
             isFocused: isFocused,
-            paneCount: splitViewController.rootNode.allPaneIds.count,
+            // cmux-rbf #cm-73.2a
+            paneCount: splitViewController.isPairZoomed ? 2 : splitViewController.rootNode.allPaneIds.count,
             surfaceCount: pane.tabs.count,
             isWindowKey: controlActiveState == .key,
             isAnyPaneZoomed: splitViewController.zoomedPaneId != nil,
+            // cmux-rbf #cm-73.2a
+            isPairZoomed: splitViewController.isPairZoomed,
             resolvedBackgroundColor: surfaceCaptionChrome.resolvedBackgroundColor
         )
     }
@@ -1133,13 +1136,19 @@ struct TabBarView: View {
 
     /// The horizontally-scrolling tab row hosted inside the tab strip's `ScrollView`.
     ///
+    // cmux-rbf #cm-73.2a
+    static func captionTab(in pane: PaneState) -> TabItem? {
+        pane.selectedTab ?? pane.tabs.first
+    }
+
     /// Extracted from `body` so the SwiftUI type-checker can resolve the surrounding
     /// view tree in reasonable time. In fill/full-width mode `tabRowFillMinWidth`
     /// forces the row to the viewport width so the flexible tabs distribute the slack.
     @ViewBuilder
     private var tabScrollContent: some View {
         HStack(spacing: TabBarMetrics.tabSpacing) {
-            if presentation == .caption, let tab = pane.tabs.first {
+            // cmux-rbf #cm-73.2a
+            if presentation == .caption, let tab = Self.captionTab(in: pane) {
                 captionItem(for: tab)
                     .id(tab.id)
             } else {
@@ -1259,6 +1268,7 @@ struct TabBarView: View {
             TabBarHoverTrackingView { updateTabBarHover($0) }
         )
         .overlay(tabDropDestination)
+        .overlay(alignment: .trailing) { pairHeaderControls } // cmux-rbf #cm-73.2a
         .background {
             if splitViewController.tabShortcutHintsEnabled {
                 TabBarHostWindowReader { window in
@@ -1304,6 +1314,35 @@ struct TabBarView: View {
     private func updateTabBarHover(_ hovering: Bool) {
         withTransaction(Transaction(animation: nil)) {
             isHoveringTabBar = hovering
+            // cmux-rbf #cm-73.2a
+            if presentation == .caption {
+                splitViewController.setPairHeaderHover(hovering, pane: pane.id)
+            }
+        }
+    }
+
+    // cmux-rbf #cm-73.2a
+    @ViewBuilder
+    private var pairHeaderControls: some View {
+        if presentation == .caption,
+           splitViewController.showsPairHeaderControls(on: pane.id),
+           let orientation = splitViewController.pairZoomOrientation {
+            PairHeaderControlsView(
+                orientation: orientation,
+                appearance: appearance,
+                tooltips: appearance.splitButtonTooltips,
+                barHeight: tabBarHeight,
+                iconScale: controlIconFontScale,
+                liveOrientation: { [splitViewController] in splitViewController.pairZoomOrientation },
+                onChoose: { chosen in
+                    guard splitViewController.isInteractive else { return }
+                    controller.requestPairArrangement(chosen)
+                },
+                onEqualize: {
+                    guard splitViewController.isInteractive else { return }
+                    controller.requestPairEqualize()
+                }
+            )
         }
     }
 

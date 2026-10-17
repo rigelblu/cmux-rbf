@@ -394,6 +394,13 @@ extension ControlCommandCoordinator {
                 "placement_strategy": .string("external_browser_disabled"),
                 "url": .string(url),
             ]))
+        // cmux-rbf #cm-73.2a
+        case .browserOpenedExternally(let windowID, let workspaceID, let url):
+            return browserOpenedExternallyResult(
+                windowID: windowID,
+                workspaceID: workspaceID,
+                url: url
+            )
         case .invalidBrowserProfile(let selector, let message, let candidates):
             var data: [String: JSONValue] = ["profile": .string(selector)]
             if !candidates.isEmpty {

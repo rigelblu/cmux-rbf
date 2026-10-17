@@ -18,6 +18,8 @@ struct TabBarPaneFocusChrome {
         surfaceCount: Int,
         isWindowKey: Bool,
         isAnyPaneZoomed: Bool,
+        // cmux-rbf #cm-73.2a
+        isPairZoomed: Bool = false,
         resolvedBackgroundColor: NSColor,
         accentColor: NSColor = .controlAccentColor
     ) {
@@ -39,7 +41,8 @@ struct TabBarPaneFocusChrome {
               isWindowKey,
               paneCount > 1,
               !isAnyPaneZoomed,
-              surfaceCount == 1 else {
+              // cmux-rbf #cm-73.2a
+              (surfaceCount == 1 || isPairZoomed) else {
             color = nil
             return
         }

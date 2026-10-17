@@ -19,6 +19,73 @@ final class SplitViewController {
     /// Currently zoomed pane. When set, rendering should only show this pane.
     var zoomedPaneId: PaneID?
 
+    // cmux-rbf #cm-73.2a
+    struct PairZoomState {
+        var firstPaneId: PaneID
+        var secondPaneId: PaneID
+        var orientation: SplitOrientation
+        var splitState: SplitState
+    }
+
+    // cmux-rbf #cm-73.2a
+    var pairZoomState: PairZoomState?
+
+    // cmux-rbf #cm-73.2a
+    var isPairZoomed: Bool {
+        pairZoomState != nil
+    }
+
+    // cmux-rbf #cm-73.2a
+    var pairZoomPanes: (first: PaneID, second: PaneID)? {
+        guard let state = pairZoomState else { return nil }
+        return (state.firstPaneId, state.secondPaneId)
+    }
+
+    // cmux-rbf #cm-73.2a
+    var pairZoomOrientation: SplitOrientation? {
+        pairZoomState?.orientation
+    }
+
+    // cmux-rbf #cm-73.2a
+    @ObservationIgnored var onPairZoomChange: (() -> Void)?
+
+    // cmux-rbf #cm-73.2a
+    /// Pair headers the pointer is over right now, oldest first. The controls show on the newest: while the pointer
+    /// moves between the two headers, the exit and the entry can arrive in either order.
+    var hoveredPairHeaderPanes: [PaneID] = []
+
+    // cmux-rbf #cm-73.2a
+    func setPairHeaderHover(_ hovering: Bool, pane: PaneID) {
+        guard let pair = pairZoomState,
+              pane == pair.firstPaneId || pane == pair.secondPaneId else {
+            return
+        }
+        if hovering {
+            if !hoveredPairHeaderPanes.contains(pane) {
+                hoveredPairHeaderPanes.append(pane)
+            }
+        } else {
+            hoveredPairHeaderPanes.removeAll { $0 == pane }
+        }
+    }
+
+    // cmux-rbf #cm-73.2a
+    /// The pane whose header carries the hover controls: the pair header the pointer is over.
+    /// `nil` when neither is hovered, outside pair zoom, and while a single pane is zoomed over the pair.
+    var pairHeaderControlsCarrier: PaneID? {
+        guard let pair = pairZoomState, zoomedPaneId == nil else { return nil } // cmux-rbf #cm-73.2a
+        return PairHeaderControls.carrierPane(
+            hovered: hoveredPairHeaderPanes.last,
+            first: pair.firstPaneId,
+            second: pair.secondPaneId
+        )
+    }
+
+    // cmux-rbf #cm-73.2a
+    func showsPairHeaderControls(on pane: PaneID) -> Bool {
+        pairHeaderControlsCarrier == pane
+    }
+
     /// Currently focused pane ID
     var focusedPaneId: PaneID?
 
@@ -203,15 +270,33 @@ final class SplitViewController {
         return paneStatesById[focusedPaneId]
     }
 
+    // cmux-rbf #cm-73.2a
     var zoomedNode: SplitNode? {
-        guard let zoomedPaneId, let pane = paneStatesById[zoomedPaneId] else { return nil }
-        return .pane(pane)
+        if let zoomedPaneId, let pane = paneStatesById[zoomedPaneId] {
+            return .pane(pane)
+        }
+        if let pairZoomState {
+            guard paneStatesById[pairZoomState.firstPaneId] != nil,
+                  paneStatesById[pairZoomState.secondPaneId] != nil else {
+                return nil
+            }
+            return .split(pairZoomState.splitState)
+        }
+        return nil
     }
 
+    // cmux-rbf #cm-73.2a
     @discardableResult
     func clearPaneZoom() -> Bool {
-        guard zoomedPaneId != nil else { return false }
+        let hadZoom = zoomedPaneId != nil
+        let hadPair = pairZoomState != nil
+        guard hadZoom || hadPair else { return false }
         zoomedPaneId = nil
+        pairZoomState = nil
+        hoveredPairHeaderPanes.removeAll() // cmux-rbf #cm-73.2a
+        if hadPair {
+            onPairZoomChange?()
+        }
         return true
     }
 
@@ -231,6 +316,73 @@ final class SplitViewController {
         return true
     }
 
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    func setPairZoom(firstPane: PaneID, secondPane: PaneID, orientation: SplitOrientation) -> Bool {
+        guard firstPane != secondPane,
+              let firstPaneState = paneStatesById[firstPane],
+              let secondPaneState = paneStatesById[secondPane] else {
+            return false
+        }
+        zoomedPaneId = nil
+        let splitState: SplitState
+        if let existing = pairZoomState, existing.firstPaneId == firstPane && existing.secondPaneId == secondPane {
+            splitState = existing.splitState
+            splitState.orientation = orientation
+        } else {
+            hoveredPairHeaderPanes.removeAll() // cmux-rbf #cm-73.2a
+            splitState = SplitState(
+                orientation: orientation,
+                first: .pane(firstPaneState),
+                second: .pane(secondPaneState)
+            )
+        }
+        pairZoomState = PairZoomState(
+            firstPaneId: firstPane,
+            secondPaneId: secondPane,
+            orientation: orientation,
+            splitState: splitState
+        )
+        onPairZoomChange?()
+        return true
+    }
+
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    func clearPairZoom() -> Bool {
+        guard pairZoomState != nil else { return false }
+        pairZoomState = nil
+        hoveredPairHeaderPanes.removeAll() // cmux-rbf #cm-73.2a
+        onPairZoomChange?()
+        return true
+    }
+
+    // cmux-rbf #cm-73.2a
+    func setPairZoomOrientation(_ orientation: SplitOrientation) {
+        guard let existing = pairZoomState else { return }
+        existing.splitState.orientation = orientation
+        pairZoomState?.orientation = orientation
+        onPairZoomChange?()
+    }
+
+    // cmux-rbf #cm-73.2a
+    var pairZoomDividerPosition: CGFloat? {
+        pairZoomState?.splitState.dividerPosition
+    }
+
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    func setPairZoomDividerPosition(_ position: CGFloat) -> Bool {
+        guard let split = pairZoomState?.splitState else { return false }
+        if split.imposedFirstExtent != nil {
+            split.imposedFirstExtent = nil
+            split.imposedEpoch &+= 1
+        }
+        split.dividerPosition = position
+        split.syncDividerNow?()
+        return true
+    }
+
     // MARK: - Split Operations
 
     /// Split the specified pane in the given orientation
@@ -238,10 +390,14 @@ final class SplitViewController {
         _ paneId: PaneID,
         orientation: SplitOrientation,
         with newTab: TabItem? = nil,
-        initialDividerPosition: CGFloat? = nil
+        initialDividerPosition: CGFloat? = nil,
+        fromSocket: Bool = false
     ) {
         guard paneStatesById[paneId] != nil else { return }
-        clearPaneZoom()
+        // cmux-rbf #cm-73.2a
+        if !(fromSocket && pairZoomState != nil && zoomedPaneId == nil) {
+            clearPaneZoom()
+        }
         var createdPane: PaneState?
         rootNode = splitNodeRecursively(
             node: rootNode,
@@ -324,10 +480,14 @@ final class SplitViewController {
         orientation: SplitOrientation,
         tab: TabItem,
         insertFirst: Bool,
-        initialDividerPosition: CGFloat? = nil
+        initialDividerPosition: CGFloat? = nil,
+        fromSocket: Bool = false
     ) {
         guard paneStatesById[paneId] != nil else { return }
-        clearPaneZoom()
+        // cmux-rbf #cm-73.2a
+        if !(fromSocket && pairZoomState != nil && zoomedPaneId == nil) {
+            clearPaneZoom()
+        }
         var createdPane: PaneState?
         rootNode = splitNodeWithTabRecursively(
             node: rootNode,
@@ -442,6 +602,13 @@ final class SplitViewController {
         if let zoomedPaneId, paneStatesById[zoomedPaneId] == nil {
             self.zoomedPaneId = nil
         }
+
+        // cmux-rbf #cm-73.2a
+        if let pair = pairZoomState, (paneStatesById[pair.firstPaneId] == nil || paneStatesById[pair.secondPaneId] == nil) {
+            pairZoomState = nil
+            hoveredPairHeaderPanes.removeAll() // cmux-rbf #cm-73.2a
+            onPairZoomChange?()
+        }
     }
 
     private func closePaneRecursively(
@@ -487,22 +654,31 @@ final class SplitViewController {
 
     // MARK: - Tab Operations
 
+    // cmux-rbf #cm-73.2a
     /// Add a tab to the focused pane (or specified pane)
-    func addTab(_ tab: TabItem, toPane paneId: PaneID? = nil, atIndex index: Int? = nil) {
+    func addTab(_ tab: TabItem, toPane paneId: PaneID? = nil, atIndex index: Int? = nil, select: Bool = true) {
         let targetPaneId = paneId ?? focusedPaneId
         guard let targetPaneId,
               let pane = paneStatesById[targetPaneId] else { return }
 
         if let index {
-            pane.insertTab(tab, at: index)
+            pane.insertTab(tab, at: index, select: select)
         } else {
-            pane.addTab(tab)
+            pane.addTab(tab, select: select)
         }
         paneIdsByTabId[tab.id] = targetPaneId
     }
 
+    // cmux-rbf #cm-73.2a
     /// Move a tab from one pane to another
-    func moveTab(_ tab: TabItem, from sourcePaneId: PaneID, to targetPaneId: PaneID, atIndex index: Int? = nil) {
+    func moveTab(
+        _ tab: TabItem,
+        from sourcePaneId: PaneID,
+        to targetPaneId: PaneID,
+        atIndex index: Int? = nil,
+        select: Bool = true,
+        focus: Bool = true
+    ) {
         guard let sourcePane = paneStatesById[sourcePaneId],
               let targetPane = paneStatesById[targetPaneId] else { return }
 
@@ -512,22 +688,29 @@ final class SplitViewController {
                 from: sourceIndex,
                 to: index.map { min(max(0, $0), sourcePane.tabs.count) } ?? sourcePane.tabs.count
             )
-            sourcePane.selectTab(tab.id)
-            focusPane(sourcePaneId)
+            // cmux-rbf #cm-73.2a
+            if select {
+                sourcePane.selectTab(tab.id)
+            }
+            if focus {
+                focusPane(sourcePaneId)
+            }
             return
         }
 
         guard removeTab(tab.id, fromPane: sourcePaneId) != nil else { return }
 
         if let index {
-            targetPane.insertTab(tab, at: index)
+            targetPane.insertTab(tab, at: index, select: select)
         } else {
-            targetPane.addTab(tab)
+            targetPane.addTab(tab, select: select)
         }
         paneIdsByTabId[tab.id] = targetPaneId
 
         // Focus target pane
-        focusPane(targetPaneId)
+        if focus {
+            focusPane(targetPaneId)
+        }
 
         // If source pane is now empty and not the only pane, close it
         if sourcePane.tabs.isEmpty && paneStatesById.count > 1 {
@@ -564,7 +747,9 @@ final class SplitViewController {
     func navigateFocus(direction: NavigationDirection) {
         guard let currentPaneId = focusedPaneId else { return }
 
-        let allPaneBounds = rootNode.computePaneBounds()
+        // cmux-rbf #cm-73.2a
+        let activeNavigationNode = (zoomedPaneId == nil ? pairZoomState.map { SplitNode.split($0.splitState) } : nil) ?? rootNode
+        let allPaneBounds = activeNavigationNode.computePaneBounds()
         guard let currentBounds = allPaneBounds.first(where: { $0.paneId == currentPaneId })?.bounds else { return }
 
         if let targetPaneId = findBestNeighbor(from: currentBounds, currentPaneId: currentPaneId,
@@ -576,7 +761,9 @@ final class SplitViewController {
 
     /// Find the closest pane in the requested direction from the given pane.
     func adjacentPane(to paneId: PaneID, direction: NavigationDirection) -> PaneID? {
-        let allPaneBounds = rootNode.computePaneBounds()
+        // cmux-rbf #cm-73.2a
+        let activeNavigationNode = (zoomedPaneId == nil ? pairZoomState.map { SplitNode.split($0.splitState) } : nil) ?? rootNode
+        let allPaneBounds = activeNavigationNode.computePaneBounds()
         guard let currentBounds = allPaneBounds.first(where: { $0.paneId == paneId })?.bounds else {
             return nil
         }

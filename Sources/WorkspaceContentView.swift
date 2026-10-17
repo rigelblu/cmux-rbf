@@ -372,6 +372,16 @@ struct WorkspaceContentView: View {
         .onChange(of: workspaceManualUnreadPanelId) { _, _ in
             syncBonsplitNotificationBadges()
         }
+        // cmux-rbf #cm-73.2a
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResizeNotification)) { notification in
+            guard workspace.isDesignFocusActive else { return }
+            guard let window = notification.object as? NSWindow else { return }
+            guard workspace.isOwnedBy(window: window) else { return }
+            workspace.updateDesignFocusOrientationIfNeeded()
+            DispatchQueue.main.async {
+                workspace.updateDesignFocusOrientationIfNeeded()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: PaneChromeSettings.didChangeNotification)) { _ in
             workspace.applyGhosttyChrome(from: config, reason: "paneChromeSettingsDidChange")
         }
@@ -467,7 +477,15 @@ struct WorkspaceContentView: View {
     }
 
     private var splitZoomRenderIdentity: String {
-        workspace.bonsplitController.zoomedPaneId.map { "zoom:\($0.id.uuidString)" } ?? "unzoomed"
+        // cmux-rbf #cm-73.2a
+        if let zoomed = workspace.bonsplitController.zoomedPaneId {
+            return "zoom:\(zoomed.id.uuidString)"
+        }
+        if let pair = workspace.bonsplitController.pairZoomPanes,
+           let orientation = workspace.bonsplitController.pairZoomOrientation {
+            return "pair:\(pair.first.id.uuidString):\(pair.second.id.uuidString):\(orientation)"
+        }
+        return "unzoomed"
     }
 
     private static let tmuxPaneOverlayGeometry = TmuxPaneOverlayGeometry(

@@ -211,7 +211,8 @@ extension TerminalController {
             orientation: orientation,
             insertFirst: insertFirst,
             focus: focus,
-            allowTextBoxFocusDefault: false
+            allowTextBoxFocusDefault: false,
+            fromSocket: true // cmux-rbf #cm-73.2a
         ) {
         case .created(let panel):
             return .created(panel.id)

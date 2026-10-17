@@ -30,6 +30,10 @@ extension KeyboardShortcutSettings {
     static func splitRightShortcut() -> StoredShortcut { shortcut(for: .splitRight) }
     static func splitDownShortcut() -> StoredShortcut { shortcut(for: .splitDown) }
     static func toggleSplitZoomShortcut() -> StoredShortcut { shortcut(for: .toggleSplitZoom) }
+    // cmux-rbf #cm-73.2a
+    static func toggleDesignFocusShortcut() -> StoredShortcut { shortcut(for: .toggleDesignFocus) }
+    // cmux-rbf #cm-73.2a
+    static func flipDesignFocusLayoutShortcut() -> StoredShortcut { shortcut(for: .flipDesignFocusLayout) }
     static func resizePaneLeftShortcut() -> StoredShortcut { shortcut(for: .resizePaneLeft) }
     static func resizePaneRightShortcut() -> StoredShortcut { shortcut(for: .resizePaneRight) }
     static func resizePaneUpShortcut() -> StoredShortcut { shortcut(for: .resizePaneUp) }

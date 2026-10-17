@@ -1,5 +1,6 @@
 import AppKit
 import Bonsplit
+import CmuxBrowser // cmux-rbf #cm-73.2a
 import CmuxFoundation
 import CmuxRemoteSession
 import CmuxTerminalCore
@@ -454,6 +455,57 @@ final class AppDelegateEqualizeSplitsShortcutTests {
             XCTAssertTrue(browserPanel.webView.performKeyEquivalent(with: event))
             XCTAssertTrue(workspace.bonsplitController.isSplitZoomed)
         }
+    }
+
+    // cmux-rbf #cm-73.2a
+    @Test
+    func testFlipDesignFocusShortcutIsConsumedOnlyInsideTheMode() {
+        guard let appDelegate = AppDelegate.shared else {
+            XCTFail("Expected AppDelegate.shared")
+            return
+        }
+
+        let windowId = appDelegate.createMainWindow()
+        defer { closeWindow(withId: windowId) }
+
+        guard let window = window(withId: windowId),
+              let manager = appDelegate.tabManagerFor(windowId: windowId),
+              let workspace = manager.selectedWorkspace,
+              let terminalPanelId = workspace.focusedPanelId,
+              let figmaURL = URL(string: "https://www.figma.com/design/KEY123/my-file"),
+              workspace.newBrowserSplit(
+                  from: terminalPanelId,
+                  orientation: .horizontal,
+                  url: figmaURL,
+                  focus: false,
+                  chromeVisibility: BrowserChromeVisibility(omnibarVisible: false)
+              ) != nil,
+              let event = makeKeyDownEvent(
+                  key: "\\",
+                  modifiers: [.command, .shift, .option],
+                  keyCode: 42,
+                  windowNumber: window.windowNumber
+              ) else {
+            XCTFail("Expected a terminal and Figma workspace and an Option+Shift+Cmd+\\ event")
+            return
+        }
+        XCTAssertTrue(KeyboardShortcutSettings.shortcut(for: .flipDesignFocusLayout).matches(event: event))
+
+#if DEBUG
+        // Outside the mode the key is not consumed, so it reaches the focused terminal as if the shortcut did not exist.
+        XCTAssertFalse(workspace.isDesignFocusActive)
+        XCTAssertFalse(appDelegate.debugHandleCustomShortcut(event: event))
+        XCTAssertFalse(workspace.isDesignFocusActive)
+
+        // Inside the mode it flips the pair.
+        XCTAssertTrue(workspace.toggleDesignFocus())
+        workspace.updateDesignFocusOrientationIfNeeded(areaSize: CGSize(width: 1800, height: 1000))
+        XCTAssertEqual(workspace.bonsplitController.pairZoomOrientation, .horizontal)
+        XCTAssertTrue(appDelegate.debugHandleCustomShortcut(event: event))
+        XCTAssertEqual(workspace.bonsplitController.pairZoomOrientation, .vertical)
+#else
+        XCTFail("debugHandleCustomShortcut is only available in DEBUG")
+#endif
     }
 
     @Test
