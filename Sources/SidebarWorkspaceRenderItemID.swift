@@ -26,6 +26,16 @@ struct SidebarWorkspaceRenderItemID: Hashable {
         return Self(kind: 3, uuid: colorSentinel, colorKey: (rgb << 1) | tier)
     }
 
+    static func statusesArea() -> Self { // (#cm-110.1)
+        Self(kind: 4, uuid: SidebarStatusHeaderIdentity.statusesAreaUUID, colorKey: 0) // (#cm-110.1)
+    } // (#cm-110.1)
+
+    static func statusGroup(_ statusId: String) -> Self { // (#cm-110.1)
+        Self(kind: 5, uuid: SidebarStatusHeaderIdentity.uuid(forStatusId: statusId), colorKey: 0) // (#cm-110.1)
+    } // (#cm-110.1)
+
+    var colorHeaderDropIdentity: UUID? { SidebarStatusHeaderIdentity.colorRowUUID(kind: kind, colorKey: colorKey) } // (#cm-110.1)
+
     /// Returns the durable group identifier when this row represents a group.
     /// Workspace rows return `nil`; callers should use their row-specific
     /// fallback identity for those rows.

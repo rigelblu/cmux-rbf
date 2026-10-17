@@ -31,6 +31,12 @@ func describePlan(_ plan: SidebarWorkspaceReorderDropPlan?, in window: NestedDro
         action = "crossWindow \(index) \(proposed)"
     case .colorSection:
         action = "colorSection"
+    case .reorderStatusGroup: action = "reorderStatusGroup" // (#cm-110.1)
+    case .moveStatusesArea: action = "moveStatusesArea" // (#cm-110.1)
+    case .statusGroupDrop: action = "statusGroupDrop" // (#cm-110.1)
+    case .statusAreaBoundaryDrop: action = "statusAreaBoundaryDrop" // (#cm-110.1)
+    case .statusGroupMove: // (#cm-110.1)
+        action = "statusGroupMove" // (#cm-110.1)
     }
     return "\(name(plan.draggedWorkspaceId)) line \(line) \(scope): \(action)"
 }

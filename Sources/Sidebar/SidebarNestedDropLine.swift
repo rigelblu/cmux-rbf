@@ -12,6 +12,7 @@ enum SidebarNestedDropLine {
     /// - A workspace or a nested header placed in a group: one more than that group's depth.
     /// - A header with no workspace of its own, placed among the groups beside it: its own depth.
     static func level(for plan: SidebarWorkspaceReorderDropPlan, depthById: [UUID: Int]) -> Int? {
+        if let level = SidebarStatusHeaderDropAdapter.lineLevel(for: plan.action) { return level } // (#cm-110.1)
         guard !depthById.isEmpty else { return nil }
         switch plan.action {
         case .reorder(_, _, let group?):
@@ -20,7 +21,7 @@ enum SidebarNestedDropLine {
             return 0
         case .reorderGroup:
             return depthById[plan.draggedWorkspaceId] ?? 0
-        case .crossWindow, .colorSection:
+        case .crossWindow, .colorSection, .statusGroupMove, .reorderStatusGroup, .moveStatusesArea, .statusGroupDrop, .statusAreaBoundaryDrop: // (#cm-110.1)
             return nil
         }
     }

@@ -16,6 +16,7 @@ final class SidebarWorkspaceDragPasteboardWriter: NSPasteboardItem, NSTableViewD
         SidebarWorkspaceDragSession.pasteboardTypeIdentifier
     )
     let provisionalToken: ProvisionalDragWriterOwnership.Token
+    var statusSourceRowId: SidebarWorkspaceRenderItemID? // (#cm-110.1)
     private var workspaceId: UUID
     private var sessionId: UUID?
 
@@ -153,7 +154,7 @@ final class SidebarWorkspaceDragPasteboardWriter: NSPasteboardItem, NSTableViewD
         }
         guard provisionalSession == nil || provisionalSession === session else { return }
         provisionalSession = session
-        actions?.beginWorkspaceDrag(workspaceId)
+        if let actions { SidebarStatusGroupDragSource.begin(workspaceId: workspaceId, rowId: statusSourceRowId, actions: actions) } // (#cm-110.1)
         if let sessionId = actions?.nativeWorkspaceDragLifecycle?.currentSessionId() {
             bind(to: sessionId)
             session.draggingPasteboard.setString(

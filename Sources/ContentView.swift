@@ -11818,11 +11818,12 @@ struct VerticalTabsSidebar: View, Equatable {
             // liveness gate; residual pasteboard data never reaches this path.
             get: {
                 guard acceptsLiveSidebarPayloadForBinding() else { return nil }
-                return dragState.draggedTabId ?? dragState.currentWorkspaceDragId
+                let id = dragState.draggedTabId ?? dragState.currentWorkspaceDragId // (#cm-110.1)
+                return id.flatMap { statusHeaderAllowsWorkspaceBinding($0) ? $0 : nil } // (#cm-110.1)
             },
             set: { newValue in
                 if let newValue {
-                    _ = dragState.activateDragging(tabId: newValue)
+                    if statusHeaderAllowsWorkspaceBinding(newValue) { _ = activateSidebarWorkspaceDragIfNeeded(pasteboardWorkspaceId: newValue) } // (#cm-110.1)
                 } else {
                     // A destination may tear down its SwiftUI presentation as
                     // soon as it accepts a drop. That is not native source
@@ -12053,6 +12054,10 @@ struct VerticalTabsSidebar: View, Equatable {
         let memberWorkspaceIdsByGroupId: [UUID: [UUID]]
         let workspaceGroupMenuSnapshot: WorkspaceGroupMenuSnapshot
         let colorSectionProjection: SidebarWorkspaceColorSectionProjection
+        let statusGroupProjection: WorkspaceStatusGroupProjection? // (#cm-110.1)
+        let statusGroupFolds: WorkspaceStatusGroupsState // (#cm-110.1)
+        /// What each status group's header shows, read once here above the lists so no row reads the status store. (#cm-110.1)
+        let statusGroupPresentationById: [String: SidebarStatusGroupPresentation] // (#cm-110.1)
         let workspaceRenderItems: [SidebarWorkspaceRenderItem]
         let visibleWorkspaceRowIds: [UUID]
         /// How many groups hold each row, by workspace id or group id; empty in a window with no nested group (#cm-106).
@@ -12079,33 +12084,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 cmuxDebugLog("sidebar.close workspace=\(workspaceId.uuidString.prefix(5)) method=middleClick")
 #endif
                 tabManager.closeWorkspaceWithConfirmation(workspace)
-            }, onBeginWorkspaceDrag: { dragId, sourceView, event, draggingFrame, dragImage in
-                let workspaceId: UUID
-                if tabManager.tabs.contains(where: { $0.id == dragId }) {
-                    workspaceId = dragId
-                } else if let group = tabManager.workspaceGroups.first(where: { $0.id == dragId }) {
-                    if group.isEmpty {
-                        workspaceId = group.id
-                    } else {
-                        guard let liveAnchorId = tabManager.workspaceGroupAnchor(for: group.id)?.id else {
-                            return false
-                        }
-                        workspaceId = liveAnchorId
-                    }
-                } else {
-                    return false
-                }
-#if DEBUG
-                cmuxDebugLog("sidebar.nativeDrag tab=\(workspaceId.uuidString.prefix(5))")
-#endif
-                return dragState.beginNativeDragging(
-                    tabId: workspaceId,
-                    pasteboardItem: SidebarTabDragPayload(tabId: workspaceId).pasteboardItem(),
-                    sourceView: sourceView,
-                    event: event,
-                    draggingFrame: draggingFrame,
-                    dragImage: dragImage
-                )
+            }, onBeginWorkspaceDrag: { candidate, sourceView, event, draggingFrame, dragImage in // (#cm-110.1)
+                beginSidebarNativeDrag(dragId: candidate.workspaceId, sourceView: sourceView, event: event, draggingFrame: draggingFrame, dragImage: dragImage, sourceRowId: candidate.renderItemId) // (#cm-110.1)
             })
         }
         if showModifierHoldHints {
@@ -12201,7 +12181,8 @@ struct VerticalTabsSidebar: View, Equatable {
             effectiveMembership: workspaceGroupIdByWorkspaceId
         )
         let _ = workspaceColorPaletteRevision
-        let colorSectionProjection = SidebarWorkspaceColorSectionProjection.project(
+        let statusGroupProjection = Self.currentStatusGroupProjection(tabs: tabs, storedOrder: sidebarState.statusGroups?.order) // (#cm-110.1)
+        let colorSectionProjection = Self.colorSectionProjection( // (#cm-110.1)
             workspaces: tabs.map {
                 SidebarWorkspaceColorSectionWorkspaceSnapshot(
                     id: $0.id,
@@ -12210,19 +12191,24 @@ struct VerticalTabsSidebar: View, Equatable {
                     customColor: $0.customColor
                 )
             },
-            paletteEntries: WorkspaceTabColorSettings.labeledPaletteEntries(),
-            collapsedHexes: sidebarState.collapsedColorSectionHexes
-        )
-        let workspaceRenderItems = colorSectionProjection.applying(to: baseWorkspaceRenderItems)
-        let numberedWorkspaceIndexById = SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(
-            from: baseWorkspaceRenderItems
-        )
+            collapsedHexes: sidebarState.collapsedColorSectionHexes, // (#cm-110.1)
+            statusGroupProjection: statusGroupProjection // (#cm-110.1)
+        ) // (#cm-110.1)
+
+        let statusRenderItems = Self.resolveRenderItems( // (#cm-110.1)
+            colorSectionProjection: colorSectionProjection, // (#cm-110.1)
+            baseItems: baseWorkspaceRenderItems, // (#cm-110.1)
+            statusGroupProjection: statusGroupProjection, // (#cm-110.1)
+            folds: sidebarState.statusGroups ?? WorkspaceStatusGroupsState(), tabs: tabs, groups: tabManager.workspaceGroups // (#cm-110.1)
+        ) // (#cm-110.1)
+        let workspaceRenderItems = statusRenderItems.items // (#cm-110.1)
+        let numberedWorkspaceIndexById = statusRenderItems.numberedWorkspaceIndexById // (#cm-110.1)
         let visibleWorkspaceRowIds = SidebarWorkspaceRenderItem.interactiveRowIds(
             from: workspaceRenderItems
         )
         let draggedSidebarTabId = dragState.draggedTabId
         let dropIndicatorScope = dragState.dropIndicatorScope
-        let sidebarReorderIds = draggedSidebarTabId.map {
+        let sidebarReorderIds = statusHeaderIndicatorRows(draggedId: draggedSidebarTabId, items: workspaceRenderItems) ?? draggedSidebarTabId.map { // (#cm-110.1)
             sidebarDropIndicatorRowIds(
                 draggedWorkspaceId: $0,
                 scope: dropIndicatorScope,
@@ -12271,11 +12257,17 @@ struct VerticalTabsSidebar: View, Equatable {
             memberWorkspaceIdsByGroupId: memberWorkspaceIdsByGroupId,
             workspaceGroupMenuSnapshot: workspaceGroupMenuSnapshot,
             colorSectionProjection: colorSectionProjection,
+            statusGroupProjection: statusGroupProjection, // (#cm-110.1)
+            statusGroupFolds: sidebarState.statusGroups ?? WorkspaceStatusGroupsState(), // (#cm-110.1)
+            statusGroupPresentationById: Self.statusGroupPresentations(projection: statusGroupProjection), // (#cm-110.1)
             workspaceRenderItems: workspaceRenderItems,
             visibleWorkspaceRowIds: visibleWorkspaceRowIds,
             rowDepthById: rowDepthById
         )
         let _ = SidebarProfilingSignposts.end(signpost)
+#if DEBUG // (#cm-110.1)
+        let _ = SidebarDebugRowSnapshots.record(windowId: windowId, items: workspaceRenderItems) // (#cm-110.1)
+#endif // (#cm-110.1)
         ZStack(alignment: .bottomLeading) {
             if CmuxExtensionSidebarSelection.resolvesToDefaultSidebar(effectiveProviderId: effectiveExtensionSidebarProviderId) {
                 workspaceScrollArea(renderContext: renderContext)
@@ -12292,6 +12284,9 @@ struct VerticalTabsSidebar: View, Equatable {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+#if DEBUG // (#cm-110.1)
+        .background(makeSidebarDebugDropHost(renderContext: renderContext, plan: { point, targets, id in workspaceReorderPlan(point: point, targets: targets, renderContext: renderContext, draggedWorkspaceId: id) }, commit: { performWorkspaceReorderPlan($0) })) // (#cm-110.1)
+#endif // (#cm-110.1)
         .accessibilityIdentifier("Sidebar")
         .ignoresSafeArea()
         .environment(\.sidebarContrastBackgroundHex, sidebarContrastBackground.hexString()) // (#cm-109.7)
@@ -12301,6 +12296,7 @@ struct VerticalTabsSidebar: View, Equatable {
         // snapshots, and it is not gated on `isPresented`. The store is read here, in the sidebar's parent; no row reads
         // it. The action runs from `onChange`, never from the body.
         .onChange(of: workspaceStatusListRevision) { _, _ in
+            sidebarState.prepareStatusGroupsOnListArrival(selectedWorkspace: tabManager.selectedTab) // (#cm-110.1)
             refreshWorkspaceSnapshots(workspaceIds: Set(tabManager.tabs.map(\.id)))
         }
         .overlay(alignment: .trailing) {
@@ -12863,6 +12859,10 @@ struct VerticalTabsSidebar: View, Equatable {
                     equivalenceValue: header,
                     makeContent: { _, _ in AnyView(header) }
                 )
+            case .statusesHeader: // (#cm-110.1)
+                return sidebarStatusesAreaTableConfiguration(renderContext: renderContext) // (#cm-110.1)
+            case .statusGroupHeader(let statusId): // (#cm-110.1)
+                return sidebarStatusGroupTableConfiguration(statusId: statusId, renderContext: renderContext) // (#cm-110.1)
             case .workspace(let workspaceId):
                 guard let workspace = renderContext.workspaceById[workspaceId],
                       let input = workspaceRowInputsById[workspaceId] else { return nil }
@@ -12909,7 +12909,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 _ = AppDelegate.shared?.createEmptyWorkspaceGroup(tabManager: tabManager)
             },
             beginWorkspaceDrag: { workspaceId in
-                _ = dragState.beginDragging(tabId: workspaceId)
+                beginStatusAwareWorkspaceDrag(workspaceId) // (#cm-110.1)
             },
             movingWorkspaceCount: { workspaceId in
                 SidebarWorkspaceDragBlockResolver().movingWorkspaceIds(
@@ -13036,6 +13036,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 }
             )
         )
+        actions.beginWorkspaceDragFromRow = { id, row in beginStatusAwareWorkspaceDrag(id, sourceRowId: row) } // (#cm-110.1)
         actions.workspaceGroupAnchorIdsForDrag = { [weak tabManager] in
             guard let tabManager else { return [:] }
             let liveWorkspaceIds = Set(tabManager.tabs.map(\.id))
@@ -13052,6 +13053,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 }
             )
         }
+        installStatusHeaderTableActions(&actions, renderContext: renderContext, plan: { point, targets, id in workspaceReorderPlan(point: point, targets: targets, renderContext: renderContext, draggedWorkspaceId: id) }, commit: { performWorkspaceReorderPlan($0) }) // (#cm-110.1)
         return actions
     }
 
@@ -14611,6 +14613,8 @@ struct VerticalTabsSidebar: View, Equatable {
             notificationIndex: notificationIndex
         )
         let actionFactory = makeWorkspaceRowActionFactory()
+        let statusHeaderRows = makeStatusHeaderSwiftUIRows(renderContext: renderContext, unreadSnapshot: unreadSnapshot, collectTargets: shouldCollectWorkspaceDropTargets) // (#cm-110.1)
+        let colorHeaderToggle = makeStatusColorHeaderToggle() // (#cm-110.1)
         let rows = LazyVStack(spacing: tabRowSpacing) {
             ForEach(renderItems, id: \.id) { item in
                 switch item {
@@ -14619,11 +14623,11 @@ struct VerticalTabsSidebar: View, Equatable {
                         sidebarWorkspaceGroupRow(snapshot: snapshot)
                     }
                 case .colorSectionHeader(let section):
-                    SidebarWorkspaceColorSectionHeader(
-                        section: section,
-                        colorScheme: renderContext.environment.colorScheme,
-                        onToggle: { sidebarState.toggleColorSection(hex: section.id.normalizedHex) }
-                    )
+                    Self.statusColorHeaderRow(section: section, colorScheme: renderContext.environment.colorScheme, collectTargets: shouldCollectWorkspaceDropTargets, toggle: colorHeaderToggle, frameChanged: statusHeaderRows.colorFrameChanged, disappeared: statusHeaderRows.colorDisappeared, paint: statusHeaderRows.colors[item.id] ?? .none) // (#cm-110.1)
+                case .statusesHeader: // (#cm-110.1)
+                    statusHeaderRows.area // (#cm-110.1)
+                case .statusGroupHeader(let statusId): // (#cm-110.1)
+                    if let row = statusHeaderRows.groups[statusId] { row } // (#cm-110.1)
                 case .workspace(let workspaceId):
                     if let input = listSnapshot.workspaceRowsById[workspaceId] {
                         workspaceRow(
@@ -14655,13 +14659,11 @@ struct VerticalTabsSidebar: View, Equatable {
         renderContext: WorkspaceListRenderContext,
         shouldCollect: Bool
     ) -> some View {
+        let externalGap = makeStatusHeaderExternalGapOverlay(renderContext: renderContext) // (#cm-110.1)
         if shouldCollect {
             rows
                 .overlayPreferenceValue(SidebarWorkspaceRowFramePreferenceKey.self) { anchors in
                     GeometryReader { proxy in
-                        let workspaceGroupsByAnchor = Dictionary(
-                            uniqueKeysWithValues: renderContext.workspaceGroups.map { ($0.anchorWorkspaceId, $0) }
-                        )
                         SidebarWorkspaceDropTargetWriters(
                             bonsplitTargetBridge: bonsplitWorkspaceDropTargetBridge,
                             bonsplitTargets: renderContext.tabs.compactMap { tab in
@@ -14673,23 +14675,9 @@ struct VerticalTabsSidebar: View, Equatable {
                                 )
                             },
                             reorderTargetBridge: workspaceReorderDropTargetBridge,
-                            reorderTargets: renderContext.visibleWorkspaceRowIds.compactMap { workspaceId in
-                                guard let anchor = anchors[workspaceId],
-                                      renderContext.workspaceById[workspaceId] != nil
-                                          || workspaceGroupsByAnchor[workspaceId] != nil else {
-                                    return nil
-                                }
-                                let group = workspaceGroupsByAnchor[workspaceId]
-                                let targetGroupId = group?.id ??
-                                    (renderContext.workspaceGroupIdByWorkspaceId[workspaceId] ?? nil)
-                                return SidebarWorkspaceReorderDropOverlay.Target(
-                                    workspaceId: workspaceId,
-                                    groupId: targetGroupId,
-                                    isGroupHeader: group != nil,
-                                    frame: proxy[anchor]
-                                )
-                            }
+                            reorderTargets: Self.statusAwareSwiftUITargets(items: renderContext.workspaceRenderItems, frames: anchors.mapValues { proxy[$0] }, context: renderContext) // (#cm-110.1)
                         )
+                        .overlay(alignment: .topLeading) { externalGap(anchors.mapValues { proxy[$0] }, proxy.size.width) } // (#cm-110.1)
                     }
                 }
         } else {
@@ -14815,6 +14803,7 @@ struct VerticalTabsSidebar: View, Equatable {
 #endif
             return false
         }
+        if let headerAccepted = activateStatusHeaderDrag(dragId) { return headerAccepted } // (#cm-110.1)
         if dragState.draggedTabId == dragId {
             return true
         }
@@ -14896,7 +14885,7 @@ struct VerticalTabsSidebar: View, Equatable {
             indicator: plan.indicator,
             scope: plan.indicatorScope,
             draggedWorkspaceId: draggedWorkspaceId,
-            indicatorRowIds: sidebarDropIndicatorRowIds(
+            indicatorRowIds: Self.workspaceStatusFeedbackRows(plan: plan, items: renderContext.workspaceRenderItems, projection: renderContext.statusGroupProjection) ?? statusHeaderIndicatorRows(draggedId: draggedWorkspaceId, items: renderContext.workspaceRenderItems) ?? sidebarDropIndicatorRowIds( // (#cm-110.1)
                 draggedWorkspaceId: draggedWorkspaceId,
                 scope: plan.indicatorScope,
                 tabs: renderContext.tabs,
@@ -14939,7 +14928,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 point: point,
                 targets: targets,
                 renderContext: renderContext,
-                draggedWorkspaceId: draggedWorkspaceId
+                draggedWorkspaceId: draggedWorkspaceId, headerSessionId: pendingSessionId // (#cm-110.1)
             )
         } else {
             guard activateSidebarWorkspaceDragIfNeeded(pasteboardWorkspaceId: pasteboardWorkspaceId) else {
@@ -14969,69 +14958,16 @@ struct VerticalTabsSidebar: View, Equatable {
         point: CGPoint,
         targets: [SidebarWorkspaceReorderDropOverlay.Target],
         renderContext: WorkspaceListRenderContext,
-        draggedWorkspaceId explicitDraggedWorkspaceId: UUID? = nil
+        draggedWorkspaceId explicitDraggedWorkspaceId: UUID? = nil, headerSessionId: UUID? = nil, skipsWorkspaceStatusRules: Bool = false, permitsStatusBoundaryAlias: Bool = false // (#cm-110.1)
     ) -> SidebarWorkspaceReorderDropPlan? {
         guard let draggedTabId = explicitDraggedWorkspaceId ?? dragState.draggedTabId else { return nil }
-        let foreignDraggedIsPinned = dragState.foreignDraggedIsPinned
-            ?? resolvedDraggedWorkspacePinState(for: draggedTabId)
-        let draggedBlockIds = SidebarWorkspaceDragBlockResolver().movingWorkspaceIds(
-            orderedWorkspaceIds: renderContext.tabs.map(\.id),
-            selectedIds: selectedTabIds,
-            draggedId: draggedTabId,
-            anchorIds: Set(renderContext.workspaceGroups.map(\.anchorWorkspaceId))
-        )
-        guard let basePlan = SidebarWorkspaceReorderDropResolver().plan(
-            for: SidebarWorkspaceReorderDropRequest(
-                point: point,
-                draggedWorkspaceId: draggedTabId,
-                foreignDraggedIsPinned: foreignDraggedIsPinned,
-                workspaces: renderContext.tabs.map {
-                    SidebarWorkspaceReorderWorkspaceSnapshot(
-                        id: $0.id,
-                        isPinned: $0.isPinned,
-                        groupId: $0.groupId
-                    )
-                },
-                groups: renderContext.workspaceGroups.map {
-                        SidebarWorkspaceReorderGroupSnapshot(
-                            id: $0.id,
-                            anchorWorkspaceId: $0.anchorWorkspaceId,
-                            isPinned: $0.isPinned,
-                            isEmpty: $0.isEmpty,
-                            parentGroupId: $0.parentGroupId // (#cm-106)
-                        )
-                },
-                targets: targets.map {
-                    SidebarWorkspaceReorderDropTarget(
-                        workspaceId: $0.workspaceId,
-                        groupId: $0.groupId,
-                        isGroupHeader: $0.isGroupHeader,
-                        frame: $0.frame
-                    )
-                },
-                draggedBlockWorkspaceIds: Set(draggedBlockIds)
-            )
-        ) else { return nil }
-        guard let sourceSection = renderContext.colorSectionProjection.sectionByWorkspaceId[draggedTabId] else {
-            return basePlan
-        }
-        if SidebarWorkspaceColorSectionDropPolicy.allowsDropOutOfSection(action: basePlan.action) {
-            return basePlan
-        }
-        guard let indicator = basePlan.indicator,
-              let targetWorkspaceId = indicator.tabId,
-              let targetSection = renderContext.colorSectionProjection.sectionByWorkspaceId[targetWorkspaceId],
-              targetSection.id == sourceSection.id else { return nil }
-        return SidebarWorkspaceReorderDropPlan(
-            draggedWorkspaceId: draggedTabId,
-            indicator: indicator,
-            indicatorScope: .raw,
-            action: .colorSection(
-                targetWorkspaceId: targetWorkspaceId,
-                insertBefore: indicator.edge == .top,
-                memberWorkspaceIds: sourceSection.memberWorkspaceIds
-            )
-        )
+        switch statusHeaderReorderPlan(point: point, targets: targets, context: renderContext, draggedId: draggedTabId, pendingSessionId: headerSessionId) { // (#cm-110.1)
+        case .notHeader: break // (#cm-110.1)
+        case .refused: return nil // (#cm-110.1)
+        case .plan(let plan): return plan // (#cm-110.1)
+        } // (#cm-110.1)
+        let status = workspaceStatusReorderPlan(point: point, targets: targets, context: renderContext, draggedId: draggedTabId, sessionId: headerSessionId, bypass: skipsWorkspaceStatusRules, ordinary: { p, t, boundary in workspaceReorderPlan(point: p, targets: t, renderContext: renderContext, draggedWorkspaceId: draggedTabId, headerSessionId: headerSessionId, skipsWorkspaceStatusRules: true, permitsStatusBoundaryAlias: boundary) }) // (#cm-110.1)
+        return Self.workspaceStatusOrOrdinaryPlan(status: status, ordinary: { Self.workspaceOrdinaryReorderPlan(point: point, targets: targets, snapshot: .init(context: renderContext, selectedIds: selectedTabIds), draggedTabId: draggedTabId, foreignDraggedIsPinned: dragState.foreignDraggedIsPinned ?? resolvedDraggedWorkspacePinState(for: draggedTabId), permitsGroupEscape: skipsWorkspaceStatusRules, permitsStatusBoundaryAlias: permitsStatusBoundaryAlias) }) // (#cm-110.1)
     }
 
     /// Resolves the frozen pin tier needed by a deferred cross-window drop.
@@ -15045,14 +14981,18 @@ struct VerticalTabsSidebar: View, Equatable {
 
     private func performWorkspaceReorderPlan(_ plan: SidebarWorkspaceReorderDropPlan) -> Bool {
         switch plan.action {
+        case .statusGroupDrop, .statusAreaBoundaryDrop: return performWorkspaceStatusAwarePlan(plan, performOrdinary: { performWorkspaceReorderPlan($0) }) // (#cm-110.1)
+        case .reorderStatusGroup, .moveStatusesArea: return performStatusHeaderReorderPlan(plan) // (#cm-110.1)
         case .reorderGroup(let targetIndex):
             let groupId = plan.draggedWorkspaceId
             guard tabManager.workspaceGroups.contains(where: { $0.id == groupId }) else {
                 return false
             }
             let previousOrder = tabManager.workspaceGroups.map(\.id)
+            let statusGroupsBeforeMove = sidebarState.reanchorStatusAreaBeforeMove(tabManager: tabManager, movingWorkspaceIds: [], movingGroupIds: [groupId]) // (#cm-110.1)
             tabManager.moveWorkspaceGroup(groupId: groupId, toIndex: targetIndex)
             let changed = tabManager.workspaceGroups.map(\.id) != previousOrder
+            sidebarState.settleStatusAreaAfterMove(previous: statusGroupsBeforeMove, moved: changed) // (#cm-110.1)
             // A self-drop is a handled no-op; returning false makes AppKit
             // animate the header back even though the pointer landed on its
             // own row.
@@ -15069,6 +15009,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 draggedId: plan.draggedWorkspaceId,
                 anchorIds: Set(tabManager.workspaceGroups.compactMap(\.liveAnchorWorkspaceId))
             )
+            let tabOrderBeforeReorder = tabManager.tabs.map(\.id) // (#cm-110.1)
+            let statusGroupsBeforeMove = sidebarState.reanchorStatusAreaBeforeMove(tabManager: tabManager, movingWorkspaceIds: movingIds, movingGroupIds: []) // (#cm-110.1)
             let didReorder: Bool
             if movingIds.count > 1 {
                 didReorder = tabManager.reorderSidebarWorkspaces(
@@ -15088,6 +15030,7 @@ struct VerticalTabsSidebar: View, Equatable {
                     explicitGroupId: explicitGroupId
                 )
             }
+            sidebarState.settleStatusAreaAfterMove(previous: statusGroupsBeforeMove, moved: didReorder && tabManager.tabs.map(\.id) != tabOrderBeforeReorder) // (#cm-110.1)
             syncSidebarSelectionAfterWorkspaceReorder(
                 preserving: selectionBeforeReorder,
                 preferredAnchorWorkspaceId: anchorWorkspaceIdBeforeReorder
@@ -15096,7 +15039,8 @@ struct VerticalTabsSidebar: View, Equatable {
         case .crossWindow(insertionIndex: _, proposedInsertionIndex: let proposedInsertionIndex):
             return performCrossWindowWorkspaceDrop(plan: plan, proposedInsertionIndex: proposedInsertionIndex)
         case .colorSection(let targetWorkspaceId, let insertBefore, let memberWorkspaceIds):
-            let freshProjection = SidebarWorkspaceColorSectionProjection.project(
+            let statusGroupProj = Self.currentStatusGroupProjection(tabs: tabManager.tabs) // (#cm-110.1)
+            let freshProjection = Self.colorSectionProjection( // (#cm-110.1)
                 workspaces: tabManager.tabs.map {
                     SidebarWorkspaceColorSectionWorkspaceSnapshot(
                         id: $0.id,
@@ -15105,8 +15049,8 @@ struct VerticalTabsSidebar: View, Equatable {
                         customColor: $0.customColor
                     )
                 },
-                paletteEntries: WorkspaceTabColorSettings.labeledPaletteEntries(),
-                collapsedHexes: []
+                collapsedHexes: [], // (#cm-110.1)
+                statusGroupProjection: statusGroupProj // (#cm-110.1)
             )
             guard let freshSection = freshProjection.sectionByWorkspaceId[plan.draggedWorkspaceId],
                   freshSection.memberWorkspaceIds == memberWorkspaceIds,
@@ -15119,6 +15063,16 @@ struct VerticalTabsSidebar: View, Equatable {
                 insertBefore: insertBefore,
                 memberWorkspaceIds: memberWorkspaceIds
             )
+        case .statusGroupMove(let statusId, let targetWorkspaceId, let insertBefore, let memberWorkspaceIds): // (#cm-110.1)
+            return Self.performStatusGroupMove( // (#cm-110.1)
+                plan: plan, // (#cm-110.1)
+                statusId: statusId, // (#cm-110.1)
+                targetWorkspaceId: targetWorkspaceId, // (#cm-110.1)
+                insertBefore: insertBefore, // (#cm-110.1)
+                memberWorkspaceIds: memberWorkspaceIds, // (#cm-110.1)
+                freshProjection: Self.currentStatusGroupProjection(tabs: tabManager.tabs), // (#cm-110.1)
+                tabManager: tabManager // (#cm-110.1)
+            ) // (#cm-110.1)
         }
     }
 
@@ -15570,7 +15524,7 @@ struct VerticalTabsSidebar: View, Equatable {
             inferredTaskStatus: workspaceSnapshot.taskStatusInput.inferred,
             activeTodoOverride: workspaceSnapshot.taskStatusInput.activeOverride,
             isTodoStatusHidden: workspaceSnapshot.taskStatusInput.isHidden,
-            depth: renderContext.rowDepthById[tab.id] ?? 0, // (#cm-106)
+            depth: Self.rowDepth(of: tab.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection), // (#cm-106) (#cm-110.1)
             dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil, // (#cm-106)
             listWidth: renderContext.listWidth
         )

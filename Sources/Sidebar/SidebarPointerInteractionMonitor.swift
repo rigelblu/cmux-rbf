@@ -203,6 +203,10 @@ final class SidebarPointerInteractionMonitor {
         scheduleGeometryReconciliation()
     }
 
+#if DEBUG // (#cm-110.1)
+    func statusHeaderDropFrame(for rowId: SidebarWorkspaceRenderItemID) -> CGRect? { rowFrames[rowId] } // (#cm-110.1)
+#endif // (#cm-110.1)
+
     func removeFrame(for rowId: SidebarWorkspaceRenderItemID) {
         rowFrames.removeValue(forKey: rowId)
         workspaceIdsByRowId.removeValue(forKey: rowId)
@@ -242,7 +246,7 @@ final class SidebarPointerInteractionMonitor {
         }
         return SidebarWorkspaceDragCandidate(
             workspaceId: workspaceId,
-            swiftUIFrame: row.value
+            swiftUIFrame: row.value, renderItemId: row.key // (#cm-110.1)
         )
     }
 

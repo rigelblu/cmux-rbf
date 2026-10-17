@@ -84,6 +84,10 @@ struct SidebarGroupHeaderBandPalette: Equatable {
     /// The band's colour before `bandOpacity` is applied.
     let bandColor: NSColor
 
+    /// Opaque composite over `base`, normally windowBackgroundColor as a proxy for sidebar material. // (#cm-110.1)
+    /// Done's solid check uses this approximation; translucent or tinted material pixels can differ. // (#cm-110.1)
+    let compositedBandColor: NSColor // (#cm-110.1)
+
     /// The rung this header sits on.
     let bandOpacity: CGFloat
 
@@ -252,6 +256,7 @@ struct SidebarGroupHeaderBandPalette: Equatable {
             bandColor.withAlphaComponent(bandOpacity),
             over: resolvedBase
         )
+        compositedBandColor = composited // (#cm-110.1)
         // The header's name was a fixed `Color.primary` while its background
         // was clear. Once the band can carry a saturated config-supplied colour
         // that is no longer safe, so the foreground is derived — the same
