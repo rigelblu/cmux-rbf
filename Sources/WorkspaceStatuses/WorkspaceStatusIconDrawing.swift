@@ -1,4 +1,5 @@
 import AppKit
+import CmuxAppKitSupportUI
 import CmuxWorkspaces
 import SwiftUI
 
@@ -341,6 +342,10 @@ enum WorkspaceStatusMenuImage {
         isDark: Bool
     ) -> NSImage {
         let appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+        let menuBackground = WindowAppearanceSnapshot.resolvedColor(
+            .windowBackgroundColor,
+            for: isDark ? .dark : .light
+        )
         let model = SidebarRowTaskStatusGlyphButton.Model(
             status: status,
             hasOverride: false,
@@ -348,7 +353,8 @@ enum WorkspaceStatusMenuImage {
             fontScale: glyphScale,
             colorScheme: isDark ? .dark : .light,
             icon: icon,
-            colorHex: colorHex
+            colorHex: colorHex,
+            contrastBackground: menuBackground
         )
         var neutral = NSColor.secondaryLabelColor
         var color = neutral.cgColor
@@ -358,7 +364,7 @@ enum WorkspaceStatusMenuImage {
                 model: model, monochromeColor: neutral, neutralColor: neutral
             ).cgColor
         }
-        let tick = SidebarRowTaskStatusGlyphButton.tickColor(model: model).cgColor
+        let tick = SidebarRowTaskStatusGlyphButton.tickColor(model: model, neutralColor: neutral).cgColor
         let symbolMask = WorkspaceStatusIconDrawing.symbolMask(for: icon, fontScale: glyphScale)
         return NSImage(size: NSSize(width: side, height: side), flipped: true) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }

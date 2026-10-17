@@ -5,6 +5,7 @@ import SwiftUI
 struct SidebarWorkspaceTableEnvironmentSnapshot {
     let colorScheme: ColorScheme
     let globalFontMagnificationPercent: Int
+    var sidebarContrastBackgroundHex: String? = nil // (#cm-109.7)
 #if DEBUG
     let lazyContractProbe: SidebarLazyContractProbe
 #endif
@@ -12,6 +13,7 @@ struct SidebarWorkspaceTableEnvironmentSnapshot {
     func hasEquivalentPresentation(to other: Self) -> Bool {
         colorScheme == other.colorScheme
             && globalFontMagnificationPercent == other.globalFontMagnificationPercent
+            && sidebarContrastBackgroundHex == other.sidebarContrastBackgroundHex // (#cm-109.7)
     }
 
     @ViewBuilder
@@ -20,11 +22,13 @@ struct SidebarWorkspaceTableEnvironmentSnapshot {
         content
             .environment(\.colorScheme, colorScheme)
             .environment(\.cmuxGlobalFontMagnificationPercent, globalFontMagnificationPercent)
+            .environment(\.sidebarContrastBackgroundHex, sidebarContrastBackgroundHex) // (#cm-109.7)
             .environment(\.sidebarLazyContractProbe, lazyContractProbe)
 #else
         content
             .environment(\.colorScheme, colorScheme)
             .environment(\.cmuxGlobalFontMagnificationPercent, globalFontMagnificationPercent)
+            .environment(\.sidebarContrastBackgroundHex, sidebarContrastBackgroundHex) // (#cm-109.7)
 #endif
     }
 }

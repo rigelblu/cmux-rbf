@@ -1764,6 +1764,12 @@ struct ContentView: View {
             },
             observedWindowReference: observedWindowReference,
             chromeBackgroundColor: windowAppearanceSnapshot.resolvedChromeBackgroundColor,
+            sidebarContrastBackground: sidebarContrastStandIn( // (#cm-109.7)
+                unifySurfaceBackdrops: windowAppearanceSnapshot.unifySurfaceBackdrops, // (#cm-109.7)
+                chromeBackground: windowAppearanceSnapshot.resolvedChromeBackgroundColor, // (#cm-109.7)
+                contentColorScheme: windowAppearanceSnapshot.sidebarContentColorScheme, // (#cm-109.7)
+                tint: windowAppearanceSnapshot.sidebarSettings.materialPolicy.tintColor // (#cm-109.7)
+            ), // (#cm-109.7)
             selection: $sidebarSelectionState.selection,
             selectedTabIds: $selectedTabIds, lastSidebarSelectionIndex: $lastSidebarSelectionIndex, sidebarRenderWorkerClient: $sidebarRenderWorkerClient
         )
@@ -11585,6 +11591,7 @@ struct VerticalTabsSidebar: View, Equatable {
             && lhs.titlebarControlsLayoutModel === rhs.titlebarControlsLayoutModel
             && lhs.isPresented == rhs.isPresented
             && lhs.chromeBackgroundColor.isEqual(rhs.chromeBackgroundColor)
+            && lhs.sidebarContrastBackground.isEqual(rhs.sidebarContrastBackground) // (#cm-109.7)
     }
 
     var updateViewModel: UpdateStateModel
@@ -11599,6 +11606,7 @@ struct VerticalTabsSidebar: View, Equatable {
     let onNewTab: () -> Void
     let observedWindowReference: WeakWindowReference
     let chromeBackgroundColor: NSColor
+    var sidebarContrastBackground: NSColor = .windowBackgroundColor // (#cm-109.7)
     var observedWindow: NSWindow? { observedWindowReference.window }
     @EnvironmentObject var tabManager: TabManager
     @EnvironmentObject var sidebarState: SidebarState
@@ -12212,12 +12220,14 @@ struct VerticalTabsSidebar: View, Equatable {
         let tableEnvironment = SidebarWorkspaceTableEnvironmentSnapshot(
             colorScheme: sidebarColorScheme,
             globalFontMagnificationPercent: sidebarGlobalFontMagnificationPercent,
+            sidebarContrastBackgroundHex: sidebarContrastBackground.hexString(), // (#cm-109.7)
             lazyContractProbe: sidebarLazyContractProbe
         )
 #else
         let tableEnvironment = SidebarWorkspaceTableEnvironmentSnapshot(
             colorScheme: sidebarColorScheme,
-            globalFontMagnificationPercent: sidebarGlobalFontMagnificationPercent
+            globalFontMagnificationPercent: sidebarGlobalFontMagnificationPercent, // (#cm-109.7)
+            sidebarContrastBackgroundHex: sidebarContrastBackground.hexString() // (#cm-109.7)
         )
 #endif
         let renderContext = WorkspaceListRenderContext(
@@ -12269,6 +12279,7 @@ struct VerticalTabsSidebar: View, Equatable {
         }
         .accessibilityIdentifier("Sidebar")
         .ignoresSafeArea()
+        .environment(\.sidebarContrastBackgroundHex, sidebarContrastBackground.hexString()) // (#cm-109.7)
         // (#cm-109) A change of the status list (or of the app's colors, which the store folds into its revision)
         // rebuilds every row's snapshot, in both sidebars: the cached snapshot holds the picker's rows. It sits on the
         // chain that is built for every sidebar, so a change while a custom sidebar shows also refreshes the cached
@@ -13068,6 +13079,7 @@ struct VerticalTabsSidebar: View, Equatable {
             shortcutHintText: hintText,
             showsShortcutHints: input.showsModifierShortcutHints,
             colorSchemeIsDark: environment.colorScheme == .dark,
+            contrastBackgroundHex: environment.sidebarContrastBackgroundHex, // (#cm-109.7)
             globalFontMagnificationPercent: environment.globalFontMagnificationPercent,
             isChecklistExpanded: input.isChecklistExpanded,
             checklistAddFieldActivationToken: input.checklistAddFieldActivationToken,
@@ -16291,6 +16303,7 @@ struct TabItemView: View, Equatable {
     // like all closures. See SidebarLazyContractProbe.
     @Environment(\.sidebarLazyContractProbe) private var sidebarLazyContractProbe
 #endif
+    @Environment(\.sidebarContrastBackgroundHex) private var sidebarContrastBackgroundHex // (#cm-109.7)
     let snapshot: SidebarWorkspaceRowSnapshot
     let actions: SidebarWorkspaceRowActions
 
@@ -16391,6 +16404,13 @@ struct TabItemView: View, Equatable {
             attentionTaskStatus: workspaceSnapshot.attentionTaskStatus
         )
     }
+
+    private var rowContrastBackground: NSColor? { // (#cm-109.7)
+        guard let hex = sidebarContrastBackgroundHex, let sidebarStandIn = NSColor(hex: hex) else { // (#cm-109.7)
+            return nil // (#cm-109.7)
+        } // (#cm-109.7)
+        return rowVisualPalette.contrastBackground(sidebarStandIn: sidebarStandIn) // (#cm-109.7)
+    } // (#cm-109.7)
 
     private var selectedWorkspaceBackgroundNSColor: NSColor {
         sidebarSelectedWorkspaceBackgroundNSColor(
@@ -16672,17 +16692,20 @@ struct TabItemView: View, Equatable {
                         usesMonochrome: usesInvertedActiveForeground,
                         monochromeColor: activeSecondaryColor(0.8),
                         neutralColor: activeSecondaryColor(0.8),
-                        fontScale: fontScale
+                        fontScale: fontScale, // (#cm-109.7)
+                        contrastBackground: rowContrastBackground, // (#cm-109.7)
+                        drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: taskStatus) // (#cm-109.7)
                     )
                     .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                     .transition(.opacity)
                 }
 
                 if slotResolution.showsHand { // (#cm-109.3)
-                    CmuxSystemSymbolImage( // (#cm-109.3)
-                        systemName: "hand.raised.fill", // (#cm-109.3)
-                        pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.3)
-                        tint: Color(nsColor: spinnerColor) // (#cm-109.3)
+                    WaitingHandView( // (#cm-109.7)
+                        pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
+                        colorScheme: colorScheme, // (#cm-109.7)
+                        rowBackground: rowContrastBackground, // (#cm-109.7)
+                        drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7)
                     ) // (#cm-109.3)
                     .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
                     .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)

@@ -1,4 +1,5 @@
 import AppKit
+import CmuxAppKitSupportUI // (#cm-109.7)
 import CmuxWorkspaces
 import SwiftUI
 
@@ -176,6 +177,7 @@ struct SidebarWorkspaceStatusPopover: View {
 
     @State private var highlightedIndex: Int
     @FocusState private var isFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme // (#cm-109.7)
 
     /// Draws the lane glyphs at ~12pt (the row glyph's base size is 9pt).
     private static let glyphFontScale: CGFloat = 12.0 / 9.0
@@ -262,6 +264,7 @@ struct SidebarWorkspaceStatusPopover: View {
                         monochromeColor: .primary,
                         neutralColor: .secondary,
                         fontScale: Self.glyphFontScale,
+                        contrastBackground: WindowAppearanceSnapshot.resolvedColor(.windowBackgroundColor, for: colorScheme), // (#cm-109.7)
                         icon: lane.icon, // (#cm-109.3)
                         colorHex: lane.colorHex // (#cm-109.3)
                     )

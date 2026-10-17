@@ -1,3 +1,4 @@
+import CmuxAppKitSupportUI // (#cm-109.7)
 import CmuxWorkspaces
 import Foundation
 import SwiftUI
@@ -124,6 +125,8 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
     let monochromeColor: Color
     let neutralColor: Color
     let fontScale: CGFloat
+    let contrastBackground: NSColor? // (#cm-109.7)
+    var drawnAlpha: CGFloat = 1 // (#cm-109.7)
 
     @State private var isStatusPopoverPresented = false
 
@@ -153,6 +156,8 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
                 monochromeColor: monochromeColor,
                 neutralColor: neutralColor,
                 fontScale: fontScale,
+                contrastBackground: contrastBackground, // (#cm-109.7)
+                drawnAlpha: drawnAlpha, // (#cm-109.7)
                 name: statusName, // (#cm-109)
                 icon: checkedEntry?.icon, // (#cm-109.3)
                 colorHex: checkedEntry.flatMap { model.colorHexes[$0.id] } // (#cm-109.3)
@@ -220,6 +225,8 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     /// The secondary color used for the todo outline.
     let neutralColor: Color
     let fontScale: CGFloat
+    let contrastBackground: NSColor? // (#cm-109.7)
+    var drawnAlpha: CGFloat = 1 // (#cm-109.7)
     /// His name for the status, for the tooltip; cmux's own name when `nil`. (#cm-109)
     var name: String? = nil
     /// The shape or symbol his entry names, or `nil` to draw the glyph of `status`. (#cm-109.3)
@@ -242,28 +249,34 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
         SidebarWorkspaceTaskStatusGlyphModel(status: status)
     }
 
+    /// The color the glyph starts from, before any contrast floor: the same one the AppKit glyph starts from. (#cm-109.7)
+    private var baseNSColor: NSColor { // (#cm-109.7)
+        var env = EnvironmentValues() // (#cm-109.7)
+        env.colorScheme = colorScheme // (#cm-109.7)
+        let glyphModel = SidebarRowTaskStatusGlyphButton.Model( // (#cm-109.7)
+            status: status, hasOverride: hasOverride, usesMonochrome: usesMonochrome, fontScale: fontScale, // (#cm-109.7)
+            colorScheme: colorScheme, colorHex: colorHex // (#cm-109.7)
+        ) // (#cm-109.7)
+        return SidebarRowTaskStatusGlyphButton.rawBaseColor( // (#cm-109.7)
+            model: glyphModel, // (#cm-109.7)
+            monochromeColor: NSColor(cgColor: monochromeColor.resolve(in: env).cgColor) ?? (colorScheme == .dark ? .white : .black), // (#cm-109.7)
+            neutralColor: NSColor(cgColor: neutralColor.resolve(in: env).cgColor) ?? .secondaryLabelColor // (#cm-109.7)
+        ) // (#cm-109.7)
+    } // (#cm-109.7)
+
+    /// The fill and tick colors with the contrast floor applied; `nil` where the row passed no background. (#cm-109.7)
+    private var flooredColors: (fill: NSColor, tick: NSColor)? { // (#cm-109.7)
+        guard let contrastBackground else { return nil } // (#cm-109.7)
+        return cmuxFlooredGlyphColors( // (#cm-109.7)
+            base: baseNSColor, colorScheme: colorScheme, background: contrastBackground, drawnAlpha: drawnAlpha // (#cm-109.7)
+        ) // (#cm-109.7)
+    } // (#cm-109.7)
+
     private var statusColor: Color {
-        if usesMonochrome { return monochromeColor }
-        // (#cm-109.3) His color for the status first, worked out as the Status menu's dot is (as stored in Light,
-        // brightened in Dark).
-        if let colorHex,
-           let color = WorkspaceTabColorSettings.displayNSColor(hex: colorHex, colorScheme: colorScheme, forceBright: false) {
-            return Color(nsColor: color)
-        }
-        switch model.colorRole {
-        case .neutral:
-            return neutralColor
-        case .working:
-            return cmuxAccentColor()
-        case .attention:
-            // Loudest lane: full-strength attention accent between orange and red.
-            return Color(red: 1.0, green: 0.42, blue: 0.2)
-        case .review:
-            return .green
-        case .done:
-            // Muted gray-green so finished rows read as settled, not celebratory.
-            return Color(red: 0.45, green: 0.62, blue: 0.5)
-        }
+        // (#cm-109.7) His color for the status first, else the status's own role: the color the AppKit glyph starts from,
+        // (#cm-109.7) floored to 3:1 against the row where one was passed. Upstream's "Loudest lane" and "Muted gray-green"
+        // (#cm-109.7) notes on the attention and done colors now sit on `SidebarRowTaskStatusGlyphButton.rawBaseColor`.
+        Color(nsColor: flooredColors?.fill ?? baseNSColor) // (#cm-109.7)
     }
 
     private var strokeWidth: CGFloat {
@@ -366,7 +379,9 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     } // (#cm-109.6)
 
     private var checkmarkColor: Color {
-        usesMonochrome ? Color.black.opacity(0.7) : Color.white
+        if usesMonochrome { return Color.black.opacity(0.7) } // (#cm-109.7)
+        guard let tick = flooredColors?.tick else { return Color.white } // (#cm-109.7)
+        return Color(nsColor: tick) // (#cm-109.7)
     }
 }
 

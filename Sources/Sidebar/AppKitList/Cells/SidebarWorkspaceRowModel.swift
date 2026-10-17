@@ -46,6 +46,7 @@ struct SidebarWorkspaceRowModel: Equatable {
     let shortcutHintText: String?
     let showsShortcutHints: Bool
     let colorSchemeIsDark: Bool
+    var contrastBackgroundHex: String? = nil // (#cm-109.7)
     let globalFontMagnificationPercent: Int
     let isChecklistExpanded: Bool
     let checklistAddFieldActivationToken: Int

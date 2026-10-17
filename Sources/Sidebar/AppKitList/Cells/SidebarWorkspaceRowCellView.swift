@@ -33,6 +33,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let leadingBadge = SidebarRowUnreadBadgeView()
     private var leadingSpinner: GPUSpinnerNSView?
     private var handImageView: NSImageView? // (#cm-109.3)
+    private var handOutlineView: WaitingHandOutlineView? // (#cm-109.7)
     private let pinImageView = NSImageView()
     private let muteImageView = NSImageView()
     private let mediaAudioView = NSImageView()
@@ -460,6 +461,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         if showsStatusGlyph, let taskStatus = snapshot.taskStatus {
             // (#cm-109.3) His entry for the status shown: the picker's checked entry row, as the glyph's name is.
             let checkedEntry = WorkspaceStatusPresentation.checkedEntry(in: snapshot.todoStatusMenuModel?.picker)
+            let rowBackground = Self.rowContrastBackground(model: model, palette: palette) // (#cm-109.7)
             statusGlyphButton.configure(
                 model: .init(
                     status: taskStatus,
@@ -469,7 +471,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                     colorScheme: palette.colorScheme,
                     name: WorkspaceStatusPresentation.checkedName(in: snapshot.todoStatusMenuModel?.picker), // (#cm-109)
                     icon: checkedEntry?.icon, // (#cm-109.3)
-                    colorHex: checkedEntry.flatMap { snapshot.todoStatusMenuModel?.colorHexes[$0.id] } // (#cm-109.3)
+                    colorHex: checkedEntry.flatMap { snapshot.todoStatusMenuModel?.colorHexes[$0.id] }, // (#cm-109.3)
+                    contrastBackground: rowBackground, // (#cm-109.7)
+                    drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: snapshot.taskStatus) // (#cm-109.7)
                 ),
                 monochromeColor: palette.secondary(0.8),
                 neutralColor: palette.secondary(0.8)
@@ -672,7 +676,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     /// Where the row's title is laid out, in the cell's own coordinates: the content's indent shows as its x (#cm-106).
     var titleFrameForTesting: NSRect { titleView.frame }
     var statusGlyphButtonForTesting: NSView { statusGlyphButton } // (#cm-109.3)
+    var statusGlyphModelForTesting: SidebarRowTaskStatusGlyphButton.Model? { statusGlyphButton.currentModelForTesting } // (#cm-109.7)
     var handForTesting: NSImageView? { handImageView } // (#cm-109.3)
+    var handOutlineForTesting: NSView? { handOutlineView } // (#cm-109.7)
     var leadingSpinnerForTesting: GPUSpinnerNSView? { leadingSpinner } // (#cm-109.3)
     var trailingSpinnerForTesting: GPUSpinnerNSView? { trailingSpinner } // (#cm-109.3)
     var leadingBadgeForTesting: SidebarRowUnreadBadgeView { leadingBadge } // (#cm-109.3)
@@ -740,14 +746,32 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
         let handVisible = slotResolution.showsHand // (#cm-109.3)
         let waitingTooltip = handVisible ? String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer") : "" // (#cm-109.3)
-        handImageView = Self.updateHand( // (#cm-109.3)
+        let handYellow = waitingHandYellow(for: palette.colorScheme) // (#cm-109.7)
+        let handOutlined = Self.rowContrastBackground(model: model, palette: palette) // (#cm-109.7)
+            .map { handNeedsOutline(yellow: handYellow, on: $0, drawnAt: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: model.snapshot.taskStatus)) } ?? false // (#cm-109.7)
+        let hand = Self.updateHand( // (#cm-109.3)
             existing: handImageView, // (#cm-109.3)
             visible: handVisible, // (#cm-109.3)
-            color: spinnerColor, // (#cm-109.3)
+            color: handYellow, // (#cm-109.7)
             tooltip: waitingTooltip, // (#cm-109.3)
             in: contentContainer // (#cm-109.3)
         ) // (#cm-109.3)
+        handImageView = hand // (#cm-109.7)
+        handOutlineView = Self.updateHandOutline( // (#cm-109.7)
+            existing: handOutlineView, // (#cm-109.7)
+            hand: hand, // (#cm-109.7)
+            visible: handVisible && handOutlined, // (#cm-109.7)
+            in: contentContainer // (#cm-109.7)
+        ) // (#cm-109.7)
     }
+
+    /// The row's own background for the contrast floors: the sidebar stand-in under the row's wash. (#cm-109.7)
+    private static func rowContrastBackground(model: SidebarWorkspaceRowModel, palette: SidebarRowPalette) -> NSColor? { // (#cm-109.7)
+        guard let hex = model.contrastBackgroundHex, let sidebarStandIn = NSColor(hex: hex) else { // (#cm-109.7)
+            return nil // (#cm-109.7)
+        } // (#cm-109.7)
+        return palette.visual.contrastBackground(sidebarStandIn: sidebarStandIn) // (#cm-109.7)
+    } // (#cm-109.7)
 
     private static func updateHand( // (#cm-109.3)
         existing: NSImageView?, // (#cm-109.3)
@@ -776,6 +800,30 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         view.setAccessibilityLabel(tooltip) // (#cm-109.3)
         return view // (#cm-109.3)
     }
+
+    /// The ink copies of the hand, in a sibling view under the yellow one; shown only where yellow alone is under 3:1. (#cm-109.7)
+    private static func updateHandOutline( // (#cm-109.7)
+        existing: WaitingHandOutlineView?, // (#cm-109.7)
+        hand: NSImageView?, // (#cm-109.7)
+        visible: Bool, // (#cm-109.7)
+        in container: NSView // (#cm-109.7)
+    ) -> WaitingHandOutlineView? { // (#cm-109.7)
+        guard visible, let hand else { // (#cm-109.7)
+            existing?.isHidden = true // (#cm-109.7)
+            return existing // (#cm-109.7)
+        } // (#cm-109.7)
+        let view: WaitingHandOutlineView // (#cm-109.7)
+        if let existing { // (#cm-109.7)
+            view = existing // (#cm-109.7)
+        } else { // (#cm-109.7)
+            view = WaitingHandOutlineView() // (#cm-109.7)
+            container.addSubview(view, positioned: .below, relativeTo: hand) // (#cm-109.7)
+        } // (#cm-109.7)
+        view.image = hand.image // (#cm-109.7) the hand's own template image, in ink
+        view.isHidden = false // (#cm-109.7)
+        view.setAccessibilityElement(false) // (#cm-109.7)
+        return view // (#cm-109.7)
+    } // (#cm-109.7)
 
     private static func updateSpinner(
         existing: GPUSpinnerNSView?,
@@ -1247,6 +1295,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
         if let hand = handImageView, !hand.isHidden { // (#cm-109.3)
             place(hand, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter) // (#cm-109.3)
+            if let outline = handOutlineView, !outline.isHidden { // (#cm-109.7)
+                place(outline, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter) // (#cm-109.7)
+            } // (#cm-109.7)
             x += spinnerSide + titleRowSpacing // (#cm-109.3)
         } // (#cm-109.3)
 
