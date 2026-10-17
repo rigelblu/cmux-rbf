@@ -184,7 +184,8 @@ extension TerminalController {
                 initialDividerPosition: dividerPosition,
                 remotePTYSessionID: inputs.remotePTYSessionID,
                 suppressWorkspaceRemoteStartupCommand: useLocalContext,
-                allowTextBoxFocusDefault: false
+                allowTextBoxFocusDefault: false,
+                fromSocket: true // cmux-rbf #cm-73.2a
             ) {
             case .created(let panel):
                 newId = panel.id
@@ -200,6 +201,24 @@ extension TerminalController {
         }
 
         guard let newId else {
+            // cmux-rbf #cm-73.2a
+            if panelType == .browser && ws.isDesignFocusActive, let url {
+                let outcome = DesignFocusRouting.decide(
+                    url: url,
+                    showsAddressBar: true,
+                    target: .newSplit,
+                    asker: .agent,
+                    wantsFocus: focus,
+                    modeEnabled: true
+                )
+                if outcome == .externalBrowser {
+                    return .browserOpenedExternally(
+                        windowID: v2ResolveWindowId(tabManager: tabManager),
+                        workspaceID: ws.id,
+                        url: url.absoluteString
+                    )
+                }
+            }
             return .createFailed
         }
         return .created(
@@ -455,7 +474,8 @@ extension TerminalController {
                 remotePTYSessionID: inputs.remotePTYSessionID,
                 suppressWorkspaceRemoteStartupCommand: useLocalContext,
                 inheritWorkingDirectoryFallback: true,
-                allowTextBoxFocusDefault: false
+                allowTextBoxFocusDefault: false,
+                fromSocket: true // cmux-rbf #cm-73.2a
             ) {
             case .created(let panel):
                 newPanelId = panel.id
@@ -471,6 +491,24 @@ extension TerminalController {
         }
 
         guard let newPanelId else {
+            // cmux-rbf #cm-73.2a
+            if panelType == .browser && ws.isDesignFocusActive, let url {
+                let outcome = DesignFocusRouting.decide(
+                    url: url,
+                    showsAddressBar: true,
+                    target: .newTab,
+                    asker: .agent,
+                    wantsFocus: focus,
+                    modeEnabled: true
+                )
+                if outcome == .externalBrowser {
+                    return .browserOpenedExternally(
+                        windowID: v2ResolveWindowId(tabManager: tabManager),
+                        workspaceID: ws.id,
+                        url: url.absoluteString
+                    )
+                }
+            }
             return .createFailed
         }
         return .created(

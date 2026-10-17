@@ -33,4 +33,27 @@ extension ControlCommandCoordinator {
             ]))
         }
     }
+
+    // cmux-rbf #cm-73.2a
+    /// The shared result for a browser URL opened externally under Design Focus.
+    func browserOpenedExternallyResult(
+        windowID: UUID?,
+        workspaceID: UUID?,
+        url: String
+    ) -> ControlCallResult {
+        .ok(.object([
+            "window_id": orNull(windowID?.uuidString),
+            "window_ref": ref(.window, windowID),
+            "workspace_id": orNull(workspaceID?.uuidString),
+            "workspace_ref": ref(.workspace, workspaceID),
+            "pane_id": .null,
+            "pane_ref": .null,
+            "surface_id": .null,
+            "surface_ref": .null,
+            "created_split": .bool(false),
+            "placement_strategy": .string("external"),
+            "opened_externally": .bool(true),
+            "url": .string(url)
+        ]))
+    }
 }

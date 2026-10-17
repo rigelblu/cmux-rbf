@@ -105,6 +105,12 @@ extension ContentView {
             return .clearScreenKeepScrollback
         case "palette.toggleSplitZoom":
             return .toggleSplitZoom
+        // cmux-rbf #cm-73.2a
+        case "palette.toggleDesignFocus":
+            return .toggleDesignFocus
+        // cmux-rbf #cm-73.2a
+        case "palette.flipDesignFocusLayout":
+            return .flipDesignFocusLayout
         case "palette.equalizeSplits":
             return .equalizeSplits
         case "palette.equalizeSplitWidths":

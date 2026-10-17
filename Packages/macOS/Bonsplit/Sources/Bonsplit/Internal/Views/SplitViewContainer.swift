@@ -41,14 +41,16 @@ struct SplitViewContainer<Content: View, EmptyContent: View>: View {
     @ViewBuilder
     private var splitNodeContent: some View {
         let nodeToRender = controller.zoomedNode ?? controller.rootNode
+        // cmux-rbf #cm-73.2a
+        let isPairZoomed = controller.isPairZoomed
         SplitNodeView(
             node: nodeToRender,
             contentBuilder: contentBuilder,
             emptyPaneBuilder: emptyPaneBuilder,
             appearance: appearance,
             dividerPositionRange: dividerPositionRange,
-            showSplitButtons: showSplitButtons,
-            tabBarVisibility: tabBarVisibility,
+            showSplitButtons: isPairZoomed ? false : showSplitButtons,
+            tabBarVisibility: isPairZoomed ? .caption : tabBarVisibility,
             contentViewLifecycle: contentViewLifecycle,
             onGeometryChange: onGeometryChange,
             enableAnimations: enableAnimations,

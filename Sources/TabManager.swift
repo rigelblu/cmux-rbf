@@ -4588,6 +4588,22 @@ class TabManager: ObservableObject {
         return tab.toggleFullWidthTabMode(panelId: focusedPanelId)
     }
 
+    // cmux-rbf #cm-73.2a
+    /// Toggle Design Focus for the selected workspace.
+    @discardableResult
+    func toggleDesignFocus() -> Bool {
+        guard let tab = selectedWorkspace else { return false }
+        return tab.toggleDesignFocus()
+    }
+
+    // cmux-rbf #cm-73.2a
+    /// Flip Design Focus layout for the selected workspace.
+    @discardableResult
+    func flipDesignFocusLayout() -> Bool {
+        guard let tab = selectedWorkspace else { return false }
+        return tab.flipDesignFocusLayout()
+    }
+
     /// Close a surface/panel
     func closeSurface(tabId: UUID, surfaceId: UUID) -> Bool {
         guard let tab = tabs.first(where: { $0.id == tabId }) else { return false }

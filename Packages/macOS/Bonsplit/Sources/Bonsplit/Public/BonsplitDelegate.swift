@@ -63,6 +63,13 @@ public protocol BonsplitDelegate: AnyObject {
     /// Called when the user clicks a host-defined action in the tab bar.
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID)
 
+    /// cmux-rbf #cm-73.2a: the pair-zoom header's segmented control chose an arrangement that differs from the
+    /// current one. Never called for the arrangement already shown.
+    func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation)
+
+    /// cmux-rbf #cm-73.2a: the pair-zoom header's 50/50 button was pressed.
+    func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController)
+
     /// Called when the user triggers an action from a tab's context menu.
     func splitTabBar(_ controller: BonsplitController, didRequestTabContextAction action: TabContextAction, for tab: Tab, inPane pane: PaneID)
 
@@ -108,6 +115,8 @@ public extension BonsplitDelegate {
     func splitTabBar(_ controller: BonsplitController, didFocusPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestNewTab kind: String, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID) {}
+    func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation) {} // cmux-rbf #cm-73.2a
+    func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController) {} // cmux-rbf #cm-73.2a
     func splitTabBar(_ controller: BonsplitController, didRequestTabContextAction action: TabContextAction, for tab: Tab, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestTabMoveToDestination destinationId: String, for tab: Tab, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didChangeGeometry snapshot: LayoutSnapshot) {}

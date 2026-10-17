@@ -398,6 +398,13 @@ extension ControlCommandCoordinator {
             )
         case .browserDisabled(let outcome):
             return browserDisabledResult(outcome)
+        // cmux-rbf #cm-73.2a
+        case .browserOpenedExternally(let windowID, let workspaceID, let url):
+            return browserOpenedExternallyResult(
+                windowID: windowID,
+                workspaceID: workspaceID,
+                url: url
+            )
         case .workspaceNotFound:
             return .err(code: "not_found", message: "Workspace not found", data: nil)
         case .requestedSurfaceNotFound(let id):
@@ -567,6 +574,13 @@ extension ControlCommandCoordinator {
         case .dockConflictingRoutingSelectors(let message): return .err(code: "invalid_params", message: message, data: nil)
         case .browserDisabled(let outcome):
             return browserDisabledResult(outcome)
+        // cmux-rbf #cm-73.2a
+        case .browserOpenedExternally(let windowID, let workspaceID, let url):
+            return browserOpenedExternallyResult(
+                windowID: windowID,
+                workspaceID: workspaceID,
+                url: url
+            )
         case .workspaceNotFound:
             return .err(code: "not_found", message: "Workspace not found", data: nil)
         case .paneNotFound:

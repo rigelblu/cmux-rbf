@@ -377,6 +377,9 @@ export const shortcutCategories: ShortcutCategory[] = [
       { id: "splitBrowserRight", combos: [["⌥", "⌘", "D"]], description: { en: "Split browser right", ja: "右にブラウザ分割" } },
       { id: "splitBrowserDown", combos: [["⌥", "⌘", "⇧", "D"]], description: { en: "Split browser down", ja: "下にブラウザ分割" } },
       { id: "toggleSplitZoom", combos: [["⌘", "⇧", "↩"]], description: { en: "Toggle pane zoom", ja: "ペインズームを切り替え" } },
+      { id: "toggleDesignFocus", combos: [["⌥", "⌘", "⇧", "↩"]], description: { en: "Toggle design focus", ja: "デザインフォーカスを切り替え" } },
+      // cmux-rbf #cm-73.2a
+      { id: "flipDesignFocusLayout", combos: [["⌥", "⌘", "⇧", "\\"]], description: { en: "Flip design focus layout", ja: "デザインフォーカスのレイアウトを変更" } },
       { id: "increaseWorkspaceTerminalFontSize", combos: [["⌃", "⌘", "="]], description: { en: "Increase font size for every terminal in the selected workspace", ja: "選択中のワークスペース内の全ターミナルのフォントサイズを大きくする" } },
       { id: "decreaseWorkspaceTerminalFontSize", combos: [["⌃", "⌘", "-"]], description: { en: "Decrease font size for every terminal in the selected workspace", ja: "選択中のワークスペース内の全ターミナルのフォントサイズを小さくする" } },
       { id: "resetWorkspaceTerminalFontSize", combos: [["⌃", "⌘", "0"]], description: { en: "Reset font size for every terminal in the selected workspace", ja: "選択中のワークスペース内の全ターミナルのフォントサイズをリセットする" } },

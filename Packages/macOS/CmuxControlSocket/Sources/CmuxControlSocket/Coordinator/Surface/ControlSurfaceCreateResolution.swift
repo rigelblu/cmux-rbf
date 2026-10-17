@@ -30,6 +30,10 @@ public enum ControlSurfaceCreateResolution: Sendable, Equatable {
     case dockConflictingRoutingSelectors(message: String)
     /// The browser was disabled; carries the shared external-open outcome.
     case browserDisabled(ControlSurfaceBrowserDisabledOutcome)
+    // cmux-rbf #cm-73.2a
+    /// A browser surface was requested while Design Focus is active and the URL
+    /// routed to an external browser.
+    case browserOpenedExternally(windowID: UUID?, workspaceID: UUID?, url: String)
     /// No workspace resolved (legacy `not_found` / "Workspace not found").
     case workspaceNotFound
     /// The requested/focused pane did not resolve (legacy `not_found` / "Pane not

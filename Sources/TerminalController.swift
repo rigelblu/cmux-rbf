@@ -7272,6 +7272,28 @@ class TerminalController {
         return result
     }
 
+    // cmux-rbf #cm-73.2a
+    func v2ExternalBrowserOpenedResult(
+        url: URL,
+        workspaceId: UUID?,
+        windowId: UUID?
+    ) -> V2CallResult {
+        .ok([
+            "window_id": v2OrNull(windowId?.uuidString),
+            "window_ref": v2Ref(kind: .window, uuid: windowId),
+            "workspace_id": v2OrNull(workspaceId?.uuidString),
+            "workspace_ref": v2Ref(kind: .workspace, uuid: workspaceId),
+            "pane_id": v2OrNull(nil),
+            "pane_ref": v2Ref(kind: .pane, uuid: nil),
+            "surface_id": v2OrNull(nil),
+            "surface_ref": v2Ref(kind: .surface, uuid: nil),
+            "created_split": false,
+            "placement_strategy": "external",
+            "opened_externally": true,
+            "url": url.absoluteString
+        ])
+    }
+
     private nonisolated func v2BrowserURLAllowlistFailure(for url: URL) -> V2CallResult? {
         let policy = BrowserURLAllowlistPolicy(defaults: .standard)
         // Only local file documents use the trusted seam here. Other
@@ -7493,23 +7515,12 @@ class TerminalController {
                         for: container.host,
                         tabManager: tabManager
                     )
-                    result = .ok([
-                        "window_id": v2OrNull(windowId?.uuidString),
-                        "window_ref": v2Ref(kind: .window, uuid: windowId),
-                        "workspace_id": container.ownerID.uuidString,
-                        "workspace_ref": v2Ref(
-                            kind: .workspace,
-                            uuid: container.ownerID
-                        ),
-                        "pane_id": v2OrNull(nil),
-                        "pane_ref": v2Ref(kind: .pane, uuid: nil),
-                        "surface_id": v2OrNull(nil),
-                        "surface_ref": v2Ref(kind: .surface, uuid: nil),
-                        "created_split": false,
-                        "placement_strategy": "external",
-                        "opened_externally": true,
-                        "url": url.absoluteString
-                    ])
+                    // cmux-rbf #cm-73.2a
+                    result = v2ExternalBrowserOpenedResult(
+                        url: url,
+                        workspaceId: container.ownerID,
+                        windowId: windowId
+                    )
                     return
                 }
             }
@@ -7589,6 +7600,29 @@ class TerminalController {
                 of: sourceSurfaceId,
                 request: request
             ) else {
+                // cmux-rbf #cm-73.2a
+                if case .workspace(let ws) = container, ws.isDesignFocusActive, let url {
+                    let outcome = DesignFocusRouting.decide(
+                        url: url,
+                        showsAddressBar: omnibarVisible,
+                        target: .newSplit,
+                        asker: .agent,
+                        wantsFocus: focus,
+                        modeEnabled: true
+                    )
+                    if outcome == .externalBrowser {
+                        let windowId = v2BrowserWindowID(
+                            for: container.host,
+                            tabManager: tabManager
+                        )
+                        result = v2ExternalBrowserOpenedResult(
+                            url: url,
+                            workspaceId: ws.id,
+                            windowId: windowId
+                        )
+                        return
+                    }
+                }
                 result = .err(code: "internal_error", message: "Failed to create browser", data: nil)
                 return
             }
@@ -7684,6 +7718,8 @@ class TerminalController {
         var navigationPanel: BrowserPanel?
         var navigationTicket: BrowserAutomationNavigationTicket?
         var navigationTargetURL: URL?
+        // cmux-rbf #cm-73.2a
+        var openedExternallyResult: V2CallResult?
         v2MainSync {
             let resolvedContext = v2ResolveBrowserPanelContext(params: params, tabManager: tabManager)
             if let error = resolvedContext.error {
@@ -7709,6 +7745,40 @@ class TerminalController {
                 resolutionError = error
                 return
             }
+            // cmux-rbf #cm-73.2a
+            let targetNavURL = resolvedURL ?? URL(string: url)
+            let workspace = context.browserPanel.owningWorkspace
+                ?? tabManager.tabs.first(where: { $0.id == context.workspaceId })
+                ?? AppDelegate.shared?.workspaceContainingPanel(panelId: context.surfaceId, preferredWorkspaceId: context.workspaceId)?.workspace
+            if let targetNavURL,
+               let workspace,
+               workspace.isDesignFocusActive,
+               let paneId = workspace.paneId(forPanelId: context.surfaceId) {
+                let isPairPane = (workspace.bonsplitController.pairZoomPanes?.first == paneId || workspace.bonsplitController.pairZoomPanes?.second == paneId)
+                let isSelected = (workspace.bonsplitController.selectedTab(inPane: paneId).flatMap { workspace.panelIdFromSurfaceId($0.id) } == context.surfaceId)
+                let target: DesignFocusRouting.Target = (isPairPane && isSelected) ? .pairTabNavigated : .hiddenTabNavigated
+                let outcome = DesignFocusRouting.decide(
+                    url: targetNavURL,
+                    showsAddressBar: context.browserPanel.isOmnibarVisible,
+                    target: target,
+                    asker: .user,
+                    wantsFocus: false,
+                    modeEnabled: true
+                )
+                if outcome == .externalBrowser {
+                    _ = Workspace.designFocusExternalOpen.perform(targetNavURL)
+                    let windowId = v2BrowserWindowID(
+                        for: context.host,
+                        tabManager: tabManager
+                    )
+                    openedExternallyResult = v2ExternalBrowserOpenedResult(
+                        url: targetNavURL,
+                        workspaceId: workspace.id,
+                        windowId: windowId
+                    )
+                    return
+                }
+            }
             guard let navigation = context.browserPanel.beginAutomationNavigationFromCLI(
                 url,
                 expectedURL: v2String(params, "expected_url")
@@ -7727,6 +7797,10 @@ class TerminalController {
                 context,
                 tabManager: tabManager
             )
+        }
+        // cmux-rbf #cm-73.2a
+        if let openedExternallyResult {
+            return openedExternallyResult
         }
         // Preserve the resolver's specific error (mirrors v2BrowserWithPanelContext)
         // instead of flattening every resolution failure to a generic not_found.
@@ -11077,12 +11151,34 @@ class TerminalController {
                 return
             }
 
+            // cmux-rbf #cm-73.2a
+            let focus = ws.isDesignFocusActive ? v2FocusAllowed(requested: v2Bool(params, "focus") ?? false) : true
             guard let panel = ws.newBrowserSurface(
                 inPane: pane,
                 url: url,
-                focus: true,
+                focus: focus,
                 creationPolicy: .automationPreload
             ) else {
+                // cmux-rbf #cm-73.2a
+                if ws.isDesignFocusActive, let url {
+                    let outcome = DesignFocusRouting.decide(
+                        url: url,
+                        showsAddressBar: true,
+                        target: .newTab,
+                        asker: .agent,
+                        wantsFocus: focus,
+                        modeEnabled: true
+                    )
+                    if outcome == .externalBrowser {
+                        let windowId = v2ResolveWindowId(tabManager: tabManager)
+                        result = v2ExternalBrowserOpenedResult(
+                            url: url,
+                            workspaceId: ws.id,
+                            windowId: windowId
+                        )
+                        return
+                    }
+                }
                 result = .err(code: "internal_error", message: "Failed to create browser tab", data: nil)
                 return
             }
@@ -13148,7 +13244,8 @@ class TerminalController {
                 from: targetSurface,
                 orientation: direction.orientation,
                 insertFirst: direction.insertFirst,
-                allowTextBoxFocusDefault: false
+                allowTextBoxFocusDefault: false,
+                fromSocket: true // cmux-rbf #cm-73.2a
             ) {
             case .created(let panel):
                 result = "OK \(panel.id.uuidString)"

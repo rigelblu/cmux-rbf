@@ -9,4 +9,24 @@ struct BrowserSplitRequest: Sendable {
     let chromeVisibility: BrowserChromeVisibility
     let transparentBackground: Bool
     let bypassRemoteProxy: Bool
+    // cmux-rbf #cm-73.2a
+    let designFocusAsker: DesignFocusRouting.Asker?
+
+    init(
+        url: URL?,
+        focus: Bool,
+        preferredProfileID: UUID?,
+        chromeVisibility: BrowserChromeVisibility,
+        transparentBackground: Bool,
+        bypassRemoteProxy: Bool,
+        designFocusAsker: DesignFocusRouting.Asker? = nil
+    ) {
+        self.url = url
+        self.focus = focus
+        self.preferredProfileID = preferredProfileID
+        self.chromeVisibility = chromeVisibility
+        self.transparentBackground = transparentBackground
+        self.bypassRemoteProxy = bypassRemoteProxy
+        self.designFocusAsker = designFocusAsker
+    }
 }

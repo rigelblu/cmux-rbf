@@ -353,7 +353,8 @@ extension TerminalController: ControlPaneContext {
                 tmuxStartCommand: inputs.tmuxStartCommand,
                 startupEnvironment: inputs.startupEnvironment,
                 initialDividerPosition: initialDividerPosition.map { CGFloat($0) },
-                allowTextBoxFocusDefault: false
+                allowTextBoxFocusDefault: false,
+                fromSocket: true // cmux-rbf #cm-73.2a
             ) {
             case .created(let panel):
                 newPanelId = panel.id
@@ -369,6 +370,24 @@ extension TerminalController: ControlPaneContext {
         }
 
         guard let newPanelId else {
+            // cmux-rbf #cm-73.2a
+            if panelType == .browser && ws.isDesignFocusActive, let url {
+                let outcome = DesignFocusRouting.decide(
+                    url: url,
+                    showsAddressBar: true,
+                    target: .newSplit,
+                    asker: .agent,
+                    wantsFocus: focus,
+                    modeEnabled: true
+                )
+                if outcome == .externalBrowser {
+                    return .browserOpenedExternally(
+                        windowID: v2ResolveWindowId(tabManager: tabManager),
+                        workspaceID: ws.id,
+                        url: url.absoluteString
+                    )
+                }
+            }
             return .createFailed
         }
         let paneUUID = ws.paneId(forPanelId: newPanelId)?.id

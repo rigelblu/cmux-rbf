@@ -170,6 +170,11 @@ extension TabManager {
     func equalizeSplits(tabId: UUID, orientationFilter: String? = nil) -> Bool {
         guard let tab = tabs.first(where: { $0.id == tabId }) else { return false }
 
+        // cmux-rbf #cm-73.2a
+        if tab.isDesignFocusActive {
+            return tab.equalizeDesignFocusPair(orientationFilter: orientationFilter)
+        }
+
         let result = equalizeSplitsOnce(in: tab, orientationFilter: orientationFilter)
         if result.foundSplit {
             tab.didProgrammaticallyChangeSplitGeometry()

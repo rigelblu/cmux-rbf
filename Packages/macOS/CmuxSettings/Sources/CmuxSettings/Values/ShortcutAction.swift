@@ -126,6 +126,10 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case splitUp
     case splitDown
     case toggleSplitZoom
+    // cmux-rbf #cm-73.2a
+    case toggleDesignFocus
+    // cmux-rbf #cm-73.2a
+    case flipDesignFocusLayout
     /// Increases every terminal font size in the selected workspace.
     case increaseWorkspaceTerminalFontSize
     /// Decreases every terminal font size in the selected workspace.

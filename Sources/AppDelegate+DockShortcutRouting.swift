@@ -122,7 +122,9 @@ extension KeyboardShortcutSettings.Action {
              .canvasDistributeVertically,
              .toggleRightSidebar,
              .findInDirectory,
-             .openDiffViewer:
+             .openDiffViewer,
+             .toggleDesignFocus, // cmux-rbf #cm-73.2a
+             .flipDesignFocusLayout: // cmux-rbf #cm-73.2a
             .mainContainer
         }
     }

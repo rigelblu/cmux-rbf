@@ -2244,6 +2244,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 guard !Task.isCancelled else { return }
                 self.mainWindowLifecycleCoordinator
                     .cancelAllWindowlessRouteFreezeTasks()
+                // cmux-rbf #cm-73.2a
+                self.exitDesignFocusForAppQuit()
                 _ = self.saveSessionSnapshot(
                     includeScrollback: true,
                     removeWhenEmpty: false,
@@ -2347,9 +2349,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    private func exitDesignFocusForAppQuit() -> Bool {
+        var didExit = false
+        for manager in allActiveTabManagers() {
+            for workspace in manager.tabs {
+                if workspace.isDesignFocusActive {
+                    workspace.exitDesignFocus(reason: "appQuit")
+                    didExit = true
+                }
+            }
+        }
+        return didExit
+    }
+
     private func prepareForConfirmedAppTermination() {
         isTerminatingApp = true
         computerUseUXCoordinator.teardownForTermination()
+        // cmux-rbf #cm-73.2a
+        if exitDesignFocusForAppQuit() {
+            _ = saveSessionSnapshotUsingCachedProcessDetectedIndexes(
+                includeScrollback: true,
+                removeWhenEmpty: false
+            )
+        }
         // The terminate-later cleanup loads the authoritative agent index off-main and
         // persists it immediately before replying to AppKit.
         // The hard AppKit watchdog is armed immediately before the terminate
@@ -2486,6 +2510,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         MemoryPressureMonitor.shared.stop()
         computerUseUXCoordinator.teardownForTermination()
         if needsTerminationSnapshotBackstop {
+            // cmux-rbf #cm-73.2a
+            exitDesignFocusForAppQuit()
             _ = saveSessionSnapshotIncludingProcessDetectedIndexes(
                 includeScrollback: true,
                 removeWhenEmpty: false,
@@ -2543,6 +2569,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func persistSessionForUpdateRelaunch() {
         isTerminatingApp = true
+        // cmux-rbf #cm-73.2a
+        exitDesignFocusForAppQuit()
         mainWindowLifecycleCoordinator.cancelAllWindowlessRouteFreezeTasks()
         _ = saveSessionSnapshotUsingCachedProcessDetectedIndexes(
             includeScrollback: true,
@@ -4841,6 +4869,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.isTerminatingApp = true
+                // cmux-rbf #cm-73.2a
+                self.exitDesignFocusForAppQuit()
                 let ttyDeviceBindings = self.currentSurfaceTTYDeviceBindings()
                 let restartCommandCaptureContext = self.restartCommandCoordinator.captureContext(
                     kind: .pendingTermination
@@ -7964,6 +7994,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             setActiveMainWindow(window)
             context.sidebarState.toggle()
+            // cmux-rbf #cm-73.2a
+            DispatchQueue.main.async {
+                context.tabManager.selectedWorkspace?.updateDesignFocusOrientationIfNeeded()
+            }
             return true
         }
 
@@ -7974,6 +8008,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 return false
             }
             preferredContext.sidebarState.toggle()
+            // cmux-rbf #cm-73.2a
+            DispatchQueue.main.async {
+                preferredContext.tabManager.selectedWorkspace?.updateDesignFocusOrientationIfNeeded()
+            }
             return true
         }
         if let keyWindow = shortcutRoutingKeyWindow,
@@ -16229,6 +16267,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 recordGotoSplitZoomIfNeeded(tabManager: routedManager)
             }
 #endif
+            return true
+        }
+
+        // cmux-rbf #cm-73.2a
+        if matchConfiguredShortcut(event: event, action: .toggleDesignFocus) {
+            let routedManager = preferredMainWindowContextForShortcutRouting(event: event)?.tabManager ?? tabManager
+            if routedManager?.toggleDesignFocus() != true {
+                NSSound.beep()
+            }
+            return true
+        }
+        // cmux-rbf #cm-73.2a
+        // Only inside the mode: outside it the key reaches the focused terminal or page as if the shortcut did not exist.
+        if matchConfiguredShortcut(event: event, action: .flipDesignFocusLayout),
+           let routedManager = preferredMainWindowContextForShortcutRouting(event: event)?.tabManager ?? tabManager,
+           routedManager.selectedWorkspace?.isDesignFocusActive == true {
+            if !routedManager.flipDesignFocusLayout() {
+                NSSound.beep()
+            }
             return true
         }
         let workspaceTerminalFontSizeActions: [KeyboardShortcutSettings.Action] = [

@@ -3307,6 +3307,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
+    // cmux-rbf #cm-73.2a
+    static var designFocusExternalOpen = DefaultBrowserOpenAction()
 #if DEBUG
     /// XCTest seam: assign before `configureRemoteConnection` to script the
     /// session coordinator's subprocess results. Instance-scoped injection of
@@ -3683,7 +3685,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             newTerminal: KeyboardShortcutSettings.Action.newSurface.tooltip("New Terminal"),
             newBrowser: KeyboardShortcutSettings.Action.openBrowser.tooltip("New Browser"),
             splitRight: KeyboardShortcutSettings.Action.splitRight.tooltip("Split Right"),
-            splitDown: KeyboardShortcutSettings.Action.splitDown.tooltip("Split Down")
+            splitDown: KeyboardShortcutSettings.Action.splitDown.tooltip("Split Down"), // cmux-rbf #cm-73.2a
+            // cmux-rbf #cm-73.2a
+            pairSideBySide: String(localized: "workspace.tooltip.pairSideBySide", defaultValue: "Side by Side"),
+            pairStacked: String(localized: "workspace.tooltip.pairStacked", defaultValue: "Stacked"),
+            pairEqualize: KeyboardShortcutSettings.Action.equalizeSplits.tooltip(
+                String(localized: "shortcut.equalizeSplits.label", defaultValue: "Equalize Splits")
+            )
         )
     }
 
@@ -4160,6 +4168,15 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         paneTree.attach(host: self)
         surfaceList.attach(tree: self)
         bonsplitController.contextMenuShortcuts = Self.buildContextMenuShortcuts()
+
+        // cmux-rbf #cm-73.2a
+        bonsplitController.onPairZoomChange = { [weak self] in
+            guard let self else { return }
+            self.objectWillChange.send()
+            if !self.bonsplitController.isPairZoomed && self.isDesignFocusActiveTracking && !self.isExitingDesignFocus {
+                self.exitDesignFocus(reason: "bonsplitCleared")
+            }
+        }
 
         // Remove the default "Welcome" tab that bonsplit creates
         let welcomeTabIds = bonsplitController.allTabIds
@@ -4913,6 +4930,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     }
 
     private func configureBrowserPanel(_ browserPanel: BrowserPanel) {
+        // cmux-rbf #cm-73.2a
+        browserPanel.owningWorkspace = self
         AppDelegate.shared?.auth?.browserAppSession.register(browserPanel)
         browserPanel.webViewDidRequestClose = { [weak self, weak browserPanel] in
             guard let self, let browserPanel else { return }
@@ -8927,7 +8946,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         initialDividerPosition: CGFloat? = nil,
         remotePTYSessionID: String? = nil,
         suppressWorkspaceRemoteStartupCommand: Bool = false,
-        allowTextBoxFocusDefault: Bool = true
+        allowTextBoxFocusDefault: Bool = true,
+        fromSocket: Bool = false // cmux-rbf #cm-73.2a
     ) -> TerminalPanel? {
         return newTerminalSplitOutcome(
             from: panelId,
@@ -8941,7 +8961,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             initialDividerPosition: initialDividerPosition,
             remotePTYSessionID: remotePTYSessionID,
             suppressWorkspaceRemoteStartupCommand: suppressWorkspaceRemoteStartupCommand,
-            allowTextBoxFocusDefault: allowTextBoxFocusDefault
+            allowTextBoxFocusDefault: allowTextBoxFocusDefault,
+            fromSocket: fromSocket // cmux-rbf #cm-73.2a
         ).panel
     }
 
@@ -8961,7 +8982,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         initialDividerPosition: CGFloat? = nil,
         remotePTYSessionID: String? = nil,
         suppressWorkspaceRemoteStartupCommand: Bool = false,
-        allowTextBoxFocusDefault: Bool = true
+        allowTextBoxFocusDefault: Bool = true,
+        fromSocket: Bool = false // cmux-rbf #cm-73.2a
     ) -> TerminalPanelCreationOutcome {
         guard !isRetiredFromOwningTabManager else { return .failed }
         // In a remote tmux mirror workspace a split means "split the mirrored
@@ -9011,7 +9033,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             initialDividerPosition: initialDividerPosition,
             remotePTYSessionID: remotePTYSessionID,
             suppressWorkspaceRemoteStartupCommand: suppressWorkspaceRemoteStartupCommand,
-            allowTextBoxFocusDefault: allowTextBoxFocusDefault
+            allowTextBoxFocusDefault: allowTextBoxFocusDefault,
+            fromSocket: fromSocket // cmux-rbf #cm-73.2a
         ) else { return .failed }
         return .created(panel)
     }
@@ -9028,8 +9051,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         initialDividerPosition: CGFloat?,
         remotePTYSessionID: String?,
         suppressWorkspaceRemoteStartupCommand: Bool,
-        allowTextBoxFocusDefault: Bool
+        allowTextBoxFocusDefault: Bool,
+        fromSocket: Bool = false // cmux-rbf #cm-73.2a
     ) -> TerminalPanel? {
+        // cmux-rbf #cm-73.2a
+        if fromSocket && focus && isDesignFocusActive {
+            exitDesignFocus(reason: "socketSplitFocus")
+        }
 #if DEBUG
         let splitTimingStart = ProcessInfo.processInfo.systemUptime
         let splitTransport = remoteConfiguration?.transport.rawValue ?? "local"
@@ -9154,7 +9182,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         // Create the split with the new tab already present in the new pane.
         isProgrammaticSplit = true
         defer { isProgrammaticSplit = false }
-        guard let newPaneId = bonsplitController.splitPane(paneId, orientation: orientation, withTab: newTab, insertFirst: insertFirst) else {
+        // cmux-rbf #cm-73.2a
+        guard let newPaneId = bonsplitController.splitPane(paneId, orientation: orientation, withTab: newTab, insertFirst: insertFirst, fromSocket: fromSocket) else {
             panels.removeValue(forKey: newPanel.id)
             panelTitles.removeValue(forKey: newPanel.id)
             remotePTYSessionIDsByPanelId.removeValue(forKey: newPanel.id)
@@ -9234,7 +9263,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         terminalFontSizeCreationPolicy: TerminalFontSizeCreationPolicy = .inherit,
         inheritWorkingDirectoryFallback: Bool = false,
         workingDirectoryFallbackSourcePanelId: UUID? = nil,
-        allowTextBoxFocusDefault: Bool = true
+        allowTextBoxFocusDefault: Bool = true,
+        fromSocket: Bool = false // cmux-rbf #cm-73.2a
     ) -> TerminalPanel? {
         return newTerminalSurfaceOutcome(
             inPane: paneId,
@@ -9254,7 +9284,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             terminalFontSizeCreationPolicy: terminalFontSizeCreationPolicy,
             inheritWorkingDirectoryFallback: inheritWorkingDirectoryFallback,
             workingDirectoryFallbackSourcePanelId: workingDirectoryFallbackSourcePanelId,
-            allowTextBoxFocusDefault: allowTextBoxFocusDefault
+            allowTextBoxFocusDefault: allowTextBoxFocusDefault,
+            fromSocket: fromSocket // cmux-rbf #cm-73.2a
         ).panel
     }
 
@@ -9279,7 +9310,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         terminalFontSizeCreationPolicy: TerminalFontSizeCreationPolicy = .inherit,
         inheritWorkingDirectoryFallback: Bool = false,
         workingDirectoryFallbackSourcePanelId: UUID? = nil,
-        allowTextBoxFocusDefault: Bool = true
+        allowTextBoxFocusDefault: Bool = true,
+        fromSocket: Bool = false // cmux-rbf #cm-73.2a
     ) -> TerminalPanelCreationOutcome {
         guard !isRetiredFromOwningTabManager else { return .failed }
         // In a remote tmux mirror, a new tab means "create a tmux window"; never
@@ -9345,7 +9377,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             terminalFontSizeCreationPolicy: terminalFontSizeCreationPolicy,
             inheritWorkingDirectoryFallback: inheritWorkingDirectoryFallback,
             workingDirectoryFallbackSourcePanelId: workingDirectoryFallbackSourcePanelId,
-            allowTextBoxFocusDefault: allowTextBoxFocusDefault
+            allowTextBoxFocusDefault: allowTextBoxFocusDefault,
+            fromSocket: fromSocket // cmux-rbf #cm-73.2a
         ) else { return .failed }
         return .created(panel)
     }
@@ -9368,8 +9401,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         terminalFontSizeCreationPolicy: TerminalFontSizeCreationPolicy,
         inheritWorkingDirectoryFallback: Bool,
         workingDirectoryFallbackSourcePanelId: UUID?,
-        allowTextBoxFocusDefault: Bool
+        allowTextBoxFocusDefault: Bool,
+        fromSocket: Bool = false // cmux-rbf #cm-73.2a
     ) -> TerminalPanel? {
+        // cmux-rbf #cm-73.2a
+        if fromSocket && focus == true && isDesignFocusActive {
+            exitDesignFocus(reason: "socketSurfaceFocus")
+        }
         let shouldFocusNewTab = focus ?? (bonsplitController.focusedPaneId == paneId)
         let previousFocusedPanelId = focusedPanelId
         let previousHostedView = focusedTerminalInputTarget()?.panel.hostedView
@@ -9447,13 +9485,16 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             trackRemoteTerminalSurface(newPanel.id)
         }
         // Create tab in bonsplit
+        // cmux-rbf #cm-73.2a
+        let createTabFromSocket = fromSocket || (isDesignFocusActive && !shouldFocusNewTab)
         guard let newTabId = bonsplitController.createTab(
             title: newPanel.displayTitle,
             icon: newPanel.displayIcon,
             kind: SurfaceKind.terminal.rawValue,
             isDirty: newPanel.isDirty,
             isPinned: false,
-            inPane: paneId
+            inPane: paneId,
+            fromSocket: createTabFromSocket // cmux-rbf #cm-73.2a
         ) else {
             panels.removeValue(forKey: newPanel.id)
             panelTitles.removeValue(forKey: newPanel.id)
@@ -9765,8 +9806,57 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         transparentBackground: Bool = false,
         bypassRemoteProxy: Bool = false,
         initialDividerPosition: CGFloat? = nil,
-        websiteDataStore: WKWebsiteDataStore? = nil
+        websiteDataStore: WKWebsiteDataStore? = nil,
+        designFocusAsker: DesignFocusRouting.Asker? = nil // cmux-rbf #cm-73.2a
     ) -> BrowserPanel? {
+        // cmux-rbf #cm-73.2a
+        var isMadeOutOfSight = false
+        if isDesignFocusActive {
+            let effectiveURL = url ?? initialRequest?.url
+            let asker: DesignFocusRouting.Asker = designFocusAsker ?? ((creationPolicy == .automationPreload) ? .agent : .user)
+            let outcome = DesignFocusRouting.decide(
+                url: effectiveURL,
+                showsAddressBar: chromeVisibility.isOmnibarVisible,
+                target: .newSplit,
+                asker: asker,
+                wantsFocus: focus,
+                modeEnabled: true
+            )
+            #if DEBUG // cmux-rbf #cm-73.2a
+            cmuxDebugLog("designFocus.route \(outcome)")
+            #endif
+            switch outcome {
+            case .intoFigmaSide(let selectKeyboard):
+                guard let pairPanes = bonsplitController.pairZoomPanes else { break }
+                let figmaPaneId = pairPanes.second
+                return newBrowserSurface(
+                    inPane: figmaPaneId,
+                    url: url,
+                    initialRequest: initialRequest,
+                    focus: selectKeyboard,
+                    selectWhenNotFocused: true,
+                    preferredProfileID: preferredProfileID,
+                    creationPolicy: creationPolicy,
+                    allowsExternalBrowserFallback: allowsExternalBrowserFallback,
+                    chromeVisibility: chromeVisibility,
+                    transparentBackground: transparentBackground,
+                    bypassRemoteProxy: bypassRemoteProxy,
+                    websiteDataStore: websiteDataStore,
+                    designFocusAsker: asker
+                )
+            case .externalBrowser:
+                if let targetURL = effectiveURL ?? externalBrowserFallbackURL(url: url, initialRequest: initialRequest) {
+                    _ = Workspace.designFocusExternalOpen.perform(targetURL)
+                }
+                return nil
+            case .endModeThenAsToday:
+                exitDesignFocus(reason: "newBrowserSplit")
+            case .behind, .asToday:
+                break
+            case .madeOutOfSight:
+                isMadeOutOfSight = true
+            }
+        }
         guard !isRetiredFromOwningTabManager else { return nil }
         // No local browser surfaces in a remote tmux mirror workspace (it is a
         // 1:1 view of a tmux session). See ``newBrowserSurface(inPane:)``.
@@ -9843,7 +9933,15 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         // Mark this split as programmatic so didSplitPane doesn't auto-create a terminal.
         isProgrammaticSplit = true
         defer { isProgrammaticSplit = false }
-        guard let newPaneId = bonsplitController.splitPane(paneId, orientation: orientation, withTab: newTab, insertFirst: insertFirst) else {
+        let effectiveFocus = isMadeOutOfSight ? false : focus
+        // cmux-rbf #cm-73.2a
+        guard let newPaneId = bonsplitController.splitPane(
+            paneId,
+            orientation: orientation,
+            withTab: newTab,
+            insertFirst: insertFirst,
+            fromSocket: isMadeOutOfSight
+        ) else {
             removeSurfaceMapping(forSurfaceId: newTab.id)
             panels.removeValue(forKey: browserPanel.id)
             panelTitles.removeValue(forKey: browserPanel.id)
@@ -9851,11 +9949,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         }
         applyInitialSplitDividerPosition(initialDividerPosition, sourcePaneId: paneId, newPaneId: newPaneId)
         setPreferredBrowserProfileID(browserPanel.profileID)
-        publishCmuxSplitCreated(newPaneId, sourcePaneId: paneId, orientation: orientation, surfaceId: browserPanel.id, kind: "browser", origin: "browser_split", focused: focus)
+        // cmux-rbf #cm-73.2a
+        publishCmuxSplitCreated(newPaneId, sourcePaneId: paneId, orientation: orientation, surfaceId: browserPanel.id, kind: "browser", origin: "browser_split", focused: effectiveFocus)
 
         // See newTerminalSplit: suppress old view's becomeFirstResponder during reparenting.
         let previousHostedView = focusedTerminalInputTarget()?.panel.hostedView
-        if focus {
+        if effectiveFocus {
             suppressReparentFocusUntilLayoutFollowUp(
                 previousHostedView,
                 reason: "workspace.browserSplitReparent"
@@ -9894,8 +9993,66 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         chromeVisibility: BrowserChromeVisibility = .visible,
         transparentBackground: Bool = false,
         bypassRemoteProxy: Bool = false,
-        websiteDataStore: WKWebsiteDataStore? = nil
+        websiteDataStore: WKWebsiteDataStore? = nil,
+        designFocusAsker: DesignFocusRouting.Asker? = nil // cmux-rbf #cm-73.2a
     ) -> BrowserPanel? {
+        // cmux-rbf #cm-73.2a
+        var effectiveFocus = focus
+        var effectiveSelectWhenNotFocused = selectWhenNotFocused
+        var createTabFromSocket = false
+        if isDesignFocusActive {
+            let effectiveURL = url ?? initialRequest?.url
+            let asker: DesignFocusRouting.Asker = designFocusAsker ?? ((creationPolicy == .automationPreload) ? .agent : .user)
+            let wantsFocus = focus == true
+            let outcome = DesignFocusRouting.decide(
+                url: effectiveURL,
+                showsAddressBar: chromeVisibility.isOmnibarVisible,
+                target: .newTab,
+                asker: asker,
+                wantsFocus: wantsFocus,
+                modeEnabled: true
+            )
+            #if DEBUG // cmux-rbf #cm-73.2a
+            cmuxDebugLog("designFocus.route \(outcome)")
+            #endif
+            switch outcome {
+            case .intoFigmaSide(let selectKeyboard):
+                if let pairPanes = bonsplitController.pairZoomPanes, paneId != pairPanes.second {
+                    return newBrowserSurface(
+                        inPane: pairPanes.second,
+                        url: url,
+                        initialRequest: initialRequest,
+                        focus: selectKeyboard,
+                        selectWhenNotFocused: true,
+                        insertAtEnd: insertAtEnd,
+                        preferredProfileID: preferredProfileID,
+                        bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce,
+                        creationPolicy: creationPolicy,
+                        allowsExternalBrowserFallback: allowsExternalBrowserFallback,
+                        chromeVisibility: chromeVisibility,
+                        transparentBackground: transparentBackground,
+                        bypassRemoteProxy: bypassRemoteProxy,
+                        websiteDataStore: websiteDataStore,
+                        designFocusAsker: asker
+                    )
+                }
+                effectiveFocus = selectKeyboard
+                effectiveSelectWhenNotFocused = true
+            case .externalBrowser:
+                if let targetURL = effectiveURL ?? externalBrowserFallbackURL(url: url, initialRequest: initialRequest) {
+                    _ = Workspace.designFocusExternalOpen.perform(targetURL)
+                }
+                return nil
+            case .behind, .madeOutOfSight:
+                effectiveFocus = false
+                effectiveSelectWhenNotFocused = false
+                createTabFromSocket = true
+            case .endModeThenAsToday:
+                exitDesignFocus(reason: "newBrowserSurface")
+            case .asToday:
+                break
+            }
+        }
         guard !isRetiredFromOwningTabManager else { return nil }
         // A remote tmux mirror workspace is a 1:1 view of a tmux session (which
         // has no browser concept). A local browser tab here would be an orphan
@@ -9918,7 +10075,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             return nil
         }
 
-        let shouldFocusNewTab = focus ?? (bonsplitController.focusedPaneId == paneId)
+        // cmux-rbf #cm-73.2a
+        let shouldFocusNewTab = effectiveFocus ?? (bonsplitController.focusedPaneId == paneId)
         let sourcePanelId = effectiveSelectedPanelId(inPane: paneId)
         let previousFocusedPanelId = focusedPanelId
         let previousHostedView = focusedTerminalInputTarget()?.panel.hostedView
@@ -9946,6 +10104,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         panels[browserPanel.id] = browserPanel
         panelTitles[browserPanel.id] = browserPanel.displayTitle
 
+        // cmux-rbf #cm-73.2a
         guard let newTabId = bonsplitController.createTab(
             title: browserPanel.displayTitle,
             icon: browserPanel.displayIcon,
@@ -9957,7 +10116,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             isAudioMuted: browserPanel.isMuted,
             isAudioPlaying: browserPanel.isPlayingAudio,
             isPinned: false,
-            inPane: paneId
+            inPane: paneId,
+            fromSocket: createTabFromSocket // cmux-rbf #cm-73.2a
         ) else {
             panels.removeValue(forKey: browserPanel.id)
             panelTitles.removeValue(forKey: browserPanel.id)
@@ -9985,7 +10145,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             browserPanel.focus()
             applyTabSelection(tabId: newTabId, inPane: paneId)
         } else {
-            if selectWhenNotFocused {
+            // cmux-rbf #cm-73.2a
+            if effectiveSelectWhenNotFocused {
                 hideBrowserPortalsForDeselectedTabs(inPane: paneId, selectedTabId: newTabId)
                 reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
             }
@@ -11024,15 +11185,58 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
 
     @discardableResult
     func moveSurface(panelId: UUID, toPane paneId: PaneID, atIndex index: Int? = nil, focus: Bool = true) -> Bool {
+        // cmux-rbf #cm-73.2a
+        var effectiveFocus = focus
+        var isBehindMove = false
+        if isDesignFocusActive {
+            let isPairPane = bonsplitController.pairZoomPanes?.first == paneId || bonsplitController.pairZoomPanes?.second == paneId
+            if isPairPane {
+                let outcome = DesignFocusRouting.decide(
+                    url: (panels[panelId] as? BrowserPanel)?.currentURL,
+                    showsAddressBar: (panels[panelId] as? BrowserPanel)?.isOmnibarVisible ?? false,
+                    target: .movedIntoPairPane,
+                    asker: focus ? .user : .agent,
+                    wantsFocus: focus,
+                    modeEnabled: true
+                )
+                #if DEBUG // cmux-rbf #cm-73.2a
+                cmuxDebugLog("designFocus.route \(outcome)")
+                #endif
+                switch outcome {
+                case .endModeThenAsToday:
+                    exitDesignFocus(reason: "moveSurface")
+                case .behind:
+                    effectiveFocus = false
+                    isBehindMove = true
+                default:
+                    break
+                }
+            }
+        }
         guard let tabId = surfaceIdFromPanelId(panelId) else { return false }
         guard bonsplitController.allPaneIds.contains(paneId) else { return false }
-        guard bonsplitController.moveTab(tabId, toPane: paneId, atIndex: index) else { return false }
+        if isBehindMove {
+            pendingBehindMoveTabId = tabId
+        }
+        defer {
+            if isBehindMove {
+                pendingBehindMoveTabId = nil
+            }
+        }
+        // cmux-rbf #cm-73.2a
+        guard bonsplitController.moveTab(
+            tabId,
+            toPane: paneId,
+            atIndex: index,
+            select: !isBehindMove,
+            focus: !isBehindMove
+        ) else { return false }
 
-        if focus {
+        if effectiveFocus {
             bonsplitController.focusPane(paneId)
             bonsplitController.selectTab(tabId)
             focusPanel(panelId)
-        } else {
+        } else if !isBehindMove {
             scheduleFocusReconcile()
         }
         scheduleTerminalGeometryReconcile()
@@ -11040,6 +11244,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     }
 
     func detachSurface(panelId: UUID) -> DetachedSurfaceTransfer? {
+        // cmux-rbf #cm-73.2a
+        if isDesignFocusActive,
+           let tabId = surfaceIdFromPanelId(panelId),
+           (tabId.uuid == currentDesignFocusSelection?.terminalTab.id || tabId.uuid == currentDesignFocusSelection?.figmaTab.id) {
+            exitDesignFocus(reason: "pairTabDetached")
+        }
         guard let tabId = surfaceIdFromPanelId(panelId) else { return nil }
         guard let sourcePanel = panels[panelId] else { return nil }
         let surfaceMachine = machineOwningSurface(panelId)
@@ -11116,6 +11326,36 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         focus: Bool = true,
         focusIntent: PanelFocusIntent? = nil
     ) -> UUID? {
+        // cmux-rbf #cm-73.2a
+        var effectiveFocus = focus
+        var effectiveFocusIntent = focusIntent
+        var isBehind = false
+        if isDesignFocusActive {
+            let isPairPane = bonsplitController.pairZoomPanes?.first == paneId || bonsplitController.pairZoomPanes?.second == paneId
+            if isPairPane {
+                let outcome = DesignFocusRouting.decide(
+                    url: (detached.panel as? BrowserPanel)?.currentURL,
+                    showsAddressBar: (detached.panel as? BrowserPanel)?.isOmnibarVisible ?? false,
+                    target: .movedIntoPairPane,
+                    asker: .agent,
+                    wantsFocus: focus,
+                    modeEnabled: true
+                )
+                #if DEBUG // cmux-rbf #cm-73.2a
+                cmuxDebugLog("designFocus.route \(outcome)")
+                #endif
+                switch outcome {
+                case .endModeThenAsToday:
+                    exitDesignFocus(reason: "attachDetachedSurface")
+                case .behind:
+                    effectiveFocus = false
+                    effectiveFocusIntent = nil
+                    isBehind = true
+                default:
+                    break
+                }
+            }
+        }
         guard !isRetiredFromOwningTabManager, acceptsDetachedSurface(detached) else { return nil }
 #if DEBUG
         let attachStart = ProcessInfo.processInfo.systemUptime
@@ -11182,6 +11422,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             ?? false
         let detachedBrowserPlayingAudio = (detached.panel as? BrowserPanel)?.isPlayingAudio ?? false
         let detachedIconImageData = detached.panel is TerminalPanel ? nil : detached.iconImageData
+        // cmux-rbf #cm-73.2a
         guard let newTabId = bonsplitController.createTab(
             title: detached.title,
             hasCustomTitle: detached.customTitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
@@ -11193,7 +11434,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             isAudioMuted: detachedBrowserMuted,
             isAudioPlaying: detachedBrowserPlayingAudio,
             isPinned: detached.isPinned,
-            inPane: paneId
+            inPane: paneId,
+            fromSocket: isBehind // cmux-rbf #cm-73.2a
         ) else {
             removeBrowserOpenTabSuggestionIfNeeded(panel: detached.panel, panelId: detached.panelId)
             (detached.panel as? any FileContentChangeObservingPanel)?.stopWatchingForFileChanges()
@@ -11393,12 +11635,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         syncPinnedStateForTab(newTabId, panelId: detached.panelId)
         syncUnreadBadgeStateForPanel(detached.panelId)
         normalizePinnedTabs(in: paneId)
-        publishCmuxSurfaceCreated(detached.panelId, paneId: paneId, kind: Self.cmuxEventSurfaceKind(detached.panel), origin: "detach_attach", focused: focus)
+        // cmux-rbf #cm-73.2a
+        publishCmuxSurfaceCreated(detached.panelId, paneId: paneId, kind: Self.cmuxEventSurfaceKind(detached.panel), origin: "detach_attach", focused: effectiveFocus)
 
-        if focus {
+        if effectiveFocus {
             bonsplitController.focusPane(paneId)
             bonsplitController.selectTab(newTabId)
-            applyTabSelection(tabId: newTabId, inPane: paneId, focusIntent: focusIntent)
+            applyTabSelection(tabId: newTabId, inPane: paneId, focusIntent: effectiveFocusIntent)
             applyFocusedPanelTitle(panelId: detached.panelId)
         } else {
             scheduleFocusReconcile()
@@ -11716,9 +11959,14 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         return panel
     }
 
+    // cmux-rbf #cm-73.2a
     @discardableResult
-    func clearSplitZoom() -> Bool {
-        bonsplitController.clearPaneZoom()
+    func clearSplitZoom(reason: String = "clearSplitZoom") -> Bool {
+        if isDesignFocusActive {
+            exitDesignFocus(reason: reason)
+            return true
+        }
+        return bonsplitController.clearPaneZoom()
     }
 
     @discardableResult
@@ -11741,6 +11989,407 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             browserExitFocusPanelId: (wasSplitZoomed && !bonsplitController.isSplitZoomed) ? panelId : nil,
             includeGeometry: true
         )
+        return true
+    }
+
+    // MARK: - Design Focus (#cm-73.2a)
+
+    // cmux-rbf #cm-73.2a
+    struct DesignFocusMovedTabState: Sendable {
+        let tabId: UUID
+        let originalPaneId: PaneID
+        let originalIndex: Int
+    }
+
+    // cmux-rbf #cm-73.2a
+    struct DesignFocusPreviousTabs: Sendable {
+        let terminalPaneId: PaneID
+        let terminalSelectedTabId: TabID?
+        let figmaPaneId: PaneID
+        let figmaSelectedTabId: TabID?
+    }
+
+    // cmux-rbf #cm-73.2a
+    private(set) var designFocusMovedTab: DesignFocusMovedTabState?
+
+    // cmux-rbf #cm-73.2a
+    private(set) var designFocusPreviousTabs: DesignFocusPreviousTabs?
+
+    // cmux-rbf #cm-73.2a
+    private(set) var currentDesignFocusSelection: DesignFocusPair.Selection?
+
+    // cmux-rbf #cm-73.2a
+    private(set) var isDesignFocusActiveTracking: Bool = false
+
+    // cmux-rbf #cm-73.2a
+    private(set) var isDesignFocusOrientationPinned: Bool = false
+
+    // cmux-rbf #cm-73.2a
+    private var isExitingDesignFocus: Bool = false
+
+    // cmux-rbf #cm-73.2a
+    private var pendingBehindMoveTabId: TabID?
+
+    // cmux-rbf #cm-73.2a
+    public private(set) var lastDesignFocusLeaveReason: String?
+
+    // cmux-rbf #cm-73.2a
+    public var isDesignFocusActive: Bool {
+        bonsplitController.isPairZoomed
+    }
+
+    // cmux-rbf #cm-73.2a
+    public var canToggleDesignFocus: Bool {
+        if isDesignFocusActive { return true }
+        guard layoutMode != .canvas else { return false }
+        return pickDesignFocusPair() != nil
+    }
+
+    // cmux-rbf #cm-73.2a
+    public var window: NSWindow? {
+        let manager = owningTabManager ?? AppDelegate.shared?.tabManagerFor(tabId: id)
+        if let win = manager?.window {
+            return win
+        }
+        if let app = AppDelegate.shared,
+           let manager,
+           let windowId = app.windowId(for: manager),
+           let win = app.mainWindow(for: windowId) {
+            return win
+        }
+        for panel in panels.values {
+            if let terminal = panel as? TerminalPanel, let win = terminal.surface.uiWindow {
+                return win
+            }
+            if let browser = panel as? BrowserPanel, let win = browser.portalAnchorView.window {
+                return win
+            }
+        }
+        return nil
+    }
+
+    // cmux-rbf #cm-73.2a
+    public func isOwnedBy(window: NSWindow) -> Bool {
+        if let myWindow = self.window {
+            return myWindow === window
+        }
+        return false
+    }
+
+    // cmux-rbf #cm-73.2a
+    func currentDesignFocusAreaSize() -> CGSize {
+        let container = bonsplitController.layoutSnapshot().containerFrame
+        if container.width > 0 && container.height > 0 {
+            return CGSize(width: container.width, height: container.height)
+        }
+        let win = window ?? NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible })
+        if let win {
+            let contentSize = win.contentView?.frame.size ?? win.frame.size
+            if contentSize.width > 0 && contentSize.height > 0 {
+                return contentSize
+            }
+        }
+        return CGSize(width: 1800, height: 1000)
+    }
+
+    // cmux-rbf #cm-73.2a
+    public func updateDesignFocusOrientationIfNeeded(areaSize: CGSize? = nil) {
+        guard isDesignFocusActive, !isDesignFocusOrientationPinned else { return }
+        let size = areaSize ?? currentDesignFocusAreaSize()
+        let current: DesignFocusPair.Orientation? = {
+            switch bonsplitController.pairZoomOrientation {
+            case .horizontal:
+                return .beside
+            case .vertical:
+                return .below
+            case nil:
+                return nil
+            }
+        }()
+        let targetPairOrientation = DesignFocusPair.orientation(areaSize: size, current: current)
+        let targetOrientation: SplitOrientation = (targetPairOrientation == .beside) ? .horizontal : .vertical
+        if bonsplitController.pairZoomOrientation != targetOrientation {
+            bonsplitController.setPairZoomOrientation(targetOrientation)
+            reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
+            reconcileBrowserPortalVisibilityForCurrentRenderedLayout(reason: "workspace.updateDesignFocusOrientation")
+            beginEventDrivenLayoutFollowUp(reason: "workspace.updateDesignFocusOrientation", includeGeometry: true)
+        }
+    }
+
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    public func flipDesignFocusLayout() -> Bool {
+        guard isDesignFocusActive, let current = bonsplitController.pairZoomOrientation else {
+            return false
+        }
+        // A single pane zoomed over the pair hides the pair: do not change a layout nobody can see.
+        guard bonsplitController.zoomedPaneId == nil else { return false } // cmux-rbf #cm-73.2a
+        let nextOrientation: SplitOrientation = (current == .horizontal) ? .vertical : .horizontal
+        isDesignFocusOrientationPinned = true
+        bonsplitController.setPairZoomOrientation(nextOrientation)
+        reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
+        reconcileBrowserPortalVisibilityForCurrentRenderedLayout(reason: "workspace.flipDesignFocusLayout")
+        beginEventDrivenLayoutFollowUp(reason: "workspace.flipDesignFocusLayout", includeGeometry: true)
+        return true
+    }
+
+    // cmux-rbf #cm-73.2a
+    /// Equalize Splits while Design Focus is on: evens only the pair. One path for the key, the menu and the
+    /// header's 50/50 button. `orientationFilter` is Equalize Splits' own ("horizontal" widths, "vertical" heights).
+    @discardableResult
+    func equalizeDesignFocusPair(orientationFilter: String? = nil) -> Bool {
+        guard isDesignFocusActive else { return false }
+        guard bonsplitController.zoomedPaneId == nil else { return false } // cmux-rbf #cm-73.2a
+        let matchesFilter: Bool = {
+            guard let filter = orientationFilter else { return true }
+            switch bonsplitController.pairZoomOrientation {
+            case .horizontal:
+                return filter == "horizontal"
+            case .vertical:
+                return filter == "vertical"
+            case nil:
+                return false
+            }
+        }()
+        guard matchesFilter else { return false }
+        let didEqualize = bonsplitController.setPairZoomDividerPosition(0.5)
+        if didEqualize {
+            didProgrammaticallyChangeSplitGeometry()
+        }
+        return didEqualize
+    }
+
+    // cmux-rbf #cm-73.2a
+    func restoreMovedDesignFocusTabIfNeeded() {
+        guard let moved = designFocusMovedTab else { return }
+        designFocusMovedTab = nil
+        let tabId = TabID(uuid: moved.tabId)
+        _ = bonsplitController.moveTab(
+            tabId,
+            toPane: moved.originalPaneId,
+            atIndex: moved.originalIndex
+        )
+    }
+
+    // cmux-rbf #cm-73.2a
+    public func exitDesignFocus(reason: String = "unknown") {
+        guard !isExitingDesignFocus else { return }
+        guard isDesignFocusActive || isDesignFocusActiveTracking else { return }
+        isExitingDesignFocus = true
+        defer { isExitingDesignFocus = false }
+
+        isDesignFocusActiveTracking = false
+        isDesignFocusOrientationPinned = false
+        lastDesignFocusLeaveReason = reason
+        currentDesignFocusSelection = nil
+        #if DEBUG // cmux-rbf #cm-73.2a
+        cmuxDebugLog("designFocus.leave reason=\(reason)")
+        #endif
+
+        let prev = designFocusPreviousTabs
+        designFocusPreviousTabs = nil
+
+        let panelToKeepFocused = focusedPanelId
+        let paneHoldingFocus = panelToKeepFocused.flatMap { paneId(forPanelId: $0) }
+        bonsplitController.clearPaneZoom()
+        restoreMovedDesignFocusTabIfNeeded()
+
+        // Restore the old selected tab in each pair pane except the pane holding focus
+        if let prev {
+            if paneHoldingFocus != prev.terminalPaneId,
+               let tTab = prev.terminalSelectedTabId,
+               bonsplitController.tabs(inPane: prev.terminalPaneId).contains(where: { $0.id == tTab }) {
+                bonsplitController.selectTab(tTab)
+            }
+            if paneHoldingFocus != prev.figmaPaneId,
+               let fTab = prev.figmaSelectedTabId,
+               bonsplitController.tabs(inPane: prev.figmaPaneId).contains(where: { $0.id == fTab }) {
+                bonsplitController.selectTab(fTab)
+            }
+        }
+
+        if let panelToKeepFocused {
+            focusPanel(panelToKeepFocused)
+            if let paneId = paneId(forPanelId: panelToKeepFocused) {
+                bonsplitController.focusPane(paneId)
+            }
+        }
+
+        reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
+        reconcileBrowserPortalVisibilityForCurrentRenderedLayout(reason: "workspace.exitDesignFocus")
+        beginEventDrivenLayoutFollowUp(
+            reason: "workspace.exitDesignFocus",
+            includeGeometry: true
+        )
+    }
+
+    // cmux-rbf #cm-73.2a
+    public func makeDesignFocusFigmaSide(paneId: PaneID) {
+        guard isDesignFocusActive, let pairPanes = bonsplitController.pairZoomPanes else { return }
+        if pairPanes.second != paneId {
+            let orientation = bonsplitController.pairZoomOrientation ?? .horizontal
+            _ = bonsplitController.setPairZoom(
+                firstPane: pairPanes.first,
+                secondPane: paneId,
+                orientation: orientation
+            )
+            reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
+            reconcileBrowserPortalVisibilityForCurrentRenderedLayout(reason: "workspace.makeDesignFocusFigmaSide")
+            beginEventDrivenLayoutFollowUp(reason: "workspace.makeDesignFocusFigmaSide", includeGeometry: true)
+        }
+    }
+
+    // cmux-rbf #cm-73.2a
+    func designFocusCandidatePanes() -> [DesignFocusPair.Pane] {
+        let snapshot = bonsplitController.layoutSnapshot()
+        var candidatePanes: [DesignFocusPair.Pane] = []
+        for p in snapshot.panes {
+            guard let paneUUID = UUID(uuidString: p.paneId) else { continue }
+            let frame = CGRect(x: p.frame.x, y: p.frame.y, width: p.frame.width, height: p.frame.height)
+            var tabs: [DesignFocusPair.Tab] = []
+            for tabIdStr in p.tabIds {
+                guard let surfaceUUID = UUID(uuidString: tabIdStr) else { continue }
+                guard let panelId = panelId(forSurfaceId: surfaceUUID) else { continue }
+                let isTerminal = terminalPanel(for: panelId) != nil
+                var isFigma = false
+                if let browser = browserPanel(for: panelId) {
+                    isFigma = browser.isFigmaPaneForHiddenUnload
+                } else if let deferred = (panels[panelId] as? DeferredBrowserPanel)?.sessionPanelSnapshot.browser,
+                          let address = deferred.urlString.flatMap({ URL(string: $0) }) {
+                    isFigma = FigmaTabMark.applies(
+                        address: address,
+                        showsAddressBar: (deferred.chromeVisibility ?? .visible).isOmnibarVisible
+                    )
+                }
+                tabs.append(
+                    DesignFocusPair.Tab(
+                        id: surfaceUUID,
+                        paneId: paneUUID,
+                        isTerminal: isTerminal,
+                        isFigma: isFigma
+                    )
+                )
+            }
+            candidatePanes.append(
+                DesignFocusPair.Pane(
+                    id: paneUUID,
+                    frame: frame,
+                    tabs: tabs,
+                    selectedTabId: p.selectedTabId.flatMap(UUID.init(uuidString:))
+                )
+            )
+        }
+        return candidatePanes
+    }
+
+    // cmux-rbf #cm-73.2a
+    func pickDesignFocusPair() -> DesignFocusPair.Selection? {
+        let focusedPaneUUID = bonsplitController.focusedPaneId?.id
+        let panes = designFocusCandidatePanes()
+        let result = DesignFocusPair.pick(
+            isCanvasLayout: layoutMode == .canvas,
+            focusedPaneId: focusedPaneUUID,
+            panes: panes
+        )
+        switch result {
+        case .success(let selection):
+            return selection
+        case .failure:
+            return nil
+        }
+    }
+
+    // cmux-rbf #cm-73.2a
+    @discardableResult
+    func toggleDesignFocus() -> Bool {
+        if isDesignFocusActive {
+            exitDesignFocus(reason: "toggle")
+            return true
+        }
+
+        guard layoutMode != .canvas else { return false }
+        guard let selection = pickDesignFocusPair() else { return false }
+
+        let originalFocusedPane = bonsplitController.focusedPaneId
+        let originalFocusedPanel = focusedPanelId
+
+        var terminalPaneId = PaneID(id: selection.terminalTab.paneId)
+        var figmaPaneId = PaneID(id: selection.figmaTab.paneId)
+
+        let terminalSelectedTab = bonsplitController.selectedTab(inPane: terminalPaneId)?.id
+        let figmaSelectedTab = bonsplitController.selectedTab(inPane: figmaPaneId)?.id
+
+        if terminalPaneId == figmaPaneId {
+            let originalIndex = bonsplitController.tabs(inPane: figmaPaneId).firstIndex(where: { $0.id.uuid == selection.figmaTab.id }) ?? 0
+            guard let newPaneId = splitPaneMovingTab(
+                figmaPaneId,
+                orientation: .horizontal,
+                movingTab: TabID(uuid: selection.figmaTab.id),
+                insertFirst: false,
+                focusIntent: .preserveCurrent
+            ) else {
+                return false
+            }
+            designFocusMovedTab = DesignFocusMovedTabState(
+                tabId: selection.figmaTab.id,
+                originalPaneId: figmaPaneId,
+                originalIndex: originalIndex
+            )
+            figmaPaneId = newPaneId
+        } else {
+            designFocusPreviousTabs = DesignFocusPreviousTabs(
+                terminalPaneId: terminalPaneId,
+                terminalSelectedTabId: terminalSelectedTab,
+                figmaPaneId: figmaPaneId,
+                figmaSelectedTabId: figmaSelectedTab
+            )
+        }
+
+        // cmux-rbf #cm-73.2a
+        let size = currentDesignFocusAreaSize()
+        let orientationEnum = DesignFocusPair.orientation(areaSize: size, current: nil)
+        let splitOrientation: SplitOrientation = (orientationEnum == .beside) ? .horizontal : .vertical
+
+        guard bonsplitController.setPairZoom(
+            firstPane: terminalPaneId,
+            secondPane: figmaPaneId,
+            orientation: splitOrientation
+        ) else {
+            return false
+        }
+
+        isDesignFocusActiveTracking = true
+        isDesignFocusOrientationPinned = false
+        currentDesignFocusSelection = selection
+
+        bonsplitController.selectTab(TabID(uuid: selection.terminalTab.id))
+        bonsplitController.selectTab(TabID(uuid: selection.figmaTab.id))
+
+        reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
+        reconcileBrowserPortalVisibilityForCurrentRenderedLayout(reason: "workspace.toggleDesignFocus")
+        beginEventDrivenLayoutFollowUp(
+            reason: "workspace.toggleDesignFocus",
+            includeGeometry: true
+        )
+
+        // cmux-rbf #cm-73.2a
+        // Item 1: Focus stays if it was on either of the two, else the terminal. Set explicitly LAST.
+        let figmaPanelId = panelId(forSurfaceId: selection.figmaTab.id)
+        if originalFocusedPanel == figmaPanelId {
+            bonsplitController.focusPane(figmaPaneId)
+            if let figmaPanelId {
+                focusPanel(figmaPanelId)
+            }
+        } else {
+            bonsplitController.focusPane(terminalPaneId)
+            if let panelId = panelId(forSurfaceId: selection.terminalTab.id) {
+                focusPanel(panelId)
+            }
+        }
+
+        #if DEBUG // cmux-rbf #cm-73.2a
+        cmuxDebugLog("designFocus.enter terminalPane=\(terminalPaneId.id) figmaPane=\(figmaPaneId.id) orientation=\(orientationEnum == .beside ? "beside" : "below")")
+        #endif
         return true
     }
 
@@ -12504,7 +13153,16 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         if layoutMode == .canvas {
             return Set(canvasModel.layout.panes.map(\.selectedPanelId.rawValue))
         }
-        let renderedPaneIds = bonsplitController.zoomedPaneId.map { [$0] } ?? bonsplitController.allPaneIds
+        // cmux-rbf #cm-73.2a
+        let renderedPaneIds: [PaneID] = {
+            if let zoomed = bonsplitController.zoomedPaneId {
+                return [zoomed]
+            }
+            if let pair = bonsplitController.pairZoomPanes {
+                return [pair.first, pair.second]
+            }
+            return bonsplitController.allPaneIds
+        }()
         var visiblePanelIds: Set<UUID> = []
         let focusedPanelForFallback = focusedPanelId.flatMap { panelId in
             panels[panelId] == nil ? nil : panelId
@@ -13169,8 +13827,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             return nil
         }
         let zoomedPaneId = bonsplitController.zoomedPaneId
-        if zoomedPaneId != nil {
-            clearSplitZoom()
+        // cmux-rbf #cm-73.2a
+        if isDesignFocusActive || zoomedPaneId != nil {
+            clearSplitZoom(reason: "forkSplit")
         }
         let forkedPanel = splitPaneWithNewTerminal(
             targetPane: paneId,
@@ -13238,8 +13897,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             return nil
         }
         let zoomedPaneId = bonsplitController.zoomedPaneId
-        if zoomedPaneId != nil {
-            clearSplitZoom()
+        // cmux-rbf #cm-73.2a
+        if isDesignFocusActive || zoomedPaneId != nil {
+            clearSplitZoom(reason: "forkNewTab")
         }
 
         let targetIndex = insertionIndexToRight(of: anchorTabId, inPane: paneId)
@@ -13852,8 +14512,10 @@ extension Workspace: BonsplitDelegate {
 
     func splitTabBar(_ controller: BonsplitController, shouldCloseTab tab: Bonsplit.Tab, inPane pane: PaneID) -> Bool {
         func recordPostCloseState() {
-            if controller.zoomedPaneId == pane,
-               controller.selectedTab(inPane: pane)?.id == tab.id {
+            // cmux-rbf #cm-73.2a
+            let isZoomedPaneClose = controller.zoomedPaneId == pane && controller.selectedTab(inPane: pane)?.id == tab.id
+            let isPairZoomPaneClose = controller.isPairZoomed && (controller.pairZoomPanes?.first == pane || controller.pairZoomPanes?.second == pane) && controller.selectedTab(inPane: pane)?.id == tab.id
+            if isZoomedPaneClose || isPairZoomPaneClose {
                 postCloseClearSplitZoomTabIds.insert(tab.id)
             } else {
                 postCloseClearSplitZoomTabIds.remove(tab.id)
@@ -14088,6 +14750,11 @@ extension Workspace: BonsplitDelegate {
         let shouldClearSplitZoom = postCloseClearSplitZoomTabIds.remove(tabId) != nil
         let closedBrowserRestoreSnapshot = pendingClosedBrowserRestoreSnapshots.removeValue(forKey: tabId)
         let isDetaching = splitLayout.consumeDetachingMark(tabId)
+        // cmux-rbf #cm-73.2a
+        if isDesignFocusActive,
+           (tabId.uuid == currentDesignFocusSelection?.terminalTab.id || tabId.uuid == currentDesignFocusSelection?.figmaTab.id) {
+            exitDesignFocus(reason: isDetaching ? "pairTabDetached" : "pairTabClosed")
+        }
         if shouldClearSplitZoom {
             clearSplitZoom()
         }
@@ -14344,9 +15011,13 @@ extension Workspace: BonsplitDelegate {
             "split.moveTab.state.before idx=\(debugDidMoveTabEventCount) panel=\(movedPanel) " +
             "destSelected=\(selectedBefore) focusedPane=\(focusedPaneBefore) focusedPanel=\(focusedPanelBefore)"
         )
-#endif
-        applyTabSelection(tabId: tab.id, inPane: destination)
-#if DEBUG
+        // cmux-rbf #cm-73.2a
+        if pendingBehindMoveTabId == tab.id {
+            reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
+            reconcileBrowserPortalVisibilityForCurrentRenderedLayout(reason: "workspace.didMoveTab.behind")
+        } else {
+            applyTabSelection(tabId: tab.id, inPane: destination)
+        }
         let movedPanelIdAfter = panelIdFromSurfaceId(tab.id)
 #endif
         if let movedPanelId = panelIdFromSurfaceId(tab.id) {
@@ -14855,6 +15526,17 @@ extension Workspace: BonsplitDelegate {
         default:
             _ = newTerminalSurface(inPane: pane, inheritWorkingDirectoryFallback: true)
         }
+    }
+
+    // cmux-rbf #cm-73.2a
+    func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation) {
+        guard isDesignFocusActive, bonsplitController.pairZoomOrientation != orientation else { return }
+        _ = flipDesignFocusLayout()
+    }
+
+    // cmux-rbf #cm-73.2a
+    func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController) {
+        _ = equalizeDesignFocusPair()
     }
 
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID) {

@@ -1709,6 +1709,12 @@
 		80730000000000000000001C /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
 		80730000000000000000001E /* FigmaStayInPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001D /* FigmaStayInPane.swift */; };
 		807310000000000000000002 /* FigmaTabMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000001 /* FigmaTabMark.swift */; };
+		80732A000000000000000002 /* DesignFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000001 /* DesignFocus.swift */; };
+		80732A000000000000000004 /* DesignFocusPairTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000003 /* DesignFocusPairTests.swift */; };
+		80732A000000000000000006 /* DesignFocusRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000005 /* DesignFocusRoutingTests.swift */; };
+		80732A000000000000000008 /* DesignFocusShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000007 /* DesignFocusShortcutTests.swift */; };
+		80732A00000000000000000A /* DesignFocusWorkspaceRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000009 /* DesignFocusWorkspaceRoutingTests.swift */; };
+		80732A00000000000000000C /* SplitDividerOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A00000000000000000B /* SplitDividerOverlayTests.swift */; };
 		807311000000000000000002 /* FigmaLoadBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807311000000000000000001 /* FigmaLoadBar.swift */; };
 		807311000000000000000004 /* FigmaLoadBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807311000000000000000003 /* FigmaLoadBarTests.swift */; };
 		807311000000000000000006 /* FigmaLoadBarSignalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807311000000000000000005 /* FigmaLoadBarSignalTests.swift */; };
@@ -5670,6 +5676,12 @@
 		807310000000000000000003 /* FigmaTabMarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkTests.swift; sourceTree = "<group>"; };
 		807310000000000000000005 /* FigmaTabMarkWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkWorkspaceTests.swift; sourceTree = "<group>"; };
 		807310000000000000000007 /* FigmaMarkAssetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaMarkAssetTests.swift; sourceTree = "<group>"; };
+		80732A000000000000000001 /* DesignFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocus.swift; sourceTree = "<group>"; };
+		80732A000000000000000003 /* DesignFocusPairTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusPairTests.swift; sourceTree = "<group>"; };
+		80732A000000000000000005 /* DesignFocusRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusRoutingTests.swift; sourceTree = "<group>"; };
+		80732A000000000000000007 /* DesignFocusShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusShortcutTests.swift; sourceTree = "<group>"; };
+		80732A000000000000000009 /* DesignFocusWorkspaceRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusWorkspaceRoutingTests.swift; sourceTree = "<group>"; };
+		80732A00000000000000000B /* SplitDividerOverlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDividerOverlayTests.swift; sourceTree = "<group>"; };
 		807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeTriggerTests.swift; sourceTree = "<group>"; };
 		80739000000000000000000F /* FigmaPaletteCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaletteCommandTests.swift; sourceTree = "<group>"; };
 		80739000000000000000000D /* FigmaEditorChromeAddressChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeAddressChangeTests.swift; sourceTree = "<group>"; };
@@ -9216,6 +9228,7 @@
 				807300000000000000000036 /* Workspace+FigmaClick.swift */,
 				807390000000000000000003 /* ContentView+FigmaCommandPalette.swift */,
 				807390000000000000000001 /* Workspace+FigmaHeaderButton.swift */,
+				80732A000000000000000001 /* DesignFocus.swift */,
 				9504A0010000000000000002 /* Workspace+MovingTabSplit.swift */,
 				875200000000000000000004 /* SurfacePaneMovement.swift */,
 				822900000000000000000002 /* Workspace+TerminalResizeInteraction.swift */,
@@ -11364,6 +11377,11 @@
 				807390000000000000000009 /* FigmaHeaderButtonTests.swift */,
 				807300000000000000000033 /* FigmaClickRouteTests.swift */,
 				807300000000000000000038 /* FigmaClickWorkspaceTests.swift */,
+				80732A000000000000000003 /* DesignFocusPairTests.swift */,
+				80732A000000000000000005 /* DesignFocusRoutingTests.swift */,
+				80732A000000000000000007 /* DesignFocusShortcutTests.swift */,
+				80732A000000000000000009 /* DesignFocusWorkspaceRoutingTests.swift */,
+				80732A00000000000000000B /* SplitDividerOverlayTests.swift */,
 				AC61257DCDCA431A908C55CC /* CLIChildEnvironmentTests.swift */,
 				95C00A2330C34E7DA7630E4D /* CLIChildEnvironment.swift */,
 				805500000000000000000002 /* CLIBrowserEvalOutputTests.swift */,
@@ -13556,6 +13574,7 @@
 				807390000000000000000006 /* FigmaButtonIcon.swift in Sources */,
 				807300000000000000000035 /* FigmaWrapperPage.swift in Sources */,
 				807300000000000000000031 /* FigmaClickRoute.swift in Sources */,
+				80732A000000000000000002 /* DesignFocus.swift in Sources */,
 				4CD85A694DB56017AB81D9B0 /* FeedWaiterRegistry.swift in Sources */,
 				10200F1E0000000000000007 /* FileContentChangeCoordinator+Entry.swift in Sources */,
 				10200F1E0000000000000001 /* FileContentChangeCoordinator.swift in Sources */,
@@ -15854,6 +15873,11 @@
 				807300000000000000000032 /* FigmaClickRoute.swift in Sources */,
 				807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */,
 				807300000000000000000039 /* FigmaClickWorkspaceTests.swift in Sources */,
+				80732A000000000000000004 /* DesignFocusPairTests.swift in Sources */,
+				80732A000000000000000006 /* DesignFocusRoutingTests.swift in Sources */,
+				80732A000000000000000008 /* DesignFocusShortcutTests.swift in Sources */,
+				80732A00000000000000000A /* DesignFocusWorkspaceRoutingTests.swift in Sources */,
+				80732A00000000000000000C /* SplitDividerOverlayTests.swift in Sources */,
 				807300000000000000000008 /* FigmaWrapperPage.swift in Sources */,
 				FEEDC0DEC0DEC0DEC0DE0003 /* FeedJumpResolverTests.swift in Sources */,
 				330A15CE33CDB525DE207F7F /* FeedWaiterRegistryTests.swift in Sources */,

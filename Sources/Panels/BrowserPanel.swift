@@ -1992,6 +1992,9 @@ final class BrowserPanel: Panel, ObservableObject {
 
     /// The workspace ID this panel belongs to
     private(set) var workspaceId: UUID
+    // cmux-rbf #cm-73.2a
+    weak var owningWorkspace: Workspace?
+    var isInitialCreationNavigation: Bool = false
     private let externalNavigationHandler: BrowserExternalNavigationHandler
 
     @Published private(set) var profileID: UUID
@@ -3686,7 +3689,7 @@ final class BrowserPanel: Panel, ObservableObject {
         )
         navDelegate.owner = self
         navDelegate.openInNewTab = { [weak self] url in
-            self?.openLinkInNewTab(url: url)
+            self?.openLinkInNewTab(url: url, designFocusAsker: .page) // cmux-rbf #cm-73.2a
         }
         navDelegate.openAppLinkInBrowserSplit = { [weak self] url in
             self?.openAppLinkInBrowserSplit?(url) ?? false
@@ -3873,7 +3876,7 @@ final class BrowserPanel: Panel, ObservableObject {
         browserUIDelegate.owner = self
         browserUIDelegate.openInNewTab = { [weak self] url in
             guard let self else { return }
-            self.openLinkInNewTab(url: url)
+            self.openLinkInNewTab(url: url, designFocusAsker: .page) // cmux-rbf #cm-73.2a
         }
         browserUIDelegate.openAppLinkInBrowserSplit = { [weak self] url in
             self?.openAppLinkInBrowserSplit?(url) ?? false
@@ -3966,6 +3969,9 @@ final class BrowserPanel: Panel, ObservableObject {
                 hasCommittedDocumentSinceWebViewReplacement = true
                 refreshBackgroundAppearance()
             } else {
+                // cmux-rbf #cm-73.2a
+                isInitialCreationNavigation = true
+                defer { isInitialCreationNavigation = false }
                 navigate(to: url)
             }
         }
@@ -5533,6 +5539,37 @@ final class BrowserPanel: Panel, ObservableObject {
         recordTypedNavigation: Bool = false,
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> WKNavigation? {
+        // cmux-rbf #cm-73.2a
+        if isInitialCreationNavigation {
+            // Initial creation load: already routed by newBrowserSurface / newBrowserSplit
+        } else if let workspace = (owningWorkspace ?? AppDelegate.shared?.workspaceContainingPanel(panelId: id, preferredWorkspaceId: workspaceId)?.workspace),
+                  workspace.isDesignFocusActive,
+                  let paneId = workspace.paneId(forPanelId: id) {
+            let isPairPane = (workspace.bonsplitController.pairZoomPanes?.first == paneId || workspace.bonsplitController.pairZoomPanes?.second == paneId)
+            let isSelected = (workspace.bonsplitController.selectedTab(inPane: paneId).flatMap { workspace.panelIdFromSurfaceId($0.id) } == id)
+            let target: DesignFocusRouting.Target = (isPairPane && isSelected) ? .pairTabNavigated : .hiddenTabNavigated
+            let outcome = DesignFocusRouting.decide(
+                url: url,
+                showsAddressBar: isOmnibarVisible,
+                target: target,
+                asker: .user,
+                wantsFocus: false,
+                modeEnabled: true
+            )
+            #if DEBUG // cmux-rbf #cm-73.2a
+            cmuxDebugLog("designFocus.route \(outcome)")
+            #endif
+            switch outcome {
+            case .externalBrowser:
+                _ = Workspace.designFocusExternalOpen.perform(url)
+                onNavigationStarted?(nil)
+                return nil
+            case .endModeThenAsToday:
+                workspace.exitDesignFocus(reason: "navigate")
+            case .asToday, .behind, .intoFigmaSide, .madeOutOfSight:
+                break
+            }
+        }
         if cloudAccess.model != nil && cloudAccess.owns(url) {
             if cloudAccess.model?.isReady != true { return nil }
         } else if let provider = SurfaceCatalog.shared.machines.values.first(where: {
@@ -5849,7 +5886,7 @@ final class BrowserPanel: Panel, ObservableObject {
             )
         case .newTab:
             onNavigationStarted?(nil)
-            openLinkInNewTab(request: request)
+            openLinkInNewTab(request: request, designFocusAsker: .page) // cmux-rbf #cm-73.2a
         }
     }
 
@@ -5990,7 +6027,7 @@ final class BrowserPanel: Panel, ObservableObject {
             case .newTab:
                 onNavigationStarted?(nil)
                 onResolution(.proceededInNewTab)
-                openLinkInNewTab(request: request, bypassInsecureHTTPHostOnce: host)
+                openLinkInNewTab(request: request, bypassInsecureHTTPHostOnce: host, designFocusAsker: .page) // cmux-rbf #cm-73.2a
             }
         default:
             onNavigationStarted?(nil)
@@ -6381,10 +6418,15 @@ extension BrowserPanel {
     }
 
     /// Open a link in a new browser surface in the same pane
-    func openLinkInNewTab(url: URL, bypassInsecureHTTPHostOnce: String? = nil) {
+    func openLinkInNewTab(
+        url: URL,
+        bypassInsecureHTTPHostOnce: String? = nil,
+        designFocusAsker: DesignFocusRouting.Asker = .page // cmux-rbf #cm-73.2a
+    ) {
         openLinkInNewTab(
             request: URLRequest(url: url),
-            bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce
+            bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce,
+            designFocusAsker: designFocusAsker
         )
     }
 
@@ -6401,12 +6443,16 @@ extension BrowserPanel {
             browserPresentExternalNavigationFailure(for: url, in: webView)
             return
         case .notConfigured:
-            openLinkInNewTab(url: url)
+            openLinkInNewTab(url: url, designFocusAsker: .user) // cmux-rbf #cm-73.2a
         }
     }
 
     /// Opens a request in a sibling browser tab without dropping request metadata.
-    func openLinkInNewTab(request: URLRequest, bypassInsecureHTTPHostOnce: String? = nil) {
+    func openLinkInNewTab(
+        request: URLRequest,
+        bypassInsecureHTTPHostOnce: String? = nil,
+        designFocusAsker: DesignFocusRouting.Asker = .page // cmux-rbf #cm-73.2a
+    ) {
         guard let seed = browserNewTabNavigationSeed(
             from: request,
             bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce
@@ -6456,7 +6502,8 @@ extension BrowserPanel {
             focus: true,
             preferredProfileID: profileID,
             bypassInsecureHTTPHostOnce: seed.bypassInsecureHTTPHostOnce,
-            websiteDataStore: explicitEphemeralWebsiteDataStoreForSibling
+            websiteDataStore: explicitEphemeralWebsiteDataStoreForSibling,
+            designFocusAsker: designFocusAsker // cmux-rbf #cm-73.2a
         ) else {
 #if DEBUG
             cmuxDebugLog("browser.newTab.open.abort panel=\(id.uuidString.prefix(5)) reason=newPanelFailed")
