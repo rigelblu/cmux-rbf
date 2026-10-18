@@ -20,6 +20,8 @@ public enum TabContextAction: String, CaseIterable, Sendable {
     case moveToLeftPane
     case moveToRightPane
     case newTerminalToRight
+    // cmux-rbf #cm-73.15: Figma uses the same tab context-action path.
+    case newFigmaToRight
     case newBrowserToRight
     case reload
     case duplicate
