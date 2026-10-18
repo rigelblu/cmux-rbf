@@ -190,6 +190,26 @@ Aligned built-in and custom colour rows, since v0.31.0:
 - In Settings → Workspace Colors, built-in and custom color rows share an aligned 5-column layout: semantic labels start at identical coordinates, color pills align, hex values share an aligned 92pt column, and an invisible placeholder preserves the Remove button slot so visibility toggles stay pinned to the right margin.
 - Custom color display name fields align vertically at their top edge with trailing label and hex text fields within 1.0pt.
 
+## 🟠⋯ Use your own workspace statuses, and see how far along each one is
+
+Since v0.33.0, a workspace's status can be one of your own, in your words and your order, and each status draws its own glyph.
+
+- Write `workspaceStatuses` in `~/.config/cmux/cmux.json`. Each entry has an `id`, a `name`, `extends` (the cmux status it behaves as: `todo`, `working`, `needs-attention`, `review` or `done`), and optionally a `color` and an `icon`:
+
+  ```json
+  "workspaceStatuses": [
+    { "id": "next",   "name": "Next",   "extends": "todo",   "color": "4: NEXT", "icon": "ring" },
+    { "id": "snooze", "name": "Snooze", "extends": "todo",   "icon": "moon.zzz.fill" },
+    { "id": "review", "name": "Review", "icon": "three-quarters" }
+  ]
+  ```
+- The Status menu, the glyph's popover, the todo pane's picker, the command palette and Cycle Status (⌘⇧;) offer your list in your order. A status with a `color` puts that color on the workspace when you set it.
+- `icon` is one of eight shapes (`dotted-ring`, `ring`, `quarter`, `half`, `three-quarters`, `full`, `check`, `pause`) or the lowercase name of any SF Symbol. Leave it out and the status draws the glyph of the one it extends.
+- With a list in use, an agent waiting or running is a state, not a status: a waiting agent shows a bright yellow raised hand, and the status you set stays.
+- Every glyph clears 3:1 contrast against its row, so it reads on a selected or dimmed row too.
+- `cmux workspace status list` prints the list in use and any problems; a mistake skips only that entry, and a pill in the sidebar's footer names it.
+- No list, no change: cmux's own five statuses work as before.
+
 ## 🟠⋯ Organize workspace groups inside larger groups
 
 Since v0.32.0, a workspace group can sit inside another group, to any depth, so one header can hold a whole area of work.
