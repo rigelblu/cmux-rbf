@@ -313,6 +313,7 @@ xcodebuild \
   ASSETCATALOG_COMPILER_APPICON_NAME="$RBF_ICON_SET" \
   CODE_SIGN_ENTITLEMENTS="" \
   TOOLCHAINS="" \
+  ONLY_ACTIVE_ARCH=YES \
   build || die "xcodebuild failed — nothing was written to /Applications"
 
 BUILT_APP="$DERIVED_DATA/Build/Products/Release/cmux.app"

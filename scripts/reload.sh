@@ -1436,22 +1436,16 @@ if [[ -z "$TAG" ]]; then
     INFOPLIST_KEY_CFBundleDisplayName="$APP_NAME"
   )
 fi
-XCODEBUILD_ARGS+=(PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID")
+# cmux-rbf (#cm-123): Do not pass PRODUCT_BUNDLE_IDENTIFIER, CMUX_CUA_HELPER_DISPLAY_NAME,
+# or CMUX_SIDEBAR_EXTENSION_POINT_ID on the xcodebuild command line. xcodebuild builds the
+# base untagged cmux DEV.app (com.cmuxterm.app.debug, matching TEST_HOST in dev.sh), ensuring
+# the build description signature matches dev.sh test exactly. Tagged values are stamped into
+# TAG_APP_STAGING_PATH before codesigning.
 if [[ "$RBF_STABLE_SIGNING_ENABLED" == "1" ]]; then
   XCODEBUILD_ARGS+=(CODE_SIGN_IDENTITY="$CMUX_DEV_CODESIGN_IDENTITY" CODE_SIGN_STYLE=Manual)
 fi
-# The helper is assembled before Xcode emits the host's processed Info.plist.
-# Pass the final tagged display name explicitly so its TCC entry matches the
-# app the user is dogfooding instead of falling back to the untagged product.
-XCODEBUILD_ARGS+=(CMUX_CUA_HELPER_DISPLAY_NAME="cmux Computer Use")
 if [[ "$PROD_AUTH" -eq 1 ]]; then
   XCODEBUILD_ARGS+=(-xcconfig "$SCRIPT_DIR/../config/IrohRelayPolicyProduction.xcconfig")
-fi
-# Scope the sidebar ExtensionKit point per build tag so concurrent dev builds (and
-# their tagged sample extensions) don't share one point. The host bundle declares
-# the point under Contents/Extensions, and Info.plist carries the same identifier.
-if [[ -n "$TAG" ]]; then
-  XCODEBUILD_ARGS+=(CMUX_SIDEBAR_EXTENSION_POINT_ID="${BUNDLE_ID}.cmux.sidebar")
 fi
 # Forward explicit CMUX_SKIP_ZIG_BUILD to xcodebuild run script phases.
 if [[ "${CMUX_SKIP_ZIG_BUILD:-}" == "1" ]]; then
@@ -1472,7 +1466,8 @@ XCODEBUILD_ARGS+=(build)
 
 if [[ -n "$BUILD_PRODUCTS_DEBUG_DIR" ]]; then
   mkdir -p "$BUILD_PRODUCTS_DEBUG_DIR"
-  cleanup_incomplete_xcodebuild_outputs
+  # cmux-rbf (#cm-123): Do not delete existing Debug app products before incremental build.
+  # reload_finalize handles cleanup if xcodebuild fails or is interrupted.
   XCODEBUILD_CLEANED_OUTPUTS=0
 fi
 
@@ -1694,7 +1689,8 @@ if [[ -n "$TAG" && "$APP_NAME" != "$SEARCH_APP_NAME" ]]; then
   TAG_APP_FINAL_PATH="$(dirname "$APP_PATH")/${APP_NAME}.app"
   TAG_APP_STAGING_PATH="$(dirname "$APP_PATH")/.${APP_NAME}.reload-$$.app"
   rm -rf "$TAG_APP_STAGING_PATH"
-  cp -R "$APP_PATH" "$TAG_APP_STAGING_PATH"
+  # cmux-rbf (#cm-123): Use clonefile copy (APFS CoW) to stage the tagged bundle
+  cp -cR "$APP_PATH" "$TAG_APP_STAGING_PATH" 2>/dev/null || cp -R "$APP_PATH" "$TAG_APP_STAGING_PATH"
   INFO_PLIST="$TAG_APP_STAGING_PATH/Contents/Info.plist"
   if [[ -f "$INFO_PLIST" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleName $APP_NAME" "$INFO_PLIST" 2>/dev/null \
@@ -1703,6 +1699,16 @@ if [[ -n "$TAG" && "$APP_NAME" != "$SEARCH_APP_NAME" ]]; then
       || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string $APP_NAME" "$INFO_PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$INFO_PLIST" 2>/dev/null \
       || /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string $BUNDLE_ID" "$INFO_PLIST"
+    # cmux-rbf (#cm-123): Stamp tagged extension point and URL types into staged Info.plist
+    /usr/libexec/PlistBuddy -c "Set :CMUXSidebarExtensionPointIdentifier ${BUNDLE_ID}.cmux.sidebar" "$INFO_PLIST" 2>/dev/null \
+      || /usr/libexec/PlistBuddy -c "Add :CMUXSidebarExtensionPointIdentifier string ${BUNDLE_ID}.cmux.sidebar" "$INFO_PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:0:CFBundleURLName ${BUNDLE_ID}.web" "$INFO_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:1:CFBundleURLName ${BUNDLE_ID}.auth" "$INFO_PLIST" 2>/dev/null || true
+    # cmux-rbf (#cm-123): Write tagged sidebar ExtensionKit declaration into staging
+    CMUX_SIDEBAR_EXTENSION_POINT_ID="${BUNDLE_ID}.cmux.sidebar" \
+      BUILT_PRODUCTS_DIR="$(dirname "$TAG_APP_STAGING_PATH")" \
+      CONTENTS_FOLDER_PATH="$(basename "$TAG_APP_STAGING_PATH")/Contents" \
+      "$PWD/scripts/write-sidebar-extension-point.sh"
     if [[ -n "${TAG_SLUG:-}" ]]; then
       APP_SUPPORT_DIR="$HOME/Library/Application Support/cmux"
       CMUXD_SOCKET="${APP_SUPPORT_DIR}/cmuxd-dev-${TAG_SLUG}.sock"
