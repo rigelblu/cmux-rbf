@@ -1517,6 +1517,21 @@ struct WorkspaceStatusEntrancesTests {
         #expect(outline.frame == hand.frame) // (#cm-109.7)
     } // (#cm-109.7)
 
+    /// The outline is Tom's Amber #7D6608 (decision of 2026-10-17): every AppKit copy is tinted with it on a light resting row,
+    /// and the SwiftUI hand reads the same constant, so both renderers draw one ink.
+    @Test func theOutlineInkIsAmberInBothRenderers() throws { // (#cm-109.7)
+        let amber = NSColor(srgbRed: 0x7D / 255, green: 0x66 / 255, blue: 0x08 / 255, alpha: 1) // (#cm-109.7)
+        let cell = try waitingHandCell(dark: false, isActive: false, standIn: "#C2C0CB") // (#cm-109.7)
+        let outline = try #require(cell.handOutlineForTesting) // (#cm-109.7)
+        #expect(outline.isHidden == false) // (#cm-109.7)
+        let copies = outline.subviews.compactMap { $0 as? NSImageView } // (#cm-109.7)
+        #expect(copies.count == waitingHandOutlineOffsets.count) // (#cm-109.7)
+        for copy in copies { // (#cm-109.7)
+            #expect(isSameColor(copy.contentTintColor, amber), "copy tinted \(String(describing: copy.contentTintColor))") // (#cm-109.7)
+        } // (#cm-109.7)
+        #expect(isSameColor(waitingHandOutlineInk, amber), "shared ink is \(waitingHandOutlineInk)") // (#cm-109.7)
+    } // (#cm-109.7)
+
     /// Scenario 81 (#cm-109.7): in Dark, a resting waiting row draws the hand in systemYellow with the outline hidden.
     @Test func theHandIsPlainYellowOnADarkRestingRow() throws { // (#cm-109.7)
         let cell = try waitingHandCell(dark: true, isActive: false, standIn: "#333846") // (#cm-109.7)
