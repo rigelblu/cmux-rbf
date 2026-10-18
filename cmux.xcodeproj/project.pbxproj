@@ -1753,6 +1753,7 @@
 		807310000000000000000002 /* FigmaTabMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000001 /* FigmaTabMark.swift */; };
 		807310000000000000000004 /* FigmaTabMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000003 /* FigmaTabMarkTests.swift */; };
 		807310000000000000000006 /* FigmaTabMarkWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000005 /* FigmaTabMarkWorkspaceTests.swift */; };
+		807315000000000000000002 /* FigmaTabToRightWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807315000000000000000001 /* FigmaTabToRightWorkspaceTests.swift */; };
 		807300000000000000000007 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
 		807300000000000000000008 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
 		807300000000000000000035 /* FigmaWrapperPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000006 /* FigmaWrapperPage.swift */; };
@@ -5722,6 +5723,7 @@
 		807310000000000000000001 /* FigmaTabMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaTabMark.swift; sourceTree = "<group>"; };
 		807310000000000000000003 /* FigmaTabMarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkTests.swift; sourceTree = "<group>"; };
 		807310000000000000000005 /* FigmaTabMarkWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkWorkspaceTests.swift; sourceTree = "<group>"; };
+		807315000000000000000001 /* FigmaTabToRightWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabToRightWorkspaceTests.swift; sourceTree = "<group>"; };
 		807300000000000000000006 /* FigmaWrapperPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPage.swift; sourceTree = "<group>"; };
 		807300000000000000000015 /* FigmaWrapperPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaWrapperPageTests.swift; sourceTree = "<group>"; };
 		10200F1E0000000000000008 /* FileContentChangeCoordinator+Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Panels/FileContentChangeCoordinator+Entry.swift"; sourceTree = "<group>"; };
@@ -11427,6 +11429,7 @@
 				807316000000000000000D01 /* FigmaFileListPersistenceTests.swift */,
 				807316000000000000001501 /* FigmaFileSubscriptionWorkspaceTests.swift */,
 				807316000000000000001601 /* FigmaButtonMenuWorkspaceTests.swift */,
+				807315000000000000000001 /* FigmaTabToRightWorkspaceTests.swift */,
 				80739000000000000000000B /* FigmaHeaderButtonWorkspaceTests.swift */,
 				807390000000000000000009 /* FigmaHeaderButtonTests.swift */,
 				807300000000000000000033 /* FigmaClickRouteTests.swift */,
@@ -15950,6 +15953,7 @@
 				807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */,
 				807310000000000000000004 /* FigmaTabMarkTests.swift in Sources */,
 				807310000000000000000006 /* FigmaTabMarkWorkspaceTests.swift in Sources */,
+				807315000000000000000002 /* FigmaTabToRightWorkspaceTests.swift in Sources */,
 				807300000000000000000008 /* FigmaWrapperPage.swift in Sources */,
 				807300000000000000000016 /* FigmaWrapperPageTests.swift in Sources */,
 				10200F1E0000000000000003 /* FileContentObserverTransferTests.swift in Sources */,

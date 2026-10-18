@@ -10,6 +10,8 @@
 "tabContext.closeOtherTabs" = "Close Other Tabs";
 "tabContext.newTerminalTabToRight" = "New Terminal Tab to Right";
 "tabContext.newBrowserTabToRight" = "New Browser Tab to Right";
+// cmux-rbf #cm-73.15
+"tabContext.newFigmaTabToRight" = "New Figma Tab to Right";
 "tabContext.reloadTab" = "Reload Tab";
 "tabContext.duplicateTab" = "Duplicate Tab";
 "tabContext.muteTab" = "Mute Tab";

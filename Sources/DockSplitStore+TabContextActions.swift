@@ -1,11 +1,19 @@
 import AppKit
 import Bonsplit
+import CmuxBrowser // cmux-rbf #cm-73.15
 import CmuxSettings
 import Foundation
 
 enum DockBatchCloseConfirmationPolicy: Sendable {
     case tabsRequiringConfirmation
     case allTabs
+}
+
+// cmux-rbf #cm-73.15: Figma is a context-menu creation kind, not a new persisted surface kind.
+enum DockContextSurfaceKind {
+    case terminal
+    case browser
+    case figma
 }
 
 extension DockSplitStore {
@@ -85,6 +93,8 @@ extension DockSplitStore {
                 anchorTabId: tab.id,
                 paneId: pane
             )
+        case .newFigmaToRight: // cmux-rbf #cm-73.15
+            createDockContextSurfaceToRight(kind: .figma, anchorTabId: tab.id, paneId: pane)
         case .newBrowserToRight:
             createDockContextSurfaceToRight(
                 kind: .browser,
@@ -265,10 +275,13 @@ extension DockSplitStore {
         )
     }
 
-    private func createDockContextSurfaceToRight(
-        kind: DockSurfaceKind,
+    // cmux-rbf #cm-73.15: Figma shares the Dock's neighbour insertion and focus path.
+    func createDockContextSurfaceToRight(
+        kind: DockContextSurfaceKind,
         anchorTabId: TabID,
-        paneId: PaneID
+        paneId: PaneID,
+        defaults: UserDefaults = .standard,
+        openExternally: (URL) -> Void = { _ = NSWorkspace.shared.open($0) }
     ) {
         let tabs = bonsplitController.tabs(inPane: paneId)
         guard let anchorIndex = tabs.firstIndex(where: {
@@ -280,15 +293,29 @@ extension DockSplitStore {
         let sourceBrowser = sourcePanelId.flatMap {
             browserPanel(for: $0)
         }
+        // cmux-rbf #cm-73.15: browser-off wins over the allowlist, as newFigmaSurface does.
+        let isFigma = kind == .figma
+        if isFigma {
+            guard isBrowserAvailable(), BrowserAvailabilitySettings.isEnabled(defaults: defaults) else { return }
+            guard BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(Workspace.figmaRecentFilesURL) else {
+                openExternally(Workspace.figmaRecentFilesURL)
+                return
+            }
+        }
         noteKeyboardFocusIntent(window: dockContextMenuWindow)
         guard let panelId = newSurface(
-            kind: kind,
+            kind: kind == .terminal ? .terminal : .browser,
             inPane: paneId,
+            url: isFigma ? Workspace.figmaRecentFilesURL : nil,
             sourcePanelId: sourcePanelId,
             focus: false,
-            preferredProfileID: sourceBrowser?.profileID,
-            websiteDataStore:
-                sourceBrowser?.explicitEphemeralWebsiteDataStoreForSibling
+            // cmux-rbf #cm-73.15: Figma passes no explicit profile/private store, as newFigmaSurface does.
+            preferredProfileID: isFigma ? nil : sourceBrowser?.profileID,
+            // cmux-rbf #cm-73.15: the same chrome and transparency as newFigmaSurface.
+            chromeVisibility: isFigma ? BrowserChromeVisibility(omnibarVisible: false) : .visible,
+            transparentBackground: isFigma,
+            allowsExternalBrowserFallback: !isFigma,
+            websiteDataStore: isFigma ? nil : sourceBrowser?.explicitEphemeralWebsiteDataStoreForSibling
         ),
         let newTabId = surfaceId(forPanelId: panelId) else {
             return
@@ -297,11 +324,16 @@ extension DockSplitStore {
             newTabId,
             toIndex: anchorIndex + 1
         )
+        // cmux-rbf #cm-73.15: publish the new neighbour before returning, as newFigmaSurface does.
+        if isFigma {
+            TerminalController.shared.publishSocketReadSnapshot()
+        }
         focusPanelFromDockInteraction(
             panelId,
             window: dockContextMenuWindow
         )
-        if let browser = browserPanel(for: panelId) {
+        // cmux-rbf #cm-73.15: a Figma tab has no address bar to focus.
+        if !isFigma, let browser = browserPanel(for: panelId) {
             _ = AppDelegate.shared?.focusBrowserAddressBar(in: browser)
         }
     }

@@ -10,6 +10,8 @@
 "tabContext.closeOtherTabs" = "他のタブを閉じる";
 "tabContext.newTerminalTabToRight" = "右側に新しいターミナルタブ";
 "tabContext.newBrowserTabToRight" = "右側に新しいブラウザータブ";
+// cmux-rbf #cm-73.15
+"tabContext.newFigmaTabToRight" = "右側に新しいFigmaタブ";
 "tabContext.reloadTab" = "タブを再読み込み";
 "tabContext.duplicateTab" = "タブを複製";
 "tabContext.muteTab" = "タブをミュート";

@@ -1474,6 +1474,15 @@ enum TabContextMenuBuilder {
             to: menu
         )
 
+        // cmux-rbf #cm-73.15: shown wherever the browser neighbour is shown.
+        addAction(
+            title: localized("tabContext.newFigmaTabToRight", defaultValue: "New Figma Tab to Right"),
+            action: .newFigmaToRight,
+            state: state,
+            target: target,
+            to: menu
+        )
+
         if state.isBrowser {
             menu.addItem(.separator())
             addAction(
@@ -1761,6 +1770,7 @@ enum TabContextMenuBuilder {
              .moveToRightPane,
              .newTerminalToRight,
              .newBrowserToRight,
+             .newFigmaToRight, // cmux-rbf #cm-73.15
              .reload,
              .duplicate,
              .toggleAudioMute,

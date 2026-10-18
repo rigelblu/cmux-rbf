@@ -13439,6 +13439,25 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         _ = reorderSurface(panelId: newPanel.id, toIndex: targetIndex)
     }
 
+    // cmux-rbf #cm-73.15: use the Figma creation gate and the browser neighbour's insertion gap.
+    func createFigmaToRight(
+        of anchorTabId: TabID,
+        inPane paneId: PaneID,
+        defaults: UserDefaults = .standard,
+        openExternally: (URL) -> Void = { _ = NSWorkspace.shared.open($0) }
+    ) {
+        let targetIndex = insertionIndexToRight(of: anchorTabId, inPane: paneId)
+        guard let panel = newFigmaSurface(
+            inPane: paneId,
+            focus: true,
+            defaults: defaults,
+            openExternally: openExternally
+        ) else { return }
+        // Design Focus can route this tab to the Figma side. Its insertion order belongs there.
+        guard self.paneId(forPanelId: panel.id) == paneId else { return }
+        _ = reorderSurface(panelId: panel.id, toIndex: targetIndex)
+    }
+
     private func createBrowserToRight(of anchorTabId: TabID, inPane paneId: PaneID, url: URL? = nil) {
         let targetIndex = insertionIndexToRight(of: anchorTabId, inPane: paneId)
         let sourceBrowser = panelIdFromSurfaceId(anchorTabId).flatMap { browserPanel(for: $0) }
@@ -15616,6 +15635,8 @@ extension Workspace: BonsplitDelegate {
             _ = moveSurface(panelId: panelId, to: .right)
         case .newTerminalToRight:
             createTerminalToRight(of: tab.id, inPane: pane)
+        case .newFigmaToRight: // cmux-rbf #cm-73.15
+            createFigmaToRight(of: tab.id, inPane: pane)
         case .newBrowserToRight:
             createBrowserToRight(of: tab.id, inPane: pane)
         case .reload:
