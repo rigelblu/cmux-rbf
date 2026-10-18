@@ -95,8 +95,10 @@ func waitingHandYellow(for colorScheme: ColorScheme) -> NSColor {
     WindowAppearanceSnapshot.resolvedColor(.systemYellow, for: colorScheme)
 }
 
-/// The dark ink the waiting hand's outline is drawn in.
-let waitingHandOutlineInk = NSColor(srgbRed: 0x2B / 255, green: 0x24 / 255, blue: 0, alpha: 1)
+/// The ink the waiting hand's outline is drawn in: Tom's palette Amber, `#7D6608`, on every row (decision of
+/// 2026-10-17). It is softer than the near-black it replaced and no longer clears 3:1 by itself; the outline
+/// only sets the hand off from the row.
+let waitingHandOutlineInk = NSColor(srgbRed: 0x7D / 255, green: 0x66 / 255, blue: 0x08 / 255, alpha: 1)
 
 /// The outline is the hand drawn eight more times under the yellow one, each copy 0.5 pt away.
 let waitingHandOutlineOffsets: [CGSize] = [
