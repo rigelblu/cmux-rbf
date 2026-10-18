@@ -298,12 +298,12 @@ struct FigmaHeaderButtonWorkspaceTests {
     }
 
     /// The workspace's header list as the app builds it: the default buttons, resolved.
-    private func applyDefaultHeaderButtons(to workspace: Workspace) throws -> URL {
+    private func applyDefaultHeaderButtons(to workspace: Workspace, config: String = "{}") throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-figma-header-list-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let configPath = root.appendingPathComponent("cmux.json")
-        try "{}".write(to: configPath, atomically: true, encoding: .utf8)
+        try config.write(to: configPath, atomically: true, encoding: .utf8)
         let store = CmuxConfigStore(globalConfigPath: configPath.path, localConfigPath: nil, startFileWatchers: false)
         store.loadAll()
         workspace.applySurfaceTabBarButtons(
@@ -320,8 +320,8 @@ struct FigmaHeaderButtonWorkspaceTests {
         workspace.bonsplitController.configuration.appearance.splitButtons.map(\.id)
     }
 
-    @Test("headerClickAddsOneFigmaTabInThatPane: the header's own route, from the button's id to a tab in the clicked pane")
-    func headerClickAddsOneFigmaTabInThatPane() throws {
+    @Test("headerClickOpensMenuAndRecentsAddsOneTab: the header's own route, from the button's id to a tab in the clicked pane")
+    func headerClickOpensMenuAndRecentsAddsOneTab() throws {
         try withFixture { f in
             let root = try applyDefaultHeaderButtons(to: f.workspace)
             defer { try? FileManager.default.removeItem(at: root) }
@@ -334,13 +334,39 @@ struct FigmaHeaderButtonWorkspaceTests {
             let beforeClicked = f.tabs(in: clickedPane).count
             let beforeOther = f.tabs(in: other).count
 
-            f.workspace.splitTabBar(f.workspace.bonsplitController, didRequestCustomAction: "cmux.newFigma", inPane: clickedPane)
-
+            // cmux-rbf #cm-73.16: Bonsplit requests the menu, and Recents adds the tab.
+            let menu = try #require(f.workspace.splitTabBar(f.workspace.bonsplitController, menuForCustomAction: "cmux.newFigma", inPane: clickedPane))
+            let recents = try #require(menu.items.firstIndex { $0.title == "Recents…" })
+            menu.performActionForItem(at: recents)
             #expect(f.tabs(in: clickedPane).count == beforeClicked + 1)
             #expect(f.tabs(in: other).count == beforeOther)
             let made = try #require(f.workspace.panels.values.compactMap { $0 as? BrowserPanel }.first)
             #expect(f.loading(made) == Self.recents)
             #expect(!made.isOmnibarVisible)
+        }
+    }
+
+    // cmux-rbf #cm-73.16: R2, the built-in action identifies this menu even with a user-defined id.
+    @Test func customIDFigmaButtonGetsTheMenu() throws {
+        try withFixture { f in
+            let root = try applyDefaultHeaderButtons(to: f.workspace, config: #"{"ui":{"surfaceTabBar":{"buttons":[{"id":"figma","builtin":"cmux.newFigma"}]}}}"#)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let button = try #require(f.workspace.bonsplitController.configuration.appearance.splitButtons.first { $0.id == "figma" })
+            #expect(button.activatesOnMouseDown)
+            #expect(button.tooltip == "Figma")
+            let menu = try #require(f.workspace.splitTabBar(f.workspace.bonsplitController, menuForCustomAction: "figma", inPane: f.firstPane))
+            #expect(menu.items.contains { $0.title == "Recents…" })
+        }
+    }
+
+    // cmux-rbf #cm-73.16: programmatic custom-action dispatch retains the one-step fallback.
+    @Test func customIDFigmaActionFallsBackToRecents() throws {
+        try withFixture { f in
+            let root = try applyDefaultHeaderButtons(to: f.workspace, config: #"{"ui":{"surfaceTabBar":{"buttons":[{"id":"figma","builtin":"cmux.newFigma"}]}}}"#)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let before = f.tabCount
+            f.workspace.splitTabBar(f.workspace.bonsplitController, didRequestCustomAction: "figma", inPane: f.firstPane)
+            #expect(f.tabCount == before + 1)
         }
     }
 

@@ -474,6 +474,8 @@ extension BonsplitConfiguration {
         public var pairStacked: String
         // cmux-rbf #cm-73.2a
         public var pairEqualize: String
+        /// cmux-rbf #cm-73.16: tooltip for leaving the host's Design Focus mode.
+        public var pairExit: String
 
         public static let `default` = SplitButtonTooltips()
 
@@ -484,7 +486,8 @@ extension BonsplitConfiguration {
             splitDown: String = "Split Down", // cmux-rbf #cm-73.2a
             pairSideBySide: String = "Side by Side", // cmux-rbf #cm-73.2a
             pairStacked: String = "Stacked", // cmux-rbf #cm-73.2a
-            pairEqualize: String = "Equalize Splits" // cmux-rbf #cm-73.2a
+            pairEqualize: String = "Equalize Splits", // cmux-rbf #cm-73.2a
+            pairExit: String = "Exit Design Focus" // cmux-rbf #cm-73.16
         ) {
             self.newTerminal = newTerminal
             self.newBrowser = newBrowser
@@ -493,6 +496,7 @@ extension BonsplitConfiguration {
             self.pairSideBySide = pairSideBySide // cmux-rbf #cm-73.2a
             self.pairStacked = pairStacked // cmux-rbf #cm-73.2a
             self.pairEqualize = pairEqualize // cmux-rbf #cm-73.2a
+            self.pairExit = pairExit // cmux-rbf #cm-73.16
         }
     }
 

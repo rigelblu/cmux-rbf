@@ -14,9 +14,14 @@ extension SettingsWindowPresenter {
     func deliverNavigation(reusedExistingWindow: Bool) {
         guard let target = pendingNavigationTarget else { return }
         if reusedExistingWindow && isContentReadyForNavigation {
+            // cmux-rbf #cm-73.16: carry the row through immediate navigation too.
+            let anchor = pendingNavigationAnchorID
+            let highlight = pendingNavigationHighlight
             pendingNavigationTarget = nil
+            pendingNavigationAnchorID = nil
+            pendingNavigationHighlight = false
             navigationDeliveryGeneration &+= 1
-            SettingsNavigationRequest.post(target)
+            SettingsNavigationRequest.post(target, anchorID: anchor, highlight: highlight)
         }
     }
 
@@ -28,18 +33,26 @@ extension SettingsWindowPresenter {
     func deliverPendingNavigationAfterContentAppears() {
         isContentReadyForNavigation = true
         guard let target = pendingNavigationTarget else { return }
+        // cmux-rbf #cm-73.16: capture before the deferred hop; later requests may supersede it.
+        let anchor = pendingNavigationAnchorID
+        let highlight = pendingNavigationHighlight
         pendingNavigationTarget = nil
+        pendingNavigationAnchorID = nil
+        pendingNavigationHighlight = false
         navigationDeliveryGeneration &+= 1
         let generation = navigationDeliveryGeneration
         Task { @MainActor in
             guard self.navigationDeliveryGeneration == generation else { return }
-            SettingsNavigationRequest.post(target)
+            SettingsNavigationRequest.post(target, anchorID: anchor, highlight: highlight)
         }
     }
 
     func consumePendingNavigationTarget() -> SettingsNavigationTarget? {
         let target = pendingNavigationTarget
         pendingNavigationTarget = nil
+        // cmux-rbf #cm-73.16: consuming a pending target also consumes its row.
+        pendingNavigationAnchorID = nil
+        pendingNavigationHighlight = false
         return target
     }
 }

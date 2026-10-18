@@ -279,6 +279,10 @@ extension Workspace {
             environment: workspaceEnvironment.isEmpty ? nil : workspaceEnvironment
         )
         snapshot.captureTodoState(from: self)
+        // cmux-rbf #cm-73.16: omit empty workspace lists like the checklist.
+        snapshot.figmaFiles = figmaFiles.entries.isEmpty ? nil : figmaFiles.entries.map {
+            SessionFigmaFileSnapshot(link: $0.link.absoluteString, view: $0.view.rawValue, name: $0.name)
+        }
         snapshot.dock = _dockSplit?.sessionSnapshot(
             includeScrollback: includeScrollback,
             restorableAgentIndex: restorableAgentIndex,
@@ -298,6 +302,8 @@ extension Workspace {
         startupRestoreCommitOwner: WorkspaceTerminalStartupRestoreCommitOwner = .workspaceTopology,
         deferBrowserPanels: Bool = false
     ) -> [UUID: UUID] {
+        // cmux-rbf #cm-73.16: new restore owns new per-tab baselines.
+        figmaFileObservations.removeAll()
         sessionRestoreLayoutSuppressionDepth += 1
         defer {
             sessionRestoreLayoutSuppressionDepth = max(sessionRestoreLayoutSuppressionDepth - 1, 0)
@@ -419,6 +425,8 @@ extension Workspace {
         isMuted = snapshot.isMuted ?? false
         groupId = snapshot.groupId
         restoreTodoState(from: snapshot)
+        // cmux-rbf #cm-73.16: restore order before queued browser emissions arrive.
+        restoreFigmaFiles(from: snapshot)
 
         // Status entries and agent PIDs are ephemeral runtime state tied to running
         // processes (e.g. claude_code "Running"). Don't restore them across app
@@ -2522,6 +2530,10 @@ extension Workspace {
 
         if let browserSnapshot = snapshot.browser,
            let browserPanel = browserPanel(for: panelId) {
+            // cmux-rbf #cm-73.16: also reached when a deferred tab is first selected.
+            let restoredAddress = browserSnapshot.urlString.flatMap { URL(string: $0) }
+            let showsAddressBar = browserSnapshot.chromeVisibility?.isOmnibarVisible ?? browserSnapshot.omnibarVisible ?? true
+            beginFigmaFileRestore(panelID: panelId, address: showsAddressBar ? nil : restoredAddress)
             let pageZoom = CGFloat(max(0.25, min(5.0, browserSnapshot.pageZoom)))
             if pageZoom.isFinite {
                 _ = browserPanel.setPageZoomFactor(pageZoom)
@@ -2910,14 +2922,16 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     /// Durable canvas-layout state (pane frames, z-order). Lives on the
     /// workspace so it survives canvas view remounts and workspace switches.
     let canvasModel = CanvasModel(metricsProvider: { CanvasLayoutSettings.currentMetrics() })
-    private struct SurfaceTabBarExecutableButton {
+    // cmux-rbf #cm-73.16: menu lookup shares the resolved action registry.
+    struct SurfaceTabBarExecutableButton {
         let button: CmuxSurfaceTabBarButton
         let builtInAction: CmuxSurfaceTabBarBuiltInAction?
         let workspaceCommand: CmuxResolvedCommand?
         let terminalCommandSourcePath: String?
     }
 
-    private var surfaceTabBarCommandButtons: [String: SurfaceTabBarExecutableButton] = [:]
+    // cmux-rbf #cm-73.16: read by the header-menu delegate extension.
+    var surfaceTabBarCommandButtons: [String: SurfaceTabBarExecutableButton] = [:]
     private var surfaceTabBarButtonSourcePath: String?
     private var surfaceTabBarButtonGlobalConfigPath: String?
     private var surfaceTabBarButtonConfiguration: SurfaceTabBarButtonConfiguration?
@@ -3330,6 +3344,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     let cloudBindingState = WorkspaceCloudBindingState()
     /// Todo lifecycle state: manual status override + persisted checklist (all logic lives in `Workspace+Todos.swift`).
     let todoState = WorkspaceTodoState()
+    // cmux-rbf #cm-73.16: workspace-owned list and per-tab showing baselines.
+    var figmaFiles = FigmaFileList()
+    var figmaFileObservations: [UUID: FigmaFileObservation] = [:]
     let sidebarProcessTitleObservation: WorkspaceSidebarProcessTitleObservationModel
     let nativeSSHConnectionBroker: NativeSSHConnectionBroker
     var restoredTerminalScrollbackByPanelId: [UUID: String] = [:]
@@ -3691,6 +3708,10 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             pairStacked: String(localized: "workspace.tooltip.pairStacked", defaultValue: "Stacked"),
             pairEqualize: KeyboardShortcutSettings.Action.equalizeSplits.tooltip(
                 String(localized: "shortcut.equalizeSplits.label", defaultValue: "Equalize Splits")
+            ),
+            // cmux-rbf #cm-73.16
+            pairExit: KeyboardShortcutSettings.Action.toggleDesignFocus.tooltip(
+                String(localized: "workspace.tooltip.pairExit", defaultValue: "Exit Design Focus")
             )
         )
     }
@@ -5175,10 +5196,18 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         .receive(on: DispatchQueue.main)
         .sink { [weak self, weak browserPanel] output in
             // cmux-rbf `#cm-73.10`: binds the address too and names the icon `ownFavicon`; the Figma tab mark below needs both.
-            let ((_, address, isLoading, ownFavicon), isMuted) = output
+            // cmux-rbf #cm-73.16: keep the emitted title paired with its emitted address.
+            let ((pageTitle, address, isLoading, ownFavicon), isMuted) = output
             guard let self = self,
                   let browserPanel = browserPanel,
                   let tabId = self.surfaceIdFromPanelId(browserPanel.id) else { return }
+            // cmux-rbf #cm-73.16: only workspace subscriptions record; Dock panels have none.
+            self.recordFigmaFile(
+                panelID: browserPanel.id,
+                address: address,
+                title: pageTitle,
+                showsAddressBar: browserPanel.isOmnibarVisible
+            )
             self.publishBrowserOpenTabSuggestion(for: browserPanel)
             guard let existing = self.bonsplitController.tab(tabId) else { return }
             let nextTitle = browserPanel.displayTitle
@@ -5343,7 +5372,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         agentSessionPanelCallbackIds.remove(panelId)
     }
 
-    func discardBrowserPanelSubscription(panelId _: UUID, panel: (any Panel)?) {
+    func discardBrowserPanelSubscription(panelId: UUID, panel: (any Panel)?) {
+        // cmux-rbf #cm-73.16: close, teardown and detach all discard the tab's showing state.
+        figmaFileObservations.removeValue(forKey: panelId)
         guard let browserPanel = panel as? BrowserPanel else { return }
         browserPanel.onMediaActivityChanged = nil
     }
@@ -15408,7 +15439,7 @@ extension Workspace: BonsplitDelegate {
             case .newTerminal, .newBrowser:
                 break
             case .newFigma:
-                // cmux-rbf `#cm-73.9`: a Figma tab in the pane whose header was clicked.
+                // cmux-rbf #cm-73.16: menu-capable presses are handled in Bonsplit; keep programmatic dispatch working.
                 _ = newFigmaSurface(inPane: pane)
             case .splitLeft, .splitUp, .splitRight, .splitDown:
                 guard let selectedTab = bonsplitController.selectedTab(inPane: pane),
@@ -15535,6 +15566,12 @@ extension Workspace: BonsplitDelegate {
     }
 
     // cmux-rbf #cm-73.2a
+    // cmux-rbf #cm-73.16
+    func splitTabBarDidRequestExitPair(_ controller: BonsplitController) {
+        guard isDesignFocusActive else { return }
+        _ = toggleDesignFocus()
+    }
+
     func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController) {
         _ = equalizeDesignFocusPair()
     }

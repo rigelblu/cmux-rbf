@@ -13,7 +13,7 @@ extension Workspace {
     /// Figma's sign-in page.
     static let figmaRecentFilesURL = URL(string: "https://www.figma.com/files/recent")!
 
-    /// Adds a Figma tab to `paneId`, showing Figma's recent files, with no
+    /// Adds a Figma tab to `paneId`, showing the requested address, with no
     /// address bar and the see-through background a Figma pane has. Every click
     /// adds one: a second Figma tab is wanted (Tom, 2026-10-12, Q15).
     ///
@@ -35,13 +35,13 @@ extension Workspace {
     @discardableResult
     func newFigmaSurface(
         inPane paneId: PaneID,
+        address: URL = Workspace.figmaRecentFilesURL, // cmux-rbf #cm-73.16
         focus: Bool? = nil,
         insertAtEnd: Bool = false,
         defaults: UserDefaults = .standard,
         openExternally: (URL) -> Void = { _ = NSWorkspace.shared.open($0) }
     ) -> BrowserPanel? {
         guard BrowserAvailabilitySettings.isEnabled(defaults: defaults) else { return nil }
-        let address = Self.figmaRecentFilesURL
         guard BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(address) else {
             openExternally(address)
             return nil

@@ -1,4 +1,5 @@
 import Foundation
+import AppKit // cmux-rbf #cm-73.16: native header menus.
 
 /// Protocol for receiving callbacks about tab bar events
 @MainActor
@@ -60,6 +61,9 @@ public protocol BonsplitDelegate: AnyObject {
     /// The `kind` string identifies the type of tab (e.g. "terminal", "browser").
     func splitTabBar(_ controller: BonsplitController, didRequestNewTab kind: String, inPane pane: PaneID)
 
+    /// cmux-rbf #cm-73.16: supplies a menu anchored to the custom header button on press.
+    func splitTabBar(_ controller: BonsplitController, menuForCustomAction identifier: String, inPane pane: PaneID) -> NSMenu?
+
     /// Called when the user clicks a host-defined action in the tab bar.
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID)
 
@@ -69,6 +73,9 @@ public protocol BonsplitDelegate: AnyObject {
 
     /// cmux-rbf #cm-73.2a: the pair-zoom header's 50/50 button was pressed.
     func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController)
+
+    /// cmux-rbf #cm-73.16: the pair header's exit control was pressed.
+    func splitTabBarDidRequestExitPair(_ controller: BonsplitController)
 
     /// Called when the user triggers an action from a tab's context menu.
     func splitTabBar(_ controller: BonsplitController, didRequestTabContextAction action: TabContextAction, for tab: Tab, inPane pane: PaneID)
@@ -101,6 +108,9 @@ public protocol BonsplitDelegate: AnyObject {
 // MARK: - Default Implementations (all methods optional)
 
 public extension BonsplitDelegate {
+    // cmux-rbf #cm-73.16: existing hosts keep their click behavior.
+    func splitTabBar(_ controller: BonsplitController, menuForCustomAction identifier: String, inPane pane: PaneID) -> NSMenu? { nil }
+
     func splitTabBar(_ controller: BonsplitController, shouldCreateTab tab: Tab, inPane pane: PaneID) -> Bool { true }
     func splitTabBar(_ controller: BonsplitController, shouldCloseTab tab: Tab, inPane pane: PaneID) -> Bool { true }
     func splitTabBar(_ controller: BonsplitController, didCreateTab tab: Tab, inPane pane: PaneID) {}
@@ -117,6 +127,7 @@ public extension BonsplitDelegate {
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation) {} // cmux-rbf #cm-73.2a
     func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController) {} // cmux-rbf #cm-73.2a
+    func splitTabBarDidRequestExitPair(_ controller: BonsplitController) {} // cmux-rbf #cm-73.16
     func splitTabBar(_ controller: BonsplitController, didRequestTabContextAction action: TabContextAction, for tab: Tab, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestTabMoveToDestination destinationId: String, for tab: Tab, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didChangeGeometry snapshot: LayoutSnapshot) {}

@@ -85,7 +85,8 @@ struct FigmaHeaderButtonTests {
         let button = try #require(store.surfaceTabBarButtons.first { $0.action == .builtIn(.newFigma) })
         let handed = button.bonsplitActionButton(configSourcePath: nil, globalConfigPath: store.globalConfigPath)
         #expect(handed.action == .custom("cmux.newFigma"))
-        #expect(handed.tooltip == "New Tab (Figma)")
+        // cmux-rbf #cm-73.16: the header names its menu; the palette keeps New Tab (Figma).
+        #expect(handed.tooltip == "Figma")
     }
 
     @Test("defaultButtonDrawsFigmasImage: the button the header is handed carries image data, not a symbol, in the default list and in a project's own list")
