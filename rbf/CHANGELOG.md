@@ -6,6 +6,37 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.33.0 (2026-10-18) — #cm-109.2, #cm-109.3, #cm-109.4, #cm-109.6, #cm-109.7, #cm-119.1, #cm-121, with #cm-73 in progress
+
+*Use my own list of workspace statuses, see how far along each one is from its glyph, and read that glyph at a glance.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-14 - feat | use my own list of workspace statuses, in my words and my order (#cm-109.2). Write `workspaceStatuses` in `~/.config/cmux/cmux.json`: each entry has an `id`, a `name`, the cmux status it behaves as (`extends`: `todo`, `working`, `needs-attention`, `review` or `done`), and optionally a `color`. The Status menu, the glyph's popover, the todo pane's picker, the command palette and the Cycle Status key (⌘⇧;) all offer your list, in your order. Setting a status that names a color puts that color on the workspace, so you no longer recolor a workspace by hand to say its stage
+  - `cmux workspace status set <id>` takes your ids; `cmux workspace status list` prints the list in use, each status's color, where the list came from and any problems
+  - A mistake in the file skips only the bad entry, and a pill in the sidebar's footer names it. A file that cannot be read keeps the last list that worked, across restarts
+  - Without `workspaceStatuses`, cmux's own five statuses work as before
+- 2026-10-17 - feat | see how far along each status is, from an icon beside it like Linear's (#cm-109.3). An entry's `icon` picks one of eight shapes: `dotted-ring`, `ring`, `quarter`, `half`, `three-quarters`, `full`, `check`, `pause`. It draws in the status's color in the row's glyph, the glyph's popover, the todo pane's header and the Status menu. An entry with no icon draws the glyph of the status it extends
+- 2026-10-17 - feat | give a status any glyph I want, such as a Zzz for Snooze (#cm-109.6). `icon` also takes the lowercase name of any SF Symbol on the Mac, such as `moon.zzz.fill`, drawn in the status's color at the size of the shapes beside it
+- feat (in progress, #cm-73) | Figma in a cmux pane. These slices ride along in this build for dogfood; #cm-73 is released on its own once all its slices are done:
+  - read a Figma design in a pane with no browser around it, and have an agent move it: `cmux figma open <link>`, `cmux figma goto <frame id>` (#cm-73.1)
+  - click a Figma link an agent wrote, in a terminal, markdown view or agent session view, and have it open in the Figma pane (#cm-73.8)
+  - a design the agent makes lands in the Figma folder you set: Settings › Automation › Figma Default Folder, `figma.defaultFolder`, `cmux figma folder` (#cm-73.6)
+  - Figma's icon on a Figma pane's tab (#cm-73.10); a Figma button in every pane header, the palette row "New Tab (Figma)" and the action `cmux.newFigma` (#cm-73.9)
+  - a 2 pt accent line on a Figma pane's top edge until the design is usable (#cm-73.11); a hidden Figma pane stays loaded, so coming back needs no reload (#cm-73.14)
+  - Design Focus: ⌥⇧⌘↩ or the palette row "Toggle Design Focus" shows only the agent's terminal and the Figma pane, side by side or stacked; ⌥⇧⌘\ flips the layout; the same key puts everything back (#cm-73.2a)
+
+## 🟠⋯ Changed for End Users
+- 2026-10-17 - feat | see what's happening in a workspace as a state, never as a status (#cm-109.4). With a list in use, an agent waiting, an agent running and uncommitted changes are states, not statuses: a wait shows a raised hand in the row's state slot, a running agent shows today's spinner, uncommitted changes keep the branch's `*`. The Auto row reads "Auto — Future", "Auto — Review" or "Auto — Done", never "Needs Attention" or "Working", and no picker offers those two. A status you pick during a wait stays after it. Cycle Status starts from where the state points. Without a list, states read as before
+- 2026-10-17 - fix | read a workspace's status glyph, and a waiting agent's hand, at a glance (#cm-109.7). Every status glyph clears 3:1 contrast against what it sits on, in every place it draws, a dimmed Done row included; only a color that falls short changes, and only as far as it must, keeping its hue. The waiting hand is bright yellow, with a thin Amber (`#7D6608`) outline wherever yellow alone is under 3:1
+
+## 🟠⋯ Fixed for End Users
+- 2026-10-11 - fix | change a setting without losing my cmux.json when the file has a typo in it (#cm-119.1). A save from Settings now reads the file first; a file it cannot parse is kept and the save fails with an error naming it. A change another program made is kept too
+- 2026-10-14 - fix | build and install cmux RBF again after macOS 27.0.1 (#cm-121)
+
+## 🟠⋯ Known Issues
+- The right-click Status menu draws no item images on macOS 27.0.1, so it shows no glyphs there (#cm-109.5, backlog)
+- Released on Tom's word of 2026-10-18, "Defer all": 66 verification scenarios of #cm-109.2–.4 are deferred, not run in the app; the automated suites are their only proof. Human Scenario 52 (do the glyphs tell how far along a workspace is, after a day) runs the day after install
+
 # 🔵⋯ v0.32.0 (2026-10-11) — #cm-106.1, #cm-113
 
 *Organize workspace groups inside larger groups while keeping their anchor workspaces.*
