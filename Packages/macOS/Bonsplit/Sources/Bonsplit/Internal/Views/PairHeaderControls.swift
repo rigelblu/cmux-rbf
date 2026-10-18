@@ -2,9 +2,9 @@
 import AppKit
 import SwiftUI
 
-/// The two controls Design Focus shows at the right end of the pair header the pointer is over.
+/// cmux-rbf #cm-73.16: arrangement, equalize and exit controls on the hovered pair header.
 enum PairHeaderControls {
-    /// The 50/50 glyph's center sits this far from the pane's right edge, where cmux's last header button sits.
+    /// cmux-rbf #cm-73.16: the last glyph's center sits this far from the pane's right edge.
     static let glyphCenterFromTrailing: CGFloat = 17.5
     /// The segmented control's right edge sits this far left of the 50/50 glyph's center.
     static let segmentedTrailingGapFromGlyphCenter: CGFloat = 13.5
@@ -13,7 +13,7 @@ enum PairHeaderControls {
     /// The AppKit small segmented control, two segments: 54 x 20 pt in Light.
     static let segmentedSize = CGSize(width: 54, height: 20)
 
-    /// Space between the pane's right edge and the 50/50 button's hit area, which centers the glyph on
+    /// cmux-rbf #cm-73.16: space between the pane's right edge and the last button's hit area, centering it on
     /// `glyphCenterFromTrailing`.
     static var buttonTrailingPadding: CGFloat {
         glyphCenterFromTrailing - glyphButtonWidth / 2
@@ -55,7 +55,7 @@ enum PairHeaderControls {
     }
 }
 
-/// The segmented control and the 50/50 button, drawn over the right end of the hovered header.
+/// cmux-rbf #cm-73.16: arrangement, 50/50 and exit, drawn at the right of the hovered header.
 struct PairHeaderControlsView: View {
     let orientation: SplitOrientation
     let appearance: BonsplitConfiguration.Appearance
@@ -65,6 +65,7 @@ struct PairHeaderControlsView: View {
     let liveOrientation: () -> SplitOrientation?
     let onChoose: (SplitOrientation) -> Void
     let onEqualize: () -> Void
+    let onExit: () -> Void // cmux-rbf #cm-73.16
 
     var body: some View {
         HStack(spacing: PairHeaderControls.segmentedSpacing) {
@@ -91,6 +92,10 @@ struct PairHeaderControlsView: View {
             .buttonStyle(PairEqualizeButtonStyle(appearance: appearance))
             .safeHelp(tooltips.pairEqualize)
             .accessibilityIdentifier("paneTabBarControl.pairEqualize")
+
+            // cmux-rbf #cm-73.16: native control permits the same runtime press test as the segmented control.
+            PairHeaderExitButton(tooltip: tooltips.pairExit, appearance: appearance, iconScale: iconScale, onExit: onExit)
+                .frame(width: PairHeaderControls.glyphButtonWidth, height: barHeight)
         }
         .padding(.trailing, PairHeaderControls.buttonTrailingPadding)
         .frame(height: barHeight)

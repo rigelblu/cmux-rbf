@@ -1049,6 +1049,9 @@ struct CmuxSurfaceTabBarButton: Codable, Sendable, Hashable, Identifiable {
             }
         }()
 
+        // cmux-rbf #cm-73.16: a person's custom button id does not change the built-in action.
+        let isFigmaButton: Bool
+        if case .builtIn(.newFigma) = action { isFigmaButton = true } else { isFigmaButton = false }
         return BonsplitConfiguration.SplitActionButton(
             id: id,
             icon: (icon ?? action.defaultButtonIcon).bonsplitIcon(
@@ -1056,8 +1059,10 @@ struct CmuxSurfaceTabBarButton: Codable, Sendable, Hashable, Identifiable {
                 globalConfigPath: globalConfigPath,
                 allowProjectLocalImage: allowProjectLocalIcon
             ),
-            tooltip: tooltip ?? title ?? terminalCommand,
-            action: bonsplitAction
+            // cmux-rbf #cm-73.16: only the Figma header action opens on press.
+            tooltip: isFigmaButton ? (tooltip ?? String(localized: "figma.menu.tooltip", defaultValue: "Figma")) : (tooltip ?? title ?? terminalCommand),
+            action: bonsplitAction,
+            activatesOnMouseDown: isFigmaButton
         )
     }
 
@@ -2393,7 +2398,8 @@ final class CmuxConfigStore: ObservableObject {
                 id: button.id,
                 title: button.title ?? entry.title,
                 icon: button.icon ?? entry.icon,
-                tooltip: button.tooltip ?? entry.tooltip ?? entry.title,
+                // cmux-rbf #cm-73.16: leave Figma's default tooltip to the button; preserve explicit overrides.
+                tooltip: button.tooltip ?? entry.tooltip ?? (entry.action == .builtIn(.newFigma) ? nil : entry.title),
                 action: entry.action,
                 confirm: button.confirm ?? entry.confirm,
                 terminalCommandTarget: button.terminalCommandTarget ?? entry.terminalCommandTarget,

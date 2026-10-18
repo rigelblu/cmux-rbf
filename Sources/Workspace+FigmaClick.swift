@@ -108,7 +108,8 @@ extension Workspace {
     /// A tab restored after a restart and not yet shown is a
     /// `DeferredBrowserPanel`, not a `BrowserPanel`: it counts too, read from the
     /// session snapshot it holds.
-    private func figmaClickPanes() -> [FigmaClickRoute.Pane] {
+    // cmux-rbf #cm-73.16: shared reading-order lookup for the header menu.
+    func figmaClickPanes() -> [FigmaClickRoute.Pane] {
         var found: [FigmaClickRoute.Pane] = []
         for paneId in spatiallyOrderedPaneIds {
             for surfaceId in surfaceIdsInTabOrder(inPaneId: paneId) {
@@ -133,7 +134,8 @@ extension Workspace {
     /// follows `open` on the write**: a link that names no frame needs no page,
     /// so a failed write is ignored; a link that names a frame cannot open
     /// without it, and the caller opens the link as it did before.
-    private func figmaClickDestination(
+    // cmux-rbf #cm-73.16: shared read-view installation and URL policy for the header menu.
+    func figmaClickDestination(
         for link: URL,
         node: String?,
         page: URL,

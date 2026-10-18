@@ -4688,6 +4688,18 @@ final class BrowserPanel: Panel, ObservableObject {
         webViewCancellables.removeAll()
     }
 
+    // cmux-rbf #cm-73.16: document observations publish through the same seam in KVO and integration tests.
+    func publishObservedDocumentURL(_ observedURL: URL?) {
+        currentURL = Self.remoteProxyDisplayURL(for: observedURL) ?? observedURL
+    }
+
+    // cmux-rbf #cm-73.16: keep a nonempty title while WebKit clears it during navigation.
+    func publishObservedDocumentTitle(_ title: String?) {
+        let trimmed = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        pageTitle = trimmed
+    }
+
     private func setupObservers(for webView: WKWebView) {
         let observedWebViewInstanceID = webViewInstanceID
         let observedWebViewObservationGeneration = webViewObservationGeneration
@@ -4709,7 +4721,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 self.designModeController.webViewURLDidChange(to: observedURL)
                 // cmux-rbf `#cm-73.9`: Figma opens a file from its file list by changing the address with no page load.
                 let addressBeforeChange = self.currentURL
-                self.currentURL = Self.remoteProxyDisplayURL(for: observedURL) ?? observedURL
+                self.publishObservedDocumentURL(observedURL) // cmux-rbf #cm-73.16
                 self.collapseFigmaEditorChromeAfterAddressChange(from: addressBeforeChange, in: webView)
                 self.refreshBackgroundAppearance()
                 GlobalSearchCoordinator.shared.captureBrowserPanel(self)
@@ -4724,9 +4736,8 @@ final class BrowserPanel: Panel, ObservableObject {
                 // Keep showing the last non-empty title while the new navigation is loading.
                 // WebKit often clears title to nil/"" during reload/navigation, which causes
                 // a distracting tab-title flash (e.g. to host/URL). Only accept non-empty titles.
-                let trimmed = (webView.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { return }
-                self.pageTitle = trimmed
+                // cmux-rbf #cm-73.16: publish by the same document-observation path.
+                self.publishObservedDocumentTitle(webView.title)
                 GlobalSearchCoordinator.shared.captureBrowserPanel(self)
             }
         }

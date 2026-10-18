@@ -1,6 +1,7 @@
 // cmux-rbf #cm-73.2a
 import AppKit
 import Testing
+import SwiftUI // cmux-rbf #cm-73.16
 @testable import Bonsplit
 
 @Suite
@@ -573,6 +574,81 @@ struct PairZoomTests {
         #expect(internal_.hoveredPairHeaderPanes.isEmpty)
     }
 
+    // cmux-rbf #cm-73.16
+    @Test @MainActor func exitRequestReachesHostOnlyInPairMode() {
+        let controller = BonsplitController()
+        let spy = PairArrangementDelegateSpy()
+        controller.delegate = spy
+        controller.requestPairExit()
+        #expect(spy.exitCount == 0)
+        let p1 = controller.focusedPaneId!
+        let p2 = controller.splitPane(p1, orientation: .horizontal, withTab: Bonsplit.Tab(title: "T2"))!
+        #expect(controller.setPairZoom(firstPane: p1, secondPane: p2, orientation: .horizontal))
+        controller.requestPairExit()
+        #expect(spy.exitCount == 1)
+    }
+
+    // cmux-rbf #cm-73.16: inspect native controls mounted by the mode header.
+    @Test @MainActor func hoveredHeaderHasExitControl() throws {
+        let controller = BonsplitController()
+        let spy = PairArrangementDelegateSpy()
+        controller.delegate = spy
+        let p1 = controller.focusedPaneId!
+        let p2 = controller.splitPane(p1, orientation: .horizontal, withTab: Bonsplit.Tab(title: "T2"))!
+        #expect(controller.setPairZoom(firstPane: p1, secondPane: p2, orientation: .horizontal))
+        let view = PairHeaderControlsView(
+            orientation: .horizontal,
+            appearance: BonsplitConfiguration.Appearance(),
+            tooltips: BonsplitConfiguration.SplitButtonTooltips(),
+            barHeight: 28, iconScale: 1,
+            liveOrientation: { .horizontal }, onChoose: { _ in }, onEqualize: {},
+            onExit: { controller.requestPairExit() }
+        )
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(x: 0, y: 0, width: 180, height: 28)
+        host.layoutSubtreeIfNeeded()
+        func descendants(_ view: NSView) -> [NSView] {
+            view.subviews + view.subviews.flatMap { descendants($0) }
+        }
+        let controls = descendants(host)
+        #expect(controls.contains { $0 is NSSegmentedControl }, "harness must find existing native arrangement control")
+        let exit = try #require(controls.compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "paneTabBarControl.pairExit" }, "hovered mode header has no exit control")
+        #expect(exit.toolTip == "Exit Design Focus")
+        #expect(exit.image != nil)
+        exit.performClick(nil)
+        #expect(spy.exitCount == 1)
+    }
+
+    // cmux-rbf #cm-73.16: configured dark chrome must override light system colours for every glyph.
+    @Test @MainActor func exitTintMatchesEqualizeOnDarkChromeInLightAppearance() throws {
+        let appearance = BonsplitConfiguration.Appearance(chromeColors: .init(backgroundHex: "#272822"))
+        let light = try #require(NSAppearance(named: .aqua))
+        var actual: NSColor?
+        var expected: NSColor?
+        light.performAsCurrentDrawingAppearance {
+            let view = PairHeaderControlsView(
+                orientation: .horizontal, appearance: appearance,
+                tooltips: .init(), barHeight: 28, iconScale: 1,
+                liveOrientation: { .horizontal }, onChoose: { _ in }, onEqualize: {}, onExit: {}
+            )
+            let host = NSHostingView(rootView: view)
+            host.appearance = light
+            host.frame = NSRect(x: 0, y: 0, width: 180, height: 28)
+            host.layoutSubtreeIfNeeded()
+            func descendants(_ view: NSView) -> [NSView] {
+                view.subviews + view.subviews.flatMap { descendants($0) }
+            }
+            let button = descendants(host).compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == "paneTabBarControl.pairExit" }
+            actual = button?.contentTintColor?.usingColorSpace(.sRGB)
+            expected = TabBarColors.nsColorSplitActionIcon(for: appearance, isPressed: false).usingColorSpace(.sRGB)
+        }
+        let tint = try #require(actual)
+        let equalize = try #require(expected)
+        let actualComponents = [tint.redComponent, tint.greenComponent, tint.blueComponent, tint.alphaComponent]
+        let expectedComponents = [equalize.redComponent, equalize.greenComponent, equalize.blueComponent, equalize.alphaComponent]
+        #expect(zip(actualComponents, expectedComponents).allSatisfy { abs($0 - $1) < 0.001 }, "exit \(actualComponents) differs from 50/50 \(expectedComponents)")
+    }
+
     // 19. Choosing a segment
     @Test
     @MainActor
@@ -635,6 +711,8 @@ struct PairZoomTests {
 private final class PairArrangementDelegateSpy: BonsplitDelegate {
     var chosenArrangements: [SplitOrientation] = []
     var equalizeCount = 0
+    var exitCount = 0
+    func splitTabBarDidRequestExitPair(_ controller: BonsplitController) { exitCount += 1 } // cmux-rbf #cm-73.16
 
     func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation) {
         chosenArrangements.append(orientation)

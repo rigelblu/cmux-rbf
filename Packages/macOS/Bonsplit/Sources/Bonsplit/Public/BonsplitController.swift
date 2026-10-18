@@ -934,6 +934,12 @@ public final class BonsplitController {
         delegate?.splitTabBarDidRequestEqualizePair(self)
     }
 
+    /// cmux-rbf #cm-73.16: asks the host to exit Design Focus.
+    public func requestPairExit() {
+        guard internalController.isPairZoomed else { return }
+        delegate?.splitTabBarDidRequestExitPair(self)
+    }
+
     // MARK: - Full Width Tab Mode
 
     /// Pane IDs whose tab chrome is currently rendered in full-width-tab mode.

@@ -17,6 +17,19 @@ import Testing
 @Suite("DesignFocusWorkspaceRouting", .serialized)
 struct DesignFocusWorkspaceRoutingTests {
 
+    // cmux-rbf #cm-73.16
+    @Test func headerExitLeavesDesignFocusAndDoesNotReenter() throws {
+        let h = try Harness(); defer { h.cleanup() }
+        try h.addFigmaSplit()
+        #expect(h.workspace.toggleDesignFocus())
+        #expect(h.workspace.isDesignFocusActive)
+        h.workspace.bonsplitController.requestPairExit()
+        #expect(!h.workspace.isDesignFocusActive)
+        #expect(!h.workspace.bonsplitController.isPairZoomed)
+        h.workspace.bonsplitController.requestPairExit()
+        #expect(!h.workspace.isDesignFocusActive)
+    }
+
     @MainActor
     private final class Harness {
         let manager: TabManager

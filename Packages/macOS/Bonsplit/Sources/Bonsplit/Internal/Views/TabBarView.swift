@@ -1341,6 +1341,11 @@ struct TabBarView: View {
                 onEqualize: {
                     guard splitViewController.isInteractive else { return }
                     controller.requestPairEqualize()
+                },
+                // cmux-rbf #cm-73.16
+                onExit: {
+                    guard splitViewController.isInteractive else { return }
+                    controller.requestPairExit()
                 }
             )
         }
@@ -1733,12 +1738,24 @@ struct TabBarView: View {
                 .foregroundStyle(TabBarColors.splitActionIcon(for: appearance, isPressed: false))
                 .tabBarButtonAnimationsDisabled()
                 .overlay(
-                    SplitActionMouseDownOverlay {
+                    // cmux-rbf #cm-73.16: build the menu at press time and anchor it in this view.
+                    SplitActionMouseDownOverlay(makeMenu: {
+                        guard splitViewController.isInteractive,
+                              case .custom(let identifier) = button.action else { return nil }
+                        return controller.delegate?.splitTabBar(controller, menuForCustomAction: identifier, inPane: pane.id)
+                    }, onMouseDown: {
                         performSplitActionButton(button)
-                    }
+                    })
                 )
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(splitActionButtonTooltip(button, tooltips: tooltips))
+                // cmux-rbf #cm-73.16: carry cm-73.9's image button name onto the press path.
+                .modifier(OptionalAccessibilityName(
+                    name: TabBarStyling.splitActionAccessibilityName(
+                        for: button.icon,
+                        tooltip: splitActionButtonTooltip(button, tooltips: tooltips)
+                    )
+                ))
                 .accessibilityAddTraits(.isButton)
         } else {
             Button {
@@ -2043,20 +2060,25 @@ private struct SplitActionButtonStyle: ButtonStyle {
 }
 
 private struct SplitActionMouseDownOverlay: NSViewRepresentable {
+    // cmux-rbf #cm-73.16: the control owns both the menu and its AppKit anchor.
+    let makeMenu: () -> NSMenu?
     let onMouseDown: () -> Void
 
     func makeNSView(context: Context) -> SplitActionMouseDownNSView {
         let view = SplitActionMouseDownNSView()
         view.onMouseDown = onMouseDown
+        view.makeMenu = makeMenu // cmux-rbf #cm-73.16
         return view
     }
 
     func updateNSView(_ nsView: SplitActionMouseDownNSView, context: Context) {
         nsView.onMouseDown = onMouseDown
+        nsView.makeMenu = makeMenu // cmux-rbf #cm-73.16
     }
 }
 
 private final class SplitActionMouseDownNSView: NSView {
+    var makeMenu: (() -> NSMenu?)? // cmux-rbf #cm-73.16
     var onMouseDown: (() -> Void)?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -2064,7 +2086,12 @@ private final class SplitActionMouseDownNSView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        onMouseDown?()
+        // cmux-rbf #cm-73.16: a native pull-down on press, under the button.
+        if let menu = makeMenu?() {
+            menu.popUp(positioning: nil, at: NSPoint(x: bounds.minX, y: bounds.minY - 2), in: self)
+        } else {
+            onMouseDown?()
+        }
     }
 }
 

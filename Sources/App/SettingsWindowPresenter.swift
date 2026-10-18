@@ -74,6 +74,9 @@ final class SettingsWindowPresenter: NSObject {
     // behavior lives in SettingsWindowNavigationDelivery.swift (split for
     // the file-length budget); no type outside the presenter touches it.
     var pendingNavigationTarget: SettingsNavigationTarget?
+    // cmux-rbf #cm-73.16: a targeted row survives fresh-window navigation delivery.
+    var pendingNavigationAnchorID: String?
+    var pendingNavigationHighlight = false
     /// Current re-entrant depth of `performShow` (close-triggered observers
     /// may re-enter). Bounded by `maxReentrantShowDepth`.
     private var activeShowDepth = 0
@@ -119,9 +122,11 @@ final class SettingsWindowPresenter: NSObject {
     @discardableResult
     static func show(
         navigationTarget: SettingsNavigationTarget? = nil,
-        activateApp: Bool = true
+        activateApp: Bool = true,
+        anchorID: String? = nil, // cmux-rbf #cm-73.16
+        highlight: Bool = false
     ) -> SettingsWindowShowResult {
-        shared.show(navigationTarget: navigationTarget, activateApp: activateApp)
+        shared.show(navigationTarget: navigationTarget, activateApp: activateApp, anchorID: anchorID, highlight: highlight) // cmux-rbf #cm-73.16
     }
 
     /// Presents the Settings window, creating it if needed. Synchronous: on
@@ -130,11 +135,18 @@ final class SettingsWindowPresenter: NSObject {
     @discardableResult
     func show(
         navigationTarget: SettingsNavigationTarget? = nil,
-        activateApp: Bool = true
+        activateApp: Bool = true,
+        anchorID: String? = nil, // cmux-rbf #cm-73.16
+        highlight: Bool = false
     ) -> SettingsWindowShowResult {
 #if DEBUG
         cmuxDebugLog("settings.window.show path=appkitWindow")
 #endif
+        // cmux-rbf #cm-73.16: untargeted opens preserve any pending targeted row.
+        if navigationTarget != nil {
+            pendingNavigationAnchorID = anchorID
+            pendingNavigationHighlight = highlight
+        }
         let result = performShow(navigationTarget: navigationTarget, activateApp: activateApp)
 #if DEBUG
         // Recorded from the verified outcome, not the request, so UI-test
@@ -286,6 +298,9 @@ final class SettingsWindowPresenter: NSObject {
         // cleared — a re-entrant show that set a different target supersedes.
         if pendingNavigationTarget == navigationTarget {
             pendingNavigationTarget = nil
+            // cmux-rbf #cm-73.16: failed requests cannot leak a row into a later open.
+            pendingNavigationAnchorID = nil
+            pendingNavigationHighlight = false
         }
         if didUnhideForVerification {
             // The (non-activating) unhide above was a verification gamble
