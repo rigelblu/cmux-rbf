@@ -257,6 +257,29 @@ extension SettingsWindowSharedStateSuites {
 
         // MARK: - Navigation delivery
 
+        // cmux-rbf #cm-73.16: a real menu action traverses the presenter and its navigation delivery.
+        @Test func figmaFolderMenuNavigatesPresenterToHighlightedAnchor() throws {
+            try withCleanSettingsWindows {
+                let presenter = SettingsWindowPresenter(windowFactory: { _ in makeFactoryWindow() })
+                #expect(presenter.show() == .presented)
+                presenter.deliverPendingNavigationAfterContentAppears()
+                let workspace = Workspace()
+                defer { workspace.teardownAllPanels() }
+                let pane = try #require(workspace.bonsplitController.allPaneIds.first)
+                let recorder = SettingsNavigationRecorder()
+                defer { recorder.stopObserving() }
+                let menu = workspace.figmaButtonMenu(inPane: pane, folder: "invalid", showSettings: { target, anchor, highlight in
+                    presenter.show(navigationTarget: target, anchorID: anchor, highlight: highlight)
+                })
+                let index = try #require(menu.items.firstIndex { $0.title == "Choose Figma Folder…" })
+                menu.performActionForItem(at: index)
+                let destination = try #require(recorder.receivedDestinations.last)
+                #expect(destination.target == .automation)
+                #expect(destination.anchorID == "setting:automation:figma-default-folder")
+                #expect(destination.shouldHighlight)
+            }
+        }
+
         @Test func navigationPostsImmediatelyForReadyExistingWindow() {
             withCleanSettingsWindows {
                 let presenter = SettingsWindowPresenter(windowFactory: { _ in makeFactoryWindow() })
@@ -534,6 +557,7 @@ private final class TestSettingsWindow: SettingsHostWindow {
 @MainActor
 private final class SettingsNavigationRecorder: NSObject {
     private(set) var receivedTargets: [SettingsNavigationTarget] = []
+    private(set) var receivedDestinations: [SettingsNavigationDestination] = [] // cmux-rbf #cm-73.16
 
     override init() {
         super.init()
@@ -551,8 +575,10 @@ private final class SettingsNavigationRecorder: NSObject {
 
     @objc
     private func didReceive(_ notification: Notification) {
-        if let target = SettingsNavigationRequest.target(from: notification) {
-            receivedTargets.append(target)
+        // cmux-rbf #cm-73.16: assert the actual navigation request, including row and highlight.
+        if let destination = SettingsNavigationRequest.destination(from: notification) {
+            receivedTargets.append(destination.target)
+            receivedDestinations.append(destination)
         }
     }
 }

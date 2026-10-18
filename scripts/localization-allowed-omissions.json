@@ -1,4 +1,28 @@
 {
+    "figma.menu.tooltip": {
+      "source": "Figma",
+      "identityLocales": {
+        "ar": "Figma is a product name",
+        "bs": "Figma is a product name",
+        "da": "Figma is a product name",
+        "de": "Figma is a product name",
+        "es": "Figma is a product name",
+        "fr": "Figma is a product name",
+        "it": "Figma is a product name",
+        "ja": "Figma is a product name",
+        "km": "Figma is a product name",
+        "ko": "Figma is a product name",
+        "nb": "Figma is a product name",
+        "pl": "Figma is a product name",
+        "pt-BR": "Figma is a product name",
+        "ru": "Figma is a product name",
+        "th": "Figma is a product name",
+        "tr": "Figma is a product name",
+        "uk": "Figma is a product name",
+        "zh-Hans": "Figma is a product name",
+        "zh-Hant": "Figma is a product name"
+      }
+    },
   "CFBundleDisplayName": {
     "source": "cmux Cloud Tunnel",
     "class": "brand"
