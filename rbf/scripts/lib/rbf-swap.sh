@@ -41,6 +41,10 @@
 
 set -uo pipefail
 
+# Code, not a value, so it does not break the one-source-of-truth rule above.
+# shellcheck source=rbf/scripts/lib/rbf-procs.sh
+source "$(dirname "${BASH_SOURCE[0]}")/rbf-procs.sh"
+
 # ---------------------------------------------------------------------------
 # Seams. Tests override these to simulate a running app, a failing rename, or
 # a fake clock; production never does. Each wraps exactly one external effect.
@@ -49,9 +53,16 @@ set -uo pipefail
 rbf_swap_process_pattern() {
   printf '%s' "$1/Contents/MacOS/" | sed 's/[][\\.^$*+?(){}|]/\\&/g'
 }
-rbf_swap_app_running() { pgrep -f "$(rbf_swap_process_pattern "$1")" >/dev/null 2>&1; }
+# Matched by executable, not argv (rbf-procs.sh): an agent whose prompt names
+# the install path must neither stall the quit loop nor take the SIGTERM.
+rbf_swap_app_running() { rbf_app_running "$(rbf_swap_process_pattern "$1")"; }
 rbf_swap_request_quit() { osascript -e "tell application id \"$1\" to quit" >/dev/null 2>&1 || true; }
-rbf_swap_sigterm() { pkill -TERM -f "$(rbf_swap_process_pattern "$1")" 2>/dev/null || true; }
+rbf_swap_sigterm() {
+  local pid _exe
+  while read -r pid _exe; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done < <(rbf_app_pids "$(rbf_swap_process_pattern "$1")")
+}
 # Launches the way the Dock would. The caller is often an agent inside cmux or
 # herdr, and `open` passes its environment to the app and every tab it opens:
 # its CMUX_* socket and surface, and HERDR_* pane variables that make each tab
