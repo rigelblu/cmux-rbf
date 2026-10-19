@@ -131,6 +131,10 @@ ensure_zig() { rbf_ensure_zig; }
 # shellcheck source=rbf/scripts/lib/rbf-metal.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-metal.sh"
 
+# Running-app checks match the executable, never argv. See the lib header.
+# shellcheck source=rbf/scripts/lib/rbf-procs.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-procs.sh"
+
 # The parent tree's recorded submodule pointer must also be readable from linked
 # JJ workspaces, which deliberately have no `.git` directory.
 # shellcheck source=scripts/lib/recorded-gitlink.sh
@@ -271,12 +275,17 @@ case "$cmd" in
     # if/then rather than `pgrep … && flag=1`: under `set -e` a non-matching
     # pgrep makes the && compound return non-zero and kills the script, so the
     # guard would abort exactly when nothing is wrong.
+    #
+    # Matched by executable, never argv, and the list below prints pid + path
+    # only (rbf-procs.sh). `pgrep -f` here once refused for an agent whose
+    # prompt named the app, and `pgrep -fl` then printed that agent's argv —
+    # an auth token — into a test log (2026-10-18).
     tagged_running=0
     untagged_running=0
-    if pgrep -f "cmux DEV $BUILD_ID_VALUE\.app/Contents/MacOS/" >/dev/null 2>&1; then
+    if rbf_app_running "cmux DEV $BUILD_ID_VALUE\.app/Contents/MacOS/"; then
       tagged_running=1
     fi
-    if pgrep -f "cmux DEV\.app/Contents/MacOS/" >/dev/null 2>&1; then
+    if rbf_app_running "cmux DEV\.app/Contents/MacOS/"; then
       untagged_running=1
     fi
     if [[ "$tagged_running" -eq 1 || "$untagged_running" -eq 1 ]]; then
@@ -289,7 +298,7 @@ case "$cmd" in
       echo "        executing tests', exit 65, and zero tests run — a failure" >&2
       echo "        that looks like broken tests and is not." >&2
       echo "        Running now:" >&2
-      pgrep -fl "cmux DEV.*\.app/Contents/MacOS/" 2>/dev/null | sed 's/^/          /' >&2 || true
+      rbf_app_pids "cmux DEV[^/]*\.app/Contents/MacOS/" | sed 's/^/          /' >&2
       echo "        Quit them, then re-run." >&2
       exit 1
     fi
