@@ -3,9 +3,13 @@ import CMUXAgentLaunch
 import CmuxAgentChat
 import Foundation
 
-// cmux-rbf #cm-73.17: one gate and delivery path for both menu jobs.
+// cmux-rbf #cm-73.17/#cm-73.12: menu and bound board jobs share one delivery path.
 struct FigmaDesignHandOff {
-    enum Job: String, CaseIterable { case put, new }
+    enum Job: String, CaseIterable {
+        case put, new
+        case layoutVertical = "layout vertical"
+        case layoutHorizontal = "layout horizontal"
+    }
     typealias IdleObserver = AgentChatSessionRecord.IdleObserver
 
     static func isAvailable(kind: ChatAgentKind?, state: ChatAgentState?, hasHookLifecycleState: Bool, needsInputEvent: WorkstreamEvent.HookEventName?, idleObserver: IdleObserver?, sawHookEvent: Bool = true, notificationType: String? = nil) -> Bool {
@@ -69,6 +73,33 @@ struct FigmaDesignHandOff {
             logRefusal("figma.designHandOff.refused reason=no-available-live-agent")
             return false
         }
+        return send(job, to: target, panel: panel, home: home, validateTarget: {
+            Self.target(in: workspace, registry: registry) == target
+        }, deliver: deliver, logRefusal: logRefusal)
+    }
+
+    @MainActor @discardableResult static func send(
+        _ job: Job, to conversation: FigmaBoardLayoutBinding.Conversation,
+        in workspace: Workspace, registry: AgentChatSessionRegistry, home: URL,
+        validateTarget: () -> Bool,
+        deliver: ((UUID, [TextBoxSubmit.DispatchEvent]) -> Void)? = nil
+    ) -> Bool {
+        guard let panel = workspace.panels[conversation.panelID] as? TerminalPanel else { return false }
+        return send(job, to: Target(panelID: conversation.panelID, kind: conversation.kind),
+                    panel: panel, home: home, validateTarget: {
+            guard let record = registry.liveSession(surfaceID: conversation.panelID.uuidString),
+                  record.sessionID == conversation.sessionID, record.agentKind == conversation.kind,
+                  isAvailable(record) else { return false }
+            return validateTarget()
+        }, deliver: deliver, logRefusal: Self.log)
+    }
+
+    @MainActor private static func send(
+        _ job: Job, to target: Target, panel: TerminalPanel, home: URL,
+        validateTarget: () -> Bool,
+        deliver: ((UUID, [TextBoxSubmit.DispatchEvent]) -> Void)?, logRefusal: (String) -> Void
+    ) -> Bool {
+        guard validateTarget() else { return false }
         _ = FigmaDesignSkill.install(home: home)
         let root = target.kind == .claude ? ".claude/skills" : ".agents/skills"
         let skillFile = home.appendingPathComponent(root + "/design-in-figma-pane/SKILL.md")
@@ -76,13 +107,14 @@ struct FigmaDesignHandOff {
             logRefusal("figma.designHandOff.refused reason=no-readable-skill")
             return false
         }
+        // Revalidate after filesystem work, immediately before any input is cleared.
+        guard validateTarget() else { return false }
         let events = dispatchEvents(for: job, kind: target.kind)
         if let deliver {
             deliver(target.panelID, events)
-        } else {
-            TextBoxSubmit.sendEvents(events, via: panel.surface)
+            return true
         }
-        return true
+        return TextBoxSubmit.sendImmediateEvents(events, via: panel.surface, validateTarget: validateTarget)
     }
 
     static func log(_ message: String) {

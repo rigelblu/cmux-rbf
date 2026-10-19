@@ -910,6 +910,9 @@ struct DesignFocusWorkspaceRoutingTests {
         // Only the side-by-side split exists in the real tree: nothing for "vertical" to even.
         // The pair is flipped to stacked, so "vertical" would match the pair if the socket reached it.
         #expect(h.workspace.toggleDesignFocus())
+        // Give the flip a known starting layout instead of inheriting the test host window's shape.
+        h.workspace.updateDesignFocusOrientationIfNeeded(areaSize: CGSize(width: 1800, height: 1000))
+        #expect(controller.pairZoomOrientation == .horizontal)
         #expect(h.workspace.flipDesignFocusLayout())
         #expect(controller.pairZoomOrientation == .vertical)
         #expect(controller.setPairZoomDividerPosition(0.7))

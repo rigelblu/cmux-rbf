@@ -11,6 +11,9 @@ import GhosttyKit
 /// This allows TerminalSurface to be used within the bonsplit-based layout system.
 @MainActor
 final class TerminalPanel: Panel, ObservableObject {
+    // cmux-rbf #cm-73.12: travels with this terminal when it moves between workspaces.
+    var lastFigmaBoardOpen: [FigmaBoardLayoutBinding.Conversation: FigmaBoardLayoutBinding.LastOpen] = [:]
+
     private enum TextBoxInputFocusIntent: Equatable {
         case hidden
         case terminal

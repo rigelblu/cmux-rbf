@@ -1287,6 +1287,14 @@ enum TextBoxSubmit {
         TextBoxSubmitEventRunner.run(events, via: surface, onComplete: onComplete)
     }
 
+    /// Destructive agent-command batches must start under the current identity guard, never wait in a queue.
+    static func sendImmediateEvents(
+        _ events: [DispatchEvent], via surface: TextBoxSubmitSurfaceControlling,
+        validateTarget: () -> Bool
+    ) -> Bool {
+        TextBoxSubmitEventRunner.runImmediately(events, via: surface, validateTarget: validateTarget)
+    }
+
     static func cleanupAttachmentsAfterSubmit(
         from parts: [TextBoxSubmissionPart],
         terminalAgentContext: String,
@@ -1586,6 +1594,26 @@ private final class TextBoxSubmitEventRunner {
             return
         }
         start(pendingRun)
+    }
+
+    /// Only synchronous text/key events qualify, so the identity guard immediately precedes the clear.
+    static func runImmediately(
+        _ events: [TextBoxSubmit.DispatchEvent], via surface: TextBoxSubmitSurfaceControlling,
+        validateTarget: () -> Bool
+    ) -> Bool {
+        let surfaceKey = ObjectIdentifier(surface)
+        guard activeRunIDBySurface[surfaceKey] == nil,
+              queuedRunsBySurface[surfaceKey]?.isEmpty != false,
+              events.allSatisfy({ event in
+                  switch event {
+                  case .keyText, .pasteText, .namedKey, .namedKeyRepeat: return true
+                  default: return false
+                  }
+              }), validateTarget() else { return false }
+        var submitted = false
+        let pending = PendingRun(events: events, surface: surface, onComplete: { submitted = $0.didSubmit })
+        start(pending)
+        return submitted
     }
 
     private static func start(_ pendingRun: PendingRun) {

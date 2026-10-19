@@ -71,6 +71,15 @@ public protocol BonsplitDelegate: AnyObject {
     /// current one. Never called for the arrangement already shown.
     func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation)
 
+    /// Supplies a snapshot when the pointer enters the pair header or a control is pressed.
+    func pairBoardControlState(for controller: BonsplitController) -> PairBoardControlState?
+
+    /// Requests a board arrangement from the host; the host rechecks its target.
+    func splitTabBar(_ controller: BonsplitController, didChooseBoardLayout orientation: BoardLayoutOrientation)
+
+    /// Requests a change to the matching Figma tab's local pin.
+    func splitTabBarDidTogglePin(_ controller: BonsplitController)
+
     /// cmux-rbf #cm-73.2a: the pair-zoom header's 50/50 button was pressed.
     func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController)
 
@@ -126,6 +135,9 @@ public extension BonsplitDelegate {
     func splitTabBar(_ controller: BonsplitController, didRequestNewTab kind: String, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation) {} // cmux-rbf #cm-73.2a
+    func pairBoardControlState(for controller: BonsplitController) -> PairBoardControlState? { nil }
+    func splitTabBar(_ controller: BonsplitController, didChooseBoardLayout orientation: BoardLayoutOrientation) {}
+    func splitTabBarDidTogglePin(_ controller: BonsplitController) {}
     func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController) {} // cmux-rbf #cm-73.2a
     func splitTabBarDidRequestExitPair(_ controller: BonsplitController) {} // cmux-rbf #cm-73.16
     func splitTabBar(_ controller: BonsplitController, didRequestTabContextAction action: TabContextAction, for tab: Tab, inPane pane: PaneID) {}

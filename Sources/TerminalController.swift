@@ -7638,7 +7638,7 @@ class TerminalController {
                 browserPanel: placement.panel,
                 webView: placement.panel.webView
             )
-            let payload = v2BrowserActionPayload(
+            var payload = v2BrowserActionPayload(
                 context,
                 tabManager: tabManager,
                 extra: [
@@ -7663,13 +7663,16 @@ class TerminalController {
                     ),
                     "created_split": placement.createdSplit,
                     "placement_strategy": placement.createdSplit
-                        ? "split_right"
+                        ? (placement.splitDirection == .vertical ? "split_down" : "split_right")
                         : "reuse_right_sibling",
                     "show_omnibar": placement.panel.isOmnibarVisible,
                     "transparent_background": transparentBackground,
                     "bypass_remote_proxy": bypassRemoteProxy,
                 ]
             )
+            if let orientation = placement.orientation {
+                payload["orientation"] = orientation.rawValue
+            }
             if focus,
                case .dock = container,
                let appDelegate = AppDelegate.shared {

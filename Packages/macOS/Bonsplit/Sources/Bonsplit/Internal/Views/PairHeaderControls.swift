@@ -63,9 +63,37 @@ struct PairHeaderControlsView: View {
     let barHeight: CGFloat
     let iconScale: CGFloat
     let liveOrientation: () -> SplitOrientation?
+    let boardState: PairBoardControlState
+    let liveBoardState: () -> PairBoardControlState
+    let onLayoutBoards: (BoardLayoutOrientation) -> Void
+    let onTogglePin: () -> Void
     let onChoose: (SplitOrientation) -> Void
     let onEqualize: () -> Void
     let onExit: () -> Void // cmux-rbf #cm-73.16
+
+    init(orientation: SplitOrientation, appearance: BonsplitConfiguration.Appearance,
+         tooltips: BonsplitConfiguration.SplitButtonTooltips, barHeight: CGFloat, iconScale: CGFloat,
+         liveOrientation: @escaping () -> SplitOrientation?,
+         boardState: PairBoardControlState = PairBoardControlState(),
+         liveBoardState: @escaping () -> PairBoardControlState = { PairBoardControlState() },
+         onLayoutBoards: @escaping (BoardLayoutOrientation) -> Void = { _ in },
+         onTogglePin: @escaping () -> Void = {},
+         onChoose: @escaping (SplitOrientation) -> Void,
+         onEqualize: @escaping () -> Void, onExit: @escaping () -> Void) {
+        self.orientation = orientation
+        self.appearance = appearance
+        self.tooltips = tooltips
+        self.barHeight = barHeight
+        self.iconScale = iconScale
+        self.liveOrientation = liveOrientation
+        self.boardState = boardState
+        self.liveBoardState = liveBoardState
+        self.onLayoutBoards = onLayoutBoards
+        self.onTogglePin = onTogglePin
+        self.onChoose = onChoose
+        self.onEqualize = onEqualize
+        self.onExit = onExit
+    }
 
     var body: some View {
         HStack(spacing: PairHeaderControls.segmentedSpacing) {
@@ -81,6 +109,12 @@ struct PairHeaderControlsView: View {
                 width: PairHeaderControls.segmentedSize.width,
                 height: PairHeaderControls.segmentedSize.height
             )
+
+            PairBoardSegmentedControl(
+                state: boardState, tooltips: tooltips, symbolPointSize: 12 * iconScale,
+                liveState: liveBoardState, onLayoutBoards: onLayoutBoards, onTogglePin: onTogglePin
+            )
+            .frame(width: 81, height: PairHeaderControls.segmentedSize.height)
 
             Button(action: onEqualize) {
                 Image(systemName: PairHeaderControls.equalizeSymbolName(for: orientation))

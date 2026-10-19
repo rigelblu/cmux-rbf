@@ -1885,6 +1885,10 @@ final class BrowserSearchState: ObservableObject {
 
 @MainActor
 final class BrowserPanel: Panel, ObservableObject {
+    // cmux-rbf #cm-73.12: never persisted; temporary navigation does not erase the binding.
+    var figmaBoardLayoutBinding: FigmaBoardLayoutBinding?
+    var keepsBoardLayoutOnFlip = false
+
     /// Popup windows owned by this panel (for lifecycle cleanup)
     private var popupControllers: [BrowserPopupWindowController] = []
 

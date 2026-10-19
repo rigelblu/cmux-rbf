@@ -90,14 +90,14 @@ struct FigmaCLIOutputTests {
         }
     }
 
-    private static func openReply(createdSplit: Bool) -> @Sendable (String, String?) -> String {
+    private static func openReply(createdSplit: Bool, orientation: String? = nil) -> @Sendable (String, String?) -> String {
         { method, surfaceID in
             guard method == "browser.open_split" else { return unexpected(method, surfaceID) }
             return ok([
                 "surface_id": "new-surface", "surface_ref": "surface:3",
                 "pane_id": "new-pane", "pane_ref": "pane:2",
                 "created_split": createdSplit
-            ])
+            ].merging(orientation.map { ["orientation": $0] } ?? [:]) { _, new in new })
         }
     }
 
@@ -385,6 +385,21 @@ struct FigmaCLIOutputTests {
             let address = try #require(run.opens.first?.params["url"] as? String, "\(link)")
             #expect(address.hasPrefix("https://www.figma.com/design/KEY/slug"), "\(address)")
             #expect(!address.contains("figma-embed.html"), "\(address)")
+        }
+    }
+
+    @Test("open preserves the app's landed orientation in text and JSON")
+    func openReportsLandedOrientation() throws {
+        for orientation in ["vertical", "horizontal"] {
+            for split in [true, false] {
+                let reply = Self.openReply(createdSplit: split, orientation: orientation)
+                let text = try drive(["figma", "open", Self.frameLink], reply: reply)
+                #expect(text.status == 0, "\(text.stderr)")
+                #expect(text.stdout == "OK surface=surface:3 pane=pane:2 placement=\(split ? "split" : "reuse") orientation=\(orientation)\n")
+                let json = try drive(["--json", "figma", "open", Self.frameLink], reply: reply)
+                #expect(json.status == 0, "\(json.stderr)")
+                #expect(jsonObject(json.stdout)?["orientation"] as? String == orientation)
+            }
         }
     }
 
