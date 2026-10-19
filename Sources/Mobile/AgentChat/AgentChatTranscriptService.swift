@@ -582,7 +582,8 @@ final class AgentChatTranscriptService {
         return tailer
     }
 
-    private func publishBatch(_ batch: AgentChatTranscriptTailer.Batch, sessionID: String) {
+    // cmux-rbf #cm-73.17: internal batch-ingress seam also exercises the real transcript idle path.
+    func publishBatch(_ batch: AgentChatTranscriptTailer.Batch, sessionID: String) {
         #if DEBUG
         cmuxDebugLog(
             "agentChat.transcript.batch session=\(sessionID.prefix(8)) "

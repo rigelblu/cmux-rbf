@@ -1544,6 +1544,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // cmux-rbf #cm-73.17: utility-priority file I/O; the test host never writes skills.
+        _ = FigmaDesignSkill.installAtLaunchInBackground(
+            home: FileManager.default.homeDirectoryForCurrentUser,
+            environment: ProcessInfo.processInfo.environment,
+            onRefusal: { url in
+                #if DEBUG
+                dlog("figma.skill.install.refused path=\(url.path)")
+                #endif
+            }
+        )
         // Composition root for surfaces: this Mac's panes and every cloud machine's
         // cmux-tui session feed one catalog, and the sidebar, drag/drop, socket and CLI all
         // open through `SurfaceCatalog.project`.

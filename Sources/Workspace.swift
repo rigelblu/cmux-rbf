@@ -3344,6 +3344,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     let cloudBindingState = WorkspaceCloudBindingState()
     /// Todo lifecycle state: manual status override + persisted checklist (all logic lives in `Workspace+Todos.swift`).
     let todoState = WorkspaceTodoState()
+    // cmux-rbf #cm-73.17: read Reply's actual sticky choice without copying its state.
+    weak var replyPanelAgentChoiceStore: ReplyPanelStore?
     // cmux-rbf #cm-73.16: workspace-owned list and per-tab showing baselines.
     var figmaFiles = FigmaFileList()
     var figmaFileObservations: [UUID: FigmaFileObservation] = [:]
