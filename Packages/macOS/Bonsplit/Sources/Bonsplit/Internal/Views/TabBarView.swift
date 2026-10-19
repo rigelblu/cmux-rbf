@@ -842,6 +842,7 @@ struct TabBarView: View {
     @AppStorage("workspacePresentationMode") private var presentationMode = "standard"
     @AppStorage("debugFadeColorStyle") private var fadeColorStyle = -1
     @State private var isHoveringTabBar = false
+    @State private var boardControlState = PairBoardControlState()
     @State private var dropTargetIndex: Int?
     @State private var scrollOffset: CGFloat = 0
     @State private var contentWidth: CGFloat = 0
@@ -1316,6 +1317,7 @@ struct TabBarView: View {
             isHoveringTabBar = hovering
             // cmux-rbf #cm-73.2a
             if presentation == .caption {
+                if hovering { boardControlState = controller.pairBoardControlState() ?? PairBoardControlState() }
                 splitViewController.setPairHeaderHover(hovering, pane: pane.id)
             }
         }
@@ -1334,9 +1336,22 @@ struct TabBarView: View {
                 barHeight: tabBarHeight,
                 iconScale: controlIconFontScale,
                 liveOrientation: { [splitViewController] in splitViewController.pairZoomOrientation },
+                boardState: boardControlState,
+                liveBoardState: { controller.pairBoardControlState() ?? PairBoardControlState() },
+                onLayoutBoards: { chosen in
+                    guard splitViewController.isInteractive else { return }
+                    controller.requestBoardLayout(chosen)
+                    boardControlState = controller.pairBoardControlState() ?? PairBoardControlState()
+                },
+                onTogglePin: {
+                    guard splitViewController.isInteractive else { return }
+                    controller.requestBoardLayoutPin()
+                    boardControlState = controller.pairBoardControlState() ?? PairBoardControlState()
+                },
                 onChoose: { chosen in
                     guard splitViewController.isInteractive else { return }
                     controller.requestPairArrangement(chosen)
+                    boardControlState = controller.pairBoardControlState() ?? PairBoardControlState()
                 },
                 onEqualize: {
                     guard splitViewController.isInteractive else { return }

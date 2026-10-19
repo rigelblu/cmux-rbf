@@ -16627,7 +16627,8 @@ struct CMUXCLI {
             let surfaceText = formatHandle(payload, kind: "surface", idFormat: effectiveIDFormat) ?? "unknown"
             let paneText = formatHandle(payload, kind: "pane", idFormat: effectiveIDFormat) ?? "unknown"
             let placement = ((payload["created_split"] as? Bool) == true) ? "split" : "reuse"
-            output(payload, fallback: "OK surface=\(surfaceText) pane=\(paneText) placement=\(placement)")
+            let orientation = (payload["orientation"] as? String).map { " orientation=\($0)" } ?? ""
+            output(payload, fallback: "OK surface=\(surfaceText) pane=\(paneText) placement=\(placement)\(orientation)")
             return
         }
 

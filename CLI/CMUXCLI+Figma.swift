@@ -229,7 +229,8 @@ extension CMUXCLI {
         let surfaceText = formatHandle(payload, kind: "surface", idFormat: idFormat) ?? "unknown"
         let paneText = formatHandle(payload, kind: "pane", idFormat: idFormat) ?? "unknown"
         let placement = ((payload["created_split"] as? Bool) == true) ? "split" : "reuse"
-        print("OK surface=\(surfaceText) pane=\(paneText) placement=\(placement)")
+        let orientation = (payload["orientation"] as? String).map { " orientation=\($0)" } ?? ""
+        print("OK surface=\(surfaceText) pane=\(paneText) placement=\(placement)\(orientation)")
     }
 
     private func withWorkspace(_ params: [String: Any], _ workspace: String?) -> [String: Any] {

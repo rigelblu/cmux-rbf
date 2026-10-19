@@ -3714,7 +3714,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             // cmux-rbf #cm-73.16
             pairExit: KeyboardShortcutSettings.Action.toggleDesignFocus.tooltip(
                 String(localized: "workspace.tooltip.pairExit", defaultValue: "Exit Design Focus")
-            )
+            ),
+            boardColumn: String(localized: "figma.board.column", defaultValue: "Lay Boards in a Column"),
+            boardRow: String(localized: "figma.board.row", defaultValue: "Lay Boards in a Row"),
+            boardPin: String(localized: "figma.board.keepLayoutOnFlip", defaultValue: "Keep Board Layout on Flip"),
+            boardBusy: String(localized: "figma.menu.handOffUnavailable", defaultValue: "Available when your agent is waiting for you"),
+            boardUnmatched: String(localized: "figma.board.unmatchedTarget", defaultValue: "This design isn’t linked to this agent")
         )
     }
 
@@ -12152,6 +12157,14 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     // cmux-rbf #cm-73.2a
     @discardableResult
     public func flipDesignFocusLayout() -> Bool {
+        flipDesignFocusLayout(requestBoardLayout: { orientation in
+            _ = handOffBoardLayout(orientation, requireChange: true)
+        })
+    }
+
+    /// The same flip path, with command delivery supplied by the host or a recording test.
+    @discardableResult
+    func flipDesignFocusLayout(requestBoardLayout: (BoardLayoutOrientation) -> Void) -> Bool {
         guard isDesignFocusActive, let current = bonsplitController.pairZoomOrientation else {
             return false
         }
@@ -12163,6 +12176,10 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         reconcileTerminalPortalVisibilityForCurrentRenderedLayout()
         reconcileBrowserPortalVisibilityForCurrentRenderedLayout(reason: "workspace.flipDesignFocusLayout")
         beginEventDrivenLayoutFollowUp(reason: "workspace.flipDesignFocusLayout", includeGeometry: true)
+        // cmux-rbf #cm-73.12: explicit flips alone request board relayout.
+        if let size = bonsplitController.pairSecondPaneSize {
+            requestBoardLayout(BoardLayoutOrientation(size: size))
+        }
         return true
     }
 

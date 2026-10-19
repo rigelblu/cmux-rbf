@@ -476,6 +476,16 @@ extension BonsplitConfiguration {
         public var pairEqualize: String
         /// cmux-rbf #cm-73.16: tooltip for leaving the host's Design Focus mode.
         public var pairExit: String
+        /// Names the column command.
+        public var boardColumn: String
+        /// Names the row command.
+        public var boardRow: String
+        /// Names the keep-layout toggle.
+        public var boardPin: String
+        /// Explains a matching agent that cannot accept a command.
+        public var boardBusy: String
+        /// Explains a missing conversation or file match.
+        public var boardUnmatched: String
 
         public static let `default` = SplitButtonTooltips()
 
@@ -487,7 +497,12 @@ extension BonsplitConfiguration {
             pairSideBySide: String = "Side by Side", // cmux-rbf #cm-73.2a
             pairStacked: String = "Stacked", // cmux-rbf #cm-73.2a
             pairEqualize: String = "Equalize Splits", // cmux-rbf #cm-73.2a
-            pairExit: String = "Exit Design Focus" // cmux-rbf #cm-73.16
+            pairExit: String = "Exit Design Focus", // cmux-rbf #cm-73.16
+            boardColumn: String = "Lay Boards in a Column",
+            boardRow: String = "Lay Boards in a Row",
+            boardPin: String = "Keep Board Layout on Flip",
+            boardBusy: String = "The agent is unavailable",
+            boardUnmatched: String = "This design isn’t linked to this agent"
         ) {
             self.newTerminal = newTerminal
             self.newBrowser = newBrowser
@@ -497,6 +512,11 @@ extension BonsplitConfiguration {
             self.pairStacked = pairStacked // cmux-rbf #cm-73.2a
             self.pairEqualize = pairEqualize // cmux-rbf #cm-73.2a
             self.pairExit = pairExit // cmux-rbf #cm-73.16
+            self.boardColumn = boardColumn
+            self.boardRow = boardRow
+            self.boardPin = boardPin
+            self.boardBusy = boardBusy
+            self.boardUnmatched = boardUnmatched
         }
     }
 

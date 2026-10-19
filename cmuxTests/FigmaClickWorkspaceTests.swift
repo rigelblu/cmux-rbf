@@ -99,6 +99,38 @@ struct FigmaClickWorkspaceTests {
         try body(fixture)
     }
 
+    @Test("clicked file uses the same shape rule as CLI open")
+    func clickedFileUsesSourceShape() throws {
+        for (width, height): (CGFloat, CGFloat) in [(600, 900), (1300, 900)] {
+            try withFixture { f in
+                f.workspace.bonsplitController.setContainerFrame(CGRect(x: 0, y: 0, width: width, height: height))
+                #expect(f.click("https://www.figma.com/design/NEW/name"))
+                let browser = try #require(f.workspace.panels.values.compactMap { $0 as? BrowserPanel }.first)
+                let pane = try #require(f.workspace.paneId(forPanelId: browser.id))
+                let source = try #require(f.workspace.paneId(forPanelId: f.terminalId))
+                let frames = f.workspace.bonsplitController.layoutSnapshot().panes
+                let a = try #require(frames.first { $0.paneId == source.id.uuidString }?.frame)
+                let b = try #require(frames.first { $0.paneId == pane.id.uuidString }?.frame)
+                #expect(width < height ? b.y > a.y : b.x > a.x)
+                #expect(browser.figmaBoardLayoutBinding == nil)
+            }
+        }
+    }
+
+    @Test("clicked file reuses a right pane even when the source is tall")
+    func clickedFileReusesRightPane() throws {
+        try withFixture { f in
+            f.workspace.bonsplitController.setContainerFrame(CGRect(x: 0, y: 0, width: 1272, height: 917))
+            let existing = try f.addBrowser("https://www.figma.com/design/OTHER/name")
+            let target = try #require(f.workspace.paneId(forPanelId: existing.id))
+            let before = f.browserPanelIds
+            #expect(f.click("https://www.figma.com/design/NEW/name"))
+            let created = try #require(f.workspace.panels.values.compactMap { $0 as? BrowserPanel }.first { !before.contains($0.id) })
+            #expect(f.workspace.paneId(forPanelId: created.id) == target)
+            #expect(f.workspace.bonsplitController.allPaneIds.count == 2)
+        }
+    }
+
     private let key = "https://www.figma.com/design/KEY"
 
     @Test("W1 a Figma pane on the file, a link with a frame: it moves to the frame on its own path, and nothing is added")

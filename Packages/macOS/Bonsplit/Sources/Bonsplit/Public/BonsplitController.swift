@@ -940,6 +940,39 @@ public final class BonsplitController {
         delegate?.splitTabBarDidRequestExitPair(self)
     }
 
+    /// Reads the host's current target eligibility without subscribing to live agent state.
+    public func pairBoardControlState() -> PairBoardControlState? {
+        delegate?.pairBoardControlState(for: self)
+    }
+
+    /// Requests a board arrangement in the displayed pair.
+    /// - Parameter orientation: A row or column of boards.
+    public func requestBoardLayout(_ orientation: BoardLayoutOrientation) {
+        guard internalController.isPairZoomed else { return }
+        delegate?.splitTabBar(self, didChooseBoardLayout: orientation)
+    }
+
+    /// Requests the local keep-board-layout toggle in the displayed pair.
+    public func requestBoardLayoutPin() {
+        guard internalController.isPairZoomed else { return }
+        delegate?.splitTabBarDidTogglePin(self)
+    }
+
+    /// The Figma side's size, computed before the next native layout pass.
+    public var pairSecondPaneSize: CGSize? {
+        guard let pair = internalController.pairZoomState else { return nil }
+        let appearance = configuration.appearance
+        return PairPaneGeometry(
+            container: internalController.containerFrame.size,
+            orientation: pair.orientation,
+            dividerPosition: pair.splitState.dividerPosition,
+            imposedFirstExtent: pair.splitState.imposedFirstExtent,
+            dividerThickness: TabBarMetrics.resolvedDividerThickness(appearance.dividerThickness),
+            minimumExtent: pair.orientation == .horizontal ? appearance.minimumPaneWidth : appearance.minimumPaneHeight,
+            dividerRange: configuration.dividerPositionRange
+        ).secondSize
+    }
+
     // MARK: - Full Width Tab Mode
 
     /// Pane IDs whose tab chrome is currently rendered in full-width-tab mode.
