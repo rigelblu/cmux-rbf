@@ -532,7 +532,10 @@ final class AgentChatSessionRegistry {
         Self.applyChildRunEvent(&record, event: event)
 
         let previous = records[sessionID]
-        record.setHookLifecycleState(Self.nextState(previous: record.state, event: event))
+        // cmux-rbf #cm-73.17: retain the event behind needsInput for prompt-safe delivery.
+        let notificationType = event.extraFieldsJSON.flatMap { $0.data(using: .utf8) }
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["notification_type"] as? String
+        record.setHookLifecycleState(Self.nextState(previous: record.state, event: event), event: event.hookEventName, notificationType: notificationType)
         stampLifecycleTransition(previous: previous, current: &record, at: event.receivedAt)
         stampVersion(&record)
         storeRecord(record, replacing: previous)

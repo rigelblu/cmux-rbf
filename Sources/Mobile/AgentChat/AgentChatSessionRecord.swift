@@ -1,3 +1,4 @@
+import CMUXAgentLaunch // cmux-rbf #cm-73.17
 import CmuxAgentChat
 import Foundation
 
@@ -24,11 +25,27 @@ struct AgentChatSessionRecord: Sendable {
     var transcriptPath: String?
 
     /// Live activity state derived from hook events.
-    var state: ChatAgentState
+    // cmux-rbf #cm-73.17: clear a pending-input reason on every exit, including process death.
+    var state: ChatAgentState {
+        didSet {
+            if case .needsInput = state {} else {
+                needsInputEvent = nil
+                notificationType = nil
+            }
+            if state != .idle { idleObserver = nil }
+        }
+    }
 
     /// Whether `state` has been established by the agent's hook lifecycle.
     /// Process-table discovery proves presence and identity, but not idleness.
     var hasHookLifecycleState: Bool = false
+
+    // cmux-rbf #cm-73.17: distinguish prompt/reminder and transcript/process idle.
+    var needsInputEvent: WorkstreamEvent.HookEventName? = nil
+    var notificationType: String? = nil
+    var sawHookEvent = false
+    enum IdleObserver { case process, transcript }
+    var idleObserver: IdleObserver? = nil
 
     /// When the record entered `.ended`. Best-effort process observations sampled
     /// before this point must not revive it after a hook or exit watcher ended it.
@@ -62,19 +79,48 @@ struct AgentChatSessionRecord: Sendable {
         if id != sessionID { hookStoreSessionID = id }
     }
 
-    mutating func setHookLifecycleState(_ nextState: ChatAgentState) {
+    // cmux-rbf #cm-73.17: prompts latch until a turn hook clears them; reminders never dismiss dialogs.
+    mutating func setHookLifecycleState(_ nextState: ChatAgentState, event: WorkstreamEvent.HookEventName? = nil, notificationType: String? = nil) {
+        sawHookEvent = true
+        // cmux-rbf #cm-73.17: telemetry keeps the parent's state and its provenance.
+        switch event {
+        case .subagentStart, .subagentStop, .preCompact, .postCompact:
+            return
+        default:
+            break
+        }
         state = nextState
         hasHookLifecycleState = true
+        idleObserver = nil
+        if case .needsInput = nextState {
+            switch event {
+            case .permissionRequest, .askUserQuestion, .exitPlanMode:
+                needsInputEvent = event
+                self.notificationType = nil
+            case .notification:
+                let notificationIsPrompt = self.notificationType == "permission_prompt" || self.notificationType == "elicitation_dialog"
+                if needsInputEvent == nil || (needsInputEvent == .notification && !notificationIsPrompt) {
+                    needsInputEvent = event
+                    self.notificationType = notificationType
+                }
+            default:
+                break
+            }
+        }
     }
 
     mutating func setProcessObservedIdle() {
+        sawHookEvent = sawHookEvent || hasHookLifecycleState // cmux-rbf #cm-73.17
         state = .idle
         hasHookLifecycleState = false
+        idleObserver = .process // cmux-rbf #cm-73.17
     }
 
     mutating func setTranscriptObservedIdle() {
+        sawHookEvent = sawHookEvent || hasHookLifecycleState // cmux-rbf #cm-73.17
         state = .idle
         hasHookLifecycleState = false
+        idleObserver = .transcript // cmux-rbf #cm-73.17
     }
 
     /// Adopts terminal/transcript bindings from a hook-store entry. The
