@@ -20,6 +20,11 @@ extension Workspace {
         folder: String? = nil,
         page: URL = FigmaPaneURL.wrapperFileURL(),
         defaults: UserDefaults = .standard,
+        // cmux-rbf #cm-73.17: test seams never send to a process or install in real home.
+        agentRegistry: AgentChatSessionRegistry? = nil,
+        skillHome: URL = FileManager.default.homeDirectoryForCurrentUser,
+        deliverHandOff: ((UUID, [TextBoxSubmit.DispatchEvent]) -> Void)? = nil,
+        logHandOffRefusal: ((String) -> Void)? = nil,
         openExternally: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) },
         showSettings: @escaping @MainActor (SettingsNavigationTarget, String, Bool) -> Void = { target, anchor, highlight in
             SettingsWindowPresenter.show(navigationTarget: target, anchorID: anchor, highlight: highlight)
@@ -28,11 +33,15 @@ extension Workspace {
         let currentFolder = folder ?? JSONConfigStore(fileURL: CmuxConfigLocation().userConfigFile)
             .snapshotValue(for: SettingCatalog().figma.defaultFolder)
         let files = figmaFiles
+        // cmux-rbf #cm-73.17: read now for presentation, and again inside send on selection.
+        let registry = agentRegistry ?? TerminalController.shared.agentChatTranscriptService?.registry
+        let canHandOff = registry.flatMap { FigmaDesignHandOff.target(in: self, registry: $0) } != nil
         let model = FigmaButtonMenuModel(
             files: files,
             folder: currentFolder,
             canEnterDesignFocus: canEnterDesignFocusFromFigmaMenu,
-            shortcut: KeyboardShortcutSettings.menuShortcut(for: .toggleDesignFocus)
+            shortcut: KeyboardShortcutSettings.menuShortcut(for: .toggleDesignFocus),
+            canHandOff: canHandOff
         )
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -54,6 +63,16 @@ extension Workspace {
                     self.newFigmaSurface(inPane: pane, defaults: defaults, openExternally: openExternally)
                 case .chooseFolder:
                     showSettings(.automation, "setting:automation:figma-default-folder", true)
+                // cmux-rbf #cm-73.17: one shared delivery path, with a fresh gate.
+                case .putDesignIntoFigma, .newDesignInFigma:
+                    FigmaDesignHandOff.send(
+                        action == .putDesignIntoFigma ? .put : .new,
+                        in: self,
+                        registry: registry,
+                        home: skillHome,
+                        deliver: deliverHandOff,
+                        logRefusal: logHandOffRefusal
+                    )
                 case .enterDesignFocus:
                     guard !self.isDesignFocusActive, self.canEnterDesignFocusFromFigmaMenu else { return }
                     _ = self.toggleDesignFocus()
@@ -69,6 +88,7 @@ extension Workspace {
             default: break
             }
             item.isEnabled = row.enabled
+            item.toolTip = row.toolTip // cmux-rbf #cm-73.17
             if let shortcut = row.shortcut, let key = shortcut.menuItemKeyEquivalent {
                 item.keyEquivalent = key
                 item.keyEquivalentModifierMask = shortcut.modifierFlags

@@ -1,4 +1,5 @@
 import AppKit
+import CMUXAgentLaunch
 import Bonsplit
 import CmuxBrowser
 import CmuxSettings
@@ -218,6 +219,48 @@ import Testing
         override func object(forKey key: String) -> Any? {
             key == "BrowserAllowLocalFiles" ? false : super.object(forKey: key)
         }
+    }
+
+    // cmux-rbf #cm-73.17: render and invoke the real menu, with recorded delivery only.
+    @Test func handOffMenuRechecksStateAndInstallsInInjectedHome() throws {
+        let w = Workspace(); defer { w.teardownAllPanels() }
+        let pane = try #require(w.bonsplitController.allPaneIds.first)
+        let panel = try #require(w.focusedPanelId)
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".claude"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".agents"), withIntermediateDirectories: true)
+        let registry = AgentChatSessionRegistry(hookStore: AgentChatHookSessionStore(homeDirectory: home))
+        func fire(_ event: WorkstreamEvent.HookEventName) {
+            _ = registry.noteHookEvent(WorkstreamEvent(sessionId: panel.uuidString, hookEventName: event, source: "claude", surfaceId: panel.uuidString))
+        }
+        var sent: [[TextBoxSubmit.DispatchEvent]] = [], logs: [String] = []
+        func menu() -> NSMenu {
+            w.figmaButtonMenu(inPane: pane, folder: folder, agentRegistry: registry, skillHome: home, deliverHandOff: { id, events in
+                #expect(id == panel); sent.append(events)
+            }, logHandOffRefusal: { logs.append($0) })
+        }
+        var m = menu()
+        for title in ["Put Design into Figma", "New Design in Figma"] {
+            let item = try #require(m.items.first { $0.title == title })
+            #expect(!item.isEnabled)
+            #expect(item.toolTip == "Available when your agent is waiting for you")
+        }
+        fire(.sessionStart); m = menu()
+        for title in ["Put Design into Figma", "New Design in Figma"] {
+            let item = try #require(m.items.first { $0.title == title })
+            #expect(item.isEnabled); #expect(item.toolTip == nil)
+        }
+        fire(.userPromptSubmit)
+        try select("Put Design into Figma", in: m)
+        #expect(sent.isEmpty); #expect(logs.count == 1)
+        #expect(!FileManager.default.fileExists(atPath: home.appendingPathComponent(".claude/skills/design-in-figma-pane/SKILL.md").path))
+        fire(.stop); m = menu()
+        try select("Put Design into Figma", in: m)
+        try select("New Design in Figma", in: m)
+        #expect(sent == [FigmaDesignHandOff.dispatchEvents(for: .put, kind: .claude), FigmaDesignHandOff.dispatchEvents(for: .new, kind: .claude)])
+        #expect(try String(contentsOf: home.appendingPathComponent(".claude/skills/design-in-figma-pane/SKILL.md"), encoding: .utf8) == FigmaDesignSkill.document())
+        #expect(w.focusedPanelId == panel)
     }
 
 }

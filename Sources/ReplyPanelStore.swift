@@ -160,7 +160,7 @@ final class ReplyPanelStore {
     /// longer reachable in this conversation — but it means a rewrite can
     /// shorten the walk, which nothing on screen explains.
     private(set) var drafts = ReplyDrafts()
-    private var stickyPanelID: UUID?
+    private(set) var stickyPanelID: UUID?
     private var tailer: AgentChatTranscriptTailer?
     private var bindingPhase: BindingPhase = .unbound
     private var bindingRevision = 0
@@ -851,30 +851,21 @@ final class ReplyPanelStore {
     /// Before any agent pane has held focus there is nothing sticky to
     /// honour, so a live session wins and ties fall to a stable id order.
     /// Arbitrary, but never moving; the explicit picker is a later slice.
-    private func resolveAgentPanelID(
+    func resolveAgentPanelID(
         in workspace: Workspace,
         registry: AgentChatSessionRegistry
     ) -> UUID? {
+        workspace.replyPanelAgentChoiceStore = self // cmux-rbf #cm-73.17: share this store's actual sticky id.
         let agentPanelIDs = workspace.panels.keys.filter { panelID in
             registry.currentOrMostRecentSession(surfaceID: panelID.uuidString) != nil
         }
-        guard !agentPanelIDs.isEmpty else {
-            stickyPanelID = nil
-            return nil
-        }
-
-        if let focused = workspace.focusedPanelId, agentPanelIDs.contains(focused) {
-            stickyPanelID = focused
-        }
-        if let sticky = stickyPanelID, agentPanelIDs.contains(sticky) {
-            return sticky
-        }
-
-        let live = agentPanelIDs.filter { panelID in
-            registry.liveSession(surfaceID: panelID.uuidString) != nil
-        }
-        let candidates = live.isEmpty ? agentPanelIDs : live
-        let resolved = candidates.min { $0.uuidString < $1.uuidString }
+        // cmux-rbf #cm-73.17: preserve sticky memory while sharing the choice rule.
+        let resolved = AgentPaneChoice.resolve(
+            agentPanelIDs: agentPanelIDs,
+            focused: workspace.focusedPanelId,
+            sticky: stickyPanelID,
+            live: Set(agentPanelIDs.filter { registry.liveSession(surfaceID: $0.uuidString) != nil })
+        )
         stickyPanelID = resolved
         return resolved
     }

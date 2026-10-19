@@ -37334,6 +37334,10 @@ export default CMUXSessionRestore;
             event["transcript_path"] = transcriptPath
         }
         if let cwd = parsedInput.cwd { event["cwd"] = cwd }
+        // cmux-rbf #cm-73.17: preserve Claude's structured notification kind through feed ingress.
+        if hookEventName == "Notification", let type = firstString(in: fallbackObject, keys: ["notification_type"]) {
+            event["notification_type"] = type
+        }
         let cursorShellCommand = source == "cursor"
             ? firstString(in: fallbackObject, keys: ["command"]).map {
                 truncate(

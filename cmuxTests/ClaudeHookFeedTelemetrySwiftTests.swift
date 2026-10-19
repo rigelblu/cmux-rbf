@@ -51,6 +51,56 @@ struct ClaudeHookFeedTelemetrySwiftTests {
         )
     }
 
+    // cmux-rbf #cm-73.17: structured notification kind reaches the registry through feed.
+    @Test(arguments: ["idle_prompt", "permission_prompt", "elicitation_dialog"])
+    func notificationTypeSurvivesFeedTelemetry(notificationType: String) throws {
+        let context = try FeedTelemetryTestContext(name: "notification-type")
+        defer { _ = context }
+
+        let workspaceID = "11111111-1111-1111-1111-111111111111"
+        let leakedSurfaceID = "22222222-2222-2222-2222-222222222222"
+        let resolvedSurfaceID = "33333333-3333-3333-3333-333333333333"
+        let ttyName = "ttys-claude-feed-surface"
+        let feedSeen = DispatchSemaphore(value: 0)
+        startServer(
+            listenerFD: context.listenerFD,
+            state: context.state,
+            workspaceID: workspaceID,
+            focusedSurfaceID: leakedSurfaceID,
+            ttyName: ttyName,
+            resolvedSurfaceID: resolvedSurfaceID,
+            feedSeen: feedSeen
+        )
+
+        let cliPath = try BundledCLITestSupport.bundledCLIPath(for: BundledCLILinkageTests.self)
+        let result = runProcess(
+            executablePath: cliPath,
+            arguments: ["hooks", "claude", "session-start"],
+            environment: context.environment(
+                workspaceID: workspaceID,
+                surfaceID: leakedSurfaceID,
+                ttyName: ttyName
+            ),
+            standardInput: #"{"session_id":"claude-feed-session","source":"clear","cwd":"\#(context.root.path)","hook_event_name":"Notification","notification_type":"\#(notificationType)"}"#,
+            timeout: 5
+        )
+
+        #expect(result.timedOut == false, Comment(rawValue: result.stderr))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(result.stdout == "{}\n")
+        #expect(feedSeen.wait(timeout: .now() + 5) == .success, "Expected feed.push, saw \(context.state.commandsSnapshot())")
+        let event = try #require(
+            context.state.feedEventsSnapshot().last { $0["hook_event_name"] as? String == "Notification" },
+            "Expected Notification feed telemetry, saw \(context.state.commandsSnapshot())"
+        )
+        #expect(
+            event["surface_id"] as? String == resolvedSurfaceID,
+            "Feed telemetry must use the resolved agent TTY surface, not leaked CMUX_SURFACE_ID; event=\(event)"
+        )
+        #expect(event["notification_type"] as? String == notificationType)
+
+    }
+
     // Regression for https://github.com/manaflow-ai/cmux/issues/7962: Claude Code
     // renders any plain-text hook stdout as a visible "hook success" block in the
     // conversation transcript — for prompt-submit hooks, a bare "OK" on every
