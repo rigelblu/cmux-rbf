@@ -533,9 +533,21 @@ final class AgentChatSessionRegistry {
 
         let previous = records[sessionID]
         // cmux-rbf #cm-73.17: retain the event behind needsInput for prompt-safe delivery.
-        let notificationType = event.extraFieldsJSON.flatMap { $0.data(using: .utf8) }
-            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["notification_type"] as? String
-        record.setHookLifecycleState(Self.nextState(previous: record.state, event: event), event: event.hookEventName, notificationType: notificationType)
+        let extraFields = event.extraFieldsJSON.flatMap { $0.data(using: .utf8) }
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let notificationType = extraFields?["notification_type"] as? String
+        // cmux-rbf #cm-73.24: the CLI forwards Claude's helper `agent_id` as `helper_agent_id`.
+        let hasAgentID = (extraFields?["helper_agent_id"] as? String).map { !$0.isEmpty } ?? false
+        #if DEBUG
+        let stateBefore = record.state
+        #endif
+        record.setHookLifecycleState(Self.nextState(previous: record.state, event: event), event: event.hookEventName, notificationType: notificationType, hasAgentID: hasAgentID)
+        #if DEBUG
+        cmuxDebugLog(
+            "agentChat.hook.state session=\(sessionID.prefix(8)) event=\(event.hookEventName.rawValue) "
+            + "agent=\(hasAgentID ? 1 : 0) before=\(Self.stateLabel(stateBefore)) after=\(Self.stateLabel(record.state))"
+        )
+        #endif
         stampLifecycleTransition(previous: previous, current: &record, at: event.receivedAt)
         stampVersion(&record)
         storeRecord(record, replacing: previous)

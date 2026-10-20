@@ -101,6 +101,53 @@ struct ClaudeHookFeedTelemetrySwiftTests {
 
     }
 
+    // cmux-rbf #cm-73.24: a helper's `agent_id` reaches the registry through feed; the main thread's events carry none.
+    @Test(arguments: ["helper-1", nil] as [String?])
+    func agentIDSurvivesFeedTelemetry(agentID: String?) throws {
+        let context = try FeedTelemetryTestContext(name: "agent-id")
+        defer { _ = context }
+
+        let workspaceID = "11111111-1111-1111-1111-111111111111"
+        let surfaceID = "22222222-2222-2222-2222-222222222222"
+        let ttyName = "ttys-claude-feed-agent-id"
+        let feedSeen = DispatchSemaphore(value: 0)
+        startServer(
+            listenerFD: context.listenerFD,
+            state: context.state,
+            workspaceID: workspaceID,
+            focusedSurfaceID: surfaceID,
+            ttyName: ttyName,
+            resolvedSurfaceID: surfaceID,
+            feedSeen: feedSeen
+        )
+
+        let agentField = agentID.map { #","agent_id":"\#($0)""# } ?? ""
+        let cliPath = try BundledCLITestSupport.bundledCLIPath(for: BundledCLILinkageTests.self)
+        let result = runProcess(
+            executablePath: cliPath,
+            arguments: ["hooks", "claude", "pre-tool-use"],
+            environment: context.environment(
+                workspaceID: workspaceID,
+                surfaceID: surfaceID,
+                ttyName: ttyName
+            ),
+            standardInput: #"{"session_id":"claude-feed-session","cwd":"\#(context.root.path)","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}\#(agentField)}"#,
+            timeout: 5
+        )
+
+        #expect(result.timedOut == false, Comment(rawValue: result.stderr))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(feedSeen.wait(timeout: .now() + 5) == .success, "Expected feed.push, saw \(context.state.commandsSnapshot())")
+        let event = try #require(
+            context.state.feedEventsSnapshot().last { $0["hook_event_name"] as? String == "PreToolUse" },
+            "Expected PreToolUse feed telemetry, saw \(context.state.commandsSnapshot())"
+        )
+        #expect(event["helper_agent_id"] as? String == agentID, "event=\(event)")
+        #expect(agentID != nil || event.keys.contains("helper_agent_id") == false, "event=\(event)")
+        // The agent journal reads `agent_id` as a request id; the feed event must not carry it.
+        #expect(event.keys.contains("agent_id") == false, "event=\(event)")
+    }
+
     // Regression for https://github.com/manaflow-ai/cmux/issues/7962: Claude Code
     // renders any plain-text hook stdout as a visible "hook success" block in the
     // conversation transcript — for prompt-submit hooks, a bare "OK" on every

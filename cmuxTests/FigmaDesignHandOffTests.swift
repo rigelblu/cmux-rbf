@@ -226,3 +226,126 @@ import Testing
     }
 
 }
+
+// cmux-rbf #cm-73.24: Scenario 185. A helper's tool event must not lift a waiting Claude session to working.
+@MainActor @Suite struct FigmaDesignHandOffHelperEventTests {
+    @MainActor private struct Rig {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let registry: AgentChatSessionRegistry
+        let session = UUID().uuidString
+        let source: String
+
+        init(source: String = "claude") {
+            self.source = source
+            registry = AgentChatSessionRegistry(hookStore: AgentChatHookSessionStore(homeDirectory: home))
+        }
+
+        func cleanup() { try? FileManager.default.removeItem(at: home) }
+
+        @discardableResult
+        func fire(_ event: WorkstreamEvent.HookEventName, agentID: String? = nil, type: String? = nil) -> AgentChatSessionRecord {
+            var extra: [String: String] = [:]
+            if let agentID { extra["helper_agent_id"] = agentID }
+            if let type { extra["notification_type"] = type }
+            let json = extra.isEmpty ? nil : (try? JSONSerialization.data(withJSONObject: extra)).flatMap { String(data: $0, encoding: .utf8) }
+            return registry.noteHookEvent(WorkstreamEvent(sessionId: session, hookEventName: event, source: source, extraFieldsJSON: json))
+        }
+    }
+
+    private static let toolEvents: [WorkstreamEvent.HookEventName] = [.preToolUse, .postToolUse, .postToolUseFailure, .todoWrite]
+
+    @Test(arguments: toolEvents)
+    func helperToolEventLeavesStopIdleAlone(event: WorkstreamEvent.HookEventName) {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.userPromptSubmit); rig.fire(.stop)
+        let record = rig.fire(event, agentID: "helper-1")
+        #expect(record.state == .idle)
+        #expect(record.hasHookLifecycleState)
+        #expect(FigmaDesignHandOff.isAvailable(record))
+    }
+
+    @Test(arguments: toolEvents)
+    func helperToolEventLeavesIdlePromptAlone(event: WorkstreamEvent.HookEventName) {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        let waiting = rig.fire(.notification, type: "idle_prompt")
+        guard case .needsInput = waiting.state else { Issue.record("idle_prompt did not set needsInput"); return }
+        let record = rig.fire(event, agentID: "helper-1")
+        guard case .needsInput = record.state else { Issue.record("helper \(event) moved needsInput to \(record.state)"); return }
+        #expect(record.needsInputEvent == .notification)
+        #expect(record.notificationType == "idle_prompt")
+        #expect(FigmaDesignHandOff.isAvailable(record))
+    }
+
+    @Test(arguments: [nil, ""] as [String?])
+    func toolEventWithoutAgentIDWorks(agentID: String?) {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        let record = rig.fire(.preToolUse, agentID: agentID)
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+        #expect(!FigmaDesignHandOff.isAvailable(record))
+    }
+
+    @Test func helperToolEventAfterSessionStartIdleWorks() {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart)
+        let record = rig.fire(.preToolUse, agentID: "helper-1")
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+    }
+
+    @Test func toolEventWithoutAgentIDLiftsPermissionRequest() {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        rig.fire(.permissionRequest)
+        let record = rig.fire(.preToolUse)
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+    }
+
+    @Test(arguments: [nil, "permission_prompt"] as [String?])
+    func helperToolEventLiftsPromptNeedsInput(type: String?) {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        if let type { rig.fire(.notification, type: type) } else { rig.fire(.permissionRequest) }
+        let record = rig.fire(.preToolUse, agentID: "helper-1")
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+    }
+
+    @Test func helperPermissionRequestStillNeedsInput() {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        let record = rig.fire(.permissionRequest, agentID: "helper-1")
+        guard case .needsInput = record.state else { Issue.record("expected needsInput, got \(record.state)"); return }
+        #expect(record.needsInputEvent == .permissionRequest)
+        #expect(!FigmaDesignHandOff.isAvailable(record))
+    }
+
+    @Test func codexHookIdleStillGoesWorking() {
+        let rig = Rig(source: "codex"); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        let record = rig.fire(.preToolUse, agentID: "helper-1")
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+    }
+
+    @Test func workingStaysWorking() {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.userPromptSubmit)
+        let record = rig.fire(.preToolUse, agentID: "helper-1")
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+    }
+
+    @Test func processObservedIdleClearsStopProvenance() {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        rig.registry.update(sessionID: rig.session) { $0.setProcessObservedIdle() }
+        let record = rig.fire(.preToolUse, agentID: "helper-1")
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+    }
+
+    @Test func transcriptObservedIdleClearsStopProvenance() {
+        let rig = Rig(); defer { rig.cleanup() }
+        rig.fire(.sessionStart); rig.fire(.stop)
+        rig.registry.update(sessionID: rig.session) { $0.setTranscriptObservedIdle() }
+        let record = rig.fire(.preToolUse, agentID: "helper-1")
+        guard case .working = record.state else { Issue.record("expected working, got \(record.state)"); return }
+    }
+}

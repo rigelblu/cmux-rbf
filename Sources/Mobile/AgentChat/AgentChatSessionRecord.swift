@@ -32,7 +32,7 @@ struct AgentChatSessionRecord: Sendable {
                 needsInputEvent = nil
                 notificationType = nil
             }
-            if state != .idle { idleObserver = nil }
+            if state != .idle { idleObserver = nil; idleEntryEvent = nil } // cmux-rbf #cm-73.24
         }
     }
 
@@ -43,6 +43,8 @@ struct AgentChatSessionRecord: Sendable {
     // cmux-rbf #cm-73.17: distinguish prompt/reminder and transcript/process idle.
     var needsInputEvent: WorkstreamEvent.HookEventName? = nil
     var notificationType: String? = nil
+    // cmux-rbf #cm-73.24: the hook event that set `.idle` (`.stop` or `.sessionStart`); nil when idle came from watching the process or transcript.
+    var idleEntryEvent: WorkstreamEvent.HookEventName? = nil
     var sawHookEvent = false
     enum IdleObserver { case process, transcript }
     var idleObserver: IdleObserver? = nil
@@ -80,7 +82,7 @@ struct AgentChatSessionRecord: Sendable {
     }
 
     // cmux-rbf #cm-73.17: prompts latch until a turn hook clears them; reminders never dismiss dialogs.
-    mutating func setHookLifecycleState(_ nextState: ChatAgentState, event: WorkstreamEvent.HookEventName? = nil, notificationType: String? = nil) {
+    mutating func setHookLifecycleState(_ nextState: ChatAgentState, event: WorkstreamEvent.HookEventName? = nil, notificationType: String? = nil, hasAgentID: Bool = false) {
         sawHookEvent = true
         // cmux-rbf #cm-73.17: telemetry keeps the parent's state and its provenance.
         switch event {
@@ -89,9 +91,22 @@ struct AgentChatSessionRecord: Sendable {
         default:
             break
         }
+        // cmux-rbf #cm-73.24: a helper's tool event (`agent_id`) after the turn's `Stop` or its idle reminder is not the main thread working again.
+        if agentKind == .claude, hasAgentID,
+           event == .preToolUse || event == .postToolUse || event == .postToolUseFailure || event == .todoWrite {
+            let waitingAfterStop = state == .idle && idleEntryEvent == .stop
+            let waitingOnReminder: Bool
+            if case .needsInput = state {
+                waitingOnReminder = needsInputEvent == .notification && self.notificationType == "idle_prompt"
+            } else {
+                waitingOnReminder = false
+            }
+            if waitingAfterStop || waitingOnReminder { return }
+        }
         state = nextState
         hasHookLifecycleState = true
         idleObserver = nil
+        idleEntryEvent = nextState == .idle && (event == .stop || event == .sessionStart) ? event : nil // cmux-rbf #cm-73.24
         if case .needsInput = nextState {
             switch event {
             case .permissionRequest, .askUserQuestion, .exitPlanMode:
@@ -114,6 +129,7 @@ struct AgentChatSessionRecord: Sendable {
         state = .idle
         hasHookLifecycleState = false
         idleObserver = .process // cmux-rbf #cm-73.17
+        idleEntryEvent = nil // cmux-rbf #cm-73.24
     }
 
     mutating func setTranscriptObservedIdle() {
@@ -121,6 +137,7 @@ struct AgentChatSessionRecord: Sendable {
         state = .idle
         hasHookLifecycleState = false
         idleObserver = .transcript // cmux-rbf #cm-73.17
+        idleEntryEvent = nil // cmux-rbf #cm-73.24
     }
 
     /// Adopts terminal/transcript bindings from a hook-store entry. The
