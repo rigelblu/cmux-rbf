@@ -9,7 +9,9 @@ import Foundation
 ///
 /// **Why `fit` has two ways.** In Figma's editor, `⇧1` (the trusted key
 /// `browser.press` sends for `!`) zooms to fit with no reload. The read view has
-/// no zoom to fit, from anyone, so it is loaded again on the whole page (`goto 0-1`).
+/// no zoom to fit, from anyone, so it is loaded again on the node its address
+/// already names, which Figma centers: the same board, or the whole page (`0-1`).
+/// Never a different node: a fit re-centers what is showing (Tom, 2026-10-20).
 enum FigmaFit {
 
     /// Which way `fit` went, as `--json` carries it.
@@ -22,15 +24,15 @@ enum FigmaFit {
     enum Decision: Equatable {
         /// Press `⇧1` in the editor.
         case pressFit
-        /// Load the read view again on the whole page.
-        case reloadWholePage
+        /// Load the read view again on this node: the one the pane's address names.
+        case reloadNode(String)
         /// Do nothing, and say why.
         case refuse(String)
 
         var mode: Mode? {
             switch self {
             case .pressFit: return .editor
-            case .reloadWholePage: return .read
+            case .reloadNode: return .read
             case .refuse: return nil
             }
         }
@@ -55,7 +57,9 @@ enum FigmaFit {
                 "cmux figma fit works on Figma design files only: surface \(handle) shows a FigJam board or a slide deck"
             )
         }
-        guard FigmaFileLink.isEditorLink(paneAddress) else { return .reloadWholePage }
+        guard FigmaFileLink.isEditorLink(paneAddress) else {
+            return .reloadNode(FigmaPaneURL.node(fromPaneURL: paneAddress) ?? "0-1")
+        }
         guard isShowing else {
             return .refuse("surface \(handle) is not showing, so fit sent no key")
         }

@@ -273,12 +273,24 @@ struct FigmaFitRulesTests {
         #expect(decide(Self.editor, showing: false).mode == nil)
     }
 
-    @Test("a read-view pane loads the whole page again, showing or not")
+    @Test("a read-view pane loads again on the node its address names, showing or not")
     func readView() {
-        for address in [Self.read, Self.wrapper] {
-            #expect(decide(address, document: Self.editor, showing: true) == .reloadWholePage, "\(address)")
-            #expect(decide(address, document: Self.editor, showing: false) == .reloadWholePage, "\(address)")
+        let onBoard = FigmaPaneURL.wrapperURL(
+            FigmaPaneURL.wrapperFileURL(),
+            embedding: URL(string: "https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2")!
+        )
+        for (address, node) in [(Self.read, "1-2"), (onBoard, "12-2")] {
+            #expect(decide(address, document: Self.editor, showing: true) == .reloadNode(node), "\(address)")
+            #expect(decide(address, document: Self.editor, showing: false) == .reloadNode(node), "\(address)")
             #expect(decide(address, document: Self.editor).mode == .read)
+        }
+    }
+
+    @Test("a read-view pane on the whole page, or with no node it can read, loads the whole page again")
+    func readViewWholePage() {
+        let onPage = URL(string: "https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=0-1")!
+        for address in [onPage, Self.wrapper] {
+            #expect(decide(address, document: Self.editor) == .reloadNode("0-1"), "\(address)")
         }
     }
 
