@@ -292,7 +292,7 @@ extension CMUXCLI {
     ///
     /// **Two ways, no new socket method.** In Figma's editor it sends `browser.press`
     /// with `!`, the trusted `⇧1`; in the read view, which has no zoom to fit, it
-    /// loads the view again on the whole page, as `goto 0-1` does. Which way, and
+    /// loads the view again on the node it shows, as `goto <that node>` does. Which way, and
     /// every refusal, is ``FigmaFit/decide(handle:paneAddress:document:isShowing:)``.
     ///
     /// **A trusted `!` types into Figma's text editing** (measured 2026-10-20), which
@@ -317,8 +317,8 @@ extension CMUXCLI {
         case .refuse(let message):
             throw CLIError(message: message)
 
-        case .reloadWholePage:
-            let destination = try figmaDestination(for: pane.document, node: "0-1")
+        case .reloadNode(let node):
+            let destination = try figmaDestination(for: pane.document, node: node)
             payload = try client.sendV2(
                 method: "browser.navigate",
                 params: ["surface_id": pane.surfaceID, "url": destination.url.absoluteString]

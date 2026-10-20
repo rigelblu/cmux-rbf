@@ -839,7 +839,7 @@ struct FigmaCLIOutputTests {
         #expect((readJSON["surface"] as? String)?.isEmpty == false, "\(readJSON)")
     }
 
-    @Test("fit in the read view loads the whole page once, with no key and no question about focus")
+    @Test("fit in the read view loads the node it shows once, with no key and no question about focus")
     func fitReadNavigatesOnce() throws {
         let run = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)]))
         #expect(run.status == 0, "\(run.stderr)")
@@ -848,7 +848,8 @@ struct FigmaCLIOutputTests {
         #expect(run.navigates.first?.params["surface_id"] as? String == "id-8")
         // The embed address sits percent-encoded inside the page's query.
         let address = (run.navigates.first?.params["url"] as? String ?? "").removingPercentEncoding ?? ""
-        #expect(address.contains("node-id=0-1") && address.contains("KEY"), "\(address)")
+        // The board the pane showed, not the whole page (Tom, 2026-10-20).
+        #expect(address.contains("node-id=1-2") && !address.contains("node-id=0-1") && address.contains("KEY"), "\(address)")
         #expect(presses(run).isEmpty && evals(run).isEmpty, "\(run.requests.map(\.method))")
         #expect(run.pageInstalledInTestHome, "the read view's page is on disk, as goto leaves it")
     }
