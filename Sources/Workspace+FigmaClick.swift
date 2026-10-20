@@ -70,15 +70,14 @@ extension Workspace {
             }
             guard let address = panes.first(where: { $0.id == paneId })?.address,
                   let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: page),
-                  let destination = figmaClickDestination(for: document, node: node, page: page, defaults: defaults)
+                  figmaClickDestination(for: document, node: node, page: page, defaults: defaults) != nil
             else { return false }
             // Showing the pane first makes a restored, not yet shown pane a real
             // `BrowserPanel`; `focusPanel` does that in one synchronous step.
             focusPanel(paneId)
             guard let panel = panels[paneId] as? BrowserPanel else { return false }
-            // The pane's own file path plus the clicked link's frame, as `goto` builds it.
-            panel.navigate(to: destination.url)
-            return true
+            // Wrapper installation and URL policy above gate the shared goto action.
+            return panel.gotoFigmaNode(node, wrapper: page, defaults: defaults) // cmux-rbf #cm-73.3
 
         case .bringForward(let paneId):
             // cmux-rbf #cm-73.2a

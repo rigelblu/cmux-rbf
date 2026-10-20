@@ -7,6 +7,22 @@ struct RemoteCLIRelayPolicyTests {
     private let tokenHex = "00112233445566778899aabbccddeeff"
     private let relayID = "relay-policy"
 
+    @Test("figma.goto stays denied even for a surface owned by the remote session")
+    func deniesFigmaGoto() throws {
+        let alias = (remote: UUID(), local: UUID())
+        try withServer(surfaceAliases: [alias.remote: alias.local]) { port, unixServer in
+            let exchange = try runPolicyRelayExchange(
+                port: port,
+                relayID: relayID,
+                tokenHex: tokenHex,
+                commandLine: """
+                {"id":"figma","method":"figma.goto","params":{"surface_id":"\(alias.remote.uuidString)","node":"12-2"}}
+                """
+            )
+            expectDenial(exchange, unixServer, "figma.goto owned surface")
+        }
+    }
+
     private func withServer(
         workspaceAliases: [UUID: UUID] = [:],
         surfaceAliases: [UUID: UUID] = [:],

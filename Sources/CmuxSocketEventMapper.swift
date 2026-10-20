@@ -129,7 +129,7 @@ enum CmuxSocketEventMapper {
             return DomainEventMapping(name: "app.focus_override.changed", category: "app", params: .unchanged)
         case "app.simulate_active":
             return DomainEventMapping(name: "app.simulated_active", category: "app", params: .unchanged)
-        case "browser.navigate", "browser.back", "browser.forward", "browser.reload":
+        case "figma.goto", "browser.navigate", "browser.back", "browser.forward", "browser.reload":
             return DomainEventMapping(name: "browser.navigation", category: "browser", params: .unchanged)
         case "browser.click", "browser.dblclick", "browser.hover", "browser.focus", "browser.press", "browser.keydown", "browser.keyup", "browser.check", "browser.uncheck", "browser.select", "browser.scroll", "browser.scroll_into_view":
             return DomainEventMapping(name: "browser.interaction", category: "browser", params: .unchanged)

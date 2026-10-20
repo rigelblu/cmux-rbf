@@ -1400,6 +1400,7 @@
       "restartNew": "Yeni bir workspace oluştur (varsayılan)"
     },
     "keyboardShortcuts": {
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Önizleme ve Tuval Arasında Geçiş Yap",
       "title": "Klavye Kısayolları",
       "description": "cmux'ta mevcut tüm klavye kısayolları, kategoriye göre gruplandırılmış.",
       "metaDescription": "macOS'ta çalışma alanları, yüzeyler, bölünmüş paneller, tarayıcı, bildirimler, bulma ve pencere yönetimi için tüm cmux klavye kısayolları.",

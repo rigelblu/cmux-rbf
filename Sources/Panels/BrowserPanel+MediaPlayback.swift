@@ -231,10 +231,14 @@ extension BrowserPanel {
 
     /// Installs the media-playback message handler on `webView`.
     ///
-    /// Each `BrowserPanel` webview is created with a fresh `WKWebViewConfiguration`
-    /// (`makeWebView`), so the handler name is never registered twice on one
-    /// content controller. Reset `isPlayingMedia` for the freshly bound webview.
+    /// A retained Figma page can be bound again on its existing content controller.
+    /// Replace that page's handler and reset playback tracking for the new binding.
     func setupMediaPlaybackMessageHandler(for webView: WKWebView) {
+        // cmux-rbf (#cm-73.3): binding an existing page must be idempotent. Reject a revert of this hunk on upstream sync.
+        webView.configuration.userContentController.removeScriptMessageHandler(
+            forName: mediaPlaybackMessageHandlerName,
+            contentWorld: Self.mediaPlaybackContentWorld
+        )
         resetMediaPlaybackTracking()
         // Bind the handler to this webview generation. The handler stays alive on
         // the old content controller until the old webview deallocates, so a late

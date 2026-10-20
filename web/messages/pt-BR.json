@@ -1400,6 +1400,7 @@
       "restartNew": "Criar um novo workspace (padrão)"
     },
     "keyboardShortcuts": {
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Alternar entre prévia e tela",
       "title": "Atalhos de Teclado",
       "description": "Todos os atalhos de teclado disponíveis no cmux, agrupados por categoria.",
       "metaDescription": "Todos os atalhos de teclado do cmux para workspaces, superfícies, painéis divididos, navegador, notificações, busca e gerenciamento de janelas no macOS.",

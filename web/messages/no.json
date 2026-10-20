@@ -1400,6 +1400,7 @@
       "restartNew": "Opprett et nytt workspace (standard)"
     },
     "keyboardShortcuts": {
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Bytt mellom forhåndsvisning og lerret",
       "title": "Tastatursnarveier",
       "description": "Alle tastatursnarveier tilgjengelige i cmux, gruppert etter kategori.",
       "metaDescription": "Alle cmux-tastatursnarveier for arbeidsområder, overflater, delte paneler, nettleser, varsler, søk og vindusbehandling på macOS.",

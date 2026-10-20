@@ -141,6 +141,8 @@ extension ShortcutAction {
         case .splitRight: return ShortcutStroke(key: "d", command: true)
         case .splitDown: return ShortcutStroke(key: "d", command: true, shift: true)
         case .toggleSplitZoom: return ShortcutStroke(key: "\r", command: true, shift: true)
+        // cmux-rbf #cm-73.3
+        case .switchFigmaPreviewAndCanvas: return ShortcutStroke(key: "c", command: true, shift: true, option: true)
         // cmux-rbf #cm-73.2a
         case .toggleDesignFocus: return ShortcutStroke(key: "\r", command: true, shift: true, option: true)
         // cmux-rbf #cm-73.2a

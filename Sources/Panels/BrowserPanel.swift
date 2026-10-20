@@ -2004,6 +2004,30 @@ final class BrowserPanel: Panel, ObservableObject {
     @Published private(set) var profileID: UUID
     @Published private(set) var historyStore: BrowserHistoryStore
 
+    // cmux-rbf (#cm-73.3): at most one hidden page beside the showing webView. Reject a revert of this hunk on upstream sync.
+    private struct RetainedFigmaPage {
+        let webView: CmuxWebView
+        let instanceID: UUID
+        let navigationDelegate: BrowserNavigationDelegate?
+        let uiDelegate: BrowserUIDelegate?
+        let downloadDelegate: BrowserDownloadDelegate?
+        let address: URL
+        let title: String
+        let history: RestoredSessionHistory
+        let trustedFile: URL?
+        let pendingTrustedFile: URL?
+        let loadBar: FigmaLoadBarState
+        let contentState: WebContentState
+        let hasCommitted: Bool
+        let stopped: Bool
+        let provisional: Bool
+    }
+    private var retainedFigmaPage: RetainedFigmaPage?
+    // Memory pressure releases the document, but the next switch still knows its address.
+    private var discardedFigmaPageAddress: URL?
+    var figmaPageWrapper = FigmaPaneURL.wrapperFileURL()
+    var retainedFigmaPageAddress: URL? { retainedFigmaPage?.address ?? discardedFigmaPageAddress }
+
     /// The underlying web view
     var webView: WKWebView
     private let surfaceSelectionReader = WebSurfaceSelectionReader()
@@ -2011,7 +2035,12 @@ final class BrowserPanel: Panel, ObservableObject {
     let viewportModel = BrowserViewportModel()
     var browserViewportHostRestorationTask: Task<Void, Never>?
     var browserViewportHostRestorationPending = false
-    var websiteDataStore: WKWebsiteDataStore
+    var websiteDataStore: WKWebsiteDataStore {
+        didSet {
+            // cmux-rbf (#cm-73.3): a profile/privacy change applies to the whole pane. Reject a revert of this hunk on upstream sync.
+            if oldValue !== websiteDataStore { releaseRetainedFigmaPage() }
+        }
+    }
     private let preservesExplicitEphemeralWebsiteDataStore: Bool
     var browserAutomationUserScripts: [WKUserScript] = []
     var browserAutomationInitScriptCount = 0
@@ -2103,6 +2132,18 @@ final class BrowserPanel: Panel, ObservableObject {
     @Published private(set) var currentURL: URL? {
         didSet {
             guard oldValue != currentURL else { return }
+            if let saved = discardedFigmaPageAddress, let currentURL,
+               FigmaPaneURL.fileKey(fromPaneURL: saved, wrapper: figmaPageWrapper) != FigmaPaneURL.fileKey(fromPaneURL: currentURL, wrapper: figmaPageWrapper)
+                || FigmaPaneURL.isWrapperPage(saved, wrapper: figmaPageWrapper) == FigmaPaneURL.isWrapperPage(currentURL, wrapper: figmaPageWrapper) {
+                discardedFigmaPageAddress = nil
+            }
+            // cmux-rbf (#cm-73.3): in-place Figma navigation must not leave a different file or a duplicate side behind. Reject a revert of this hunk on upstream sync.
+            if let held = retainedFigmaPage, let currentURL,
+               let key = FigmaPaneURL.fileKey(fromPaneURL: currentURL, wrapper: figmaPageWrapper),
+               key != FigmaPaneURL.fileKey(fromPaneURL: held.address, wrapper: figmaPageWrapper)
+                || FigmaPaneURL.isWrapperPage(currentURL, wrapper: figmaPageWrapper) == FigmaPaneURL.isWrapperPage(held.address, wrapper: figmaPageWrapper) {
+                releaseRetainedFigmaPage()
+            }
             applyConfiguredWebViewBackground()
             mobileBrowserStreamStateDidChange(markDirty: true)
         }
@@ -2782,6 +2823,7 @@ final class BrowserPanel: Panel, ObservableObject {
         guard blockers.isEmpty else { return false }
 
         cancelHiddenWebViewDiscard()
+        releaseRetainedFigmaPage(keepingAddress: true) // cmux-rbf #cm-73.3: release documents, retain the hidden address.
 
         let oldWebView = webView
         let pendingRecoveryURL = pendingWebContentRecoveryURL
@@ -3252,6 +3294,237 @@ final class BrowserPanel: Panel, ObservableObject {
         userContentController.add(handler, name: BrowserSSLTrustBypassMessageHandler.name)
     }
 
+    // cmux-rbf (#cm-73.3): used at initial creation and for the lazily made second page. Reject a revert of this hunk on upstream sync.
+    private func configurePageDelegates() {
+        // Set up navigation delegate
+        let navDelegate = BrowserNavigationDelegate(
+            externalNavigationHandler: externalNavigationHandler
+        )
+        navDelegate.owner = self
+        navDelegate.openInNewTab = { [weak self] url in
+            self?.openLinkInNewTab(url: url, designFocusAsker: .page) // cmux-rbf #cm-73.2a
+        }
+        navDelegate.openAppLinkInBrowserSplit = { [weak self] url in
+            self?.openAppLinkInBrowserSplit?(url) ?? false
+        }
+        navDelegate.requestNavigation = { [weak self, weak navDelegate] request, intent, onNavigationStarted in
+            guard let self, let navDelegate, self.navigationDelegate === navDelegate else {
+                onNavigationStarted?(nil)
+                return
+            }
+            self.requestNavigation(
+                request,
+                intent: intent,
+                onNavigationStarted: onNavigationStarted
+            )
+        }
+        navDelegate.presentAlert = { [weak self] alert, webView, completion, cancel in
+            guard let self else {
+                cancel()
+                return
+            }
+            // Discard the dismiss handle explicitly: Xcode 26.3's Swift rejects a
+            // discarded function-typed result as an error even under
+            // @discardableResult.
+            _ = self.presentBrowserAlert(alert, in: webView, completion: completion, cancel: cancel)
+        }
+        navDelegate.shouldBlockInsecureHTTPNavigation = { [weak self] in self?.shouldBlockInsecureHTTPNavigation(to: $0) ?? false }
+        navDelegate.shouldBlockInsecureHTTPSubframeDownload = { browserShouldBlockInsecureHTTPURL($0) }
+        navDelegate.handleBlockedInsecureHTTPNavigation = { [weak self] request, intent in
+            guard let self else { return }
+            let restoreAttemptID = self.currentDiscardRestoreAttemptID
+            // This is an action-policy replacement, which exposes no WKNavigation identity.
+            // Do not transfer an automation ticket based on WebView or URL coincidence.
+            self.presentInsecureHTTPAlert(
+                for: request,
+                intent: intent,
+                recordTypedNavigation: false,
+                onResolution: { [weak self] resolution in
+                    guard resolution.isTerminalPolicyCancellation else { return }
+                    self?.noteDiscardedWebViewRestoreNavigationTerminallyCancelled(restoreAttemptID: restoreAttemptID)
+                }
+            )
+        }
+        navDelegate.currentRestoreAttemptID = { [weak self] in self?.currentDiscardRestoreAttemptID }
+        navDelegate.terminalPolicyCancellationReporter = { [weak self] navigationAction, webView in
+            let restoreAttemptID = self?.currentDiscardRestoreAttemptID
+            return { [weak self, weak webView] in
+                guard let self, let webView, navigationAction.targetFrame?.isMainFrame == true, self.isCurrentWebView(webView) else { return }
+                self.noteDiscardedWebViewRestoreNavigationTerminallyCancelled(restoreAttemptID: restoreAttemptID)
+            }
+        }
+        navDelegate.handleDroppedFileNavigation = { [weak self] urls in
+            guard let self,
+                  let appDelegate = AppDelegate.shared,
+                  let target = appDelegate.browserActionTarget(for: self) else {
+                return false
+            }
+            return appDelegate.openFilePreviews(
+                urls,
+                relativeTo: target,
+                zone: .right
+            )
+        }
+        navDelegate.handleBlockedURLAllowlistNavigation = { [weak self] url, webView in
+            guard let self, self.isCurrentWebView(webView) else { return }
+            let safeURL = URL(string: BrowserURLAllowlistBlockedPage.safeDisplayOrigin(for: url))
+            self.currentURL = Self.remoteProxyDisplayURL(for: safeURL) ?? safeURL
+            let policy = BrowserURLAllowlistPolicy(defaults: .standard)
+            self.pageTitle = BrowserURLAllowlistBlockedPage.title(isManaged: policy.isManaged)
+            self.faviconPNGData = nil
+            self.lastFaviconURLString = nil
+            BrowserURLAllowlistBlockedPage(
+                blockedURL: url,
+                isManaged: policy.isManaged
+            ).load(in: webView)
+            self.refreshBackgroundAppearance()
+        }
+        navDelegate.didTerminateWebContentProcess = { [weak self] webView in
+            self?.handleWebContentProcessTermination(for: webView)
+        }
+        // Set up download delegate for navigation-based downloads.
+        // Downloads save to a temp file synchronously (no UI during WebKit
+        // callbacks), then auto-save to Downloads unless the prompt setting is enabled.
+        let dlDelegate = BrowserDownloadDelegate()
+        dlDelegate.savePanelParentWindow = { [weak self] in
+            self.flatMap { browserInteractiveModalHostWindow(for: $0.webView) }
+        }
+        dlDelegate.onDownloadStarted = { [weak self] filename, downloadID in
+            guard let self else { return }
+            self.beginDownloadActivity()
+            self.applyBrowserDownloadEvent(type: "started", downloadID: downloadID, filename: filename, path: nil)
+            NotificationCenter.default.post(
+                name: .browserDownloadEventDidArrive,
+                object: self,
+                userInfo: [
+                    "surfaceId": self.id,
+                    "workspaceId": self.workspaceId,
+                    "event": [
+                        "type": "started",
+                        "download_id": downloadID,
+                        "filename": filename
+                    ]
+                ]
+            )
+        }
+        dlDelegate.onDownloadReadyToSave = { [weak self] filename, downloadID in
+            guard let self else { return }
+            self.endDownloadActivity()
+            NotificationCenter.default.post(
+                name: .browserDownloadEventDidArrive,
+                object: self,
+                userInfo: [
+                    "surfaceId": self.id,
+                    "workspaceId": self.workspaceId,
+                    "event": [
+                        "type": "ready_to_save",
+                        "download_id": downloadID,
+                        "filename": filename
+                    ]
+                ]
+            )
+        }
+        dlDelegate.onDownloadSaved = { [weak self] filename, destinationURL, shouldEndActivity, downloadID in
+            guard let self else { return }
+            if shouldEndActivity { self.endDownloadActivity() }
+            self.applyBrowserDownloadEvent(type: "saved", downloadID: downloadID, filename: filename, path: destinationURL.path)
+            NotificationCenter.default.post(
+                name: .browserDownloadEventDidArrive,
+                object: self,
+                userInfo: [
+                    "surfaceId": self.id,
+                    "workspaceId": self.workspaceId,
+                    "event": [
+                        "type": "saved",
+                        "download_id": downloadID,
+                        "filename": filename,
+                        "path": destinationURL.path
+                    ]
+                ]
+            )
+        }
+        dlDelegate.onDownloadCancelled = { [weak self] filename, shouldEndActivity, downloadID in
+            guard let self else { return }
+            if shouldEndActivity { self.endDownloadActivity() }
+            self.applyBrowserDownloadEvent(type: "cancelled", downloadID: downloadID, filename: filename, path: nil)
+            NotificationCenter.default.post(
+                name: .browserDownloadEventDidArrive,
+                object: self,
+                userInfo: [
+                    "surfaceId": self.id,
+                    "workspaceId": self.workspaceId,
+                    "event": [
+                        "type": "cancelled",
+                        "download_id": downloadID,
+                        "filename": filename
+                    ]
+                ]
+            )
+        }
+        dlDelegate.onDownloadFailed = { [weak self] _, shouldEndActivity, downloadID in
+            guard let self else { return }
+            if shouldEndActivity { self.endDownloadActivity() }
+            self.applyBrowserDownloadEvent(type: "failed", downloadID: downloadID, filename: nil, path: nil)
+            var event: [String: Any] = [
+                "type": "failed",
+                "error": String(localized: "browser.download.error.generic", defaultValue: "Download failed")
+            ]
+            if let downloadID {
+                event["download_id"] = downloadID
+            }
+            NotificationCenter.default.post(
+                name: .browserDownloadEventDidArrive,
+                object: self,
+                userInfo: [
+                    "surfaceId": self.id,
+                    "workspaceId": self.workspaceId,
+                    "event": event
+                ]
+            )
+        }
+        navDelegate.downloadDelegate = dlDelegate
+        self.downloadDelegate = dlDelegate
+        self.navigationDelegate = navDelegate
+
+        // Set up UI delegate (handles cmd+click, target=_blank, and context menu)
+        let browserUIDelegate = BrowserUIDelegate(
+            externalNavigationHandler: externalNavigationHandler
+        )
+        browserUIDelegate.owner = self
+        browserUIDelegate.openInNewTab = { [weak self] url in
+            guard let self else { return }
+            self.openLinkInNewTab(url: url, designFocusAsker: .page) // cmux-rbf #cm-73.2a
+        }
+        browserUIDelegate.openAppLinkInBrowserSplit = { [weak self] url in
+            self?.openAppLinkInBrowserSplit?(url) ?? false
+        }
+        browserUIDelegate.requestNavigation = { [weak self, weak browserUIDelegate] request, intent in
+            guard let self, let browserUIDelegate, self.uiDelegate === browserUIDelegate else { return }
+            self.requestNavigation(request, intent: intent)
+        }
+        browserUIDelegate.recordPDFPrintIntent = { [weak navDelegate] in navDelegate?.recordPDFPrintIntentIfNeeded($0, sourceFrame: $1) }
+        browserUIDelegate.presentAlert = { [weak self] alert, webView, completion, cancel in
+            guard let self else {
+                cancel()
+                return
+            }
+            // See navDelegate.presentAlert above: explicit discard for Xcode 26.3.
+            _ = self.presentBrowserAlert(alert, in: webView, completion: completion, cancel: cancel)
+        }
+        browserUIDelegate.openPopup = { [weak self] configuration, windowFeatures in
+            self?.createFloatingPopup(configuration: configuration, windowFeatures: windowFeatures)
+        }
+        browserUIDelegate.closeRequested = { [weak self] closedWebView in
+            guard let self, self.isCurrentWebView(closedWebView) else { return }
+#if DEBUG
+            cmuxDebugLog("browser.webViewDidClose panel=\(self.id.uuidString.prefix(5))")
+#endif
+            self.webViewDidRequestClose?()
+        }
+        self.uiDelegate = browserUIDelegate
+
+    }
+
     private func configureNavigationDelegateCallbacks() {
         guard let navigationDelegate else { return }
         let boundWebViewInstanceID = webViewInstanceID
@@ -3314,7 +3587,15 @@ final class BrowserPanel: Panel, ObservableObject {
         }
         navigationDelegate.didFinish = { [weak self] webView in
             MainActor.assumeIsolated {
-                guard let self, self.isCurrentWebView(webView, instanceID: boundWebViewInstanceID) else { return }
+                guard let self else { return }
+                // cmux-rbf (#cm-73.3): the held canvas finishes its own chrome work without touching presentation state. Reject a revert of this hunk on upstream sync.
+                guard self.isCurrentWebView(webView, instanceID: boundWebViewInstanceID) else {
+                    if self.retainedFigmaPage?.webView === webView,
+                       FigmaEditorChrome.shouldMinimizeUI(paneURL: webView.url, isOmnibarVisible: self.isOmnibarVisible) {
+                        webView.callAsyncJavaScript(FigmaEditorChrome.minimizeUIScript(timeoutMilliseconds: self.figmaMinimizeTimeoutMilliseconds), arguments: [:], in: nil, in: .page) { _ in }
+                    }
+                    return
+                }
                 if self.navigationDelegate?.activeErrorPageDisplayURL == nil {
                     self.cloudAccess.didFinish(url: webView.url)
                 }
@@ -3690,226 +3971,7 @@ final class BrowserPanel: Panel, ObservableObject {
         applyProxyConfigurationIfAvailable()
         BrowserProfileStore.shared.noteUsed(resolvedProfileID)
 
-        // Set up navigation delegate
-        let navDelegate = BrowserNavigationDelegate(
-            externalNavigationHandler: externalNavigationHandler
-        )
-        navDelegate.owner = self
-        navDelegate.openInNewTab = { [weak self] url in
-            self?.openLinkInNewTab(url: url, designFocusAsker: .page) // cmux-rbf #cm-73.2a
-        }
-        navDelegate.openAppLinkInBrowserSplit = { [weak self] url in
-            self?.openAppLinkInBrowserSplit?(url) ?? false
-        }
-        navDelegate.requestNavigation = { [weak self] request, intent, onNavigationStarted in
-            self?.requestNavigation(
-                request,
-                intent: intent,
-                onNavigationStarted: onNavigationStarted
-            )
-        }
-        navDelegate.presentAlert = { [weak self] alert, webView, completion, cancel in
-            guard let self else {
-                cancel()
-                return
-            }
-            // Discard the dismiss handle explicitly: Xcode 26.3's Swift rejects a
-            // discarded function-typed result as an error even under
-            // @discardableResult.
-            _ = self.presentBrowserAlert(alert, in: webView, completion: completion, cancel: cancel)
-        }
-        navDelegate.shouldBlockInsecureHTTPNavigation = { [weak self] in self?.shouldBlockInsecureHTTPNavigation(to: $0) ?? false }
-        navDelegate.shouldBlockInsecureHTTPSubframeDownload = { browserShouldBlockInsecureHTTPURL($0) }
-        navDelegate.handleBlockedInsecureHTTPNavigation = { [weak self] request, intent in
-            guard let self else { return }
-            let restoreAttemptID = self.currentDiscardRestoreAttemptID
-            // This is an action-policy replacement, which exposes no WKNavigation identity.
-            // Do not transfer an automation ticket based on WebView or URL coincidence.
-            self.presentInsecureHTTPAlert(
-                for: request,
-                intent: intent,
-                recordTypedNavigation: false,
-                onResolution: { [weak self] resolution in
-                    guard resolution.isTerminalPolicyCancellation else { return }
-                    self?.noteDiscardedWebViewRestoreNavigationTerminallyCancelled(restoreAttemptID: restoreAttemptID)
-                }
-            )
-        }
-        navDelegate.currentRestoreAttemptID = { [weak self] in self?.currentDiscardRestoreAttemptID }
-        navDelegate.terminalPolicyCancellationReporter = { [weak self] navigationAction, webView in
-            let restoreAttemptID = self?.currentDiscardRestoreAttemptID
-            return { [weak self, weak webView] in
-                guard let self, let webView, navigationAction.targetFrame?.isMainFrame == true, self.isCurrentWebView(webView) else { return }
-                self.noteDiscardedWebViewRestoreNavigationTerminallyCancelled(restoreAttemptID: restoreAttemptID)
-            }
-        }
-        navDelegate.handleDroppedFileNavigation = { [weak self] urls in
-            guard let self,
-                  let appDelegate = AppDelegate.shared,
-                  let target = appDelegate.browserActionTarget(for: self) else {
-                return false
-            }
-            return appDelegate.openFilePreviews(
-                urls,
-                relativeTo: target,
-                zone: .right
-            )
-        }
-        navDelegate.handleBlockedURLAllowlistNavigation = { [weak self] url, webView in
-            guard let self, self.isCurrentWebView(webView) else { return }
-            let safeURL = URL(string: BrowserURLAllowlistBlockedPage.safeDisplayOrigin(for: url))
-            self.currentURL = Self.remoteProxyDisplayURL(for: safeURL) ?? safeURL
-            let policy = BrowserURLAllowlistPolicy(defaults: .standard)
-            self.pageTitle = BrowserURLAllowlistBlockedPage.title(isManaged: policy.isManaged)
-            self.faviconPNGData = nil
-            self.lastFaviconURLString = nil
-            BrowserURLAllowlistBlockedPage(
-                blockedURL: url,
-                isManaged: policy.isManaged
-            ).load(in: webView)
-            self.refreshBackgroundAppearance()
-        }
-        navDelegate.didTerminateWebContentProcess = { [weak self] webView in
-            self?.handleWebContentProcessTermination(for: webView)
-        }
-        // Set up download delegate for navigation-based downloads.
-        // Downloads save to a temp file synchronously (no UI during WebKit
-        // callbacks), then auto-save to Downloads unless the prompt setting is enabled.
-        let dlDelegate = BrowserDownloadDelegate()
-        dlDelegate.savePanelParentWindow = { [weak self] in
-            self.flatMap { browserInteractiveModalHostWindow(for: $0.webView) }
-        }
-        dlDelegate.onDownloadStarted = { [weak self] filename, downloadID in
-            guard let self else { return }
-            self.beginDownloadActivity()
-            self.applyBrowserDownloadEvent(type: "started", downloadID: downloadID, filename: filename, path: nil)
-            NotificationCenter.default.post(
-                name: .browserDownloadEventDidArrive,
-                object: self,
-                userInfo: [
-                    "surfaceId": self.id,
-                    "workspaceId": self.workspaceId,
-                    "event": [
-                        "type": "started",
-                        "download_id": downloadID,
-                        "filename": filename
-                    ]
-                ]
-            )
-        }
-        dlDelegate.onDownloadReadyToSave = { [weak self] filename, downloadID in
-            guard let self else { return }
-            self.endDownloadActivity()
-            NotificationCenter.default.post(
-                name: .browserDownloadEventDidArrive,
-                object: self,
-                userInfo: [
-                    "surfaceId": self.id,
-                    "workspaceId": self.workspaceId,
-                    "event": [
-                        "type": "ready_to_save",
-                        "download_id": downloadID,
-                        "filename": filename
-                    ]
-                ]
-            )
-        }
-        dlDelegate.onDownloadSaved = { [weak self] filename, destinationURL, shouldEndActivity, downloadID in
-            guard let self else { return }
-            if shouldEndActivity { self.endDownloadActivity() }
-            self.applyBrowserDownloadEvent(type: "saved", downloadID: downloadID, filename: filename, path: destinationURL.path)
-            NotificationCenter.default.post(
-                name: .browserDownloadEventDidArrive,
-                object: self,
-                userInfo: [
-                    "surfaceId": self.id,
-                    "workspaceId": self.workspaceId,
-                    "event": [
-                        "type": "saved",
-                        "download_id": downloadID,
-                        "filename": filename,
-                        "path": destinationURL.path
-                    ]
-                ]
-            )
-        }
-        dlDelegate.onDownloadCancelled = { [weak self] filename, shouldEndActivity, downloadID in
-            guard let self else { return }
-            if shouldEndActivity { self.endDownloadActivity() }
-            self.applyBrowserDownloadEvent(type: "cancelled", downloadID: downloadID, filename: filename, path: nil)
-            NotificationCenter.default.post(
-                name: .browserDownloadEventDidArrive,
-                object: self,
-                userInfo: [
-                    "surfaceId": self.id,
-                    "workspaceId": self.workspaceId,
-                    "event": [
-                        "type": "cancelled",
-                        "download_id": downloadID,
-                        "filename": filename
-                    ]
-                ]
-            )
-        }
-        dlDelegate.onDownloadFailed = { [weak self] _, shouldEndActivity, downloadID in
-            guard let self else { return }
-            if shouldEndActivity { self.endDownloadActivity() }
-            self.applyBrowserDownloadEvent(type: "failed", downloadID: downloadID, filename: nil, path: nil)
-            var event: [String: Any] = [
-                "type": "failed",
-                "error": String(localized: "browser.download.error.generic", defaultValue: "Download failed")
-            ]
-            if let downloadID {
-                event["download_id"] = downloadID
-            }
-            NotificationCenter.default.post(
-                name: .browserDownloadEventDidArrive,
-                object: self,
-                userInfo: [
-                    "surfaceId": self.id,
-                    "workspaceId": self.workspaceId,
-                    "event": event
-                ]
-            )
-        }
-        navDelegate.downloadDelegate = dlDelegate
-        self.downloadDelegate = dlDelegate
-        self.navigationDelegate = navDelegate
-
-        // Set up UI delegate (handles cmd+click, target=_blank, and context menu)
-        let browserUIDelegate = BrowserUIDelegate(
-            externalNavigationHandler: externalNavigationHandler
-        )
-        browserUIDelegate.owner = self
-        browserUIDelegate.openInNewTab = { [weak self] url in
-            guard let self else { return }
-            self.openLinkInNewTab(url: url, designFocusAsker: .page) // cmux-rbf #cm-73.2a
-        }
-        browserUIDelegate.openAppLinkInBrowserSplit = { [weak self] url in
-            self?.openAppLinkInBrowserSplit?(url) ?? false
-        }
-        browserUIDelegate.requestNavigation = { [weak self] in self?.requestNavigation($0, intent: $1) }
-        browserUIDelegate.recordPDFPrintIntent = { [weak navDelegate] in navDelegate?.recordPDFPrintIntentIfNeeded($0, sourceFrame: $1) }
-        browserUIDelegate.presentAlert = { [weak self] alert, webView, completion, cancel in
-            guard let self else {
-                cancel()
-                return
-            }
-            // See navDelegate.presentAlert above: explicit discard for Xcode 26.3.
-            _ = self.presentBrowserAlert(alert, in: webView, completion: completion, cancel: cancel)
-        }
-        browserUIDelegate.openPopup = { [weak self] configuration, windowFeatures in
-            self?.createFloatingPopup(configuration: configuration, windowFeatures: windowFeatures)
-        }
-        browserUIDelegate.closeRequested = { [weak self] closedWebView in
-            guard let self, self.isCurrentWebView(closedWebView) else { return }
-#if DEBUG
-            cmuxDebugLog("browser.webViewDidClose panel=\(self.id.uuidString.prefix(5))")
-#endif
-            self.webViewDidRequestClose?()
-        }
-        self.uiDelegate = browserUIDelegate
-
+        configurePageDelegates() // cmux-rbf #cm-73.3: each retained page owns its delegates.
         bindWebView(webView)
         installDetachedDeveloperToolsWindowCloseObserver()
         installHiddenWebViewDiscardPolicyObserver()
@@ -4948,6 +5010,8 @@ final class BrowserPanel: Panel, ObservableObject {
     // cmux-rbf (#cm-73.11): runs the minimize UI script as a promise and notifies figmaLoadBar when answered. Reject a revert of this hunk on upstream sync.
     private func runFigmaMinimizeScript(in webView: WKWebView) {
         let waitID = figmaLoadBar.currentWaitID ?? 0
+        let sourceLoadBar = figmaLoadBar // cmux-rbf #cm-73.3
+        let sourceInstanceID = webViewInstanceID
         let script = FigmaEditorChrome.minimizeUIScript(timeoutMilliseconds: figmaMinimizeTimeoutMilliseconds)
         webView.callAsyncJavaScript(
             script,
@@ -4957,7 +5021,8 @@ final class BrowserPanel: Panel, ObservableObject {
         ) { [weak self, weak webView] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.figmaLoadBar.scriptAnswered(waitID: waitID)
+                sourceLoadBar.scriptAnswered(waitID: waitID)
+                guard self.webView === webView, self.webViewInstanceID == sourceInstanceID else { return }
                 // cmux-rbf (#cm-73.22): the mark is spent here, found or timed out; the press is owed only on `found`. Reject a revert of this hunk on upstream sync.
                 let found = (try? result.get()) as? String == "found"
                 if self.figmaFitMark.minimizeScriptAnswered(found: found), let webView {
@@ -5138,6 +5203,7 @@ final class BrowserPanel: Panel, ObservableObject {
     }
 
     func close() {
+        releaseRetainedFigmaPage() // cmux-rbf #cm-73.3
         cloudAccess.leave()
         cancelHiddenWebViewDiscard()
         isClosingWebViewLifecycle = true
@@ -5204,6 +5270,9 @@ final class BrowserPanel: Panel, ObservableObject {
     /// redirects, while this sweep closes the window in which an already-open
     /// document could otherwise remain visible under a newly stricter policy.
     func enforceURLAllowlistPolicy() {
+        if let held = retainedFigmaPage {
+            held.navigationDelegate?.enforceURLAllowlistPolicy(in: held.webView, displayURL: held.webView.url ?? held.address)
+        } // cmux-rbf #cm-73.3
         navigationDelegate?.enforceURLAllowlistPolicy(
             in: webView,
             displayURL: Self.remoteProxyDisplayURL(for: webView.url)
@@ -5561,6 +5630,177 @@ final class BrowserPanel: Panel, ObservableObject {
 
     // MARK: - Navigation
 
+    // cmux-rbf (#cm-73.3): one owner for switching and every goto entrance. Reject a revert of this hunk on upstream sync.
+    @discardableResult
+    func switchFigmaPreviewAndCanvas(wrapper: URL = FigmaPaneURL.wrapperFileURL()) -> Bool {
+        guard let address = currentURL ?? webView.url,
+              FigmaTabMark.applies(address: address, showsAddressBar: isOmnibarVisible, wrapper: wrapper),
+              let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper) else { return false }
+        let showingPreview = FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
+        let destination: URL
+        if showingPreview {
+            var components = URLComponents(url: document, resolvingAgainstBaseURL: false)
+            if let node = FigmaPaneURL.node(fromPaneURL: address, wrapper: wrapper) {
+                components?.queryItems = [URLQueryItem(name: "node-id", value: node)]
+            }
+            destination = components?.url ?? document
+        } else {
+            guard let preview = try? FigmaPaneURL.destination(for: document, node: "0-1", wrapper: wrapper) else { return false }
+            destination = preview.url
+        }
+        return showFigmaPage(preview: !showingPreview, destination: destination, reload: false, wrapper: wrapper)
+    }
+
+    /// The sole goto decision point. Existing paired pages are retained; native-history-only panes navigate in place.
+    @discardableResult
+    func gotoFigmaNode(_ node: String, wrapper: URL = FigmaPaneURL.wrapperFileURL(), defaults: UserDefaults = .standard) -> Bool {
+        let node = node.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !node.isEmpty, let address = currentURL ?? webView.url,
+              let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper),
+              let destination = try? FigmaPaneURL.destination(for: document, node: node, wrapper: wrapper),
+              BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination.url)
+        else { return false }
+        // Explicit --surface accepts ordinary panes. A canvas opened alone also
+        // keeps native Back until the cross-side history action exists (step 5).
+        if isOmnibarVisible || (!FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
+            && retainedFigmaPage == nil && discardedFigmaPageAddress == nil) {
+            do { try FigmaWrapperPage.install(at: wrapper) } catch { return false }
+            figmaPageWrapper = wrapper
+            currentURL = destination.url
+            navigate(to: destination.url)
+            scheduleFigmaReadSnapshotRefresh()
+            return true
+        }
+        return showFigmaPage(preview: true, destination: destination.url, reload: true, wrapper: wrapper, defaults: defaults)
+    }
+
+    /// Exchanges the presentation binding; an existing page is never navigated by a switch.
+    private func showFigmaPage(preview: Bool, destination: URL, reload: Bool, wrapper: URL, defaults: UserDefaults = .standard) -> Bool {
+        guard BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination),
+              let outgoingView = webView as? CmuxWebView,
+              let address = currentURL ?? webView.url else { return false }
+        if preview {
+            do { try FigmaWrapperPage.install(at: wrapper) } catch { return false }
+        }
+        let destination = (!reload ? discardedFigmaPageAddress.flatMap { saved in
+            FigmaPaneURL.isWrapperPage(saved, wrapper: wrapper) == preview
+                && FigmaPaneURL.fileKey(fromPaneURL: saved, wrapper: wrapper) == FigmaPaneURL.fileKey(fromPaneURL: address, wrapper: wrapper) ? saved : nil
+        } : nil) ?? destination
+        figmaPageWrapper = wrapper
+        let isPreview = FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
+        if isPreview == preview {
+            if reload {
+                currentURL = destination
+                navigate(to: destination)
+            }
+            scheduleFigmaReadSnapshotRefresh()
+            return true
+        }
+        discardedFigmaPageAddress = nil
+        let outgoing = RetainedFigmaPage(
+            webView: outgoingView, instanceID: webViewInstanceID,
+            navigationDelegate: navigationDelegate, uiDelegate: uiDelegate, downloadDelegate: downloadDelegate,
+            address: address, title: pageTitle, history: restoredSessionHistory,
+            trustedFile: trustedLocalFileURL, pendingTrustedFile: pendingTrustedLocalFileURL,
+            loadBar: figmaLoadBar, contentState: webContentState,
+            hasCommitted: hasCommittedDocumentSinceWebViewReplacement, stopped: userStoppedLoadSinceWebViewReplacement,
+            provisional: isMainFrameProvisionalNavigationActive
+        )
+        let incoming = retainedFigmaPage
+        // Cancel per-presentation work without stopping or navigating the outgoing document.
+        loadingGeneration &+= 1
+        loadingEndScheduler.cancel()
+        faviconTask?.cancel()
+        faviconTask = nil
+        invalidateSearchFocusRequests(reason: "figma.switch")
+        searchState = nil
+        detachWebViewObservers()
+        closeBackgroundPreloadHost(reason: "figma.switch")
+        BrowserWindowPortalRegistry.detach(webView: outgoingView)
+        webAuthnCoordinator.uninstall(from: outgoingView)
+        retainedFigmaPage = outgoing
+        figmaFitMark.navigationFinishedWithoutMinimize()
+        hiddenWebViewDiscardManager.resetMetadata()
+        pendingDiscardRestoreNavigation = nil
+        currentDiscardRestoreAttemptID = nil
+        if let incoming {
+            webView = incoming.webView
+            webViewInstanceID = incoming.instanceID
+            navigationDelegate = incoming.navigationDelegate
+            uiDelegate = incoming.uiDelegate
+            downloadDelegate = incoming.downloadDelegate
+            restoredSessionHistory = incoming.history
+            trustedLocalFileURL = incoming.trustedFile
+            pendingTrustedLocalFileURL = incoming.pendingTrustedFile
+            figmaLoadBar = incoming.loadBar
+            webContentState = incoming.contentState
+            hasCommittedDocumentSinceWebViewReplacement = incoming.hasCommitted || incoming.webView.backForwardList.currentItem != nil
+            userStoppedLoadSinceWebViewReplacement = incoming.stopped
+            isMainFrameProvisionalNavigationActive = incoming.provisional && incoming.webView.isLoading
+            let live = incoming.webView.url.flatMap { $0.absoluteString == "about:blank" ? nil : $0 }
+            currentURL = live ?? incoming.address
+            pageTitle = incoming.webView.title.flatMap { $0.isEmpty ? nil : $0 } ?? incoming.title
+            bindWebView(incoming.webView)
+            if !incoming.webView.isLoading { figmaLoadBar.cancelled() }
+        } else {
+            let next = makeReplacementWebView(profileID: profileID, websiteDataStore: websiteDataStore)
+            next.pageZoom = effectivePageZoom
+            webView = next
+            webViewInstanceID = UUID()
+            restoredSessionHistory = RestoredSessionHistory(sanitizer: SessionHistoryURLSanitizer { browserIsTemporaryHistoryURL($0) })
+            trustedLocalFileURL = nil
+            pendingTrustedLocalFileURL = nil
+            figmaLoadBar = FigmaLoadBarState(changed: { [weak self] in self?.objectWillChange.send() })
+            webContentState = .active
+            hasCommittedDocumentSinceWebViewReplacement = false
+            userStoppedLoadSinceWebViewReplacement = false
+            isMainFrameProvisionalNavigationActive = false
+            currentURL = destination
+            pageTitle = ""
+            configurePageDelegates()
+            bindWebView(next)
+        }
+        shouldRenderWebView = true
+        isLoading = webView.isLoading
+        estimatedProgress = webView.estimatedProgress
+        nativeCanGoBack = webView.canGoBack
+        nativeCanGoForward = webView.canGoForward
+        refreshNavigationAvailability()
+        BrowserThemeSettings.apply(browserThemeMode, to: webView)
+        applyConfiguredWebViewBackground()
+        if reload || incoming == nil {
+            currentURL = destination
+            navigate(to: destination)
+        } else if webView.url == nil && !webView.isLoading, let savedAddress = currentURL {
+            // A deferred page has never loaded: restore its saved address, rather than the switch's first-creation default.
+            navigate(to: savedAddress)
+        }
+        refreshWebViewLifecycleState()
+        scheduleFigmaReadSnapshotRefresh()
+        return true
+    }
+
+    /// A switch need not change the title or navigate, so URL-bearing socket mirrors need their own refresh.
+    private func scheduleFigmaReadSnapshotRefresh() {
+        // cmux-rbf (#cm-73.3): workspace key/palette/click entrances bypass the socket's normal post-command refresh. Reject a revert of this hunk on upstream sync.
+        if owningWorkspace != nil { TerminalController.shared.scheduleSocketReadSnapshotRefresh() }
+    }
+
+    private func releaseRetainedFigmaPage(keepingAddress: Bool = false) {
+        if !keepingAddress { discardedFigmaPageAddress = nil }
+        guard let page = retainedFigmaPage else { return }
+        if keepingAddress { discardedFigmaPageAddress = page.address }
+        retainedFigmaPage = nil
+        page.navigationDelegate?.cancelPendingAuthenticationPrompts()
+        BrowserWindowPortalRegistry.detach(webView: page.webView)
+        webAuthnCoordinator.uninstall(from: page.webView)
+        page.webView.stopLoading()
+        page.webView.navigationDelegate = nil
+        page.webView.uiDelegate = nil
+        page.webView.clearBrowserDownloadCallbacks()
+        page.webView.configuration.userContentController.removeAllScriptMessageHandlers()
+    }
+
     /// Navigate to a URL
     @discardableResult
     func navigate(
@@ -5568,6 +5808,11 @@ final class BrowserPanel: Panel, ObservableObject {
         recordTypedNavigation: Bool = false,
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> WKNavigation? {
+        // cmux-rbf (#cm-73.3): a different file cannot keep the old file behind its switch. Reject a revert of this hunk on upstream sync.
+        if (retainedFigmaPage != nil || discardedFigmaPageAddress != nil),
+           FigmaPaneURL.fileKey(fromPaneURL: url, wrapper: figmaPageWrapper) != currentURL.flatMap({ FigmaPaneURL.fileKey(fromPaneURL: $0, wrapper: figmaPageWrapper) }) {
+            releaseRetainedFigmaPage()
+        }
         // cmux-rbf #cm-73.2a
         if isInitialCreationNavigation {
             // Initial creation load: already routed by newBrowserSurface / newBrowserSplit
@@ -6359,6 +6604,7 @@ extension BrowserPanel {
     @discardableResult
     func setMuted(_ muted: Bool) -> Bool {
         let applied = applyMuteState(muted, to: webView, reason: "setMuted")
+        if let held = retainedFigmaPage { _ = applyMuteState(muted, to: held.webView, reason: "setMuted.figma") } // cmux-rbf #cm-73.3
         if applied, isMuted != muted {
             isMuted = muted
             refreshAudioMediaActivity(reason: "audio_mute_changed")

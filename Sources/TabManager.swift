@@ -4604,6 +4604,12 @@ class TabManager: ObservableObject {
         return tab.flipDesignFocusLayout()
     }
 
+    // cmux-rbf (#cm-73.3): workspace only; Dock targets are a later decision. Reject a revert of this hunk on upstream sync.
+    @discardableResult
+    func switchFigmaPreviewAndCanvas() -> Bool {
+        selectedWorkspace?.switchFigmaPreviewAndCanvas() ?? false
+    }
+
     /// Close a surface/panel
     func closeSurface(tabId: UUID, surfaceId: UUID) -> Bool {
         guard let tab = tabs.first(where: { $0.id == tabId }) else { return false }

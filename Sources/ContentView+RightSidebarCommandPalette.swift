@@ -4,6 +4,16 @@ import CmuxSidebar
 import CmuxSwiftRender
 
 extension ContentView {
+    // cmux-rbf #cm-73.3: the palette's real command registration, independent of view rendering.
+    static func registerFigmaPageSwitchPaletteHandler(
+        _ registry: inout CommandPaletteHandlerRegistry,
+        tabManager: TabManager
+    ) {
+        registry.register(commandId: "palette.switchFigmaPreviewAndCanvas") {
+            _ = tabManager.switchFigmaPreviewAndCanvas()
+        }
+    }
+
     static func commandPaletteShortcutAction(forCommandID commandId: String) -> KeyboardShortcutSettings.Action? {
         if let movement = SurfacePaneMovement(commandID: commandId) {
             return movement.shortcutAction
@@ -105,6 +115,9 @@ extension ContentView {
             return .clearScreenKeepScrollback
         case "palette.toggleSplitZoom":
             return .toggleSplitZoom
+        // cmux-rbf #cm-73.3: show the configured switch key in the palette.
+        case "palette.switchFigmaPreviewAndCanvas":
+            return .switchFigmaPreviewAndCanvas
         // cmux-rbf #cm-73.2a
         case "palette.toggleDesignFocus":
             return .toggleDesignFocus
