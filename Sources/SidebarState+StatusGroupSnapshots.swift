@@ -7,7 +7,7 @@ extension VerticalTabsSidebar {
         let tabs = tabManager.tabs, groups = tabManager.workspaceGroups
         let base = SidebarWorkspaceRenderItem.renderItems(tabs: tabs,
             groupsById: Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) }), orderedGroups: groups)
-        let projection = currentStatusGroupProjection(tabs: tabs, storedOrder: state.statusGroups?.order)
+        let projection = currentStatusGroupProjection(tabs: tabs, groups: groups, storedOrder: state.statusGroups?.order)
         let colors = colorSectionProjection(workspaces: tabs.map {
             SidebarWorkspaceColorSectionWorkspaceSnapshot(id: $0.id, groupId: $0.groupId,
                 isPinned: $0.isPinned, customColor: $0.customColor)
@@ -22,7 +22,7 @@ extension SidebarState {
     func statusGroupsForSnapshot(tabManager: TabManager) -> WorkspaceStatusGroupsState? {
         reconcileStatusGroupOrder(list: AppDelegate.statusListInUse)
         let items = VerticalTabsSidebar.statusRenderItemsForSnapshot(tabManager: tabManager, state: self).items
-        let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, storedOrder: statusGroups?.order)
+        let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: statusGroups?.order)
         let saved = SidebarStatusAreaLayout(items: items, tabs: tabManager.tabs,
             groups: tabManager.workspaceGroups, statusProjection: projection).saving(state: statusGroups)
         if saved != statusGroups { setStatusGroups(saved) }
@@ -38,7 +38,7 @@ extension SidebarState {
         guard statusGroups != nil else { return previous }
         let items = VerticalTabsSidebar.statusRenderItemsForSnapshot(tabManager: tabManager, state: self).items
         guard items.contains(where: { if case .statusesHeader = $0 { return true }; return false }) else { return previous }
-        let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, storedOrder: statusGroups?.order)
+        let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: statusGroups?.order)
         let saved = SidebarStatusAreaLayout(items: items, tabs: tabManager.tabs,
             groups: tabManager.workspaceGroups, statusProjection: projection)
             .saving(state: statusGroups, movingWorkspaceIds: Set(movingWorkspaceIds), movingGroupIds: Set(movingGroupIds))

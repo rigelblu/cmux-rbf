@@ -2023,6 +2023,7 @@ extension SessionWorkspaceSnapshot {
 }
 
 struct SessionWorkspaceGroupSnapshot: Codable, Sendable, Equatable {
+    var statusId: String? = nil // (#cm-110.2)
     var id: UUID
     var name: String
     var isCollapsed: Bool

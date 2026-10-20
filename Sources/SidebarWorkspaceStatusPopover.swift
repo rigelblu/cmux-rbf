@@ -158,6 +158,8 @@ struct SidebarWorkspaceStatusPopoverModel: Equatable {
     let colorHexes: [String: String]
     /// Whether the workspace is opted out (None active).
     var isHidden: Bool = false
+    /// Group pickers supply None followed by explicit statuses, with no Auto. (#cm-110.2)
+    var lanesOverride: [WorkspaceTodoStatusLane]? = nil // (#cm-110.2)
 }
 
 // MARK: - Popover content
@@ -192,13 +194,13 @@ struct SidebarWorkspaceStatusPopover: View {
         self.onSelectLane = onSelectLane
         self.onSelectNone = onSelectNone
         self.onClose = onClose
-        let lanes = WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109)
+        let lanes = model.lanesOverride ?? WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109) (#cm-110.2)
         // The highlight starts on the first checked row that can be chosen, and on Auto when there is none.
         _highlightedIndex = State(initialValue: lanes.firstIndex(where: { $0.isSelected && $0.action != nil }) ?? 0)
     }
 
     private var lanes: [WorkspaceTodoStatusLane] {
-        WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109)
+        model.lanesOverride ?? WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109) (#cm-110.2)
     }
 
     var body: some View {

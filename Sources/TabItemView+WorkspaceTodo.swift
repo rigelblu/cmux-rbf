@@ -208,7 +208,8 @@ enum WorkspaceTodoPaletteCommands {
         tabManager: TabManager,
         list: WorkspaceStatusList? = nil,
         controlsEnabled: Bool? = nil,
-        apply: ((WorkspaceStatusPickAction, [Workspace]) -> Void)? = nil
+        apply: ((WorkspaceStatusPickAction, [Workspace]) -> Void)? = nil, // (#cm-110.2)
+        beep: @escaping () -> Void = { NSSound.beep() } // (#cm-110.2)
     ) {
         let list = list ?? AppDelegate.statusListInUse
         let isEnabled: () -> Bool = { controlsEnabled ?? WorkspaceTodoFeature.isEnabled }
@@ -226,34 +227,34 @@ enum WorkspaceTodoPaletteCommands {
         }
         registry.register(
             commandId: statusAutoCommandId,
-            handler: withSelectedWorkspace { workspace in
+            handler: withSelectedWorkspace { _ in // (#cm-110.2)
                 guard isEnabled() else {
                     NSSound.beep()
                     return
                 }
-                applyStatus(.auto, [workspace])
+                if !WorkspaceGroupStatusUIActions.app(tabManager: tabManager, controlsEnabled: isEnabled()).applySelected(.auto, workspaceApply: applyStatus) { beep() } // (#cm-110.2)
             }
         )
         for entry in list.entries {
             registry.register(
                 commandId: WorkspaceStatusPresentation.paletteStatusCommandID(entry.id),
-                handler: withSelectedWorkspace { workspace in
+                handler: withSelectedWorkspace { _ in // (#cm-110.2)
                     guard isEnabled() else {
                         NSSound.beep()
                         return
                     }
-                    applyStatus(.status(id: entry.id), [workspace])
+                    if !WorkspaceGroupStatusUIActions.app(tabManager: tabManager, controlsEnabled: isEnabled()).applySelected(.status(id: entry.id), workspaceApply: applyStatus) { beep() } // (#cm-110.2)
                 }
             )
         }
         registry.register(
             commandId: markWorkspaceDoneCommandId,
-            handler: withSelectedWorkspace { workspace in
+            handler: withSelectedWorkspace { _ in // (#cm-110.2)
                 guard isEnabled() else {
                     NSSound.beep()
                     return
                 }
-                applyStatus(.done, [workspace])
+                if !WorkspaceGroupStatusUIActions.app(tabManager: tabManager, controlsEnabled: isEnabled()).applySelected(.done, workspaceApply: applyStatus) { beep() } // (#cm-110.2)
             }
         )
         registry.register(

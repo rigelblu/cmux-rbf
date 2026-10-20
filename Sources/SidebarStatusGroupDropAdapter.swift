@@ -68,6 +68,12 @@ extension VerticalTabsSidebar {
         token: UUID?, foreignDraggedIsPinned: Bool?, controlsEnabled: Bool, hasUserStatusList: Bool,
         ordinary: (CGPoint, [SidebarWorkspaceReorderDropOverlay.Target], Bool) -> SidebarWorkspaceReorderDropPlan?) -> SidebarStatusHeaderPlanResult {
         guard let projection = snapshot.statusGroupProjection else { return .notHeader }
+        // Headers displayed under a status stay inert until cm-110.8, including ordinary destinations.
+        if workspaceProjectedStatusHeaderIsRefused(draggedId: draggedId, sourceKind: sourceKind,
+            groups: snapshot.workspaceGroups, projection: projection) { return .refused }
+        if let join = workspaceProjectedGroupJoin(point: point, targets: targets, snapshot: snapshot,
+            draggedId: draggedId, sourceKind: sourceKind, token: token,
+            controlsEnabled: controlsEnabled, hasUserStatusList: hasUserStatusList) { return join }
         let workspace = snapshot.tabs.first { $0.id == draggedId }
         let sourceGroup: WorkspaceGroup?
         if case .workspaceGroupHeader(let id)? = sourceKind { sourceGroup = snapshot.workspaceGroups.first { $0.id == id } }
@@ -78,10 +84,12 @@ extension VerticalTabsSidebar {
             source: .init(workspaceId: draggedId, kind: sourceKind ?? .unknown,
                 isLocal: workspace != nil || sourceGroup != nil,
                 isPinned: sourceGroup?.isPinned ?? workspace?.isPinned ?? foreignDraggedIsPinned ?? false,
-                groupId: workspace?.groupId,
+                groupId: projection.contains(workspaceId: draggedId) ? nil : workspace?.groupId,
                 isColorSectionMember: snapshot.colorSectionProjection.sectionByWorkspaceId[draggedId] != nil),
             targets: Self.workspaceStatusDropTargets(items: snapshot.workspaceRenderItems, measured: targets, useContentFrames: sourceKind == .workspace),
-            groups: projection.groups.map { .init(statusId: $0.statusId, memberWorkspaceIds: $0.memberWorkspaceIds) },
+            groups: projection.groups.map { .init(statusId: $0.statusId,
+                memberWorkspaceIds: workspaceStatusDisplayDropMembers(statusId: $0.statusId,
+                    projection: projection, items: snapshot.workspaceRenderItems)) },
             areaIsLast: layout.saving(state: snapshot.statusGroupFolds)?.last == true,
             controlsEnabled: controlsEnabled, hasUserStatusList: hasUserStatusList)
         let rootPoint = CGPoint(x: targets.map(\.frame.minX).min() ?? point.x, y: point.y)
@@ -105,7 +113,9 @@ extension VerticalTabsSidebar {
             guard let token, sourceKind == .workspace else { return .refused }
             return .plan(.init(draggedWorkspaceId: draggedId, indicator: value.indicator,
                 indicatorScope: .group(SidebarStatusHeaderIdentity.uuid(forStatusId: value.statusId)),
-                action: .statusGroupDrop(plan: value, sessionId: token)))
+                action: .statusGroupDrop(plan: .init(statusId: value.statusId, placement: value.placement,
+                    setsStatus: projection.group(for: value.statusId)?.memberWorkspaceIds.contains(draggedId) != true,
+                    indicator: value.indicator), sessionId: token)))
         case .areaBoundary(let boundary, let indicator):
             guard let token, sourceKind != nil else { return .refused }
             let ordinaryTargets = targets.filter { target in
@@ -361,7 +371,8 @@ extension VerticalTabsSidebar {
         switch plan.action {
         case .statusGroupDrop(let value, _):
             return workspaceStatusDropIndicatorRows(statusId: value.statusId, items: items,
-                memberWorkspaceIds: projection?.group(for: value.statusId)?.memberWorkspaceIds ?? [])
+                memberWorkspaceIds: projection.map { workspaceStatusDisplayDropMembers(statusId: value.statusId,
+                    projection: $0, items: items) } ?? [])
         case .statusAreaBoundaryDrop: return items.compactMap(\.headerDropIdentity)
         case .reorder(_, _, nil) where plan.indicatorScope == .raw
             && plan.indicator == SidebarDropIndicator(tabId: nil, edge: .bottom)
@@ -410,6 +421,7 @@ extension VerticalTabsSidebar {
             case .statusGroupHeader(let id) where id == statusId:
                 return SidebarStatusHeaderIdentity.uuid(forStatusId: id)
             case .workspace(let id) where members.contains(id): return id
+            case .groupHeader(_, let anchor) where members.contains(anchor): return anchor
             default: return nil
             }
         }
@@ -452,7 +464,7 @@ extension VerticalTabsSidebar {
             statusActions: { .app() },
             statusReorder: { id,target,before,members in tabManager.reorderWorkspaceWithinColorSection(tabId: id,
                 targetWorkspaceId: target,insertBefore: before,memberWorkspaceIds: members) },
-            currentProjection: { Self.currentStatusGroupProjection(tabs: tabManager.tabs, storedOrder: sidebarState.statusGroups?.order) },
+            currentProjection: { Self.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: sidebarState.statusGroups?.order) },
             currentRenderItems: { Self.statusRenderItemsForSnapshot(tabManager: tabManager, state: sidebarState).items },
             performOrdinary: performOrdinary)
     }
@@ -473,10 +485,15 @@ extension VerticalTabsSidebar {
         }
         guard let source = sourceRecorder.source(windowId: windowId,
             workspaceId: plan.draggedWorkspaceId, sessionId: token, dragState: dragState) else { return false }
+        if workspaceProjectedStatusHeaderIsRefused(draggedId: plan.draggedWorkspaceId, sourceKind: source.kind,
+            groups: tabManager.workspaceGroups, projection: currentProjection()) { return false }
         switch plan.action {
         case .statusGroupDrop(let value, _):
             guard let dragged = tabManager.tabs.first(where: { $0.id == plan.draggedWorkspaceId }) else { return false }
-            return StatusGroupDropPerformer(statusActions: statusActions(), currentProjection: currentProjection,
+            let actions = statusActions()
+            if let handled = performWorkspaceProjectedStatusDrop(value, dragged: dragged, sourceKind: source.kind,
+                tabManager: tabManager, actions: actions, projection: currentProjection()) { return handled }
+            return StatusGroupDropPerformer(statusActions: actions, currentProjection: currentProjection,
                 reorder: statusReorder).perform(value, dragged: dragged, sourceKind: source.kind)
         case .statusAreaBoundaryDrop(let value, _):
             let moving = SidebarWorkspaceDragBlockResolver().movingWorkspaceIds(orderedWorkspaceIds: tabManager.tabs.map(\.id),

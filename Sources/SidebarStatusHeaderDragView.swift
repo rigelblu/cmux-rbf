@@ -170,7 +170,10 @@ extension VerticalTabsSidebar {
         let rows = statusHeaderIndicatorRows(draggedId: dragged, items: renderContext.workspaceRenderItems)
         let workspaceStatusId = Self.workspaceStatusDropScopeId(scope: dragState.dropIndicatorScope,
             projection: renderContext.statusGroupProjection)
-        let workspaceMembers = workspaceStatusId.flatMap { renderContext.statusGroupProjection?.group(for: $0)?.memberWorkspaceIds } ?? []
+        let workspaceMembers = workspaceStatusId.flatMap { id in
+            renderContext.statusGroupProjection.map { Self.workspaceStatusDisplayDropMembers(statusId: id,
+                projection: $0, items: renderContext.workspaceRenderItems) }
+        } ?? []
         let items = renderContext.workspaceRenderItems
         let areaRows = Self.workspaceAreaBoundaryPaintRows(draggedId: dragged, scope: dragState.dropIndicatorScope,
             indicator: indicator, level: dragState.dropIndicatorLevel, items: items, projection: renderContext.statusGroupProjection)

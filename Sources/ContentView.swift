@@ -12181,7 +12181,7 @@ struct VerticalTabsSidebar: View, Equatable {
             effectiveMembership: workspaceGroupIdByWorkspaceId
         )
         let _ = workspaceColorPaletteRevision
-        let statusGroupProjection = Self.currentStatusGroupProjection(tabs: tabs, storedOrder: sidebarState.statusGroups?.order) // (#cm-110.1)
+        let statusGroupProjection = Self.currentStatusGroupProjection(tabs: tabs, groups: workspaceGroups, storedOrder: sidebarState.statusGroups?.order) // (#cm-110.1) (#cm-110.2)
         let colorSectionProjection = Self.colorSectionProjection( // (#cm-110.1)
             workspaces: tabs.map {
                 SidebarWorkspaceColorSectionWorkspaceSnapshot(
@@ -14855,7 +14855,7 @@ struct VerticalTabsSidebar: View, Equatable {
             return false
         }
         dragAutoScrollController.updateFromDragLocation()
-        let level = SidebarNestedDropLine.level(for: plan, depthById: renderContext.rowDepthById) // (#cm-106)
+        let level = Self.workspaceProjectedStatusDropLineLevel(for: plan, depthById: renderContext.rowDepthById, projection: renderContext.statusGroupProjection) // (#cm-106) (#cm-110.2)
         guard dragState.dropIndicator != plan.indicator ||
                 dragState.dropIndicatorScope != plan.indicatorScope ||
                 dragState.dropIndicatorLevel != level else {
@@ -14893,7 +14893,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 visibleWorkspaceRowIds: renderContext.visibleWorkspaceRowIds
             ),
             plan: plan,
-            level: SidebarNestedDropLine.level(for: plan, depthById: renderContext.rowDepthById) // (#cm-106)
+            level: Self.workspaceProjectedStatusDropLineLevel(for: plan, depthById: renderContext.rowDepthById, projection: renderContext.statusGroupProjection) // (#cm-106) (#cm-110.2)
         )
     }
 
@@ -15039,7 +15039,7 @@ struct VerticalTabsSidebar: View, Equatable {
         case .crossWindow(insertionIndex: _, proposedInsertionIndex: let proposedInsertionIndex):
             return performCrossWindowWorkspaceDrop(plan: plan, proposedInsertionIndex: proposedInsertionIndex)
         case .colorSection(let targetWorkspaceId, let insertBefore, let memberWorkspaceIds):
-            let statusGroupProj = Self.currentStatusGroupProjection(tabs: tabManager.tabs) // (#cm-110.1)
+            let statusGroupProj = Self.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups) // (#cm-110.1) (#cm-110.2)
             let freshProjection = Self.colorSectionProjection( // (#cm-110.1)
                 workspaces: tabManager.tabs.map {
                     SidebarWorkspaceColorSectionWorkspaceSnapshot(
@@ -15070,7 +15070,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 targetWorkspaceId: targetWorkspaceId, // (#cm-110.1)
                 insertBefore: insertBefore, // (#cm-110.1)
                 memberWorkspaceIds: memberWorkspaceIds, // (#cm-110.1)
-                freshProjection: Self.currentStatusGroupProjection(tabs: tabManager.tabs), // (#cm-110.1)
+                freshProjection: Self.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups), // (#cm-110.1) (#cm-110.2)
                 tabManager: tabManager // (#cm-110.1)
             ) // (#cm-110.1)
         }

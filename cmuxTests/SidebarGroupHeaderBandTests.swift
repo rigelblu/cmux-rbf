@@ -1,5 +1,6 @@
 import AppKit
 import CmuxSidebar
+import CmuxWorkspaces
 import SwiftUI
 import Testing
 @testable import cmux_DEV
@@ -779,5 +780,147 @@ struct SidebarGroupHeaderColorMenuTests {
 
         #expect(applied.count == 1)
         #expect(applied.first ?? "unset" == nil)
+    }
+}
+
+// The group's own status uses row paint, not the containing status header's name paint. (#cm-110.2)
+extension SidebarGroupHeaderBandTests {
+    private static func statusGlyphActions(
+        onSetColor: @escaping (String?) -> Void = { _ in }
+    ) -> SidebarGroupHeaderRowActions {
+        SidebarGroupHeaderRowActions(
+            onToggleCollapsed: {},
+            onFocusAnchor: { _ in },
+            onTapPlus: {},
+            onRunResolvedItem: { _ in },
+            onRename: {},
+            onSetColor: onSetColor,
+            onPromptCustomColor: {},
+            onTogglePinned: {},
+            onMarkRead: {},
+            onMarkUnread: {},
+            onClearLatestNotifications: {},
+            onMarkAllRead: {},
+            onMarkAllUnread: {},
+            onUngroup: {},
+            onDelete: {},
+            onEditConfig: {},
+            onOpenDocs: {}
+        )
+    }
+
+    private var groupStatusList: WorkspaceStatusList {
+        WorkspaceStatusList(entries: [
+            WorkspaceStatusEntry(id: "parked", name: "Parked", extends: .todo, color: "#7D6609", icon: .shape(.dottedRing)),
+            WorkspaceStatusEntry(id: "doing", name: "Doing", extends: .working, color: "#00C65F", icon: .shape(.half)),
+            WorkspaceStatusEntry(id: "uncolored", name: "Uncolored", extends: .todo)
+        ], source: .file)
+    }
+
+    private func statusGroup(_ status: String? = "parked") -> WorkspaceGroup {
+        var group = WorkspaceGroup(id: UUID(), name: "Group", isCollapsed: false, isPinned: false, anchorWorkspaceId: UUID(), customColor: nil, iconSymbol: nil)
+        group.statusId = status
+        group.customColor = "#7D6609"
+        return group
+    }
+
+    @Test func groupGlyphUsesOwnEntryForNestedAndPinnedGroups() throws {
+        var group = statusGroup()
+        group.parentGroupId = UUID()
+        group.isPinned = true
+        let glyph = try #require(SidebarWorkspaceGroupStatusGlyph.resolve(
+            group: group, list: groupStatusList, colorHexes: ["parked": "#7D6609"], controlsEnabled: true
+        ))
+        #expect(glyph.status == .todo)
+        #expect(glyph.name == "Parked")
+        #expect(glyph.glyph == .shape(.dottedRing))
+        #expect(glyph.colorHex == "#7D6609")
+    }
+
+    @Test func controlsOffHidesGroupGlyphWithoutRemovingItsBandColor() {
+        let group = statusGroup()
+        #expect(SidebarWorkspaceGroupStatusGlyph.resolve(
+            group: group, list: groupStatusList, colorHexes: ["parked": "#7D6609"], controlsEnabled: false
+        ) == nil)
+        #expect(group.customColor == "#7D6609" && group.statusId == "parked")
+    }
+
+    @Test func noStoredGroupStatusNeverCreatesGlyphFromItsColor() {
+        #expect(SidebarWorkspaceGroupStatusGlyph.resolve(
+            group: statusGroup(nil), list: groupStatusList, colorHexes: ["parked": "#7D6609"], controlsEnabled: true
+        ) == nil)
+    }
+
+    @Test func unlistedBuiltinGroupStatusStillHasItsOwnGlyph() throws {
+        let glyph = try #require(SidebarWorkspaceGroupStatusGlyph.resolve(
+            group: statusGroup("done"), list: groupStatusList, colorHexes: [:], controlsEnabled: true
+        ))
+        #expect(glyph.status == .done)
+        #expect(glyph.name == WorkspaceTaskStatus.done.displayName)
+        #expect(glyph.colorHex == nil)
+    }
+
+    @Test func groupGlyphClearsThreeToOneOnEveryBandState() {
+        for appearance in SidebarGroupHeaderBandPalette.RenderedAppearance.allCases {
+            let scheme: ColorScheme = [.darkAqua, .highContrastDarkAqua].contains(appearance) ? .dark : .light
+            for hex in ["#00C65F", "#7D6609", "#FFFFFF", "#000000"] {
+                for (active, multi) in [(false, false), (true, false), (false, true), (true, true)] {
+                    let band = Self.palette(tintHex: hex, isAnchorActive: active, isMultiSelected: multi,
+                                            multiSelectionBackgroundStyle: .clear, renderedAppearance: appearance,
+                                            base: scheme == .dark ? NSColor(hex: "#343442")! : NSColor(hex: "#C3B9CE")!)
+                    let glyph = SidebarWorkspaceGroupStatusGlyph(status: .working, name: "Doing", glyph: .shape(.half), colorHex: hex)
+                    let colors = glyph.colors(colorScheme: scheme, band: band)
+                    let ratio = cmuxContrastRatio(foreground: colors.fill, background: band.compositedBandColor)
+                    #expect(ratio >= 3, "\(appearance) \(hex) active=\(active) multi=\(multi): \(ratio)")
+                }
+            }
+        }
+    }
+
+    @Test func anUncoloredGroupStatusUsesTheRowsDefaultColorRole() throws {
+        let glyph = try #require(SidebarWorkspaceGroupStatusGlyph.resolve(
+            group: statusGroup("uncolored"), list: groupStatusList, colorHexes: [:], controlsEnabled: true
+        ))
+        #expect(glyph.status == .todo)
+        #expect(glyph.colorHex == nil)
+        let band = Self.palette(tintHex: nil)
+        let model = SidebarRowTaskStatusGlyphButton.Model(status: .todo, hasOverride: true, usesMonochrome: false,
+                                                        fontScale: 1, colorScheme: .dark, contrastBackground: band.compositedBandColor)
+        let expected = SidebarRowTaskStatusGlyphButton.statusColor(model: model, monochromeColor: .secondaryLabelColor,
+                                                                 neutralColor: .secondaryLabelColor)
+        #expect(glyph.colors(colorScheme: .dark, band: band).fill == expected)
+    }
+
+    @Test func appKitGroupStatusGlyphReplacesFolderAndHeaderOnlyDot() throws {
+        let glyph = SidebarWorkspaceGroupStatusGlyph(status: .todo, name: "Parked", glyph: .shape(.dottedRing), colorHex: "#7D6609")
+        let band = Self.palette(tintHex: "#7D6609", renderedAppearance: .aqua, base: .windowBackgroundColor)
+        let expected = glyph.image(fontScale: 1, colorScheme: .light, band: band)
+        for hasAnchor in [true, false] {
+            var model = Self.groupHeaderModel(tintHex: "#7D6609", isAnchorActive: false, colorSchemeIsDark: false)
+            model.groupStatusGlyph = glyph
+            model.hasOwnWorkspace = hasAnchor
+            let cell = SidebarGroupHeaderTableCellView()
+            cell.appearance = NSAppearance(named: .aqua)
+            cell.configure(model: model, actions: Self.statusGlyphActions(), isPointerHovering: false,
+                           contextMenuDidOpen: {}, contextMenuDidClose: {})
+            #expect(cell.iconTintForTesting == nil)
+            #expect(try #require(cell.iconImageForTesting).tiffRepresentation == expected.tiffRepresentation)
+        }
+    }
+
+    @Test func appKitGroupPressPreviewRefreshesTheGlyphForItsNewBand() throws {
+        let glyph = SidebarWorkspaceGroupStatusGlyph(status: .working, name: "Doing", glyph: .shape(.half), colorHex: "#00C65F")
+        var model = Self.groupHeaderModel(tintHex: "#00C65F", isAnchorActive: false, colorSchemeIsDark: false)
+        model.groupStatusGlyph = glyph
+        let cell = SidebarGroupHeaderTableCellView()
+        cell.appearance = NSAppearance(named: .aqua)
+        cell.configure(model: model, actions: Self.statusGlyphActions(), isPointerHovering: false,
+                       contextMenuDidOpen: {}, contextMenuDidClose: {})
+        cell.showOptimisticAnchorActive()
+        let active = Self.palette(tintHex: "#00C65F", isAnchorActive: true, renderedAppearance: .aqua, base: .windowBackgroundColor)
+        #expect(try #require(cell.iconImageForTesting).tiffRepresentation == glyph.image(fontScale: 1, colorScheme: .light, band: active).tiffRepresentation)
+        cell.restoreStoredModelPaint()
+        let resting = Self.palette(tintHex: "#00C65F", renderedAppearance: .aqua, base: .windowBackgroundColor)
+        #expect(try #require(cell.iconImageForTesting).tiffRepresentation == glyph.image(fontScale: 1, colorScheme: .light, band: resting).tiffRepresentation)
     }
 }

@@ -154,8 +154,8 @@ struct StatusAreaDropPerformerTests {
             }
         }
         func projection() -> WorkspaceStatusGroupProjection? {
-            VerticalTabsSidebar.statusGroupProjection(items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: tabs, list: list),
-                list: list, colorHexes: ["parked": "#555555"], controlsEnabled: controls, storedOrder: state.statusGroups?.order)
+            VerticalTabsSidebar.statusGroupProjection(items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: tabs, list: list, groups: []),
+                list: list, colorHexes: ["parked": "#555555"], controlsEnabled: controls, storedOrder: state.statusGroups?.order, workspaceGroups: [])
         }
         func rendered() -> [SidebarWorkspaceRenderItem] {
             let projection = projection()

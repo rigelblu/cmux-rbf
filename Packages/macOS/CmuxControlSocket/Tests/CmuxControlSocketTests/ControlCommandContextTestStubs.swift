@@ -272,7 +272,7 @@ extension ControlWorkspaceGroupContext {
         placementRaw: String?
     ) -> ControlWorkspaceGroupNewWorkspaceResolution { .tabManagerUnavailable }
 
-    func controlSetWorkspaceGroupColor(routing: ControlRoutingSelectors, groupID: UUID, hex: String?) -> Bool? { nil }
+    func controlSetWorkspaceGroupColor(routing: ControlRoutingSelectors, groupID: UUID, hex: String?) -> (found: Bool, storedHex: String?)? { nil } // (#cm-110.2)
     func controlSetWorkspaceGroupIcon(routing: ControlRoutingSelectors, groupID: UUID, symbol: String?) -> (found: Bool, storedSymbol: String?)? { nil }
 
     func controlMoveWorkspaceGroup(

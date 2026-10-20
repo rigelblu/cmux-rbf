@@ -362,14 +362,17 @@ extension ControlCommandCoordinator {
         }
         // Accept "hex": null to clear the override, or omit it entirely.
         let hex: String? = rawString(params, "hex").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        let normalized: String? = (hex?.isEmpty == false) ? hex : nil
-        guard let ok = context?.controlSetWorkspaceGroupColor(
+        let normalized = hex.flatMap(WorkspaceColorHex.normalized) // (#cm-110.2)
+        if hex?.isEmpty == false, normalized == nil { // (#cm-110.2)
+            return .err(code: "invalid_params", message: "Invalid hex color", data: nil) // (#cm-110.2)
+        } // (#cm-110.2)
+        guard let result = context?.controlSetWorkspaceGroupColor( // (#cm-110.2)
             routing: routingSelectors(params), groupID: gid, hex: normalized
         ) else {
             return .err(code: "unavailable", message: "TabManager not available", data: nil)
         }
-        return ok
-            ? .ok(.object(["group_id": .string(gid.uuidString), "custom_color": orNull(normalized)]))
+        return result.found // (#cm-110.2)
+            ? .ok(.object(["group_id": .string(gid.uuidString), "custom_color": orNull(result.storedHex)])) // (#cm-110.2)
             : .err(code: "not_found", message: "Group not found", data: .object(["group_id": .string(gid.uuidString)]))
     }
 

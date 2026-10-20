@@ -1,4 +1,5 @@
 import CmuxSettingsUI
+import CmuxWorkspaces
 import Foundation
 import Testing
 
@@ -11,6 +12,26 @@ import Testing
 @MainActor
 @Suite("WorkspacePaletteColorEditCoordinator", .serialized)
 struct WorkspacePaletteColorEditCoordinatorTests {
+    @Test("Palette rollback restores a group's status as well as its color")
+    func rollbackRestoresSavedGroupStatusPair() throws {
+        try withIsolatedPalette(["Custom 11": "#765432"]) {
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            let workspace = manager.addWorkspace(select: false, eagerLoadTerminal: false)
+            let id = UUID()
+            workspace.groupId = id
+            var group = WorkspaceGroup(id: id, name: "Group", isCollapsed: false, isPinned: false,
+                                       anchorWorkspaceId: workspace.id, customColor: "#008800", iconSymbol: nil)
+            group.statusId = "doing"
+            manager.workspaceGroups = [group]
+            let saved = WorkspacePaletteColorEditCoordinator.Snapshot(
+                palette: ["Custom 11": "#765432"], workspaces: [],
+                groups: [(manager: manager, id: id, color: "#765432", statusId: "parked")]
+            )
+            WorkspacePaletteColorEditCoordinator().restore(saved)
+            #expect(manager.workspaceGroups[0].customColor == "#765432")
+            #expect(manager.workspaceGroups[0].statusId == "parked")
+        }
+    }
     @Test("Preview rejects a duplicate palette value")
     func previewRejectsDuplicateHex() throws {
         try withIsolatedPalette([

@@ -79,7 +79,7 @@ import CmuxWorkspaces
             colorSectionProjection: Self.emptyColorProjection,
             baseItems: f.baseItems,
             statusGroupProjection: f.projection
-        )
+        , groups: [])
         let expected: [SidebarWorkspaceRenderItem] = [
             .workspace(workspaceId: f.wA),
             .workspace(workspaceId: f.wD),
@@ -99,7 +99,7 @@ import CmuxWorkspaces
             colorSectionProjection: Self.emptyColorProjection,
             baseItems: f.baseItems,
             statusGroupProjection: nil
-        )
+        , groups: [])
         #expect(Self.ids(resolution.items) == Self.ids(f.baseItems))
     }
 
@@ -109,7 +109,7 @@ import CmuxWorkspaces
             colorSectionProjection: Self.emptyColorProjection,
             baseItems: f.baseItems,
             statusGroupProjection: f.projection
-        )
+        , groups: [])
         #expect(resolution.numberedWorkspaceIndexById == [f.wA: 0, f.wB: 1, f.wC: 2, f.wD: 3])
         // The drawn order puts wB and wC after wD, so numbering the drawn items would change the numbers.
         #expect(SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(from: resolution.items) != resolution.numberedWorkspaceIndexById)
@@ -145,7 +145,7 @@ import CmuxWorkspaces
             colorSectionProjection: Self.emptyColorProjection,
             baseItems: nestedItems,
             statusGroupProjection: projection
-        )
+        , groups: [])
         let area: [SidebarWorkspaceRenderItem] = [
             .statusesHeader, .statusGroupHeader(statusId: "next"), .workspace(workspaceId: wLoose),
         ]
@@ -180,8 +180,8 @@ import CmuxWorkspaces
         let f = Fixture()
         let list = WorkspaceStatusList(entries: [WorkspaceStatusEntry(id: "next", name: "Next", color: "#3B82F6")], source: .file)
         let item = WorkspaceStatusGroupProjectionItem(workspaceId: f.wA, resolution: .ownInEffect(list.entries[0]))
-        let on = Sidebar.statusGroupProjection(items: [item], list: list, colorHexes: ["next": "#3B82F6"], controlsEnabled: true)
-        let off = Sidebar.statusGroupProjection(items: [item], list: list, colorHexes: ["next": "#3B82F6"], controlsEnabled: false)
+        let on = Sidebar.statusGroupProjection(items: [item], list: list, colorHexes: ["next": "#3B82F6"], controlsEnabled: true, workspaceGroups: [])
+        let off = Sidebar.statusGroupProjection(items: [item], list: list, colorHexes: ["next": "#3B82F6"], controlsEnabled: false, workspaceGroups: [])
         #expect(on?.group(for: "next")?.memberWorkspaceIds == [f.wA])
         #expect(off == nil)
 
@@ -469,7 +469,7 @@ import CmuxWorkspaces
             statusGroupProjection: showsArea ? WorkspaceStatusGroupProjection(groups: [
                 WorkspaceStatusGroup(statusId: "next", memberWorkspaceIds: []),
             ]) : nil
-        ).items
+        , groups: []).items
     }
 
     @Test(arguments: [false, true])
@@ -509,7 +509,7 @@ import CmuxWorkspaces
             statusGroupProjection: WorkspaceStatusGroupProjection(groups: [
                 WorkspaceStatusGroup(statusId: "next", memberWorkspaceIds: []),
             ])
-        ).items
+        , groups: []).items
         #expect(Self.ids(items) == Self.ids(base + [.statusesHeader, .statusGroupHeader(statusId: "next")]))
     }
 
@@ -668,7 +668,7 @@ import CmuxWorkspaces
                     groupsById: Dictionary(uniqueKeysWithValues: manager.workspaceGroups.map { ($0.id, $0) }),
                     orderedGroups: manager.workspaceGroups),
                 statusGroupProjection: projection
-            ).items
+            , groups: []).items
         }
         func rowId(_ item: SidebarWorkspaceRenderItem) -> UUID? {
             switch item {
@@ -801,7 +801,7 @@ import CmuxWorkspaces
                     groupsById: Dictionary(uniqueKeysWithValues: manager.workspaceGroups.map { ($0.id, $0) }),
                     orderedGroups: manager.workspaceGroups),
                 statusGroupProjection: projection
-            ).items
+            , groups: []).items
         }
         let before = visibleItems()
         let targets = before.enumerated().compactMap { index, item -> SidebarWorkspaceReorderDropTarget? in

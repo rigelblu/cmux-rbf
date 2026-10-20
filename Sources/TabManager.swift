@@ -6343,6 +6343,7 @@ extension TabManager {
             hasher.combine(group.anchorWorkspaceId)
             hasher.combine(group.isEmpty)
             hasher.combine(group.customColor ?? "")
+            hasher.combine(group.statusId) // (#cm-110.2)
             hasher.combine(group.iconSymbol ?? "")
             hasher.combine(group.externalID ?? "")
             hasher.combine(group.anchorWorkspaceProvenance.rawValue)
@@ -6664,6 +6665,7 @@ extension TabManager {
                         memberIds.firstIndex(of: $0)
                     }
                     return SessionWorkspaceGroupSnapshot(
+                        statusId: group.statusId, // (#cm-110.2)
                         id: group.id,
                         name: group.name,
                         isCollapsed: group.isCollapsed,
@@ -6930,7 +6932,7 @@ extension TabManager {
                     // are durable without a live member (#cm-106).
                     // Their persisted anchor id is a stable header identity;
                     // older snapshots that omit it fall back to the group id.
-                    return WorkspaceGroup(
+                    var restoredGroup = WorkspaceGroup( // (#cm-110.2)
                         id: groupSnapshot.id,
                         name: groupSnapshot.name,
                         isCollapsed: groupSnapshot.isCollapsed,
@@ -6948,6 +6950,8 @@ extension TabManager {
                         ) ?? .unknown,
                         parentGroupId: savedParentId
                     )
+                    restoredGroup.statusId = groupSnapshot.statusId // (#cm-110.2)
+                    return restoredGroup // (#cm-110.2)
                 }
                 // Resolve anchor: prefer the restore-stable index, then the
                 // persisted UUID hint. The UUID hint matches on ordinary
@@ -6963,7 +6967,7 @@ extension TabManager {
                     }
                     return members[0]
                 }()
-                return WorkspaceGroup(
+                var restoredGroup = WorkspaceGroup( // (#cm-110.2)
                     id: groupSnapshot.id,
                     name: groupSnapshot.name,
                     isCollapsed: groupSnapshot.isCollapsed,
@@ -6977,6 +6981,8 @@ extension TabManager {
                     ) ?? .unknown,
                     parentGroupId: savedParentId
                 )
+                restoredGroup.statusId = groupSnapshot.statusId // (#cm-110.2)
+                return restoredGroup // (#cm-110.2)
             }
         }()
         // A saved file with a loop of groups or a parent that names no group is repaired, one log line each (#cm-106).

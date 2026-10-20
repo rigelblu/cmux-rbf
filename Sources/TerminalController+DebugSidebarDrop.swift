@@ -78,7 +78,9 @@ extension VerticalTabsSidebar {
                 let usesStatusFrames: Bool
                 switch typed.first(where: { $0.workspaceId == target.id })?.kind {
                 case .some(.statusesArea), .some(.statusGroupHeader(_)): usesStatusFrames = true
-                case .some(.workspace): usesStatusFrames = projection.contains(workspaceId: target.id)
+                case .some(.workspace):
+                    usesStatusFrames = projection.allDisplayMemberWorkspaceIds.contains(target.id)
+                        || target.row?.groupId.flatMap { projection.workspaceGroups?.statusIdByGroupId[$0] } != nil
                 default: usesStatusFrames = false
                 }
                 pointFrames = usesStatusFrames ? Dictionary(uniqueKeysWithValues: typed.map { ($0.workspaceId, $0.frame) }) : nil

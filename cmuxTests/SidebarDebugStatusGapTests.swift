@@ -230,8 +230,8 @@ struct SidebarDebugStatusGapTests {
 
         func projection() -> WorkspaceStatusGroupProjection? {
             VerticalTabsSidebar.statusGroupProjection(
-                items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: all, list: list), list: list,
-                colorHexes: ["next": "#111111", "parked": "#555555"], controlsEnabled: true)
+                items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: all, list: list, groups: []), list: list,
+                colorHexes: ["next": "#111111", "parked": "#555555"], controlsEnabled: true, workspaceGroups: [])
         }
 
         func performer() -> StatusGroupDropPerformer {

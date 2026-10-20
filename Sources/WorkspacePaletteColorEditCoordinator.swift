@@ -4,10 +4,10 @@ import Foundation
 /// Coordinates one revision-checked palette edit across the app's explicit color owners.
 @MainActor
 struct WorkspacePaletteColorEditCoordinator {
-    private struct Snapshot {
+    struct Snapshot {
         let palette: [String: String]
         let workspaces: [(workspace: Workspace, color: String?)]
-        let groups: [(manager: TabManager, id: UUID, color: String?)]
+        let groups: [(manager: TabManager, id: UUID, color: String?, statusId: String?)]
     }
 
     func preview(
@@ -96,7 +96,7 @@ struct WorkspacePaletteColorEditCoordinator {
             }
             for item in before.groups where
                 WorkspaceTabColorSettings.normalizedHex(item.color ?? "") == preview.oldHex {
-                item.manager.setWorkspaceGroupColor(groupId: item.id, hex: preview.newHex)
+                item.manager.restoreWorkspaceGroupStatus(groupId: item.id, statusId: item.statusId, hex: preview.newHex)
             }
         }
 
@@ -124,13 +124,13 @@ struct WorkspacePaletteColorEditCoordinator {
         var seenWorkspaces: Set<ObjectIdentifier> = []
         var workspaces: [(Workspace, String?)] = []
         var seenGroups: Set<UUID> = []
-        var groups: [(TabManager, UUID, String?)] = []
+        var groups: [(TabManager, UUID, String?, String?)] = []
         for manager in managers {
             for workspace in manager.tabs where seenWorkspaces.insert(ObjectIdentifier(workspace)).inserted {
                 workspaces.append((workspace, workspace.customColor))
             }
             for group in manager.workspaceGroups where seenGroups.insert(group.id).inserted {
-                groups.append((manager, group.id, group.customColor))
+                groups.append((manager, group.id, group.customColor, group.statusId))
             }
         }
         return Snapshot(palette: palette, workspaces: workspaces, groups: groups)
@@ -144,7 +144,7 @@ struct WorkspacePaletteColorEditCoordinator {
             .map { "w:\($0.workspace.id.uuidString)=\($0.color ?? "nil")" }
             .sorted()
         let groups = snapshot.groups
-            .map { "g:\($0.id.uuidString)=\($0.color ?? "nil")" }
+            .map { "g:\($0.id.uuidString)=\($0.color ?? "nil"):status=\($0.statusId ?? "nil")" }
             .sorted()
         return (palette + workspaces + groups).joined(separator: "\n")
     }
@@ -166,6 +166,7 @@ struct WorkspacePaletteColorEditCoordinator {
         for item in before.groups where
             WorkspaceTabColorSettings.normalizedHex(item.color ?? "") == preview.oldHex {
             guard let group = item.manager.workspaceGroups.first(where: { $0.id == item.id }),
+                  group.statusId == item.statusId,
                   WorkspaceTabColorSettings.normalizedHex(group.customColor ?? "") == preview.newHex else {
                 return false
             }
@@ -173,13 +174,13 @@ struct WorkspacePaletteColorEditCoordinator {
         return true
     }
 
-    private func restore(_ snapshot: Snapshot) {
+    func restore(_ snapshot: Snapshot) {
         WorkspaceTabColorSettings.persistPaletteMap(snapshot.palette)
         for item in snapshot.workspaces {
             item.workspace.setCustomColor(item.color)
         }
         for item in snapshot.groups {
-            item.manager.setWorkspaceGroupColor(groupId: item.id, hex: item.color)
+            item.manager.restoreWorkspaceGroupStatus(groupId: item.id, statusId: item.statusId, hex: item.color)
         }
     }
 
@@ -193,6 +194,9 @@ struct WorkspacePaletteColorEditCoordinator {
         )
         let expectedGroupColors = Dictionary(uniqueKeysWithValues: expected.groups.map { ($0.id, $0.color) })
         let actualGroupColors = Dictionary(uniqueKeysWithValues: actual.groups.map { ($0.id, $0.color) })
+        let expectedGroupStatuses = Dictionary(uniqueKeysWithValues: expected.groups.map { ($0.id, $0.statusId) })
+        let actualGroupStatuses = Dictionary(uniqueKeysWithValues: actual.groups.map { ($0.id, $0.statusId) })
         return actualWorkspaceColors == expectedWorkspaceColors && actualGroupColors == expectedGroupColors
+            && actualGroupStatuses == expectedGroupStatuses
     }
 }

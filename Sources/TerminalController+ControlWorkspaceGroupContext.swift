@@ -337,11 +337,11 @@ extension TerminalController: ControlWorkspaceGroupContext {
         routing: ControlRoutingSelectors,
         groupID: UUID,
         hex: String?
-    ) -> Bool? {
+    ) -> (found: Bool, storedHex: String?)? { // (#cm-110.2)
         guard let tabManager = resolveTabManager(routing: routing) else { return nil }
-        let ok = tabManager.workspaceGroups.contains(where: { $0.id == groupID })
-        if ok { tabManager.setWorkspaceGroupColor(groupId: groupID, hex: hex) }
-        return ok
+        let found = tabManager.workspaceGroups.contains(where: { $0.id == groupID }) // (#cm-110.2)
+        if found { tabManager.setWorkspaceGroupColor(groupId: groupID, hex: hex) } // (#cm-110.2)
+        return (found, tabManager.workspaceGroups.first { $0.id == groupID }?.customColor) // (#cm-110.2)
     }
 
     func controlSetWorkspaceGroupIcon(

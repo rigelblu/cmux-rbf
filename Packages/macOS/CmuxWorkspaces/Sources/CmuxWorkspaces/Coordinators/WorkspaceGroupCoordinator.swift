@@ -459,8 +459,7 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
     /// Sets the group-level color override (hex string, nil clears).
     public func setWorkspaceGroupColor(groupId: UUID, hex: String?) {
         guard let index = model.workspaceGroups.firstIndex(where: { $0.id == groupId }) else { return }
-        guard model.workspaceGroups[index].customColor != hex else { return }
-        model.workspaceGroups[index].customColor = hex
+        applyWorkspaceGroupColor(at: index, hex: hex) // (#cm-110.2)
     }
 
     /// Sets the group header icon (normalized through the host's symbol
