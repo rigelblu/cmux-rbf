@@ -65,12 +65,12 @@ With your Figma MCP tools, create a new Figma Design file, passing `planKey` and
 Run `cmux figma open '<the new file's link>'`. Its answer ends with `orientation=vertical` or `orientation=horizontal`: the shape of the pane the file landed in. If the answer has no `orientation=`, take `vertical`.
 
 ## 5. Draw the design in that file
-Draw it with your Figma MCP tools in the file you just made, by its file key. Draw in no other file. Lay its boards out for the orientation step 4 gave: `vertical`, one column, top to bottom; `horizontal`, one row, left to right. Then run `cmux figma goto <the first board's node id>`.
+Draw it with your Figma MCP tools in the file you just made, by its file key. Draw in no other file. Lay its boards out for the orientation step 4 gave: `vertical`, one column, top to bottom; `horizontal`, one row, left to right. Then run `cmux figma fit --surface <the surface cmux figma open printed>`. If it fails, say so in one line and stop; switch or focus nothing.
 
 ## Re-lay the boards
 For `layout vertical` and `layout horizontal` only; steps 1 to 5 don't apply.
 - Take the Figma file you last opened in this conversation with `cmux figma open`. If you opened none, say so and stop.
-- With your Figma MCP tools, move that file's top-level boards into one column, top to bottom (`vertical`), or one row, left to right (`horizontal`), keeping their order. Leave the first board where it is and line the rest up after it. Change nothing inside a board, add nothing, delete nothing, and make no new file.
+- With your Figma MCP tools, move that file's top-level boards into one column, top to bottom (`vertical`), or one row, left to right (`horizontal`), keeping their order. Leave the first board where it is and line the rest up after it. Change nothing inside a board, add nothing, delete nothing, and make no new file. Then run `cmux figma fit --surface <the surface cmux figma open printed>`. If it fails, say so in one line and stop; switch or focus nothing.
 - If you have no Figma MCP tools, or Figma says you are signed out, say so and stop.
 """#
         #expect(try #require(FigmaDesignSkill.document()) == expected + "\n")

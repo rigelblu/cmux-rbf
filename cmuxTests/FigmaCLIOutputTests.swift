@@ -763,6 +763,202 @@ struct FigmaCLIOutputTests {
         #expect(lists(run).isEmpty, "\(run.requests.map(\.method))")
     }
 
+    // MARK: - fit
+
+    private static let readLink = "https://embed.figma.com/design/KEY/slug?node-id=1-2&embed-host=cmux"
+
+    /// The app side of `fit`: `goto`'s pane discovery, plus what `fit` asks beyond it. The
+    /// `surface.list` that carries a `surface_id` is the visibility question; the one without
+    /// is the pane discovery, and `gotoReply` answers it.
+    private static func fitReply(
+        _ panes: [Pane],
+        selectedInPane: Bool? = true,
+        selectedWorkspace: String = "ws-1",
+        focus: String = "ok"
+    ) -> @Sendable (String, String?) -> String {
+        let base = gotoReply(panes)
+        return { method, surfaceID in
+            switch method {
+            case "surface.list" where surfaceID != nil:
+                return ok([
+                    "workspace_id": "ws-1",
+                    "window_id": "win-1",
+                    "surfaces": panes.map {
+                        ["type": "browser", "id": $0.id, "ref": $0.ref,
+                         "selected_in_pane": selectedInPane.map { $0 as Any } ?? NSNull()] as [String: Any]
+                    }
+                ])
+            case "workspace.current":
+                return ok(["window_id": "win-1", "workspace_id": selectedWorkspace])
+            case "browser.eval":
+                return ok(["surface_id": surfaceID ?? "", "value": focus])
+            case "browser.press":
+                let ref = panes.first { $0.id == surfaceID }?.ref ?? "surface:?"
+                return ok(["surface_id": surfaceID ?? "", "surface_ref": ref])
+            default:
+                return base(method, surfaceID)
+            }
+        }
+    }
+
+    private func presses(_ run: Run) -> [StandInSocket.Request] { run.requests.filter { $0.method == "browser.press" } }
+    private func evals(_ run: Run) -> [StandInSocket.Request] { run.requests.filter { $0.method == "browser.eval" } }
+
+    /// Nothing that moves the page or types into it was sent.
+    private func sentNothingToThePage(_ run: Run, sourceLocation: SourceLocation = #_sourceLocation) {
+        #expect(presses(run).isEmpty, "\(run.requests.map(\.method))", sourceLocation: sourceLocation)
+        #expect(run.navigates.isEmpty, "\(run.requests.map(\.method))", sourceLocation: sourceLocation)
+    }
+
+    @Test("fit in the editor sends one ! press to the pane, after asking what has focus, and no navigation")
+    func fitEditorPressesOnce() throws {
+        let run = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8)]))
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.stdout == "OK\n")
+        #expect(run.stderr.isEmpty, "\(run.stderr)")
+        #expect(presses(run).count == 1, "\(run.requests.map(\.method))")
+        #expect(presses(run).first?.params["surface_id"] as? String == "id-8")
+        #expect(presses(run).first?.params["key"] as? String == "!")
+        #expect(run.navigates.isEmpty)
+        let methods = run.requests.map(\.method)
+        let ask = methods.firstIndex(of: "browser.eval")
+        let press = methods.firstIndex(of: "browser.press")
+        #expect(ask != nil && press != nil && ask! < press!, "the guard asks before the press: \(methods)")
+        #expect(evals(run).first?.params["script"] as? String == FigmaFit.focusGuardScript)
+    }
+
+    @Test("fit under --json carries the surface and the way it went")
+    func fitJSON() throws {
+        let editor = try drive(["--json", "figma", "fit"], reply: Self.fitReply([Self.figmaPane(8)]))
+        let editorJSON = try #require(jsonObject(editor.stdout), "\(editor.stdout)")
+        #expect(editorJSON["mode"] as? String == "editor")
+        #expect((editorJSON["surface"] as? String)?.isEmpty == false, "\(editorJSON)")
+        let read = try drive(["--json", "figma", "fit"], reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)]))
+        let readJSON = try #require(jsonObject(read.stdout), "\(read.stdout)")
+        #expect(readJSON["mode"] as? String == "read")
+        #expect((readJSON["surface"] as? String)?.isEmpty == false, "\(readJSON)")
+    }
+
+    @Test("fit in the read view loads the whole page once, with no key and no question about focus")
+    func fitReadNavigatesOnce() throws {
+        let run = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)]))
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.stdout == "OK\n")
+        #expect(run.navigates.count == 1, "\(run.requests.map(\.method))")
+        #expect(run.navigates.first?.params["surface_id"] as? String == "id-8")
+        // The embed address sits percent-encoded inside the page's query.
+        let address = (run.navigates.first?.params["url"] as? String ?? "").removingPercentEncoding ?? ""
+        #expect(address.contains("node-id=0-1") && address.contains("KEY"), "\(address)")
+        #expect(presses(run).isEmpty && evals(run).isEmpty, "\(run.requests.map(\.method))")
+        #expect(run.pageInstalledInTestHome, "the read view's page is on disk, as goto leaves it")
+    }
+
+    @Test("fit with no Figma pane gives goto's refusal and sends nothing to a page")
+    func fitWithNoPane() throws {
+        let run = try drive(["figma", "fit"], reply: Self.fitReply([]))
+        fails(run, with: "no Figma pane is open — run `cmux figma open <url>` first")
+        sentNothingToThePage(run)
+    }
+
+    @Test("fit with two Figma panes and no --surface gives goto's refusal; with --surface only that pane is pressed")
+    func fitWithTwoPanes() throws {
+        let panes = [Self.figmaPane(7), Self.figmaPane(8)]
+        let refused = try drive(["figma", "fit"], reply: Self.fitReply(panes))
+        fails(refused, with: "more than one Figma pane is open (surface:7, surface:8) — pass --surface <handle>")
+        sentNothingToThePage(refused)
+
+        let chosen = try drive(["figma", "fit", "--surface", "id-8"], reply: Self.fitReply(panes))
+        #expect(chosen.status == 0, "\(chosen.stderr)")
+        #expect(presses(chosen).count == 1)
+        #expect(presses(chosen).first?.params["surface_id"] as? String == "id-8")
+        #expect(evals(chosen).allSatisfy { $0.params["surface_id"] as? String == "id-8" })
+    }
+
+    @Test("fit on an editor pane that is not showing is refused by name and sends nothing")
+    func fitHiddenEditor() throws {
+        let behindAnotherTab = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8)], selectedInPane: false))
+        fails(behindAnotherTab, with: "surface surface:8 is not showing, so fit sent no key")
+        sentNothingToThePage(behindAnotherTab)
+        #expect(evals(behindAnotherTab).isEmpty)
+
+        let otherWorkspace = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8)], selectedWorkspace: "ws-2"))
+        fails(otherWorkspace, with: "surface surface:8 is not showing, so fit sent no key")
+        sentNothingToThePage(otherWorkspace)
+    }
+
+    /// The app answers `browser.url.get` for an alias such as `tab:8` with the pane's own id, as `v2BrowserGetURL` does.
+    private static func aliasReply(
+        _ alias: String,
+        for pane: Pane,
+        selectedInPane: Bool?
+    ) -> @Sendable (String, String?) -> String {
+        let base = fitReply([pane], selectedInPane: selectedInPane)
+        return { method, surfaceID in
+            if method == "browser.url.get", surfaceID == alias {
+                return ok(["surface_id": pane.id, "url": pane.url, "show_omnibar": false])
+            }
+            return base(method, surfaceID)
+        }
+    }
+
+    @Test("fit --surface with an alias finds the pane's row, so a hidden pane is still refused")
+    func fitHiddenEditorByAlias() throws {
+        let run = try drive(
+            ["figma", "fit", "--surface", "tab:8"],
+            reply: Self.aliasReply("tab:8", for: Self.figmaPane(8), selectedInPane: false)
+        )
+        fails(run, with: "surface tab:8 is not showing, so fit sent no key")
+        sentNothingToThePage(run)
+    }
+
+    @Test("fit on a read-view pane that is not showing still loads the page once")
+    func fitHiddenReadNavigates() throws {
+        let run = try drive(
+            ["figma", "fit"],
+            reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)], selectedInPane: false, selectedWorkspace: "ws-2")
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.navigates.count == 1, "\(run.requests.map(\.method))")
+        #expect(presses(run).isEmpty)
+    }
+
+    @Test("fit on a FigJam board or a slide deck is refused and sends nothing, in the editor and the read view")
+    func fitRefusesBoardsAndDecks() throws {
+        let message = "cmux figma fit works on Figma design files only: surface surface:8 shows a FigJam board or a slide deck"
+        for link in [
+            "https://www.figma.com/board/KEY/slug",
+            "https://www.figma.com/slides/KEY/slug",
+            "https://embed.figma.com/slides/KEY/slug?node-id=1-2&embed-host=cmux"
+        ] {
+            let run = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8, link: link)]))
+            fails(run, with: message)
+            sentNothingToThePage(run)
+            #expect(evals(run).isEmpty, "\(link)")
+        }
+    }
+
+    @Test("fit while a text field has focus is refused and no key is sent")
+    func fitRefusesWhileTyping() throws {
+        let run = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8)], focus: "typing"))
+        fails(run, with: "a text field in the Figma pane has focus (surface surface:8), so fit sent no key")
+        #expect(evals(run).count == 1)
+        sentNothingToThePage(run)
+    }
+
+    @Test("fit takes no word and refuses what it does not know, sending nothing")
+    func fitArgumentsAreRefused() throws {
+        let cases: [(arguments: [String], message: String)] = [
+            (["figma", "fit", "12-2"], "cmux figma fit does not take an extra argument: 12-2"),
+            (["figma", "fit", "--workspace", "w"], "cmux figma fit does not support --workspace"),
+            (["figma", "fit", "--surface"], "--surface requires a value")
+        ]
+        for testCase in cases {
+            let run = try drive(testCase.arguments, reply: Self.fitReply([Self.figmaPane(8)]))
+            fails(run, with: testCase.message)
+            #expect(run.requests.isEmpty, "\(testCase.arguments): \(run.requests.map(\.method))")
+        }
+    }
+
     // MARK: - Failures and the help
 
     @Test("a missing argument or subcommand fails with the message the brief promises, and sends nothing")
@@ -770,8 +966,8 @@ struct FigmaCLIOutputTests {
         let cases: [(arguments: [String], message: String)] = [
             (["figma", "open"], "cmux figma open requires a Figma file URL"),
             (["figma", "goto"], "cmux figma goto requires a node id"),
-            (["figma"], "cmux figma requires a subcommand: open, goto, folder"),
-            (["figma", "bogus"], "unknown cmux figma subcommand 'bogus' (expected open, goto, folder)"),
+            (["figma"], "cmux figma requires a subcommand: open, goto, fit, folder"),
+            (["figma", "bogus"], "unknown cmux figma subcommand 'bogus' (expected open, goto, fit, folder)"),
             (["figma", "goto", "12-2", "--surface"], "--surface requires a value")
         ]
         for testCase in cases {
@@ -868,7 +1064,7 @@ struct FigmaCLIOutputTests {
     func helpPrintsWithNoSocket() throws {
         let run = try drive(["figma", "--help"], listening: false)
         #expect(run.status == 0, "\(run.stderr)")
-        #expect(run.stdout.hasPrefix("cmux figma\n\nUsage: cmux figma <open|goto|folder>"), "\(run.stdout)")
+        #expect(run.stdout.hasPrefix("cmux figma\n\nUsage: cmux figma <open|goto|fit|folder>"), "\(run.stdout)")
         for phrase in ["cmux browser click", "node-id=0-1", "no address bar", "does not count", "--workspace", "12-2", "12:2"] {
             #expect(run.stdout.contains(phrase), "\(phrase)")
         }

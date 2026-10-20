@@ -3,6 +3,7 @@ import Bonsplit
 import CMUXAgentLaunch
 import CmuxAgentChat
 import CmuxBrowser
+import CmuxSettings
 import Foundation
 import Testing
 #if canImport(cmux_DEV)
@@ -340,5 +341,68 @@ struct FigmaBoardLayoutWorkspaceTests {
         #expect(commands == Set(["/", "$"].flatMap { prefix in
             ["put", "new", "layout vertical", "layout horizontal"].map { prefix + "design-in-figma-pane " + $0 }
         }))
+    }
+}
+
+/// Where the one-shot "fit once the editor has loaded" mark is set (`cm-73.22`). The clicked-link
+/// entrance is in `FigmaClickWorkspaceTests`.
+@Suite(.serialized) @MainActor
+struct FigmaFitEntranceWorkspaceTests {
+    private let design = URL(string: "https://www.figma.com/design/KEY/name")!
+
+    private func request(_ url: URL?, omnibar: Bool = false) -> BrowserSplitRequest {
+        BrowserSplitRequest(url: url, focus: false, preferredProfileID: nil,
+                            chromeVisibility: .init(omnibarVisible: omnibar),
+                            transparentBackground: false, bypassRemoteProxy: true, designFocusAsker: .agent)
+    }
+
+    @Test func openPlacementSetsTheMarkForADesignFileWithNoAddressBar() throws {
+        let wrapperEmbed = FigmaPaneURL.wrapperURL(
+            FigmaPaneURL.wrapperFileURL(),
+            embedding: URL(string: "https://embed.figma.com/design/KEY/name?node-id=1-2")!
+        )
+        let cases: [(url: URL, omnibar: Bool, fits: Bool)] = [
+            (design, false, true),
+            (design, true, false),
+            (URL(string: "https://www.figma.com/board/KEY/name")!, false, false),
+            (URL(string: "https://www.figma.com/slides/KEY/name")!, false, false),
+            (wrapperEmbed, false, false),
+            (URL(string: "https://example.com")!, false, false)
+        ]
+        for testCase in cases {
+            for existingRightPane in [false, true] {
+                let w = Workspace(); defer { w.teardownAllPanels() }
+                w.bonsplitController.setContainerFrame(CGRect(x: 0, y: 0, width: 1272, height: 917))
+                let source = try #require(w.focusedPanelId)
+                if existingRightPane { _ = try #require(w.newTerminalSplit(from: source, orientation: .horizontal)) }
+                let landed = try #require(BrowserSplitContainer.workspace(w).openBrowserToRight(
+                    of: source, request: request(testCase.url, omnibar: testCase.omnibar)))
+                #expect(landed.panel.figmaFitMark.isPending == testCase.fits,
+                        "\(testCase.url) omnibar \(testCase.omnibar) reuse \(existingRightPane)")
+            }
+        }
+    }
+
+    @Test func menuAndNewFileEntriesSetTheMarkAndRecentFilesDoNot() throws {
+        let suite = "figma-fit-entrance-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(false, forKey: BrowserAvailabilitySettings.disabledKey)
+        defaults.set("www.figma.com", forKey: BrowserURLAllowlistPolicy.userDefaultsKey)
+        let w = Workspace(); defer { w.teardownAllPanels() }
+        let pane = try #require(w.bonsplitController.allPaneIds.first)
+        let file = try #require(w.newFigmaSurface(inPane: pane, address: design, focus: false,
+                                                   defaults: defaults, openExternally: { _ in }))
+        #expect(file.figmaFitMark.isPending)
+        let newFile = try #require(w.newFigmaSurface(
+            inPane: pane, address: URL(string: "https://www.figma.com/design/new?folder_id=1&team_id=2")!,
+            focus: false, defaults: defaults, openExternally: { _ in }))
+        #expect(newFile.figmaFitMark.isPending)
+        let board = try #require(w.newFigmaSurface(
+            inPane: pane, address: URL(string: "https://www.figma.com/board/new?folder_id=1&team_id=2")!,
+            focus: false, defaults: defaults, openExternally: { _ in }))
+        #expect(!board.figmaFitMark.isPending)
+        let recent = try #require(w.newFigmaSurface(inPane: pane, focus: false, defaults: defaults, openExternally: { _ in }))
+        #expect(!recent.figmaFitMark.isPending)
     }
 }

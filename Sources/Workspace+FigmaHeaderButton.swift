@@ -57,6 +57,7 @@ extension Workspace {
             chromeVisibility: BrowserChromeVisibility(omnibarVisible: false),
             transparentBackground: true
         ) else { return nil }
+        panel.markFigmaFitOnOpen(for: address) // cmux-rbf #cm-73.22: a design file opened from the menu fits once
         // A tab added to an existing pane schedules no refresh of the saved
         // socket list. Publishing here lets `surface.list` hold the new tab at
         // once, so `cmux figma goto` finds the pane as soon as a file is open in it.

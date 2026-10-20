@@ -2252,6 +2252,9 @@ final class BrowserPanel: Panel, ObservableObject {
     // cmux-rbf (#cm-73.11): the loading line's state; a change tells the panel's views to redraw. Reject a revert of this hunk on upstream sync.
     private(set) lazy var figmaLoadBar = FigmaLoadBarState(changed: { [weak self] in self?.objectWillChange.send() })
 
+    // cmux-rbf (#cm-73.22): "fit on the next editor load", set by the entrances that open a file and spent when the Minimize UI script answers. In memory only, so a restart restore, a reload and an unload-reload never fit. Reject a revert of this hunk on upstream sync.
+    var figmaFitMark = FigmaFitMark()
+
     // cmux-rbf (#cm-73.11): the timeout for Figma's Minimize UI script and the Swift deadline. Reject a revert of this hunk on upstream sync.
     var figmaMinimizeTimeoutMilliseconds: Int = 20_000 {
         didSet {
@@ -4911,7 +4914,11 @@ final class BrowserPanel: Panel, ObservableObject {
         guard FigmaEditorChrome.shouldMinimizeUI(
             paneURL: webView.url,
             isOmnibarVisible: isOmnibarVisible
-        ) else { return }
+        ) else {
+            // cmux-rbf (#cm-73.22): a finished load that starts no script is not the fresh open's. Reject a revert of this hunk on upstream sync.
+            figmaFitMark.navigationFinishedWithoutMinimize()
+            return
+        }
         runFigmaMinimizeScript(in: webView)
     }
 
@@ -4929,6 +4936,8 @@ final class BrowserPanel: Panel, ObservableObject {
             isOmnibarVisible: isOmnibarVisible,
             loadInProgress: webView.isLoading
         ) else { return }
+        // cmux-rbf (#cm-73.22): a file opened in place from Figma's recent files fits once. Reject a revert of this hunk on upstream sync.
+        figmaFitMark.openedInPlace(from: before, to: currentURL)
         // cmux-rbf (#cm-73.11): starts phase 2 sliding wait on in-place editor open. Reject a revert of this hunk on upstream sync.
         if FigmaLoadBar.hasMinimizeControl(currentURL) {
             figmaLoadBar.inPlaceEditorOpened()
@@ -4945,10 +4954,15 @@ final class BrowserPanel: Panel, ObservableObject {
             arguments: [:],
             in: nil,
             in: .page
-        ) { [weak self] _ in
+        ) { [weak self, weak webView] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.figmaLoadBar.scriptAnswered(waitID: waitID)
+                // cmux-rbf (#cm-73.22): the mark is spent here, found or timed out; the press is owed only on `found`. Reject a revert of this hunk on upstream sync.
+                let found = (try? result.get()) as? String == "found"
+                if self.figmaFitMark.minimizeScriptAnswered(found: found), let webView {
+                    self.fitFigmaDesignAfterOpen(in: webView)
+                }
             }
         }
     }
