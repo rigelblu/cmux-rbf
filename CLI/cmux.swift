@@ -5120,7 +5120,7 @@ struct CMUXCLI {
 
         // `figma folder` only reads/writes one key of the shared cmux.json, so like
         // `window default-display` it works with no cmux running and is handled
-        // before socket resolution. `figma open` and `goto` still need the app.
+        // before socket resolution. `figma open`, `goto` and `fit` still need the app.
         if command == "figma",
            commandArgs.first?.lowercased() == "folder" {
             try await runFigmaFolderCommand(

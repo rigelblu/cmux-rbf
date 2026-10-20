@@ -50,7 +50,7 @@ enum FigmaGotoPicker {
     }
 }
 
-/// What follows `cmux figma open` or `goto`, split into the one word the verb
+/// What follows `cmux figma open`, `goto` or `fit`, split into the one word the verb
 /// takes and the one option it takes, so a test can hold it with no socket.
 ///
 /// **A verb refuses what it does not know.** `goto 12-2 --surfce surface:8`
@@ -70,7 +70,7 @@ enum FigmaArguments {
         let message: String
     }
 
-    /// `open` takes `--workspace`; `goto` takes `--surface`.
+    /// `open` takes `--workspace`; `goto` and `fit` take `--surface`. `fit` takes no word.
     static func parse(verb: String, args: [String]) throws -> Parsed {
         let flag = verb == "open" ? "--workspace" : "--surface"
         var word: String?
@@ -94,7 +94,7 @@ enum FigmaArguments {
                 index += 2
                 continue
             }
-            guard word == nil else {
+            guard word == nil, verb != "fit" else {
                 throw Failure(message: "cmux figma \(verb) does not take an extra argument: \(arg)")
             }
             word = arg
@@ -236,7 +236,7 @@ enum FigmaFolderText {
 /// can read it with no socket and no `CMUXCLI`.
 enum FigmaUsage {
     static let text = """
-    Usage: cmux figma <open|goto|folder> [args]
+    Usage: cmux figma <open|goto|fit|folder> [args]
 
     Open a Figma design in a pane with no browser around it, and steer it.
 
@@ -252,6 +252,11 @@ enum FigmaUsage {
                         A Figma file in a browser pane with its address bar showing is left alone.
                         --surface <handle> also moves a browser pane that goto does not count,
                         and picks one when more than one Figma pane is open.
+      fit               Center the open Figma pane on all its boards, as Figma's own zoom to fit does.
+                        In the editor it presses ! (Figma's Shift+1); in the read view it loads the whole page again.
+                        Run it after you draw or move boards. It works on Figma design files only.
+                        It sends no key to a pane that is not showing, or while a text field in the pane has focus.
+                        Counts the same pane goto does. --surface <handle> picks one.
       folder            Print the default Figma folder as projectId, planKey and url.
                         Pass projectId and planKey to Figma's create_new_file.
                         Works with no app running.

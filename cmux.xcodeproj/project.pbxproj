@@ -1731,6 +1731,10 @@
 		807300000000000000000010 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
 		807300000000000000000011 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
 		807300000000000000000012 /* FigmaFileLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000000F /* FigmaFileLink.swift */; };
+		8073B0000000000000000002 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
+		8073B0000000000000000003 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
+		8073B0000000000000000004 /* FigmaFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000001 /* FigmaFit.swift */; };
+		8073B0000000000000000006 /* FigmaFitOnLoad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073B0000000000000000005 /* FigmaFitOnLoad.swift */; };
 		807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000013 /* FigmaFileLinkTests.swift */; };
 		807316000000000000000002 /* FigmaFileList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000001 /* FigmaFileList.swift */; };
 		807316000000000000000D02 /* FigmaFileListPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000D01 /* FigmaFileListPersistenceTests.swift */; };
@@ -5713,6 +5717,8 @@
 		80730000000000000000000B /* FigmaEditorChromeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeTests.swift; sourceTree = "<group>"; };
 		807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaEditorChromeTriggerTests.swift; sourceTree = "<group>"; };
 		80730000000000000000000F /* FigmaFileLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLink.swift; sourceTree = "<group>"; };
+		8073B0000000000000000001 /* FigmaFit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFit.swift; sourceTree = "<group>"; };
+		8073B0000000000000000005 /* FigmaFitOnLoad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaFitOnLoad.swift; sourceTree = "<group>"; };
 		807300000000000000000013 /* FigmaFileLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileLinkTests.swift; sourceTree = "<group>"; };
 		807316000000000000000001 /* FigmaFileList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileList.swift; sourceTree = "<group>"; };
 		807316000000000000000D01 /* FigmaFileListPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFileListPersistenceTests.swift; sourceTree = "<group>"; };
@@ -10087,6 +10093,7 @@
 				8054A0080000000000000008 /* BrowserAutomationSnapshotResult.swift */,
 				8054A00A000000000000000A /* BrowserJavaScriptEvaluationResult.swift */,
 				807300000000000000000009 /* FigmaEditorChrome.swift */,
+				8073B0000000000000000005 /* FigmaFitOnLoad.swift */,
 				80730000000000000000001D /* FigmaStayInPane.swift */,
 				807310000000000000000001 /* FigmaTabMark.swift */,
 				807316000000000000000001 /* FigmaFileList.swift */,
@@ -10763,6 +10770,7 @@
 				80730000000000000000000D /* CMUXCLI+Figma.swift */,
 				807300000000000000000001 /* FigmaPaneURL.swift */,
 				80730000000000000000000F /* FigmaFileLink.swift */,
+				8073B0000000000000000001 /* FigmaFit.swift */,
 				807300000000000000000017 /* FigmaCLIRules.swift */,
 				807300000000000000000030 /* FigmaClickRoute.swift */,
 				805500000000000000000003 /* BrowserValueTextFormatter.swift */,
@@ -13669,6 +13677,8 @@
 				807317000000000000000302 /* FigmaDesignSkill.swift in Sources */, // cmux-rbf #cm-73.17
 				80730000000000000000000A /* FigmaEditorChrome.swift in Sources */,
 				807300000000000000000011 /* FigmaFileLink.swift in Sources */,
+				8073B0000000000000000002 /* FigmaFit.swift in Sources */,
+				8073B0000000000000000006 /* FigmaFitOnLoad.swift in Sources */,
 				807316000000000000000002 /* FigmaFileList.swift in Sources */,
 				807316200000000000000008 /* FigmaKindIcon.swift in Sources */,
 				807311000000000000000002 /* FigmaLoadBar.swift in Sources */,
@@ -15402,6 +15412,7 @@
 				FEEDC1A50000000000000001 /* FeedEventClassifier.swift in Sources */,
 				807300000000000000000018 /* FigmaCLIRules.swift in Sources */,
 				807300000000000000000010 /* FigmaFileLink.swift in Sources */,
+				8073B0000000000000000003 /* FigmaFit.swift in Sources */,
 				807300000000000000000002 /* FigmaPaneURL.swift in Sources */,
 				807300000000000000000007 /* FigmaWrapperPage.swift in Sources */,
 				F97300010000000000000002 /* FreestyleInteractiveShellScript.swift in Sources */,
@@ -15974,6 +15985,7 @@
 				80730000000000000000000C /* FigmaEditorChromeTests.swift in Sources */,
 				807390000000000000000012 /* FigmaEditorChromeTriggerTests.swift in Sources */,
 				807300000000000000000012 /* FigmaFileLink.swift in Sources */,
+				8073B0000000000000000004 /* FigmaFit.swift in Sources */,
 				807300000000000000000014 /* FigmaFileLinkTests.swift in Sources */,
 				807316000000000000000D02 /* FigmaFileListPersistenceTests.swift in Sources */,
 				807316000000000000000302 /* FigmaFileListTests.swift in Sources */,

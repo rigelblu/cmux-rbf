@@ -133,6 +133,31 @@ struct FigmaClickWorkspaceTests {
 
     private let key = "https://www.figma.com/design/KEY"
 
+    @Test("a clicked whole-file link makes a pane that fits once; a clicked frame link, a board and a deck do not")
+    func clickedLinkSetsTheFitMark() throws {
+        for (link, fits): (String, Bool) in [
+            ("https://www.figma.com/design/NEW/name", true),
+            ("https://www.figma.com/design/NEW/name?node-id=1-2", false),
+            ("https://www.figma.com/board/NEW/name", false),
+            ("https://www.figma.com/slides/NEW/name", false)
+        ] {
+            try withFixture { f in
+                #expect(f.click(link), "\(link)")
+                let browser = try #require(f.workspace.panels.values.compactMap { $0 as? BrowserPanel }.first)
+                #expect(browser.figmaFitMark.isPending == fits, "\(link)")
+            }
+        }
+    }
+
+    @Test("a pane already on the file keeps its mark clear when a link moves it: a frame link never fits")
+    func movingAPaneSetsNoFitMark() throws {
+        try withFixture { f in
+            let pane = try f.addBrowser(f.address("https://www.figma.com/design/KEY/old-name?node-id=1-1"))
+            #expect(f.click("https://www.figma.com/design/KEY/name?node-id=3-4"))
+            #expect(!pane.figmaFitMark.isPending)
+        }
+    }
+
     @Test("W1 a Figma pane on the file, a link with a frame: it moves to the frame on its own path, and nothing is added")
     func w1MovesThePane() throws {
         try withFixture { f in

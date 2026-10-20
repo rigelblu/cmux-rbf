@@ -919,7 +919,7 @@ struct FigmaFolderCLITests {
             ]
             let start = try #require(lines.firstIndex(of: expected[0]), "\(result.stdout)")
             #expect(Array(lines[start..<min(start + expected.count, lines.count)]) == expected)
-            #expect(result.stdout.hasPrefix("cmux figma\n\nUsage: cmux figma <open|goto|folder> [args]\n"))
+            #expect(result.stdout.hasPrefix("cmux figma\n\nUsage: cmux figma <open|goto|fit|folder> [args]\n"))
         }
     }
 

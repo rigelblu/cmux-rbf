@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 import Testing
 
 /// Which pane `cmux figma goto` moves, what it says when it moves none, and
@@ -143,6 +144,16 @@ struct FigmaCLIRulesTests {
         #expect(parsed("goto", ["12-2", "--surface", "--json"]) == .init(word: "12-2", option: "--json"))
     }
 
+    @Test("fit takes --surface and no word; a word, a --workspace and a repeated --surface are refused by name")
+    func fitArguments() {
+        #expect(parsed("fit", []) == .init(word: nil, option: nil))
+        #expect(parsed("fit", ["--surface", "s"]) == .init(word: nil, option: "s"))
+        #expect(refusal("fit", ["12-2"]) == "cmux figma fit does not take an extra argument: 12-2")
+        #expect(refusal("fit", ["--workspace", "w"]) == "cmux figma fit does not support --workspace")
+        #expect(refusal("fit", ["--surface", "a", "--surface", "b"]) == "cmux figma fit accepts --surface only once")
+        #expect(refusal("fit", ["--surface"]) == "--surface requires a value")
+    }
+
     // MARK: - The help text
 
     private var lines: [String] { FigmaUsage.text.components(separatedBy: "\n") }
@@ -151,7 +162,7 @@ struct FigmaCLIRulesTests {
 
     @Test("the help starts with the usage line and has no --theme")
     func usageLineAndNoTheme() {
-        #expect(lines.first == "Usage: cmux figma <open|goto|folder> [args]")
+        #expect(lines.first == "Usage: cmux figma <open|goto|fit|folder> [args]")
         #expect(!FigmaUsage.text.contains("--theme"))
     }
 
@@ -212,5 +223,175 @@ struct FigmaCLIRulesTests {
         let found = phrases.map { phrase in lines.firstIndex { $0.contains(phrase) } }
         #expect(!found.contains(nil))
         #expect(Set(found.compactMap { $0 }).count == phrases.count)
+    }
+
+    @Test("the help describes fit between goto and folder, with the two ways and the refusals")
+    func helpDescribesFit() {
+        let fit = lines.firstIndex { $0.hasPrefix("  fit ") }
+        let goto = lines.firstIndex { $0.contains("goto <node-id>") }
+        let folder = lines.firstIndex { $0.hasPrefix("  folder ") }
+        #expect(fit != nil && goto != nil && folder != nil)
+        if let fit, let goto, let folder { #expect(goto < fit && fit < folder) }
+        for phrase in ["Center the open Figma pane", "Shift+1", "read view", "design files only", "text field"] {
+            #expect(FigmaUsage.text.contains(phrase), "\(phrase)")
+        }
+    }
+}
+
+/// What `cmux figma fit` decides, and what the fit on a fresh open shares with it. Pure: no
+/// socket and no app.
+@Suite("FigmaFitRules")
+struct FigmaFitRulesTests {
+
+    private static let editor = URL(string: "https://www.figma.com/design/KEY/slug")!
+    private static let read = URL(string: "https://embed.figma.com/design/KEY/slug?node-id=1-2&embed-host=cmux")!
+    private static let wrapper = URL(string: "file:///Users/x/Library/Application%20Support/cmux/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY%2Fslug")!
+    private static let board = URL(string: "https://www.figma.com/board/KEY/slug")!
+    private static let slides = URL(string: "https://www.figma.com/slides/KEY/slug")!
+
+    private func decide(_ address: URL, document: URL? = nil, showing: Bool = true) -> FigmaFit.Decision {
+        FigmaFit.decide(
+            handle: "surface:8",
+            paneAddress: address,
+            document: document ?? FigmaPaneURL.documentURL(fromPaneURL: address) ?? address,
+            isShowing: showing
+        )
+    }
+
+    // MARK: - decide
+
+    @Test("an editor pane that is showing: press, mode editor")
+    func editorShowing() {
+        #expect(decide(Self.editor) == .pressFit)
+        #expect(decide(Self.editor).mode == .editor)
+    }
+
+    @Test("an editor pane that is not showing is refused by name, and nothing is pressed")
+    func editorHidden() {
+        #expect(decide(Self.editor, showing: false)
+            == .refuse("surface surface:8 is not showing, so fit sent no key"))
+        #expect(decide(Self.editor, showing: false).mode == nil)
+    }
+
+    @Test("a read-view pane loads the whole page again, showing or not")
+    func readView() {
+        for address in [Self.read, Self.wrapper] {
+            #expect(decide(address, document: Self.editor, showing: true) == .reloadWholePage, "\(address)")
+            #expect(decide(address, document: Self.editor, showing: false) == .reloadWholePage, "\(address)")
+            #expect(decide(address, document: Self.editor).mode == .read)
+        }
+    }
+
+    @Test("a FigJam board or a slide deck is refused in either view and either state")
+    func notADesignFile() {
+        let message = "cmux figma fit works on Figma design files only: surface surface:8 shows a FigJam board or a slide deck"
+        let readSlides = URL(string: "https://embed.figma.com/slides/KEY/slug?node-id=1-2")!
+        for (address, document) in [(Self.board, Self.board), (Self.slides, Self.slides), (readSlides, Self.slides)] {
+            for showing in [true, false] {
+                #expect(decide(address, document: document, showing: showing) == .refuse(message), "\(address) showing \(showing)")
+            }
+        }
+    }
+
+    @Test("an older /file/ link is a design file")
+    func olderFileLink() {
+        #expect(decide(URL(string: "https://www.figma.com/file/KEY/slug")!) == .pressFit)
+    }
+
+    // MARK: - isShowing
+
+    @Test("a pane shows when it is selected in its pane and its workspace is the selected one; an unknown counts as showing")
+    func showing() {
+        #expect(FigmaFit.isShowing(selectedInPane: true, workspaceID: "a", selectedWorkspaceID: "a"))
+        #expect(!FigmaFit.isShowing(selectedInPane: false, workspaceID: "a", selectedWorkspaceID: "a"))
+        #expect(!FigmaFit.isShowing(selectedInPane: true, workspaceID: "a", selectedWorkspaceID: "b"))
+        #expect(FigmaFit.isShowing(selectedInPane: nil, workspaceID: "a", selectedWorkspaceID: "a"))
+        #expect(FigmaFit.isShowing(selectedInPane: true, workspaceID: nil, selectedWorkspaceID: "b"))
+        #expect(FigmaFit.isShowing(selectedInPane: true, workspaceID: "a", selectedWorkspaceID: nil))
+    }
+
+    // MARK: - Which opens fit
+
+    @Test("only a design file in the editor is a fresh open that fits")
+    func opensDesignInEditor() {
+        #expect(FigmaFit.opensDesignInEditor(Self.editor))
+        #expect(FigmaFit.opensDesignInEditor(URL(string: "https://www.figma.com/file/KEY/slug")!))
+        #expect(FigmaFit.opensDesignInEditor(URL(string: "https://www.figma.com/design/new?folder_id=1&team_id=2")!))
+        for no in [Self.board, Self.slides, Self.read, Self.wrapper,
+                   URL(string: "https://www.figma.com/files/recent")!,
+                   URL(string: "https://example.com/design/KEY/slug")!] {
+            #expect(!FigmaFit.opensDesignInEditor(no), "\(no)")
+        }
+        #expect(!FigmaFit.opensDesignInEditor(nil))
+    }
+
+    @Test("an in-place open fits only when the address moved from a page that is no file to a design file")
+    func opensDesignInPlace() {
+        let recent = URL(string: "https://www.figma.com/files/recent")!
+        #expect(FigmaFit.opensDesignInPlace(from: recent, to: Self.editor))
+        #expect(!FigmaFit.opensDesignInPlace(from: Self.editor, to: Self.editor))
+        #expect(!FigmaFit.opensDesignInPlace(from: URL(string: "https://www.figma.com/design/OTHER/x")!, to: Self.editor))
+        #expect(!FigmaFit.opensDesignInPlace(from: nil, to: Self.editor))
+        #expect(!FigmaFit.opensDesignInPlace(from: recent, to: Self.board))
+        #expect(!FigmaFit.opensDesignInPlace(from: recent, to: recent))
+    }
+
+    // MARK: - What is read from the page
+
+    /// Runs the focus guard against a page whose focused element is `element` (a JS object literal, or `null`).
+    private func guardAnswer(_ element: String) -> String? {
+        let context = JSContext()!
+        context.evaluateScript("var document = { activeElement: \(element) };")
+        return context.evaluateScript(FigmaFit.focusGuardScript)?.toString()
+    }
+
+    private func field(_ tag: String, sink: Bool, editable: Bool = false) -> String {
+        "{ tagName: '\(tag)', isContentEditable: \(editable), classList: { contains: function (c) { return \(sink) && c === 'focus-target'; } } }"
+    }
+
+    @Test("the guard lets Figma's keyboard sink and a page with nothing focused through")
+    func guardOk() {
+        #expect(guardAnswer("null") == "ok")
+        #expect(guardAnswer(field("BODY", sink: false)) == "ok")
+        #expect(guardAnswer(field("INPUT", sink: true)) == "ok")
+        #expect(guardAnswer(field("DIV", sink: false)) == "ok")
+    }
+
+    @Test("the guard stops a text field, an editable element, and the sink once it is editable")
+    func guardTyping() {
+        #expect(guardAnswer(field("INPUT", sink: false)) == "typing")
+        #expect(guardAnswer(field("TEXTAREA", sink: false)) == "typing")
+        #expect(guardAnswer(field("SELECT", sink: false)) == "typing")
+        #expect(guardAnswer(field("DIV", sink: true, editable: true)) == "typing")
+        #expect(guardAnswer(field("DIV", sink: false, editable: true)) == "typing")
+    }
+
+    @Test("a guard answer other than ok counts as typing, so a script that did not run stops the press")
+    func guardAnswerReading() {
+        #expect(!FigmaFit.isTyping("ok"))
+        #expect(FigmaFit.isTyping("typing"))
+        #expect(FigmaFit.isTyping(nil))
+        #expect(FigmaFit.isTyping(3))
+    }
+
+    @Test("the zoom label script reads the aria-label of the zoom button, and null when it is not there")
+    func zoomLabel() {
+        let context = JSContext()!
+        context.evaluateScript("""
+        var asked = null;
+        var document = { querySelector: function (selector) {
+          asked = selector;
+          return { getAttribute: function (name) { return name === 'aria-label' ? '15%, zoom and view options' : null; } };
+        } };
+        """)
+        #expect(context.evaluateScript(FigmaFit.zoomLabelScript)?.toString() == "15%, zoom and view options")
+        #expect(context.evaluateScript("asked")?.toString() == "[aria-label$=\"zoom and view options\"]")
+        context.evaluateScript("document = { querySelector: function () { return null; } };")
+        #expect(context.evaluateScript(FigmaFit.zoomLabelScript)?.isNull == true)
+    }
+
+    @Test("fit presses the ! key, the trusted shift-1")
+    func fitKey() {
+        #expect(FigmaFit.fitKey == "!")
     }
 }

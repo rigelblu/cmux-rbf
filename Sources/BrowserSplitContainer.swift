@@ -110,6 +110,10 @@ enum BrowserSplitContainer {
     private func placement(panel: BrowserPanel, sourcePanelID: UUID, request: BrowserSplitRequest,
                            createdSplit: Bool, splitDirection: SplitOrientation? = nil,
                            registry: AgentChatSessionRegistry?) -> BrowserSplitPlacement {
+        // cmux-rbf (#cm-73.22): a Figma request with no address bar is a fresh open, so the pane fits once the editor has loaded. Reject a revert of this hunk on upstream sync.
+        if FigmaTabMark.applies(address: request.url, showsAddressBar: request.chromeVisibility.isOmnibarVisible) {
+            panel.markFigmaFitOnOpen(for: request.url)
+        }
         var orientation: BoardLayoutOrientation?
         if case .workspace(let workspace) = self,
            FigmaTabMark.applies(address: request.url, showsAddressBar: request.chromeVisibility.isOmnibarVisible),

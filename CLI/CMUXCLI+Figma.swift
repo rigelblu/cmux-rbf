@@ -9,7 +9,7 @@ extension CMUXCLI {
     /// updates.
     var figmaUsage: String { FigmaUsage.text }
 
-    /// `cmux figma open <url>` and `cmux figma goto <node>`.
+    /// `cmux figma open <url>`, `cmux figma goto <node>` and `cmux figma fit`.
     ///
     /// **Why a verb rather than a flag on `browser`.** The agent calling this
     /// should not have to know that a Figma pane is a browser pane, which host
@@ -24,7 +24,7 @@ extension CMUXCLI {
     ) throws {
         var args = commandArgs
         guard !args.isEmpty else {
-            throw CLIError(message: "cmux figma requires a subcommand: open, goto, folder")
+            throw CLIError(message: "cmux figma requires a subcommand: open, goto, fit, folder")
         }
         let subcommand = args.removeFirst().lowercased()
         if ["help", "--help", "-h"].contains(subcommand) {
@@ -32,8 +32,8 @@ extension CMUXCLI {
             return
         }
 
-        guard subcommand == "open" || subcommand == "goto" else {
-            throw CLIError(message: "unknown cmux figma subcommand '\(subcommand)' (expected open, goto, folder)")
+        guard subcommand == "open" || subcommand == "goto" || subcommand == "fit" else {
+            throw CLIError(message: "unknown cmux figma subcommand '\(subcommand)' (expected open, goto, fit, folder)")
         }
         let parsed: FigmaArguments.Parsed
         do {
@@ -50,9 +50,16 @@ extension CMUXCLI {
                 jsonOutput: jsonOutput,
                 idFormat: idFormat
             )
-        } else {
+        } else if subcommand == "goto" {
             try runFigmaGoto(
                 node: parsed.word,
+                surfaceOverride: parsed.option,
+                client: client,
+                jsonOutput: jsonOutput,
+                idFormat: idFormat
+            )
+        } else {
+            try runFigmaFit(
                 surfaceOverride: parsed.option,
                 client: client,
                 jsonOutput: jsonOutput,
@@ -254,15 +261,15 @@ extension CMUXCLI {
             throw CLIError(message: "cmux figma goto requires a node id")
         }
 
-        let (surfaceID, document) = try resolveBoundFigmaPane(
+        let pane = try resolveBoundFigmaPane(
             surfaceOverride: surfaceOverride,
             client: client
         )
-        let destination = try figmaDestination(for: document, node: node)
+        let destination = try figmaDestination(for: pane.document, node: node)
 
         let payload = try client.sendV2(
             method: "browser.navigate",
-            params: ["surface_id": surfaceID, "url": destination.url.absoluteString]
+            params: ["surface_id": pane.surfaceID, "url": destination.url.absoluteString]
         )
         if jsonOutput {
             print(jsonString(formatIDs(payload, mode: idFormat)))
@@ -271,6 +278,100 @@ extension CMUXCLI {
         // Deliberately just `OK`: anything more lands in the transcript the
         // user is reading.
         print("OK")
+    }
+
+    // MARK: - fit
+
+    /// How long `fit` waits before it presses `⇧1` in the editor, so boards the agent
+    /// has just moved are on screen. Measured 2026-10-20: they show within 0.3 s of an
+    /// edit through the Figma MCP, so a second is ample. The wait lives here, so the
+    /// app holds no timer.
+    private static let figmaFitSettleSeconds: TimeInterval = 1.0
+
+    /// `cmux figma fit [--surface <ref>]`: center the open Figma pane on all its boards.
+    ///
+    /// **Two ways, no new socket method.** In Figma's editor it sends `browser.press`
+    /// with `!`, the trusted `⇧1`; in the read view, which has no zoom to fit, it
+    /// loads the view again on the whole page, as `goto 0-1` does. Which way, and
+    /// every refusal, is ``FigmaFit/decide(handle:paneAddress:document:isShowing:)``.
+    ///
+    /// **A trusted `!` types into Figma's text editing** (measured 2026-10-20), which
+    /// would edit the file, so the editor way first asks the page what has focus and
+    /// sends no key when it is a text field.
+    private func runFigmaFit(
+        surfaceOverride: String?,
+        client: SocketClient,
+        jsonOutput: Bool,
+        idFormat: CLIIDFormat
+    ) throws {
+        let pane = try resolveBoundFigmaPane(surfaceOverride: surfaceOverride, client: client)
+        let decision = FigmaFit.decide(
+            handle: pane.handle,
+            paneAddress: pane.address,
+            document: pane.document,
+            isShowing: figmaPaneIsShowing(surfaceID: pane.surfaceID, canonicalID: pane.canonicalID, client: client)
+        )
+
+        let payload: [String: Any]
+        switch decision {
+        case .refuse(let message):
+            throw CLIError(message: message)
+
+        case .reloadWholePage:
+            let destination = try figmaDestination(for: pane.document, node: "0-1")
+            payload = try client.sendV2(
+                method: "browser.navigate",
+                params: ["surface_id": pane.surfaceID, "url": destination.url.absoluteString]
+            )
+
+        case .pressFit:
+            Thread.sleep(forTimeInterval: Self.figmaFitSettleSeconds)
+            let focus = try client.sendV2(
+                method: "browser.eval",
+                params: ["surface_id": pane.surfaceID, "script": FigmaFit.focusGuardScript]
+            )
+            if FigmaFit.isTyping(focus["value"]) {
+                throw CLIError(message: FigmaFit.typingRefusal(handle: pane.handle))
+            }
+            payload = try client.sendV2(
+                method: "browser.press",
+                params: ["surface_id": pane.surfaceID, "key": FigmaFit.fitKey]
+            )
+        }
+
+        if jsonOutput {
+            var out = formatIDs(payload, mode: idFormat) as? [String: Any] ?? [:]
+            out["surface"] = formatHandle(payload, kind: "surface", idFormat: idFormat) ?? pane.handle
+            out["mode"] = decision.mode?.rawValue
+            print(jsonString(out))
+            return
+        }
+        // Just `OK`, as `goto` answers: anything more lands in the transcript the user is reading.
+        print("OK")
+    }
+
+    /// Whether a pane is on screen, read from `surface.list` and `workspace.current`.
+    ///
+    /// A pane that is not selected in its pane, or whose workspace is not the
+    /// selected one in its window, is not showing. Neither field reads the window
+    /// itself, and a reply that lacks a field says nothing, so any answer this
+    /// cannot read counts as showing: a refusal that is wrong blocks the person, a press that is
+    /// wrong only frames the wrong size.
+    private func figmaPaneIsShowing(surfaceID: String, canonicalID: String, client: SocketClient) -> Bool {
+        guard let listed = try? client.sendV2(method: "surface.list", params: ["surface_id": surfaceID]) else {
+            return true
+        }
+        let rows = listed["surfaces"] as? [[String: Any]] ?? []
+        // Matched by the canonical id, so `--surface tab:3` or a lower-case UUID still finds its row.
+        let row = rows.first { ($0["id"] as? String) == canonicalID || ($0["ref"] as? String) == surfaceID }
+        var currentParams: [String: Any] = [:]
+        if let window = listed["window_id"] as? String { currentParams["window_id"] = window }
+        let current = try? client.sendV2(method: "workspace.current", params: currentParams)
+        return FigmaFit.isShowing(
+            selectedInPane: row?["selected_in_pane"] as? Bool,
+            workspaceID: listed["workspace_id"] as? String,
+            selectedWorkspaceID: current?["workspace_id"] as? String
+        )
     }
 
     /// Find the pane a `goto` should steer.
@@ -283,13 +384,17 @@ extension CMUXCLI {
     private func resolveBoundFigmaPane(
         surfaceOverride: String?,
         client: SocketClient
-    ) throws -> (surfaceID: String, document: URL) {
+    ) throws -> BoundFigmaPane {
+        var addresses: [String: URL] = [:]
+        var canonicalIDs: [String: String] = [:]
         func pane(ofSurface id: String, handle: String) -> FigmaGotoPicker.Pane? {
             guard let payload = try? client.sendV2(
                 method: "browser.url.get",
                 params: ["surface_id": id]
             ) else { return nil }
             guard let raw = payload["url"] as? String, let url = URL(string: raw) else { return nil }
+            addresses[id] = url
+            canonicalIDs[id] = payload["surface_id"] as? String
             return FigmaGotoPicker.Pane(
                 id: id,
                 handle: handle,
@@ -299,10 +404,17 @@ extension CMUXCLI {
         }
 
         if let surfaceOverride {
-            guard let document = pane(ofSurface: surfaceOverride, handle: surfaceOverride)?.document else {
+            guard let document = pane(ofSurface: surfaceOverride, handle: surfaceOverride)?.document,
+                  let address = addresses[surfaceOverride] else {
                 throw CLIError(message: "surface \(surfaceOverride) is not showing a Figma file")
             }
-            return (surfaceOverride, document)
+            return BoundFigmaPane(
+                surfaceID: surfaceOverride,
+                canonicalID: canonicalIDs[surfaceOverride] ?? surfaceOverride,
+                handle: surfaceOverride,
+                document: document,
+                address: address
+            )
         }
 
         // Ask for the list by the pane this command ran in, as `open` does: a
@@ -342,13 +454,31 @@ extension CMUXCLI {
         switch FigmaGotoPicker.pick(panes) {
         case .move(let pane):
             // `pick` only moves a pane that shows a Figma file.
-            guard let document = pane.document else {
+            guard let document = pane.document, let address = addresses[pane.id] else {
                 throw CLIError(message: "surface \(pane.handle) is not showing a Figma file")
             }
-            return (pane.id, document)
+            return BoundFigmaPane(
+                surfaceID: pane.id,
+                canonicalID: canonicalIDs[pane.id] ?? pane.id,
+                handle: pane.handle,
+                document: document,
+                address: address
+            )
         case .refuse(let message):
             throw CLIError(message: message)
         }
+    }
+
+    /// A Figma pane `goto` or `fit` found: the id the socket takes, the name a person
+    /// can paste, the Figma file it shows, and the address it shows it at (the editor
+    /// on Figma's own host, or cmux's read-view page).
+    struct BoundFigmaPane {
+        let surfaceID: String
+        /// The pane's UUID as `browser.url.get` answers it, whatever alias or case `surfaceID` was given in.
+        let canonicalID: String
+        let handle: String
+        let document: URL
+        let address: URL
     }
 
     // MARK: - Shared
