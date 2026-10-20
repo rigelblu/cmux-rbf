@@ -159,7 +159,7 @@ struct SidebarStatusAreaPlacementTests {
         let list = WorkspaceStatusList(entries: [WorkspaceStatusEntry(id: "a", name: "A", extends: .todo),
                                                 WorkspaceStatusEntry(id: "b", name: "B", extends: .working)], source: .file)
         let projection = VerticalTabsSidebar.statusGroupProjection(items: [], list: list, colorHexes: [:],
-            controlsEnabled: true, storedOrder: ["b", "a"])
+            controlsEnabled: true, storedOrder: ["b", "a"], workspaceGroups: [])
         #expect(projection?.groups.map(\.statusId) == ["b", "a"])
     }
     @Test func aNewStatusIsRememberedBeforeAFollowingFileReorder() throws {
@@ -189,7 +189,7 @@ struct SidebarStatusAreaPlacementTests {
         let item = WorkspaceStatusGroupProjectionItem(workspaceId: member, isStatusHidden: true,
             normalizedColorHex: "#AABBCC", resolution: .detected(.todo))
         let projection = try #require(VerticalTabsSidebar.statusGroupProjection(items: [item], list: list,
-            colorHexes: ["a": "#AABBCC", "b": "#AABBCC"], controlsEnabled: true, storedOrder: ["b", "a"]))
+            colorHexes: ["a": "#AABBCC", "b": "#AABBCC"], controlsEnabled: true, storedOrder: ["b", "a"], workspaceGroups: []))
         #expect(projection.groups.map(\.statusId) == ["b", "a"])
         #expect(projection.group(for: "a")?.memberWorkspaceIds == [member])
         #expect(projection.group(for: "b")?.memberWorkspaceIds == [])

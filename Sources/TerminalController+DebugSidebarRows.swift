@@ -29,7 +29,7 @@ extension TerminalController {
             let tabsById = Dictionary(uniqueKeysWithValues: tabManager.tabs.map { ($0.id, $0) })
             let statusList = AppDelegate.statusListInUse
             let statusGroups = app.mainWindowContexts.values.first { $0.windowId == windowId }?.sidebarState.statusGroups ?? .init()
-            let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, storedOrder: statusGroups.order)
+            let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: statusGroups.order)
             var statusIdByWorkspaceId: [UUID: String] = [:]
             for group in projection?.groups ?? [] {
                 for id in group.memberWorkspaceIds { statusIdByWorkspaceId[id] = group.statusId }
@@ -47,7 +47,10 @@ extension TerminalController {
                         colorHexes: [:]
                     ).name
                 },
-                statusGroups: statusGroups, statusIdByWorkspaceId: statusIdByWorkspaceId
+                statusGroups: statusGroups, statusIdByWorkspaceId: statusIdByWorkspaceId,
+                groupStatusId: { groupsById[$0]?.statusId },
+                parentGroupId: { groupsById[$0]?.parentGroupId },
+                statusIdByGroupId: projection?.workspaceGroups?.statusIdByGroupId ?? [:]
             )
             let rowsData: [[String: Any]] = rows.map { row in
                 [
@@ -56,6 +59,7 @@ extension TerminalController {
                     "title": row.title,
                     "header": row.header.map { $0 as Any } ?? NSNull(),
                     "folded": row.folded,
+                    "status_id": row.statusId.map { $0 as Any } ?? NSNull(),
                 ]
             }
             return .ok([

@@ -86,9 +86,16 @@ public protocol WorkspaceGroupHosting<Tab>: WorkspaceOrderHosting {
     /// that app-side title in sync when the group is renamed so persisted and
     /// projected workspace identities cannot resurrect the old name.
     func workspaceGroupGeneratedAnchorNameDidChange(_ anchor: Tab, name: String)
+
+    /// The current list and palette resolver for group status/color mutations. (#cm-110.2)
+    var workspaceGroupStatusActions: WorkspaceGroupStatusActions { get } // (#cm-110.2)
 }
 
 public extension WorkspaceGroupHosting {
+    /// Hosts without a configured list retain plain group colors. (#cm-110.2)
+    var workspaceGroupStatusActions: WorkspaceGroupStatusActions { // (#cm-110.2)
+        WorkspaceGroupStatusActions(list: .cmuxFive, resolveColor: { _ in nil }) // (#cm-110.2)
+    } // (#cm-110.2)
     /// Hosts that do not persist workspace titles can leave this hook as a no-op.
     func workspaceGroupGeneratedAnchorNameDidChange(_ anchor: Tab, name: String) {}
 }

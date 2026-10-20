@@ -50,7 +50,7 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     let bottomDropIndicatorVisible: Bool
     /// Resolved cmux scheme used by native group-header chrome.
     let colorSchemeIsDark: Bool
-    /// How many groups hold this header; 0 at the top level and in a window with no nested group (#cm-106).
+    /// Display depth, including the Statuses area and status header when projected. (#cm-106) (#cm-110.2)
     var depth: Int = 0
     /// Whether a workspace stands behind the group's name. When none does the header is never active, a dot in the
     /// group's tint stands where its icon was and its name keeps the band's colour (#cm-106).
@@ -59,6 +59,9 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     var isFoldedOverSelection: Bool = false
     /// Whether a group sits inside this one; a pinned group that holds only groups is still offered Ungroup (#cm-106).
     var holdsGroups: Bool = false
+    /// The group's own status, captured above the lazy boundary. (#cm-110.2)
+    var groupStatusGlyph: SidebarWorkspaceGroupStatusGlyph? = nil // (#cm-110.2)
+    var groupStatusMenu: SidebarWorkspaceGroupStatusMenu? = nil // (#cm-110.2)
     /// Distinguishes status-related headers from upstream workspace group headers (#cm-110.1).
     var statusHeaderKind: SidebarStatusHeaderKind? = nil // (#cm-110.1)
     /// Status glyph icon for status group header drawing (#cm-110.1).
@@ -96,4 +99,6 @@ struct SidebarGroupHeaderRowActions {
     var onMoveGroup: (UUID?) -> Void = { _ in }
     /// What `Move Group to` offers, read when the menu opens (#cm-106).
     var moveMenu: () -> WorkspaceGroupMoveMenu? = { nil }
+    var onSetStatus: (WorkspaceStatusPickAction) -> Void = { _ in } // (#cm-110.2)
+    var statusMenu: () -> SidebarWorkspaceGroupStatusMenu? = { nil } // (#cm-110.2)
 }

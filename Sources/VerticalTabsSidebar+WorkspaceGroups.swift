@@ -125,10 +125,12 @@ extension VerticalTabsSidebar {
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
             colorSchemeIsDark: renderContext.environment.colorScheme == .dark,
-            depth: renderContext.rowDepthById[group.id] ?? 0, // (#cm-106)
+            depth: Self.rowDepth(of: group.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection), // (#cm-106) (#cm-110.2)
             hasOwnWorkspace: headerOnlyLook.hasOwnWorkspace, // (#cm-106)
             isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
-            holdsGroups: renderContext.workspaceGroups.contains { $0.parentGroupId == group.id } // (#cm-106)
+            holdsGroups: renderContext.workspaceGroups.contains { $0.parentGroupId == group.id }, // (#cm-106) (#cm-110.2)
+            groupStatusGlyph: Self.workspaceGroupStatusGlyph(for: group), // (#cm-110.2)
+            groupStatusMenu: Self.workspaceGroupStatusMenu(for: group) // (#cm-110.2)
         )
         let actions = makeWorkspaceGroupHeaderActions(
             groupId: group.id,
@@ -292,13 +294,15 @@ extension VerticalTabsSidebar {
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
             shouldCollectWorkspaceDropTargets: shouldCollectWorkspaceDropTargets,
-            depth: renderContext.rowDepthById[group.id] ?? 0, // (#cm-106)
+            depth: Self.rowDepth(of: group.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection), // (#cm-106) (#cm-110.2)
             hasOwnWorkspace: headerOnlyLook.hasOwnWorkspace, // (#cm-106)
             isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
             moveMenu: WorkspaceGroupMoveMenu.menu(for: group.id, groups: renderContext.workspaceGroups), // (#cm-106)
             holdsGroups: renderContext.workspaceGroups.contains { $0.parentGroupId == group.id }, // (#cm-106)
             listWidth: renderContext.listWidth, // (#cm-106)
-            dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil // (#cm-106)
+            dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil, // (#cm-106) (#cm-110.2)
+            groupStatusGlyph: Self.workspaceGroupStatusGlyph(for: group), // (#cm-110.2)
+            groupStatusMenu: Self.workspaceGroupStatusMenu(for: group) // (#cm-110.2)
         )
     }
 
@@ -357,6 +361,8 @@ extension VerticalTabsSidebar {
             holdsGroups: snapshot.holdsGroups, // (#cm-106)
             dropLineLevel: snapshot.dropLineLevel, // (#cm-106)
             listWidth: snapshot.listWidth, // (#cm-106)
+            groupStatusGlyph: snapshot.groupStatusGlyph, // (#cm-110.2)
+            groupStatusMenu: snapshot.groupStatusMenu, // (#cm-110.2)
             actions: actions,
             onContextMenuAppear: {},
             onContextMenuDisappear: {}
@@ -567,6 +573,7 @@ extension VerticalTabsSidebar {
             tabManager?.moveWorkspaceGroup(groupId: groupId, intoParent: parentId)
         }
         actions.moveMenu = { [weak tabManager] in tabManager?.workspaceGroupMoveMenu(for: groupId) } // (#cm-106)
+        Self.bindWorkspaceGroupStatusActions(&actions, tabManager: tabManager, groupId: groupId) // (#cm-110.2)
         return actions
     }
 

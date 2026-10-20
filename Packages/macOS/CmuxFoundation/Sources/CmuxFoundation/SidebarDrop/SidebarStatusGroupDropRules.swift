@@ -76,7 +76,9 @@ public struct SidebarStatusGroupDropRules: Sendable {
     public func plan(_ request: Request) -> Decision {
         let targets = request.targets.filter { $0.frame.width > 0 && $0.frame.height > 0 }
             .sorted { $0.frame.minY < $1.frame.minY }
-        let sourceGroup = request.groups.first { $0.memberWorkspaceIds.contains(request.source.workspaceId) }
+        // A structural member owns no loose status membership, even when its whole group is displayed here.
+        let sourceGroup = request.source.groupId == nil
+            ? request.groups.first { $0.memberWorkspaceIds.contains(request.source.workspaceId) } : nil
         func statusId(_ row: SidebarWorkspaceReorderDropTarget) -> String? {
             if case .statusGroupHeader(let id) = row.kind { return id }
             return request.groups.first { $0.memberWorkspaceIds.contains(row.workspaceId) }?.statusId

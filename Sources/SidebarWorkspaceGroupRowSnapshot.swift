@@ -46,7 +46,7 @@ struct SidebarWorkspaceGroupRowSnapshot {
     let topDropIndicatorVisible: Bool
     let bottomDropIndicatorVisible: Bool
     let shouldCollectWorkspaceDropTargets: Bool
-    /// How many groups hold this header; 0 at the top level and in a window with no nested group (#cm-106).
+    /// Display depth, including the Statuses area and status header when projected. (#cm-106) (#cm-110.2)
     var depth: Int = 0
     /// See `SidebarHeaderOnlyLook`; false for a header with no workspace behind its name, in any window (#cm-106).
     var hasOwnWorkspace: Bool = true
@@ -60,4 +60,7 @@ struct SidebarWorkspaceGroupRowSnapshot {
     var listWidth: CGFloat? = nil
     /// The level a reorder drop lands at, set only on a header that draws a drop line, for the line's indent (#cm-106).
     var dropLineLevel: Int? = nil
+    /// The group's own status, resolved above the lazy boundary. (#cm-110.2)
+    var groupStatusGlyph: SidebarWorkspaceGroupStatusGlyph? = nil // (#cm-110.2)
+    var groupStatusMenu: SidebarWorkspaceGroupStatusMenu? = nil // (#cm-110.2)
 }

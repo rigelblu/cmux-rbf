@@ -11,6 +11,8 @@ struct SidebarDebugRow: Equatable {
     /// The header the row sits under, or `nil` for a top-level row.
     let header: String?
     let folded: Bool
+    /// The group's own stored status; independent of the header it sits under.
+    var statusId: String? = nil
 
     /// Reads the rows off the items the sidebar built, in order.
     static func rows(
@@ -21,7 +23,10 @@ struct SidebarDebugRow: Equatable {
         groupIdOfWorkspace: (UUID) -> UUID?,
         statusName: (String) -> String,
         statusGroups: WorkspaceStatusGroupsState = WorkspaceStatusGroupsState(),
-        statusIdByWorkspaceId: [UUID: String]? = nil
+        statusIdByWorkspaceId: [UUID: String]? = nil,
+        groupStatusId: (UUID) -> String? = { _ in nil },
+        parentGroupId: (UUID) -> UUID? = { _ in nil },
+        statusIdByGroupId: [UUID: String] = [:]
     ) -> [SidebarDebugRow] {
         var rows: [SidebarDebugRow] = []
         var insideStatusArea = false
@@ -29,11 +34,17 @@ struct SidebarDebugRow: Equatable {
         for item in items {
             switch item {
             case .groupHeader(let groupId, _):
-                insideStatusArea = false
-                currentStatusId = nil
+                let parent = parentGroupId(groupId)
+                let containingStatus = insideStatusArea && currentStatusId == statusIdByGroupId[groupId]
+                    ? currentStatusId : nil
+                if parent == nil && containingStatus == nil {
+                    insideStatusArea = false
+                    currentStatusId = nil
+                }
                 rows.append(SidebarDebugRow(
-                    kind: "groupHeader", id: groupId.uuidString, title: groupName(groupId), header: nil,
-                    folded: groupIsFolded(groupId)
+                    kind: "groupHeader", id: groupId.uuidString, title: groupName(groupId),
+                    header: parent?.uuidString ?? containingStatus,
+                    folded: groupIsFolded(groupId), statusId: groupStatusId(groupId)
                 ))
             case .colorSectionHeader(let section):
                 insideStatusArea = false

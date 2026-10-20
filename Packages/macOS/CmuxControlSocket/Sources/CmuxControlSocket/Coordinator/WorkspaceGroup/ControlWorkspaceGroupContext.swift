@@ -190,13 +190,12 @@ public protocol ControlWorkspaceGroupContext: AnyObject {
     ///   - routing: The routing selectors used for TabManager resolution.
     ///   - groupID: The group to update.
     ///   - hex: The normalized hex override, or `nil` to clear it.
-    /// - Returns: `true` if the group existed and was updated, `false` if not
-    ///   found, or `nil` if no TabManager resolved.
+    /// - Returns: Whether the group exists and its stored color, or nil without a TabManager. (#cm-110.2)
     func controlSetWorkspaceGroupColor(
         routing: ControlRoutingSelectors,
         groupID: UUID,
         hex: String?
-    ) -> Bool?
+    ) -> (found: Bool, storedHex: String?)? // (#cm-110.2)
 
     /// Sets the group's custom icon for `workspace.group.set_icon`, returning the
     /// stored symbol the app actually persisted.

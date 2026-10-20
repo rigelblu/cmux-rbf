@@ -29,6 +29,8 @@ public struct WorkspaceGroup: Identifiable, Equatable, Sendable {
     /// cwd-config color resolved from `cmux.json` for the anchor's cwd, then
     /// to no tint.
     public var customColor: String?
+    /// The group's own status, independent of its anchor and members. Nil means no status. (#cm-110.2)
+    public var statusId: String? = nil // (#cm-110.2)
     /// SF symbol name for the header icon. When nil, defaults to `folder.fill`.
     public var iconSymbol: String?
     /// Stable caller-owned identity used by idempotent group creation.

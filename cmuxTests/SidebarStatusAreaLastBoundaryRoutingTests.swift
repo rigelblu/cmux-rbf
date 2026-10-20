@@ -138,8 +138,8 @@ struct SidebarStatusAreaLastBoundaryRoutingTests {
         var unmovedIds: [UUID] { manager.tabs.filter { $0.id != source.id }.map(\.id) }
         func held() -> [UUID: Held] { Dictionary(uniqueKeysWithValues: manager.tabs.map { ($0.id, Held($0)) }) }
         func projection() -> WorkspaceStatusGroupProjection? {
-            VerticalTabsSidebar.statusGroupProjection(items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: manager.tabs, list: list),
-                list: list, colorHexes: ["parked": "#555555"], controlsEnabled: true, storedOrder: state.statusGroups?.order)
+            VerticalTabsSidebar.statusGroupProjection(items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: manager.tabs, list: list, groups: []),
+                list: list, colorHexes: ["parked": "#555555"], controlsEnabled: true, storedOrder: state.statusGroups?.order, workspaceGroups: [])
         }
         func colors(_ projection: WorkspaceStatusGroupProjection?) -> SidebarWorkspaceColorSectionProjection {
             VerticalTabsSidebar.colorSectionProjection(workspaces: manager.tabs.map {

@@ -10,6 +10,8 @@ struct SidebarStatusAreaLayout {
     private let owners: [SidebarWorkspaceRenderItemID: String]
     private let pinnedRows: Set<SidebarWorkspaceRenderItemID>
     private let statusIdByMember: [UUID: String]
+    private let statusIdByGroup: [UUID: String]
+    private let projectedGroupAnchors: Set<String>
 
     init(items: [SidebarWorkspaceRenderItem], tabs: [Workspace] = [], groups: [WorkspaceGroup] = [],
          statusProjection: WorkspaceStatusGroupProjection? = nil) {
@@ -65,11 +67,18 @@ struct SidebarStatusAreaLayout {
         for group in statusProjection?.groups ?? [] {
             for id in group.memberWorkspaceIds { byMember[id] = group.statusId }
         }
+        for (id, status) in statusProjection?.workspaceGroups?.statusIdByWorkspaceId ?? [:] { byMember[id] = status }
         statusIdByMember = byMember
+        statusIdByGroup = statusProjection?.workspaceGroups?.statusIdByGroupId ?? [:]
+        projectedGroupAnchors = Set(groups.filter { group in
+            group.parentGroupId == nil && !group.isPinned
+                && statusProjection?.workspaceGroups?.statusIdByGroupId[group.id] != nil
+        }.map { "group:\($0.id.uuidString)" })
     }
 
     func owner(of row: SidebarWorkspaceRenderItemID) -> String? {
         if case .workspace(let id)? = itemById[row], statusIdByMember[id] != nil { return nil }
+        if case .groupHeader(let id, _)? = itemById[row], statusIdByGroup[id] != nil { return nil }
         return owners[row]
     }
 
@@ -105,9 +114,13 @@ struct SidebarStatusAreaLayout {
         }
         let above = items[..<areaIndex].last(where: anchors)
         let below = items.dropFirst(areaIndex + 1).first(where: anchors)
-        state.aboveRow = above.flatMap { owner(of: $0.id) } ?? "top"
-        state.belowRow = below.flatMap { owner(of: $0.id) }
-        state.last = below == nil
+        let retained = projectedGroupAnchors.subtracting(leaving)
+            .subtracting(movingGroupIds.map { "group:\($0.uuidString)" })
+        state.aboveRow = state.aboveRow.flatMap { retained.contains($0) ? $0 : nil }
+            ?? above.flatMap { owner(of: $0.id) } ?? "top"
+        state.belowRow = state.belowRow.flatMap { retained.contains($0) ? $0 : nil }
+            ?? below.flatMap { owner(of: $0.id) }
+        state.last = state.belowRow == nil
         return state
     }
 
@@ -143,6 +156,7 @@ struct SidebarStatusAreaLayout {
             case .statusesHeader: statusId = nil; isArea = true
             case .statusGroupHeader(let id): statusId = id; isArea = false
             case .workspace(let id): statusId = statusIdByMember[id]; isArea = false
+            case .groupHeader(let id, _): statusId = statusIdByGroup[id]; isArea = false
             default: statusId = nil; isArea = false
             }
             return .init(rowId: target.workspaceId, frame: target.frame,

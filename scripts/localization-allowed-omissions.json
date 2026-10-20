@@ -753,7 +753,37 @@
   "contextMenu.workspaceStatus": {
     "source": "Status",
     "identityLocales": {
-      "de": "Established UI or technical term with the same spelling in this locale; a translated entry is still required."
+      "de": "Established UI or technical term with the same spelling in this locale; a translated entry is still required.",
+      "bs": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status"
+        ]
+      },
+      "da": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status"
+        ]
+      },
+      "nb": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status"
+        ]
+      },
+      "pl": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status"
+        ]
+      },
+      "pt-BR": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status"
+        ]
+      }
     }
   },
   "contextMenu.workspaceStatus.auto": {
@@ -2569,7 +2599,37 @@
   "sidebar.status.compactLabel": {
     "source": "Status: %@",
     "identityLocales": {
-      "de": "Reviewed native UI spelling, established developer terminology, or the named macOS Dock component; an explicit translated entry remains required."
+      "de": "Reviewed native UI spelling, established developer terminology, or the named macOS Dock component; an explicit translated entry remains required.",
+      "bs": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status: %@"
+        ]
+      },
+      "da": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status: %@"
+        ]
+      },
+      "nb": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status: %@"
+        ]
+      },
+      "pl": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status: %@"
+        ]
+      },
+      "pt-BR": {
+        "reason": "Status is the standard native UI term in this locale; its explicit translated entry retains the same spelling and placeholder.",
+        "values": [
+          "Status: %@"
+        ]
+      }
     }
   },
   "sidebar.tree.group.remote.subtitle": {

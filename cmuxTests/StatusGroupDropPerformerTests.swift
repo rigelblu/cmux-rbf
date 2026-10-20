@@ -49,8 +49,8 @@ struct StatusGroupDropPerformerTests {
         func projection() -> WorkspaceStatusGroupProjection? {
             guard !noProjection else { return nil }
             return VerticalTabsSidebar.statusGroupProjection(
-                items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: all, list: list), list: list,
-                colorHexes: ["parked": "#555555", "next": "#111111", "done": "#222222"], controlsEnabled: controls)
+                items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: all, list: list, groups: []), list: list,
+                colorHexes: ["parked": "#555555", "next": "#111111", "done": "#222222"], controlsEnabled: controls, workspaceGroups: [])
         }
         func performer() -> StatusGroupDropPerformer {
             let actions = WorkspaceStatusActions(list: list, origin: origin, controlsEnabled: controls,
@@ -188,7 +188,7 @@ struct StatusGroupDropPerformerTests {
         let projection = try #require(f.projection())
         let result = VerticalTabsSidebar.resolveRenderItems(
             colorSectionProjection: .project(workspaces: [], paletteEntries: [], collapsedHexes: []),
-            baseItems: f.all.map { .workspace(workspaceId: $0.id) }, statusGroupProjection: projection, folds: folds)
+            baseItems: f.all.map { .workspace(workspaceId: $0.id) }, statusGroupProjection: projection, folds: folds, groups: [])
         #expect(folds.collapsedStatusIds == ["parked"])
         #expect(result.items.contains { if case .statusGroupHeader(statusId: "parked") = $0 { return true }; return false })
         #expect(!result.items.contains { if case .workspace(let id) = $0 { return id == f.dragged.id }; return false })

@@ -214,7 +214,7 @@ extension VerticalTabsSidebar {
         return SidebarStatusHeaderDragSession.shared.commitIfAccepted(headerId: plan.draggedWorkspaceId,
             windowId: windowId, sessionId: token, dragState: dragState) {
                 let items = Self.statusRenderItemsForSnapshot(tabManager: tabManager, state: sidebarState).items
-                let projection = Self.currentStatusGroupProjection(tabs: tabManager.tabs, storedOrder: sidebarState.statusGroups?.order)
+                let projection = Self.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: sidebarState.statusGroups?.order)
                 let layout = SidebarStatusAreaLayout(items: items, tabs: tabManager.tabs,
                     groups: tabManager.workspaceGroups, statusProjection: projection)
                 return sidebarState.commitStatusHeaderDrop(source: kind, plan: .init(indicator: indicator, action: action),

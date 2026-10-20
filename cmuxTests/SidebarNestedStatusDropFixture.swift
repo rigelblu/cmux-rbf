@@ -44,9 +44,12 @@ final class SidebarNestedStatusDropFixture {
     var selected: Set<UUID> = [], selectionIndex: Int?
     var sourceId: UUID?, sourceRow: SidebarWorkspaceRenderItemID?, token: UUID?
     var controls = true
+    var projectsWorkspaceGroups = false
     var resolutions: [String] = [], writes: [Write] = [], reorderCalls = 0, ordinaryCalls = 0
     var writesBeforeReorder: [Int] = [], freshReorderMembers: [[UUID]] = []
+    var orderAtWrites: [[UUID]] = []
     var ordinaryOverride: ((SidebarWorkspaceReorderDropPlan) -> Bool)?
+    private var legacyDragActions: SidebarWorkspaceTableActions?
     var list = WorkspaceStatusList(entries: [
         .init(id: "parked", name: "Parked", extends: .todo, color: "5: PARKED"),
         .init(id: "next", name: "Next", extends: .working, color: "1: NEXT"),
@@ -119,12 +122,13 @@ final class SidebarNestedStatusDropFixture {
         }
     }
     func close() {
+        legacyDragActions = nil
         drag.finishDrag(); controller.reorderDropDragExited(); controller.dismantleContainerView(container)
         window.contentView = nil; window.close(); manager.finalizeAllWorkspacesForWindowClose(); defaults.removePersistentDomain(forName: suite)
     }
     func projection() -> WorkspaceStatusGroupProjection? {
-        VerticalTabsSidebar.statusGroupProjection(items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: manager.tabs,list: list),
-            list: list,colorHexes: hexes,controlsEnabled: controls,storedOrder: state.statusGroups?.order)
+        VerticalTabsSidebar.statusGroupProjection(items: VerticalTabsSidebar.statusGroupProjectionItems(tabs: manager.tabs,list: list,groups: projectsWorkspaceGroups ? manager.workspaceGroups : []),
+            list: list,colorHexes: hexes,controlsEnabled: controls,storedOrder: state.statusGroups?.order,workspaceGroups: projectsWorkspaceGroups ? manager.workspaceGroups : [])
     }
     func colors(_ projection: WorkspaceStatusGroupProjection?) -> SidebarWorkspaceColorSectionProjection {
         VerticalTabsSidebar.colorSectionProjection(workspaces: manager.tabs.map {
@@ -149,14 +153,23 @@ final class SidebarNestedStatusDropFixture {
             statusGroupFolds: state.statusGroups ?? .init(),colorSectionProjection: colors(projection()),selectedIds: selected,
             rootWorkspaceIds: manager.sidebarReorderWorkspaceIds(forDraggedWorkspaceId: nil,usesTopLevelRows: true))
     }
-    func begin(row: SidebarWorkspaceRenderItemID) throws {
+    func begin(row: SidebarWorkspaceRenderItemID, legacy: Bool = false) throws {
         let item = try #require(rendered().first { $0.id == row })
         let id = try #require(item.headerDropIdentity)
-        let session = drag.beginDragging(tabId: id)
-        sourceId = id; sourceRow = row; token = session.id
-        scope.began(windowId: windowId,session: session,rowId: row)
-        let captured = try #require(scope.source(windowId: windowId,workspaceId: id,sessionId: session.id,dragState: drag))
-        try #require(captured.rowId == row)
+        sourceRow = row
+        if legacy {
+            let actions = try #require(legacyDragActions)
+            try #require(actions.beginWorkspaceDragFromRow == nil)
+            SidebarStatusGroupDragSource.begin(workspaceId: id, rowId: row, actions: actions)
+        } else {
+            let session = drag.beginDragging(tabId: id)
+            sourceId = id; token = session.id
+            scope.began(windowId: windowId,session: session,rowId: row)
+        }
+        let sessionId = try #require(token)
+        let captured = try #require(scope.source(windowId: windowId,workspaceId: id,sessionId: sessionId,dragState: drag))
+        try #require(captured.rowId == (legacy ? nil : row))
+        if legacy { try #require(captured.kind == .unknown) }
     }
     struct RowGeometry {
         let raw: CGRect, cell: CGRect, content: CGRect
@@ -241,7 +254,7 @@ final class SidebarNestedStatusDropFixture {
     func statusActions() -> WorkspaceStatusActions {
         WorkspaceStatusActions(list: list,origin: .mac,controlsEnabled: controls,
             resolveColor: { [self] text in resolutions.append(text); return ["5: PARKED":"#555555","1: NEXT":"#111111","2: DONE":"#222222"][text] },
-            writeColor: { [self] hex,workspace in writes.append(.init(id: workspace.id,color: hex)); workspace.setCustomColor(hex) })
+            writeColor: { [self] hex,workspace in orderAtWrites.append(manager.tabs.map(\.id)); writes.append(.init(id: workspace.id,color: hex)); workspace.setCustomColor(hex) })
     }
     func ordinary(_ plan: SidebarWorkspaceReorderDropPlan) -> Bool {
         ordinaryCalls += 1
@@ -297,12 +310,17 @@ final class SidebarNestedStatusDropFixture {
         }
         container.tableView.intercellSpacing = NSSize(width: 0,height: 2)
         var actions = SidebarWorkspaceTableActions(attachScrollView: { _ in },closeWorkspace: { _ in },createWorkspaceAtEnd: {},createEmptyWorkspaceGroup: {},
-            beginWorkspaceDrag: { _ in },movingWorkspaceCount: { _ in 1 },endWorkspaceDrag: {},isValidWorkspaceDrag: { true },
+            beginWorkspaceDrag: { [self] id in
+                let session = drag.beginDragging(tabId: id)
+                sourceId = id; token = session.id
+                scope.began(windowId: windowId, session: session, rowId: nil)
+            },movingWorkspaceCount: { _ in 1 },endWorkspaceDrag: {},isValidWorkspaceDrag: { true },
             updateWorkspaceDrag: { _,_,_ in nil },performWorkspaceDrop: { _,_,_ in false },commitWorkspaceDropPlan: { _ in false },
             clearWorkspaceDropIndicator: {},currentDropIndicator: { nil },currentDropIndicatorScope: { .raw },canPerformBonsplitAction: { _,_ in false },
             moveBonsplitToExistingWorkspace: { _,_ in false },moveBonsplitToNewWorkspace: { _,_ in nil },didMoveBonsplitToWorkspace: { _ in },
             updateDragAutoscroll: {},setBonsplitDropTargetCollectionActive: { _ in },setBonsplitDropIndicator: { _ in })
         actions.usesStatusHeaderDropTargets = { true }
+        legacyDragActions = actions
         controller.apply(rows: rows,actions: actions,workspaceIds: manager.tabs.map(\.id),selectedWorkspaceId: manager.selectedTabId,selectedScrollTargetWorkspaceId: nil)
         await withCheckedContinuation { c in RunLoop.main.perform(inModes: [.common]) { c.resume() } }
         container.layoutSubtreeIfNeeded(); container.tableView.layoutSubtreeIfNeeded()

@@ -5,9 +5,12 @@ public struct WorkspaceStatusGroupProjection: Equatable, Sendable {
     public let groups: [WorkspaceStatusGroup]
     public let allMemberWorkspaceIds: Set<UUID>
     public let statusGroupStatusIds: Set<String>
+    /// Whole workspace groups, kept separate from loose workspace drop membership.
+    public let workspaceGroups: WorkspaceGroupStatusProjection?
 
-    public init(groups: [WorkspaceStatusGroup]) {
+    public init(groups: [WorkspaceStatusGroup], workspaceGroups: WorkspaceGroupStatusProjection? = nil) {
         self.groups = groups
+        self.workspaceGroups = workspaceGroups
         var memberIds = Set<UUID>()
         var statusIds = Set<String>()
         for group in groups {
@@ -24,6 +27,20 @@ public struct WorkspaceStatusGroupProjection: Equatable, Sendable {
 
     public func group(for statusId: String) -> WorkspaceStatusGroup? {
         groups.first { $0.statusId == statusId }
+    }
+
+    /// Every workspace hidden by folding a status group, including anchors and nested group members.
+    /// - Parameter statusId: The containing status group's id.
+    /// - Returns: Unique workspace identities, distinct from the loose-workspace drop membership.
+    public func displayMemberWorkspaceIds(for statusId: String) -> Set<UUID> {
+        var ids = Set(group(for: statusId)?.memberWorkspaceIds ?? [])
+        for (id, status) in workspaceGroups?.statusIdByWorkspaceId ?? [:] where status == statusId { ids.insert(id) }
+        return ids
+    }
+
+    /// Every workspace hidden by folding the entire Statuses area.
+    public var allDisplayMemberWorkspaceIds: Set<UUID> {
+        allMemberWorkspaceIds.union(workspaceGroups?.statusIdByWorkspaceId.keys.map { $0 } ?? [])
     }
 
     /// Projects workspaces into status groups.

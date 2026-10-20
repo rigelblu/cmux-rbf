@@ -1,35 +1,25 @@
 import AppKit
 
 extension AppDelegate {
-    /// Handles the `markWorkspaceDone` shortcut: resolves the TabManager for
-    /// the preferred/key window (multi-window users act on the window they
-    /// are looking at, mirroring `handleGroupSelectedWorkspacesShortcut`) and
-    /// pins the selected workspace's todo status to done through the shared
-    /// action path used by the context menu and command palette.
-    ///
-    /// - Returns: Whether the event was consumed (a workspace was resolved).
+    /// Resolves the preferred/key window, then applies Done to its selected group anchor or workspace. (#cm-110.2)
+    /// The UI target path is shared with the palette; explicit workspace CLI calls stay workspace-owned. (#cm-110.2)
+    /// - Returns: Whether a selected target consumed the event. (#cm-110.2)
     func handleMarkWorkspaceDoneShortcut(preferredWindow: NSWindow? = nil) -> Bool {
         guard WorkspaceTodoFeature.isEnabled else { return false }
         let targetWindow = preferredWindow ?? shortcutRoutingActiveWindow
         let resolvedTabManager = contextForMainWindow(targetWindow)?.tabManager ?? tabManager
-        guard let workspace = resolvedTabManager?.selectedWorkspace else { return false }
-        WorkspaceTodoActions.applyStatusOverride(.done, to: [workspace])
-        return true
+        guard let resolvedTabManager else { return false } // (#cm-110.2)
+        return WorkspaceGroupStatusUIActions.app(tabManager: resolvedTabManager).applySelected(.done) // (#cm-110.2)
     }
 
-    /// Handles the `cycleWorkspaceStatus` shortcut: resolves the TabManager
-    /// for the preferred/key window and advances the selected workspace's
-    /// todo status one lane forward through the shared action path (same as
-    /// the `workspace.status.cycle` socket verb and `cmux workspace status
-    /// cycle`).
-    ///
-    /// - Returns: Whether the event was consumed (a workspace was resolved).
+    /// Cycles a selected group's explicit list upward, or preserves the workspace's existing cycle. (#cm-110.2)
+    /// The selected anchor is the header selection, including focus in its own terminal. (#cm-110.2)
+    /// - Returns: Whether a selected target consumed the event. (#cm-110.2)
     func handleCycleWorkspaceStatusShortcut(preferredWindow: NSWindow? = nil) -> Bool {
         guard WorkspaceTodoFeature.isEnabled else { return false }
         let targetWindow = preferredWindow ?? shortcutRoutingActiveWindow
         let resolvedTabManager = contextForMainWindow(targetWindow)?.tabManager ?? tabManager
-        guard let workspace = resolvedTabManager?.selectedWorkspace else { return false }
-        WorkspaceTodoActions.cycleStatus(for: workspace)
-        return true
+        guard let resolvedTabManager else { return false } // (#cm-110.2)
+        return WorkspaceGroupStatusUIActions.app(tabManager: resolvedTabManager).cycleSelected() // (#cm-110.2)
     }
 }

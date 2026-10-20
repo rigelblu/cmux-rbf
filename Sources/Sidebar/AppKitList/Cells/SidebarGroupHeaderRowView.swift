@@ -17,7 +17,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     private let hairlineView = NSView() // (#cm-110.1)
     private let pinImageView = NSImageView()
     private let chevronButton = SidebarHeaderGlyphButton()
-    private let iconImageView = NSImageView()
+    let iconImageView = NSImageView() // (#cm-110.2) shared group-status paint extension
+    let groupStatusPopover = SidebarWorkspaceGroupStatusPopoverHost() // (#cm-110.2)
     private let nameField = NSTextField(labelWithString: "")
     // Direct-draw badge (shared with workspace rows): NSTextField's
     // intrinsic insets shift single digits off the circle's optical center.
@@ -79,6 +80,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
 
         iconImageView.imageScaling = .scaleProportionallyDown
         addSubview(iconImageView)
+        groupStatusPopover.install(in: self) // (#cm-110.2)
 
         nameField.lineBreakMode = .byTruncatingTail
         nameField.maximumNumberOfLines = 1
@@ -160,9 +162,13 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     ) {
         let requiresFullApply = self.actions == nil
         let previous = self.model
+        if previous?.groupId != model.groupId || previous?.statusHeaderKind != model.statusHeaderKind { groupStatusPopover.close() } // (#cm-110.2)
         self.actions = actions
         self.contextMenuDidOpen = contextMenuDidOpen
         self.contextMenuDidClose = contextMenuDidClose
+        groupStatusPopover.configure(menu: model.statusHeaderKind == nil ? model.groupStatusMenu : nil, // (#cm-110.2)
+            showsGlyph: model.statusHeaderKind == nil && model.groupStatusGlyph != nil, // (#cm-110.2)
+            name: model.groupStatusGlyph?.name, apply: actions.onSetStatus) // (#cm-110.2)
         let hoverChanged = self.isPointerHovering != isPointerHovering
         self.isPointerHovering = isPointerHovering
         guard requiresFullApply || previous != model || hoverChanged else { return }
@@ -220,6 +226,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             iconImageView.contentTintColor = SidebarHeaderOnlyLook.dotTint(tintHex: model.tintHex, colorScheme: colorScheme)
                 ?? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme)
         }
+
+        applyGroupStatusGlyph(model, palette: headerPalette) // (#cm-110.2)
 
         nameField.stringValue = model.name
         nameField.font = .systemFont(
@@ -394,6 +402,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
         nameField.textColor = nameTextColor(model, palette: palette) // (#cm-106)
+        applyGroupStatusGlyph(model, palette: palette) // (#cm-110.2)
     }
 
     /// Modifier-click preview: paints the same dim membership tint as an
@@ -409,6 +418,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             .withAlphaComponent(palette.bandOpacity).cgColor
         CATransaction.commit()
         nameField.textColor = nameTextColor(model, palette: palette) // (#cm-106)
+        applyGroupStatusGlyph(model, palette: palette) // (#cm-110.2)
     }
 
     /// Plain-click counterpart: clears active and multi-selected header paint
@@ -425,6 +435,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         CATransaction.commit()
         let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
         nameField.textColor = nameTextColor(model, palette: palette) // (#cm-106)
+        applyGroupStatusGlyph(model, palette: palette) // (#cm-110.2)
     }
 
     /// The name's colour: the accent tint while a folded header holds the selected workspace, else the band's own (#cm-106).
@@ -467,6 +478,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     /// toggles collapse, plus creates a workspace — neither selects).
     func selectionPreviewShouldIgnore(_ hitView: NSView) -> Bool {
         if model?.statusHeaderKind != nil { return true } // (#cm-110.1)
+        if hitView === groupStatusPopover.button || hitView.isDescendant(of: groupStatusPopover.button) { return true } // (#cm-110.2)
         return hitView === chevronButton || hitView.isDescendant(of: chevronButton) // (#cm-110.1)
             || hitView === plusButton || hitView.isDescendant(of: plusButton)
     }
@@ -522,6 +534,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             iconImageView.frame = centered(metrics.iconFrame) // (#cm-110.1)
             x = iconImageView.frame.maxX + 6 // (#cm-110.1)
         } // (#cm-110.1)
+
+        groupStatusPopover.updateFrame(iconImageView.frame) // (#cm-110.2)
 
         var badgeSize = NSSize.zero
         if !unreadBadgeView.isHidden {
@@ -734,6 +748,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             promptCustomColor: actions.onPromptCustomColor
         )
         menu.addItem(colorParent)
+        appendGroupStatusMenu(to: menu, actions: actions) // (#cm-110.2)
         menu.addItem(menuItem(
             model.isPinned
                 ? String(localized: "workspaceGroup.contextMenu.unpin", defaultValue: "Unpin Group")

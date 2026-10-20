@@ -46,15 +46,15 @@ struct SidebarStatusGroupFoldingTests {
 
     @Test func aRestoredWindowWaitsForAListBeforeSeeding() {
         let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
-        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: nil)
+        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: nil, workspaceGroups: [])
         #expect(state.statusGroups == nil)
     }
 
     @Test func theFirstListCopiesFoldsBeforeOpeningTheSelectedColor() throws {
         let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
-        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: nil)
+        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: nil, workspaceGroups: [])
         let selected = try Self.selectedWorkspace()
-        state.prepareStatusGroupsForSelection(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected)
+        state.prepareStatusGroupsForSelection(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected, workspaceGroups: [])
         let folds = try #require(state.statusGroups)
         // Both statuses shared the folded color before selection opened that color group.
         #expect(folds.collapsedStatusIds.contains("done"))
@@ -65,7 +65,7 @@ struct SidebarStatusGroupFoldingTests {
         let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
         state.prepareStatusGroupsForSelection(
             list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: try Self.selectedWorkspace()
-        )
+        , workspaceGroups: [])
         let folds = try #require(state.statusGroups)
         #expect(!folds.collapsedStatusIds.contains("parked"))
         #expect(!folds.areaCollapsed)
@@ -73,15 +73,15 @@ struct SidebarStatusGroupFoldingTests {
 
     @Test func aNewWindowDoesNotCopyItsColorFolds() throws {
         let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"])
-        state.prepareStatusGroupsForSelection(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: nil)
+        state.prepareStatusGroupsForSelection(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: nil, workspaceGroups: [])
         #expect(try #require(state.statusGroups).collapsedStatusIds.isEmpty)
     }
 
     @Test func aSeededWindowNeverCopiesAgainAndKeepsAbsentIds() {
         let original = WorkspaceStatusGroupsState(areaCollapsed: true, collapsedStatusIds: ["parked", "not-listed"])
         let state = SidebarState(statusGroups: original)
-        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: nil)
-        state.prepareStatusGroupsForSelection(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: nil)
+        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: nil, workspaceGroups: [])
+        state.prepareStatusGroupsForSelection(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: nil, workspaceGroups: [])
         #expect(state.statusGroups == original)
     }
 
@@ -89,7 +89,7 @@ struct SidebarStatusGroupFoldingTests {
         let state = SidebarState(statusGroups: .init(areaCollapsed: true, collapsedStatusIds: ["parked", "done"]))
         state.revealStatusGroup(
             containing: try Self.selectedWorkspace(), list: Self.list, resolvedHexByStatusId: Self.colors
-        )
+        , workspaceGroups: [])
         let folds = try #require(state.statusGroups)
         #expect(!folds.areaCollapsed)
         #expect(!folds.collapsedStatusIds.contains("parked"))
@@ -101,11 +101,11 @@ struct SidebarStatusGroupFoldingTests {
         let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
         let selected = try Self.selectedWorkspace()
         for _ in 0..<automaticReveals {
-            state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected)
+            state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
         }
         #expect(state.statusGroups == nil)
         #expect(state.collapsedColorSectionHexes.isEmpty)
-        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected)
+        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected, workspaceGroups: [])
         let folds = try #require(state.statusGroups)
         #expect(folds.collapsedStatusIds.contains("done"))
         #expect(!folds.collapsedStatusIds.contains("parked"))
@@ -116,13 +116,13 @@ struct SidebarStatusGroupFoldingTests {
     func aDeliberateColorToggleUpdatesThePendingCopySource(_ deliberatelyFolded: Bool) throws {
         let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
         let selected = try Self.selectedWorkspace()
-        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected)
+        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
         state.toggleColorSection(hex: "#AABBCC")
         if !deliberatelyFolded { state.toggleColorSection(hex: "#AABBCC") }
         #expect(state.collapsedColorSectionHexes.contains("#AABBCC") == deliberatelyFolded)
         // Automatic selection reveals the color again but must preserve the explicit choice for the pending copy.
-        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected)
-        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected)
+        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
+        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected, workspaceGroups: [])
         let folds = try #require(state.statusGroups)
         #expect(folds.collapsedStatusIds.contains("done") == deliberatelyFolded)
         #expect(!folds.collapsedStatusIds.contains("parked"))
@@ -132,9 +132,9 @@ struct SidebarStatusGroupFoldingTests {
     @Test func anEmptyFileListCompletesTheOneTimeCopy() throws {
         let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
         state.prepareStatusGroupsForSelection(list: .init(entries: [], source: .file),
-                                              resolvedHexByStatusId: [:], selectedWorkspace: nil)
+                                              resolvedHexByStatusId: [:], selectedWorkspace: nil, workspaceGroups: [])
         #expect(state.statusGroups != nil)
-        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: nil)
+        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: nil, workspaceGroups: [])
         #expect(try #require(state.statusGroups).collapsedStatusIds.isEmpty)
     }
 
@@ -146,7 +146,7 @@ struct SidebarStatusGroupFoldingTests {
             WorkspaceStatusEntry(id: "done", name: "Done"),
         ], source: .file)
         state.prepareStatusGroupsOnListArrival(list: renamed, resolvedHexByStatusId: Self.colors,
-                                              selectedWorkspace: try Self.selectedWorkspace())
+                                              selectedWorkspace: try Self.selectedWorkspace(), workspaceGroups: [])
         #expect(state.statusGroups == original)
     }
 
@@ -265,7 +265,7 @@ struct SidebarStatusGroupFoldingTests {
                 .init(statusId: "parked", memberWorkspaceIds: [first]),
                 .init(statusId: "done", memberWorkspaceIds: [second]),
             ]), folds: folds
-        )
+        , groups: [])
     }
 
     private static func configuration(

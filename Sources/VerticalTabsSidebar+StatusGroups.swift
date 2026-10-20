@@ -27,7 +27,9 @@ extension VerticalTabsSidebar { // (#cm-110.1)
 
     // MARK: Projection
 
-    static func statusGroupProjectionItems(tabs: [Workspace], list: WorkspaceStatusList) -> [WorkspaceStatusGroupProjectionItem] {
+    static func statusGroupProjectionItems(tabs: [Workspace], list: WorkspaceStatusList, groups: [WorkspaceGroup]) -> [WorkspaceStatusGroupProjectionItem] {
+        let memberships = SidebarWorkspaceRenderItem.effectiveGroupIdByWorkspaceId(tabs: tabs,
+            groupsById: Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) }))
         var items: [WorkspaceStatusGroupProjectionItem] = []
         items.reserveCapacity(tabs.count)
         for tab in tabs {
@@ -35,7 +37,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             items.append(
                 WorkspaceStatusGroupProjectionItem(
                     workspaceId: tab.id,
-                    groupId: tab.groupId,
+                    groupId: groups.isEmpty ? tab.groupId : (memberships[tab.id] ?? nil),
                     isPinned: tab.isPinned,
                     isStatusHidden: tab.todoState.statusHidden,
                     normalizedColorHex: normalizedColorHex,
@@ -53,28 +55,33 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         list: WorkspaceStatusList,
         colorHexes: [String: String],
         controlsEnabled: Bool,
-        storedOrder: [String]? = nil
+        storedOrder: [String]? = nil,
+        workspaceGroups: [WorkspaceGroup]
     ) -> WorkspaceStatusGroupProjection? {
         guard controlsEnabled else { return nil }
-        return WorkspaceStatusGroupProjection.project(
+        guard let loose = WorkspaceStatusGroupProjection.project(
             workspaces: items,
             list: list,
             resolvedHexByStatusId: colorHexes,
             storedOrder: storedOrder
-        )
+        ) else { return nil }
+        let grouped = WorkspaceGroupStatusProjection(groups: workspaceGroups,
+            workspaces: items.map { .init(id: $0.workspaceId, groupId: $0.groupId, isPinned: $0.isPinned) }, list: list)
+        return WorkspaceStatusGroupProjection(groups: loose.groups, workspaceGroups: workspaceGroups.isEmpty ? nil : grouped)
     }
 
     /// The projection of the app's own state: his list in use, the colors the app resolved, the controls setting.
-    static func currentStatusGroupProjection(tabs: [Workspace], storedOrder: [String]? = nil) -> WorkspaceStatusGroupProjection? {
+    static func currentStatusGroupProjection(tabs: [Workspace], groups: [WorkspaceGroup], storedOrder: [String]? = nil) -> WorkspaceStatusGroupProjection? {
         let controlsEnabled: Bool = WorkspaceTodoFeature.isEnabled
         guard controlsEnabled else { return nil }
         let list: WorkspaceStatusList = AppDelegate.statusListInUse
         return statusGroupProjection(
-            items: statusGroupProjectionItems(tabs: tabs, list: list),
+            items: statusGroupProjectionItems(tabs: tabs, list: list, groups: groups),
             list: list,
             colorHexes: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:],
             controlsEnabled: controlsEnabled,
-            storedOrder: storedOrder
+            storedOrder: storedOrder,
+            workspaceGroups: groups
         )
     }
 
@@ -139,34 +146,10 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         baseItems: [SidebarWorkspaceRenderItem],
         statusGroupProjection: WorkspaceStatusGroupProjection?,
         folds: WorkspaceStatusGroupsState = WorkspaceStatusGroupsState(),
-        tabs: [Workspace] = [], groups: [WorkspaceGroup] = []
+        tabs: [Workspace] = [], groups: [WorkspaceGroup]
     ) -> SidebarStatusRenderItemsResolution {
-        var withoutStatusMembers: [SidebarWorkspaceRenderItem] = baseItems
-        if let statusGroupProjection {
-            withoutStatusMembers = baseItems.filter { item in
-                if case .workspace(let id) = item { return !statusGroupProjection.contains(workspaceId: id) }
-                return true
-            }
-        }
-        var items: [SidebarWorkspaceRenderItem] = colorSectionProjection.applying(to: withoutStatusMembers)
-        if let statusGroupProjection {
-            var area: [SidebarWorkspaceRenderItem] = [.statusesHeader]
-            for group in statusGroupProjection.groups where !folds.areaCollapsed {
-                area.append(.statusGroupHeader(statusId: group.statusId))
-                for memberId in group.memberWorkspaceIds where !folds.collapsedStatusIds.contains(group.statusId) {
-                    area.append(.workspace(workspaceId: memberId))
-                }
-            }
-            if folds.last == true || (folds.aboveRow == nil && folds.belowRow == nil) { items += area }
-            else {
-                items = SidebarStatusAreaLayout(items: items, tabs: tabs, groups: groups, statusProjection: statusGroupProjection)
-                    .placing(area: area, state: folds)
-            }
-        }
-        return SidebarStatusRenderItemsResolution(
-            items: items,
-            numberedWorkspaceIndexById: SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(from: baseItems)
-        )
+        SidebarWorkspaceGroupStatusRenderItems().resolve(colorSections: colorSectionProjection, base: baseItems,
+            projection: statusGroupProjection, folds: folds, tabs: tabs, groups: groups)
     }
 
     /// A row's indent level. The nested-group depths stay the only thing in `rowDepthById`, because an empty map
@@ -177,6 +160,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         rowDepthById: [UUID: Int],
         statusGroupProjection: WorkspaceStatusGroupProjection?
     ) -> Int {
+        if let depth = statusGroupProjection?.workspaceGroups?.depthById[workspaceId] { return depth }
         if let depth = rowDepthById[workspaceId] { return depth }
         if statusGroupProjection?.contains(workspaceId: workspaceId) == true { return statusMemberDepth }
         return 0
@@ -334,7 +318,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         onToggle: @escaping @MainActor () -> Void
     ) -> SidebarStatusesAreaSwiftUIHeader {
         let folds = renderContext.statusGroupFolds
-        let memberIds = renderContext.statusGroupProjection?.allMemberWorkspaceIds ?? []
+        let memberIds = renderContext.statusGroupProjection?.allDisplayMemberWorkspaceIds ?? []
         return SidebarStatusesAreaSwiftUIHeader(
             groupCount: renderContext.statusGroupProjection?.groups.count ?? 0,
             isCollapsed: folds.areaCollapsed,
@@ -356,16 +340,17 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         guard let group = projection?.group(for: statusId),
               let presentation = presentations[statusId] else { return nil }
         let collapsed = folds.collapsedStatusIds.contains(statusId)
+        let memberIds = projection?.displayMemberWorkspaceIds(for: group.statusId) ?? []
         let unreadCount = collapsed
-            ? group.memberWorkspaceIds.reduce(0) { $0 + unreadSnapshot.unreadCount(forWorkspaceId: $1) } : 0
+            ? memberIds.reduce(0) { $0 + unreadSnapshot.unreadCount(forWorkspaceId: $1) } : 0
         let model = Self.statusHeaderModel(
             kind: .statusGroup(statusId), presentation: presentation,
-            memberCount: group.memberWorkspaceIds.count, unreadCount: unreadCount,
+            memberCount: memberIds.count, unreadCount: unreadCount,
             isCollapsed: collapsed, environment: environment
         )
         return SidebarStatusGroupSwiftUIHeader(
             statusId: statusId, presentation: presentation,
-            memberCount: group.memberWorkspaceIds.count, isCollapsed: collapsed,
+            memberCount: memberIds.count, isCollapsed: collapsed,
             listWidth: listWidth, colorScheme: environment.colorScheme,
             fontScale: model.fontScale,
             globalFontMagnificationPercent: model.globalFontMagnificationPercent,
@@ -473,7 +458,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         return Self.statusHeaderConfiguration(
             kind: .statusesArea, presentation: nil,
             memberCount: renderContext.statusGroupProjection?.groups.count ?? 0,
-            memberIds: renderContext.statusGroupProjection?.allMemberWorkspaceIds ?? [],
+            memberIds: renderContext.statusGroupProjection?.allDisplayMemberWorkspaceIds ?? [],
             folds: renderContext.statusGroupFolds, environment: renderContext.environment,
             onToggle: { toggle(.statusesArea) },
             isBeingDragged: dragState.draggedTabId == SidebarStatusHeaderIdentity.statusesAreaUUID
@@ -487,9 +472,10 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         guard let group = renderContext.statusGroupProjection?.group(for: statusId),
               let presentation = renderContext.statusGroupPresentationById[statusId] else { return nil }
         let toggle = makeStatusHeaderToggleAction()
+        let memberIds = renderContext.statusGroupProjection?.displayMemberWorkspaceIds(for: group.statusId) ?? []
         return Self.statusHeaderConfiguration(
             kind: .statusGroup(statusId), presentation: presentation,
-            memberCount: group.memberWorkspaceIds.count, memberIds: Set(group.memberWorkspaceIds),
+            memberCount: memberIds.count, memberIds: memberIds,
             folds: renderContext.statusGroupFolds, environment: renderContext.environment,
             onToggle: { toggle(.statusGroup(statusId)) },
             isBeingDragged: dragState.draggedTabId == SidebarStatusHeaderIdentity.uuid(forStatusId: statusId)

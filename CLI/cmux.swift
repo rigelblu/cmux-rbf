@@ -19257,6 +19257,10 @@ struct CMUXCLI {
                 localized: "cli.workspaceGroup.help.overview",
                 defaultValue: "Manage collapsible workspace groups in the sidebar. Each group is owned by an \"anchor\" workspace; the group header IS the anchor's sidebar representation. Closing the anchor closes only that workspace and promotes the group's next member to be the new anchor, so the group and its other members stay intact. When the anchor is the group's only workspace, the group is removed, unless it is pinned or holds other groups."
             )
+            let setColorStatus = String( // (#cm-110.2)
+                localized: "cli.workspaceGroup.help.setColorStatus", // (#cm-110.2)
+                defaultValue: "With a custom status list, picking a status's color sets that status. Any other color clears it. Invalid hex is refused." // (#cm-110.2)
+            ) // (#cm-110.2)
             return """
             Usage: cmux workspace-group <subcommand> [flags]
 
@@ -19290,6 +19294,7 @@ struct CMUXCLI {
                                         afterCurrent; without an active
                                         in-group reference it behaves like top.
               set-color <group> [--hex #RRGGBB]
+                                        \(setColorStatus)
               set-icon <group> [--symbol <sf-symbol>]
               move <group> --to-index <n> | --before <group> | --after <group>
               focus <group>             Focus the group's anchor workspace

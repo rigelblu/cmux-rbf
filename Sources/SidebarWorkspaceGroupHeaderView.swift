@@ -50,7 +50,9 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             lhs.moveMenu == rhs.moveMenu &&
             lhs.holdsGroups == rhs.holdsGroups &&
             lhs.dropLineLevel == rhs.dropLineLevel &&
-            lhs.listWidth == rhs.listWidth
+            lhs.listWidth == rhs.listWidth && // (#cm-110.2)
+            lhs.groupStatusGlyph == rhs.groupStatusGlyph && // (#cm-110.2)
+            lhs.groupStatusMenu == rhs.groupStatusMenu // (#cm-110.2)
     }
 
     let groupId: UUID
@@ -88,7 +90,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     let isBeingDragged: Bool
     let topDropIndicatorVisible: Bool
     let bottomDropIndicatorVisible: Bool
-    /// How many groups hold this header; 0 at the top level and in a window with no nested group (#cm-106).
+    /// Display depth, including the Statuses area and status header when projected. (#cm-106) (#cm-110.2)
     var depth: Int = 0
     /// See `SidebarHeaderOnlyLook` (#cm-106).
     var hasOwnWorkspace: Bool = true
@@ -100,6 +102,9 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     var dropLineLevel: Int? = nil
     /// The list's width, for the cap on the indent (#cm-106).
     var listWidth: CGFloat? = nil
+    /// The group's own status, captured before the lazy boundary. (#cm-110.2)
+    var groupStatusGlyph: SidebarWorkspaceGroupStatusGlyph? = nil // (#cm-110.2)
+    var groupStatusMenu: SidebarWorkspaceGroupStatusMenu? = nil // (#cm-110.2)
     /// Shared actions for SwiftUI and AppKit group headers.
     let actions: SidebarGroupHeaderRowActions
     let onContextMenuAppear: () -> Void
@@ -270,6 +275,13 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                                 .frame(width: SidebarHeaderOnlyLook.dotDiameter, height: SidebarHeaderOnlyLook.dotDiameter)
                         }
                     }
+                    .opacity(groupStatusGlyph == nil ? 1 : 0) // (#cm-110.2)
+                    .overlay { // (#cm-110.2)
+                        if let groupStatusGlyph { // (#cm-110.2)
+                            SidebarWorkspaceGroupStatusGlyphButton(glyph: groupStatusGlyph, menu: groupStatusMenu, // (#cm-110.2)
+                                fontScale: fontScale, colorScheme: colorScheme, band: bandPalette, apply: actions.onSetStatus) // (#cm-110.2)
+                        } // (#cm-110.2)
+                    } // (#cm-110.2)
                 Text(name)
                     .cmuxFont(size: metrics.nameFontSize, weight: .semibold)
                     .foregroundStyle(nameColor) // (#cm-106)
@@ -452,6 +464,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     promptCustomColor: actions.onPromptCustomColor
                 )
             }
+            SidebarWorkspaceGroupStatusMenuView(menu: groupStatusMenu, apply: actions.onSetStatus) // (#cm-110.2)
             Button(
                 isPinned
                     ? String(
