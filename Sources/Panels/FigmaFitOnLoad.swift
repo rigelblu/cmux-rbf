@@ -111,8 +111,8 @@ extension BrowserPanel {
 
     /// An entrance opened a file in this pane: set the one-shot mark if it is a design file
     /// in Figma's editor. Called where a pane is made for a Figma request with no address bar
-    /// (`BrowserSplitContainer`), where a clicked link or a menu entry opens a file, and where
-    /// a clicked whole-file link moves a pane that already shows the file.
+    /// (`BrowserSplitContainer`, which covers `cmux figma open` and a clicked link that opens a
+    /// new pane) and where the Figma button's menu opens a file (`Workspace.newFigmaSurface`).
     func markFigmaFitOnOpen(for address: URL?) {
         figmaFitMark.opened(address)
     }
