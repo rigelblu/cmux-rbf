@@ -596,6 +596,8 @@ extension CMUXCLI {
             ),
             maximumLength: 80
         )
+        // cmux-rbf #cm-73.24: the registry reads a helper's `agent_id` to keep a waiting session waiting.
+        setBoundedString("agent_id", value: firstString(in: rawObject, keys: ["agent_id", "agentId"]), maximumLength: 80)
         for key in ["agent_state", "turn_outcome"] {
             setBoundedString(
                 key,

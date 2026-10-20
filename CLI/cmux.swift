@@ -37339,6 +37339,11 @@ export default CMUXSessionRestore;
         if hookEventName == "Notification", let type = firstString(in: fallbackObject, keys: ["notification_type"]) {
             event["notification_type"] = type
         }
+        // cmux-rbf #cm-73.24: Claude marks a helper's events with `agent_id`; the registry keeps a waiting
+        // session waiting on them. Sent under our own key: the agent journal reads `agent_id` as a request id.
+        if source == "claude", let agentID = firstString(in: fallbackObject, keys: ["agent_id", "agentId"]), !agentID.isEmpty {
+            event["helper_agent_id"] = agentID
+        }
         let cursorShellCommand = source == "cursor"
             ? firstString(in: fallbackObject, keys: ["command"]).map {
                 truncate(
