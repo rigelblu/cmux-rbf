@@ -70,7 +70,7 @@ Draw it with your Figma MCP tools in the file you just made, by its file key. Dr
 ## Re-lay the boards
 For `layout vertical` and `layout horizontal` only; steps 1 to 5 don't apply.
 - Take the Figma file you last opened in this conversation with `cmux figma open`. If you opened none, say so and stop.
-- With your Figma MCP tools, move that file's top-level boards into one column, top to bottom (`vertical`), or one row, left to right (`horizontal`), keeping their order. Change nothing inside a board, add nothing, delete nothing, and make no new file.
+- With your Figma MCP tools, move that file's top-level boards into one column, top to bottom (`vertical`), or one row, left to right (`horizontal`), keeping their order. Leave the first board where it is and line the rest up after it. Change nothing inside a board, add nothing, delete nothing, and make no new file.
 - If you have no Figma MCP tools, or Figma says you are signed out, say so and stop.
 """#
         #expect(try #require(FigmaDesignSkill.document()) == expected + "\n")
