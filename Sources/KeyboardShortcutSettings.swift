@@ -174,6 +174,8 @@ enum KeyboardShortcutSettings {
         case toggleDesignFocus
         // cmux-rbf #cm-73.2a
         case flipDesignFocusLayout
+        // cmux-rbf #cm-73.3
+        case switchFigmaPreviewAndCanvas
         case increaseWorkspaceTerminalFontSize
         case decreaseWorkspaceTerminalFontSize
         case resetWorkspaceTerminalFontSize
@@ -345,6 +347,8 @@ enum KeyboardShortcutSettings {
             case .splitUp: return String(localized: "shortcut.splitUp.label", defaultValue: "Split Up")
             case .splitDown: return String(localized: "shortcut.splitDown.label", defaultValue: "Split Down")
             case .toggleSplitZoom: return String(localized: "shortcut.togglePaneZoom.label", defaultValue: "Toggle Pane Zoom")
+            // cmux-rbf #cm-73.3
+            case .switchFigmaPreviewAndCanvas: return String(localized: "shortcut.switchFigmaPreviewAndCanvas.label", defaultValue: "Figma: Switch Preview and Canvas")
             // cmux-rbf #cm-73.2a
             case .toggleDesignFocus: return String(localized: "shortcut.toggleDesignFocus.label", defaultValue: "Toggle Design Focus")
             // cmux-rbf #cm-73.2a
@@ -604,6 +608,8 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "d", command: true, shift: false, option: false, control: false)
             case .splitDown: return StoredShortcut(key: "d", command: true, shift: true, option: false, control: false)
             case .toggleSplitZoom: return StoredShortcut(key: "\r", command: true, shift: true, option: false, control: false)
+            // cmux-rbf #cm-73.3
+            case .switchFigmaPreviewAndCanvas: return StoredShortcut(key: "c", command: true, shift: true, option: true, control: false)
             // cmux-rbf #cm-73.2a
             case .toggleDesignFocus: return StoredShortcut(key: "\r", command: true, shift: true, option: true, control: false)
             // cmux-rbf #cm-73.2a

@@ -225,6 +225,8 @@ extension BrowserPanel {
     }
 
     func setupReactGrabMessageHandler(for webView: WKWebView) {
+        // cmux-rbf (#cm-73.3): a kept Figma page is bound again without a new content controller. Reject a revert of this hunk on upstream sync.
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: reactGrabMessageHandlerName)
         let handler = ReactGrabMessageHandler(
             isCurrent: webViewObservationValidator(for: webView)
         ) { [weak self] message in

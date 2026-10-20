@@ -130,6 +130,8 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case toggleDesignFocus
     // cmux-rbf #cm-73.2a
     case flipDesignFocusLayout
+    /// Switches the visible Figma pane between its retained preview and canvas.
+    case switchFigmaPreviewAndCanvas
     /// Increases every terminal font size in the selected workspace.
     case increaseWorkspaceTerminalFontSize
     /// Decreases every terminal font size in the selected workspace.

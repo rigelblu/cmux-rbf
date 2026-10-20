@@ -265,11 +265,11 @@ extension CMUXCLI {
             surfaceOverride: surfaceOverride,
             client: client
         )
-        let destination = try figmaDestination(for: pane.document, node: node)
-
+        // Keep the existing wrapper installation/preflight contract; the app owns page selection.
+        _ = try figmaDestination(for: pane.document, node: node)
         let payload = try client.sendV2(
-            method: "browser.navigate",
-            params: ["surface_id": pane.surfaceID, "url": destination.url.absoluteString]
+            method: "figma.goto",
+            params: ["surface_id": pane.surfaceID, "node": node]
         )
         if jsonOutput {
             print(jsonString(formatIDs(payload, mode: idFormat)))
@@ -290,7 +290,7 @@ extension CMUXCLI {
 
     /// `cmux figma fit [--surface <ref>]`: center the open Figma pane on all its boards.
     ///
-    /// **Two ways, no new socket method.** In Figma's editor it sends `browser.press`
+    /// **Two ways, with the shared app-side goto for the preview.** In Figma's editor it sends `browser.press`
     /// with `!`, the trusted `⇧1`; in the read view, which has no zoom to fit, it
     /// loads the view again on the node it shows, as `goto <that node>` does. Which way, and
     /// every refusal, is ``FigmaFit/decide(handle:paneAddress:document:isShowing:)``.
@@ -318,10 +318,10 @@ extension CMUXCLI {
             throw CLIError(message: message)
 
         case .reloadNode(let node):
-            let destination = try figmaDestination(for: pane.document, node: node)
+            _ = try figmaDestination(for: pane.document, node: node)
             payload = try client.sendV2(
-                method: "browser.navigate",
-                params: ["surface_id": pane.surfaceID, "url": destination.url.absoluteString]
+                method: "figma.goto",
+                params: ["surface_id": pane.surfaceID, "node": node]
             )
 
         case .pressFit:

@@ -119,6 +119,9 @@ extension ShortcutAction {
             return String(localized: "shortcut.splitUp.label", defaultValue: "Split Up")
         case .splitDown: return "Split Down"
         case .toggleSplitZoom: return "Toggle Pane Zoom"
+        // cmux-rbf #cm-73.3
+        case .switchFigmaPreviewAndCanvas:
+            return String(localized: "shortcut.switchFigmaPreviewAndCanvas.label", defaultValue: "Figma: Switch Preview and Canvas")
         // cmux-rbf #cm-73.2a
         case .toggleDesignFocus: return "Toggle Design Focus"
         // cmux-rbf #cm-73.2a

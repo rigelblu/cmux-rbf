@@ -31,6 +31,9 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     public static let workspaceHasSplits = CommandPaletteContextKeys(rawValue: "workspace.hasSplits")
     /// Whether the workspace uses the canvas layout mode.
     public static let workspaceCanvasLayout = CommandPaletteContextKeys(rawValue: "workspace.canvasLayout")
+    // cmux-rbf #cm-73.3
+    /// Whether a visible workspace Figma pane can switch its retained pages.
+    public static let workspaceCanSwitchFigmaPage = CommandPaletteContextKeys(rawValue: "workspace.canSwitchFigmaPage")
     // cmux-rbf #cm-73.2a
     /// Whether the workspace can toggle design focus (or is currently in design focus).
     public static let workspaceCanToggleDesignFocus = CommandPaletteContextKeys(rawValue: "workspace.canToggleDesignFocus")

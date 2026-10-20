@@ -12076,6 +12076,42 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         bonsplitController.isPairZoomed
     }
 
+    // cmux-rbf (#cm-73.3): key and palette share the workspace target and preserve keyboard focus. Reject a revert of this hunk on upstream sync.
+    private var figmaPageUseOrder: [UUID] = []
+
+    func noteFigmaPageUse(_ panelId: UUID) {
+        guard let panel = panels[panelId] as? BrowserPanel,
+              FigmaTabMark.applies(address: panel.currentURL ?? panel.webView.url, showsAddressBar: panel.isOmnibarVisible) else { return }
+        figmaPageUseOrder.removeAll { $0 == panelId || panels[$0] == nil }
+        figmaPageUseOrder.append(panelId)
+    }
+
+    func figmaPageSwitchTarget() -> BrowserPanel? {
+        let visible = renderedVisiblePanelIdsForCurrentLayout()
+        func figma(_ id: UUID?) -> BrowserPanel? {
+            guard let id, visible.contains(id), let panel = panels[id] as? BrowserPanel,
+                  FigmaTabMark.applies(address: panel.currentURL ?? panel.webView.url, showsAddressBar: panel.isOmnibarVisible) else { return nil }
+            return panel
+        }
+        if isDesignFocusActive, let pair = bonsplitController.pairZoomPanes,
+           let tab = bonsplitController.selectedTab(inPane: pair.second) {
+            return figma(panelIdFromSurfaceId(tab.id))
+        }
+        if let focused = figma(focusedPanelId) { return focused }
+        for id in figmaPageUseOrder.reversed() {
+            if let panel = figma(id) { return panel }
+        }
+        return orderedPanelIds.compactMap { figma($0) }.first
+    }
+
+    @discardableResult
+    func switchFigmaPreviewAndCanvas() -> Bool {
+        guard let panel = figmaPageSwitchTarget() else { return false }
+        let switched = panel.switchFigmaPreviewAndCanvas()
+        if switched { noteFigmaPageUse(panel.id) }
+        return switched
+    }
+
     // cmux-rbf #cm-73.2a
     public var canToggleDesignFocus: Bool {
         if isDesignFocusActive { return true }
@@ -14572,6 +14608,7 @@ extension Workspace: BonsplitDelegate {
     }
 
     private func markExplicitFocusIntent(on panelId: UUID) {
+        noteFigmaPageUse(panelId) // cmux-rbf #cm-73.3: MRU follows real focus, never an agent goto.
         guard let pending = pendingNonFocusSplitFocusReassert,
               pending.splitPanelId == panelId else {
             return

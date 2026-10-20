@@ -3043,6 +3043,9 @@ class TerminalController {
             return v2Result(id: id, self.v2BrowserZoomSet(params: params))
         case "browser.history.clear":
             return v2Result(id: id, self.v2BrowserHistoryClear(params: params))
+        // cmux-rbf (#cm-73.3): WKWebView presentation mutates on the main actor; no focus intent. Reject a revert of this hunk on upstream sync.
+        case "figma.goto":
+            return v2Result(id: id, self.v2FigmaGoto(params: params))
         case "browser.url.get":
             return v2Result(id: id, self.v2BrowserGetURL(params: params))
         case "browser.focus_webview":
@@ -3380,6 +3383,7 @@ class TerminalController {
             "file.open",
             "markdown.open",
             "browser.open_split",
+            "figma.goto",
             "browser.navigate",
             "browser.back",
             "browser.forward",
@@ -9667,6 +9671,26 @@ class TerminalController {
             BrowserHistoryStore.shared.clearHistory()
         }
         return .ok(["cleared": true, "scope": "default_profile"])
+    }
+
+    // cmux-rbf (#cm-73.3): deliberately absent from the remote relay allowlist. Reject a revert of this hunk on upstream sync.
+    private func v2FigmaGoto(params: [String: Any]) -> V2CallResult {
+        guard v2UUID(params, "surface_id") != nil,
+              let node = v2String(params, "node"), !node.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
+        }
+        return v2BrowserWithPanel(params: params) { workspaceId, surfaceId, panel in
+            guard let manager = self.v2ResolveTabManager(params: params) else {
+                return .err(code: "unavailable", message: String(localized: "cli.browser.error.tabManagerUnavailable", defaultValue: "Browser controls are unavailable"), data: nil)
+            }
+            guard panel.gotoFigmaNode(node) else {
+                return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
+            }
+            return .ok(self.v2BrowserActionPayload(workspaceId: workspaceId, surfaceId: surfaceId, tabManager: manager, extra: [
+                "url": panel.currentURL?.absoluteString ?? "",
+                "side": "preview", "stayed": false
+            ]))
+        }
     }
 
     private func v2BrowserGetURL(params: [String: Any]) -> V2CallResult {

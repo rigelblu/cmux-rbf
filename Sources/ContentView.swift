@@ -7255,6 +7255,8 @@ struct ContentView: View {
                 CommandPaletteContextKeys.workspaceCanvasLayout,
                 workspace.layoutMode == .canvas
             )
+            // cmux-rbf (#cm-73.3): the palette uses the key's target selection. Reject a revert of this hunk on upstream sync.
+            snapshot.setBool(CommandPaletteContextKeys.workspaceCanSwitchFigmaPage, workspace.figmaPageSwitchTarget() != nil)
             // cmux-rbf #cm-73.2a
             snapshot.setBool(
                 CommandPaletteContextKeys.workspaceCanToggleDesignFocus,
@@ -8623,6 +8625,17 @@ struct ContentView: View {
                 }
             )
         )
+        // cmux-rbf (#cm-73.3): one shared action behind both entrances. Reject a revert of this hunk on upstream sync.
+        contributions.append(
+            CommandPaletteCommandContribution(
+                commandId: "palette.switchFigmaPreviewAndCanvas",
+                title: constant(String(localized: "command.switchFigmaPreviewAndCanvas.title", defaultValue: "Figma: Switch Preview and Canvas")),
+                subtitle: constant(String(localized: "figma.menu.tooltip", defaultValue: "Figma")),
+                keywords: ["preview", "canvas", "figma"],
+                when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) },
+                enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanSwitchFigmaPage) }
+            )
+        )
         // cmux-rbf #cm-73.2a
         contributions.append(
             CommandPaletteCommandContribution(
@@ -9535,6 +9548,8 @@ struct ContentView: View {
                 NSSound.beep()
             }
         }
+        // cmux-rbf #cm-73.3: production and tests use the same registered entrance.
+        Self.registerFigmaPageSwitchPaletteHandler(&registry, tabManager: tabManager)
         // cmux-rbf #cm-73.2a
         registry.register(commandId: "palette.toggleDesignFocus") {
             if !tabManager.toggleDesignFocus() {

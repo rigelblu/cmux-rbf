@@ -367,3 +367,22 @@ Three keyboard shortcuts drive the todo state, all editable in **Settings > Keyb
 - `toggleChecklistItemComplete` (default `cmd+return`) toggles the highlighted checklist item in the focused todo pane or checklist popover.
 
 cmux also posts a notification when a workspace's status first reaches done, and when its checklist first becomes fully complete, so you can watch agent progress without keeping the pane open.
+
+## Figma preview and canvas shortcut
+
+`switchFigmaPreviewAndCanvas` defaults to `opt+shift+cmd+c` and is editable in
+Settings > Keyboard Shortcuts. The command palette labels it **Figma: Switch
+Preview and Canvas**. It switches the Design Focus pair’s Figma pane, or the
+focused Figma pane, or the visible Figma pane used last. With no visible Figma
+pane it does nothing. Both pages stay loaded when switching. This shortcut targets workspace panes;
+Dock Figma tabs are outside its targets in this version.
+
+```json
+{
+  "shortcuts": {
+    "bindings": {
+      "switchFigmaPreviewAndCanvas": "opt+shift+cmd+c"
+    }
+  }
+}
+```

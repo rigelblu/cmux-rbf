@@ -60,8 +60,8 @@ struct FigmaCLIOutputTests {
                 var reply: [String: Any] = ["url": pane.url]
                 if let showsAddressBar = pane.showsAddressBar { reply["show_omnibar"] = showsAddressBar }
                 return ok(reply)
-            case "browser.navigate":
-                return ok(["surface_id": surfaceID ?? "", "surface_ref": "surface:moved"])
+            case "figma.goto":
+                return ok(["surface_id": surfaceID ?? "", "surface_ref": "surface:moved", "side": "preview", "stayed": false])
             default:
                 return unexpected(method, surfaceID)
             }
@@ -193,7 +193,7 @@ struct FigmaCLIOutputTests {
         /// What that file holds after the command, if it exists.
         let pageContents: String?
 
-        var navigates: [StandInSocket.Request] { requests.filter { $0.method == "browser.navigate" } }
+        var gotos: [StandInSocket.Request] { requests.filter { $0.method == "figma.goto" } }
         var opens: [StandInSocket.Request] { requests.filter { $0.method == "browser.open_split" } }
     }
 
@@ -417,7 +417,9 @@ struct FigmaCLIOutputTests {
     func gotoPrintsJSON() throws {
         let run = try drive(["--json", "figma", "goto", "12-2"], reply: Self.gotoReply([Self.figmaPane(8)]))
         #expect(run.status == 0, "\(run.stderr)")
-        #expect(jsonObject(run.stdout) != nil, "\(run.stdout.debugDescription)")
+        let result = try #require(jsonObject(run.stdout))
+        #expect(result["side"] as? String == "preview")
+        #expect(result["stayed"] as? Bool == false)
     }
 
     @Test("goto moves the Figma pane and leaves an ordinary pane on a Figma file alone")
@@ -428,10 +430,10 @@ struct FigmaCLIOutputTests {
         ]
         let run = try drive(["figma", "goto", "12-2"], reply: Self.gotoReply(panes))
         #expect(run.status == 0, "\(run.stderr)")
-        #expect(run.navigates.count == 1, "\(run.requests.map(\.method))")
-        #expect(run.navigates.first?.params["surface_id"] as? String == "id-8")
-        let address = run.navigates.first?.params["url"] as? String ?? ""
-        #expect(address.contains("KEY") && !address.contains("OTHER"), "\(address)")
+        #expect(run.gotos.count == 1, "\(run.requests.map(\.method))")
+        #expect(run.gotos.first?.params["surface_id"] as? String == "id-8")
+        #expect(run.gotos.first?.params["node"] as? String == "12-2")
+        #expect(!run.requests.contains { $0.method == "browser.navigate" })
     }
 
     @Test("goto with only an ordinary pane on a Figma file refuses, moves nothing and names that pane")
@@ -439,7 +441,7 @@ struct FigmaCLIOutputTests {
         let run = try drive(["figma", "goto", "12-2"], reply: Self.gotoReply([Self.ordinaryPane(8)]))
         fails(run, with: "no Figma pane is open — browser panes showing a Figma file: surface:8. "
             + "Pass --surface <handle> to move one, or run `cmux figma open <url>` first")
-        #expect(run.navigates.isEmpty)
+        #expect(run.gotos.isEmpty)
     }
 
     @Test("a reply with no show_omnibar counts as an ordinary pane")
@@ -448,7 +450,7 @@ struct FigmaCLIOutputTests {
         let run = try drive(["figma", "goto", "12-2"], reply: Self.gotoReply([pane]))
         fails(run, with: "no Figma pane is open — browser panes showing a Figma file: surface:8. "
             + "Pass --surface <handle> to move one, or run `cmux figma open <url>` first")
-        #expect(run.navigates.isEmpty)
+        #expect(run.gotos.isEmpty)
     }
 
     @Test("--surface moves an ordinary pane that shows a Figma file")
@@ -459,7 +461,7 @@ struct FigmaCLIOutputTests {
         )
         #expect(run.status == 0, "\(run.stderr)")
         #expect(run.stdout == "OK\n")
-        #expect(run.navigates.first?.params["surface_id"] as? String == "id-8")
+        #expect(run.gotos.first?.params["surface_id"] as? String == "id-8")
     }
 
     @Test("two ordinary panes on a Figma file are both named, separated by a comma")
@@ -470,7 +472,7 @@ struct FigmaCLIOutputTests {
         )
         fails(run, with: "no Figma pane is open — browser panes showing a Figma file: surface:8, surface:10. "
             + "Pass --surface <handle> to move one, or run `cmux figma open <url>` first")
-        #expect(run.navigates.isEmpty)
+        #expect(run.gotos.isEmpty)
     }
 
     @Test("two Figma panes and an ordinary one: the refusal lists the two and not the third")
@@ -480,7 +482,7 @@ struct FigmaCLIOutputTests {
             reply: Self.gotoReply([Self.figmaPane(8), Self.ordinaryPane(9), Self.figmaPane(10)])
         )
         fails(run, with: "more than one Figma pane is open (surface:8, surface:10) — pass --surface <handle>")
-        #expect(run.navigates.isEmpty)
+        #expect(run.gotos.isEmpty)
     }
 
     @Test("goto with no browser pane showing a Figma file refuses and opens nothing")
@@ -488,7 +490,7 @@ struct FigmaCLIOutputTests {
         let other = Pane(id: "id-5", ref: "surface:5", url: "https://example.com", showsAddressBar: true)
         let run = try drive(["figma", "goto", "12-2"], reply: Self.gotoReply([other]))
         fails(run, with: "no Figma pane is open — run `cmux figma open <url>` first")
-        #expect(run.navigates.isEmpty)
+        #expect(run.gotos.isEmpty)
         #expect(run.opens.isEmpty)
     }
 
@@ -497,7 +499,7 @@ struct FigmaCLIOutputTests {
         let other = Pane(id: "id-5", ref: "surface:5", url: "https://example.com", showsAddressBar: true)
         let run = try drive(["figma", "goto", "12-2", "--surface", "id-5"], reply: Self.gotoReply([other]))
         fails(run, with: "surface id-5 is not showing a Figma file")
-        #expect(run.navigates.isEmpty)
+        #expect(run.gotos.isEmpty)
     }
 
     // MARK: - The page on disk
@@ -550,7 +552,7 @@ struct FigmaCLIOutputTests {
             reply: Self.gotoReply([Self.figmaPane(8)])
         )
         expectPageWriteFailure(run)
-        #expect(run.navigates.isEmpty, "\(run.requests.map(\.method))")
+        #expect(run.gotos.isEmpty, "\(run.requests.map(\.method))")
     }
 
     /// One readable line that names the page and says the read view needs it,
@@ -692,7 +694,7 @@ struct FigmaCLIOutputTests {
         let params = try #require(lists(run).first?.params)
         #expect(params["surface_id"] as? String == Self.callerSurface, "\(params)")
         #expect(params["workspace_id"] == nil, "\(params)")
-        #expect(run.navigates.first?.params["surface_id"] as? String == "id-8")
+        #expect(run.gotos.first?.params["surface_id"] as? String == "id-8")
     }
 
     @Test("when the app cannot find that pane, goto lists once more by the environment's workspace and goes on from that")
@@ -711,7 +713,7 @@ struct FigmaCLIOutputTests {
         let second = try #require(lists(run).last?.params)
         #expect(second["surface_id"] == nil, "\(second)")
         #expect(second["workspace_id"] as? String == Self.callerWorkspace, "\(second)")
-        #expect(run.navigates.first?.params["surface_id"] as? String == "id-9")
+        #expect(run.gotos.first?.params["surface_id"] as? String == "id-9")
     }
 
     @Test("any other error from the list is reported as it is, with no second list")
@@ -728,7 +730,7 @@ struct FigmaCLIOutputTests {
         #expect(run.status == 1, "\(run.stdout)")
         #expect(run.stderr.contains("Source surface refused"), "\(run.stderr)")
         #expect(lists(run).count == 1, "\(run.requests.map(\.method))")
-        #expect(run.navigates.isEmpty, "\(run.requests.map(\.method))")
+        #expect(run.gotos.isEmpty, "\(run.requests.map(\.method))")
     }
 
     @Test("with no CMUX_SURFACE_ID, goto lists by the environment's workspace alone, as it always did")
@@ -807,7 +809,7 @@ struct FigmaCLIOutputTests {
     /// Nothing that moves the page or types into it was sent.
     private func sentNothingToThePage(_ run: Run, sourceLocation: SourceLocation = #_sourceLocation) {
         #expect(presses(run).isEmpty, "\(run.requests.map(\.method))", sourceLocation: sourceLocation)
-        #expect(run.navigates.isEmpty, "\(run.requests.map(\.method))", sourceLocation: sourceLocation)
+        #expect(run.gotos.isEmpty, "\(run.requests.map(\.method))", sourceLocation: sourceLocation)
     }
 
     @Test("fit in the editor sends one ! press to the pane, after asking what has focus, and no navigation")
@@ -819,7 +821,7 @@ struct FigmaCLIOutputTests {
         #expect(presses(run).count == 1, "\(run.requests.map(\.method))")
         #expect(presses(run).first?.params["surface_id"] as? String == "id-8")
         #expect(presses(run).first?.params["key"] as? String == "!")
-        #expect(run.navigates.isEmpty)
+        #expect(run.gotos.isEmpty)
         let methods = run.requests.map(\.method)
         let ask = methods.firstIndex(of: "browser.eval")
         let press = methods.firstIndex(of: "browser.press")
@@ -844,12 +846,10 @@ struct FigmaCLIOutputTests {
         let run = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)]))
         #expect(run.status == 0, "\(run.stderr)")
         #expect(run.stdout == "OK\n")
-        #expect(run.navigates.count == 1, "\(run.requests.map(\.method))")
-        #expect(run.navigates.first?.params["surface_id"] as? String == "id-8")
-        // The embed address sits percent-encoded inside the page's query.
-        let address = (run.navigates.first?.params["url"] as? String ?? "").removingPercentEncoding ?? ""
-        // The board the pane showed, not the whole page (Tom, 2026-10-20).
-        #expect(address.contains("node-id=1-2") && !address.contains("node-id=0-1") && address.contains("KEY"), "\(address)")
+        #expect(run.gotos.count == 1, "\(run.requests.map(\.method))")
+        #expect(run.gotos.first?.params["surface_id"] as? String == "id-8")
+        // The shared app-side goto owns the preview's URL; fit preserves its current node.
+        #expect(run.gotos.first?.params["node"] as? String == "1-2")
         #expect(presses(run).isEmpty && evals(run).isEmpty, "\(run.requests.map(\.method))")
         #expect(run.pageInstalledInTestHome, "the read view's page is on disk, as goto leaves it")
     }
@@ -919,7 +919,7 @@ struct FigmaCLIOutputTests {
             reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)], selectedInPane: false, selectedWorkspace: "ws-2")
         )
         #expect(run.status == 0, "\(run.stderr)")
-        #expect(run.navigates.count == 1, "\(run.requests.map(\.method))")
+        #expect(run.gotos.count == 1, "\(run.requests.map(\.method))")
         #expect(presses(run).isEmpty)
     }
 
