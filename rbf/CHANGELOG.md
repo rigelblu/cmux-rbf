@@ -6,6 +6,31 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.34.0 (2026-10-20) — #cm-110.1, with #cm-73 in progress
+
+*See my workspaces grouped by status in the sidebar, and set a status by dropping a workspace on its group.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-20 - feat | see my loose workspaces grouped by status in the sidebar, each in its status's color (#cm-110.1). With a `workspaceStatuses` list in `~/.config/cmux/cmux.json` and the Workspace Todo Controls beta on, a **Statuses** area at the bottom of the sidebar holds one group per status, in the order of your file. Each header shows the status's name and glyph on a band in the status's color
+  - Drop a workspace on a status group, on its header or between its rows, to set that status by hand; the workspace takes the status's color. A pinned workspace takes the status and color and stays pinned. While you hold it, a line shows where it will land; a drop that is refused draws no line and moves nothing
+  - Drag a status group up or down to reorder the groups, and drag the **Statuses** header to move the whole area. The order you set comes back after a relaunch
+  - Fold a status group by clicking its header; a folded header shows only the unread count of the workspaces inside it
+  - On the first day, each status group starts folded if the color group of its status's color was folded in that window
+  - A workspace in a workspace group, a pinned workspace, and a color no status names keep their place and their groups. Without a list, or with the beta off, the sidebar is unchanged
+- feat (in progress, #cm-73) | Figma in a cmux pane. These slices ride along because this release sits on #cm-73.22; #cm-73 is released on its own once all its slices are done:
+  - pick "Put Design into Figma" or "New Design in Figma" in the Figma button's menu and have the agent do it (#cm-73.17)
+  - arrange Figma boards for the pane, keep the first board in place when the agent lines up the rest, and keep their layout when flipping (#cm-73.12)
+  - see the whole Figma design centered when the agent draws or re-lays it and when you open a file, and keep the board you went to centered in the read view (#cm-73.22)
+  - also in v0.33.0's build, not listed there: a new Figma tab opens right beside the tab you right-clicked (#cm-73.15); the Figma button goes back to a Figma file opened in this workspace, or starts a new design, board or deck in your Figma folder (#cm-73.16)
+
+## 🟠⋯ Fixed for Developers
+- fix | run `make test` and `make install-rbf` without an agent's prompt blocking them, getting killed, or leaking its argv into a log
+
+## 🟠⋯ Known Issues
+- The day-one fold copy does not run in a window where this build first ran with no status list in use: its status groups start unfolded (#cm-110.1, Known Unknowns 22.2)
+- Moving the **Statuses** header can put workspaces on both sides of the area, which reads as if they belonged to the last status group. Two separate sections, Workspaces and Statuses, come in #cm-110.4
+- Released on Tom's word of 2026-10-20, "Defer and release": Tom dropped human Scenarios 16, 43 and 54, whose rules other checks already read. Agent Scenarios 1, 2, 6, 11, 19, 23, 35 and 36 were not run in the app
+
 # 🔵⋯ v0.33.0 (2026-10-18) — #cm-109.2, #cm-109.3, #cm-109.4, #cm-109.6, #cm-109.7, #cm-119.1, #cm-121, with #cm-73 in progress
 
 *Use my own list of workspace statuses, see how far along each one is from its glyph, and read that glyph at a glance.*

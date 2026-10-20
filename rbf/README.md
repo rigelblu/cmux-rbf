@@ -210,6 +210,14 @@ Since v0.33.0, a workspace's status can be one of your own, in your words and yo
 - `cmux workspace status list` prints the list in use and any problems; a mistake skips only that entry, and a pill in the sidebar's footer names it.
 - No list, no change: cmux's own five statuses work as before.
 
+## 🟠⋯ See your workspaces grouped by status
+Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at the bottom of the sidebar, one group per status.
+
+- It shows with a `workspaceStatuses` list in `~/.config/cmux/cmux.json` and **Settings → Beta Features → Workspace Todo Controls** on.
+- Drop a workspace on a status group to set that status and its color. A pinned workspace stays pinned.
+- Drag a status group, or the **Statuses** header, to reorder; the order survives a relaunch.
+- Click a header to fold it; a folded header shows the unread count inside.
+
 ## 🟠⋯ Organize workspace groups inside larger groups
 
 Since v0.32.0, a workspace group can sit inside another group, to any depth, so one header can hold a whole area of work.
