@@ -1,4 +1,14 @@
 {
+  "figma.page.editor": {
+    "source": "Editor",
+    "identityLocales": {
+      "da": "Established name for an app editing view; translated entry remains required.",
+      "de": "Established name for an app editing view; translated entry remains required.",
+      "es": "Established name for an app editing view; translated entry remains required.",
+      "it": "Established name for an app editing view; translated entry remains required.",
+      "pt-BR": "Established name for an app editing view; translated entry remains required."
+    }
+  },
     "figma.menu.tooltip": {
       "source": "Figma",
       "identityLocales": {

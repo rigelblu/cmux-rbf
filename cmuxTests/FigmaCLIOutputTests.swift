@@ -61,7 +61,7 @@ struct FigmaCLIOutputTests {
                 if let showsAddressBar = pane.showsAddressBar { reply["show_omnibar"] = showsAddressBar }
                 return ok(reply)
             case "figma.goto":
-                return ok(["surface_id": surfaceID ?? "", "surface_ref": "surface:moved", "side": "preview", "stayed": false])
+                return ok(["surface_id": surfaceID ?? "", "surface_ref": "surface:moved", "side": "preview"])
             default:
                 return unexpected(method, surfaceID)
             }
@@ -419,7 +419,7 @@ struct FigmaCLIOutputTests {
         #expect(run.status == 0, "\(run.stderr)")
         let result = try #require(jsonObject(run.stdout))
         #expect(result["side"] as? String == "preview")
-        #expect(result["stayed"] as? Bool == false)
+        #expect(result["stayed"] == nil)
     }
 
     @Test("goto moves the Figma pane and leaves an ordinary pane on a Figma file alone")
@@ -850,6 +850,7 @@ struct FigmaCLIOutputTests {
         #expect(run.gotos.first?.params["surface_id"] as? String == "id-8")
         // The shared app-side goto owns the preview's URL; fit preserves its current node.
         #expect(run.gotos.first?.params["node"] as? String == "1-2")
+        #expect(run.gotos.first?.params["purpose"] as? String == "fit")
         #expect(presses(run).isEmpty && evals(run).isEmpty, "\(run.requests.map(\.method))")
         #expect(run.pageInstalledInTestHome, "the read view's page is on disk, as goto leaves it")
     }

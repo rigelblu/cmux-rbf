@@ -1402,7 +1402,7 @@
       "restartNew": "สร้าง workspace ใหม่ (ค่าเริ่มต้น)"
     },
     "keyboardShortcuts": {
-      "figmaSwitchDescription": "⌥⇧⌘C — Figma: สลับระหว่างตัวอย่างและแคนวาส",
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: สลับระหว่างตัวอย่างและตัวแก้ไข",
       "title": "คีย์ลัด",
       "description": "คีย์ลัดทั้งหมดใน cmux จัดกลุ่มตามหมวดหมู่",
       "metaDescription": "คีย์ลัด cmux ทั้งหมดสำหรับ workspace, surface, แยกหน้าจอ, เบราว์เซอร์, แจ้งเตือน, ค้นหา และจัดการหน้าต่างบน macOS",

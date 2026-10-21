@@ -123,7 +123,7 @@ extension KeyboardShortcutSettings.Action {
              .toggleRightSidebar,
              .findInDirectory,
              .openDiffViewer,
-             .switchFigmaPreviewAndCanvas, // cmux-rbf #cm-73.3
+             .switchFigmaPreviewAndEditor, // cmux-rbf #cm-73.3
              .toggleDesignFocus, // cmux-rbf #cm-73.2a
              .flipDesignFocusLayout: // cmux-rbf #cm-73.2a
             .mainContainer

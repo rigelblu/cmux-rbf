@@ -1317,6 +1317,7 @@ struct TabBarView: View {
             isHoveringTabBar = hovering
             // cmux-rbf #cm-73.2a
             if presentation == .caption {
+                if hovering { controller.refreshPairFigmaPage() } // cmux-rbf #cm-73.3
                 if hovering { boardControlState = controller.pairBoardControlState() ?? PairBoardControlState() }
                 splitViewController.setPairHeaderHover(hovering, pane: pane.id)
             }
@@ -1361,6 +1362,13 @@ struct TabBarView: View {
                 onExit: {
                     guard splitViewController.isInteractive else { return }
                     controller.requestPairExit()
+                },
+                // cmux-rbf #cm-73.3: immutable snapshot below the header; no host store in the row.
+                figmaPage: splitViewController.pairFigmaPage,
+                liveFigmaPage: { controller.pairFigmaPage() },
+                onChooseFigmaPage: { page in
+                    guard splitViewController.isInteractive else { return }
+                    controller.requestFigmaPage(page)
                 }
             )
         }

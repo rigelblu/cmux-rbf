@@ -16281,9 +16281,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 
         // cmux-rbf (#cm-73.3): the same action as the palette; a missing target is silent. Reject a revert of this hunk on upstream sync.
-        if matchConfiguredShortcut(event: event, action: .switchFigmaPreviewAndCanvas) {
+        if matchConfiguredShortcut(event: event, action: .switchFigmaPreviewAndEditor) {
             let routedManager = preferredMainWindowContextForShortcutRouting(event: event)?.tabManager ?? tabManager
-            _ = routedManager?.switchFigmaPreviewAndCanvas()
+            _ = routedManager?.switchFigmaPreviewAndEditor()
             return true
         }
 

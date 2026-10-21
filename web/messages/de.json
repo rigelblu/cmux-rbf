@@ -1400,7 +1400,7 @@
       "restartNew": "Neuen Workspace erstellen (Standard)"
     },
     "keyboardShortcuts": {
-      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Zwischen Vorschau und Arbeitsfläche wechseln",
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Zwischen Vorschau und Editor wechseln",
       "title": "Tastaturkürzel",
       "description": "Alle in cmux verfügbaren Tastaturkürzel, nach Kategorie gruppiert.",
       "metaDescription": "Alle cmux-Tastaturkürzel für Workspaces, Oberflächen, geteilte Bereiche, Browser, Benachrichtigungen, Suche und Fensterverwaltung unter macOS.",

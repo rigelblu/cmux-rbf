@@ -9,8 +9,8 @@ extension ContentView {
         _ registry: inout CommandPaletteHandlerRegistry,
         tabManager: TabManager
     ) {
-        registry.register(commandId: "palette.switchFigmaPreviewAndCanvas") {
-            _ = tabManager.switchFigmaPreviewAndCanvas()
+        registry.register(commandId: "palette.switchFigmaPreviewAndEditor") {
+            _ = tabManager.switchFigmaPreviewAndEditor()
         }
     }
 
@@ -116,8 +116,8 @@ extension ContentView {
         case "palette.toggleSplitZoom":
             return .toggleSplitZoom
         // cmux-rbf #cm-73.3: show the configured switch key in the palette.
-        case "palette.switchFigmaPreviewAndCanvas":
-            return .switchFigmaPreviewAndCanvas
+        case "palette.switchFigmaPreviewAndEditor":
+            return .switchFigmaPreviewAndEditor
         // cmux-rbf #cm-73.2a
         case "palette.toggleDesignFocus":
             return .toggleDesignFocus

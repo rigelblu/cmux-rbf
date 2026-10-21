@@ -3715,6 +3715,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             pairExit: KeyboardShortcutSettings.Action.toggleDesignFocus.tooltip(
                 String(localized: "workspace.tooltip.pairExit", defaultValue: "Exit Design Focus")
             ),
+            // cmux-rbf #cm-73.3
+            figmaPreview: String(localized: "figma.page.preview", defaultValue: "Preview"),
+            figmaEditor: String(localized: "figma.page.editor", defaultValue: "Editor"),
             boardColumn: String(localized: "figma.board.column", defaultValue: "Lay Boards in a Column"),
             boardRow: String(localized: "figma.board.row", defaultValue: "Lay Boards in a Row"),
             boardPin: String(localized: "figma.board.keepLayoutOnFlip", defaultValue: "Keep Board Layout on Flip"),
@@ -4200,6 +4203,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         // cmux-rbf #cm-73.2a
         bonsplitController.onPairZoomChange = { [weak self] in
             guard let self else { return }
+            self.bonsplitController.refreshPairFigmaPage() // cmux-rbf #cm-73.3
             self.objectWillChange.send()
             if !self.bonsplitController.isPairZoomed && self.isDesignFocusActiveTracking && !self.isExitingDesignFocus {
                 self.exitDesignFocus(reason: "bonsplitCleared")
@@ -5216,6 +5220,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
                 showsAddressBar: browserPanel.isOmnibarVisible
             )
             self.publishBrowserOpenTabSuggestion(for: browserPanel)
+            // cmux-rbf #cm-73.3: a showing-side URL change also updates an already-hovered row.
+            self.bonsplitController.refreshPairFigmaPage()
             guard let existing = self.bonsplitController.tab(tabId) else { return }
             let nextTitle = browserPanel.displayTitle
             if self.panelTitles[browserPanel.id] != nextTitle {
@@ -12105,11 +12111,26 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     }
 
     @discardableResult
-    func switchFigmaPreviewAndCanvas() -> Bool {
+    func switchFigmaPreviewAndEditor() -> Bool {
         guard let panel = figmaPageSwitchTarget() else { return false }
-        let switched = panel.switchFigmaPreviewAndCanvas()
+        let switched = panel.switchFigmaPreviewAndEditor()
         if switched { noteFigmaPageUse(panel.id) }
+        bonsplitController.refreshPairFigmaPage() // cmux-rbf #cm-73.3
         return switched
+    }
+
+    // cmux-rbf #cm-73.3: Bonsplit sees only the showing side, never the pane's observable model.
+    func pairFigmaPage(for controller: BonsplitController) -> PairFigmaPage? {
+        guard controller === bonsplitController, isDesignFocusActive,
+              let panel = figmaPageSwitchTarget(), let address = panel.currentURL ?? panel.webView.url else { return nil }
+        return FigmaPaneURL.isWrapperPage(address, wrapper: panel.figmaPageWrapper) ? .preview : .editor
+    }
+
+    // cmux-rbf #cm-73.3: either pair header uses the key/palette action, with click-intent focus after success.
+    func splitTabBar(_ controller: BonsplitController, didChooseFigmaPage page: PairFigmaPage) {
+        guard let current = pairFigmaPage(for: controller), current != page,
+              let panel = figmaPageSwitchTarget() else { return }
+        if switchFigmaPreviewAndEditor() { focusPanel(panel.id) }
     }
 
     // cmux-rbf #cm-73.2a

@@ -945,6 +945,26 @@ public final class BonsplitController {
         delegate?.pairBoardControlState(for: self)
     }
 
+    /// cmux-rbf #cm-73.3: reads the host's showing Figma side without retaining its observable model.
+    public func pairFigmaPage() -> PairFigmaPage? {
+        delegate?.pairFigmaPage(for: self)
+    }
+
+    /// cmux-rbf #cm-73.3: requests a different side in the displayed Design Focus pair.
+    /// - Parameter page: The side chosen in the hover row.
+    public func requestFigmaPage(_ page: PairFigmaPage) {
+        guard internalController.isPairZoomed, internalController.zoomedPaneId == nil,
+              let current = pairFigmaPage(), current != page else { return }
+        delegate?.splitTabBar(self, didChooseFigmaPage: page)
+        refreshPairFigmaPage()
+    }
+
+    /// cmux-rbf #cm-73.3: refreshes the hover row after a host-side Figma navigation or switch.
+    public func refreshPairFigmaPage() {
+        let page = pairFigmaPage()
+        if internalController.pairFigmaPage != page { internalController.pairFigmaPage = page }
+    }
+
     /// Requests a board arrangement in the displayed pair.
     /// - Parameter orientation: A row or column of boards.
     public func requestBoardLayout(_ orientation: BoardLayoutOrientation) {

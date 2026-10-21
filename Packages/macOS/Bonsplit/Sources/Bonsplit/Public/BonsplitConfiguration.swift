@@ -476,6 +476,10 @@ extension BonsplitConfiguration {
         public var pairEqualize: String
         /// cmux-rbf #cm-73.16: tooltip for leaving the host's Design Focus mode.
         public var pairExit: String
+        /// cmux-rbf #cm-73.3: names the preview half of the Figma page switch.
+        public var figmaPreview: String
+        /// cmux-rbf #cm-73.3: names the editor half of the Figma page switch.
+        public var figmaEditor: String
         /// Names the column command.
         public var boardColumn: String
         /// Names the row command.
@@ -498,6 +502,8 @@ extension BonsplitConfiguration {
             pairStacked: String = "Stacked", // cmux-rbf #cm-73.2a
             pairEqualize: String = "Equalize Splits", // cmux-rbf #cm-73.2a
             pairExit: String = "Exit Design Focus", // cmux-rbf #cm-73.16
+            figmaPreview: String = "Preview", // cmux-rbf #cm-73.3
+            figmaEditor: String = "Editor", // cmux-rbf #cm-73.3
             boardColumn: String = "Lay Boards in a Column",
             boardRow: String = "Lay Boards in a Row",
             boardPin: String = "Keep Board Layout on Flip",
@@ -512,6 +518,8 @@ extension BonsplitConfiguration {
             self.pairStacked = pairStacked // cmux-rbf #cm-73.2a
             self.pairEqualize = pairEqualize // cmux-rbf #cm-73.2a
             self.pairExit = pairExit // cmux-rbf #cm-73.16
+            self.figmaPreview = figmaPreview // cmux-rbf #cm-73.3
+            self.figmaEditor = figmaEditor // cmux-rbf #cm-73.3
             self.boardColumn = boardColumn
             self.boardRow = boardRow
             self.boardPin = boardPin

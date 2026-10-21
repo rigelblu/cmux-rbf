@@ -1400,7 +1400,7 @@
       "restartNew": "Kreiraj novi radni prostor (zadano)"
     },
     "keyboardShortcuts": {
-      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Prebaci pregled i platno",
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Prebaci pregled i uređivač",
       "title": "Prečice na tastaturi",
       "description": "Sve prečice na tastaturi dostupne u cmux-u, grupirane po kategorijama.",
       "metaDescription": "Sve cmux prečice na tastaturi za radne prostore, površine, podijeljene panele, preglednik, notifikacije, pretragu i upravljanje prozorima na macOS-u.",
