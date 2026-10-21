@@ -70,6 +70,10 @@ struct PairHeaderControlsView: View {
     let onChoose: (SplitOrientation) -> Void
     let onEqualize: () -> Void
     let onExit: () -> Void // cmux-rbf #cm-73.16
+    // cmux-rbf #cm-73.3
+    let figmaPage: PairFigmaPage?
+    let liveFigmaPage: () -> PairFigmaPage?
+    let onChooseFigmaPage: (PairFigmaPage) -> Void
 
     init(orientation: SplitOrientation, appearance: BonsplitConfiguration.Appearance,
          tooltips: BonsplitConfiguration.SplitButtonTooltips, barHeight: CGFloat, iconScale: CGFloat,
@@ -79,7 +83,10 @@ struct PairHeaderControlsView: View {
          onLayoutBoards: @escaping (BoardLayoutOrientation) -> Void = { _ in },
          onTogglePin: @escaping () -> Void = {},
          onChoose: @escaping (SplitOrientation) -> Void,
-         onEqualize: @escaping () -> Void, onExit: @escaping () -> Void) {
+         onEqualize: @escaping () -> Void, onExit: @escaping () -> Void,
+         figmaPage: PairFigmaPage? = nil, // cmux-rbf #cm-73.3
+         liveFigmaPage: @escaping () -> PairFigmaPage? = { nil },
+         onChooseFigmaPage: @escaping (PairFigmaPage) -> Void = { _ in }) {
         self.orientation = orientation
         self.appearance = appearance
         self.tooltips = tooltips
@@ -93,10 +100,20 @@ struct PairHeaderControlsView: View {
         self.onChoose = onChoose
         self.onEqualize = onEqualize
         self.onExit = onExit
+        self.figmaPage = figmaPage
+        self.liveFigmaPage = liveFigmaPage
+        self.onChooseFigmaPage = onChooseFigmaPage
     }
 
     var body: some View {
         HStack(spacing: PairHeaderControls.segmentedSpacing) {
+            // cmux-rbf #cm-73.3: only this Design Focus hover row gets the clickable switch.
+            PairFigmaPageSegmentedControl(
+                selected: figmaPage, tooltips: tooltips, symbolPointSize: 12 * iconScale,
+                liveSelected: liveFigmaPage, onChoose: onChooseFigmaPage
+            )
+            .frame(width: PairHeaderControls.segmentedSize.width, height: PairHeaderControls.segmentedSize.height)
+
             PairArrangementSegmentedControl(
                 selected: orientation,
                 sideBySideTooltip: tooltips.pairSideBySide,

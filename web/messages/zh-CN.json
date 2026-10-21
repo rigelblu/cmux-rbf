@@ -1400,7 +1400,7 @@
       "restartNew": "创建新的 workspace（默认）"
     },
     "keyboardShortcuts": {
-      "figmaSwitchDescription": "⌥⇧⌘C — Figma：切换预览和画布",
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma：切换预览和编辑器",
       "title": "快捷键",
       "description": "cmux 中所有可用的快捷键，按类别分组。",
       "metaDescription": "cmux 的所有 macOS 快捷键，涵盖工作区、surface、分屏面板、浏览器、通知、查找和窗口管理。",

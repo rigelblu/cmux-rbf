@@ -1,252 +1,502 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "shortcut.switchFigmaPreviewAndCanvas.label": {
+    "figma.page.preview": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: التبديل بين المعاينة ولوحة التصميم"
+            "value": "معاينة"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Prebaci pregled i platno"
+            "value": "Pregled"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Skift mellem forhåndsvisning og lærred"
+            "value": "Forhåndsvisning"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Zwischen Vorschau und Arbeitsfläche wechseln"
+            "value": "Vorschau"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Switch Preview and Canvas"
+            "value": "Preview"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Cambiar entre vista previa y lienzo"
+            "value": "Vista previa"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma : Basculer entre aperçu et canevas"
+            "value": "Aperçu"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Passa tra anteprima e tela"
+            "value": "Anteprima"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: プレビューとキャンバスを切り替え"
+            "value": "プレビュー"
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma៖ ប្ដូររវាងការមើលជាមុន និងផ្ទាំងរចនា"
+            "value": "ការមើលជាមុន"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: 미리보기와 캔버스 전환"
+            "value": "미리보기"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Bytt mellom forhåndsvisning og lerret"
+            "value": "Forhåndsvisning"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Przełącz podgląd i płótno"
+            "value": "Podgląd"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Alternar entre prévia e tela"
+            "value": "Prévia"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Переключить предпросмотр и холст"
+            "value": "Предпросмотр"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: สลับระหว่างตัวอย่างและแคนวาส"
+            "value": "ตัวอย่าง"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Önizleme ve Tuval Arasında Geçiş Yap"
+            "value": "Önizleme"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Перемкнути попередній перегляд і полотно"
+            "value": "Попередній перегляд"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma：切换预览和画布"
+            "value": "预览"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma：切換預覽與畫布"
+            "value": "預覽"
           }
         }
       }
     },
-    "command.switchFigmaPreviewAndCanvas.title": {
+    "figma.page.editor": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: التبديل بين المعاينة ولوحة التصميم"
+            "value": "المحرّر"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Prebaci pregled i platno"
+            "value": "Uređivač"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Skift mellem forhåndsvisning og lærred"
+            "value": "Editor"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Zwischen Vorschau und Arbeitsfläche wechseln"
+            "value": "Editor"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Switch Preview and Canvas"
+            "value": "Editor"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Cambiar entre vista previa y lienzo"
+            "value": "Editor"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma : Basculer entre aperçu et canevas"
+            "value": "Éditeur"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Passa tra anteprima e tela"
+            "value": "Editor"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: プレビューとキャンバスを切り替え"
+            "value": "エディター"
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma៖ ប្ដូររវាងការមើលជាមុន និងផ្ទាំងរចនា"
+            "value": "កន្លែងកែសម្រួល"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: 미리보기와 캔버스 전환"
+            "value": "편집기"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Bytt mellom forhåndsvisning og lerret"
+            "value": "Redigering"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Przełącz podgląd i płótno"
+            "value": "Edytor"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Alternar entre prévia e tela"
+            "value": "Editor"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Переключить предпросмотр и холст"
+            "value": "Редактор"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: สลับระหว่างตัวอย่างและแคนวาส"
+            "value": "ตัวแก้ไข"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Önizleme ve Tuval Arasında Geçiş Yap"
+            "value": "Düzenleyici"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma: Перемкнути попередній перегляд і полотно"
+            "value": "Редактор"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma：切换预览和画布"
+            "value": "编辑器"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "Figma：切換預覽與畫布"
+            "value": "編輯器"
+          }
+        }
+      }
+    },
+    "shortcut.switchFigmaPreviewAndEditor.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: التبديل بين المعاينة والمحرّر"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Prebaci pregled i uređivač"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Skift mellem forhåndsvisning og editor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Zwischen Vorschau und Editor wechseln"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Switch Preview and Editor"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Cambiar entre vista previa y editor"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma : Basculer entre aperçu et éditeur"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Passa tra anteprima ed editor"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: プレビューとエディターを切り替え"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma៖ ប្ដូររវាងការមើលជាមុន និងកន្លែងកែសម្រួល"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: 미리보기와 편집기 전환"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Bytt mellom forhåndsvisning og redigering"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Przełącz podgląd i edytor"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Alternar entre prévia e editor"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Переключить предпросмотр и редактор"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: สลับระหว่างตัวอย่างและตัวแก้ไข"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Önizleme ve Düzenleyici Arasında Geçiş Yap"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Перемкнути попередній перегляд і редактор"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma：切换预览和编辑器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma：切換預覽與編輯器"
+          }
+        }
+      }
+    },
+    "command.switchFigmaPreviewAndEditor.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: التبديل بين المعاينة والمحرّر"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Prebaci pregled i uređivač"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Skift mellem forhåndsvisning og editor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Zwischen Vorschau und Editor wechseln"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Switch Preview and Editor"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Cambiar entre vista previa y editor"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma : Basculer entre aperçu et éditeur"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Passa tra anteprima ed editor"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: プレビューとエディターを切り替え"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma៖ ប្ដូររវាងការមើលជាមុន និងកន្លែងកែសម្រួល"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: 미리보기와 편집기 전환"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Bytt mellom forhåndsvisning og redigering"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Przełącz podgląd i edytor"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Alternar entre prévia e editor"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Переключить предпросмотр и редактор"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: สลับระหว่างตัวอย่างและตัวแก้ไข"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Önizleme ve Düzenleyici Arasında Geçiş Yap"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma: Перемкнути попередній перегляд і редактор"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma：切换预览和编辑器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Figma：切換預覽與編輯器"
           }
         }
       }

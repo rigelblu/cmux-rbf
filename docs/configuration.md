@@ -368,20 +368,22 @@ Three keyboard shortcuts drive the todo state, all editable in **Settings > Keyb
 
 cmux also posts a notification when a workspace's status first reaches done, and when its checklist first becomes fully complete, so you can watch agent progress without keeping the pane open.
 
-## Figma preview and canvas shortcut
+## Figma preview and editor shortcut
 
-`switchFigmaPreviewAndCanvas` defaults to `opt+shift+cmd+c` and is editable in
+`switchFigmaPreviewAndEditor` defaults to `opt+shift+cmd+c` and is editable in
 Settings > Keyboard Shortcuts. The command palette labels it **Figma: Switch
-Preview and Canvas**. It switches the Design Focus pair’s Figma pane, or the
+Preview and Editor**. It switches the Design Focus pair’s Figma pane, or the
 focused Figma pane, or the visible Figma pane used last. With no visible Figma
-pane it does nothing. Both pages stay loaded when switching. This shortcut targets workspace panes;
+pane it does nothing. Both pages stay loaded when switching. An agent pointing at
+a node shows Preview and releases the held Editor; the next switch opens Editor
+on that node. A fit preserves both pages and the showing side. This shortcut targets workspace panes;
 Dock Figma tabs are outside its targets in this version.
 
 ```json
 {
   "shortcuts": {
     "bindings": {
-      "switchFigmaPreviewAndCanvas": "opt+shift+cmd+c"
+      "switchFigmaPreviewAndEditor": "opt+shift+cmd+c"
     }
   }
 }

@@ -9675,7 +9675,9 @@ class TerminalController {
 
     // cmux-rbf (#cm-73.3): deliberately absent from the remote relay allowlist. Reject a revert of this hunk on upstream sync.
     private func v2FigmaGoto(params: [String: Any]) -> V2CallResult {
-        guard v2UUID(params, "surface_id") != nil,
+        guard let purposeText = (params["purpose"] ?? "point") as? String,
+              let purpose = BrowserPanel.FigmaGotoPurpose(rawValue: purposeText),
+              v2UUID(params, "surface_id") != nil,
               let node = v2String(params, "node"), !node.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
         }
@@ -9683,12 +9685,15 @@ class TerminalController {
             guard let manager = self.v2ResolveTabManager(params: params) else {
                 return .err(code: "unavailable", message: String(localized: "cli.browser.error.tabManagerUnavailable", defaultValue: "Browser controls are unavailable"), data: nil)
             }
-            guard panel.gotoFigmaNode(node) else {
+            guard panel.gotoFigmaNode(node, purpose: purpose) else {
                 return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
             }
+            let showingPreview = (panel.currentURL ?? panel.webView.url).map {
+                FigmaPaneURL.isWrapperPage($0, wrapper: panel.figmaPageWrapper)
+            } ?? true
             return .ok(self.v2BrowserActionPayload(workspaceId: workspaceId, surfaceId: surfaceId, tabManager: manager, extra: [
                 "url": panel.currentURL?.absoluteString ?? "",
-                "side": "preview", "stayed": false
+                "side": showingPreview ? "preview" : "editor"
             ]))
         }
     }

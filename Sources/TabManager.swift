@@ -4606,8 +4606,8 @@ class TabManager: ObservableObject {
 
     // cmux-rbf (#cm-73.3): workspace only; Dock targets are a later decision. Reject a revert of this hunk on upstream sync.
     @discardableResult
-    func switchFigmaPreviewAndCanvas() -> Bool {
-        selectedWorkspace?.switchFigmaPreviewAndCanvas() ?? false
+    func switchFigmaPreviewAndEditor() -> Bool {
+        selectedWorkspace?.switchFigmaPreviewAndEditor() ?? false
     }
 
     /// Close a surface/panel

@@ -1400,7 +1400,7 @@
       "restartNew": "새 워크스페이스 만들기 (기본값)"
     },
     "keyboardShortcuts": {
-      "figmaSwitchDescription": "⌥⇧⌘C — Figma: 미리보기와 캔버스 전환",
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: 미리보기와 편집기 전환",
       "title": "키보드 단축키",
       "description": "카테고리별로 정리된 cmux의 모든 키보드 단축키.",
       "metaDescription": "워크스페이스, 서피스, 분할 패널, 브라우저, 알림, 검색, 창 관리를 위한 cmux의 모든 macOS 키보드 단축키.",

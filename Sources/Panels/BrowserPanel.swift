@@ -3588,7 +3588,7 @@ final class BrowserPanel: Panel, ObservableObject {
         navigationDelegate.didFinish = { [weak self] webView in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                // cmux-rbf (#cm-73.3): the held canvas finishes its own chrome work without touching presentation state. Reject a revert of this hunk on upstream sync.
+                // cmux-rbf (#cm-73.3): the held editor finishes its own chrome work without touching presentation state. Reject a revert of this hunk on upstream sync.
                 guard self.isCurrentWebView(webView, instanceID: boundWebViewInstanceID) else {
                     if self.retainedFigmaPage?.webView === webView,
                        FigmaEditorChrome.shouldMinimizeUI(paneURL: webView.url, isOmnibarVisible: self.isOmnibarVisible) {
@@ -4759,6 +4759,13 @@ final class BrowserPanel: Panel, ObservableObject {
 
     // cmux-rbf #cm-73.16: document observations publish through the same seam in KVO and integration tests.
     func publishObservedDocumentURL(_ observedURL: URL?) {
+        // cmux-rbf #cm-73.3: WebKit may clear its URL while the requested Preview is still loading. Keep that pending address available to the shared switch. Reject a revert of this hunk on upstream sync.
+        if observedURL == nil,
+           let pending = pendingTrustedLocalFileURL,
+           currentURL == pending,
+           FigmaPaneURL.isWrapperPage(pending, wrapper: figmaPageWrapper) {
+            return
+        }
         currentURL = Self.remoteProxyDisplayURL(for: observedURL) ?? observedURL
     }
 
@@ -5632,7 +5639,7 @@ final class BrowserPanel: Panel, ObservableObject {
 
     // cmux-rbf (#cm-73.3): one owner for switching and every goto entrance. Reject a revert of this hunk on upstream sync.
     @discardableResult
-    func switchFigmaPreviewAndCanvas(wrapper: URL = FigmaPaneURL.wrapperFileURL()) -> Bool {
+    func switchFigmaPreviewAndEditor(wrapper: URL = FigmaPaneURL.wrapperFileURL()) -> Bool {
         guard let address = currentURL ?? webView.url,
               FigmaTabMark.applies(address: address, showsAddressBar: isOmnibarVisible, wrapper: wrapper),
               let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper) else { return false }
@@ -5651,16 +5658,25 @@ final class BrowserPanel: Panel, ObservableObject {
         return showFigmaPage(preview: !showingPreview, destination: destination, reload: false, wrapper: wrapper)
     }
 
-    /// The sole goto decision point. Existing paired pages are retained; native-history-only panes navigate in place.
+    enum FigmaGotoPurpose: String {
+        case point
+        case fit
+    }
+
+    /// Pointing replaces the held Editor; a fit reload preserves the current pair.
     @discardableResult
-    func gotoFigmaNode(_ node: String, wrapper: URL = FigmaPaneURL.wrapperFileURL(), defaults: UserDefaults = .standard) -> Bool {
+    func gotoFigmaNode(_ node: String, wrapper: URL = FigmaPaneURL.wrapperFileURL(), defaults: UserDefaults = .standard, purpose: FigmaGotoPurpose = .point) -> Bool {
         let node = node.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !node.isEmpty, let address = currentURL ?? webView.url,
               let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper),
               let destination = try? FigmaPaneURL.destination(for: document, node: node, wrapper: wrapper),
               BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination.url)
         else { return false }
-        // Explicit --surface accepts ordinary panes. A canvas opened alone also
+        // Preview fit reloads only Preview; editor fitting is handled by the CLI's key path.
+        if purpose == .fit, !FigmaPaneURL.isWrapperPage(address, wrapper: wrapper) {
+            return true
+        }
+        // Explicit --surface accepts ordinary panes. An editor opened alone also
         // keeps native Back until the cross-side history action exists (step 5).
         if isOmnibarVisible || (!FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
             && retainedFigmaPage == nil && discardedFigmaPageAddress == nil) {
@@ -5668,10 +5684,13 @@ final class BrowserPanel: Panel, ObservableObject {
             figmaPageWrapper = wrapper
             currentURL = destination.url
             navigate(to: destination.url)
+            if purpose == .point { releaseRetainedFigmaPage() }
             scheduleFigmaReadSnapshotRefresh()
             return true
         }
-        return showFigmaPage(preview: true, destination: destination.url, reload: true, wrapper: wrapper, defaults: defaults)
+        let moved = showFigmaPage(preview: true, destination: destination.url, reload: true, wrapper: wrapper, defaults: defaults)
+        if moved, purpose == .point { releaseRetainedFigmaPage() }
+        return moved
     }
 
     /// Exchanges the presentation binding; an existing page is never navigated by a switch.

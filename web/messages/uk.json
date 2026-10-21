@@ -1384,7 +1384,7 @@
       "restartNew": "Створити новий workspace (за замовчуванням)"
     },
     "keyboardShortcuts": {
-      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Перемкнути попередній перегляд і полотно",
+      "figmaSwitchDescription": "⌥⇧⌘C — Figma: Перемкнути попередній перегляд і редактор",
       "title": "Клавіатурні скорочення",
       "description": "Усі клавіатурні скорочення cmux, згруповані за категоріями.",
       "metaTitle": "Клавіатурні скорочення",

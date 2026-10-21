@@ -321,7 +321,7 @@ extension CMUXCLI {
             _ = try figmaDestination(for: pane.document, node: node)
             payload = try client.sendV2(
                 method: "figma.goto",
-                params: ["surface_id": pane.surfaceID, "node": node]
+                params: ["surface_id": pane.surfaceID, "node": node, "purpose": "fit"]
             )
 
         case .pressFit:

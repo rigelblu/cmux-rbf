@@ -1872,7 +1872,7 @@
               "splitDown",
               "toggleSplitZoom",
               "toggleDesignFocus",
-              "switchFigmaPreviewAndCanvas",
+              "switchFigmaPreviewAndEditor",
               "flipDesignFocusLayout",
               "increaseWorkspaceTerminalFontSize",
               "decreaseWorkspaceTerminalFontSize",

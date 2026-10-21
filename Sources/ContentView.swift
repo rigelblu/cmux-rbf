@@ -8628,10 +8628,10 @@ struct ContentView: View {
         // cmux-rbf (#cm-73.3): one shared action behind both entrances. Reject a revert of this hunk on upstream sync.
         contributions.append(
             CommandPaletteCommandContribution(
-                commandId: "palette.switchFigmaPreviewAndCanvas",
-                title: constant(String(localized: "command.switchFigmaPreviewAndCanvas.title", defaultValue: "Figma: Switch Preview and Canvas")),
+                commandId: "palette.switchFigmaPreviewAndEditor",
+                title: constant(String(localized: "command.switchFigmaPreviewAndEditor.title", defaultValue: "Figma: Switch Preview and Editor")),
                 subtitle: constant(String(localized: "figma.menu.tooltip", defaultValue: "Figma")),
-                keywords: ["preview", "canvas", "figma"],
+                keywords: ["preview", "editor", "figma"],
                 when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) },
                 enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanSwitchFigmaPage) }
             )
