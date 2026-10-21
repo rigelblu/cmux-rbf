@@ -68,12 +68,6 @@ extension VerticalTabsSidebar {
         token: UUID?, foreignDraggedIsPinned: Bool?, controlsEnabled: Bool, hasUserStatusList: Bool,
         ordinary: (CGPoint, [SidebarWorkspaceReorderDropOverlay.Target], Bool) -> SidebarWorkspaceReorderDropPlan?) -> SidebarStatusHeaderPlanResult {
         guard let projection = snapshot.statusGroupProjection else { return .notHeader }
-        // Headers displayed under a status stay inert until cm-110.8, including ordinary destinations.
-        if workspaceProjectedStatusHeaderIsRefused(draggedId: draggedId, sourceKind: sourceKind,
-            groups: snapshot.workspaceGroups, projection: projection) { return .refused }
-        if let join = workspaceProjectedGroupJoin(point: point, targets: targets, snapshot: snapshot,
-            draggedId: draggedId, sourceKind: sourceKind, token: token,
-            controlsEnabled: controlsEnabled, hasUserStatusList: hasUserStatusList) { return join }
         let workspace = snapshot.tabs.first { $0.id == draggedId }
         let sourceGroup: WorkspaceGroup?
         if case .workspaceGroupHeader(let id)? = sourceKind { sourceGroup = snapshot.workspaceGroups.first { $0.id == id } }
@@ -86,17 +80,26 @@ extension VerticalTabsSidebar {
                 isPinned: sourceGroup?.isPinned ?? workspace?.isPinned ?? foreignDraggedIsPinned ?? false,
                 groupId: projection.contains(workspaceId: draggedId) ? nil : workspace?.groupId,
                 isColorSectionMember: snapshot.colorSectionProjection.sectionByWorkspaceId[draggedId] != nil),
-            targets: Self.workspaceStatusDropTargets(items: snapshot.workspaceRenderItems, measured: targets, useContentFrames: sourceKind == .workspace),
+            targets: Self.workspaceStatusDropTargets(items: snapshot.workspaceRenderItems, measured: targets, useContentFrames: sourceKind == .workspace || sourceGroup != nil), // (#cm-110.8)
             groups: projection.groups.map { .init(statusId: $0.statusId,
                 memberWorkspaceIds: workspaceStatusDisplayDropMembers(statusId: $0.statusId,
                     projection: projection, items: snapshot.workspaceRenderItems)) },
             areaIsLast: layout.saving(state: snapshot.statusGroupFolds)?.last == true,
             controlsEnabled: controlsEnabled, hasUserStatusList: hasUserStatusList)
+        let decision = SidebarStatusGroupDropRules().plan(request) // (#cm-110.8)
+        if let header = SidebarWorkspaceGroupStatusHeaderDrops(snapshot: snapshot).route(decision: decision, // (#cm-110.8)
+            source: request.source, token: token) { return header } // (#cm-110.8)
+        // A projected header's non-status destinations remain refused, including nested descendants. // (#cm-110.8)
+        if workspaceProjectedStatusHeaderIsRefused(draggedId: draggedId, sourceKind: sourceKind, // (#cm-110.8)
+            groups: snapshot.workspaceGroups, projection: projection) { return .refused } // (#cm-110.8)
+        if let join = workspaceProjectedGroupJoin(point: point, targets: targets, snapshot: snapshot, // (#cm-110.8)
+            draggedId: draggedId, sourceKind: sourceKind, token: token, // (#cm-110.8)
+            controlsEnabled: controlsEnabled, hasUserStatusList: hasUserStatusList) { return join } // (#cm-110.8)
         let rootPoint = CGPoint(x: targets.map(\.frame.minX).min() ?? point.x, y: point.y)
         let lastMeasuredBottom = request.targets.filter { $0.frame.width > 0 && $0.frame.height > 0 }.map(\.frame.maxY).max()
         let belowLastArea = request.areaIsLast && request.targets.contains { $0.kind == .statusesArea }
             && lastMeasuredBottom.map { point.y > $0 } == true
-        switch SidebarStatusGroupDropRules().plan(request) {
+        switch decision { // (#cm-110.8)
         case .refused: return .refused
         case .unrelated:
             // A pinned workspace keeps the legacy pin-tier action, but the last area has no right-hand group.
@@ -485,6 +488,13 @@ extension VerticalTabsSidebar {
         }
         guard let source = sourceRecorder.source(windowId: windowId,
             workspaceId: plan.draggedWorkspaceId, sessionId: token, dragState: dragState) else { return false }
+        if case .statusGroupDrop(let value, _) = plan.action, case .workspaceGroupHeader(let id) = source.kind { // (#cm-110.8)
+            return WorkspaceGroupStatusDropPerformer(tabManager: tabManager, sidebarState: sidebarState, // (#cm-110.8)
+                actions: statusActions(), projection: currentProjection(), renderItems: currentRenderItems(), // (#cm-110.8)
+                reorder: { id, index in tabManager.reorderSidebarWorkspace(tabId: id, toIndex: index, // (#cm-110.8)
+                    isDragOperation: true, usesTopLevelRows: true, explicitGroupId: nil) }) // (#cm-110.8)
+                .perform(value, groupId: id, draggedId: plan.draggedWorkspaceId) // (#cm-110.8)
+        } // (#cm-110.8)
         if workspaceProjectedStatusHeaderIsRefused(draggedId: plan.draggedWorkspaceId, sourceKind: source.kind,
             groups: tabManager.workspaceGroups, projection: currentProjection()) { return false }
         switch plan.action {

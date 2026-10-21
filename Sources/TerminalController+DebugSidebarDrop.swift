@@ -71,20 +71,9 @@ extension VerticalTabsSidebar {
             beginStatusAwareWorkspaceDrag(source.id, sourceRowId: source.row)
             defer { dragState.finishDrag() }
             var acceptedPlan: SidebarWorkspaceReorderDropPlan?
-            let pointFrames: [UUID: CGRect]?
-            if source.row == .workspace(source.id), let projection = renderContext.statusGroupProjection {
-                // Only status-workspace DEBUG readings use status conversion; ordinary/header readings keep raw geometry.
-                let typed = Self.workspaceStatusDropTargets(items: renderContext.workspaceRenderItems, measured: targets)
-                let usesStatusFrames: Bool
-                switch typed.first(where: { $0.workspaceId == target.id })?.kind {
-                case .some(.statusesArea), .some(.statusGroupHeader(_)): usesStatusFrames = true
-                case .some(.workspace):
-                    usesStatusFrames = projection.allDisplayMemberWorkspaceIds.contains(target.id)
-                        || target.row?.groupId.flatMap { projection.workspaceGroups?.statusIdByGroupId[$0] } != nil
-                default: usesStatusFrames = false
-                }
-                pointFrames = usesStatusFrames ? Dictionary(uniqueKeysWithValues: typed.map { ($0.workspaceId, $0.frame) }) : nil
-            } else { pointFrames = nil }
+            let pointFrames = Self.workspaceStatusDebugPointFrames(sourceId: source.id, sourceRowId: source.row, // (#cm-110.8)
+                targetId: target.id, targetRowId: target.row, items: renderContext.workspaceRenderItems, // (#cm-110.8)
+                projection: renderContext.statusGroupProjection, targets: targets) // (#cm-110.8)
             let performed = SidebarDebugHeaderDrop.perform(draggedId: source.id, targetId: target.id,
                 zone: request.target == "below" ? .belowAll : request.zone, side: request.side, targets: targets,
                 renderItemId: target.row, pointFrames: pointFrames,

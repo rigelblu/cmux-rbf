@@ -85,8 +85,14 @@ public struct SidebarStatusGroupDropRules: Sendable {
         }
         func resolve(_ row: SidebarWorkspaceReorderDropTarget, edge: SidebarDropEdge) -> Decision {
             if let id = statusId(row) {
-                guard request.controlsEnabled, request.hasUserStatusList, request.source.isLocal,
-                      request.source.kind == .workspace,
+                let admitsSource: Bool // (#cm-110.8)
+                switch request.source.kind { // (#cm-110.8)
+                case .workspace: admitsSource = true // (#cm-110.8)
+                // Empty headers already carry the group id as their payload, rather than a live anchor. // (#cm-110.8)
+                case .workspaceGroupHeader(let groupId): admitsSource = request.source.workspaceId != groupId // (#cm-110.8)
+                case .unknown: admitsSource = false // (#cm-110.8)
+                } // (#cm-110.8)
+                guard request.controlsEnabled, request.hasUserStatusList, request.source.isLocal, admitsSource, // (#cm-110.8)
                       let group = request.groups.first(where: { $0.statusId == id }) else { return .refused }
                 let placement: SidebarStatusGroupWorkspaceDropPlan.Placement
                 let indicator: SidebarDropIndicator
