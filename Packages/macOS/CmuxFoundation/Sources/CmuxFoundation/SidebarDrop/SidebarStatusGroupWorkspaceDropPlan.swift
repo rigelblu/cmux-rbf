@@ -13,11 +13,15 @@ public struct SidebarStatusGroupWorkspaceDropPlan: Equatable, Sendable {
     public let placement: Placement
     public let setsStatus: Bool
     public let indicator: SidebarDropIndicator
+    /// Transient header admission proof, checked again before any mutation; never persisted or sent on the wire. // (#cm-110.8)
+    public let headerPlacement: SidebarStatusGroupHeaderPlacementPlan? // (#cm-110.8)
 
-    public init(statusId: String, placement: Placement, setsStatus: Bool, indicator: SidebarDropIndicator) {
+    public init(statusId: String, placement: Placement, setsStatus: Bool, indicator: SidebarDropIndicator, // (#cm-110.8)
+                headerPlacement: SidebarStatusGroupHeaderPlacementPlan? = nil) { // (#cm-110.8)
         self.statusId = statusId
         self.placement = placement
         self.setsStatus = setsStatus
         self.indicator = indicator
+        self.headerPlacement = headerPlacement // (#cm-110.8)
     }
 }

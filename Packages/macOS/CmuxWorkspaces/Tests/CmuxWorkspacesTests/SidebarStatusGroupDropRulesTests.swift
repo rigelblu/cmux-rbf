@@ -134,14 +134,15 @@ struct SidebarStatusGroupDropRulesTests {
                     f.status("parked", .first, f.parkedHeader, .bottom))
             }
             add("09_585_groupedWorkspaceOutsideArea_\(side)", f, grouped, f.point(f.loose, 0.5, x: x), .unrelated)
-            for (role, source) in [("nonemptyHeader", header), ("selectedHeaders", header)] {
-                add("09_586_\(role)_statusHeaderRefused_\(side)", f, source, f.point(f.parkedHeader, 0.75, x: x), .refused)
-                add("09_586_\(role)_memberRefused_\(side)", f, source, f.point(f.p2, 0.25, x: x), .refused)
-                add("09_586_\(role)_statusesBoundaryAbove_\(side)", f, source, f.point(f.area, 0.75, x: x),
-                    .areaBoundary(.aboveArea, indicator: .init(tabId: f.area, edge: .top)))
-                add("09_586_\(role)_belowBoundary_\(side)", f, source, below,
-                    .areaBoundary(.belowAll, indicator: .init(tabId: nil, edge: .bottom)))
-            }
+            // Selection is absent from Rules.Source; only the app's selected-header tests cover it. // (#cm-110.8)
+            add("1108_nonemptyHeader_statusHeader_\(side)", f, header, f.point(f.parkedHeader, 0.75, x: x), // (#cm-110.8)
+                f.status("parked", .first, f.parkedHeader, .bottom)) // (#cm-110.8)
+            add("1108_nonemptyHeader_member_\(side)", f, header, f.point(f.p2, 0.25, x: x), // (#cm-110.8)
+                f.status("parked", .member(f.p2, insertBefore: true), f.p2, .top)) // (#cm-110.8)
+            add("09_586_nonemptyHeader_statusesBoundaryAbove_\(side)", f, header, f.point(f.area, 0.75, x: x), // (#cm-110.8)
+                .areaBoundary(.aboveArea, indicator: .init(tabId: f.area, edge: .top))) // (#cm-110.8)
+            add("09_586_nonemptyHeader_belowBoundary_\(side)", f, header, below, // (#cm-110.8)
+                .areaBoundary(.belowAll, indicator: .init(tabId: nil, edge: .bottom))) // (#cm-110.8)
             let e = Fixture(emptySourceHeader: true)
             let emptyHeader = Rules.Source(workspaceId: e.group, kind: .workspaceGroupHeader(groupId: e.group))
             add("09_586_emptyHeader_statusRefused_\(side)", e, emptyHeader, e.point(e.parkedHeader, 0.5, x: x), .refused)

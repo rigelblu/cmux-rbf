@@ -3047,6 +3047,8 @@
 		6707F0056707F0056707F005 /* SidebarWorkspaceGroupRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6707F0066707F0066707F006 /* SidebarWorkspaceGroupRowView.swift */; };
 		C11020000000000000000014 /* SidebarWorkspaceGroupStatusDrops.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11020000000000000000013 /* SidebarWorkspaceGroupStatusDrops.swift */; }; // (#cm-110.2)
 		C1102000000000000000000A /* SidebarWorkspaceGroupStatusGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11020000000000000000009 /* SidebarWorkspaceGroupStatusGlyph.swift */; }; // (#cm-110.2)
+		C11080000000000000000004 /* SidebarWorkspaceGroupStatusHeaderDrops.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11080000000000000000003 /* SidebarWorkspaceGroupStatusHeaderDrops.swift */; }; // (#cm-110.8)
+		C11080000000000000000002 /* SidebarWorkspaceGroupStatusHeaderDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11080000000000000000001 /* SidebarWorkspaceGroupStatusHeaderDropTests.swift */; }; // (#cm-110.8)
 		C1102000000000000000000E /* SidebarWorkspaceGroupStatusMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1102000000000000000000D /* SidebarWorkspaceGroupStatusMenu.swift */; }; // (#cm-110.2)
 		C11020000000000000000010 /* SidebarWorkspaceGroupStatusPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1102000000000000000000F /* SidebarWorkspaceGroupStatusPopover.swift */; }; // (#cm-110.2)
 		C11020000000000000000006 /* SidebarWorkspaceGroupStatusProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11020000000000000000005 /* SidebarWorkspaceGroupStatusProjectionTests.swift */; }; // (#cm-110.2)
@@ -3948,6 +3950,7 @@
 		C10600000000000000000018 /* WorkspaceGroupNestedTableRowsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10600000000000000000017 /* WorkspaceGroupNestedTableRowsTests.swift */; };
 		C10600000000000000000001 /* WorkspaceGroupNestingPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10600000000000000000002 /* WorkspaceGroupNestingPersistenceTests.swift */; };
 		9164A0019164A0019164A001 /* WorkspaceGroupNumberedSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9164A0029164A0029164A002 /* WorkspaceGroupNumberedSelectionTests.swift */; };
+		C11080000000000000000006 /* WorkspaceGroupStatusDropPerformer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11080000000000000000005 /* WorkspaceGroupStatusDropPerformer.swift */; }; // (#cm-110.8)
 		C11020000000000000000012 /* WorkspaceGroupStatusEntrancesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11020000000000000000011 /* WorkspaceGroupStatusEntrancesTests.swift */; }; // (#cm-110.2)
 		C11020000000000000000004 /* WorkspaceGroupStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11020000000000000000003 /* WorkspaceGroupStatusTests.swift */; }; // (#cm-110.2)
 		C1102000000000000000000C /* WorkspaceGroupStatusUIActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1102000000000000000000B /* WorkspaceGroupStatusUIActions.swift */; }; // (#cm-110.2)
@@ -7084,6 +7087,8 @@
 		6707F0066707F0066707F006 /* SidebarWorkspaceGroupRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWorkspaceGroupRowView.swift; sourceTree = "<group>"; };
 		C11020000000000000000013 /* SidebarWorkspaceGroupStatusDrops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarWorkspaceGroupStatusDrops.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
 		C11020000000000000000009 /* SidebarWorkspaceGroupStatusGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarWorkspaceGroupStatusGlyph.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
+		C11080000000000000000003 /* SidebarWorkspaceGroupStatusHeaderDrops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarWorkspaceGroupStatusHeaderDrops.swift"; sourceTree = "<group>"; }; // (#cm-110.8)
+		C11080000000000000000001 /* SidebarWorkspaceGroupStatusHeaderDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarWorkspaceGroupStatusHeaderDropTests.swift"; sourceTree = "<group>"; }; // (#cm-110.8)
 		C1102000000000000000000D /* SidebarWorkspaceGroupStatusMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarWorkspaceGroupStatusMenu.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
 		C1102000000000000000000F /* SidebarWorkspaceGroupStatusPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarWorkspaceGroupStatusPopover.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
 		C11020000000000000000005 /* SidebarWorkspaceGroupStatusProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarWorkspaceGroupStatusProjectionTests.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
@@ -7973,6 +7978,7 @@
 		C10600000000000000000017 /* WorkspaceGroupNestedTableRowsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceGroupNestedTableRowsTests.swift; sourceTree = "<group>"; };
 		C10600000000000000000002 /* WorkspaceGroupNestingPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceGroupNestingPersistenceTests.swift; sourceTree = "<group>"; };
 		9164A0029164A0029164A002 /* WorkspaceGroupNumberedSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceGroupNumberedSelectionTests.swift; sourceTree = "<group>"; };
+		C11080000000000000000005 /* WorkspaceGroupStatusDropPerformer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceGroupStatusDropPerformer.swift"; sourceTree = "<group>"; }; // (#cm-110.8)
 		C11020000000000000000011 /* WorkspaceGroupStatusEntrancesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceGroupStatusEntrancesTests.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
 		C11020000000000000000003 /* WorkspaceGroupStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceGroupStatusTests.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
 		C1102000000000000000000B /* WorkspaceGroupStatusUIActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceGroupStatusUIActions.swift"; sourceTree = "<group>"; }; // (#cm-110.2)
@@ -10907,6 +10913,8 @@
 				C1102000000000000000000D /* SidebarWorkspaceGroupStatusMenu.swift */,
 				C11020000000000000000013 /* SidebarWorkspaceGroupStatusDrops.swift */,
 				C1102000000000000000000B /* WorkspaceGroupStatusUIActions.swift */,
+				C11080000000000000000005 /* WorkspaceGroupStatusDropPerformer.swift */,
+				C11080000000000000000003 /* SidebarWorkspaceGroupStatusHeaderDrops.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -12233,6 +12241,7 @@
 				C11020000000000000000003 /* WorkspaceGroupStatusTests.swift */,
 				C11020000000000000000005 /* SidebarWorkspaceGroupStatusProjectionTests.swift */,
 				C11020000000000000000011 /* WorkspaceGroupStatusEntrancesTests.swift */,
+				C11080000000000000000001 /* SidebarWorkspaceGroupStatusHeaderDropTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -14724,6 +14733,7 @@
 				6707F0056707F0056707F005 /* SidebarWorkspaceGroupRowView.swift in Sources */,
 				C11020000000000000000014 /* SidebarWorkspaceGroupStatusDrops.swift in Sources */,
 				C1102000000000000000000A /* SidebarWorkspaceGroupStatusGlyph.swift in Sources */,
+				C11080000000000000000004 /* SidebarWorkspaceGroupStatusHeaderDrops.swift in Sources */,
 				C1102000000000000000000E /* SidebarWorkspaceGroupStatusMenu.swift in Sources */,
 				C11020000000000000000010 /* SidebarWorkspaceGroupStatusPopover.swift in Sources */,
 				C11020000000000000000008 /* SidebarWorkspaceGroupStatusRenderItems.swift in Sources */,
@@ -15387,6 +15397,7 @@
 				C10600000000000000000005 /* WorkspaceGroupDeleteMessages.swift in Sources */,
 				C9A57203C9A57203C9A57203 /* WorkspaceGroupMenuSnapshot.swift in Sources */,
 				C9A57206C9A57206C9A57206 /* WorkspaceGroupMoveToMenuState.swift in Sources */,
+				C11080000000000000000006 /* WorkspaceGroupStatusDropPerformer.swift in Sources */,
 				C1102000000000000000000C /* WorkspaceGroupStatusUIActions.swift in Sources */,
 				D92310030000000000000001 /* WorkspaceHandoffRetirementGate.swift in Sources */,
 				A17C0A110000000000000001 /* WorkspaceInitialCommandLoginShell.swift in Sources */,
@@ -16630,6 +16641,7 @@
 				B8624C050000000000000005 /* SidebarWorkspaceDropTargetSuspensionTests.swift in Sources */,
 				C135190000000000000000B1 /* SidebarWorkspaceGroupConfigOpenerTests.swift in Sources */,
 				C9A57303C9A57303C9A57303 /* SidebarWorkspaceGroupHeaderMetricsTests.swift in Sources */,
+				C11080000000000000000002 /* SidebarWorkspaceGroupStatusHeaderDropTests.swift in Sources */,
 				C11020000000000000000006 /* SidebarWorkspaceGroupStatusProjectionTests.swift in Sources */,
 				6707F0236707F0236707F023 /* SidebarWorkspaceNotificationIndexTests.swift in Sources */,
 				C9A57305C9A57305C9A57305 /* SidebarWorkspaceReorderDropOverlayHitTestingTests.swift in Sources */,

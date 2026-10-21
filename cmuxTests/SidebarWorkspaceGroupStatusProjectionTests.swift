@@ -510,15 +510,20 @@ struct SidebarProjectedWorkspaceGroupDropTests {
         }
     }
     @Test(arguments: [false,true])
-    func aProjectedHeaderIsRefusedAtLooseMemberStatusAndEndDestinations(_ native: Bool) async throws {
+    func aProjectedHeaderAcceptsStatusDestinationsButKeepsOutsideRefusals(_ native: Bool) async throws { // (#cm-110.8)
         try await AppContextSerialGate.withExclusiveAppContext {
             let f = try fixture(); defer { f.close() }; await f.applyRows()
             try f.begin(row: .group(f.q))
             let targets = f.targets(native ? .native : .swiftUI),before = f.manager.tabs.map(\.id)
-            for id in [f.w("l1").id,f.w("pa").id,SidebarStatusHeaderIdentity.uuid(forStatusId: "parked")] {
-                let row = try #require(targets.first { $0.workspaceId == id })
-                #expect(try f.route(point: .init(x: 180,y: row.frame.midY),targets: targets) == nil)
-            }
+            // Rulings (5)/(11) keep the outside refusal; status/member destinations now set the nested group's own status. // (#cm-110.8)
+            let looseRow = try #require(targets.first { $0.workspaceId == f.w("l1").id }) // (#cm-110.8)
+            #expect(try f.route(point: .init(x: 180,y: looseRow.frame.midY),targets: targets) == nil) // (#cm-110.8)
+            for id in [f.w("pa").id,SidebarStatusHeaderIdentity.uuid(forStatusId: "parked")] { // (#cm-110.8)
+                let row = try #require(targets.first { $0.workspaceId == id }) // (#cm-110.8)
+                let plan = try #require(try f.route(point: .init(x: 180,y: row.frame.midY),targets: targets)) // (#cm-110.8)
+                guard case .statusGroupDrop(let value, _) = plan.action else { Issue.record("Expected header status drop"); return } // (#cm-110.8)
+                #expect(value.statusId == "parked" && value.setsStatus) // (#cm-110.8)
+            } // (#cm-110.8)
             let bottom = try #require(targets.map { $0.frame.maxY }.max())
             #expect(try f.route(point: .init(x: 180,y: bottom+20),targets: targets) == nil)
             #expect(f.manager.tabs.map(\.id) == before)
