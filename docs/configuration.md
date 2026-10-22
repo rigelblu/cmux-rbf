@@ -376,7 +376,9 @@ Preview and Editor**. It switches the Design Focus pair’s Figma pane, or the
 focused Figma pane, or the visible Figma pane used last. With no visible Figma
 pane it does nothing. Both pages stay loaded when switching. An agent pointing at
 a node shows Preview and releases the held Editor; the next switch opens Editor
-on that node. A fit preserves both pages and the showing side. This shortcut targets workspace panes;
+on that node. A fit preserves both pages and the showing side. A restart restores
+the showing side and both page addresses when the pane holds both. The other page
+loads on the first switch; Figma's zoom is not saved. This shortcut targets workspace panes;
 Dock Figma tabs are outside its targets in this version.
 
 ```json

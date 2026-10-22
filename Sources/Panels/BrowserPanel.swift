@@ -4625,7 +4625,42 @@ final class BrowserPanel: Panel, ObservableObject {
         refreshNavigationAvailability()
     }
 
+    // cmux-rbf (#cm-73.3): save actual pair addresses; a point-released side has no record. Reject a revert of this hunk on upstream sync.
+    func figmaPagesSessionSnapshot() -> SessionFigmaPagesSnapshot? {
+        guard let showingString = preferredURLStringForSessionSnapshot(),
+              let showing = URL(string: showingString),
+              let key = FigmaPaneURL.fileKey(fromPaneURL: showing, wrapper: figmaPageWrapper),
+              let savedOther = retainedFigmaPageAddress else { return nil }
+        let liveOther = retainedFigmaPage?.webView.url.flatMap {
+            Self.remoteProxyDisplayURL(for: $0) ?? $0
+        }.flatMap { $0.absoluteString == "about:blank" ? nil : $0 }
+        let other = liveOther ?? savedOther
+        let showingPreview = FigmaPaneURL.isWrapperPage(showing, wrapper: figmaPageWrapper)
+        guard FigmaPaneURL.fileKey(fromPaneURL: other, wrapper: figmaPageWrapper) == key,
+              FigmaPaneURL.isWrapperPage(other, wrapper: figmaPageWrapper) != showingPreview,
+              let otherString = Self.serializableSessionHistoryURLString(other) else { return nil }
+        return SessionFigmaPagesSnapshot(
+            previewURLString: showingPreview ? showingString : otherString,
+            editorURLString: showingPreview ? otherString : showingString,
+            showingSide: showingPreview ? .preview : .editor
+        )
+    }
+
+    private func restoreFigmaPagesSessionSnapshot(_ pages: SessionFigmaPagesSnapshot?, showingURL: URL?) {
+        guard let pages, let showingURL,
+              let preview = Self.sanitizedSessionHistoryURL(pages.previewURLString),
+              let editor = Self.sanitizedSessionHistoryURL(pages.editorURLString),
+              FigmaPaneURL.isWrapperPage(preview, wrapper: figmaPageWrapper),
+              FigmaFileLink.isEditorLink(editor),
+              let key = FigmaPaneURL.fileKey(fromPaneURL: preview, wrapper: figmaPageWrapper),
+              FigmaPaneURL.fileKey(fromPaneURL: editor, wrapper: figmaPageWrapper) == key,
+              showingURL == (pages.showingSide == .preview ? preview : editor) else { return }
+        // Reuse the existing lazy switch path; restoring a hidden side creates no web view or fit mark.
+        discardedFigmaPageAddress = pages.showingSide == .preview ? editor : preview
+    }
+
     func restoreSessionSnapshot(_ snapshot: SessionBrowserPanelSnapshot) {
+        releaseRetainedFigmaPage()
         keepLoaded = snapshot.keepLoaded
         // Diff viewer surfaces navigate via the app-owned custom scheme, so they
         // restore even though the original local HTTP server is gone. Manifest
@@ -4670,6 +4705,8 @@ final class BrowserPanel: Panel, ObservableObject {
         )
 
         currentURL = restoredURL
+
+        restoreFigmaPagesSessionSnapshot(snapshot.figmaPages, showingURL: restoredURL)
 
         guard shouldRenderRestoredWebView, let restoredURL else {
             shouldRenderWebView = false
