@@ -13053,6 +13053,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 }
             )
         }
+        installTabStatusLandingActions(&actions, renderContext: renderContext) // (#cm-110.10)
         installStatusHeaderTableActions(&actions, renderContext: renderContext, plan: { point, targets, id in workspaceReorderPlan(point: point, targets: targets, renderContext: renderContext, draggedWorkspaceId: id) }, commit: { performWorkspaceReorderPlan($0) }) // (#cm-110.1)
         return actions
     }
@@ -14559,7 +14560,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .overlay {
-            bonsplitWorkspaceDropOverlay()
+            bonsplitWorkspaceDropOverlay(renderContext: renderContext) // (#cm-110.10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -14685,7 +14686,7 @@ struct VerticalTabsSidebar: View, Equatable {
         }
     }
 
-    private func bonsplitWorkspaceDropOverlay() -> some View {
+    private func bonsplitWorkspaceDropOverlay(renderContext: WorkspaceListRenderContext) -> some View { // (#cm-110.10)
         SidebarBonsplitTabWorkspaceDropOverlay(
             currentSelectedTabId: {
                 tabManager.selectedTabId
@@ -14732,7 +14733,18 @@ struct VerticalTabsSidebar: View, Equatable {
                 isBonsplitWorkspaceDropTargetCollectionActive = isActive
             },
             isWorkspaceDropTargetCollectionActive: isBonsplitWorkspaceDropTargetCollectionActive,
-            targetBridge: bonsplitWorkspaceDropTargetBridge
+            targetBridge: bonsplitWorkspaceDropTargetBridge,
+            resolveStatusLanding: { point, headersOnly in // (#cm-110.10)
+                tabStatusLanding(point: point, targets: workspaceReorderDropTargetBridge.currentTargets, // (#cm-110.10)
+                    renderContext: renderContext, headersOnly: headersOnly) // (#cm-110.10)
+            }, // (#cm-110.10)
+            moveToNewWorkspaceAtLanding: { landing, transfer in // (#cm-110.10)
+                moveBonsplitTabToNewWorkspace(at: landing, transfer: transfer) // (#cm-110.10)
+            }, // (#cm-110.10)
+            landingPaintUpdate: { landing in tabLandingPaintUpdate(for: landing, renderContext: renderContext) }, // (#cm-110.10)
+            paintLandingUpdate: { update in // (#cm-110.10)
+                dragState.setDropIndicator(update.indicator, scope: update.scope, level: update.level) // (#cm-110.10)
+            } // (#cm-110.10)
         )
     }
 
@@ -14881,20 +14893,28 @@ struct VerticalTabsSidebar: View, Equatable {
             return nil
         }
         dragAutoScrollController.updateFromDragLocation()
+        let paint = workspaceDropPaintFields(plan: plan, draggedWorkspaceId: draggedWorkspaceId, renderContext: renderContext) // (#cm-110.10)
         return SidebarWorkspaceTableReorderDropUpdate(
             indicator: plan.indicator,
             scope: plan.indicatorScope,
             draggedWorkspaceId: draggedWorkspaceId,
-            indicatorRowIds: Self.workspaceStatusFeedbackRows(plan: plan, items: renderContext.workspaceRenderItems, projection: renderContext.statusGroupProjection) ?? statusHeaderIndicatorRows(draggedId: draggedWorkspaceId, items: renderContext.workspaceRenderItems) ?? sidebarDropIndicatorRowIds( // (#cm-110.1)
-                draggedWorkspaceId: draggedWorkspaceId,
-                scope: plan.indicatorScope,
-                tabs: renderContext.tabs,
-                workspaceGroups: renderContext.workspaceGroups,
-                visibleWorkspaceRowIds: renderContext.visibleWorkspaceRowIds
-            ),
+            indicatorRowIds: paint.indicatorRowIds, // (#cm-110.10)
             plan: plan,
-            level: Self.workspaceProjectedStatusDropLineLevel(for: plan, depthById: renderContext.rowDepthById, projection: renderContext.statusGroupProjection) // (#cm-106) (#cm-110.2)
+            level: paint.level // (#cm-106) (#cm-110.2) (#cm-110.10)
         )
+    }
+
+    /// The rows that carry a drop line and the level it lands at, for a workspace drag and for a dragged tab's landing alike. // (#cm-110.10)
+    func workspaceDropPaintFields(plan: SidebarWorkspaceReorderDropPlan, draggedWorkspaceId: UUID, // (#cm-110.10)
+        renderContext: WorkspaceListRenderContext) -> (indicatorRowIds: [UUID], level: Int?) { // (#cm-110.10)
+        (indicatorRowIds: Self.workspaceStatusFeedbackRows(plan: plan, items: renderContext.workspaceRenderItems, projection: renderContext.statusGroupProjection) ?? statusHeaderIndicatorRows(draggedId: draggedWorkspaceId, items: renderContext.workspaceRenderItems) ?? sidebarDropIndicatorRowIds( // (#cm-110.1)
+            draggedWorkspaceId: draggedWorkspaceId,
+            scope: plan.indicatorScope,
+            tabs: renderContext.tabs,
+            workspaceGroups: renderContext.workspaceGroups,
+            visibleWorkspaceRowIds: renderContext.visibleWorkspaceRowIds
+        ),
+        level: Self.workspaceProjectedStatusDropLineLevel(for: plan, depthById: renderContext.rowDepthById, projection: renderContext.statusGroupProjection)) // (#cm-106) (#cm-110.2)
     }
 
     private func performWorkspaceReorderDrop(
@@ -17714,6 +17734,13 @@ enum BonsplitTabDragPayload {
             )
             self.sourcePaneId = transfer.sourcePaneId.id
         }
+
+#if DEBUG // (#cm-110.10)
+        init(debugTabId: UUID, sourcePaneId: UUID) { // (#cm-110.10)
+            self.tab = TabInfo(id: debugTabId, kind: nil) // (#cm-110.10)
+            self.sourcePaneId = sourcePaneId // (#cm-110.10)
+        } // (#cm-110.10)
+#endif // (#cm-110.10)
     }
 
     @MainActor

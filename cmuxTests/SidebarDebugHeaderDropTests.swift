@@ -14,7 +14,7 @@ import SwiftUI
 @MainActor
 @Suite(.serialized)
 struct SidebarDebugHeaderDropTests {
-    @Test(arguments: [SidebarDebugHeaderDrop.Zone.upper, .lower, .topEdge, .bottomEdge, .belowAll], SidebarDebugHeaderDrop.Side.allCases)
+    @Test(arguments: [SidebarDebugHeaderDrop.Zone.upper, .lower, .topEdge, .bottomEdge, .belowAll, .middle, .innerTop, .innerBottom], SidebarDebugHeaderDrop.Side.allCases) // (#cm-110.10)
     func coordinatesComeFromTheRealTableTargets(_ zone: SidebarDebugHeaderDrop.Zone, _ side: SidebarDebugHeaderDrop.Side) async throws {
         let (controller, container, window) = await mount()
         defer {
@@ -34,6 +34,9 @@ struct SidebarDebugHeaderDropTests {
         case .lower: y = frame.minY + frame.height * 0.75
         case .topEdge: y = frame.minY
         case .bottomEdge: y = frame.maxY
+        case .middle: y = frame.midY // (#cm-110.10)
+        case .innerTop: y = frame.minY + 2 // (#cm-110.10)
+        case .innerBottom: y = frame.maxY - 2 // (#cm-110.10)
         case .belowAll: y = try #require(targets.map { $0.frame.maxY }.max()) + 1
         case .gap25, .gap50, .gap75: Issue.record("Interior gaps have their own calibrated Piece4 cases"); return
         }

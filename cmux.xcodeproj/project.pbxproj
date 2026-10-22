@@ -3017,6 +3017,8 @@
 		D7AB34300000000000000105 /* SidebarTabDropIndicatorPredicateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AB34300000000000000106 /* SidebarTabDropIndicatorPredicateTests.swift */; };
 		F7216006000000000000001 /* SidebarTabItemContextMenuState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7216006000000000000002 /* SidebarTabItemContextMenuState.swift */; };
 		8430A0030000000000000003 /* SidebarTabItemSettingsSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8430B0030000000000000003 /* SidebarTabItemSettingsSnapshot.swift */; };
+		CM11010A0000000000000001 /* SidebarTabStatusLanding.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM11010A0000000000000002 /* SidebarTabStatusLanding.swift */; }; // (#cm-110.10)
+		CM11010B0000000000000001 /* SidebarTabStatusLandingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM11010B0000000000000002 /* SidebarTabStatusLandingTests.swift */; }; // (#cm-110.10)
 		A6AC73F10000000000000001 /* SidebarTitleFirstLineCenterAlignment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AC73F10000000000000002 /* SidebarTitleFirstLineCenterAlignment.swift */; };
 		CA39C0304FE351A21C372429 /* SidebarWidthPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0171AF1F49F7547191CEE5 /* SidebarWidthPolicyTests.swift */; };
 		ACCE10000000000000000001 /* SidebarWorkspaceAccentStripPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACCE10000000000000000002 /* SidebarWorkspaceAccentStripPaletteTests.swift */; };
@@ -7057,6 +7059,8 @@
 		D7AB34300000000000000106 /* SidebarTabDropIndicatorPredicateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarTabDropIndicatorPredicateTests.swift; sourceTree = "<group>"; };
 		F7216006000000000000002 /* SidebarTabItemContextMenuState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarTabItemContextMenuState.swift; sourceTree = "<group>"; };
 		8430B0030000000000000003 /* SidebarTabItemSettingsSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarTabItemSettingsSnapshot.swift; sourceTree = "<group>"; };
+		CM11010A0000000000000002 /* SidebarTabStatusLanding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarTabStatusLanding.swift; sourceTree = "<group>"; }; // (#cm-110.10)
+		CM11010B0000000000000002 /* SidebarTabStatusLandingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarTabStatusLandingTests.swift; sourceTree = "<group>"; }; // (#cm-110.10)
 		A6AC73F10000000000000002 /* SidebarTitleFirstLineCenterAlignment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarTitleFirstLineCenterAlignment.swift; sourceTree = "<group>"; };
 		EE0171AF1F49F7547191CEE5 /* SidebarWidthPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWidthPolicyTests.swift; sourceTree = "<group>"; };
 		ACCE10000000000000000002 /* SidebarWorkspaceAccentStripPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWorkspaceAccentStripPaletteTests.swift; sourceTree = "<group>"; };
@@ -10915,6 +10919,7 @@
 				C1102000000000000000000B /* WorkspaceGroupStatusUIActions.swift */,
 				C11080000000000000000005 /* WorkspaceGroupStatusDropPerformer.swift */,
 				C11080000000000000000003 /* SidebarWorkspaceGroupStatusHeaderDrops.swift */,
+				CM11010A0000000000000002 /* SidebarTabStatusLanding.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -12242,6 +12247,7 @@
 				C11020000000000000000005 /* SidebarWorkspaceGroupStatusProjectionTests.swift */,
 				C11020000000000000000011 /* WorkspaceGroupStatusEntrancesTests.swift */,
 				C11080000000000000000001 /* SidebarWorkspaceGroupStatusHeaderDropTests.swift */,
+				CM11010B0000000000000002 /* SidebarTabStatusLandingTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -14711,6 +14717,7 @@
 				D7344F010000000000000001 /* SidebarTabDragPayload.swift in Sources */,
 				F7216006000000000000001 /* SidebarTabItemContextMenuState.swift in Sources */,
 				8430A0030000000000000003 /* SidebarTabItemSettingsSnapshot.swift in Sources */,
+				CM11010A0000000000000001 /* SidebarTabStatusLanding.swift in Sources */,
 				A6AC73F10000000000000001 /* SidebarTitleFirstLineCenterAlignment.swift in Sources */,
 				8430A0010000000000000001 /* SidebarWorkspaceBranchDirectorySettings.swift in Sources */,
 				EDA24082C65B4E2A2A03F276 /* SidebarWorkspaceChecklistPopover.swift in Sources */,
@@ -16633,6 +16640,7 @@
 				CM1103090000000000000001 /* SidebarStatusHeaderDragScopeTests.swift in Sources */,
 				D73440010000000000000001 /* SidebarTabDragPayloadProviderTests.swift in Sources */,
 				D7AB34300000000000000105 /* SidebarTabDropIndicatorPredicateTests.swift in Sources */,
+				CM11010B0000000000000001 /* SidebarTabStatusLandingTests.swift in Sources */,
 				CA39C0304FE351A21C372429 /* SidebarWidthPolicyTests.swift in Sources */,
 				ACCE10000000000000000001 /* SidebarWorkspaceAccentStripPaletteTests.swift in Sources */,
 				A0560001A0560001A0560001 /* SidebarWorkspaceColorSectionTests.swift in Sources */,

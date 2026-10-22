@@ -18,7 +18,8 @@ final class WorkspaceStatusListStore {
     /// The one sentence this file types. A top level that parses but is not an object.
     static let notAnObjectDetail = "The top level is not an object."
 
-    private static let log = Logger(subsystem: "com.cmuxterm.app", category: "WorkspaceStatusListStore")
+    /// Internal so a tab's failed status landing logs here too, like the store's own write failures. // (#cm-110.10)
+    static let log = Logger(subsystem: "com.cmuxterm.app", category: "WorkspaceStatusListStore") // (#cm-110.10)
 
     /// The list in use. cmux's five until a load leaves another.
     private(set) var list = WorkspaceStatusList.cmuxFive
