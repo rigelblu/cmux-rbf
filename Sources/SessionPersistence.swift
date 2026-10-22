@@ -1653,6 +1653,18 @@ struct SessionTextBoxInputAttachmentSnapshot: Codable, Equatable, Sendable {
     var cleanupLocalPathWhenDisposed: Bool
 }
 
+// cmux-rbf (#cm-73.3): optional pair metadata leaves urlString as the showing side for older readers. Reject a revert of this hunk on upstream sync.
+struct SessionFigmaPagesSnapshot: Codable, Sendable {
+    enum Side: String, Codable, Sendable {
+        case preview
+        case editor
+    }
+
+    var previewURLString: String
+    var editorURLString: String
+    var showingSide: Side
+}
+
 struct SessionBrowserPanelSnapshot: Codable, Sendable {
     var urlString: String?
     var profileID: UUID?
@@ -1673,6 +1685,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
     /// and navigating via the custom scheme, independent of the (possibly-dead) local HTTP server.
     var diffViewerToken: String? = nil
     var diffViewerRequestPath: String? = nil
+    var figmaPages: SessionFigmaPagesSnapshot? = nil
 
     init(
         urlString: String?,
@@ -1688,7 +1701,8 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         forwardHistoryURLStrings: [String]?,
         transparentBackground: Bool? = nil,
         diffViewerToken: String? = nil,
-        diffViewerRequestPath: String? = nil
+        diffViewerRequestPath: String? = nil,
+        figmaPages: SessionFigmaPagesSnapshot? = nil
     ) {
         self.urlString = urlString
         self.profileID = profileID
@@ -1704,6 +1718,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         self.transparentBackground = transparentBackground
         self.diffViewerToken = diffViewerToken
         self.diffViewerRequestPath = diffViewerRequestPath
+        self.figmaPages = figmaPages
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -1721,6 +1736,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         case transparentBackground
         case diffViewerToken
         case diffViewerRequestPath
+        case figmaPages
     }
 
     init(from decoder: Decoder) throws {
@@ -1739,6 +1755,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         transparentBackground = try container.decodeIfPresent(Bool.self, forKey: .transparentBackground)
         diffViewerToken = try container.decodeIfPresent(String.self, forKey: .diffViewerToken)
         diffViewerRequestPath = try container.decodeIfPresent(String.self, forKey: .diffViewerRequestPath)
+        figmaPages = try? container.decodeIfPresent(SessionFigmaPagesSnapshot.self, forKey: .figmaPages)
     }
 }
 struct SessionMarkdownPanelSnapshot: Codable, Sendable {

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */; };
 		807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807333000000000000000001 /* FigmaPageSwitchTests.swift */; };
 		A11CE0040000000000000001 /* AboutLicenseContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0030000000000000001 /* AboutLicenseContent.swift */; };
 		A11CE0010000000000000001 /* AboutLicensesResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */; };
@@ -4116,6 +4117,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSessionRestoreTests.swift; sourceTree = "<group>"; };
 		807333000000000000000001 /* FigmaPageSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSwitchTests.swift; sourceTree = "<group>"; };
 		A11CE0030000000000000001 /* AboutLicenseContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicenseContent.swift; sourceTree = "<group>"; };
 		A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicensesResourceTests.swift; sourceTree = "<group>"; };
@@ -11454,6 +11456,7 @@
 				807310000000000000000007 /* FigmaMarkAssetTests.swift */,
 				807311000000000000000003 /* FigmaLoadBarTests.swift */,
 				807311000000000000000005 /* FigmaLoadBarSignalTests.swift */,
+				807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */,
 				807333000000000000000001 /* FigmaPageSwitchTests.swift */,
 				807314000000000000000003 /* FigmaHiddenUnloadTests.swift */,
 				807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */,
@@ -15997,6 +16000,7 @@
 				8073000000000000000000F4 /* FigmaFolderCLITests.swift in Sources */,
 				80739000000000000000000A /* FigmaHeaderButtonTests.swift in Sources */,
 				80739000000000000000000C /* FigmaHeaderButtonWorkspaceTests.swift in Sources */,
+				807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */,
 				807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */,
 				807314000000000000000004 /* FigmaHiddenUnloadTests.swift in Sources */,
 				807311000000000000000006 /* FigmaLoadBarSignalTests.swift in Sources */,

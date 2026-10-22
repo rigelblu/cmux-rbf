@@ -841,7 +841,8 @@ extension Workspace {
                     forwardHistoryURLStrings: historySnapshot.forwardHistoryURLStrings,
                     transparentBackground: browserPanel.sessionSnapshotTransparentBackground,
                     diffViewerToken: diffViewerComponents?.token,
-                    diffViewerRequestPath: diffViewerComponents?.requestPath
+                    diffViewerRequestPath: diffViewerComponents?.requestPath,
+                    figmaPages: browserPanel.figmaPagesSessionSnapshot()
                 )
             } else if let deferredPanel = panel as? DeferredBrowserPanel {
                 // A deferred panel already owns the exact persisted browser DTO;
