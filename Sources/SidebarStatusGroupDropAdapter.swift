@@ -22,6 +22,9 @@ extension VerticalTabsSidebar {
         let colorSectionProjection: SidebarWorkspaceColorSectionProjection
         let selectedIds: Set<UUID>
         let rootWorkspaceIds: [UUID]
+        /// A loose, unpinned workspace that does not exist yet, planned as if it sat last in `tabs`: a dragged tab's new workspace. // (#cm-110.10)
+        var standInWorkspaceId: UUID? = nil // (#cm-110.10)
+        func isWorkspace(_ id: UUID) -> Bool { standInWorkspaceId == id || tabs.contains { $0.id == id } } // (#cm-110.10)
 
         init(context: WorkspaceListRenderContext, selectedIds: Set<UUID>, rootWorkspaceIds: [UUID] = []) {
             self.init(tabs: context.tabs, workspaceGroups: context.workspaceGroups,
@@ -76,7 +79,7 @@ extension VerticalTabsSidebar {
             groups: snapshot.workspaceGroups, statusProjection: projection)
         let request = SidebarStatusGroupDropRules.Request(point: point,
             source: .init(workspaceId: draggedId, kind: sourceKind ?? .unknown,
-                isLocal: workspace != nil || sourceGroup != nil,
+                isLocal: workspace != nil || sourceGroup != nil || snapshot.standInWorkspaceId == draggedId, // (#cm-110.10)
                 isPinned: sourceGroup?.isPinned ?? workspace?.isPinned ?? foreignDraggedIsPinned ?? false,
                 groupId: projection.contains(workspaceId: draggedId) ? nil : workspace?.groupId,
                 isColorSectionMember: snapshot.colorSectionProjection.sectionByWorkspaceId[draggedId] != nil),
@@ -329,8 +332,9 @@ extension VerticalTabsSidebar {
     static func workspaceLegacyBaseReorderPlan(point: CGPoint, targets: [SidebarWorkspaceReorderDropOverlay.Target],
         snapshot: WorkspaceStatusDropSnapshot, draggedTabId: UUID, foreignDraggedIsPinned: Bool?) -> SidebarWorkspaceReorderDropPlan? {
         guard let targets = workspaceOnlyDropTargets(point: point, targets: targets, items: snapshot.workspaceRenderItems) else { return nil } // (#cm-110.1)
+        let standIn = snapshot.standInWorkspaceId.map { [$0] } ?? [] // (#cm-110.10)
         let draggedBlockIds = SidebarWorkspaceDragBlockResolver().movingWorkspaceIds(
-            orderedWorkspaceIds: snapshot.tabs.map(\.id),
+            orderedWorkspaceIds: snapshot.tabs.map(\.id) + standIn, // (#cm-110.10)
             selectedIds: snapshot.selectedIds,
             draggedId: draggedTabId,
             anchorIds: Set(snapshot.workspaceGroups.map(\.anchorWorkspaceId))
@@ -346,7 +350,7 @@ extension VerticalTabsSidebar {
                         isPinned: $0.isPinned,
                         groupId: $0.groupId
                     )
-                },
+                } + standIn.map { SidebarWorkspaceReorderWorkspaceSnapshot(id: $0, isPinned: false, groupId: nil) }, // (#cm-110.10)
                 groups: snapshot.workspaceGroups.map {
                         SidebarWorkspaceReorderGroupSnapshot(
                             id: $0.id,

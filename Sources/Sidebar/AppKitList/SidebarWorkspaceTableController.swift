@@ -1901,18 +1901,25 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
     @discardableResult
     func refreshReorderDropTargets(includeHeaders: Bool = false) -> [SidebarWorkspaceReorderDropOverlay.Target] { // Shared measured geometry; callers explicitly choose header or workspace admission. // (#cm-110.1)
         guard let container = containerView else { return [] }
+        let targets = measureReorderDropTargets(includeHeaders: includeHeaders) // (#cm-110.10)
+        guard !targets.isEmpty else { // (#cm-110.10)
+            clearReorderDropTargets() // (#cm-110.10)
+            return [] // (#cm-110.10)
+        } // (#cm-110.10)
+        container.reorderDropView.targets = targets // (#cm-110.10)
+        container.reorderDropView.targetsDidUpdate() // (#cm-110.10)
+        return targets // (#cm-110.10)
+    }
+
+    /// The measured rows of `refreshReorderDropTargets`, without publishing them to the reorder overlay. // (#cm-110.10)
+    func measureReorderDropTargets(includeHeaders: Bool) -> [SidebarWorkspaceReorderDropOverlay.Target] { // (#cm-110.10)
+        guard let container = containerView else { return [] }
         let table = container.tableView
         let visibleRange = table.rows(in: table.visibleRect)
-        guard visibleRange.location != NSNotFound, visibleRange.length > 0 else {
-            clearReorderDropTargets()
-            return []
-        }
+        guard visibleRange.location != NSNotFound, visibleRange.length > 0 else { return [] } // (#cm-110.10)
         let lower = max(0, visibleRange.location)
         let upper = min(rows.count, visibleRange.location + visibleRange.length)
-        guard lower < upper else {
-            clearReorderDropTargets()
-            return []
-        }
+        guard lower < upper else { return [] } // (#cm-110.10)
         // Workspace drags retain their exclusions; header drags measure complete visible blocks. // (#cm-110.1)
         let targets: [SidebarWorkspaceReorderDropOverlay.Target] = (lower..<upper).compactMap { row in
             let configuration = rows[row]
@@ -1926,15 +1933,43 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 statusContentFrame: VerticalTabsSidebar.workspaceStatusContentFrame(table: table, row: row, overlay: container.reorderDropView) // (#cm-110.1)
             )
         }
-        container.reorderDropView.targets = targets
-        container.reorderDropView.targetsDidUpdate()
         return targets
     }
 
+    /// Paints a dragged tab's landing the way a workspace drag paints the same spot: through the reorder painter. // (#cm-110.10)
+    private func paintTabLanding(_ update: SidebarWorkspaceTableReorderDropUpdate) { // (#cm-110.10)
+        reorderIndicatorPainter = SidebarWorkspaceTableReorderIndicatorPainter(indicator: update.indicator, scope: update.scope, // (#cm-110.10)
+            draggedWorkspaceId: update.draggedWorkspaceId, indicatorRowIds: update.indicatorRowIds, level: update.level) // (#cm-110.10)
+        appKitDropIndicatorLevel = update.level // (#cm-110.10)
+        enforceReorderIndicatorPaintOnVisibleCells() // (#cm-110.10)
+        let external = SidebarStatusHeaderDropAdapter.externalIndicator(painter: reorderIndicatorPainter, rows: rows) // (#cm-110.10)
+        setAppKitDropIndicator(external ?? update.indicator, scope: update.scope, includeRowTargets: external != nil) // (#cm-110.10)
+    } // (#cm-110.10)
+
+    /// Clears what `paintTabLanding` painted; a tab drag never owns a reorder drag, so a painter here is always its own. // (#cm-110.10)
+    private func retireTabLandingPaint() { // (#cm-110.10)
+        guard reorderIndicatorPainter != nil, reorderDragWindowPoint == nil else { return } // (#cm-110.10)
+        retireReorderIndicator() // (#cm-110.10)
+    } // (#cm-110.10)
+
 #if DEBUG // (#cm-110.1)
     func debugPerformSidebarDrop(_ request: SidebarDebugDropRequest) -> SidebarDebugDropResult? { // (#cm-110.1)
-        actions?.debugPerformSidebarDrop?(request, refreshReorderDropTargets(includeHeaders: true)) // (#cm-110.1)
+        actions?.debugPerformSidebarDrop?(request, refreshReorderDropTargets(includeHeaders: true)) { [weak self] point, tabId in // (#cm-110.1) (#cm-110.10)
+            self?.debugPerformTabDrop(reorderPoint: point, tabId: tabId) // (#cm-110.10)
+        } // (#cm-110.10)
     } // (#cm-110.1)
+
+    /// Drives the real bonsplit tab drop view at a point measured in the reorder overlay's space. // (#cm-110.10)
+    private func debugPerformTabDrop(reorderPoint: CGPoint, tabId: UUID) -> SidebarDebugDropResult? { // (#cm-110.10)
+        guard let container = containerView, let transfer = SidebarDebugTabDrop.transfer(forTab: tabId) else { return nil } // (#cm-110.10)
+        let bonsplit = container.bonsplitDropView // (#cm-110.10)
+        bonsplit.setWorkspaceDropTargetCollectionActive(true) // (#cm-110.10)
+        defer { bonsplit.setWorkspaceDropTargetCollectionActive(false) } // (#cm-110.10)
+        let point = bonsplit.convert(reorderPoint, from: container.reorderDropView) // (#cm-110.10)
+        let result = bonsplit.debugDrop(point: point, transfer: transfer) // (#cm-110.10)
+        return SidebarDebugDropResult(performed: result.performed, plan: nil, tabDrop: (result.accepted, result.indicator), // (#cm-110.10)
+            paint: result.paint.map { SidebarDebugDropPaint(scope: $0.scope, rowIds: $0.indicatorRowIds, level: $0.level) }) // (#cm-110.10)
+    } // (#cm-110.10)
 #endif // (#cm-110.1)
 
     private func clearReorderDropTargets() {
@@ -2868,6 +2903,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             }
         }
         bonsplit.setDropIndicator = { [weak self] indicator in
+            self?.retireTabLandingPaint() // (#cm-110.10)
             actions.setBonsplitDropIndicator(indicator)
             self?.setAppKitDropIndicator(indicator, scope: .raw, includeRowTargets: true)
         }
@@ -2876,6 +2912,18 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             actions.didMoveBonsplitToWorkspace(workspaceId)
             return true
         }
+        bonsplit.resolveStatusLanding = { [weak self] point, headersOnly in // (#cm-110.10)
+            guard let self, let container = self.containerView else { return nil } // (#cm-110.10)
+            let targets = self.measureReorderDropTargets(includeHeaders: true) // (#cm-110.10)
+            return actions.resolveTabStatusLanding(container.reorderDropView.convert(point, from: container.bonsplitDropView), targets, headersOnly) // (#cm-110.10)
+        } // (#cm-110.10)
+        bonsplit.landingPaintUpdate = { landing in actions.tabLandingPaintUpdate?(landing) } // (#cm-110.10)
+        bonsplit.paintLandingUpdate = { [weak self] update in self?.paintTabLanding(update) } // (#cm-110.10)
+        bonsplit.performNewWorkspaceLandingMove = { landing, transfer in // (#cm-110.10)
+            guard let workspaceId = actions.moveBonsplitToNewWorkspaceAtLanding(landing, transfer) else { return false } // (#cm-110.10)
+            actions.didMoveBonsplitToWorkspace(workspaceId) // (#cm-110.10)
+            return true // (#cm-110.10)
+        } // (#cm-110.10)
         bonsplit.performNewWorkspaceMove = { insertionIndex, _, transfer in
             guard let workspaceId = actions.moveBonsplitToNewWorkspace(insertionIndex, transfer) else {
                 return false
@@ -2905,6 +2953,10 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         bonsplit.setDropIndicator = { _ in }
         bonsplit.performExistingWorkspaceMove = { _, _ in false }
         bonsplit.performNewWorkspaceMove = { _, _, _ in false }
+        bonsplit.resolveStatusLanding = { _, _ in nil } // (#cm-110.10)
+        bonsplit.landingPaintUpdate = { _ in nil } // (#cm-110.10)
+        bonsplit.paintLandingUpdate = { _ in } // (#cm-110.10)
+        bonsplit.performNewWorkspaceLandingMove = { _, _ in false } // (#cm-110.10)
     }
 
     private func updateDropTargets() {

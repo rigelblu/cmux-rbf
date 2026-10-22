@@ -80,7 +80,7 @@ extension VerticalTabsSidebar {
                 guard let statusId = grouped.statusIdByGroupId[before], status(typed[previous + 1]) == statusId else { return nil }
                 if point.y >= (typed[previous].frame.maxY + typed[previous + 1].frame.minY) / 2 {
                     guard sourceKind == .workspace, let token, controlsEnabled, hasUserStatusList,
-                          snapshot.tabs.contains(where: { $0.id == draggedId }) else { return .refused }
+                          snapshot.isWorkspace(draggedId) else { return .refused } // (#cm-110.10)
                     // The lower gap is a status landing after this group, rather than a loose-slot permutation before the next row.
                     let indicator = SidebarDropIndicator(tabId: typed[previous].workspaceId, edge: .bottom)
                     let landing = SidebarStatusGroupWorkspaceDropPlan(statusId: statusId,
@@ -96,7 +96,7 @@ extension VerticalTabsSidebar {
         } else { return nil }
         guard group(typed[index]) != nil else { return nil }
         guard sourceKind == .workspace, token != nil, controlsEnabled, hasUserStatusList,
-              snapshot.tabs.contains(where: { $0.id == draggedId }) else { return .refused }
+              snapshot.isWorkspace(draggedId) else { return .refused } // (#cm-110.10)
         guard let base = workspaceLegacyBaseReorderPlan(point: point, targets: targets, snapshot: snapshot,
             draggedTabId: draggedId, foreignDraggedIsPinned: nil),
               case .reorder(_, false, let destination?) = base.action,

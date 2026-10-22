@@ -77,8 +77,12 @@ struct SidebarWorkspaceTableActions {
     /// id so member drags never accidentally move the anchor.
     let workspaceIdForDrag: ((SidebarWorkspaceRenderItemID, UUID) -> UUID)?
     var usesStatusHeaderDropTargets: () -> Bool = { false } // (#cm-110.1)
+    /// Where the status-group drop plan would put a new workspace made from a dragged tab at a point (reorder-overlay space). // (#cm-110.10)
+    var resolveTabStatusLanding: (CGPoint, [SidebarWorkspaceReorderDropOverlay.Target], Bool) -> SidebarTabStatusLanding? = { _, _, _ in nil } // (#cm-110.10)
+    var tabLandingPaintUpdate: ((SidebarTabStatusLanding) -> SidebarWorkspaceTableReorderDropUpdate)? = nil // (#cm-110.10)
+    var moveBonsplitToNewWorkspaceAtLanding: (SidebarTabStatusLanding, BonsplitTabDragPayload.Transfer) -> UUID? = { _, _ in nil } // (#cm-110.10)
 #if DEBUG // (#cm-110.1)
-    var debugPerformSidebarDrop: ((SidebarDebugDropRequest, [SidebarWorkspaceReorderDropOverlay.Target]) -> SidebarDebugDropResult?)? = nil // (#cm-110.1)
+    var debugPerformSidebarDrop: ((SidebarDebugDropRequest, [SidebarWorkspaceReorderDropOverlay.Target], @escaping (CGPoint, UUID) -> SidebarDebugDropResult?) -> SidebarDebugDropResult?)? = nil // (#cm-110.1) (#cm-110.10)
 #endif // (#cm-110.1)
     /// Native source ownership, when this bundle supports tokenized completion.
     let nativeWorkspaceDragLifecycle: NativeWorkspaceDragLifecycle?

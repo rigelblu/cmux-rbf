@@ -52,6 +52,11 @@ struct SidebarBonsplitTabWorkspaceDropOverlay: NSViewRepresentable {
     let setWorkspaceDropTargetCollectionActive: (Bool) -> Void
     let isWorkspaceDropTargetCollectionActive: Bool
     let targetBridge: TargetBridge
+    /// Where the status-group drop plan would land a new workspace made from the tab; the AppKit sidebar wires the same four. // (#cm-110.10)
+    var resolveStatusLanding: (CGPoint, Bool) -> SidebarTabStatusLanding? = { _, _ in nil } // (#cm-110.10)
+    var moveToNewWorkspaceAtLanding: (SidebarTabStatusLanding, BonsplitTabDragPayload.Transfer) -> UUID? = { _, _ in nil } // (#cm-110.10)
+    var landingPaintUpdate: (SidebarTabStatusLanding) -> SidebarWorkspaceTableReorderDropUpdate? = { _ in nil } // (#cm-110.10)
+    var paintLandingUpdate: (SidebarWorkspaceTableReorderDropUpdate) -> Void = { _ in } // (#cm-110.10)
 
     func makeNSView(context: Context) -> SidebarBonsplitTabWorkspaceDropView {
         SidebarBonsplitTabWorkspaceDropView()
@@ -82,6 +87,15 @@ struct SidebarBonsplitTabWorkspaceDropOverlay: NSViewRepresentable {
             syncSidebarSelection(preferredSelectedTabId: workspaceId)
             return true
         }
+        nsView.resolveStatusLanding = resolveStatusLanding // (#cm-110.10)
+        nsView.landingPaintUpdate = landingPaintUpdate // (#cm-110.10)
+        nsView.paintLandingUpdate = paintLandingUpdate // (#cm-110.10)
+        nsView.performNewWorkspaceLandingMove = { landing, transfer in // (#cm-110.10)
+            guard let destinationWorkspaceId = moveToNewWorkspaceAtLanding(landing, transfer) else { return false } // (#cm-110.10)
+            selectedTabIds = [destinationWorkspaceId] // (#cm-110.10)
+            syncSidebarSelection(preferredSelectedTabId: destinationWorkspaceId) // (#cm-110.10)
+            return true // (#cm-110.10)
+        } // (#cm-110.10)
         nsView.performNewWorkspaceMove = { insertionIndex, _, transfer in
             guard let destinationWorkspaceId = moveToNewWorkspace(insertionIndex, transfer) else { return false }
             selectedTabIds = [destinationWorkspaceId]

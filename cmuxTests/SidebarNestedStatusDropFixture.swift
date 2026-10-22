@@ -320,6 +320,10 @@ final class SidebarNestedStatusDropFixture {
             moveBonsplitToExistingWorkspace: { _,_ in false },moveBonsplitToNewWorkspace: { _,_ in nil },didMoveBonsplitToWorkspace: { _ in },
             updateDragAutoscroll: {},setBonsplitDropTargetCollectionActive: { _ in },setBonsplitDropIndicator: { _ in })
         actions.usesStatusHeaderDropTargets = { true }
+        actions.resolveTabStatusLanding = { [self] point, targets, headersOnly in // (#cm-110.10)
+            VerticalTabsSidebar.tabStatusLanding(point: point, targets: targets, snapshot: snapshot(), headersOnly: headersOnly, // (#cm-110.10)
+                controlsEnabled: controls, hasUserStatusList: true) // (#cm-110.10)
+        } // (#cm-110.10)
         legacyDragActions = actions
         controller.apply(rows: rows,actions: actions,workspaceIds: manager.tabs.map(\.id),selectedWorkspaceId: manager.selectedTabId,selectedScrollTargetWorkspaceId: nil)
         await withCheckedContinuation { c in RunLoop.main.perform(inModes: [.common]) { c.resume() } }
