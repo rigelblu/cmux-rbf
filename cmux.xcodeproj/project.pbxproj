@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */; };
+		807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000001 /* FigmaPaneBackTests.swift */; };
 		807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807333000000000000000001 /* FigmaPageSwitchTests.swift */; };
 		A11CE0040000000000000001 /* AboutLicenseContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0030000000000000001 /* AboutLicenseContent.swift */; };
 		A11CE0010000000000000001 /* AboutLicensesResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */; };
@@ -1764,6 +1765,7 @@
 		80730000000000000000001C /* FigmaPaneURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000001 /* FigmaPaneURL.swift */; };
 		807300000000000000000005 /* FigmaPaneURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000004 /* FigmaPaneURLTests.swift */; };
 		80730000000000000000001E /* FigmaStayInPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001D /* FigmaStayInPane.swift */; };
+		807335000000000000000004 /* FigmaPaneHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000003 /* FigmaPaneHistory.swift */; };
 		807300000000000000000020 /* FigmaStayInPaneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001F /* FigmaStayInPaneTests.swift */; };
 		807310000000000000000002 /* FigmaTabMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000001 /* FigmaTabMark.swift */; };
 		807310000000000000000004 /* FigmaTabMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000003 /* FigmaTabMarkTests.swift */; };
@@ -4118,6 +4120,7 @@
 
 /* Begin PBXFileReference section */
 		807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSessionRestoreTests.swift; sourceTree = "<group>"; };
+		807335000000000000000001 /* FigmaPaneBackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneBackTests.swift; sourceTree = "<group>"; };
 		807333000000000000000001 /* FigmaPageSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSwitchTests.swift; sourceTree = "<group>"; };
 		A11CE0030000000000000001 /* AboutLicenseContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicenseContent.swift; sourceTree = "<group>"; };
 		A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicensesResourceTests.swift; sourceTree = "<group>"; };
@@ -5748,6 +5751,7 @@
 		807300000000000000000001 /* FigmaPaneURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneURL.swift; sourceTree = "<group>"; };
 		807300000000000000000004 /* FigmaPaneURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneURLTests.swift; sourceTree = "<group>"; };
 		80730000000000000000001D /* FigmaStayInPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaStayInPane.swift; sourceTree = "<group>"; };
+		807335000000000000000003 /* FigmaPaneHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaPaneHistory.swift; sourceTree = "<group>"; };
 		80730000000000000000001F /* FigmaStayInPaneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaStayInPaneTests.swift; sourceTree = "<group>"; };
 		807310000000000000000001 /* FigmaTabMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaTabMark.swift; sourceTree = "<group>"; };
 		807310000000000000000003 /* FigmaTabMarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaTabMarkTests.swift; sourceTree = "<group>"; };
@@ -10099,6 +10103,7 @@
 				807300000000000000000009 /* FigmaEditorChrome.swift */,
 				8073B0000000000000000005 /* FigmaFitOnLoad.swift */,
 				80730000000000000000001D /* FigmaStayInPane.swift */,
+				807335000000000000000003 /* FigmaPaneHistory.swift */,
 				807310000000000000000001 /* FigmaTabMark.swift */,
 				807316000000000000000001 /* FigmaFileList.swift */,
 				807316000000000000000101 /* FigmaNewFileLink.swift */,
@@ -11457,6 +11462,7 @@
 				807311000000000000000003 /* FigmaLoadBarTests.swift */,
 				807311000000000000000005 /* FigmaLoadBarSignalTests.swift */,
 				807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */,
+				807335000000000000000001 /* FigmaPaneBackTests.swift */,
 				807333000000000000000001 /* FigmaPageSwitchTests.swift */,
 				807314000000000000000003 /* FigmaHiddenUnloadTests.swift */,
 				807390000000000000000011 /* FigmaEditorChromeTriggerTests.swift */,
@@ -13691,6 +13697,7 @@
 				807316000000000000000102 /* FigmaNewFileLink.swift in Sources */,
 				80730000000000000000001C /* FigmaPaneURL.swift in Sources */,
 				80730000000000000000001E /* FigmaStayInPane.swift in Sources */,
+				807335000000000000000004 /* FigmaPaneHistory.swift in Sources */,
 				807310000000000000000002 /* FigmaTabMark.swift in Sources */,
 				807300000000000000000035 /* FigmaWrapperPage.swift in Sources */,
 				10200F1E0000000000000007 /* FileContentChangeCoordinator+Entry.swift in Sources */,
@@ -16001,6 +16008,7 @@
 				80739000000000000000000A /* FigmaHeaderButtonTests.swift in Sources */,
 				80739000000000000000000C /* FigmaHeaderButtonWorkspaceTests.swift in Sources */,
 				807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */,
+				807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */,
 				807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */,
 				807314000000000000000004 /* FigmaHiddenUnloadTests.swift in Sources */,
 				807311000000000000000006 /* FigmaLoadBarSignalTests.swift in Sources */,
