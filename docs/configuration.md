@@ -381,6 +381,20 @@ the showing side and both page addresses when the pane holds both. The other pag
 loads on the first switch; Figma's zoom is not saved. This shortcut targets workspace panes;
 Dock Figma tabs are outside its targets in this version.
 
+Back and Forward follow one history across a Figma pane's two pages, however they
+are reached: `browserBack` and `browserForward` (default `cmd+[` and `cmd+]`), a
+mouse's back and forward buttons, `cmux browser back` and `cmux browser forward`,
+and the phone's back and forward. Back on Editor returns to the Preview it was opened from, and on Preview
+it walks the boards the agent pointed at, in order. Back into an Editor that a
+pointing released opens it again at its last address, so Figma's zoom and
+selection are not kept. Figma's *Open in Figma* mark opens Editor with Preview kept
+behind it. A trackpad swipe is not part of this history: it moves within the page
+showing, and Back and Forward carry on from wherever the swipe left it. Moving
+to a board the Preview still holds uses its own history and reloads nothing; a
+board it no longer holds, such as one restored after a restart, loads again from
+its address.
+The history is not saved, so after a restart Back starts from the side that shows.
+
 ```json
 {
   "shortcuts": {

@@ -256,32 +256,6 @@ struct FigmaPageSwitchTests {
         #expect((view.navigationDelegate as? BrowserNavigationDelegate)?.lastAttemptedURL == panel.currentURL)
     }
 
-    @Test("Editor-only goto preserves native Back until cross-side Back exists")
-    func editorOnlyGotoPreservesBack() async throws {
-        let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
-        let editorFile = page.deletingLastPathComponent().appendingPathComponent("editor.html")
-        try "<html><body>Editor history fixture</body></html>".write(to: editorFile, atomically: true, encoding: .utf8)
-        let panel = panel(on: document)
-        defer { panel.close() }
-        let editor = panel.webView
-        editor.loadFileURL(editorFile, allowingReadAccessTo: editorFile.deletingLastPathComponent())
-        for _ in 0..<200 {
-            if editor.url == editorFile && !editor.isLoading { break }
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        try #require(editor.url == editorFile && !editor.isLoading)
-        panel.publishObservedDocumentURL(document)
-        try #require(panel.gotoFigmaNode("12-2", wrapper: page))
-        try #require(panel.webView === editor, "Editor-only goto discarded native Back history")
-        for _ in 0..<200 {
-            if editor.backForwardList.backItem?.url == editorFile { break }
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        #expect(editor.backForwardList.backItem?.url == editorFile)
-        #expect(editor.canGoBack)
-    }
-
     @Test("Memory pressure retains the hidden preview's last board address")
     func memoryPressureRemembersHiddenBoard() throws {
         let page = try wrapper()
@@ -323,8 +297,8 @@ struct FigmaPageSwitchTests {
         #expect(panel.currentURL.flatMap { FigmaPaneURL.node(fromPaneURL: $0, wrapper: page) } == "99-1")
     }
 
-    @Test("Open in Figma keeps the showing view's native history until cross-side Back exists")
-    func openInFigmaStaysInPlace() throws {
+    @Test("Open in Figma opens the editor beside the preview and reports its navigation start")
+    func openInFigmaOpensEditorBesidePreview() throws {
         let page = try wrapper()
         defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
@@ -335,7 +309,9 @@ struct FigmaPageSwitchTests {
         let delegate = try #require(view.navigationDelegate as? BrowserNavigationDelegate)
         var started = false
         delegate.requestNavigation?(URLRequest(url: document), .currentTab) { started = $0 != nil }
-        #expect(panel.webView === view)
+        #expect(panel.webView !== view)
+        #expect(panel.currentURL == document)
+        #expect(panel.retainedFigmaPageAddress.map { FigmaPaneURL.isWrapperPage($0, wrapper: page) } == true)
         #expect(started)
     }
 
@@ -694,8 +670,8 @@ struct FigmaPageSwitchTests {
         #expect(pane.currentURL.flatMap { FigmaPaneURL.node(fromPaneURL: $0, wrapper: page) } == "31-4")
     }
 
-    @Test("Open in Figma replaces a held Editor and the next switch creates a Preview")
-    func openInFigmaReleasesHeldEditor() throws {
+    @Test("Open in Figma moves a held Editor to the board and keeps the clicked Preview behind")
+    func openInFigmaMovesHeldEditorAndKeepsPreview() throws {
         let page = try wrapper()
         defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
@@ -710,17 +686,14 @@ struct FigmaPageSwitchTests {
         var started = false
         delegate.requestNavigation?(URLRequest(url: destination), .currentTab) { started = $0 != nil }
         try #require(started)
-        #expect(pane.webView === clickedView)
+        #expect(pane.webView === heldEditor)
         #expect(pane.currentURL == destination)
-        #expect(pane.retainedFigmaPageAddress == nil)
-        #expect(heldEditor.navigationDelegate == nil)
+        #expect(pane.retainedFigmaPageAddress.map { FigmaPaneURL.isWrapperPage($0, wrapper: page) } == true)
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
-        #expect(pane.webView !== clickedView)
-        #expect(pane.webView !== heldEditor)
+        #expect(pane.webView === clickedView)
         let address = try #require(pane.currentURL)
         #expect(FigmaPaneURL.isWrapperPage(address, wrapper: page))
-        #expect(FigmaPaneURL.fileKey(fromPaneURL: address, wrapper: page) == "KEY")
-        // Following this clicked node and cross-side Back belong to step 5.
+        #expect(FigmaPaneURL.node(fromPaneURL: address, wrapper: page) == "12-2")
     }
 
     @Test("An Editor moving to another file releases the previous file's Preview")
@@ -751,6 +724,65 @@ struct FigmaPageSwitchTests {
         #expect(pane.webView === editor)
         #expect(pane.currentURL == otherFile)
     }
+
+    // cmux-rbf (#cm-73.3 step 5): this test opens and closes a main window through AppDelegate.shared, so it
+    // lives in this serialized suite beside the socket tests that swap AppDelegate.shared; in another suite it ran
+    // alongside them and the socket answered "TabManager not available".
+#if DEBUG
+    @Test("⌘[ and ⌘] cross sides through the same path")
+    func keysCrossSides() throws {
+        let appDelegate = try #require(AppDelegate.shared)
+        let windowId = appDelegate.createMainWindow()
+        defer { closeWindow(withId: windowId) }
+        let window = try #require(NSApp.windows.first { $0.identifier?.rawValue == "cmux.main.\(windowId.uuidString)" })
+        let manager = try #require(appDelegate.tabManagerFor(windowId: windowId))
+        let workspace = try #require(manager.selectedWorkspace)
+        let terminal = try #require(workspace.focusedPanelId)
+        let previewA = try FigmaPaneURL.destination(for: document, node: "12-2").url
+        let figma = try #require(workspace.newBrowserSplit(
+            from: terminal, orientation: .horizontal, url: previewA, focus: true,
+            chromeVisibility: BrowserChromeVisibility(omnibarVisible: false)
+        ))
+        let previewView = figma.webView
+        try #require(figma.switchFigmaPreviewAndEditor())
+        let editorView = figma.webView
+        window.makeKeyAndOrderFront(nil)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+        try #require(window.makeFirstResponder(editorView))
+        #expect(Self.dispatch(.browserBack, in: window, using: appDelegate))
+        #expect(figma.webView === previewView, "⌘[ did not cross to the preview")
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.3))
+        _ = window.makeFirstResponder(figma.webView)
+        #expect(Self.dispatch(.browserForward, in: window, using: appDelegate))
+        #expect(figma.webView === editorView, "⌘] did not cross to the editor")
+    }
+
+    private static func dispatch(_ action: KeyboardShortcutSettings.Action, in window: NSWindow, using appDelegate: AppDelegate) -> Bool {
+        let shortcut = KeyboardShortcutSettings.shortcut(for: action)
+        guard !shortcut.isUnbound, !shortcut.hasChord,
+              let keyCode = shortcut.firstStroke.resolvedKeyCode(),
+              let event = NSEvent.keyEvent(
+                  with: .keyDown, location: .zero, modifierFlags: shortcut.modifierFlags,
+                  timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                  characters: shortcut.menuItemKeyEquivalent ?? shortcut.key,
+                  charactersIgnoringModifiers: shortcut.menuItemKeyEquivalent ?? shortcut.key,
+                  isARepeat: false, keyCode: keyCode
+              ) else { return false }
+        return appDelegate.debugHandleCustomShortcut(event: event)
+    }
+
+    private func closeWindow(withId windowId: UUID) {
+        guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "cmux.main.\(windowId.uuidString)" }) else { return }
+        let appDelegate = AppDelegate.shared
+        let original = appDelegate?.debugCloseMainWindowConfirmationHandler
+        appDelegate?.debugCloseMainWindowConfirmationHandler = { _ in true }
+        defer { appDelegate?.debugCloseMainWindowConfirmationHandler = original }
+        window.animationBehavior = .none
+        window.orderOut(nil)
+        window.close()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+    }
+#endif
 
     private func switchEntranceFixture() throws -> (manager: TabManager, workspace: Workspace, figma: BrowserPanel, terminal: UUID) {
         let manager = TabManager()

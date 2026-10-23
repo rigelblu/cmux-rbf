@@ -2027,6 +2027,10 @@ final class BrowserPanel: Panel, ObservableObject {
     private var discardedFigmaPageAddress: URL?
     var figmaPageWrapper = FigmaPaneURL.wrapperFileURL()
     var retainedFigmaPageAddress: URL? { retainedFigmaPage?.address ?? discardedFigmaPageAddress }
+    // cmux-rbf (#cm-73.3): one Back and Forward history across the two pages, for ⌘[ and the mouse buttons. Not saved. Reject a revert of this hunk on upstream sync.
+    private var figmaHistory = FigmaPaneHistory<WKBackForwardListItem>()
+    /// While the history itself swaps or loads pages, the address changes it causes are not news to it.
+    private var figmaHistoryBusy = false
 
     /// The underlying web view
     var webView: WKWebView
@@ -2138,12 +2142,21 @@ final class BrowserPanel: Panel, ObservableObject {
                 discardedFigmaPageAddress = nil
             }
             // cmux-rbf (#cm-73.3): in-place Figma navigation must not leave a different file or a duplicate side behind. Reject a revert of this hunk on upstream sync.
+            // A held page Tom left on a page that is not Figma's (its sign-in) names no file, so it is not a different one.
             if let held = retainedFigmaPage, let currentURL,
                let key = FigmaPaneURL.fileKey(fromPaneURL: currentURL, wrapper: figmaPageWrapper),
-               key != FigmaPaneURL.fileKey(fromPaneURL: held.address, wrapper: figmaPageWrapper)
+               FigmaPaneURL.fileKey(fromPaneURL: held.address, wrapper: figmaPageWrapper).map({ $0 != key }) ?? false
                 || FigmaPaneURL.isWrapperPage(currentURL, wrapper: figmaPageWrapper) == FigmaPaneURL.isWrapperPage(held.address, wrapper: figmaPageWrapper) {
                 releaseRetainedFigmaPage()
+                figmaHistory.reset()
             }
+            // The history belongs to one file, whether or not a page is held behind this one.
+            if figmaHistory.isActive, let currentURL,
+               let key = FigmaPaneURL.fileKey(fromPaneURL: currentURL, wrapper: figmaPageWrapper), key != figmaHistory.fileKey {
+                figmaHistory.reset()
+            }
+            // Figma's editor moves its own address; the preview's moves only through the history's own steps.
+            figmaHistoryFollowShowing()
             applyConfiguredWebViewBackground()
             mobileBrowserStreamStateDidChange(markDirty: true)
         }
@@ -3579,6 +3592,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 // navigations, so a persisting SPA video keeps its frame id.
                 self.resetMediaPlaybackTracking()
                 self.publishCommittedURL(from: webView)
+                self.figmaHistoryFollowShowing() // cmux-rbf #cm-73.3: a commit can leave the address as it was
                 self.applyMuteState(to: webView, reason: "navigationCommit")
                 if self.shouldTreatCommitAsDiscardedRestoreCommit(from: webView) {
                     self.noteDiscardedWebViewRestoreNavigationCommitted()
@@ -4661,6 +4675,7 @@ final class BrowserPanel: Panel, ObservableObject {
 
     func restoreSessionSnapshot(_ snapshot: SessionBrowserPanelSnapshot) {
         releaseRetainedFigmaPage()
+        figmaHistory.reset() // cmux-rbf #cm-73.3: cross-side history is not saved; a restart starts it again.
         keepLoaded = snapshot.keepLoaded
         // Diff viewer surfaces navigate via the app-owned custom scheme, so they
         // restore even though the original local HTTP server is gone. Manifest
@@ -5692,7 +5707,11 @@ final class BrowserPanel: Panel, ObservableObject {
             guard let preview = try? FigmaPaneURL.destination(for: document, node: "0-1", wrapper: wrapper) else { return false }
             destination = preview.url
         }
-        return showFigmaPage(preview: !showingPreview, destination: destination, reload: false, wrapper: wrapper)
+        figmaPageWrapper = wrapper
+        figmaHistoryWillLeave()
+        guard let shown = showFigmaPage(preview: !showingPreview, destination: destination, reload: false, wrapper: wrapper) else { return false }
+        figmaHistoryDidArrive(shown)
+        return true
     }
 
     enum FigmaGotoPurpose: String {
@@ -5713,31 +5732,262 @@ final class BrowserPanel: Panel, ObservableObject {
         if purpose == .fit, !FigmaPaneURL.isWrapperPage(address, wrapper: wrapper) {
             return true
         }
-        // Explicit --surface accepts ordinary panes. An editor opened alone also
-        // keeps native Back until the cross-side history action exists (step 5).
-        if isOmnibarVisible || (!FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
-            && retainedFigmaPage == nil && discardedFigmaPageAddress == nil) {
+        // Explicit --surface accepts ordinary panes; they keep WebKit's own Back.
+        if isOmnibarVisible {
             do { try FigmaWrapperPage.install(at: wrapper) } catch { return false }
             figmaPageWrapper = wrapper
             currentURL = destination.url
             navigate(to: destination.url)
             if purpose == .point { releaseRetainedFigmaPage() }
+            figmaHistory.reset()
             scheduleFigmaReadSnapshotRefresh()
             return true
         }
-        let moved = showFigmaPage(preview: true, destination: destination.url, reload: true, wrapper: wrapper, defaults: defaults)
-        if moved, purpose == .point { releaseRetainedFigmaPage() }
-        return moved
+        // An editor opened alone gets a preview page beside it, so Back can reopen the editor.
+        figmaPageWrapper = wrapper
+        if purpose == .point { figmaHistoryWillLeave() }
+        guard let shown = showFigmaPage(preview: true, destination: destination.url, reload: true, wrapper: wrapper, defaults: defaults) else { return false }
+        if purpose == .point {
+            releaseRetainedFigmaPage()
+            figmaHistoryDidArrive(shown)
+        }
+        // A fit loads the same board again into the same slot: still the same place.
+        return true
+    }
+
+    /// Figma's *Open in Figma* mark on the preview is Tom's own move to the editor: the
+    /// editor loads that board, and the preview stays behind for the next switch or Back.
+    private func openFigmaEditorFromPreview(_ url: URL, onNavigationStarted: ((WKNavigation?) -> Void)?) -> Bool {
+        guard let address = currentURL ?? webView.url,
+              FigmaStayInPane.shouldLoadInThisPane(paneURL: address, isOmnibarVisible: isOmnibarVisible, target: url, wrapper: figmaPageWrapper),
+              let key = FigmaPaneURL.fileKey(fromPaneURL: address, wrapper: figmaPageWrapper),
+              FigmaPaneURL.fileKey(fromPaneURL: url, wrapper: figmaPageWrapper) == key else { return false }
+        figmaHistoryWillLeave()
+        guard let shown = showFigmaPage(
+            preview: false, destination: url, reload: true, wrapper: figmaPageWrapper, onNavigationStarted: onNavigationStarted
+        ) else { return false }
+        figmaHistoryDidArrive(shown)
+        return true
+    }
+
+    private typealias FigmaHistory = FigmaPaneHistory<WKBackForwardListItem>
+
+    private struct FigmaShown {
+        /// Whether the page started a load of the address it shows now.
+        let loaded: Bool
+        /// The entry the page showed when it started; a load of that same address keeps it.
+        let from: WKBackForwardListItem?
+        let sameAddress: Bool
+    }
+
+    private func figmaHistorySide(of address: URL?) -> FigmaHistory.Side? {
+        guard let address, FigmaPaneURL.fileKey(fromPaneURL: address, wrapper: figmaPageWrapper) != nil else { return nil }
+        return FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) ? .preview : .editor
+    }
+
+    /// An address a place can be loaded from again: the preview's page, or a Figma editor link. Anything
+    /// else the page passed through (Figma's sign-in, a blank page) keeps the address the place had.
+    private func figmaReopenAddress(_ address: URL?) -> URL? {
+        guard let address else { return nil }
+        if FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) {
+            return FigmaPaneURL.fileKey(fromPaneURL: address, wrapper: figmaPageWrapper) == nil ? nil : address
+        }
+        return FigmaFileLink.isEditorLink(address) ? address : nil
+    }
+
+    private static func figmaListItems(of view: WKWebView) -> [WKBackForwardListItem] {
+        let list = view.backForwardList
+        return list.backList + (list.currentItem.map { [$0] } ?? []) + list.forwardList
+    }
+
+    /// Tells the history what the showing page shows now, and keeps the current place's reopen address up to date.
+    /// Runs from the address observer and the commit, which together see every move: a commit misses pushState,
+    /// replaceState and fragment moves, and the address changes before a load or traversal commits.
+    private func figmaHistoryFollowShowing(fromObserver: Bool = true) {
+        guard figmaHistory.isActive, !figmaHistoryBusy, !isOmnibarVisible else { return }
+        let list = webView.backForwardList
+        // A load this history started is on its way: the entry showing is still the one it left from.
+        if webView.isLoading, figmaHistory.hasLoadInFlight(page: webViewInstanceID, from: list.currentItem) {
+            return figmaHistoryNoteAddress()
+        }
+        // Mid-load the address is the incoming one but the entry is still the old: the commit or finish follows.
+        // A key press reads what WebKit shows now, so a load stopped before it committed counts as gone.
+        if fromObserver, webView.isLoading, list.currentItem?.url != webView.url { return figmaHistoryNoteAddress() }
+        let address = currentURL ?? webView.url
+        figmaHistory.follow(
+            page: webViewInstanceID, current: list.currentItem, atEnd: list.forwardList.isEmpty,
+            side: figmaHistorySide(of: address), address: figmaReopenAddress(address)
+        )
+        figmaHistoryNoteAddress()
+        refreshNavigationAvailability()
+    }
+
+    /// The current place's reopen address follows what its page shows: its entry's address once it has one
+    /// (a replaceState changes that in place), else the address the page reports.
+    private func figmaHistoryNoteAddress() {
+        guard let place = figmaHistory.current, place.page == webViewInstanceID else { return }
+        let address = place.item?.url ?? currentURL ?? webView.url
+        figmaHistory.leave(address: figmaReopenAddress(address), side: figmaHistorySide(of: address))
+    }
+
+    /// Before a new place: the showing page becomes the first places, or the current place is brought up to date.
+    private func figmaHistoryWillLeave() {
+        guard !isOmnibarVisible, let address = currentURL ?? webView.url, let side = figmaHistorySide(of: address),
+              let key = FigmaPaneURL.fileKey(fromPaneURL: address, wrapper: figmaPageWrapper) else { return }
+        guard !figmaHistory.isActive else {
+            figmaHistoryFollowShowing(fromObserver: false)
+            return
+        }
+        let page = webViewInstanceID
+        let list = webView.backForwardList
+        func place(_ url: URL, item: WKBackForwardListItem?) -> FigmaHistory.Place? {
+            guard FigmaPaneURL.fileKey(fromPaneURL: url, wrapper: figmaPageWrapper) == key,
+                  let side = figmaHistorySide(of: url), figmaReopenAddress(url) != nil else { return nil }
+            return FigmaHistory.Place(side: side, address: url, page: item == nil ? nil : page, item: item, pending: false, pendingFrom: nil)
+        }
+        let before: [FigmaHistory.Place]
+        let after: [FigmaHistory.Place]
+        if usesRestoredSessionHistory {
+            // After a restart the page's restored history becomes places that load from their addresses.
+            // The page's own entries are then the replay's, not places: replaying it again would show them.
+            before = restoredSessionHistory.back.compactMap { place($0, item: nil) }
+            after = restoredSessionHistory.forward.reversed().compactMap { place($0, item: nil) }
+        } else {
+            before = list.backList.compactMap { place($0.url, item: $0) }
+            after = list.forwardList.compactMap { place($0.url, item: $0) }
+        }
+        let showing = FigmaHistory.Place(
+            side: side, address: address, page: page, item: list.currentItem,
+            pending: list.currentItem == nil, pendingFrom: nil
+        )
+        figmaHistory.start(fileKey: key, places: before + [showing] + after, index: before.count)
+        abandonRestoredSessionHistoryIfNeeded()
+    }
+
+    private func figmaHistoryDidArrive(_ shown: FigmaShown) {
+        if let address = currentURL ?? webView.url, let side = figmaHistorySide(of: address) {
+            let (item, from) = figmaHistoryEntry(after: shown)
+            figmaHistory.push(side: side, address: address, page: webViewInstanceID, item: item, from: from)
+        }
+        refreshNavigationAvailability()
+    }
+
+    /// The entry the showing page shows for what it just showed: the one it had (shown as left, or a load of
+    /// the same address), or none yet while a load is on its way.
+    private func figmaHistoryEntry(after shown: FigmaShown) -> (item: WKBackForwardListItem?, from: WKBackForwardListItem?) {
+        if !shown.loaded || shown.sameAddress, let current = webView.backForwardList.currentItem { return (current, nil) }
+        return (nil, shown.from)
+    }
+
+    /// `⌘[`, `⌘]` and the mouse buttons, through `goBack`/`goForward`. True when the
+    /// history handled the press; false leaves it to the pane's ordinary Back or Forward.
+    private func goFigmaHistory(back: Bool) -> Bool {
+        guard figmaHistory.isActive, !isOmnibarVisible else { return false }
+        figmaHistoryFollowShowing(fromObserver: false)
+        if let place = back ? figmaHistory.back() : figmaHistory.forward() {
+            showFigmaHistoryPlace(place)
+        }
+        return true
+    }
+
+    /// Shows the history's current place: by moving its web view's own list to its entry when that list still
+    /// holds it, else by loading its address on its side.
+    private func showFigmaHistoryPlace(_ place: FigmaHistory.Place) {
+        figmaHistoryBusy = true
+        defer {
+            figmaHistoryBusy = false
+            refreshNavigationAvailability()
+            scheduleFigmaReadSnapshotRefresh()
+        }
+        /// Whether `view` still shows this place, or is still on its way to it.
+        func holds(_ view: WKWebView, page: UUID) -> Bool {
+            guard place.page == page else { return false }
+            if let item = place.item { return Self.figmaListItems(of: view).contains { $0 === item } }
+            // Its load has not committed anything since it started, and has not been stopped.
+            return place.pending && view.backForwardList.currentItem === place.pendingFrom
+                && (view.isLoading || view.backForwardList.currentItem == nil)
+        }
+        settlePendingLoad(in: webView, page: webViewInstanceID)
+        if holds(webView, page: webViewInstanceID) {
+            moveFigmaPage(to: place.item)
+            return
+        }
+        // The showing page's side, also while it shows a page that is not Figma's (its sign-in, its own files).
+        let showingSide = figmaHistorySide(of: currentURL ?? webView.url)
+            ?? retainedFigmaPage.flatMap { figmaHistorySide(of: $0.address) }.map { $0 == .preview ? .editor : .preview }
+        if place.side == showingSide {
+            loadFigmaHistoryPlace(place)
+            return
+        }
+        let preview = place.side == .preview
+        if let incoming = retainedFigmaPage {
+            settlePendingLoad(in: incoming.webView, page: incoming.instanceID)
+            if holds(incoming.webView, page: incoming.instanceID) {
+                guard let shown = showFigmaPage(preview: preview, destination: place.address, reload: false, wrapper: figmaPageWrapper) else {
+                    return figmaHistory.reset()
+                }
+                if shown.loaded {
+                    let entry = figmaHistoryEntry(after: shown)
+                    figmaHistory.shown(page: webViewInstanceID, item: entry.item, from: entry.from)
+                } else {
+                    moveFigmaPage(to: place.item)
+                }
+                return
+            }
+        }
+        guard let shown = showFigmaPage(preview: preview, destination: place.address, reload: true, wrapper: figmaPageWrapper) else {
+            return figmaHistory.reset()
+        }
+        let entry = figmaHistoryEntry(after: shown)
+        figmaHistory.shown(page: webViewInstanceID, item: entry.item, from: entry.from)
+    }
+
+    /// A load the history started in `view` may have committed while nobody watched it (the page was held).
+    private func settlePendingLoad(in view: WKWebView, page: UUID) {
+        let list = view.backForwardList
+        guard !view.isLoading || list.currentItem?.url == view.url else { return }
+        figmaHistory.settle(page: page, current: list.currentItem, atEnd: list.forwardList.isEmpty)
+    }
+
+    /// Moves the showing page's own list to `item`, which it holds; nil leaves it where it is.
+    /// A load still on its way there (one this history started, or the page's own) is cancelled by going
+    /// to `item` even when it is the entry showing, as the pane's ordinary Back stops a load before it moves.
+    private func moveFigmaPage(to item: WKBackForwardListItem?) {
+        guard let item, webView.backForwardList.currentItem !== item || webView.isLoading else { return }
+        figmaHistory.loadsCancelled(on: webViewInstanceID)
+        markTrustedInternalNavigationIfNeeded(for: item.url)
+        webView.applyBrowserUserAgentPolicy(for: item.url)
+        webView.go(to: item)
+    }
+
+    /// Loads the current place again into the showing page, which is on the place's side.
+    private func loadFigmaHistoryPlace(_ place: FigmaHistory.Place) {
+        let from = webView.backForwardList.currentItem
+        let sameAddress = from?.url == place.address
+        currentURL = place.address
+        navigate(to: place.address)
+        let entry = figmaHistoryEntry(after: FigmaShown(loaded: true, from: from, sameAddress: sameAddress))
+        figmaHistory.shown(page: webViewInstanceID, item: entry.item, from: entry.from)
     }
 
     /// Exchanges the presentation binding; an existing page is never navigated by a switch.
-    private func showFigmaPage(preview: Bool, destination: URL, reload: Bool, wrapper: URL, defaults: UserDefaults = .standard) -> Bool {
+    private func showFigmaPage(
+        preview: Bool,
+        destination: URL,
+        reload: Bool,
+        wrapper: URL,
+        defaults: UserDefaults = .standard,
+        onNavigationStarted: ((WKNavigation?) -> Void)? = nil
+    ) -> FigmaShown? {
         guard BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination),
               let outgoingView = webView as? CmuxWebView,
-              let address = currentURL ?? webView.url else { return false }
+              let address = currentURL ?? webView.url else { return nil }
         if preview {
-            do { try FigmaWrapperPage.install(at: wrapper) } catch { return false }
+            do { try FigmaWrapperPage.install(at: wrapper) } catch { return nil }
         }
+        let wasBusy = figmaHistoryBusy
+        figmaHistoryBusy = true
+        defer { figmaHistoryBusy = wasBusy }
         let destination = (!reload ? discardedFigmaPageAddress.flatMap { saved in
             FigmaPaneURL.isWrapperPage(saved, wrapper: wrapper) == preview
                 && FigmaPaneURL.fileKey(fromPaneURL: saved, wrapper: wrapper) == FigmaPaneURL.fileKey(fromPaneURL: address, wrapper: wrapper) ? saved : nil
@@ -5745,12 +5995,13 @@ final class BrowserPanel: Panel, ObservableObject {
         figmaPageWrapper = wrapper
         let isPreview = FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
         if isPreview == preview {
+            let from = webView.backForwardList.currentItem
             if reload {
                 currentURL = destination
-                navigate(to: destination)
+                navigate(to: destination, onNavigationStarted: onNavigationStarted)
             }
             scheduleFigmaReadSnapshotRefresh()
-            return true
+            return FigmaShown(loaded: reload, from: from, sameAddress: from?.url == destination)
         }
         discardedFigmaPageAddress = nil
         let outgoing = RetainedFigmaPage(
@@ -5824,16 +6075,20 @@ final class BrowserPanel: Panel, ObservableObject {
         refreshNavigationAvailability()
         BrowserThemeSettings.apply(browserThemeMode, to: webView)
         applyConfiguredWebViewBackground()
+        let from = webView.backForwardList.currentItem
+        var shown = FigmaShown(loaded: false, from: from, sameAddress: false)
         if reload || incoming == nil {
+            shown = FigmaShown(loaded: true, from: from, sameAddress: from?.url == destination)
             currentURL = destination
-            navigate(to: destination)
+            navigate(to: destination, onNavigationStarted: onNavigationStarted)
         } else if webView.url == nil && !webView.isLoading, let savedAddress = currentURL {
             // A deferred page has never loaded: restore its saved address, rather than the switch's first-creation default.
+            shown = FigmaShown(loaded: true, from: from, sameAddress: from?.url == savedAddress)
             navigate(to: savedAddress)
         }
         refreshWebViewLifecycleState()
         scheduleFigmaReadSnapshotRefresh()
-        return true
+        return shown
     }
 
     /// A switch need not change the title or navigate, so URL-bearing socket mirrors need their own refresh.
@@ -5865,9 +6120,10 @@ final class BrowserPanel: Panel, ObservableObject {
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> WKNavigation? {
         // cmux-rbf (#cm-73.3): a different file cannot keep the old file behind its switch. Reject a revert of this hunk on upstream sync.
-        if (retainedFigmaPage != nil || discardedFigmaPageAddress != nil),
+        if (retainedFigmaPage != nil || discardedFigmaPageAddress != nil || figmaHistory.isActive),
            FigmaPaneURL.fileKey(fromPaneURL: url, wrapper: figmaPageWrapper) != currentURL.flatMap({ FigmaPaneURL.fileKey(fromPaneURL: $0, wrapper: figmaPageWrapper) }) {
             releaseRetainedFigmaPage()
+            figmaHistory.reset()
         }
         // cmux-rbf #cm-73.2a
         if isInitialCreationNavigation {
@@ -6209,6 +6465,7 @@ final class BrowserPanel: Panel, ObservableObject {
         }
         switch intent {
         case .currentTab:
+            if openFigmaEditorFromPreview(url, onNavigationStarted: onNavigationStarted) { return } // cmux-rbf #cm-73.3
             navigateWithoutInsecureHTTPPrompt(
                 request: request,
                 recordTypedNavigation: false,
@@ -6675,6 +6932,7 @@ extension BrowserPanel {
 
     /// Go back in history
     func goBack() {
+        if goFigmaHistory(back: true) { return } // cmux-rbf #cm-73.3
         guard canGoBack else { return }
         reactivateDiscardedWebViewWithoutNavigation(reason: "goBack")
         cancelInFlightNavigationBeforeHistoryTraversal()
@@ -6713,6 +6971,7 @@ extension BrowserPanel {
 
     /// Go forward in history
     func goForward() {
+        if goFigmaHistory(back: false) { return } // cmux-rbf #cm-73.3
         guard canGoForward else { return }
         reactivateDiscardedWebViewWithoutNavigation(reason: "goForward")
         cancelInFlightNavigationBeforeHistoryTraversal()
@@ -8505,11 +8764,15 @@ extension BrowserPanel {
             nativeCanGoForward: nativeCanGoForward
         )
 
-        if canGoBack != availability.canGoBack {
-            canGoBack = availability.canGoBack
+        // cmux-rbf #cm-73.3: while a Figma pane's history runs Back and Forward, it alone says whether they go anywhere.
+        let figmaRuns = figmaHistory.isActive && !isOmnibarVisible
+        let back = figmaRuns ? figmaHistory.canGoBackAcross : availability.canGoBack
+        let forward = figmaRuns ? figmaHistory.canGoForwardAcross : availability.canGoForward
+        if canGoBack != back {
+            canGoBack = back
         }
-        if canGoForward != availability.canGoForward {
-            canGoForward = availability.canGoForward
+        if canGoForward != forward {
+            canGoForward = forward
         }
     }
 
