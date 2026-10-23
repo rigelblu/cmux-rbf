@@ -42,6 +42,10 @@ So the rule cannot key on the request. An agent that has already decided "this i
 ---
 
 # 🔵⋯ Custom Project Rules
+Read `rbf/LANGUAGE.md` — this project's own words and the sense each one carries.
+
+Before changing a pane header or tab bar, a workspace's status or todo state, or a key handler, read `rbf/CODE-NOTES.md`: what that code does that one file won't tell you.
+
 ## 🔴 There is no CI. Nothing runs on push or on a PR.
 `.github/workflows/ci.yml` has exactly one trigger, `workflow_dispatch`, and 26 of 40 workflows carry no `push`/`pull_request`/`schedule` trigger at all.
 **We are our own fork and we do not run one. Never propose wiring up CI as a prerequisite for other work.**
@@ -59,7 +63,7 @@ rg -n "cmux-rbf: pruned upstream text" CLAUDE.md skills/ docs/ .claude/commands/
 ### 🟣⋯ Build, run and test: `make`
 The front door, so you never invent a **build-id** or hunt a DerivedData path.
 
-**Where the build-id comes from: your jj bookmark first, then a git branch.** `tom-rigelblu/cm-19` → `cm-19`. jj keeps git's HEAD detached permanently, so in this checkout `git branch --show-current` is *empty* — the jj lookup is the one that fires, and the git path only matters in the git worktrees used for isolated builds. If neither resolves you get `detached-<sha>` **and a warning on stderr**, because that mints a fresh ~6GB DerivedData dir per commit.
+**Where the build-id comes from: your jj bookmark first, then a git branch.** `tom-rigelblu/cm-19` → `cm-19`. jj keeps git's HEAD detached permanently, so in this checkout `git branch --show-current` is *empty* — the jj lookup is the one that fires, and the git path only matters in the git worktrees used for isolated builds. If neither resolves you get `detached-<sha>` **and a warning on stderr**, because that mints a fresh ~6GB DerivedData dir per commit. Git's `HEAD` follows jj's working copy, so it's often someone's undescribed work in progress, not a release. When you make a checkout or worktree, name the release commit; the tell is `git log --oneline -1 <sha>` printing a sha with no subject. The jj lookup is `heads(::@ & bookmarks())`, skipping `zz-` bookmarks: the nearest bookmarked ancestor wins, so a probe change on a release builds into the release's slot, and of several bookmarks on one commit the alphabetically first wins. When a bookmark you didn't set lands on your commit, say so and pass `BUILD_ID=<yours>`.
 
 The build-id is what `scripts/reload.sh --tag` takes. It decides the DerivedData dir, the debug socket, the app name, and the bundle id suffix — so two dev builds never collide. It is a *component* of the bundle id, not a peer: build-id `cm-18` gives `com.cmuxterm.app.debug.cm.18` (reload.sh maps non-alnum runs to dots, so the hyphen does not survive). That is why changing it resets TCC grants and keychain-backed sign-in — the same mechanism behind `#cm-17`'s "sign-in does not migrate".
 
@@ -76,34 +80,6 @@ make help
 ```
 
 Logic lives in `rbf/scripts/dev.sh`, except what `make install-rbf` also needs — that lives in `rbf/scripts/lib/`, because `make install-rbf` calls `rbf/scripts/install-rbf.sh` directly and never passes through `dev.sh`.
-
-### 🟣⋯ How to hand a build back
-**Give Tom the command, not the path.** When a change is ready to look at, end with the `make` line he should run:
-
-```
-Ready to look at:  make run
-```
-
-Name a non-default build-id only when the work genuinely needs one (`make run BUILD_ID=spike`), and say why in the same breath.
-
-**Never hand back a `file://` link to a `.app`** — that is upstream's convention and it is pruned from `CLAUDE.md`. A path addresses a bundle *that was already built*, so it keeps resolving after the tree moves on and launches the previous build without saying so. Observed 2026-08-02 on `#cm-20`: a link offered as the fix pointed at the prior value of the constant, because the intervening command was `make test`, which builds `cmux-unit` and never touches the app. `make run` rebuilds, so it cannot be stale; a link cannot know whether it is.
-
-The same holds for pasting a DerivedData path as prose, and `BUILD_ID` takes a **build-id**, never a filename — `BUILD_ID=cm-17.app` mints `cmux DEV cm-17.app.app` with its own ~6GB DerivedData dir and its own bundle id, which resets TCC grants and keychain sign-in.
-
-#### 🟡⋯ If you did not build in Tom's checkout, say where you built
-Bare `make run` means *"whatever your current directory's branch resolves to"*. Run in Tom's tree it builds **Tom's** branch, not yours — so an agent working in its own worktree that hands back bare `make run` is handing back someone else's build. Give the directory:
-
-```
-Ready to look at:  make -C /Volumes/Tom's HDD/tmp/<your-worktree> run
-```
-
-Absolute path, always. `make -C` moves make's working directory before anything runs, and the derivation is **cwd-relative** (`derive_build_id()` tests `.jj` and `git branch --show-current` in `$PWD`), so `-C` is what makes it read *your* branch.
-
-**Do not reach for `BUILD_ID` to do this.** The build-id names the *output slot*; the checkout names the *source*. `make run BUILD_ID=<yours>` in Tom's tree compiles **his** working copy into a slot wearing **your** name — wrong code, right-looking app, no error. That is strictly worse than a stale link, which at least shows an app someone really built.
-
-`BUILD_ID` has exactly one use in a multi-agent session: **two agents on the same branch name**. Distinct branches already isolate everything — build-id, DerivedData, debug socket, bundle id — with no flag at all. Same branch in two worktrees collides on all four, and one of the two must pass `BUILD_ID=<something>` and say so.
-
-Before handing back, confirm the tree you built is the tree you are naming: `make -C <path> help` prints `current build-id:` and costs nothing.
 
 ### 🟣⋯ How to hand a build back
 **Give Tom the command, not the path.** When a change is ready to look at, end with the `make` line he should run:
@@ -154,6 +130,19 @@ Measured 2026-09-17 on `#cm-96.3`'s v0.27.5 install — three failures, three di
 **Quit any running tagged app before `make test`**, or the run dies with "Test runner never began executing tests", exit 65, zero tests run.
 
 **A test that runs a resume command through `zsh` must never read your real `$HOME`** — fixed in `#cm-58` for the one test that did. `testAgentHookSurfaceResumeStartupInputRunsWhenSavedWorkingDirectoryWasDeleted` put a fake `codex` first on `PATH`, but ran a login shell with the host's environment, and a binding with `environment` makes `startupInput` nest a second `/bin/zsh -lc`. Either login shell reads `~/.zprofile`, which can put a real `codex` ahead of the fake, so the test started an interactive `codex resume session-duplicate-turn -c check_for_update_on_startup=false --yolo` and waited on it forever — the stray process that stalled `make test` at 0% CPU in at least `#cm-56`, `#cm-54`, `#cm-69.1` and `#cm-75` sessions. **Copy the fixed shape** for any new test that executes one: outer `zsh -fc`; an environment of only a sandbox `HOME`, a minimal `PATH` and the test's own variables; a `.zprofile` in that `HOME` that puts the fake's dir first again (`path=('<bin>' $path)`, with any `'` in the path written `'\''` — an unmatched quote makes zsh skip the file silently), because every login shell runs `/etc/zprofile`'s `path_helper`, which moves `/usr/local/bin`, `/opt/homebrew/bin` and the rest ahead of whatever `PATH` it was given; and a bounded wait like the file-scope `runWithBoundedWait` in `cmuxTests/SessionPersistenceTests.swift`, which throws within 32 s (30 s, terminate, 2 s grace) and says whether the process was still running. That helper is `private` to its file, so a test in another file copies it too — two other copies already exist (`SessionPersistenceResumeBindingTests.swift`, `ClaudeWrapperResumeEnvironmentTests.swift`). **Measured 2026-09-14:** dropping only `HOME` brings the real `codex` back and the test fails at 30 s instead of hanging. **Still possible:** `#cm-35`'s unrelated stall in `AppDelegateShortcutRoutingTests`, so a hang is not automatically this one. Diagnose with `pgrep -fl '^codex resume session-duplicate-turn'` — anchor the pattern, since an unanchored one also matches any shell whose command line contains it, including the one you typed it in. A real hit's parent is the tagged test-host app, or `PPID 1` for an orphan from an interrupted run; kill that pid.
+
+**More traps a build or test run hits here** — each one cost a session before it was written down:
+- **`make build` and `make run` quit the running app of the same build-id.** Gate on it in the same command, `pgrep -f 'cmux DEV <id>' && { echo STOP; exit 1; }`, then ask Tom: `reload.sh` once quit his `cmux DEV cm-73` with a Claude session inside. It runs the other way too: his own `make run` mid-build kills both builds (`database is locked`), so tell him the app relaunches by itself, and check `ps` for a login-shell `make run` before diagnosing a failure. A compile-only check can use `xcodebuild` with its own `-derivedDataPath`, which never touches the app
+- **Check `ps` before any `pkill`, and never match `cmux RBF`**, Tom's everyday app. A too-broad pattern killed two apps that weren't blocking anything
+- **`make test` goes silent for two reasons:** `xcodebuild` wedged at 0% CPU, or `dev.sh` refusing because a killed run left its unit-test host alive (the refusal never says `error:`). The Xcode build also waits on any cargo on the machine, since `~/.cargo/.package-cache-mutate` is machine-global: find the holder with `lsof -p <cargo-pid> | grep cargo`, and don't kill it — it's someone's live work
+- **A test run prints two result streams.** Swift Testing prints the function name, never the suite; read `Test run with N tests`. For a Swift Testing `@Suite`, XCTest's `Executed 0 tests` is the healthy result. A failure prints `􀢄  Test name() failed`, not `✘`, and `swift test --filter` takes the type name. Anchor log patterns to the line shape (`^/.*\.swift:[0-9]+:[0-9]+: error:`, `\*\* (BUILD|TEST) (SUCCEEDED|FAILED) \*\*`): a bare `error:` matched source text echoed into a passing log
+- **`make test`'s tail is app logs.** Get failures from the `.xcresult` printed above `** TEST FAILED **`: `xcrun xcresulttool get test-results tests --path <path> --format json`. After "Restarting after unexpected exit", the tests that were running get no result, and the summary still counts only the rest — 14 crashed tests hid that way on `#cm-110.1`
+- **`#expect(Double == CGFloat)` fails even on identical values** (Swift 6.4, measured 2026-10-26). Convert one side with `Double(...)` first. Neither `XCTWaiter().wait` nor a nested `RunLoop.main.run(until:)` drains the main dispatch queue, so a test awaiting a timer-delivered result fails every time
+- **A fresh build-id resolves every feature flag to its `defaultWhenUnavailable`** until the remote config arrives. `strings` on `Contents/MacOS/<name>` proves nothing in a Debug build (the code is in `<name>.debug.dylib`), and `open --env VAR=1 <app>` exits 0 even when it drops the variable — exec the binary instead
+- **A `Sources/*.swift` file needs pbxproj wiring too**, not only `cmuxTests/`: an unwired one compiles nowhere while every test passes. Check its reference with `rg -n "path = <Dir>;" -B3 cmux.xcodeproj/project.pbxproj`
+- **Never round-trip `Resources/Localizable.xcstrings` through a JSON serializer.** Its mixed formatting and unsorted keys turn a rewrite into tens of thousands of changed lines. Insert a key as text beside a neighbour, then validate with `json.load`; its 129 duplicate keys show only with `object_pairs_hook`
+- **A settings key needs four registrations:** the `DefaultsKey` in a `*CatalogSection`; a `parseXSection` and its dispatch in `parseSettingsRoot`; the dotted path in `supportedSettingsJSONPaths`; and `web/data/cmux.schema.json` plus `skills/cmux-settings/references/all-keys.md`. `#cm-67.1` shipped with the first alone. Read `defaults read <bundle-id> <key>` on the running app before handing it over
+- **A dev build's socket refuses agent hooks by default.** `SocketControlSettings.defaultMode` is `cmuxOnly`, and the mode is per bundle id, so every new build-id starts there while the installed app is on Automation. Check it before trusting any hook-driven check — resume bindings, waits, running
 
 ### 🟣⋯ `/Applications` holds **two** cmux apps — check which one you are in
 Since v0.9.0 (`#cm-17`) the flavour installs beside upstream rather than replacing it:
@@ -219,6 +208,8 @@ A test never observed failing proves nothing, and this repo ships several ways t
 - The `cmux` scheme compiles no unit tests and still prints `TEST BUILD SUCCEEDED` — use `cmux-unit`
 - `-only-testing:` names a **class**, not a file; an unmatched filter runs nothing and still reports `TEST SUCCEEDED`
 - A test guarding a production gate that has no consumer stays green no matter what the fix does
+
+Whether a test proves anything at all — reds, mutations, fixtures, reaching the real code — is in the `verify-changes-yourself` skill's `references/proving-a-test.md`. Read it before you trust one.
 
 ### 🟣⋯ When you already wrote the test and the code together
 It happens, especially for a new pure type where the test cannot compile until the type exists. The recovery is **mutation testing**, not a shrug: deliberately break the implementation one behaviour at a time and confirm the matching test fails.
