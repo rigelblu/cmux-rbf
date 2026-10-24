@@ -7,7 +7,7 @@ public struct SidebarStatusHeaderDropPlanner: Sendable {
 
     /// nil draggedStatusId means the entire Statuses area. A nil result refuses without an indicator.
     public func plan(point: CGPoint, draggedStatusId: String?,
-                     targets: [SidebarStatusHeaderDropTarget]) -> SidebarStatusHeaderDropPlan? {
+                     targets: [SidebarStatusHeaderDropTarget], draggedWorkspacesArea: Bool = false) -> SidebarStatusHeaderDropPlan? {
         let rows = targets.sorted { $0.frame.minY < $1.frame.minY }
         guard let area = rows.first(where: \.isStatusesArea), let last = rows.last else { return nil }
         let belowAll = point.y > last.frame.maxY
@@ -33,6 +33,9 @@ public struct SidebarStatusHeaderDropPlanner: Sendable {
                          action: .statusGroup(targetStatusId: statusId, insertBefore: before))
         }
 
+        if rows.contains(where: \.isWorkspacesArea) {
+            return sectionPlan(point: point, rows: rows, draggedWorkspacesArea: draggedWorkspacesArea)
+        }
         guard !hit.isStatusesArea, hit.statusId == nil || belowAll else { return nil }
         var owners: [String] = []
         for row in rows where !row.isPinned {
@@ -64,5 +67,32 @@ public struct SidebarStatusHeaderDropPlanner: Sendable {
             belowRow: boundary < owners.count ? owners[boundary] : nil,
             last: boundary == owners.count
         ))
+    }
+
+    /// Section identities, rather than member ownership, delimit each complete visible block.
+    private func sectionPlan(point: CGPoint, rows: [SidebarStatusHeaderDropTarget],
+                             draggedWorkspacesArea: Bool) -> SidebarStatusHeaderDropPlan? {
+        guard let last = rows.last, let firstUnpinned = rows.first(where: { !$0.isPinned }) else { return nil }
+        func intent(first: Bool, indicator: SidebarDropIndicator) -> SidebarStatusHeaderDropPlan {
+            // Keep the area intent's compatibility shape; every result is a canonical two-order value.
+            .init(indicator: indicator, action: .area(aboveRow: "top", belowRow: nil,
+                last: draggedWorkspacesArea == first))
+        }
+        if point.y > last.frame.maxY {
+            return intent(first: false, indicator: .init(tabId: last.rowId, edge: .bottom))
+        }
+        guard let hitIndex = rows.firstIndex(where: { point.y <= $0.frame.maxY }) else { return nil }
+        if rows[hitIndex].isPinned {
+            return intent(first: true, indicator: .init(tabId: firstUnpinned.rowId, edge: .top))
+        }
+        guard let start = rows.indices.prefix(through: hitIndex).last(where: {
+            rows[$0].isStatusesArea || rows[$0].isWorkspacesArea
+        }), rows[start].isWorkspacesArea != draggedWorkspacesArea else { return nil }
+        let end = rows.indices.dropFirst(start + 1).first(where: {
+            rows[$0].isStatusesArea || rows[$0].isWorkspacesArea
+        }).map { $0 - 1 } ?? (rows.count - 1)
+        let before = point.y < (rows[start].frame.minY + rows[end].frame.maxY) / 2
+        return intent(first: before, indicator: .init(tabId: before ? rows[start].rowId : rows[end].rowId,
+            edge: before ? .top : .bottom))
     }
 }

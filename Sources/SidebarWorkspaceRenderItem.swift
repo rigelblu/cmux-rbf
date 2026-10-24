@@ -20,6 +20,7 @@ enum SidebarWorkspaceRenderItem {
     case workspace(workspaceId: UUID)
     case statusesHeader // (#cm-110.1)
     case statusGroupHeader(statusId: String) // (#cm-110.1)
+    case workspacesHeader // (#cm-110.4)
 
     var id: SidebarWorkspaceRenderItemID {
         switch self {
@@ -31,6 +32,7 @@ enum SidebarWorkspaceRenderItem {
             return .workspace(workspaceId)
         case .statusesHeader: // (#cm-110.1)
             return .statusesArea() // (#cm-110.1)
+        case .workspacesHeader: return .workspacesArea() // (#cm-110.4)
         case .statusGroupHeader(let statusId): // (#cm-110.1)
             return .statusGroup(statusId) // (#cm-110.1)
         }
@@ -48,7 +50,7 @@ enum SidebarWorkspaceRenderItem {
             return section.memberWorkspaceIds.first
         case .workspace(let workspaceId):
             return workspaceId
-        case .statusesHeader, .statusGroupHeader: // (#cm-110.1)
+        case .statusesHeader, .workspacesHeader, .statusGroupHeader: // (#cm-110.4)
             return nil // (#cm-110.1)
         }
     }
@@ -183,7 +185,7 @@ enum SidebarWorkspaceRenderItem {
                         return !group.isPinned
                     }
                     return !workspace.isPinned
-                case .statusesHeader, .statusGroupHeader: // (#cm-110.1)
+                case .statusesHeader, .workspacesHeader, .statusGroupHeader: // (#cm-110.4)
                     return true // Statuses area is unpinned by definition (#cm-110.1)
                 }
             } ?? rendered.count

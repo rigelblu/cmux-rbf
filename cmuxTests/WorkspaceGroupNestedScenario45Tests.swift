@@ -190,6 +190,7 @@ struct WorkspaceGroupNestedScenario45Tests {
             case .workspace(let id): return "workspace in \(manager.tabs.first { $0.id == id }?.groupId.flatMap { names[$0] } ?? "top")"
             case .colorSectionHeader: return "color"
             case .statusesHeader: return "statuses" // (#cm-110.1)
+            case .workspacesHeader: return "workspaces" // (#cm-110.4)
             case .statusGroupHeader(let statusId): return "status(\(statusId))" // (#cm-110.1)
             }
         }

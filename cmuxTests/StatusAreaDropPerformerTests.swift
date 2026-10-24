@@ -22,14 +22,41 @@ struct StatusAreaDropPerformerTests {
         }
     }
 
+    @Test func belowAllLooseWorkspaceEndsWorkspacesWithoutStatusMutation() throws {
+        let f = Fixture(.loose)
+        var state = try #require(f.state.statusGroups)
+        state.placeSections(.workspacesFirst)
+        f.state.setStatusGroups(state)
+        let held = f.heldById, other = f.unmovedIds
+        #expect(f.performer().perform(f.plan(.belowAll), workspaceId: f.sourceId, sourceKind: f.kind))
+        let rows = f.rendered()
+        let area = try #require(rows.firstIndex { $0.id == .statusesArea() })
+        #expect(area > 0 && rows[area - 1].id == .workspace(f.sourceId))
+        #expect(f.tabs.last?.id == f.sourceId && f.heldById == held && f.unmovedIds == other)
+        #expect(f.state.statusGroups == state)
+    }
+
+    @Test func boundaryCommitMigratesPendingRecordBeforeChangingAnchors() throws {
+        let f = Fixture(.loose)
+        f.state.setStatusGroups(.init(last: false, aboveRow: "workspace:\(f.other.id)"))
+        #expect(f.state.statusGroups?.sectionOrder == nil)
+        #expect(f.performer().perform(f.plan(.belowAll), workspaceId: f.sourceId, sourceKind: f.kind))
+        #expect(f.state.statusGroups?.sectionOrder == .workspacesFirst)
+        #expect(f.state.statusGroups?.last == true && f.state.statusGroups?.aboveRow == "top")
+        #expect(f.state.statusGroups?.belowRow == nil)
+    }
+
     @Test(arguments: Role.allCases)
-    func anExplicitBelowDropActuallyRendersTheMovedBlockAfterTheAreaAndSavesThatPlace(_ role: Role) throws {
+    func anExplicitBelowBoundaryKeepsTheMovedBlockLastInWorkspacesAndCanonicalOrder(_ role: Role) throws {
         let f = Fixture(role)
+        var sections = try #require(f.state.statusGroups) // (#cm-110.4) supersedes cm-110.1's pending item-relative save
+        sections.placeSections(.workspacesFirst) // (#cm-110.4) supersedes cm-110.1's pending item-relative save
+        f.state.setStatusGroups(sections) // (#cm-110.4) supersedes cm-110.1's pending item-relative save
         let otherOrder = f.unmovedIds
         let groupValues = Dictionary(uniqueKeysWithValues: f.groups.map { ($0.id, $0) })
         let original = try #require(f.state.statusGroups)
         if role == .alreadyLastLoose {
-            try #require(original.last == true && original.aboveRow == f.movingOwnerKeys.first)
+            try #require(original.last == true && original.aboveRow == "top") // (#cm-110.4) supersedes cm-110.1's moved-source anchor
         }
         try #require(f.sourceRows.allSatisfy { row in f.index(row) >= 0 && f.index(row) < f.index(.statusesArea()) })
         let plan = f.plan(.belowAll)
@@ -40,20 +67,23 @@ struct StatusAreaDropPerformerTests {
         #expect(f.unmovedIds == otherOrder)
         let rows = f.rendered()
         let lastStatusMember = try #require(rows.firstIndex { $0.id == .workspace(f.statusMember.id) })
-        for row in f.sourceRows { #expect(f.index(row) > lastStatusMember) }
+        let area = try #require(rows.firstIndex { $0.id == .statusesArea() }) // (#cm-110.4) supersedes cm-110.1's after-area destination
+        for row in f.sourceRows { #expect(f.index(row) < area && f.index(row) < lastStatusMember) } // (#cm-110.4) supersedes cm-110.1's after-area destination
+        let lastOrdinary = rows[..<area].last?.id // (#cm-110.4) supersedes cm-110.1's after-area destination
+        #expect(lastOrdinary == (f.role == .groupHeader || f.role == .selectedHeaders ? .workspace(f.role == .selectedHeaders ? f.memberB.id : f.member.id) : f.sourceRows.last)) // (#cm-110.4) supersedes cm-110.1's after-area destination
         let record = try #require(f.state.statusGroups)
-        #expect(record.last == false)
-        #expect(record.belowRow == f.movingOwnerKeys.first)
+        #expect(record.last == true && record.aboveRow == "top") // (#cm-110.4) supersedes cm-110.1's middle-area anchors
+        #expect(record.belowRow == nil && record == original) // (#cm-110.4) supersedes cm-110.1's moved-source anchor
         #expect(record.order == original.order && record.collapsedStatusIds == original.collapsedStatusIds && record.areaCollapsed == original.areaCollapsed)
         let saved = try #require(SidebarStatusAreaLayout(items: rows, tabs: f.tabs, groups: f.groups, statusProjection: f.projection()).saving(state: record))
-        #expect(saved.last == false && saved.belowRow == record.belowRow)
+        #expect(saved == record) // (#cm-110.4) supersedes cm-110.1's noncanonical middle-area save
         let snapshot = SessionSidebarSnapshot(isVisible: true, selection: .tabs, width: 300, statusGroups: saved)
         let restored = try JSONDecoder().decode(SessionSidebarSnapshot.self, from: JSONEncoder().encode(snapshot))
         #expect(restored.statusGroups == saved)
     }
 
     @Test(arguments: [Role.groupHeader, .emptyHeader, .selectedHeaders])
-    func aWorkspaceGroupHeaderOnStatusesLandsAboveTheWholeAreaWithoutStatusOrColorWrites(_ role: Role) throws {
+    func anExplicitAboveAreaBoundaryPreservesSectionOrderAndWorkspaceValues(_ role: Role) throws {
         let f = Fixture(role), original = f.state.statusGroups
         let otherOrder = f.unmovedIds
         let groupValues = Dictionary(uniqueKeysWithValues: f.groups.map { ($0.id, $0) })
@@ -63,7 +93,7 @@ struct StatusAreaDropPerformerTests {
         #expect(f.heldById == f.originalHeld && f.unmovedIds == otherOrder)
         #expect(Dictionary(uniqueKeysWithValues: f.groups.map { ($0.id, $0) }) == groupValues)
         for row in f.sourceRows { #expect(f.index(row) >= 0 && f.index(row) < f.index(.statusesArea())) }
-        #expect(f.state.statusGroups?.aboveRow == f.movingOwnerKeys.last)
+        #expect(f.state.statusGroups == original) // (#cm-110.4) section order, not item anchors
         #expect(f.state.statusGroups?.order == original?.order && f.state.statusGroups?.collapsedStatusIds == original?.collapsedStatusIds)
     }
 
@@ -110,7 +140,7 @@ struct StatusAreaDropPerformerTests {
         let loose = Workspace(), other = Workspace(), anchor = Workspace(), member = Workspace()
         let anchorB = Workspace(), memberB = Workspace(), statusMember = Workspace()
         let g1 = UUID(), g2 = UUID()
-        let state = SidebarState(statusGroups: .init(collapsedStatusIds: ["not-listed"], order: ["parked", "not-listed"], last: true))
+        let state = SidebarState(statusGroups: .init(collapsedStatusIds: ["not-listed"], order: ["parked", "not-listed"], last: true, sectionOrder: .workspacesFirst)) // (#cm-110.4) ordinary fixtures start migrated; pending case resets explicitly
         let list = WorkspaceStatusList(entries: [.init(id: "parked", name: "Parked", extends: .todo, color: "5: PARKED")], source: .file)
         var tabs: [Workspace] = [], groups: [WorkspaceGroup] = []
         var controls = true

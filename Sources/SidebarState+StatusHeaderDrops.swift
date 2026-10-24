@@ -16,7 +16,14 @@ extension SidebarState {
             let adopted = WorkspaceStatusGroupOrder.adopting(fileIds: fileIds, storedOrder: next.order ?? fileIds)
             next.order = WorkspaceStatusGroupOrder.moving(id, relativeTo: target, insertBefore: before,
                 fileIds: fileIds, storedOrder: adopted) ?? adopted
-        case (.statusesArea, .area(let above, let below, let last)):
+        case (.statusesArea, .area(let above, let below, let last)),
+             (.workspacesArea, .area(let above, let below, let last)):
+            if next.sectionOrder != nil {
+                guard above == "top", below == nil else { return false }
+                next.placeSections(last ? .workspacesFirst : .statusesFirst)
+                break
+            }
+            guard source == .statusesArea else { return false }
             guard (above == "top" || validTopLevelRowIds.contains(above)),
                   below.map(validTopLevelRowIds.contains) ?? true,
                   last || below != nil else { return false }

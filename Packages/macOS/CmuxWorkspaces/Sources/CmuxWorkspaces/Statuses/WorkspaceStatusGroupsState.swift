@@ -9,22 +9,31 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
     public var last: Bool?
     public var aboveRow: String?
     public var belowRow: String?
+    /// Absent until this window's untouched legacy placement has been resolved.
+    public var sectionOrder: WorkspaceSectionOrder?
+    /// Missing records start unfolded; absence is retained while migration is pending.
+    public var workspacesCollapsed: Bool?
 
     /// Creates a record; a new window starts with the area and every status open.
     public init(areaCollapsed: Bool = false, collapsedStatusIds: Set<String> = [],
-                order: [String]? = nil, last: Bool? = nil, aboveRow: String? = nil, belowRow: String? = nil) {
+                order: [String]? = nil, last: Bool? = nil, aboveRow: String? = nil, belowRow: String? = nil,
+                sectionOrder: WorkspaceSectionOrder? = nil, workspacesCollapsed: Bool? = nil) {
         self.areaCollapsed = areaCollapsed
         self.collapsedStatusIds = collapsedStatusIds
         self.order = order
         self.last = last
         self.aboveRow = aboveRow
         self.belowRow = belowRow
+        self.sectionOrder = sectionOrder
+        self.workspacesCollapsed = workspacesCollapsed
+        self = canonicalizingSectionOrder()
     }
 
     private enum CodingKeys: String, CodingKey {
         case areaCollapsed
         case collapsedStatusIds
         case order, last, aboveRow, belowRow
+        case sectionOrder, workspacesCollapsed
     }
 
     public init(from decoder: any Decoder) throws {
@@ -35,16 +44,53 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
         last = try values.decodeIfPresent(Bool.self, forKey: .last)
         aboveRow = try values.decodeIfPresent(String.self, forKey: .aboveRow)
         belowRow = try values.decodeIfPresent(String.self, forKey: .belowRow)
+        // A future order must not make the entire window undecodable.
+        sectionOrder = try values.decodeIfPresent(String.self, forKey: .sectionOrder)
+            .flatMap(WorkspaceSectionOrder.init(rawValue:))
+        workspacesCollapsed = try values.decodeIfPresent(Bool.self, forKey: .workspacesCollapsed)
+        self = canonicalizingSectionOrder()
     }
 
     public func encode(to encoder: any Encoder) throws {
+        let state = canonicalizingSectionOrder()
         var values = encoder.container(keyedBy: CodingKeys.self)
-        try values.encode(areaCollapsed, forKey: .areaCollapsed)
-        try values.encode(collapsedStatusIds.sorted(), forKey: .collapsedStatusIds)
-        try values.encodeIfPresent(order, forKey: .order)
-        try values.encodeIfPresent(last, forKey: .last)
-        try values.encodeIfPresent(aboveRow, forKey: .aboveRow)
-        if last != true { try values.encodeIfPresent(belowRow, forKey: .belowRow) }
+        try values.encode(state.areaCollapsed, forKey: .areaCollapsed)
+        try values.encode(state.collapsedStatusIds.sorted(), forKey: .collapsedStatusIds)
+        try values.encodeIfPresent(state.order, forKey: .order)
+        try values.encodeIfPresent(state.last, forKey: .last)
+        try values.encodeIfPresent(state.aboveRow, forKey: .aboveRow)
+        if state.last != true { try values.encodeIfPresent(state.belowRow, forKey: .belowRow) }
+        try values.encodeIfPresent(state.sectionOrder?.rawValue, forKey: .sectionOrder)
+        try values.encodeIfPresent(state.workspacesCollapsed, forKey: .workspacesCollapsed)
+    }
+
+    /// Retains the old decoder's top/end placement as a copy of an already resolved order.
+    /// Pending legacy records are returned unchanged, including their original anchors.
+    public func canonicalizingSectionOrder() -> Self {
+        guard let sectionOrder else { return self }
+        var next = self
+        next.aboveRow = "top"
+        next.belowRow = nil
+        next.last = sectionOrder == .workspacesFirst
+        next.workspacesCollapsed = workspacesCollapsed ?? false
+        return next
+    }
+
+    /// Saves a resolved section order and its legacy compatibility copy.
+    /// - Parameter order: Which section precedes the other below pinned rows.
+    public mutating func placeSections(_ order: WorkspaceSectionOrder) {
+        sectionOrder = order
+        self = canonicalizingSectionOrder()
+    }
+
+    /// Toggles only the ordinary workspace section, retaining all inner folds.
+    public mutating func toggleWorkspaces() {
+        workspacesCollapsed = !(workspacesCollapsed ?? false)
+    }
+
+    /// Reveals an ordinary selected workspace without changing the Statuses folds.
+    public mutating func revealWorkspaces() {
+        workspacesCollapsed = false
     }
 
     /// Copies a restored window's color folds into the statuses of the first list it uses.

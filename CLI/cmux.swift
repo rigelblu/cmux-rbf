@@ -20873,6 +20873,17 @@ struct CMUXCLI {
 
         switch action {
 #if DEBUG // (#cm-110.1)
+        case "fold", "unfold": // (#cm-110.4)
+            guard let header = optionValue(remaining, name: "--header"), // (#cm-110.4)
+                  ["statuses", "workspaces"].contains(header) else { // (#cm-110.4)
+                throw CLIError(message: "DEBUG sidebar fold/unfold requires --header statuses|workspaces") // (#cm-110.4)
+            } // (#cm-110.4)
+            let windowRaw = windowOverride ?? optionValue(remaining, name: "--window") // (#cm-110.4)
+            if let window = try normalizeWindowHandle(windowRaw, client: client) { params["window_id"] = window } // (#cm-110.4)
+            params["fold_header"] = header // (#cm-110.4)
+            params["folded"] = action == "fold" // (#cm-110.4)
+            print(jsonString(try client.sendV2(method: "debug.sidebar.rows", params: params))) // (#cm-110.4)
+            return // (#cm-110.4)
         case "drop": // (#cm-110.1)
             let windowRaw = windowOverride ?? optionValue(remaining, name: "--window") // (#cm-110.1)
             if let window = try normalizeWindowHandle(windowRaw, client: client) { params["window_id"] = window } // (#cm-110.1)

@@ -202,40 +202,43 @@ struct SidebarStatusAreaPlacementTests {
         #expect(state.statusGroups == original)
     }
 
-    // MARK: An ordinary reorder moves the row the area was saved under (#cm-110.1)
+    // MARK: Ordinary reorders preserve the migrated two-section order (#cm-110.4)
 
     /// The Statuses area renders only with the status controls on (a beta setting, off in the test host) and a file
     /// list in use (the app delegate's store). Runs `body` with both, and puts both back.
-    private func withStatusControlsOn(_ body: () throws -> Void) throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SidebarStatusAreaPlacementTests-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let file = directory.appendingPathComponent("cmux.json")
-        try ##"{ "workspaceStatuses": [ { "id": "parked", "name": "Parked", "extends": "todo", "color": "#445566" } ] }"##
-            .write(to: file, atomically: true, encoding: .utf8)
-        let suite = "SidebarStatusAreaPlacementTests.\(UUID().uuidString)"
-        let storeDefaults = try #require(UserDefaults(suiteName: suite))
-        let store = WorkspaceStatusListStore(fileURL: file, defaults: storeDefaults, resolveColor: { _ in nil },
-                                             paletteFingerprint: { "fixed" }, clock: ContinuousClock())
-        store.load()
-        let previousDelegate = AppDelegate.shared
-        let delegate = AppDelegate()
-        delegate.workspaceStatusListStore = store
-        AppDelegate.shared = delegate
-        let defaults = UserDefaults.standard
-        let key = BetaFeaturesCatalogSection().workspaceTodoControls.userDefaultsKey
-        let previous = defaults.object(forKey: key)
-        defaults.set(true, forKey: key)
-        defer {
-            if let previous { defaults.set(previous, forKey: key) } else { defaults.removeObject(forKey: key) }
-            AppDelegate.shared = previousDelegate
-            storeDefaults.removePersistentDomain(forName: suite)
-            try? FileManager.default.removeItem(at: directory)
+    private func withStatusControlsOn(_ body: () throws -> Void) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("SidebarStatusAreaPlacementTests-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let file = directory.appendingPathComponent("cmux.json")
+            try ##"{ "workspaceStatuses": [ { "id": "parked", "name": "Parked", "extends": "todo", "color": "#445566" } ] }"##
+                .write(to: file, atomically: true, encoding: .utf8)
+            let suite = "SidebarStatusAreaPlacementTests.\(UUID().uuidString)"
+            let storeDefaults = try #require(UserDefaults(suiteName: suite))
+            let store = WorkspaceStatusListStore(fileURL: file, defaults: storeDefaults, resolveColor: { _ in nil },
+                                                 paletteFingerprint: { "fixed" }, clock: ContinuousClock())
+            store.load()
+            let previousDelegate = AppDelegate.shared
+            let delegate = AppDelegate()
+            delegate.workspaceStatusListStore = store
+            AppDelegate.shared = delegate
+            let defaults = UserDefaults.standard
+            let key = BetaFeaturesCatalogSection().workspaceTodoControls.userDefaultsKey
+            let previous = defaults.object(forKey: key)
+            defaults.set(true, forKey: key)
+            defer {
+                if let previous { defaults.set(previous, forKey: key) } else { defaults.removeObject(forKey: key) }
+                AppDelegate.shared = previousDelegate
+                storeDefaults.removePersistentDomain(forName: suite)
+                try? FileManager.default.removeItem(at: directory)
+            }
+            try #require(WorkspaceTodoFeature.isEnabled, "the area needs the status controls on in the test host")
+            try #require(AppDelegate.statusListInUse.source == .file, "the area needs a file list in use")
+            try body()
         }
-        try #require(WorkspaceTodoFeature.isEnabled, "the area needs the status controls on in the test host")
-        try #require(AppDelegate.statusListInUse.source == .file, "the area needs a file list in use")
-        try body()
     }
+
     private func makeManager() -> TabManager {
         TabManager(autoWelcomeIfNeeded: false, createInitialWorkspace: false)
     }
@@ -243,26 +246,26 @@ struct SidebarStatusAreaPlacementTests {
         ids(VerticalTabsSidebar.statusRenderItemsForSnapshot(tabManager: manager, state: state).items)
     }
 
-    /// `home, L2 | area | L1` with the area saved under L2; L2 is dropped below every row.
-    @Test func theAreaStaysPutWhenTheRowItWasSavedUnderMovesToTheEnd() throws {
-        try withStatusControlsOn {
+    /// Legacy middle placement becomes Statuses second before its above row moves. (#cm-110.4)
+    @Test func statusesSecondStaysAfterAllWorkspacesWhenItsLegacyAboveRowMovesToTheEnd() async throws { // (#cm-110.4)
+        try await withStatusControlsOn {
             let manager = makeManager()
             let home = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let l2 = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let l1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let state = SidebarState(statusGroups: .init(last: false, aboveRow: key(l2.id), belowRow: key(l1.id)))
-            #expect(render(manager, state) == [.workspace(home.id), .workspace(l2.id), .statusesArea(), .statusGroup("parked"), .workspace(l1.id)])
+            #expect(render(manager, state) == [.workspacesArea(), .workspace(home.id), .workspace(l2.id), .workspace(l1.id), .statusesArea(), .statusGroup("parked")]) // (#cm-110.4) supersedes cm-110.1's item-relative Statuses placement
 
             state.reanchorStatusAreaBeforeMove(tabManager: manager, movingWorkspaceIds: [l2.id], movingGroupIds: [])
             #expect(manager.reorderSidebarWorkspace(tabId: l2.id, toIndex: 2, isDragOperation: true, usesTopLevelRows: true))
 
             #expect(manager.tabs.map(\.id) == [home.id, l1.id, l2.id])
-            #expect(render(manager, state) == [.workspace(home.id), .statusesArea(), .statusGroup("parked"), .workspace(l1.id), .workspace(l2.id)])
+            #expect(render(manager, state) == [.workspacesArea(), .workspace(home.id), .workspace(l1.id), .workspace(l2.id), .statusesArea(), .statusGroup("parked")]) // (#cm-110.4) supersedes cm-110.1's item-relative Statuses placement
         }
     }
-    /// Control, the other direction: the row under the area moves above the row the area was saved under.
-    @Test func theAreaStaysPutWhenTheRowBelowItMovesAboveTheRowItWasSavedUnder() throws {
-        try withStatusControlsOn {
+    /// Moving the old below row upward also preserves the resolved section order. (#cm-110.4)
+    @Test func statusesSecondStaysAfterAllWorkspacesWhenItsLegacyBelowRowMovesUp() async throws { // (#cm-110.4)
+        try await withStatusControlsOn {
             let manager = makeManager()
             let home = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let l2 = manager.addWorkspace(autoWelcomeIfNeeded: false)
@@ -273,12 +276,12 @@ struct SidebarStatusAreaPlacementTests {
             #expect(manager.reorderSidebarWorkspace(tabId: l1.id, toIndex: 1, isDragOperation: true, usesTopLevelRows: true))
 
             #expect(manager.tabs.map(\.id) == [home.id, l1.id, l2.id])
-            #expect(render(manager, state) == [.workspace(home.id), .workspace(l1.id), .workspace(l2.id), .statusesArea(), .statusGroup("parked")])
+            #expect(render(manager, state) == [.workspacesArea(), .workspace(home.id), .workspace(l1.id), .workspace(l2.id), .statusesArea(), .statusGroup("parked")]) // (#cm-110.4) supersedes cm-110.1's item-relative Statuses placement
         }
     }
-    /// `home, G1 | area | G2, L1`: the group directly above the area is dragged below G2.
-    @Test func theAreaStaysAboveTheRowsThatDidNotMoveWhenTheGroupAboveItMoves() throws {
-        try withStatusControlsOn {
+    /// Moving the old above group preserves Statuses after every ordinary item. (#cm-110.4)
+    @Test func statusesSecondStaysAfterAllWorkspacesWhenItsLegacyAboveGroupMoves() async throws { // (#cm-110.4)
+        try await withStatusControlsOn {
             let manager = makeManager()
             let home = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let m1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
@@ -289,26 +292,25 @@ struct SidebarStatusAreaPlacementTests {
             let anchor1 = try #require(manager.workspaceGroupAnchor(for: g1)), anchor2 = try #require(manager.workspaceGroupAnchor(for: g2))
             manager.tabs = [home, anchor1, m1, anchor2, m2, l1]
             let state = SidebarState(statusGroups: .init(last: false, aboveRow: "group:\(g1.uuidString)", belowRow: "group:\(g2.uuidString)"))
-            #expect(render(manager, state) == [.workspace(home.id), .group(g1), .workspace(m1.id), .statusesArea(), .statusGroup("parked"),
-                                               .group(g2), .workspace(m2.id), .workspace(l1.id)])
+            #expect(render(manager, state) == [.workspacesArea(), .workspace(home.id), .group(g1), .workspace(m1.id), .group(g2), .workspace(m2.id), .workspace(l1.id), .statusesArea(), .statusGroup("parked")]) // (#cm-110.4) supersedes cm-110.1's item-relative Statuses placement
 
             state.reanchorStatusAreaBeforeMove(tabManager: manager, movingWorkspaceIds: [], movingGroupIds: [g1])
             manager.moveWorkspaceGroup(groupId: g1, toIndex: 1)
 
             #expect(manager.workspaceGroups.map(\.id) == [g2, g1])
-            #expect(render(manager, state) == [.workspace(home.id), .statusesArea(), .statusGroup("parked"), .group(g2), .workspace(m2.id),
-                                               .group(g1), .workspace(m1.id), .workspace(l1.id)])
+            #expect(render(manager, state) == [.workspacesArea(), .workspace(home.id), .group(g2), .workspace(m2.id), .group(g1), .workspace(m1.id), .workspace(l1.id), .statusesArea(), .statusGroup("parked")]) // (#cm-110.4) supersedes cm-110.1's item-relative Statuses placement
         }
     }
 
     /// `home, L2 | area | L1`: L2 is dropped back on its own place, so nothing moves and the area must not.
-    @Test func aWorkspaceReorderThatMovesNothingLeavesTheAreaWhereItWas() throws {
-        try withStatusControlsOn {
+    @Test func aWorkspaceReorderThatMovesNothingLeavesTheAreaWhereItWas() async throws {
+        try await withStatusControlsOn {
             let manager = makeManager()
             let home = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let l2 = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let l1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let state = SidebarState(statusGroups: .init(last: false, aboveRow: key(l2.id), belowRow: key(l1.id)))
+            #expect(state.prepareWorkspaceSections(tabManager: manager)) // (#cm-110.4) supersedes cm-110.1's pending middle-placement rollback
             let before = state.statusGroups
             let orderBefore = manager.tabs.map(\.id)
 
@@ -318,12 +320,12 @@ struct SidebarStatusAreaPlacementTests {
 
             #expect(manager.tabs.map(\.id) == orderBefore)
             #expect(state.statusGroups == before)
-            #expect(render(manager, state) == [.workspace(home.id), .workspace(l2.id), .statusesArea(), .statusGroup("parked"), .workspace(l1.id)])
+            #expect(render(manager, state) == [.workspacesArea(), .workspace(home.id), .workspace(l2.id), .workspace(l1.id), .statusesArea(), .statusGroup("parked")]) // (#cm-110.4) supersedes cm-110.1's item-relative Statuses placement
         }
     }
     /// The same for a group header dropped on its own slot, and a move that did happen keeps its new anchors.
-    @Test func aGroupReorderThatMovesNothingLeavesTheAreaWhereItWas() throws {
-        try withStatusControlsOn {
+    @Test func aGroupReorderThatMovesNothingLeavesTheAreaWhereItWas() async throws {
+        try await withStatusControlsOn {
             let manager = makeManager()
             let home = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let m1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
@@ -332,6 +334,7 @@ struct SidebarStatusAreaPlacementTests {
             let anchor1 = try #require(manager.workspaceGroupAnchor(for: g1))
             manager.tabs = [home, anchor1, m1, l1]
             let state = SidebarState(statusGroups: .init(last: false, aboveRow: "group:\(g1.uuidString)", belowRow: key(l1.id)))
+            #expect(state.prepareWorkspaceSections(tabManager: manager)) // (#cm-110.4) supersedes cm-110.1's pending middle-placement rollback
             let before = state.statusGroups
             let groupsBefore = manager.workspaceGroups.map(\.id)
 
@@ -340,7 +343,7 @@ struct SidebarStatusAreaPlacementTests {
             state.settleStatusAreaAfterMove(previous: previous, moved: manager.workspaceGroups.map(\.id) != groupsBefore)
 
             #expect(state.statusGroups == before)
-            #expect(render(manager, state) == [.workspace(home.id), .group(g1), .workspace(m1.id), .statusesArea(), .statusGroup("parked"), .workspace(l1.id)])
+            #expect(render(manager, state) == [.workspacesArea(), .workspace(home.id), .group(g1), .workspace(m1.id), .workspace(l1.id), .statusesArea(), .statusGroup("parked")]) // (#cm-110.4) supersedes cm-110.1's item-relative Statuses placement
         }
     }
 

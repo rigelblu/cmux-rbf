@@ -105,9 +105,11 @@ public struct SidebarStatusGroupDropRules: Sendable {
                 return .statusGroup(.init(statusId: id, placement: placement,
                     setsStatus: !group.memberWorkspaceIds.contains(request.source.workspaceId), indicator: indicator))
             }
+            if row.kind == .workspaceSectionHeader { return .refused } // (#cm-110.4)
             if row.kind == .statusesArea {
                 guard request.source.isLocal else { return .unrelated }
                 guard request.controlsEnabled, request.hasUserStatusList else { return .refused }
+                if targets.contains(where: { $0.kind == .workspaceSectionHeader }) { return .refused } // (#cm-110.4) a mixed legacy target list still refuses section-header drops
                 if case .workspaceGroupHeader = request.source.kind {
                     return .areaBoundary(.aboveArea, indicator: .init(tabId: row.workspaceId, edge: .top))
                 }

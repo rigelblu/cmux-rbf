@@ -9,6 +9,7 @@ extension SidebarWorkspaceRenderItem {
     var headerDropIdentity: UUID? {
         switch self {
         case .statusesHeader: return SidebarStatusHeaderIdentity.statusesAreaUUID
+        case .workspacesHeader: return SidebarStatusHeaderIdentity.workspacesAreaUUID
         case .statusGroupHeader(let id): return SidebarStatusHeaderIdentity.uuid(forStatusId: id)
         case .colorSectionHeader: return id.colorHeaderDropIdentity
         default: return rowWorkspaceId
@@ -164,11 +165,11 @@ extension VerticalTabsSidebar {
               SidebarStatusHeaderDragSession.shared.acceptsCommit(headerId: draggedId, windowId: windowId,
                 sessionId: token, dragState: dragState) else { return .refused }
         let statusId: String?
-        switch kind { case .statusesArea: statusId = nil; case .statusGroup(let id): statusId = id }
+        switch kind { case .statusesArea: statusId = nil; case .statusGroup(let id): statusId = id; case .workspacesArea: statusId = nil }
         let layout = SidebarStatusAreaLayout(items: context.workspaceRenderItems, tabs: context.tabs,
             groups: context.workspaceGroups, statusProjection: context.statusGroupProjection)
         guard let plan = SidebarStatusHeaderDropPlanner().plan(point: point, draggedStatusId: statusId,
-            targets: layout.headerDropTargets(measured: targets)) else { return .refused }
+            targets: layout.headerDropTargets(measured: targets), draggedWorkspacesArea: kind == .workspacesArea) else { return .refused }
         let action: SidebarWorkspaceReorderDropAction
         switch plan.action {
         case .statusGroup(let target, let before):
@@ -187,7 +188,7 @@ extension VerticalTabsSidebar {
         for target in targets {
             guard let rowId = target.renderItemId, let item = byId[rowId] else { result.append(target); continue }
             switch item {
-            case .statusesHeader, .statusGroupHeader:
+            case .statusesHeader, .workspacesHeader, .statusGroupHeader:
                 if target.frame.contains(point) { return nil }
             case .colorSectionHeader: break
             default: result.append(target)
@@ -213,6 +214,7 @@ extension VerticalTabsSidebar {
               let indicator = plan.indicator else { return false }
         return SidebarStatusHeaderDragSession.shared.commitIfAccepted(headerId: plan.draggedWorkspaceId,
             windowId: windowId, sessionId: token, dragState: dragState) {
+                sidebarState.prepareWorkspaceSections(tabManager: tabManager) // (#cm-110.4)
                 let items = Self.statusRenderItemsForSnapshot(tabManager: tabManager, state: sidebarState).items
                 let projection = Self.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: sidebarState.statusGroups?.order)
                 let layout = SidebarStatusAreaLayout(items: items, tabs: tabManager.tabs,

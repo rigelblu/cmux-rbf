@@ -72,6 +72,7 @@ private struct SidebarStatusHeaderDragView<Content: View>: View {
 
 struct SidebarStatusHeaderSwiftUIRows {
     let area: AnyView
+    let workspaces: AnyView
     let groups: [String: AnyView]
     let colors: [SidebarWorkspaceRenderItemID: SidebarStatusHeaderDropPaint]
     let colorFrameChanged: (SidebarWorkspaceRenderItemID, CGRect) -> Void
@@ -99,6 +100,7 @@ extension VerticalTabsSidebar {
             let level: Int
             switch kind {
             case .statusesArea: row = .statusesArea(); level = 0
+            case .workspacesArea: row = .workspacesArea(); level = 0
             case .statusGroup(let id): row = .statusGroup(id); level = 1
             }
             let isSource = draggedId == id
@@ -113,6 +115,9 @@ extension VerticalTabsSidebar {
         }
         let area = wrapped(Self.sidebarStatusesAreaHeaderRow(renderContext: renderContext,
             unreadSnapshot: unreadSnapshot, onToggle: { toggle(.statusesArea) }), kind: .statusesArea)
+        let workspaces = wrapped(Self.sidebarWorkspacesAreaHeaderRow(folds: renderContext.statusGroupFolds,
+            memberIds: renderContext.workspacesSectionMemberIds,
+            unreadSnapshot: unreadSnapshot, onToggle: { toggle(.workspacesArea) }), kind: .workspacesArea)
         var groups: [String: AnyView] = [:]
         for group in renderContext.statusGroupProjection?.groups ?? [] {
             let id = group.statusId
@@ -129,7 +134,7 @@ extension VerticalTabsSidebar {
             colors[item.id] = .forRow(id, draggedId: draggedId, indicator: indicator,
                 rowIds: rowIds, level: 0, availableWidth: renderContext.listWidth)
         }
-        return .init(area: area, groups: groups, colors: colors, colorFrameChanged: { row, frame in
+        return .init(area: area, workspaces: workspaces, groups: groups, colors: colors, colorFrameChanged: { row, frame in
             guard let id = row.colorHeaderDropIdentity else { return }
             monitor.setWorkspaceDragEnabled(false, for: row)
             monitor.updateFrame(frame, for: row, workspaceId: id)

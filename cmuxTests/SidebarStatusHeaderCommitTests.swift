@@ -98,4 +98,26 @@ struct SidebarStatusHeaderCommitTests {
                                              validTopLevelRowIds: ["workspace:live"]))
         #expect(state.statusGroups == before)
     }
+
+    @Test func sectionDropChangesOnlyWindowSectionOrderAndSameOrderRetainsRecord() {
+        for source in [SidebarStatusHeaderKind.workspacesArea, .statusesArea] {
+            let original = WorkspaceStatusGroupsState(areaCollapsed: true, collapsedStatusIds: ["a", "unknown"],
+                order: ["c", "unknown", "a", "b"], sectionOrder: .workspacesFirst, workspacesCollapsed: true)
+            let state = SidebarState(statusGroups: original), other = SidebarState(statusGroups: original)
+            for last in [false, false, true, true] {
+                #expect(state.commitStatusHeaderDrop(source: source,
+                    plan: plan(.area(aboveRow: "top", belowRow: nil, last: last)), list: Self.list, controlsEnabled: true))
+                let record = state.statusGroups
+                #expect(record?.sectionOrder == (last ? .workspacesFirst : .statusesFirst))
+                #expect(record?.aboveRow == "top" && record?.belowRow == nil && record?.last == last)
+                #expect(record?.areaCollapsed == original.areaCollapsed && record?.workspacesCollapsed == true)
+                #expect(record?.order == original.order && record?.collapsedStatusIds == original.collapsedStatusIds)
+                #expect(other.statusGroups == original)
+                #expect(!state.commitStatusHeaderDrop(source: source,
+                    plan: plan(.area(aboveRow: "workspace:middle", belowRow: "workspace:end", last: false)),
+                    list: Self.list, controlsEnabled: true, validTopLevelRowIds: ["workspace:middle", "workspace:end"]))
+                #expect(state.statusGroups == record)
+            }
+        }
+    }
 }

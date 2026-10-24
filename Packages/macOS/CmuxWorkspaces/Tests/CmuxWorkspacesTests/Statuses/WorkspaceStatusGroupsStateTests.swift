@@ -61,4 +61,53 @@ import Testing
         #expect(!state.collapsedStatusIds.contains("parked"))
         #expect(state.collapsedStatusIds.contains("done"))
     }
+
+    @Test func sectionStateRoundTripsWithoutChangingInnerFolds() throws {
+        let data = Data(#"{"areaCollapsed":true,"collapsedStatusIds":["parked"],"order":["parked","next"],"sectionOrder":"statusesFirst","workspacesCollapsed":true,"last":false,"aboveRow":"top"}"#.utf8)
+        let state = try JSONDecoder().decode(WorkspaceStatusGroupsState.self, from: data)
+        let saved = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(state)) as? [String: Any])
+        #expect(saved["sectionOrder"] as? String == "statusesFirst")
+        #expect(saved["workspacesCollapsed"] as? Bool == true)
+        #expect(state.areaCollapsed)
+        #expect(state.collapsedStatusIds == ["parked"])
+        #expect(state.order == ["parked", "next"])
+    }
+
+    @Test func pendingLegacyRecordsKeepTheirPlacementUntilMigration() throws {
+        let state = WorkspaceStatusGroupsState(areaCollapsed: true, collapsedStatusIds: ["parked"],
+            last: false, aboveRow: "workspace:old", belowRow: "workspace:next")
+        let saved = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(state)) as? [String: Any])
+        #expect(saved["sectionOrder"] == nil)
+        #expect(saved["workspacesCollapsed"] == nil)
+        #expect(saved["aboveRow"] as? String == "workspace:old")
+        #expect(saved["belowRow"] as? String == "workspace:next")
+        #expect(saved["last"] as? Bool == false)
+    }
+
+    @Test func unknownSectionOrderDoesNotLoseWindow() throws {
+        let data = Data(#"{"sectionOrder":"future-order","workspacesCollapsed":true,"areaCollapsed":true,"collapsedStatusIds":["parked"],"last":true,"aboveRow":"workspace:old"}"#.utf8)
+        let state = try JSONDecoder().decode(WorkspaceStatusGroupsState.self, from: data)
+        #expect(state.sectionOrder == nil)
+        #expect(state.workspacesCollapsed == true)
+        #expect(state.areaCollapsed && state.collapsedStatusIds == ["parked"])
+        #expect(state.last == true && state.aboveRow == "workspace:old")
+    }
+
+    @Test(arguments: WorkspaceSectionOrder.allCases)
+    func canonicalMirrorsDecodeWithReleasedState(_ order: WorkspaceSectionOrder) throws {
+        var state = WorkspaceStatusGroupsState(areaCollapsed: true, collapsedStatusIds: ["parked"],
+            order: ["next", "parked"], sectionOrder: order, workspacesCollapsed: true)
+        // A stale legacy writer may alter only the copy; saving must still obey the primary order.
+        state.aboveRow = "workspace:stale"
+        state.belowRow = "workspace:other"
+        state.last = order != .workspacesFirst
+        let data = try JSONEncoder().encode(state)
+        let old = try JSONDecoder().decode(ReleasedWorkspaceStatusGroupsState.self, from: data)
+        #expect(old.last == (order == .workspacesFirst))
+        #expect(old.aboveRow == "top" && old.belowRow == nil)
+        #expect(old.areaCollapsed && old.collapsedStatusIds == ["parked"])
+        #expect(old.order == ["next", "parked"])
+        let downgraded = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        #expect(downgraded["sectionOrder"] == nil && downgraded["workspacesCollapsed"] == nil)
+    }
 }

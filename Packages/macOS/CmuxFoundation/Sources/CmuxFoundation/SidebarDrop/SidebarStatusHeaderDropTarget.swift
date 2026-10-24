@@ -8,15 +8,17 @@ public struct SidebarStatusHeaderDropTarget: Equatable, Sendable {
     public let topLevelRowId: String?
     public let statusId: String?
     public let isStatusesArea: Bool
+    public let isWorkspacesArea: Bool
     public let isPinned: Bool
 
     public init(rowId: UUID, frame: CGRect, topLevelRowId: String? = nil,
-                statusId: String? = nil, isStatusesArea: Bool = false, isPinned: Bool = false) {
+                statusId: String? = nil, isStatusesArea: Bool = false, isPinned: Bool = false, isWorkspacesArea: Bool = false) {
         self.rowId = rowId
         self.frame = frame
         self.topLevelRowId = topLevelRowId
         self.statusId = statusId
         self.isStatusesArea = isStatusesArea
         self.isPinned = isPinned
+        self.isWorkspacesArea = isWorkspacesArea
     }
 }
