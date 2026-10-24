@@ -191,6 +191,7 @@ struct WorkspaceGroupNestedScenario45Tests {
             case .colorSectionHeader: return "color"
             case .statusesHeader: return "statuses" // (#cm-110.1)
             case .workspacesHeader: return "workspaces" // (#cm-110.4)
+            case .pinnedHeader: return "pinned" // (#cm-110.5)
             case .statusGroupHeader(let statusId): return "status(\(statusId))" // (#cm-110.1)
             }
         }

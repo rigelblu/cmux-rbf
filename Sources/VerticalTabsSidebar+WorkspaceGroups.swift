@@ -140,7 +140,7 @@ extension VerticalTabsSidebar {
             selectedTabIds: $selectedTabIds,
             lastSidebarSelectionIndex: $lastSidebarSelectionIndex
         )
-        return SidebarWorkspaceTableRowConfiguration(
+        var configuration = SidebarWorkspaceTableRowConfiguration( // (#cm-110.5)
             groupHeaderModel: model,
             actions: actions,
             environment: renderContext.environment,
@@ -177,7 +177,37 @@ extension VerticalTabsSidebar {
                 return fresh
             }
         )
+        configuration.dropTabIds = Self.groupDropTabIds(group: group, tabIds: renderContext.tabIds, // (#cm-110.5)
+            groupIdByWorkspaceId: renderContext.workspaceGroupIdByWorkspaceId, groupsById: renderContext.workspaceGroupById) // (#cm-110.5)
+        configuration.isPinnedByGroup = Self.isPinnedByGroup(groupId: group.id, groupsById: renderContext.workspaceGroupById) // (#cm-110.5)
+        return configuration // (#cm-110.5)
     }
+
+    /// Whether a pinned group holds the row, at any level: the group is pinned, or a group above it is. (#cm-110.5)
+    static func isPinnedByGroup(groupId: UUID?, groupsById: [UUID: WorkspaceGroup]) -> Bool { // (#cm-110.5)
+        var next = groupId // (#cm-110.5)
+        var seen: Set<UUID> = [] // (#cm-110.5)
+        while let id = next, seen.insert(id).inserted, let group = groupsById[id] { // (#cm-110.5)
+            if group.isPinned { return true } // (#cm-110.5)
+            next = group.parentGroupId // (#cm-110.5)
+        } // (#cm-110.5)
+        return false // (#cm-110.5)
+    } // (#cm-110.5)
+
+    /// The workspaces a group's header stands for beside a dropped tab: its anchor, or, folded, everything it holds (nested groups too); none for a model-empty group. (#cm-110.5)
+    static func groupDropTabIds(group: WorkspaceGroup, tabIds: [UUID], groupIdByWorkspaceId: [UUID: UUID?], groupsById: [UUID: WorkspaceGroup]) -> [UUID] { // (#cm-110.5)
+        guard group.isCollapsed else { return group.liveAnchorWorkspaceId.map { [$0] } ?? [] } // (#cm-110.5)
+        func holds(_ workspaceId: UUID) -> Bool { // (#cm-110.5)
+            var next = groupIdByWorkspaceId[workspaceId] ?? nil // (#cm-110.5)
+            var seen: Set<UUID> = [] // (#cm-110.5)
+            while let groupId = next, seen.insert(groupId).inserted { // (#cm-110.5)
+                if groupId == group.id { return true } // (#cm-110.5)
+                next = groupsById[groupId]?.parentGroupId // (#cm-110.5)
+            } // (#cm-110.5)
+            return false // (#cm-110.5)
+        } // (#cm-110.5)
+        return tabIds.filter { $0 == group.liveAnchorWorkspaceId || holds($0) } // (#cm-110.5)
+    } // (#cm-110.5)
 
     func sidebarWorkspaceGroupRowSnapshot(
         group: WorkspaceGroup,

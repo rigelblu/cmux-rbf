@@ -12057,6 +12057,7 @@ struct VerticalTabsSidebar: View, Equatable {
         let statusGroupProjection: WorkspaceStatusGroupProjection? // (#cm-110.1)
         let statusGroupFolds: WorkspaceStatusGroupsState // (#cm-110.1)
         let workspacesSectionMemberIds: Set<UUID> // (#cm-110.4)
+        let pinnedSectionMemberIds: Set<UUID> // (#cm-110.5)
         /// What each status group's header shows, read once here above the lists so no row reads the status store. (#cm-110.1)
         let statusGroupPresentationById: [String: SidebarStatusGroupPresentation] // (#cm-110.1)
         let workspaceRenderItems: [SidebarWorkspaceRenderItem]
@@ -12073,6 +12074,7 @@ struct VerticalTabsSidebar: View, Equatable {
             copy.listWidth = width
             return copy
         }
+
 
         var workspaceIds: [UUID] { tabIds }
     }
@@ -12261,6 +12263,7 @@ struct VerticalTabsSidebar: View, Equatable {
             statusGroupProjection: statusGroupProjection, // (#cm-110.1)
             statusGroupFolds: sidebarState.statusGroups ?? WorkspaceStatusGroupsState(), // (#cm-110.1)
             workspacesSectionMemberIds: statusRenderItems.workspacesSectionMemberIds, // (#cm-110.4)
+            pinnedSectionMemberIds: statusRenderItems.pinnedSectionMemberIds, // (#cm-110.5)
             statusGroupPresentationById: Self.statusGroupPresentations(projection: statusGroupProjection), // (#cm-110.1)
             workspaceRenderItems: workspaceRenderItems,
             visibleWorkspaceRowIds: visibleWorkspaceRowIds,
@@ -12850,7 +12853,7 @@ struct VerticalTabsSidebar: View, Equatable {
                     colorScheme: renderContext.environment.colorScheme,
                     onToggle: { sidebarState.toggleColorSection(hex: section.id.normalizedHex) }
                 )
-                return SidebarWorkspaceTableRowConfiguration(
+                var configuration = SidebarWorkspaceTableRowConfiguration(
                     id: .colorSection(section.id),
                     workspaceId: section.memberWorkspaceIds[0],
                     groupId: nil,
@@ -12861,10 +12864,14 @@ struct VerticalTabsSidebar: View, Equatable {
                     equivalenceValue: header,
                     makeContent: { _, _ in AnyView(header) }
                 )
+                configuration.dropTabIds = section.isCollapsed ? section.memberWorkspaceIds : [] // (#cm-110.5) a folded color section stands for the members it hides
+                return configuration // (#cm-110.5)
             case .statusesHeader: // (#cm-110.1)
                 return sidebarStatusesAreaTableConfiguration(renderContext: renderContext) // (#cm-110.1)
             case .workspacesHeader: // (#cm-110.4)
                 return sidebarWorkspacesAreaTableConfiguration(renderContext: renderContext) // (#cm-110.4)
+            case .pinnedHeader: // (#cm-110.5)
+                return sidebarPinnedAreaTableConfiguration(renderContext: renderContext) // (#cm-110.5)
             case .statusGroupHeader(let statusId): // (#cm-110.1)
                 return sidebarStatusGroupTableConfiguration(statusId: statusId, renderContext: renderContext) // (#cm-110.1)
             case .workspace(let workspaceId):
@@ -13246,7 +13253,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 tabManager?.setCustomTitle(tabId: workspaceId, title: text)
             }
         )
-        return SidebarWorkspaceTableRowConfiguration(
+        var configuration = SidebarWorkspaceTableRowConfiguration(
             workspaceRowModel: model,
             actions: rowActions,
             groupId: input.groupId,
@@ -13264,6 +13271,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 return fresh
             }
         )
+        configuration.isPinnedByGroup = Self.isPinnedByGroup(groupId: input.groupId, groupsById: renderContext.workspaceGroupById) // (#cm-110.5)
+        return configuration // (#cm-110.5)
     }
 
 
@@ -14633,6 +14642,8 @@ struct VerticalTabsSidebar: View, Equatable {
                     statusHeaderRows.area // (#cm-110.1)
                 case .workspacesHeader: // (#cm-110.4)
                     statusHeaderRows.workspaces // (#cm-110.4)
+                case .pinnedHeader: // (#cm-110.5)
+                    statusHeaderRows.pinned // (#cm-110.5)
                 case .statusGroupHeader(let statusId): // (#cm-110.1)
                     if let row = statusHeaderRows.groups[statusId] { row } // (#cm-110.1)
                 case .workspace(let workspaceId):

@@ -11,6 +11,7 @@ enum SidebarStatusHeaderIdentity { // (#cm-110.1)
     /// Fixed deterministic UUID for the `Statuses` header row.
     static let statusesAreaUUID = deterministicUUID(name: "cmux:statuses-area")
     static let workspacesAreaUUID = deterministicUUID(name: "cmux:workspaces-area") // (#cm-110.4)
+    static let pinnedAreaUUID = deterministicUUID(name: "cmux:pinned-area") // (#cm-110.5)
 
     /// Deterministic UUID for a status group header by status id. Cached: a row's `id` reads it on every list diff,
     /// and the hash allocates.
@@ -22,6 +23,7 @@ enum SidebarStatusHeaderIdentity { // (#cm-110.1)
         switch kind {
         case .statusesArea: return statusesAreaUUID
         case .workspacesArea: return workspacesAreaUUID // (#cm-110.4)
+        case .pinnedArea: return pinnedAreaUUID // (#cm-110.5)
         case .statusGroup(let id): return uuid(forStatusId: id)
         }
     }
@@ -30,6 +32,7 @@ enum SidebarStatusHeaderIdentity { // (#cm-110.1)
         guard list.source != .cmux, !list.entries.isEmpty else { return nil }
         if id == statusesAreaUUID { return .statusesArea }
         if id == workspacesAreaUUID { return .workspacesArea } // (#cm-110.4)
+        if id == pinnedAreaUUID { return .pinnedArea } // (#cm-110.5)
         return list.entries.first { uuid(forStatusId: $0.id) == id }.map { .statusGroup($0.id) }
     }
 

@@ -6,12 +6,14 @@ public enum SidebarStatusHeaderKind: Equatable, Hashable, Sendable { // (#cm-110
     case statusesArea
     /// The ordinary workspace section, below pinned rows.
     case workspacesArea
+    /// The root `Pinned` area header above pinned rows.
+    case pinnedArea // (#cm-110.5)
     /// A header for a specific status group in the user's file.
     case statusGroup(String)
 
     var isSection: Bool {
         switch self {
-        case .statusesArea, .workspacesArea: return true
+        case .statusesArea, .workspacesArea, .pinnedArea: return true
         case .statusGroup: return false
         }
     }

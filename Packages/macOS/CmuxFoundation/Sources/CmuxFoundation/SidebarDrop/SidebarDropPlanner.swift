@@ -214,16 +214,26 @@ public struct SidebarDropPlanner {
         /// The row frame in the coordinate space used for drop hit testing.
         public let frame: CGRect
 
+        /// The workspaces the row stands for, so a line beside it can be found in the tab order by id. A workspace row has itself, a header row none, a folded group, section or status group all its hidden members. // (#cm-110.5)
+        public let tabIds: [UUID] // (#cm-110.5)
+
+        /// Whether the row is a section header (`Pinned`, `Workspaces` or `Statuses`): a tab let go anywhere inside it, its top-edge band too, is refused. A status group's header and a color group's header are not. // (#cm-110.5)
+        public let isSectionHeader: Bool // (#cm-110.5)
+
         /// Creates a workspace drop target from a row snapshot.
         ///
         /// - Parameters:
         ///   - workspaceId: The workspace represented by the row.
         ///   - isPinned: Whether the row is in the pinned workspace section.
         ///   - frame: The row frame in drop-overlay coordinates.
-        public init(workspaceId: UUID, isPinned: Bool, frame: CGRect) {
+        ///   - tabIds: The workspaces the row stands for; `nil` means the row's own workspace. // (#cm-110.5)
+        ///   - isSectionHeader: Whether the row is a `Pinned`, `Workspaces` or `Statuses` header. // (#cm-110.5)
+        public init(workspaceId: UUID, isPinned: Bool, frame: CGRect, tabIds: [UUID]? = nil, isSectionHeader: Bool = false) { // (#cm-110.5)
             self.workspaceId = workspaceId
             self.isPinned = isPinned
             self.frame = frame
+            self.tabIds = tabIds ?? [workspaceId] // (#cm-110.5)
+            self.isSectionHeader = isSectionHeader // (#cm-110.5)
         }
     }
 
@@ -301,6 +311,7 @@ public struct SidebarDropPlanner {
         orderedTargets: [WorkspaceDropTarget]
     ) -> WorkspaceDropAction? {
         guard let targetIndex = orderedTargets.firstIndex(of: target) else { return nil }
+        if target.isSectionHeader { return nil } // (#cm-110.5) 02_decisions 2026-10-25 ruling (19): a tab let go inside a section header row is refused, with no line
         let edgeBand = min(max(target.frame.height * 0.25, 10), target.frame.height / 2)
         if point.y <= target.frame.minY + edgeBand {
             let insertionIndex = legalNewWorkspaceInsertionIndex(targetIndex, orderedTargets: orderedTargets)
@@ -318,6 +329,47 @@ public struct SidebarDropPlanner {
         }
         return .existingWorkspace(target.workspaceId)
     }
+
+    /// Where, in the tab order, a new workspace goes for a line at a row position; the app resolves it against its tabs. // (#cm-110.5)
+    public enum NewWorkspacePlacement: Equatable { // (#cm-110.5)
+        /// Before the first of these workspaces in the tab order. // (#cm-110.5)
+        case before([UUID]) // (#cm-110.5)
+        /// After the last of these workspaces in the tab order. // (#cm-110.5)
+        case after([UUID]) // (#cm-110.5)
+        /// Loose, at the end of the tab order. // (#cm-110.5)
+        case end // (#cm-110.5)
+
+        /// The index in `tabOrder` the new workspace is inserted at: before the first, or after the last, of the named workspaces that are in it; the end if none is. // (#cm-110.5)
+        public func tabIndex(in tabOrder: [UUID]) -> Int { // (#cm-110.5)
+            switch self { // (#cm-110.5)
+            case .before(let ids): // (#cm-110.5)
+                return tabOrder.firstIndex { ids.contains($0) } ?? tabOrder.count // (#cm-110.5)
+            case .after(let ids): // (#cm-110.5)
+                return tabOrder.lastIndex { ids.contains($0) }.map { $0 + 1 } ?? tabOrder.count // (#cm-110.5)
+            case .end: // (#cm-110.5)
+                return tabOrder.count // (#cm-110.5)
+            } // (#cm-110.5)
+        } // (#cm-110.5)
+    } // (#cm-110.5)
+
+    /// The place in the tab order for a line at `rowPosition` among `targets`, found by the workspaces of the rows beside the line, never by a count. // (#cm-110.5)
+    ///
+    /// A line above a row that stands for workspaces goes before them. A line above a header row, reached from the bottom edge // (#cm-110.5)
+    /// of the row above it or from the gap between rows, goes after the nearest workspaces above it, and a folded group or section // (#cm-110.5)
+    /// stands for its hidden members. Below every row it is the end. A tab let go inside a section header row never gets here: // (#cm-110.5)
+    /// the action is refused first (ruling 19). // (#cm-110.5)
+    public func newWorkspacePlacement(atRowPosition rowPosition: Int, targets: OrderedWorkspaceDropTargets) -> NewWorkspacePlacement { // (#cm-110.5)
+        newWorkspacePlacement(atRowPosition: rowPosition, orderedTargets: targets.targets) // (#cm-110.5)
+    } // (#cm-110.5)
+
+    private func newWorkspacePlacement(atRowPosition rowPosition: Int, orderedTargets targets: [WorkspaceDropTarget]) -> NewWorkspacePlacement { // (#cm-110.5)
+        let position = max(0, min(rowPosition, targets.count)) // (#cm-110.5)
+        guard position < targets.count else { return .end } // (#cm-110.5)
+        if !targets[position].tabIds.isEmpty { return .before(targets[position].tabIds) } // (#cm-110.5)
+        if let above = targets[..<position].last(where: { !$0.tabIds.isEmpty }) { return .after(above.tabIds) } // (#cm-110.5)
+        if let below = targets[position...].first(where: { !$0.tabIds.isEmpty }) { return .before(below.tabIds) } // (#cm-110.5)
+        return .end // (#cm-110.5)
+    } // (#cm-110.5)
 
     private func legalNewWorkspaceInsertionIndex(
         _ proposedInsertion: Int,

@@ -81,6 +81,7 @@ import CmuxWorkspaces
             statusGroupProjection: f.projection
         , groups: [])
         let expected: [SidebarWorkspaceRenderItem] = [
+            .workspacesHeader, // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
             .workspace(workspaceId: f.wA),
             .workspace(workspaceId: f.wD),
             .statusesHeader,
@@ -150,7 +151,9 @@ import CmuxWorkspaces
             .statusesHeader, .statusGroupHeader(statusId: "next"), .workspace(workspaceId: wLoose),
         ]
         #expect(Self.ids(Array(resolution.items.suffix(3))) == Self.ids(area))
-        let nestedWithoutLoose = nestedItems.filter { $0.id != SidebarWorkspaceRenderItem.workspace(workspaceId: wLoose).id }
+        // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
+        let nestedWithoutLoose = [SidebarWorkspaceRenderItem.workspacesHeader]
+            + nestedItems.filter { $0.id != SidebarWorkspaceRenderItem.workspace(workspaceId: wLoose).id }
         #expect(Self.ids(Array(resolution.items.dropLast(3))) == Self.ids(nestedWithoutLoose))
         #expect(resolution.items.contains { item in
             if case .groupHeader(let id, _) = item, id == gChild { return true }
@@ -457,7 +460,8 @@ import CmuxWorkspaces
         )
     }
 
-    private func as34Items(rows: [Workspace], groups: [WorkspaceGroup], showsArea: Bool = true) -> [SidebarWorkspaceRenderItem] {
+    /// `knowsGroups` hands the tabs and groups to the resolver, which is how it finds the pinned tier (a `Pinned` section needs them). // (#cm-110.5)
+    private func as34Items(rows: [Workspace], groups: [WorkspaceGroup], showsArea: Bool = true, knowsGroups: Bool = false) -> [SidebarWorkspaceRenderItem] {
         Sidebar.resolveRenderItems(
             colorSectionProjection: SidebarWorkspaceColorSectionProjection.project(
                 workspaces: rows.map { .init(id: $0.id, groupId: $0.groupId, isPinned: $0.isPinned, customColor: $0.customColor) },
@@ -469,7 +473,7 @@ import CmuxWorkspaces
             statusGroupProjection: showsArea ? WorkspaceStatusGroupProjection(groups: [
                 WorkspaceStatusGroup(statusId: "next", memberWorkspaceIds: []),
             ]) : nil
-        , groups: []).items
+        , tabs: knowsGroups ? rows : [], groups: knowsGroups ? groups : []).items
     }
 
     @Test(arguments: [false, true])
@@ -510,7 +514,8 @@ import CmuxWorkspaces
                 WorkspaceStatusGroup(statusId: "next", memberWorkspaceIds: []),
             ])
         , groups: []).items
-        #expect(Self.ids(items) == Self.ids(base + [.statusesHeader, .statusGroupHeader(statusId: "next")]))
+        // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
+        #expect(Self.ids(items) == Self.ids([.workspacesHeader] + base + [.statusesHeader, .statusGroupHeader(statusId: "next")]))
     }
 
     // Cold tests: keep the drawn order as the oracle, including the real UI's
@@ -839,7 +844,8 @@ import CmuxWorkspaces
         let workspace = try #require(source.detachWorkspace(tabId: dragged))
         manager.attachWorkspace(workspace, at: rawIndex, select: false)
         let hItem = SidebarWorkspaceRenderItem.groupHeader(groupId: groupId, anchorWorkspaceId: anchor)
-        let expected: [SidebarWorkspaceRenderItem] =
+        // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
+        let expected: [SidebarWorkspaceRenderItem] = [.workspacesHeader] +
             (edge == .top ? [.workspace(workspaceId: dragged), hItem] : [hItem, .workspace(workspaceId: dragged)])
             + loose.map { .workspace(workspaceId: $0) }
             + [.statusesHeader, .statusGroupHeader(statusId: "next")]
@@ -878,6 +884,7 @@ import CmuxWorkspaces
         rows[1].groupId = live.id
         rows[2].groupId = live.id
         #expect(Self.ids(as34Items(rows: rows, groups: [before, live, trailing])) == Self.ids([
+            .workspacesHeader, // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
             .workspace(workspaceId: rows[0].id),
             .groupHeader(groupId: before.id, anchorWorkspaceId: before.anchorWorkspaceId),
             .groupHeader(groupId: live.id, anchorWorkspaceId: live.anchorWorkspaceId),
@@ -897,6 +904,7 @@ import CmuxWorkspaces
         rows[2].groupId = second.id
         rows[3].groupId = second.id
         #expect(Self.ids(as34Items(rows: rows, groups: [first, empty, second])) == Self.ids([
+            .workspacesHeader, // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
             .groupHeader(groupId: first.id, anchorWorkspaceId: first.anchorWorkspaceId),
             .workspace(workspaceId: rows[1].id),
             .groupHeader(groupId: empty.id, anchorWorkspaceId: empty.anchorWorkspaceId),
@@ -911,8 +919,10 @@ import CmuxWorkspaces
         let anchorOnly = as34Group(anchor: .workspace(rows[0].id))
         let trailing = as34Group(anchor: .empty(UUID()))
         rows[0].groupId = anchorOnly.id
-        #expect(Self.ids(as34Items(rows: rows, groups: [pinned, anchorOnly, trailing])) == Self.ids([
+        #expect(Self.ids(as34Items(rows: rows, groups: [pinned, anchorOnly, trailing], knowsGroups: true)) == Self.ids([
+            .pinnedHeader, // 02_decisions 2026-10-23 (cm-110.5): "pinned workspaces sit in a `Pinned` section at the very top"
             .groupHeader(groupId: pinned.id, anchorWorkspaceId: pinned.anchorWorkspaceId),
+            .workspacesHeader, // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
             .groupHeader(groupId: anchorOnly.id, anchorWorkspaceId: anchorOnly.anchorWorkspaceId),
             .workspace(workspaceId: rows[1].id), .workspace(workspaceId: rows[2].id),
             .groupHeader(groupId: trailing.id, anchorWorkspaceId: trailing.anchorWorkspaceId),

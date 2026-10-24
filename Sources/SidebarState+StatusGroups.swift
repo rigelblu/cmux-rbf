@@ -79,8 +79,11 @@ extension SidebarState {
             workspaceGroups: workspaceGroups) else { return }
         let statusId = projection.workspaceGroups?.statusIdByWorkspaceId[workspace.id]
             ?? projection.groups.first(where: { $0.memberWorkspaceIds.contains(workspace.id) })?.statusId
-        if let statusId { next.reveal(statusId: statusId) }
-        else if revealWorkspaces, WorkspaceTodoFeature.isEnabled, next.sectionOrder != nil, !item.isPinned {
+        if revealWorkspaces, WorkspaceTodoFeature.isEnabled, item.isPinned { // (#cm-110.5)
+            next.revealPinned()
+        } else if let statusId {
+            next.reveal(statusId: statusId)
+        } else if revealWorkspaces, WorkspaceTodoFeature.isEnabled, next.sectionOrder != nil, !item.isPinned {
             next.revealWorkspaces()
         }
         if next != statusGroups { setStatusGroups(next) }

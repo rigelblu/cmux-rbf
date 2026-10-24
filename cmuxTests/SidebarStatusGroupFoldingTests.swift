@@ -153,15 +153,17 @@ struct SidebarStatusGroupFoldingTests {
     @Test func aFoldedAreaHidesEveryStatusHeaderAndMember() {
         let first = UUID(), second = UUID(), loose = UUID()
         let result = Self.render(first: first, second: second, loose: loose, folds: .init(areaCollapsed: true))
-        #expect(result.items.map(\.id) == [.workspace(loose), .statusesArea()])
+        // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
+        #expect(result.items.map(\.id) == [.workspacesArea(), .workspace(loose), .statusesArea()])
     }
 
     @Test func aFoldedStatusHidesOnlyItsOwnMembers() {
         let first = UUID(), second = UUID(), loose = UUID()
         let result = Self.render(first: first, second: second, loose: loose,
                                  folds: .init(collapsedStatusIds: ["parked"]))
+        // 02_decisions 2026-10-23 (cm-110.4): "the rows with no status get a `Workspaces` header … shown whichever section comes first"
         #expect(result.items.map(\.id) == [
-            .workspace(loose), .statusesArea(), .statusGroup("parked"), .statusGroup("done"), .workspace(second),
+            .workspacesArea(), .workspace(loose), .statusesArea(), .statusGroup("parked"), .statusGroup("done"), .workspace(second),
         ])
     }
 

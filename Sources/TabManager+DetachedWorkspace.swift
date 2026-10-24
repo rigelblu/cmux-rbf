@@ -1,5 +1,6 @@
 import Foundation
 import CmuxSettings
+import CmuxWorkspaces
 import CmuxTerminalCore
 
 extension TabManager {
@@ -89,7 +90,7 @@ extension TabManager {
             wireClosedBrowserTracking(for: newWorkspace)
 
             var updatedTabs = tabs
-            let insertIndex = Self.clampedDetachedWorkspaceInsertIndex(plannedInsertIndex, workspaces: updatedTabs)
+            let insertIndex = Self.clampedDetachedWorkspaceInsertIndex(plannedInsertIndex, workspaces: updatedTabs, groups: workspaceGroups) // (#cm-110.5)
             updatedTabs.insert(newWorkspace, at: insertIndex)
             tabs = updatedTabs
             // The insert index can fall inside an area of a nested window: repair the order (#cm-106).
@@ -143,9 +144,21 @@ extension TabManager {
 
     private static func clampedDetachedWorkspaceInsertIndex(
         _ proposedInsertion: Int,
-        workspaces: [Workspace]
+        workspaces: [Workspace],
+        groups: [WorkspaceGroup] // (#cm-110.5)
     ) -> Int {
-        let pinnedCount = workspaces.prefix { $0.isPinned }.count
+        // A pinned group pins its members, though they are not pinned one by one (#cm-110.5)
+        let groupsById = Dictionary(groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }) // (#cm-110.5)
+        func isPinnedByGroup(_ workspace: Workspace) -> Bool { // (#cm-110.5)
+            var next = workspace.groupId // (#cm-110.5)
+            var seen: Set<UUID> = [] // (#cm-110.5)
+            while let groupId = next, seen.insert(groupId).inserted, let group = groupsById[groupId] { // (#cm-110.5)
+                if group.isPinned { return true } // (#cm-110.5)
+                next = group.parentGroupId // (#cm-110.5)
+            } // (#cm-110.5)
+            return false // (#cm-110.5)
+        } // (#cm-110.5)
+        let pinnedCount = workspaces.prefix { $0.isPinned || isPinnedByGroup($0) }.count // (#cm-110.5)
         return clampedDetachedWorkspaceInsertIndex(
             proposedInsertion,
             totalCount: workspaces.count,

@@ -10,6 +10,7 @@ extension SidebarWorkspaceRenderItem {
         switch self {
         case .statusesHeader: return SidebarStatusHeaderIdentity.statusesAreaUUID
         case .workspacesHeader: return SidebarStatusHeaderIdentity.workspacesAreaUUID
+        case .pinnedHeader: return SidebarStatusHeaderIdentity.pinnedAreaUUID // (#cm-110.5)
         case .statusGroupHeader(let id): return SidebarStatusHeaderIdentity.uuid(forStatusId: id)
         case .colorSectionHeader: return id.colorHeaderDropIdentity
         default: return rowWorkspaceId
@@ -101,7 +102,7 @@ enum SidebarStatusHeaderPlanResult {
 
 extension VerticalTabsSidebar {
     func isStatusHeaderDrag(_ id: UUID) -> Bool {
-        SidebarStatusHeaderDragSession.shared.isKnownHeader(id)
+        return SidebarStatusHeaderDragSession.shared.isKnownHeader(id)
             || SidebarStatusHeaderIdentity.kind(forDragId: id, list: AppDelegate.statusListInUse) != nil
     }
 
@@ -109,6 +110,7 @@ extension VerticalTabsSidebar {
     func statusHeaderAllowsWorkspaceBinding(_ id: UUID) -> Bool { !isStatusHeaderDrag(id) }
 
     func activateStatusHeaderDrag(_ id: UUID) -> Bool? {
+        guard id != SidebarStatusHeaderIdentity.pinnedAreaUUID else { return nil } // (#cm-110.5)
         guard isStatusHeaderDrag(id) else { return nil }
         guard WorkspaceTodoFeature.isEnabled,
               SidebarStatusHeaderIdentity.kind(forDragId: id, list: AppDelegate.statusListInUse) != nil else { return false }
@@ -116,12 +118,14 @@ extension VerticalTabsSidebar {
     }
 
     func beginStatusAwareWorkspaceDrag(_ id: UUID, sourceRowId: SidebarWorkspaceRenderItemID? = nil) {
+        guard id != SidebarStatusHeaderIdentity.pinnedAreaUUID else { return } // (#cm-110.5)
         let session = dragState.beginDragging(tabId: id)
         SidebarStatusGroupDragSource.shared.began(windowId: windowId, session: session, rowId: sourceRowId)
         if isStatusHeaderDrag(id) { SidebarStatusHeaderDragSession.shared.began(windowId: windowId, session: session) }
     }
 
     func beginSidebarNativeDrag(dragId: UUID, sourceView: NSView, event: NSEvent, draggingFrame: NSRect, dragImage: NSImage, sourceRowId: SidebarWorkspaceRenderItemID? = nil) -> Bool {
+        guard dragId != SidebarStatusHeaderIdentity.pinnedAreaUUID else { return false } // (#cm-110.5)
         let workspaceId: UUID
         if isStatusHeaderDrag(dragId) {
             guard WorkspaceTodoFeature.isEnabled,
@@ -161,11 +165,12 @@ extension VerticalTabsSidebar {
         let list = AppDelegate.statusListInUse
         guard WorkspaceTodoFeature.isEnabled, context.statusGroupProjection != nil,
               let kind = SidebarStatusHeaderIdentity.kind(forDragId: draggedId, list: list),
+              kind != .pinnedArea, // (#cm-110.5) Pinned header does not drag
               let token = pendingSessionId ?? dragState.currentWorkspaceDragSessionId,
               SidebarStatusHeaderDragSession.shared.acceptsCommit(headerId: draggedId, windowId: windowId,
                 sessionId: token, dragState: dragState) else { return .refused }
         let statusId: String?
-        switch kind { case .statusesArea: statusId = nil; case .statusGroup(let id): statusId = id; case .workspacesArea: statusId = nil }
+        switch kind { case .statusesArea: statusId = nil; case .statusGroup(let id): statusId = id; case .workspacesArea: statusId = nil; case .pinnedArea: statusId = nil }
         let layout = SidebarStatusAreaLayout(items: context.workspaceRenderItems, tabs: context.tabs,
             groups: context.workspaceGroups, statusProjection: context.statusGroupProjection)
         guard let plan = SidebarStatusHeaderDropPlanner().plan(point: point, draggedStatusId: statusId,
@@ -188,7 +193,7 @@ extension VerticalTabsSidebar {
         for target in targets {
             guard let rowId = target.renderItemId, let item = byId[rowId] else { result.append(target); continue }
             switch item {
-            case .statusesHeader, .workspacesHeader, .statusGroupHeader:
+            case .statusesHeader, .workspacesHeader, .pinnedHeader, .statusGroupHeader: // (#cm-110.5)
                 if target.frame.contains(point) { return nil }
             case .colorSectionHeader: break
             default: result.append(target)

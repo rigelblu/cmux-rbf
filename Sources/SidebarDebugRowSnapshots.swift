@@ -59,6 +59,11 @@ struct SidebarDebugRow: Equatable {
                     kind: "statusesHeader", id: SidebarStatusHeaderIdentity.statusesAreaUUID.uuidString,
                     title: SidebarStatusHeaderText.statusesAreaTitle, header: nil, folded: statusGroups.areaCollapsed
                 ))
+            case .pinnedHeader: // (#cm-110.5)
+                insideStatusArea = false
+                currentStatusId = nil
+                rows.append(SidebarDebugRow(kind: "pinnedHeader", id: SidebarStatusHeaderIdentity.pinnedAreaUUID.uuidString,
+                    title: SidebarStatusHeaderText.pinnedAreaTitle, header: nil, folded: statusGroups.pinnedCollapsed == true))
             case .workspacesHeader:
                 insideStatusArea = false
                 currentStatusId = nil

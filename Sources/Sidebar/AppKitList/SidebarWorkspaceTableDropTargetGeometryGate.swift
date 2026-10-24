@@ -52,8 +52,10 @@ final class SidebarWorkspaceTableDropTargetGeometryGate {
             let configuration = rows[row]
             return SidebarDropPlanner.WorkspaceDropTarget(
                 workspaceId: configuration.workspaceId,
-                isPinned: configuration.isPinned,
-                frame: table.convert(table.rect(ofRow: row), to: container.bonsplitDropView)
+                isPinned: configuration.isPinned || configuration.isPinnedByGroup, // (#cm-110.5) a pinned group's members are in the pinned run, though not pinned one by one
+                frame: table.convert(table.rect(ofRow: row), to: container.bonsplitDropView),
+                tabIds: configuration.dropTabIds ?? configuration.defaultDropTabIds, // (#cm-110.5)
+                isSectionHeader: configuration.statusHeaderKind?.isSection == true // (#cm-110.5)
             )
         })
         return true
@@ -63,3 +65,8 @@ final class SidebarWorkspaceTableDropTargetGeometryGate {
         bonsplitTargetBridge.updateTargets([])
     }
 }
+
+extension SidebarWorkspaceTableRowConfiguration { // (#cm-110.5)
+    /// A workspace row and a workspace group's header (it stands for the group's anchor workspace, which has its own slot) stand for their own workspace (`nil`); a status header or a color-section header stands for none unless its builder set `dropTabIds`. // (#cm-110.5)
+    fileprivate var defaultDropTabIds: [UUID]? { statusHeaderKind == nil && !isColorSectionHeader ? nil : [] } // (#cm-110.5)
+} // (#cm-110.5)

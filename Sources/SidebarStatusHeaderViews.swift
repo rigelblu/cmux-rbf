@@ -16,9 +16,19 @@ enum SidebarStatusHeaderText {
         String(localized: "sidebar.workspacesArea.title", defaultValue: "Workspaces")
     }
 
+    static var pinnedAreaTitle: String { // (#cm-110.5)
+        String(localized: "sidebar.tree.group.pinned", defaultValue: "Pinned")
+    }
+
     static func workspacesAreaLabel(isCollapsed: Bool) -> String {
         String.localizedStringWithFormat(
             String(localized: "sidebar.workspacesArea.accessibility", defaultValue: "Workspaces, %@"),
+            stateWord(isCollapsed: isCollapsed))
+    }
+
+    static func pinnedAreaLabel(isCollapsed: Bool) -> String { // (#cm-110.5)
+        String.localizedStringWithFormat(
+            String(localized: "sidebar.pinnedArea.accessibility", defaultValue: "Pinned, %@"),
             stateWord(isCollapsed: isCollapsed))
     }
 
@@ -58,6 +68,10 @@ enum SidebarStatusHeaderText {
     /// What pressing the chevron does: "Collapse status group" while open, "Expand status group" while folded.
     static func chevronLabel(kind: SidebarStatusHeaderKind, isCollapsed: Bool) -> String {
         switch (kind, isCollapsed) {
+        case (.pinnedArea, true): // (#cm-110.5)
+            return String(localized: "sidebar.pinnedArea.chevron.expand", defaultValue: "Expand pinned area")
+        case (.pinnedArea, false): // (#cm-110.5)
+            return String(localized: "sidebar.pinnedArea.chevron.collapse", defaultValue: "Collapse pinned area")
         case (.workspacesArea, true):
             return String(localized: "sidebar.workspacesArea.chevron.expand", defaultValue: "Expand workspaces area")
         case (.workspacesArea, false):

@@ -138,7 +138,7 @@ extension VerticalTabsSidebar {
     }
 
     private func debugSidebarSource(_ raw: String, items: [SidebarWorkspaceRenderItem]) -> (id: UUID, row: SidebarWorkspaceRenderItemID?)? {
-        if raw == "workspaces", WorkspaceTodoFeature.isEnabled,
+        if (raw == "workspaces" || raw == "pinned"), WorkspaceTodoFeature.isEnabled, // (#cm-110.5)
            let id = SidebarDebugActions.identity(raw, items: items),
            let item = items.first(where: { $0.headerDropIdentity == id }) {
             return (id, item.id)
@@ -168,7 +168,7 @@ extension VerticalTabsSidebar {
         guard let id = UUID(uuidString: value) else { return nil }
         if let kind = SidebarStatusHeaderIdentity.kind(forDragId: id, list: list), WorkspaceTodoFeature.isEnabled {
             let row: SidebarWorkspaceRenderItemID
-            switch kind { case .statusesArea: row = .statusesArea(); case .workspacesArea: row = .workspacesArea(); case .statusGroup(let id): row = .statusGroup(id) }
+            switch kind { case .statusesArea: row = .statusesArea(); case .workspacesArea: row = .workspacesArea(); case .pinnedArea: row = .pinnedArea(); case .statusGroup(let id): row = .statusGroup(id) } // (#cm-110.5)
             return (SidebarStatusHeaderIdentity.uuid(for: kind), row)
         }
         if let group = tabManager.workspaceGroups.first(where: { $0.id == id }) {
@@ -196,6 +196,7 @@ extension VerticalTabsSidebar {
             switch item {
             case .statusesHeader: return raw == "statuses" || rawId == SidebarStatusHeaderIdentity.statusesAreaUUID
             case .workspacesHeader: return raw == "workspaces" || rawId == SidebarStatusHeaderIdentity.workspacesAreaUUID
+            case .pinnedHeader: return raw == "pinned" || rawId == SidebarStatusHeaderIdentity.pinnedAreaUUID // (#cm-110.5)
             case .statusGroupHeader(let id): return raw == "status:\(id)" || rawId == SidebarStatusHeaderIdentity.uuid(forStatusId: id)
             case .groupHeader(let id, let anchor): return groupId == id || rawId == anchor
             case .colorSectionHeader(let section):
