@@ -14,6 +14,34 @@ extension ContentView {
         }
     }
 
+    // cmux-rbf (#cm-73.32): the palette's motion toggle command registration.
+    static func registerFigmaMotionPaletteHandler(
+        _ registry: inout CommandPaletteHandlerRegistry,
+        tabManager: TabManager
+    ) {
+        registry.register(commandId: "palette.toggleFigmaMotion") {
+            _ = tabManager.toggleFigmaMotion()
+        }
+    }
+
+    // cmux-rbf (#cm-73.32): command palette contribution for Figma motion toggle. Reject a revert of this hunk on upstream sync.
+    static func figmaMotionCommandContribution() -> CommandPaletteCommandContribution {
+        CommandPaletteCommandContribution(
+            commandId: "palette.toggleFigmaMotion",
+            title: { context in
+                if context.bool(CommandPaletteContextKeys.workspaceFigmaMotionIsPlaying) {
+                    return String(localized: "command.figmaShowStill.title", defaultValue: "Figma: Show Still")
+                } else {
+                    return String(localized: "command.figmaPlayMotion.title", defaultValue: "Figma: Play Motion")
+                }
+            },
+            subtitle: { _ in String(localized: "figma.menu.tooltip", defaultValue: "Figma") },
+            keywords: ["play", "still", "motion", "figma", "prototype"],
+            when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) },
+            enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion) }
+        )
+    }
+
     static func commandPaletteShortcutAction(forCommandID commandId: String) -> KeyboardShortcutSettings.Action? {
         if let movement = SurfacePaneMovement(commandID: commandId) {
             return movement.shortcutAction
@@ -118,6 +146,9 @@ extension ContentView {
         // cmux-rbf #cm-73.3: show the configured switch key in the palette.
         case "palette.switchFigmaPreviewAndEditor":
             return .switchFigmaPreviewAndEditor
+        // cmux-rbf (#cm-73.32): show the configured motion key in the palette if any.
+        case "palette.toggleFigmaMotion":
+            return .toggleFigmaMotion
         // cmux-rbf #cm-73.2a
         case "palette.toggleDesignFocus":
             return .toggleDesignFocus

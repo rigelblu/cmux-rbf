@@ -12,10 +12,11 @@ struct FigmaPaneURLTests {
     private static let wrapper = URL(fileURLWithPath: "/tmp/cmux-test/figma-embed.html")
     private static let fileURL = URL(string: "https://www.figma.com/design/MVdKSLWiPvKNyWab361uJ2/cm-73---figma-native-pane")!
 
-    private func resolve(_ raw: String, node: String? = nil) throws -> FigmaPaneURL.Destination {
+    private func resolve(_ raw: String, node: String? = nil, motion: Bool = false) throws -> FigmaPaneURL.Destination {
         try FigmaPaneURL.destination(
             for: URL(string: raw)!,
             node: node,
+            motion: motion,
             wrapper: Self.wrapper
         )
     }
@@ -218,6 +219,29 @@ struct FigmaPaneURLTests {
         #expect(embedded.path == "/design/MVdKSLWiPvKNyWab361uJ2/cm-73---figma-native-pane")
         #expect(query(embedded, "node-id") == "34-5")
         #expect(FigmaPaneURL.node(fromPaneURL: second.url, wrapper: Self.wrapper) == "34-5")
+    }
+
+    @Test("goto with motion marks the wrapper URL with motion=1 beside embed")
+    func gotoWithMotionMarksWrapper() throws {
+        let destination = try resolve(Self.fileURL.absoluteString, node: "12-2", motion: true)
+        guard case .embed(let wrapper, let embedded) = destination else {
+            Issue.record("expected an embed")
+            return
+        }
+        #expect(query(wrapper, "motion") == "1")
+        #expect(query(embedded, "motion") == nil)
+        #expect(FigmaPaneURL.hasMotionMark(inWrapper: wrapper, wrapper: Self.wrapper))
+    }
+
+    @Test("plain goto writes no motion mark")
+    func plainGotoWritesNoMotionMark() throws {
+        let destination = try resolve(Self.fileURL.absoluteString, node: "12-2", motion: false)
+        guard case .embed(let wrapper, _) = destination else {
+            Issue.record("expected an embed")
+            return
+        }
+        #expect(query(wrapper, "motion") == nil)
+        #expect(!FigmaPaneURL.hasMotionMark(inWrapper: wrapper, wrapper: Self.wrapper))
     }
 
     // MARK: - Refusals

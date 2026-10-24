@@ -160,13 +160,118 @@ struct PairFigmaPageControlTests {
         }
     }
 
+    // cmux-rbf (#cm-73.32)
+    @Test func motionButtonPresentationRule() {
+        let tooltips = BonsplitConfiguration.SplitButtonTooltips(
+            figmaPlayMotion: "Play motion",
+            figmaShowStill: "Show still"
+        )
+        #expect(PairHeaderControls.MotionButtonPresentation.resolve(state: .still, tooltips: tooltips) == .init(
+            isVisible: true, symbolName: "play.fill", tooltip: "Play motion", isSelected: false
+        ))
+        #expect(PairHeaderControls.MotionButtonPresentation.resolve(state: .playing, tooltips: tooltips) == .init(
+            isVisible: true, symbolName: "stop.fill", tooltip: "Show still", isSelected: true
+        ))
+        #expect(PairHeaderControls.MotionButtonPresentation.resolve(state: .hidden, tooltips: tooltips) == .init(
+            isVisible: false, symbolName: nil, tooltip: nil, isSelected: false
+        ))
+    }
+
+    // cmux-rbf (#cm-73.32)
+    @Test func hoverRowMotionButtonShowsStillAndPlayingAndHidesOnHidden() throws {
+        var stillToggled = 0
+        let stillView = PairHeaderControlsView(
+            orientation: .horizontal, appearance: .init(), tooltips: .init(),
+            barHeight: 28, iconScale: 1, liveOrientation: { .horizontal },
+            onChoose: { _ in }, onEqualize: {}, onExit: {},
+            figmaPage: .preview, figmaMotionState: .still,
+            onToggleFigmaMotion: { stillToggled += 1 }
+        )
+        let stillHost = NSHostingView(rootView: stillView)
+        stillHost.frame = NSRect(x: 0, y: 0, width: 360, height: 28)
+        stillHost.layoutSubtreeIfNeeded()
+
+        let playingView = PairHeaderControlsView(
+            orientation: .horizontal, appearance: .init(), tooltips: .init(),
+            barHeight: 28, iconScale: 1, liveOrientation: { .horizontal },
+            onChoose: { _ in }, onEqualize: {}, onExit: {},
+            figmaPage: .preview, figmaMotionState: .playing
+        )
+        let playingHost = NSHostingView(rootView: playingView)
+        playingHost.frame = NSRect(x: 0, y: 0, width: 360, height: 28)
+        playingHost.layoutSubtreeIfNeeded()
+
+        let hiddenView = PairHeaderControlsView(
+            orientation: .horizontal, appearance: .init(), tooltips: .init(),
+            barHeight: 28, iconScale: 1, liveOrientation: { .horizontal },
+            onChoose: { _ in }, onEqualize: {}, onExit: {},
+            figmaPage: .preview, figmaMotionState: .hidden
+        )
+        let hiddenHost = NSHostingView(rootView: hiddenView)
+        hiddenHost.frame = NSRect(x: 0, y: 0, width: 360, height: 28)
+        hiddenHost.layoutSubtreeIfNeeded()
+
+        let stillSegments = descendants(stillHost).compactMap { $0 as? NSSegmentedControl }
+        let stillSwitch = try #require(stillSegments.first { $0.toolTip(forSegment: 0) == "Preview" })
+        let playingSegments = descendants(playingHost).compactMap { $0 as? NSSegmentedControl }
+        let playingSwitch = try #require(playingSegments.first { $0.toolTip(forSegment: 0) == "Preview" })
+        let hiddenSegments = descendants(hiddenHost).compactMap { $0 as? NSSegmentedControl }
+        let hiddenSwitch = try #require(hiddenSegments.first { $0.toolTip(forSegment: 0) == "Preview" })
+
+        let stillMinX = stillSwitch.convert(stillSwitch.bounds, to: stillHost).minX
+        let playingMinX = playingSwitch.convert(playingSwitch.bounds, to: playingHost).minX
+        let hiddenMinX = hiddenSwitch.convert(hiddenSwitch.bounds, to: hiddenHost).minX
+
+        // The motion button sits at the left end before the switch, offsetting the switch to the right.
+        #expect(stillMinX > hiddenMinX)
+        #expect(playingMinX > hiddenMinX)
+        #expect(abs(stillMinX - playingMinX) < 0.5)
+
+        let stillMotion = descendants(stillHost).compactMap { $0 as? NSButton }
+            .first { $0.identifier?.rawValue == "paneTabBarControl.figmaMotion" }
+        let stillMotionButton = try #require(stillMotion)
+        #expect(stillMotionButton.toolTip == "Play motion")
+        stillMotionButton.performClick(nil)
+        #expect(stillToggled == 1)
+
+        let playingMotion = descendants(playingHost).compactMap { $0 as? NSButton }
+            .first { $0.identifier?.rawValue == "paneTabBarControl.figmaMotion" }
+        let playingMotionButton = try #require(playingMotion)
+        #expect(playingMotionButton.toolTip == "Show still")
+
+        let hiddenMotion = descendants(hiddenHost).compactMap { $0 as? NSButton }
+            .first { $0.identifier?.rawValue == "paneTabBarControl.figmaMotion" }
+        #expect(hiddenMotion == nil)
+    }
+
+    // cmux-rbf (#cm-73.32)
+    @Test func controllerRoutesToggleFigmaMotionInsidePair() throws {
+        let controller = BonsplitController()
+        let host = Host()
+        controller.delegate = host
+        controller.requestToggleFigmaMotion()
+        #expect(host.motionToggles == 0)
+        let first = try #require(controller.focusedPaneId)
+        let second = try #require(controller.splitPane(first, orientation: .horizontal, withTab: .init(title: "Figma")))
+        try #require(controller.setPairZoom(firstPane: first, secondPane: second, orientation: .horizontal))
+        controller.requestToggleFigmaMotion()
+        #expect(host.motionToggles == 1)
+        #expect(controller.pairFigmaMotionState() == .still)
+    }
+
     private final class Host: BonsplitDelegate {
         var page: PairFigmaPage? = .preview
         var choices: [PairFigmaPage] = []
+        var motion: PairFigmaMotionState = .still
+        var motionToggles: Int = 0
         func pairFigmaPage(for controller: BonsplitController) -> PairFigmaPage? { page }
         func splitTabBar(_ controller: BonsplitController, didChooseFigmaPage page: PairFigmaPage) {
             choices.append(page)
             self.page = page
+        }
+        func pairFigmaMotionState(for controller: BonsplitController) -> PairFigmaMotionState { motion }
+        func splitTabBarDidToggleFigmaMotion(_ controller: BonsplitController) {
+            motionToggles += 1
         }
     }
 }

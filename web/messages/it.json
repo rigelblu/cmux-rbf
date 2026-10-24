@@ -1401,6 +1401,7 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Passa tra anteprima ed editor",
+      "figmaMotionDescription": "(non assegnato) — Figma: Riproduci movimento / mostra fermo immagine",
       "title": "Scorciatoie da tastiera",
       "description": "Tutte le scorciatoie da tastiera disponibili in cmux, raggruppate per categoria.",
       "metaDescription": "Tutte le scorciatoie da tastiera cmux per workspace, superfici, pannelli divisi, browser, notifiche, ricerca e gestione delle finestre su macOS.",

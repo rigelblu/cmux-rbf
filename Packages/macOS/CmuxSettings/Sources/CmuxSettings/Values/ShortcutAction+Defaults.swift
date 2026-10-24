@@ -143,6 +143,8 @@ extension ShortcutAction {
         case .toggleSplitZoom: return ShortcutStroke(key: "\r", command: true, shift: true)
         // cmux-rbf #cm-73.3
         case .switchFigmaPreviewAndEditor: return ShortcutStroke(key: "c", command: true, shift: true, option: true)
+        // cmux-rbf #cm-73.32: unbound by default; configured in Settings or cmux.json.
+        case .toggleFigmaMotion: return nil
         // cmux-rbf #cm-73.2a
         case .toggleDesignFocus: return ShortcutStroke(key: "\r", command: true, shift: true, option: true)
         // cmux-rbf #cm-73.2a

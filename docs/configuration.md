@@ -390,16 +390,31 @@ pointing released opens it again at its last address, so Figma's zoom and
 selection are not kept. Figma's *Open in Figma* mark opens Editor with Preview kept
 behind it. A trackpad swipe is not part of this history: it moves within the page
 showing, and Back and Forward carry on from wherever the swipe left it. Moving
-to a board the Preview still holds uses its own history and reloads nothing; a
-board it no longer holds, such as one restored after a restart, loads again from
-its address.
+to a board the Preview still holds uses its own history and reloads nothing, except
+that a frame left playing comes back still; a board it no longer holds, such as one
+restored after a restart, loads again from its address.
 The history is not saved, so after a restart Back starts from the side that shows.
+
+A frame with Figma Motion can play in Preview. Play loads the same frame in Figma's
+prototype view, with no Figma bar, fitted to the pane on a light grey canvas, and its
+motion loops; Show Still goes back to the read view. In Design Focus the Play
+button sits first in the row that shows while the pointer is on the pair header, and it
+shows only on a frame the agent marked as having motion (`cmux figma goto <node> --motion`).
+The palette entry Figma: Play Motion (Figma: Show Still while playing) works on any frame
+of a design file's Preview, marked or not. Neither shows on a FigJam board or a slide deck.
+Play lasts while Preview stays on that frame: a switch to Editor, a pointing, a clicked
+Figma link, Back or Forward stops it, and Back, Forward, a restart and `cmux figma fit`
+show the frame still. Play and Show Still add no step to the history.
+
+The motion toggle action, `toggleFigmaMotion`, has no default shortcut binding; bind it
+in Settings › Keyboard Shortcuts or `cmux.json`:
 
 ```json
 {
   "shortcuts": {
     "bindings": {
-      "switchFigmaPreviewAndEditor": "opt+shift+cmd+c"
+      "switchFigmaPreviewAndEditor": "opt+shift+cmd+c",
+      "toggleFigmaMotion": "opt+shift+cmd+m"
     }
   }
 }

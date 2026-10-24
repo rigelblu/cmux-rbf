@@ -340,6 +340,139 @@ struct FigmaPageSwitchTests {
         #expect(ContentView.commandPaletteShortcutAction(forCommandID: "palette.switchFigmaPreviewAndEditor") == .switchFigmaPreviewAndEditor)
     }
 
+    // cmux-rbf (#cm-73.32)
+    @Test("The palette motion row advertises its configured shortcut")
+    func paletteMotionShortcutHint() {
+        #expect(ContentView.commandPaletteShortcutAction(forCommandID: "palette.toggleFigmaMotion") == .toggleFigmaMotion)
+    }
+
+    // cmux-rbf (#cm-73.32)
+    @Test("The row motion button visibility rule evaluates as a pure decision")
+    func rowMotionButtonVisibilityRule() throws {
+        let manager = TabManager()
+        let workspace = try #require(manager.selectedWorkspace)
+        defer { workspace.teardownAllPanels() }
+        let terminal = try #require(workspace.focusedPanelId)
+        let controller = workspace.bonsplitController
+
+        // 1. Marked design file preview in Design Focus: still when not playing, playing when playing
+        let markedPreview = try FigmaPaneURL.destination(for: document, node: "12-2", motion: true).url
+        let figma = try #require(workspace.newBrowserSplit(
+            from: terminal, orientation: .horizontal, url: markedPreview, focus: false,
+            chromeVisibility: BrowserChromeVisibility(omnibarVisible: false)
+        ))
+        try #require(workspace.toggleDesignFocus())
+        #expect(controller.pairFigmaMotionState() == .still)
+        figma.isFigmaMotionPlaying = true
+        #expect(controller.pairFigmaMotionState() == .playing)
+        figma.isFigmaMotionPlaying = false
+        #expect(controller.pairFigmaMotionState() == .still)
+
+        // 2. Editor side: hidden even with motion mark on preview
+        try #require(figma.switchFigmaPreviewAndEditor())
+        #expect(controller.pairFigmaMotionState() == .hidden)
+        try #require(figma.switchFigmaPreviewAndEditor())
+        #expect(controller.pairFigmaMotionState() == .still)
+
+        // 3. Unmarked design file preview: hidden
+        let unmarkedPreview = try FigmaPaneURL.destination(for: document, node: "12-2", motion: false).url
+        figma.navigate(to: unmarkedPreview)
+        #expect(controller.pairFigmaMotionState() == .hidden)
+
+        // 4. FigJam board preview with motion mark: hidden
+        let boardDoc = URL(string: "https://www.figma.com/board/KEY/whiteboard")!
+        let boardPreview = try FigmaPaneURL.destination(for: boardDoc, node: "12-2", motion: true).url
+        figma.navigate(to: boardPreview)
+        #expect(controller.pairFigmaMotionState() == .hidden)
+
+        // 5. Slide deck preview with motion mark: hidden
+        let slidesDoc = URL(string: "https://www.figma.com/slides/KEY/deck")!
+        let slidesPreview = try FigmaPaneURL.destination(for: slidesDoc, node: "12-2", motion: true).url
+        figma.navigate(to: slidesPreview)
+        #expect(controller.pairFigmaMotionState() == .hidden)
+    }
+
+    // cmux-rbf (#cm-73.32)
+    @Test("The motion button's tooltip names a shortcut only once one is bound")
+    func motionTooltipNamesShortcutOnlyWhenBound() {
+        #expect(Workspace.figmaMotionTooltip("Play motion", shortcut: .unbound) == "Play motion")
+        #expect(Workspace.figmaMotionTooltip("Show still", shortcut: .unbound) == "Show still")
+        let bound = StoredShortcut(key: "m", command: true, shift: true, option: true, control: false)
+        let tooltip = Workspace.figmaMotionTooltip("Play motion", shortcut: bound)
+        #expect(tooltip == "Play motion (\(bound.displayString))")
+        // The row's own tooltips go through it while the action ships with no key.
+        let rowTooltips = Workspace.currentSplitButtonTooltips()
+        #expect(rowTooltips.figmaPlayMotion == "Play motion")
+        #expect(rowTooltips.figmaShowStill == "Show still")
+    }
+
+    // cmux-rbf (#cm-73.32)
+    @Test("The palette motion availability rule and title follow state")
+    func paletteMotionAvailabilityAndTitle() throws {
+        let manager = TabManager()
+        let workspace = try #require(manager.selectedWorkspace)
+        defer { workspace.teardownAllPanels() }
+        let terminal = try #require(workspace.focusedPanelId)
+
+        let contribution = ContentView.figmaMotionCommandContribution()
+
+        // 1. Unmarked design file preview: available in or out of Design Focus
+        let unmarkedPreview = try FigmaPaneURL.destination(for: document, node: "12-2", motion: false).url
+        let figma = try #require(workspace.newBrowserSplit(
+            from: terminal, orientation: .horizontal, url: unmarkedPreview, focus: false,
+            chromeVisibility: BrowserChromeVisibility(omnibarVisible: false)
+        ))
+        #expect(workspace.figmaMotionTarget() === figma)
+        var snapshot = CommandPaletteContextSnapshot()
+        snapshot.setBool(CommandPaletteContextKeys.hasWorkspace, true)
+        let motionTarget = workspace.figmaMotionTarget()
+        snapshot.setBool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion, motionTarget != nil)
+        snapshot.setBool(CommandPaletteContextKeys.workspaceFigmaMotionIsPlaying, motionTarget?.isFigmaMotionPlaying == true)
+        #expect(contribution.enablement(snapshot))
+        #expect(contribution.title(snapshot) == "Figma: Play Motion")
+
+        // When playing:
+        figma.isFigmaMotionPlaying = true
+        snapshot.setBool(CommandPaletteContextKeys.workspaceFigmaMotionIsPlaying, figma.isFigmaMotionPlaying)
+        #expect(contribution.title(snapshot) == "Figma: Show Still")
+        figma.isFigmaMotionPlaying = false
+
+        // 2. Editor: unavailable
+        try #require(figma.switchFigmaPreviewAndEditor())
+        #expect(workspace.figmaMotionTarget() == nil)
+        snapshot.setBool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion, workspace.figmaMotionTarget() != nil)
+        #expect(!contribution.enablement(snapshot))
+
+        // 3. FigJam board or slide deck: unavailable
+        try #require(figma.switchFigmaPreviewAndEditor())
+        let boardDoc = URL(string: "https://www.figma.com/board/KEY/whiteboard")!
+        let boardPreview = try FigmaPaneURL.destination(for: boardDoc, node: "12-2", motion: true).url
+        figma.navigate(to: boardPreview)
+        #expect(workspace.figmaMotionTarget() == nil)
+        snapshot.setBool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion, workspace.figmaMotionTarget() != nil)
+        #expect(!contribution.enablement(snapshot))
+    }
+
+    // cmux-rbf (#cm-73.32)
+    @Test("The real palette motion handler toggles motion on its manager")
+    func paletteMotionEntranceTogglesSuppliedManager() throws {
+        let intended = try switchEntranceFixture()
+        defer { intended.workspace.teardownAllPanels() }
+        let other = try switchEntranceFixture()
+        defer { other.workspace.teardownAllPanels() }
+
+        var registry = CommandPaletteHandlerRegistry()
+        ContentView.registerFigmaMotionPaletteHandler(&registry, tabManager: intended.manager)
+        let handler = try #require(registry.handler(for: "palette.toggleFigmaMotion"))
+        #expect(intended.figma.figmaPlayRequestCount == 0)
+        #expect(other.figma.figmaPlayRequestCount == 0)
+
+        handler()
+
+        #expect(intended.figma.figmaPlayRequestCount == 1)
+        #expect(other.figma.figmaPlayRequestCount == 0)
+    }
+
     @Test("figma.goto is advertised and emits the browser navigation event")
     func capabilitiesAndNavigationEvent() throws {
         let response = TerminalController.shared.handleSocketLine(#"{"id":1,"method":"system.capabilities","params":{}}"#)
