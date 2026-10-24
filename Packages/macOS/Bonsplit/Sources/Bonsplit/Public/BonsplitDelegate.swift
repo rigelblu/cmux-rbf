@@ -77,8 +77,14 @@ public protocol BonsplitDelegate: AnyObject {
     /// cmux-rbf #cm-73.3: supplies the showing side of the pair's Figma pane, or nil without a target.
     func pairFigmaPage(for controller: BonsplitController) -> PairFigmaPage?
 
+    /// cmux-rbf (#cm-73.32): supplies the motion state of the pair's Figma preview pane.
+    func pairFigmaMotionState(for controller: BonsplitController) -> PairFigmaMotionState
+
     /// cmux-rbf #cm-73.3: requests the selected side of the pair's Figma pane and focuses that pane.
     func splitTabBar(_ controller: BonsplitController, didChooseFigmaPage page: PairFigmaPage)
+
+    /// cmux-rbf (#cm-73.32): toggles motion playing/still on the pair's Figma preview pane.
+    func splitTabBarDidToggleFigmaMotion(_ controller: BonsplitController)
 
     /// Requests a board arrangement from the host; the host rechecks its target.
     func splitTabBar(_ controller: BonsplitController, didChooseBoardLayout orientation: BoardLayoutOrientation)
@@ -143,7 +149,9 @@ public extension BonsplitDelegate {
     func splitTabBar(_ controller: BonsplitController, didChoosePairArrangement orientation: SplitOrientation) {} // cmux-rbf #cm-73.2a
     func pairBoardControlState(for controller: BonsplitController) -> PairBoardControlState? { nil }
     func pairFigmaPage(for controller: BonsplitController) -> PairFigmaPage? { nil } // cmux-rbf #cm-73.3
+    func pairFigmaMotionState(for controller: BonsplitController) -> PairFigmaMotionState { .hidden } // cmux-rbf (#cm-73.32)
     func splitTabBar(_ controller: BonsplitController, didChooseFigmaPage page: PairFigmaPage) {} // cmux-rbf #cm-73.3
+    func splitTabBarDidToggleFigmaMotion(_ controller: BonsplitController) {} // cmux-rbf (#cm-73.32)
     func splitTabBar(_ controller: BonsplitController, didChooseBoardLayout orientation: BoardLayoutOrientation) {}
     func splitTabBarDidTogglePin(_ controller: BonsplitController) {}
     func splitTabBarDidRequestEqualizePair(_ controller: BonsplitController) {} // cmux-rbf #cm-73.2a

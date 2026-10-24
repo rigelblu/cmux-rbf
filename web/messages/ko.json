@@ -1401,6 +1401,7 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: 미리보기와 편집기 전환",
+      "figmaMotionDescription": "(미할당) — Figma: 모션 재생 / 스틸 보기",
       "title": "키보드 단축키",
       "description": "카테고리별로 정리된 cmux의 모든 키보드 단축키.",
       "metaDescription": "워크스페이스, 서피스, 분할 패널, 브라우저, 알림, 검색, 창 관리를 위한 cmux의 모든 macOS 키보드 단축키.",

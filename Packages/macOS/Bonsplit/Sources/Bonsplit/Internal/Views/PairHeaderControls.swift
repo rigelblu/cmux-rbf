@@ -53,6 +53,43 @@ enum PairHeaderControls {
     static func orientation(forSegment index: Int) -> SplitOrientation {
         index == 0 ? .horizontal : .vertical
     }
+
+    // cmux-rbf (#cm-73.32): hover row motion button presentation derived from state and tooltips.
+    struct MotionButtonPresentation: Equatable {
+        let isVisible: Bool
+        let symbolName: String?
+        let tooltip: String?
+        let isSelected: Bool
+
+        static func resolve(
+            state: PairFigmaMotionState,
+            tooltips: BonsplitConfiguration.SplitButtonTooltips
+        ) -> MotionButtonPresentation {
+            switch state {
+            case .hidden:
+                return MotionButtonPresentation(
+                    isVisible: false,
+                    symbolName: nil,
+                    tooltip: nil,
+                    isSelected: false
+                )
+            case .still:
+                return MotionButtonPresentation(
+                    isVisible: true,
+                    symbolName: "play.fill",
+                    tooltip: tooltips.figmaPlayMotion,
+                    isSelected: false
+                )
+            case .playing:
+                return MotionButtonPresentation(
+                    isVisible: true,
+                    symbolName: "stop.fill",
+                    tooltip: tooltips.figmaShowStill,
+                    isSelected: true
+                )
+            }
+        }
+    }
 }
 
 /// cmux-rbf #cm-73.16: arrangement, 50/50 and exit, drawn at the right of the hovered header.
@@ -74,6 +111,9 @@ struct PairHeaderControlsView: View {
     let figmaPage: PairFigmaPage?
     let liveFigmaPage: () -> PairFigmaPage?
     let onChooseFigmaPage: (PairFigmaPage) -> Void
+    // cmux-rbf (#cm-73.32)
+    let figmaMotionState: PairFigmaMotionState
+    let onToggleFigmaMotion: () -> Void
 
     init(orientation: SplitOrientation, appearance: BonsplitConfiguration.Appearance,
          tooltips: BonsplitConfiguration.SplitButtonTooltips, barHeight: CGFloat, iconScale: CGFloat,
@@ -86,7 +126,9 @@ struct PairHeaderControlsView: View {
          onEqualize: @escaping () -> Void, onExit: @escaping () -> Void,
          figmaPage: PairFigmaPage? = nil, // cmux-rbf #cm-73.3
          liveFigmaPage: @escaping () -> PairFigmaPage? = { nil },
-         onChooseFigmaPage: @escaping (PairFigmaPage) -> Void = { _ in }) {
+         onChooseFigmaPage: @escaping (PairFigmaPage) -> Void = { _ in },
+         figmaMotionState: PairFigmaMotionState = .hidden, // cmux-rbf (#cm-73.32)
+         onToggleFigmaMotion: @escaping () -> Void = {}) {
         self.orientation = orientation
         self.appearance = appearance
         self.tooltips = tooltips
@@ -103,10 +145,26 @@ struct PairHeaderControlsView: View {
         self.figmaPage = figmaPage
         self.liveFigmaPage = liveFigmaPage
         self.onChooseFigmaPage = onChooseFigmaPage
+        self.figmaMotionState = figmaMotionState
+        self.onToggleFigmaMotion = onToggleFigmaMotion
     }
 
     var body: some View {
         HStack(spacing: PairHeaderControls.segmentedSpacing) {
+            // cmux-rbf (#cm-73.32): motion toggle button sits at left end before switch, shown only for marked preview.
+            let motion = PairHeaderControls.MotionButtonPresentation.resolve(state: figmaMotionState, tooltips: tooltips)
+            if motion.isVisible, let symbolName = motion.symbolName, let tooltip = motion.tooltip {
+                PairHeaderMotionButton(
+                    symbolName: symbolName,
+                    tooltip: tooltip,
+                    isSelected: motion.isSelected,
+                    appearance: appearance,
+                    iconScale: iconScale,
+                    onToggle: onToggleFigmaMotion
+                )
+                .frame(width: PairHeaderControls.glyphButtonWidth, height: barHeight)
+            }
+
             // cmux-rbf #cm-73.3: only this Design Focus hover row gets the clickable switch.
             PairFigmaPageSegmentedControl(
                 selected: figmaPage, tooltips: tooltips, symbolPointSize: 12 * iconScale,

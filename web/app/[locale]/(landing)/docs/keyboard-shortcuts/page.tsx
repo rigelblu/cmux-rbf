@@ -40,6 +40,7 @@ export default function KeyboardShortcutsPage() {
       <p>{t("description")}</p>
       <p>{t("paneResizeDescription")}</p>
       <p>{t("figmaSwitchDescription")}</p>
+      <p>{t("figmaMotionDescription")}</p>
 
       <DocsHeading level={2} id="shortcut-chords" className="scroll-mt-24">{t("chordsTitle")}</DocsHeading>
       <p>

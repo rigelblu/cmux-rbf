@@ -4616,6 +4616,12 @@ class TabManager: ObservableObject {
         selectedWorkspace?.switchFigmaPreviewAndEditor() ?? false
     }
 
+    // cmux-rbf (#cm-73.32): workspace only; one shared action toggles Figma prototype motion. Reject a revert of this hunk on upstream sync.
+    @discardableResult
+    func toggleFigmaMotion() -> Bool {
+        selectedWorkspace?.toggleFigmaMotion() ?? false
+    }
+
     /// Close a surface/panel
     func closeSurface(tabId: UUID, surfaceId: UUID) -> Bool {
         guard let tab = tabs.first(where: { $0.id == tabId }) else { return false }

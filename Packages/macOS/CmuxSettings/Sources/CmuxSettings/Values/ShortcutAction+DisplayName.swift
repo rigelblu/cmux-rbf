@@ -122,6 +122,9 @@ extension ShortcutAction {
         // cmux-rbf #cm-73.3
         case .switchFigmaPreviewAndEditor:
             return String(localized: "shortcut.switchFigmaPreviewAndEditor.label", defaultValue: "Figma: Switch Preview and Editor")
+        // cmux-rbf #cm-73.32
+        case .toggleFigmaMotion:
+            return String(localized: "shortcut.toggleFigmaMotion.label", defaultValue: "Figma: Play Motion / Show Still")
         // cmux-rbf #cm-73.2a
         case .toggleDesignFocus: return "Toggle Design Focus"
         // cmux-rbf #cm-73.2a

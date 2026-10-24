@@ -176,6 +176,8 @@ enum KeyboardShortcutSettings {
         case flipDesignFocusLayout
         // cmux-rbf #cm-73.3
         case switchFigmaPreviewAndEditor
+        // cmux-rbf (#cm-73.32)
+        case toggleFigmaMotion
         case increaseWorkspaceTerminalFontSize
         case decreaseWorkspaceTerminalFontSize
         case resetWorkspaceTerminalFontSize
@@ -349,6 +351,8 @@ enum KeyboardShortcutSettings {
             case .toggleSplitZoom: return String(localized: "shortcut.togglePaneZoom.label", defaultValue: "Toggle Pane Zoom")
             // cmux-rbf #cm-73.3
             case .switchFigmaPreviewAndEditor: return String(localized: "shortcut.switchFigmaPreviewAndEditor.label", defaultValue: "Figma: Switch Preview and Editor")
+            // cmux-rbf (#cm-73.32)
+            case .toggleFigmaMotion: return String(localized: "shortcut.toggleFigmaMotion.label", defaultValue: "Figma: Play Motion / Show Still")
             // cmux-rbf #cm-73.2a
             case .toggleDesignFocus: return String(localized: "shortcut.toggleDesignFocus.label", defaultValue: "Toggle Design Focus")
             // cmux-rbf #cm-73.2a
@@ -610,6 +614,8 @@ enum KeyboardShortcutSettings {
             case .toggleSplitZoom: return StoredShortcut(key: "\r", command: true, shift: true, option: false, control: false)
             // cmux-rbf #cm-73.3
             case .switchFigmaPreviewAndEditor: return StoredShortcut(key: "c", command: true, shift: true, option: true, control: false)
+            // cmux-rbf (#cm-73.32): unbound by default.
+            case .toggleFigmaMotion: return .unbound
             // cmux-rbf #cm-73.2a
             case .toggleDesignFocus: return StoredShortcut(key: "\r", command: true, shift: true, option: true, control: false)
             // cmux-rbf #cm-73.2a

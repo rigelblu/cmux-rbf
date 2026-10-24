@@ -64,6 +64,15 @@ enum FigmaArguments {
         let word: String?
         /// The value of `--workspace` for `open`, of `--surface` for `goto`.
         let option: String?
+        let motion: Bool
+        let play: Bool
+
+        init(word: String?, option: String?, motion: Bool = false, play: Bool = false) {
+            self.word = word
+            self.option = option
+            self.motion = motion
+            self.play = play
+        }
     }
 
     struct Failure: Error, Equatable {
@@ -75,10 +84,22 @@ enum FigmaArguments {
         let flag = verb == "open" ? "--workspace" : "--surface"
         var word: String?
         var option: String?
+        var motion = false
+        var play = false
         var index = 0
         while index < args.count {
             let arg = args[index]
             if arg.hasPrefix("--") {
+                if verb == "goto" && (arg == "--motion" || arg == "--play") {
+                    if arg == "--motion" {
+                        motion = true
+                    } else if arg == "--play" {
+                        play = true
+                        motion = true
+                    }
+                    index += 1
+                    continue
+                }
                 guard arg == flag else {
                     throw Failure(message: "cmux figma \(verb) does not support \(arg)")
                 }
@@ -100,7 +121,7 @@ enum FigmaArguments {
             word = arg
             index += 1
         }
-        return Parsed(word: word, option: option)
+        return Parsed(word: word, option: option, motion: motion, play: play)
     }
 }
 
@@ -248,6 +269,8 @@ enum FigmaUsage {
                         The link Figma's Share button copies with nothing selected carries node-id=0-1 and opens the editor too.
                         A link to one frame opens the read view on that frame.
       goto <node-id>    Move the open Figma pane to that frame, in the read view. Accepts 12-2 or 12:2.
+                        --motion marks the frame as having motion so the Play button shows.
+                        --play marks it and plays its Figma Motion loop once loaded.
                         goto counts a browser pane that shows a Figma file and has no address bar.
                         A Figma file in a browser pane with its address bar showing is left alone.
                         --surface <handle> also moves a browser pane that goto does not count,

@@ -436,6 +436,35 @@ struct FigmaCLIOutputTests {
         #expect(!run.requests.contains { $0.method == "browser.navigate" })
     }
 
+    @Test("goto with --motion or --play passes parameters and prints OK")
+    func gotoMotionAndPlayCLI() throws {
+        let panes = [Self.figmaPane(8)]
+        let runMotion = try drive(["figma", "goto", "12-2", "--motion"], reply: Self.gotoReply(panes))
+        #expect(runMotion.status == 0, "\(runMotion.stderr)")
+        #expect(runMotion.stdout == "OK\n")
+        #expect(runMotion.gotos.first?.params["motion"] as? Bool == true)
+        #expect(runMotion.gotos.first?.params["play"] == nil)
+
+        let runPlay = try drive(["figma", "goto", "12-2", "--play"], reply: Self.gotoReply(panes))
+        #expect(runPlay.status == 0, "\(runPlay.stderr)")
+        #expect(runPlay.stdout == "OK\n")
+        #expect(runPlay.gotos.last?.params["motion"] as? Bool == true)
+        #expect(runPlay.gotos.last?.params["play"] as? Bool == true)
+    }
+
+    @Test("goto with --motion or --play on a board or slide deck preview is refused")
+    func gotoMotionRefusedOnBoardOrDeck() throws {
+        let boardPane = Self.figmaPane(8, link: "https://www.figma.com/board/KEY/my-board")
+        let runBoard = try drive(["figma", "goto", "12-2", "--motion"], reply: Self.gotoReply([boardPane]))
+        #expect(runBoard.status != 0)
+        #expect(runBoard.stderr.contains("cmux figma goto --motion works on Figma design files only: surface surface:8 shows a FigJam board or a slide deck"))
+
+        let slidesPane = Self.figmaPane(9, link: "https://www.figma.com/slides/KEY/my-slides")
+        let runSlides = try drive(["figma", "goto", "12-2", "--play"], reply: Self.gotoReply([slidesPane]))
+        #expect(runSlides.status != 0)
+        #expect(runSlides.stderr.contains("cmux figma goto --play works on Figma design files only: surface surface:9 shows a FigJam board or a slide deck"))
+    }
+
     @Test("goto with only an ordinary pane on a Figma file refuses, moves nothing and names that pane")
     func gotoRefusesAnOrdinaryPaneAndNamesIt() throws {
         let run = try drive(["figma", "goto", "12-2"], reply: Self.gotoReply([Self.ordinaryPane(8)]))

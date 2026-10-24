@@ -83,6 +83,7 @@ enum FigmaPaneURL {
     static func destination(
         for pasted: URL,
         node explicitNode: String? = nil,
+        motion: Bool = false,
         wrapper: URL = wrapperFileURL()
     ) throws -> Destination {
         guard isFigmaDocumentURL(pasted) else {
@@ -103,7 +104,7 @@ enum FigmaPaneURL {
         if normalizedNode(explicitNode) == nil, firstPageIDs.contains(node) { return .editor(pasted) }
 
         let embedded = embedURL(for: pasted, node: node)
-        return .embed(wrapper: wrapperURL(wrapper, embedding: embedded), embedded: embedded)
+        return .embed(wrapper: wrapperURL(wrapper, embedding: embedded, motion: motion), embedded: embedded)
     }
 
     /// The embed URL: host swapped, **path kept verbatim**, parameters appended.
@@ -137,12 +138,24 @@ enum FigmaPaneURL {
     /// resolve and a restart could not return to the steered node. Measured
     /// 2026-09-08: a query string on a `file://` URL survives, and is what the
     /// pane reports back through `browser get url`.
-    static func wrapperURL(_ wrapper: URL, embedding embedded: URL) -> URL {
+    static func wrapperURL(_ wrapper: URL, embedding embedded: URL, motion: Bool = false) -> URL {
         var components = URLComponents(url: wrapper, resolvingAgainstBaseURL: false)
             ?? URLComponents()
         // No theme: the page picks light or dark from the pane each time it loads.
-        components.queryItems = [URLQueryItem(name: "embed", value: embedded.absoluteString)]
+        var items = [URLQueryItem(name: "embed", value: embedded.absoluteString)]
+        if motion {
+            items.append(URLQueryItem(name: "motion", value: "1"))
+        }
+        components.queryItems = items
         return components.url ?? wrapper
+    }
+
+    /// Whether cmux's wrapper page URL carries the `motion=1` mark in its query.
+    static func hasMotionMark(inWrapper paneURL: URL, wrapper: URL = wrapperFileURL()) -> Bool {
+        guard isWrapperPage(paneURL, wrapper: wrapper),
+              let components = URLComponents(url: paneURL, resolvingAgainstBaseURL: false)
+        else { return false }
+        return components.queryItems?.contains(where: { $0.name == "motion" && $0.value == "1" }) ?? false
     }
 
     // MARK: - Reverse: what the pane is bound to
@@ -227,4 +240,111 @@ enum FigmaPaneURL {
         }
         return trimmed
     }
+}
+
+/// Scripts evaluated in the Figma wrapper page for Play and Still.
+enum FigmaPlayScript {
+    /// Pure function for transforming a design or file embed URL into a prototype embed URL.
+    static let script = #"""
+    function cmuxProtoAddress(src, canvasBg) {
+      if (!src) return null;
+      var mark = src.indexOf('?');
+      var base = mark >= 0 ? src.slice(0, mark) : src;
+      base = base.replace(/^([a-z]+:\/\/[^\/]+)?\/(?:design|file)\//i, function (match, host) {
+        return (host || '') + '/proto/';
+      });
+      var query = mark >= 0 ? src.slice(mark + 1) : '';
+      var params = {};
+      query.split('&').forEach(function (pair) {
+        if (!pair) return;
+        var at = pair.indexOf('=');
+        var k = at >= 0 ? pair.slice(0, at) : pair;
+        var v = at >= 0 ? pair.slice(at + 1) : '';
+        params[k] = v;
+      });
+      var nodeId = params['node-id'];
+      delete params['page-selector'];
+      params['hide-ui'] = '1';
+      if (canvasBg) { params['bg-color'] = canvasBg; }
+      params['scaling'] = 'contain';
+      if (nodeId) { params['starting-point-node-id'] = nodeId; }
+      var pairs = [];
+      for (var k in params) {
+        if (Object.prototype.hasOwnProperty.call(params, k)) {
+          pairs.push(k + '=' + params[k]);
+        }
+      }
+      return base + '?' + pairs.join('&');
+    }
+    """#
+
+    /// Helper JavaScript for restoring the still read view.
+    /// Replaces iframe element only when current src contains `/proto/`.
+    /// The still embed address is validated through `cmuxFramableAddress` and themed through `cmuxThemedAddress`.
+    static let restoreStillCode = #"""
+    function cmuxRestoreStill() {
+      var cur = document.querySelector('iframe');
+      if (!cur || !cur.src || cur.src.indexOf('/proto/') === -1) return false;
+      var params = new URLSearchParams(location.search);
+      var embed = params.get('embed');
+      var stillEmbed = typeof cmuxFramableAddress === 'function' ? cmuxFramableAddress(embed) : embed;
+      if (!stillEmbed) return false;
+      var dark = matchMedia('(prefers-color-scheme: dark)').matches;
+      var stillFrame = document.createElement('iframe');
+      stillFrame.setAttribute('allowfullscreen', '');
+      stillFrame.src = typeof cmuxThemedAddress === 'function' ? cmuxThemedAddress(stillEmbed, dark) : stillEmbed;
+      cur.parentNode.replaceChild(stillFrame, cur);
+      return true;
+    }
+    """#
+
+    static func playScript(canvasBg: String = "e5e5e5") -> String {
+        """
+        (function () {
+          var oldFrame = document.querySelector('iframe');
+          if (!oldFrame) return false;
+          \(script)
+          var protoSrc = cmuxProtoAddress(oldFrame.src, '\(canvasBg)');
+          if (!protoSrc) return false;
+          var newFrame = document.createElement('iframe');
+          newFrame.setAttribute('allowfullscreen', '');
+          newFrame.src = protoSrc;
+          oldFrame.parentNode.replaceChild(newFrame, oldFrame);
+          \(restoreStillCode)
+          if (window.__cmuxPlayRestore) {
+            window.removeEventListener('pageshow', window.__cmuxPlayRestore);
+            delete window.__cmuxPlayRestore;
+          }
+          window.__cmuxPlayRestore = function (event) {
+            if (event.persisted) {
+              cmuxRestoreStill();
+              if (window.__cmuxPlayRestore) {
+                window.removeEventListener('pageshow', window.__cmuxPlayRestore);
+                delete window.__cmuxPlayRestore;
+              }
+            }
+          };
+          window.addEventListener('pageshow', window.__cmuxPlayRestore);
+          return true;
+        })();
+        """
+    }
+
+    static let stillScript = """
+    (function () {
+      if (window.__cmuxPlayRestore) {
+        window.removeEventListener('pageshow', window.__cmuxPlayRestore);
+        delete window.__cmuxPlayRestore;
+      }
+      \(restoreStillCode)
+      return cmuxRestoreStill();
+    })();
+    """
+
+    static let isPlayingScript = """
+    (function () {
+      var frame = document.querySelector('iframe');
+      return !!(frame && frame.src && frame.src.indexOf('/proto/') !== -1);
+    })();
+    """
 }

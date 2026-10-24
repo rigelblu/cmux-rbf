@@ -14,7 +14,7 @@ import WebKit
     private var shouldPrintAfterCurrentNavigationFinishes = false
     var didStartProvisionalNavigation: ((WKWebView, WKNavigation?) -> Void)?
     var didCommit: ((WKWebView, WKNavigation?) -> Void)?
-    var didFinish: ((WKWebView) -> Void)?
+    var didFinish: ((WKWebView, WKNavigation?) -> Void)? // cmux-rbf (#cm-73.32): pass navigation to didFinish for bound pending play. Reject a revert of this hunk on upstream sync.
     var didFailNavigation: ((WKWebView, String, String, WKNavigation?) -> Void)?
     var didCancelProvisionalNavigation: ((WKWebView, WKNavigation?) -> Void)?
     var didChooseMainFrameDownloadPolicy: ((WKWebView, WKNavigation?) -> Void)?
@@ -146,7 +146,7 @@ import WebKit
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let isCurrentNavigation = isCurrentMainFrameNavigation(navigation)
-        didFinish?(webView)
+        didFinish?(webView, navigation)
         if isCurrentNavigation, let finishedURL = webView.url {
             owner?.commitTrustedLocalFileNavigation(finishedURL)
             owner?.clearTrustedLocalFileDocumentIfNeeded(for: finishedURL)

@@ -6,6 +6,9 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+## 🟠⋯ Added for End Users
+- 2026-10-24 - feat | watch a frame's motion play in my Figma pane's preview, not only see the still frame (#cm-73.32)
+
 # 🔵⋯ v0.34.2 (2026-10-29) — #cm-110.13
 
 *See a quiet dot on a workspace with no status, and have None keep it out of every status group.*

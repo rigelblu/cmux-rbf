@@ -54,6 +54,8 @@ extension CMUXCLI {
             try runFigmaGoto(
                 node: parsed.word,
                 surfaceOverride: parsed.option,
+                motion: parsed.motion,
+                play: parsed.play,
                 client: client,
                 jsonOutput: jsonOutput,
                 idFormat: idFormat
@@ -251,6 +253,8 @@ extension CMUXCLI {
     private func runFigmaGoto(
         node: String?,
         surfaceOverride: String?,
+        motion: Bool,
+        play: Bool,
         client: SocketClient,
         jsonOutput: Bool,
         idFormat: CLIIDFormat
@@ -265,11 +269,27 @@ extension CMUXCLI {
             surfaceOverride: surfaceOverride,
             client: client
         )
+
+        if motion || play {
+            let flag = play ? "--play" : "--motion"
+            guard FigmaFit.isDesignFile(pane.document) else {
+                throw CLIError(
+                    message: "cmux figma goto \(flag) works on Figma design files only: surface \(pane.handle) shows a FigJam board or a slide deck"
+                )
+            }
+        }
+
         // Keep the existing wrapper installation/preflight contract; the app owns page selection.
-        _ = try figmaDestination(for: pane.document, node: node)
+        _ = try figmaDestination(for: pane.document, node: node, motion: motion)
+        var params: [String: Any] = [
+            "surface_id": pane.surfaceID,
+            "node": node
+        ]
+        if motion { params["motion"] = true }
+        if play { params["play"] = true }
         let payload = try client.sendV2(
             method: "figma.goto",
-            params: ["surface_id": pane.surfaceID, "node": node]
+            params: params
         )
         if jsonOutput {
             print(jsonString(formatIDs(payload, mode: idFormat)))
@@ -506,11 +526,12 @@ extension CMUXCLI {
     /// for the editor, nothing there reads the page, and the command goes on.
     private func figmaDestination(
         for pasted: URL,
-        node: String?
+        node: String?,
+        motion: Bool = false
     ) throws -> FigmaPaneURL.Destination {
         let destination: FigmaPaneURL.Destination
         do {
-            destination = try FigmaPaneURL.destination(for: pasted, node: node)
+            destination = try FigmaPaneURL.destination(for: pasted, node: node, motion: motion)
         } catch FigmaPaneURL.Failure.notAFigmaURL(let raw) {
             throw CLIError(message: "not a Figma file URL: \(raw)")
         }

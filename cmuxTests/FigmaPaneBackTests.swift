@@ -1237,6 +1237,102 @@ struct FigmaPaneBackTests {
         return try #require(NSEvent(cgEvent: cgEvent))
     }
 
+    // MARK: - Motion Play / Still (cm-73.32)
+
+    @Test("fit keeps motion=1 mark and a plain goto drops it")
+    func fitKeepsMotionMarkAndPlainGotoDropsIt() throws {
+        let page = try wrapper()
+        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
+        let destinationWithMotion = try FigmaPaneURL.destination(for: document, node: "12-2", motion: true, wrapper: page).url
+        let pane = panel(on: destinationWithMotion, wrapper: page)
+        defer { pane.close() }
+        #expect(FigmaPaneURL.hasMotionMark(inWrapper: try #require(pane.currentURL), wrapper: page))
+
+        // fit to another node keeps motion=1
+        _ = pane.gotoFigmaNode("12-3", wrapper: page, purpose: .fit)
+        #expect(FigmaPaneURL.hasMotionMark(inWrapper: try #require(pane.currentURL), wrapper: page))
+
+        // plain goto (purpose: .point) drops motion=1
+        _ = pane.gotoFigmaNode("12-4", wrapper: page, purpose: .point)
+        #expect(!FigmaPaneURL.hasMotionMark(inWrapper: try #require(pane.currentURL), wrapper: page))
+    }
+
+    @Test("the exchange to editor runs Still and stores isPlaying: false")
+    func exchangeToEditorRunsStillAndStoresNotPlaying() async throws {
+        let page = try wrapper()
+        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
+        let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
+        let pane = panel(on: previewA, wrapper: page)
+        defer { pane.close() }
+
+        let previewView = pane.webView
+        let loader = DocumentLoader()
+        try await loader.seed(previewView, value: "preview", baseURL: previewA)
+        pane.publishObservedDocumentURL(previewA)
+
+        // Insert /proto/ iframe into the preview document
+        _ = try await previewView.evaluateJavaScript(#"""
+        (function() {
+          var frame = document.createElement('iframe');
+          frame.src = 'https://www.figma.com/proto/testfile?node-id=12-2';
+          document.body.appendChild(frame);
+          return frame.src;
+        })()
+        """#)
+        pane.isFigmaMotionPlaying = true
+
+        let initialSrc = try await previewView.evaluateJavaScript("document.querySelector('iframe')?.src") as? String
+        #expect(initialSrc?.contains("/proto/") == true)
+
+        // Switch to editor
+        try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
+        #expect(!showsPreview(pane, page))
+        #expect(!pane.isFigmaMotionPlaying)
+
+        // Outgoing previewView had stillScript run: iframe is no longer /proto/
+        let outgoingSrc = try await previewView.evaluateJavaScript("document.querySelector('iframe')?.src") as? String
+        #expect(outgoingSrc?.contains("/proto/") == false)
+
+        // Switch back to preview
+        try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
+        #expect(showsPreview(pane, page))
+        #expect(!pane.isFigmaMotionPlaying)
+    }
+
+    @Test("goto --play during in-flight load binds to target navigation and plays when finished")
+    func gotoPlayDuringInFlightLoadBindsToTargetNavigation() throws {
+        let page = try wrapper()
+        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
+        let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
+        let pane = panel(on: previewA, wrapper: page)
+        defer { pane.close() }
+
+        // Start initial navigation and capture its navigation handle
+        var firstNav: WKNavigation?
+        _ = pane.gotoFigmaNode("12-2", wrapper: page, onNavigationStarted: { firstNav = $0 })
+        let supersededNav = try #require(firstNav)
+
+        // Trigger goto with play: true
+        _ = pane.gotoFigmaNode("12-3", wrapper: page, play: true)
+        let targetNav = try #require(pane.pendingFigmaPlayNavigation)
+        #expect(targetNav !== supersededNav)
+
+        // An unrelated cancelled navigation (-999 from previous load) must NOT clear pending play
+        pane.navigationDelegate?.didCancelProvisionalNavigation?(pane.webView, supersededNav)
+        #expect(pane.pendingFigmaPlayNavigation === targetNav)
+
+        // Another non-matching navigation completion must NOT clear pending play, nor play
+        let requestsBefore = pane.figmaPlayRequestCount
+        pane.navigationDelegate?.didFinish?(pane.webView, supersededNav)
+        #expect(pane.pendingFigmaPlayNavigation === targetNav)
+        #expect(pane.figmaPlayRequestCount == requestsBefore)
+
+        // The matching navigation finishes -> clears pending navigation and requests Play once
+        pane.navigationDelegate?.didFinish?(pane.webView, targetNav)
+        #expect(pane.pendingFigmaPlayNavigation == nil)
+        #expect(pane.figmaPlayRequestCount == requestsBefore + 1)
+    }
+
     private final class NavigationStarts: @unchecked Sendable {
         private let lock = NSLock()
         private var value = 0
