@@ -1401,6 +1401,7 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Önizleme ve Düzenleyici Arasında Geçiş Yap",
+      "figmaMotionDescription": "(atanmamış) — Figma: Hareketi oynat / sabit görüntüyü göster",
       "title": "Klavye Kısayolları",
       "description": "cmux'ta mevcut tüm klavye kısayolları, kategoriye göre gruplandırılmış.",
       "metaDescription": "macOS'ta çalışma alanları, yüzeyler, bölünmüş paneller, tarayıcı, bildirimler, bulma ve pencere yönetimi için tüm cmux klavye kısayolları.",

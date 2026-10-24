@@ -9685,11 +9685,14 @@ class TerminalController {
               let node = v2String(params, "node"), !node.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
         }
+        // cmux-rbf (#cm-73.32): motion and play flags for Figma prototype motion. Reject a revert of this hunk on upstream sync.
+        let motion = v2Bool(params, "motion") ?? false
+        let play = v2Bool(params, "play") ?? false
         return v2BrowserWithPanel(params: params) { workspaceId, surfaceId, panel in
             guard let manager = self.v2ResolveTabManager(params: params) else {
                 return .err(code: "unavailable", message: String(localized: "cli.browser.error.tabManagerUnavailable", defaultValue: "Browser controls are unavailable"), data: nil)
             }
-            guard panel.gotoFigmaNode(node, purpose: purpose) else {
+            guard panel.gotoFigmaNode(node, purpose: purpose, motion: motion, play: play) else {
                 return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
             }
             let showingPreview = (panel.currentURL ?? panel.webView.url).map {

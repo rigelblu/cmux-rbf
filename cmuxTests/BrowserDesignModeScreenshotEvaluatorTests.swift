@@ -852,8 +852,8 @@ struct BrowserDesignModeScreenshotEvaluatorTests {
         let panel = BrowserPanel(workspaceId: UUID())
         let (loaded, loadedContinuation) = AsyncStream<Void>.makeStream()
         let existingDidFinish = panel.navigationDelegate?.didFinish
-        panel.navigationDelegate?.didFinish = { webView in
-            existingDidFinish?(webView)
+        panel.navigationDelegate?.didFinish = { webView, navigation in
+            existingDidFinish?(webView, navigation)
             loadedContinuation.yield()
             loadedContinuation.finish()
         }

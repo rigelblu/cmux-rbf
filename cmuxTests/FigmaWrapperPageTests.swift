@@ -202,4 +202,177 @@ struct FigmaWrapperPageTests {
             #expect(try framedAddress(embed: address, darkPane: true) == nil, "\(address)")
         }
     }
+
+    // MARK: - Play / prototype URL transformation
+
+    @Test("cmuxProtoAddress transforms design embed URL to prototype embed URL with required parameters")
+    func transformsDesignToProtoAddress() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaPlayScript.script)
+        let fn = context.objectForKeyedSubscript("cmuxProtoAddress")
+        let src = "https://embed.figma.com/design/KEY/slug?embed-host=cmux&footer=0&page-selector=0&node-id=12-2&theme=light"
+        let result = fn?.call(withArguments: [src, "e5e5e5"])?.toString()
+        let proto = try #require(result)
+        let components = try #require(URLComponents(string: proto))
+        #expect(components.host == "embed.figma.com")
+        #expect(components.path == "/proto/KEY/slug")
+        let queryMap = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        #expect(queryMap["node-id"] == "12-2")
+        #expect(queryMap["starting-point-node-id"] == "12-2")
+        #expect(queryMap["page-selector"] == nil)
+        #expect(queryMap["hide-ui"] == "1")
+        #expect(queryMap["bg-color"] == "e5e5e5")
+        #expect(queryMap["scaling"] == "contain")
+        #expect(queryMap["embed-host"] == "cmux")
+        #expect(queryMap["footer"] == "0")
+        #expect(queryMap["theme"] == "light")
+    }
+
+    @Test("cmuxProtoAddress transforms /file/ embed URL to prototype embed URL")
+    func transformsFileToProtoAddress() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaPlayScript.script)
+        let fn = context.objectForKeyedSubscript("cmuxProtoAddress")
+        let src = "https://embed.figma.com/file/KEY/slug?embed-host=cmux&footer=0&page-selector=0&node-id=12-2&theme=light"
+        let result = fn?.call(withArguments: [src, "e5e5e5"])?.toString()
+        let proto = try #require(result)
+        let components = try #require(URLComponents(string: proto))
+        #expect(components.host == "embed.figma.com")
+        #expect(components.path == "/proto/KEY/slug")
+        let queryMap = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        #expect(queryMap["node-id"] == "12-2")
+        #expect(queryMap["starting-point-node-id"] == "12-2")
+        #expect(queryMap["page-selector"] == nil)
+        #expect(queryMap["hide-ui"] == "1")
+        #expect(queryMap["bg-color"] == "e5e5e5")
+        #expect(queryMap["scaling"] == "contain")
+        #expect(queryMap["embed-host"] == "cmux")
+        #expect(queryMap["footer"] == "0")
+        #expect(queryMap["theme"] == "light")
+    }
+
+    @Test("cmuxProtoAddress only rewrites first path segment")
+    func onlyRewritesFirstPathSegment() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaPlayScript.script)
+        let fn = context.objectForKeyedSubscript("cmuxProtoAddress")
+        let src = "https://embed.figma.com/design/KEY/design-file-slug?embed-host=cmux&node-id=12-2"
+        let result = fn?.call(withArguments: [src, "e5e5e5"])?.toString()
+        let proto = try #require(result)
+        let components = try #require(URLComponents(string: proto))
+        #expect(components.path == "/proto/KEY/design-file-slug")
+    }
+
+    @Test("synthetic pageshow with persisted: true restores still read view and removes listener")
+    func pageshowPersistedRestoresStill() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaWrapperPage.addressScript)
+        let embed = "https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2"
+        context.evaluateScript("""
+        location = { search: '?embed=' + encodeURIComponent('\(embed)') };
+        URLSearchParams = function (search) {
+          var map = {};
+          search.replace(/^\\?/, '').split('&').forEach(function (pair) {
+            var at = pair.indexOf('=');
+            if (at >= 0) { map[decodeURIComponent(pair.slice(0, at))] = decodeURIComponent(pair.slice(at + 1)); }
+          });
+          this.get = function (name) { return name in map ? map[name] : null; };
+        };
+        matchMedia = function (query) { return { matches: false }; };
+        listeners = {};
+        window = {
+          addEventListener: function (type, fn) { listeners[type] = fn; },
+          removeEventListener: function (type, fn) { if (listeners[type] === fn) { delete listeners[type]; } }
+        };
+        currentFrame = {
+          src: 'https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2',
+          setAttribute: function (k, v) { this[k] = v; },
+          parentNode: {
+            replaceChild: function (newChild, oldChild) {
+              replaced = newChild;
+              currentFrame = newChild;
+            }
+          }
+        };
+        replaced = null;
+        document = {
+          querySelector: function (sel) { return sel === 'iframe' ? currentFrame : null; },
+          createElement: function (tag) {
+            return {
+              src: '',
+              setAttribute: function (k, v) { this[k] = v; },
+              parentNode: currentFrame.parentNode
+            };
+          }
+        };
+        """)
+        let play = context.evaluateScript(FigmaPlayScript.playScript(canvasBg: "e5e5e5"))
+        #expect(play?.toBool() == true)
+        #expect(context.evaluateScript("currentFrame.src.indexOf('/proto/') !== -1")?.toBool() == true)
+        #expect(context.evaluateScript("typeof window.__cmuxPlayRestore")?.toString() == "function")
+
+        // Fire pageshow with persisted: false -> no restore
+        context.evaluateScript("listeners['pageshow']({ persisted: false })")
+        #expect(context.evaluateScript("currentFrame.src.indexOf('/proto/') !== -1")?.toBool() == true)
+        #expect(context.evaluateScript("typeof window.__cmuxPlayRestore")?.toString() == "function")
+
+        // Fire pageshow with persisted: true -> restores still and deletes __cmuxPlayRestore
+        context.evaluateScript("listeners['pageshow']({ persisted: true })")
+        #expect(context.evaluateScript("currentFrame.src.indexOf('/design/') !== -1")?.toBool() == true)
+        #expect(context.evaluateScript("currentFrame.src.indexOf('/proto/') === -1")?.toBool() == true)
+        #expect(context.evaluateScript("typeof window.__cmuxPlayRestore")?.toString() == "undefined")
+        #expect(context.evaluateScript("typeof listeners['pageshow']")?.toString() == "undefined")
+    }
+
+    @Test("stillScript is idempotent: does not replace iframe when not playing")
+    func stillScriptIsIdempotent() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaWrapperPage.addressScript)
+        let embed = "https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2"
+        context.evaluateScript("""
+        window = this;
+        location = { search: '?embed=' + encodeURIComponent('\(embed)') };
+        URLSearchParams = function (search) {
+          var map = {};
+          search.replace(/^\\?/, '').split('&').forEach(function (pair) {
+            var at = pair.indexOf('=');
+            if (at >= 0) { map[decodeURIComponent(pair.slice(0, at))] = decodeURIComponent(pair.slice(at + 1)); }
+          });
+          this.get = function (name) { return name in map ? map[name] : null; };
+        };
+        matchMedia = function (query) { return { matches: false }; };
+        replacedCount = 0;
+        currentFrame = {
+          src: 'https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2',
+          setAttribute: function (k, v) { this[k] = v; },
+          parentNode: {
+            replaceChild: function (newChild, oldChild) {
+              replacedCount++;
+              currentFrame = newChild;
+            }
+          }
+        };
+        document = {
+          querySelector: function (sel) { return sel === 'iframe' ? currentFrame : null; },
+          createElement: function (tag) {
+            return {
+              src: '',
+              setAttribute: function (k, v) { this[k] = v; },
+              parentNode: currentFrame.parentNode
+            };
+          }
+        };
+        """)
+        let result = context.evaluateScript(FigmaPlayScript.stillScript)
+        #expect(context.exception == nil)
+        #expect(result?.toBool() == false)
+        #expect(context.evaluateScript("replacedCount")?.toInt32() == 0)
+
+        // Control: the same script does replace a playing frame, so the still case above is a real refusal.
+        context.evaluateScript("currentFrame.src = 'https://embed.figma.com/proto/KEY/slug?node-id=12-2';")
+        let replaced = context.evaluateScript(FigmaPlayScript.stillScript)
+        #expect(context.exception == nil)
+        #expect(replaced?.toBool() == true)
+        #expect(context.evaluateScript("replacedCount")?.toInt32() == 1)
+    }
 }

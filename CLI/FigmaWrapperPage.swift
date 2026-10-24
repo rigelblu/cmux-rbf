@@ -40,7 +40,7 @@ enum FigmaWrapperPage {
     /// Figma's embed paints its own skeleton (grey placeholders, blue progress
     /// bar) and would only be hidden behind a second one.
     ///
-    /// **It frames Figma's read-view address and nothing else**, and it picks
+    /// **It frames Figma's read-view address (or prototype view when playing motion)**, and it picks
     /// light or dark from the pane each time it loads, so no flag and no
     /// address parameter carries the theme. The background is the one thing
     /// cmux must paint: it is the instant before the iframe starts drawing, and

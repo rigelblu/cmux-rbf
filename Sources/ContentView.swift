@@ -7266,6 +7266,10 @@ struct ContentView: View {
             )
             // cmux-rbf (#cm-73.3): the palette uses the key's target selection. Reject a revert of this hunk on upstream sync.
             snapshot.setBool(CommandPaletteContextKeys.workspaceCanSwitchFigmaPage, workspace.figmaPageSwitchTarget() != nil)
+            // cmux-rbf (#cm-73.32): palette motion availability and playing state.
+            let motionTarget = workspace.figmaMotionTarget()
+            snapshot.setBool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion, motionTarget != nil)
+            snapshot.setBool(CommandPaletteContextKeys.workspaceFigmaMotionIsPlaying, motionTarget?.isFigmaMotionPlaying == true)
             // cmux-rbf #cm-73.2a
             snapshot.setBool(
                 CommandPaletteContextKeys.workspaceCanToggleDesignFocus,
@@ -8645,6 +8649,8 @@ struct ContentView: View {
                 enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanSwitchFigmaPage) }
             )
         )
+        // cmux-rbf (#cm-73.32): one shared action behind button, shortcut and palette. Reject a revert of this hunk on upstream sync.
+        contributions.append(Self.figmaMotionCommandContribution())
         // cmux-rbf #cm-73.2a
         contributions.append(
             CommandPaletteCommandContribution(
@@ -9559,6 +9565,8 @@ struct ContentView: View {
         }
         // cmux-rbf #cm-73.3: production and tests use the same registered entrance.
         Self.registerFigmaPageSwitchPaletteHandler(&registry, tabManager: tabManager)
+        // cmux-rbf (#cm-73.32): production and tests use the same registered entrance.
+        Self.registerFigmaMotionPaletteHandler(&registry, tabManager: tabManager)
         // cmux-rbf #cm-73.2a
         registry.register(commandId: "palette.toggleDesignFocus") {
             if !tabManager.toggleDesignFocus() {

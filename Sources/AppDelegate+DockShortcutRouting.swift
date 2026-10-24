@@ -124,6 +124,7 @@ extension KeyboardShortcutSettings.Action {
              .findInDirectory,
              .openDiffViewer,
              .switchFigmaPreviewAndEditor, // cmux-rbf #cm-73.3
+             .toggleFigmaMotion, // cmux-rbf (#cm-73.32)
              .toggleDesignFocus, // cmux-rbf #cm-73.2a
              .flipDesignFocusLayout: // cmux-rbf #cm-73.2a
             .mainContainer

@@ -38,7 +38,7 @@ extension ShortcutAction {
              .focusPreviousPane, .focusNextPane,
              .splitLeft, .splitRight, .splitUp, .splitDown,
              // cmux-rbf #cm-73.2a
-             .toggleSplitZoom, .switchFigmaPreviewAndEditor, .toggleDesignFocus, .flipDesignFocusLayout, .increaseWorkspaceTerminalFontSize,
+             .toggleSplitZoom, .switchFigmaPreviewAndEditor, .toggleFigmaMotion, .toggleDesignFocus, .flipDesignFocusLayout, .increaseWorkspaceTerminalFontSize,
              .decreaseWorkspaceTerminalFontSize, .resetWorkspaceTerminalFontSize,
              .equalizeSplits, .equalizeSplitWidths, .equalizeSplitHeights,
              .resizePaneLeft, .resizePaneRight, .resizePaneUp, .resizePaneDown,
