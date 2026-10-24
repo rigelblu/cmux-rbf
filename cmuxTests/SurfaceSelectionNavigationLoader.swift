@@ -17,7 +17,7 @@ enum SurfaceSelectionTestError: Error {
 final class SurfaceSelectionNavigationLoader {
     private var continuation: CheckedContinuation<Void, any Error>?
     private weak var navigationDelegate: BrowserNavigationDelegate?
-    private var previousDidFinish: ((WKWebView) -> Void)?
+    private var previousDidFinish: ((WKWebView, WKNavigation?) -> Void)?
     private var previousDidFailNavigation: ((WKWebView, String, String, WKNavigation?) -> Void)?
 
     func load(
@@ -33,8 +33,8 @@ final class SurfaceSelectionNavigationLoader {
         previousDidFailNavigation = navigationDelegate.didFailNavigation
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
-            navigationDelegate.didFinish = { [weak self, weak webView] finishedWebView in
-                self?.previousDidFinish?(finishedWebView)
+            navigationDelegate.didFinish = { [weak self, weak webView] finishedWebView, navigation in
+                self?.previousDidFinish?(finishedWebView, navigation)
                 guard finishedWebView === webView else { return }
                 self?.finish(with: .success(()))
             }

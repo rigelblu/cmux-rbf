@@ -2575,6 +2575,7 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: プレビューとエディターを切り替え",
+      "figmaMotionDescription": "(未割り当て) — Figma: モーションを再生 / 静止画を表示",
       "title": "キーボードショートカット",
       "description": "cmuxのデフォルトショートカット一覧です。cmux管理のショートカットはすべて設定画面または ~/.config/cmux/cmux.json で変更でき、2段階のコードにも対応しています。",
       "chordsTitle": "ショートカットコード",

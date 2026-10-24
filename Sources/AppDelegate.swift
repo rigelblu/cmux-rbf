@@ -16309,6 +16309,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return true
         }
 
+        // cmux-rbf (#cm-73.32): the same action as the button and palette; a missing target is silent. Reject a revert of this hunk on upstream sync.
+        if matchConfiguredShortcut(event: event, action: .toggleFigmaMotion) {
+            let routedManager = preferredMainWindowContextForShortcutRouting(event: event)?.tabManager ?? tabManager
+            _ = routedManager?.toggleFigmaMotion()
+            return true
+        }
+
         // cmux-rbf #cm-73.2a
         if matchConfiguredShortcut(event: event, action: .toggleDesignFocus) {
             let routedManager = preferredMainWindowContextForShortcutRouting(event: event)?.tabManager ?? tabManager

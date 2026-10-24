@@ -236,6 +236,25 @@ struct FigmaCLIRulesTests {
             #expect(FigmaUsage.text.contains(phrase), "\(phrase)")
         }
     }
+
+    @Test("the help describes --motion and --play for goto")
+    func helpDescribesMotionAndPlay() {
+        #expect(FigmaUsage.text.contains("--motion"))
+        #expect(FigmaUsage.text.contains("--play"))
+    }
+
+    @Test("goto accepts --motion and --play, in any position, and --play implies --motion")
+    func gotoAcceptsMotionAndPlay() {
+        #expect(parsed("goto", ["12-2", "--motion"]) == .init(word: "12-2", option: nil, motion: true, play: false))
+        #expect(parsed("goto", ["--motion", "12-2"]) == .init(word: "12-2", option: nil, motion: true, play: false))
+        #expect(parsed("goto", ["12-2", "--play"]) == .init(word: "12-2", option: nil, motion: true, play: true))
+        #expect(parsed("goto", ["--play", "12-2", "--surface", "s"]) == .init(word: "12-2", option: "s", motion: true, play: true))
+        #expect(parsed("goto", ["12-2", "--motion", "--play"]) == .init(word: "12-2", option: nil, motion: true, play: true))
+        #expect(refusal("open", ["LINK", "--motion"]) == "cmux figma open does not support --motion")
+        #expect(refusal("open", ["LINK", "--play"]) == "cmux figma open does not support --play")
+        #expect(refusal("fit", ["--motion"]) == "cmux figma fit does not support --motion")
+        #expect(refusal("fit", ["--play"]) == "cmux figma fit does not support --play")
+    }
 }
 
 /// What `cmux figma fit` decides, and what the fit on a fresh open shares with it. Pure: no

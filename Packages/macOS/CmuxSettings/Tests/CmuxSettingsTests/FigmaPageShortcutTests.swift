@@ -9,4 +9,13 @@ struct FigmaPageShortcutTests {
         #expect(action.group == .panes)
         #expect(action.displayName == "Figma: Switch Preview and Editor")
     }
+
+    // cmux-rbf #cm-73.32
+    @Test func motionShortcutExistsWithNoDefault() throws {
+        let action = try #require(ShortcutAction(rawValue: "toggleFigmaMotion"))
+        #expect(action.defaultStroke == nil)
+        #expect(action.defaultShortcut == nil)
+        #expect(action.group == .panes)
+        #expect(action.displayName == "Figma: Play Motion / Show Still")
+    }
 }
