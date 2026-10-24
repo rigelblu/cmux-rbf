@@ -16,6 +16,7 @@ struct StatusAreaDropPerformer {
 
     func perform(_ plan: SidebarStatusAreaBoundaryDropPlan, workspaceId: UUID,
                  sourceKind: SidebarStatusGroupDropRules.SourceKind) -> Bool {
+        state.prepareWorkspaceSections(renderItems: currentRenderItems) // (#cm-110.4)
         let tabs = currentTabs(), groups = currentGroups(), items = currentRenderItems()
         guard let projection = currentProjection(), var next = state.statusGroups,
               let areaIndex = items.firstIndex(where: { $0.id == .statusesArea() }) else { return false }

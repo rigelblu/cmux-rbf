@@ -18,6 +18,13 @@ extension TerminalController {
             guard let tabManager, let windowId = app.windowId(for: tabManager) else {
                 return .err(code: "not_found", message: "TabManager not found", data: nil)
             }
+            if let rawHeader = params["fold_header"] as? String {
+                guard let header = SidebarDebugActions.Header(rawValue: rawHeader),
+                      let folded = params["folded"] as? Bool else {
+                    return .err(code: "invalid_params", message: "Invalid DEBUG section fold request", data: nil)
+                }
+                return .ok(["accepted": app.sidebarDebugActions.setCollapsed(folded, header: header, windowId: windowId)])
+            }
             guard let items = SidebarDebugRowSnapshots.items(windowId: windowId) else {
                 return .err(
                     code: "not_found",
@@ -52,7 +59,7 @@ extension TerminalController {
                 parentGroupId: { groupsById[$0]?.parentGroupId },
                 statusIdByGroupId: projection?.workspaceGroups?.statusIdByGroupId ?? [:]
             )
-            let rowsData: [[String: Any]] = rows.map { row in
+            let rowsData: [[String: Any]] = app.sidebarDebugActions.rows(rows, windowId: windowId).map { row in
                 [
                     "kind": row.kind,
                     "id": row.id,
@@ -64,6 +71,7 @@ extension TerminalController {
             }
             return .ok([
                 "rows": rowsData,
+                "renderer": CmuxFeatureFlags.shared.isAppKitSidebarListEnabled ? "appkit" : "swiftui",
                 "session_file_path": app.sessionSnapshotStore.defaultSnapshotFileURL()?.path ?? "",
             ])
         }

@@ -34,6 +34,24 @@ struct SidebarWorkspaceGroupStatusHeaderDropTests {
         return (f, group)
     }
 
+    @Test(arguments: [false, true], [false, true])
+    func statusesHeaderRefusesGroupWhenWorkspacesHeaderIsNotMeasured(_ native: Bool, _ nested: Bool) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let (f, root) = try fixture(); defer { f.close() }
+            try makeUnblocked(f)
+            await f.applyRows()
+            try #require(f.rendered().contains { $0.id == .workspacesArea() })
+            try f.begin(row: .group(nested ? f.q : root))
+            let (point, allTargets) = try target(f, native: native,
+                id: SidebarStatusHeaderIdentity.statusesAreaUUID)
+            let visibleTargets = allTargets.filter { $0.workspaceId != SidebarStatusHeaderIdentity.workspacesAreaUUID }
+            let originalTabs = f.manager.tabs.map(\.id), originalGroups = f.manager.workspaceGroups
+            #expect(try f.route(point: point, targets: visibleTargets) == nil,
+                "Section identity comes from the model even if the other header is offscreen")
+            #expect(f.manager.tabs.map(\.id) == originalTabs && f.manager.workspaceGroups == originalGroups)
+        }
+    }
+
     private func target(_ f: F, native: Bool, id: UUID, edge: SidebarDropEdge = .top,
                         right: Bool = false) throws -> (CGPoint, [SidebarWorkspaceReorderDropOverlay.Target]) {
         let targets = f.targets(native ? .native : .swiftUI)

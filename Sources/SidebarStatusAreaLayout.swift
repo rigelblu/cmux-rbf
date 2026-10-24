@@ -12,6 +12,8 @@ struct SidebarStatusAreaLayout {
     private let statusIdByMember: [UUID: String]
     private let statusIdByGroup: [UUID: String]
     private let projectedGroupAnchors: Set<String>
+    /// Includes members hidden by inner folds, for the ordinary section's folded unread badge.
+    let workspacesSectionMemberIds: Set<UUID>
 
     init(items: [SidebarWorkspaceRenderItem], tabs: [Workspace] = [], groups: [WorkspaceGroup] = [],
          statusProjection: WorkspaceStatusGroupProjection? = nil) {
@@ -52,7 +54,7 @@ struct SidebarStatusAreaLayout {
                     owners[.workspace(member)] = key
                     if isPinned { pinned.insert(.workspace(member)) }
                 }
-            case .statusesHeader, .statusGroupHeader: break
+            case .statusesHeader, .workspacesHeader, .statusGroupHeader: break
             }
         }
         // Color headers precede their members, so apply whole-color ownership after visiting all rows.
@@ -69,6 +71,14 @@ struct SidebarStatusAreaLayout {
         }
         for (id, status) in statusProjection?.workspaceGroups?.statusIdByWorkspaceId ?? [:] { byMember[id] = status }
         statusIdByMember = byMember
+        let pinnedWorkspaceIds = Set(tabs.compactMap { workspace -> UUID? in
+            if let groupId = effectiveGroups[workspace.id] ?? nil, let root = rootGroup(groupId) {
+                return root.isPinned ? workspace.id : nil
+            }
+            return workspace.isPinned ? workspace.id : nil
+        })
+        workspacesSectionMemberIds = Set(tabs.map(\.id))
+            .subtracting(pinnedWorkspaceIds).subtracting(byMember.keys)
         statusIdByGroup = statusProjection?.workspaceGroups?.statusIdByGroupId ?? [:]
         projectedGroupAnchors = Set(groups.filter { group in
             group.parentGroupId == nil && !group.isPinned
@@ -86,9 +96,22 @@ struct SidebarStatusAreaLayout {
         Set(items.compactMap { pinnedRows.contains($0.id) ? nil : owner(of: $0.id) })
     }
 
+    var pinnedBoundary: Int {
+        items.indices.last(where: { pinnedRows.contains(items[$0].id) }).map { $0 + 1 } ?? 0
+    }
+
+    /// Reads the untouched old placement, with `last` taking precedence even for an empty ordinary section.
+    func legacySectionOrder(state: WorkspaceStatusGroupsState?) -> WorkspaceSectionOrder {
+        guard let state, state.last != true else { return .workspacesFirst }
+        guard state.aboveRow != nil || state.belowRow != nil else { return .workspacesFirst }
+        let placed = placing(area: [.statusesHeader], state: state)
+        let index = placed.firstIndex { if case .statusesHeader = $0 { return true }; return false }
+        return index == pinnedBoundary ? .statusesFirst : .workspacesFirst
+    }
+
     func placing(area: [SidebarWorkspaceRenderItem], state: WorkspaceStatusGroupsState?) -> [SidebarWorkspaceRenderItem] {
         guard !area.isEmpty, let state, state.last != true else { return items + area }
-        let pinBoundary = items.indices.last(where: { pinnedRows.contains(items[$0].id) }).map { $0 + 1 } ?? 0
+        let pinBoundary = pinnedBoundary
         let insertion: Int
         if state.aboveRow == "top" { insertion = pinBoundary }
         else if let above = state.aboveRow, let index = items.indices.last(where: { owner(of: items[$0].id) == above }) {
@@ -106,6 +129,7 @@ struct SidebarStatusAreaLayout {
     /// Saves the area's neighbours as `saving(state:)` does, but never anchors it to a row that is about to leave: an
     /// owner whose every row is moving is skipped, so the area keeps the next row that stays. (#cm-110.1)
     func saving(state: WorkspaceStatusGroupsState?, movingWorkspaceIds: Set<UUID>, movingGroupIds: Set<UUID>) -> WorkspaceStatusGroupsState? {
+        if state?.sectionOrder != nil { return state?.canonicalizingSectionOrder() }
         guard var state, let areaIndex = items.firstIndex(where: { if case .statusesHeader = $0 { return true }; return false }) else { return state }
         let leaving = leavingOwners(movingWorkspaceIds: movingWorkspaceIds, movingGroupIds: movingGroupIds)
         func anchors(_ item: SidebarWorkspaceRenderItem) -> Bool {
@@ -140,7 +164,7 @@ struct SidebarStatusAreaLayout {
             case .colorSectionHeader(let section):
                 let members = section.memberWorkspaceIds
                 if !members.isEmpty && members.allSatisfy(movingWorkspaceIds.contains) { moving.insert(owner) } else { staying.insert(owner) }
-            case .statusesHeader, .statusGroupHeader: break
+            case .statusesHeader, .workspacesHeader, .statusGroupHeader: break
             }
         }
         return wholeGroups.union(moving.subtracting(staying))
@@ -161,7 +185,7 @@ struct SidebarStatusAreaLayout {
             }
             return .init(rowId: target.workspaceId, frame: target.frame,
                          topLevelRowId: statusId == nil && !isArea ? owner(of: rowId) : nil,
-                         statusId: statusId, isStatusesArea: isArea, isPinned: pinnedRows.contains(rowId))
+                         statusId: statusId, isStatusesArea: isArea, isPinned: pinnedRows.contains(rowId), isWorkspacesArea: rowId == .workspacesArea())
         }
     }
 }

@@ -119,21 +119,30 @@ extension VerticalTabsSidebar {
             return SidebarDebugDropResult(performed: performed, plan: acceptedPlan, paint: paint) // (#cm-110.10)
     }
 
+    @ViewBuilder
     func makeSidebarDebugDropHost(renderContext: WorkspaceListRenderContext,
         plan: @escaping (CGPoint, [SidebarWorkspaceReorderDropOverlay.Target], UUID) -> SidebarWorkspaceReorderDropPlan?,
         commit: @escaping (SidebarWorkspaceReorderDropPlan) -> Bool) -> some View {
         let monitor = pointerInteractionMonitor
-        return SidebarDebugDropHost(windowId: windowId) { request in
-            var frames: [UUID: CGRect] = [:]
-            for item in renderContext.workspaceRenderItems {
-                if let id = item.headerDropIdentity, let frame = monitor.statusHeaderDropFrame(for: item.id) { frames[id] = frame }
-            }
-            let targets = Self.statusAwareSwiftUITargets(items: renderContext.workspaceRenderItems, frames: frames, context: renderContext)
-            return performDebugSidebarDrop(request, targets: targets, renderContext: renderContext, plan: plan, commit: commit)
-        }.frame(width: 0, height: 0).accessibilityHidden(true)
+        if let registry = AppDelegate.shared?.sidebarDebugActions {
+            SidebarDebugDropHost(registry: registry, windowId: windowId,
+                actions: makeSidebarDebugSectionHeaderActions(renderContext: renderContext)) { request in
+                var frames: [UUID: CGRect] = [:]
+                for item in renderContext.workspaceRenderItems {
+                    if let id = item.headerDropIdentity, let frame = monitor.statusHeaderDropFrame(for: item.id) { frames[id] = frame }
+                }
+                let targets = Self.statusAwareSwiftUITargets(items: renderContext.workspaceRenderItems, frames: frames, context: renderContext)
+                return performDebugSidebarDrop(request, targets: targets, renderContext: renderContext, plan: plan, commit: commit)
+            }.frame(width: 0, height: 0).accessibilityHidden(true)
+        }
     }
 
     private func debugSidebarSource(_ raw: String, items: [SidebarWorkspaceRenderItem]) -> (id: UUID, row: SidebarWorkspaceRenderItemID?)? {
+        if raw == "workspaces", WorkspaceTodoFeature.isEnabled,
+           let id = SidebarDebugActions.identity(raw, items: items),
+           let item = items.first(where: { $0.headerDropIdentity == id }) {
+            return (id, item.id)
+        }
         let list = AppDelegate.statusListInUse
         if raw == "statuses", WorkspaceTodoFeature.isEnabled, list.source != .cmux, !list.entries.isEmpty {
             return (SidebarStatusHeaderIdentity.statusesAreaUUID, .statusesArea())
@@ -159,7 +168,7 @@ extension VerticalTabsSidebar {
         guard let id = UUID(uuidString: value) else { return nil }
         if let kind = SidebarStatusHeaderIdentity.kind(forDragId: id, list: list), WorkspaceTodoFeature.isEnabled {
             let row: SidebarWorkspaceRenderItemID
-            switch kind { case .statusesArea: row = .statusesArea(); case .statusGroup(let id): row = .statusGroup(id) }
+            switch kind { case .statusesArea: row = .statusesArea(); case .workspacesArea: row = .workspacesArea(); case .statusGroup(let id): row = .statusGroup(id) }
             return (SidebarStatusHeaderIdentity.uuid(for: kind), row)
         }
         if let group = tabManager.workspaceGroups.first(where: { $0.id == id }) {
@@ -172,6 +181,10 @@ extension VerticalTabsSidebar {
 
     private static func debugSidebarTarget(_ raw: String, items: [SidebarWorkspaceRenderItem],
         targets: [SidebarWorkspaceReorderDropOverlay.Target]) -> (id: UUID, row: SidebarWorkspaceRenderItemID?)? {
+        if let id = SidebarDebugActions.identity(raw, items: items),
+           let item = items.first(where: { $0.headerDropIdentity == id }) {
+            return (id, item.id)
+        }
         if raw == "below" {
             guard let last = targets.max(by: { $0.frame.maxY < $1.frame.maxY }) else { return nil }
             return (last.workspaceId, last.renderItemId)
@@ -182,6 +195,7 @@ extension VerticalTabsSidebar {
         let item = items.first { item in
             switch item {
             case .statusesHeader: return raw == "statuses" || rawId == SidebarStatusHeaderIdentity.statusesAreaUUID
+            case .workspacesHeader: return raw == "workspaces" || rawId == SidebarStatusHeaderIdentity.workspacesAreaUUID
             case .statusGroupHeader(let id): return raw == "status:\(id)" || rawId == SidebarStatusHeaderIdentity.uuid(forStatusId: id)
             case .groupHeader(let id, let anchor): return groupId == id || rawId == anchor
             case .colorSectionHeader(let section):
@@ -195,34 +209,25 @@ extension VerticalTabsSidebar {
     }
 }
 
-/// The representable refreshes this event handler from updateNSView, never from body.
-@MainActor
-private enum SidebarDebugDropRegistry {
-    private struct Entry { let owner: ObjectIdentifier; let handler: (SidebarDebugDropRequest) -> SidebarDebugDropResult? }
-    private static var entries: [UUID: Entry] = [:]
-    static func update(windowId: UUID, owner: NSView, handler: @escaping (SidebarDebugDropRequest) -> SidebarDebugDropResult?) {
-        entries[windowId] = Entry(owner: ObjectIdentifier(owner), handler: handler)
-    }
-    static func remove(windowId: UUID, owner: NSView) {
-        if entries[windowId]?.owner == ObjectIdentifier(owner) { entries.removeValue(forKey: windowId) }
-    }
-    static func perform(windowId: UUID, request: SidebarDebugDropRequest) -> SidebarDebugDropResult? { entries[windowId]?.handler(request) }
-}
-
 private struct SidebarDebugDropHost: NSViewRepresentable {
+    let registry: SidebarDebugActions
     let windowId: UUID
+    let actions: [SidebarDebugActions.Action]
     let handler: (SidebarDebugDropRequest) -> SidebarDebugDropResult?
     func makeNSView(context: Context) -> SidebarDebugDropHostView { SidebarDebugDropHostView() }
     func updateNSView(_ view: SidebarDebugDropHostView, context: Context) {
+        if let old = view.ownerWindowId { view.registry?.remove(windowId: old, owner: view) }
+        view.registry = registry
         view.ownerWindowId = windowId
-        SidebarDebugDropRegistry.update(windowId: windowId, owner: view, handler: handler)
+        registry.update(windowId: windowId, owner: view, actions: actions, handler: handler)
     }
     static func dismantleNSView(_ view: SidebarDebugDropHostView, coordinator: ()) {
-        if let id = view.ownerWindowId { SidebarDebugDropRegistry.remove(windowId: id, owner: view) }
+        if let id = view.ownerWindowId { view.registry?.remove(windowId: id, owner: view) }
     }
 }
 
 private final class SidebarDebugDropHostView: NSView {
+    var registry: SidebarDebugActions?
     var ownerWindowId: UUID?
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
@@ -252,7 +257,7 @@ extension TerminalController {
             }
             let result: SidebarDebugDropResult?
             if let native = controller(in: content) { result = native.debugPerformSidebarDrop(request) }
-            else { result = SidebarDebugDropRegistry.perform(windowId: context.windowId, request: request) }
+            else { result = app.sidebarDebugActions.perform(windowId: context.windowId, request: request) }
             guard let result else { return self.debugSidebarDropUnavailable() }
             return .ok(result.payload)
         }

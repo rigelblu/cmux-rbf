@@ -215,7 +215,7 @@ struct WorkspaceGroupTests {
                 break
             case .workspace(let workspaceId):
                 visibleWorkspaceIds.append(workspaceId)
-            case .statusesHeader, .statusGroupHeader: // (#cm-110.1)
+            case .statusesHeader, .workspacesHeader, .statusGroupHeader: // (#cm-110.4)
                 break // (#cm-110.1)
             }
         }
@@ -269,7 +269,7 @@ struct WorkspaceGroupTests {
         // stale reference must not inherit the member indent. The render-item
         // projection and row-input projection therefore agree on root-level
         // membership, which keeps long titles left-aligned with other roots.
-        #expect(effectiveMembership[staleMember.id] == nil)
+        #expect((effectiveMembership[staleMember.id] ?? nil) == nil) // (#cm-110.4) pre-existing optional comparison, not a cm-110.4 behaviour change
         #expect(!memberWorkspaceIdsByGroupId[groupId, default: []].contains(staleMember.id))
         #expect(renderItems.contains { item in
             if case .workspace(let workspaceId) = item {

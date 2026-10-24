@@ -91,4 +91,69 @@ struct SidebarStatusHeaderDropPlannerTests {
     func statusHeaderRefusesWorkspaceAndColorGroups(_ owner: String) {
         #expect(plan(30, targets: [row(group, 22, owner)] + Array(rows.dropFirst(2))) == nil)
     }
+
+    // cm-110.4 Experience #9: both source headers, both orders, both sidebar halves.
+    private func sectionRows(statusesFirst: Bool, compact: Bool = false) -> [SidebarStatusHeaderDropTarget] {
+        let w = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        var result = [row(pin, 0, "workspace:pin", pinned: true)]
+        let blocks = statusesFirst ? [[area, a, a1], [w, loose, member]] : [[w, loose, member], [area, a, a1]]
+        for block in blocks {
+            for id in compact ? [block[0]] : block {
+                result.append(.init(rowId: id, frame: CGRect(x: 0, y: result.count * 22, width: 300, height: 20),
+                    statusId: block[0] == area && id != area ? "a" : nil,
+                    isStatusesArea: id == area, isWorkspacesArea: id == w))
+            }
+        }
+        return result
+    }
+    private func sectionPlan(rows: [SidebarStatusHeaderDropTarget], sourceW: Bool, y: CGFloat, x: CGFloat = 75) -> SidebarStatusHeaderDropPlan? {
+        SidebarStatusHeaderDropPlanner().plan(point: .init(x: x, y: y), draggedStatusId: nil,
+            targets: rows, draggedWorkspacesArea: sourceW)
+    }
+    private func checkOther(before: Bool, compact: Bool = false) throws {
+        for first in [false, true] { for sourceW in [false, true] { for x in [CGFloat(75), 225] {
+            let rows = sectionRows(statusesFirst: first, compact: compact)
+            let otherStart = try #require(rows.firstIndex { sourceW ? $0.isStatusesArea : $0.isWorkspacesArea })
+            let end = rows.dropFirst(otherStart + 1).firstIndex { $0.isStatusesArea || $0.isWorkspacesArea }.map { $0 - 1 } ?? (rows.count - 1)
+            let midpoint = (rows[otherStart].frame.minY + rows[end].frame.maxY) / 2
+            let probes = (otherStart...end).flatMap { i in
+                [rows[i].frame.minY + 1, rows[i].frame.midY, rows[i].frame.maxY]
+            }.filter { ($0 < midpoint) == before }
+            for y in probes {
+                let actual = try #require(sectionPlan(rows: rows, sourceW: sourceW, y: y, x: x))
+                #expect(actual.action == .area(aboveRow: "top", belowRow: nil, last: sourceW == before))
+                #expect(actual.indicator == .init(tabId: before ? rows[otherStart].rowId : rows[end].rowId, edge: before ? .top : .bottom))
+            }
+        } } }
+    }
+    @Test func upperHalfOfOtherSectionPlacesWholeSectionBeforeIt() throws { try checkOther(before: true) }
+    @Test func lowerHalfOfOtherSectionPlacesWholeSectionAfterIt() throws { try checkOther(before: false) }
+    @Test func foldedOrEmptySectionUsesOnlyItsHeaderHalves() throws {
+        try checkOther(before: true, compact: true); try checkOther(before: false, compact: true)
+    }
+    @Test func ownSectionRefusesWithNoIndicator() {
+        for first in [false, true] { for sourceW in [false, true] {
+            let rows = sectionRows(statusesFirst: first)
+            let start = rows.firstIndex { sourceW ? $0.isWorkspacesArea : $0.isStatusesArea }!
+            for y in [rows[start].frame.midY, rows[start + 1].frame.midY, rows[start + 2].frame.maxY] {
+                #expect(sectionPlan(rows: rows, sourceW: sourceW, y: y) == nil)
+            }
+        } }
+    }
+    @Test func pinnedRowsClampSectionFirstBelowAllPins() throws {
+        for first in [false, true] { for sourceW in [false, true] {
+            let rows = sectionRows(statusesFirst: first)
+            let actual = try #require(sectionPlan(rows: rows, sourceW: sourceW, y: 5))
+            #expect(actual.action == .area(aboveRow: "top", belowRow: nil, last: sourceW))
+            #expect(actual.indicator == .init(tabId: rows[1].rowId, edge: .top))
+        } }
+    }
+    @Test func belowAllPlacesDraggedSectionSecond() throws {
+        for first in [false, true] { for sourceW in [false, true] {
+            let rows = sectionRows(statusesFirst: first)
+            let actual = try #require(sectionPlan(rows: rows, sourceW: sourceW, y: rows.last!.frame.maxY + 1))
+            #expect(actual.action == .area(aboveRow: "top", belowRow: nil, last: !sourceW))
+            #expect(actual.indicator == .init(tabId: rows.last!.rowId, edge: .bottom))
+        } }
+    }
 }

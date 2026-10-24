@@ -28,7 +28,8 @@ extension SidebarState {
         list: WorkspaceStatusList,
         resolvedHexByStatusId: [String: String],
         selectedWorkspace: Workspace?,
-        workspaceGroups: [WorkspaceGroup]
+        workspaceGroups: [WorkspaceGroup],
+        revealWorkspaces: Bool = true
     ) {
         if statusGroups == nil, list.source != .cmux {
             setStatusGroups(.seeded(list: list, resolvedHexByStatusId: resolvedHexByStatusId,
@@ -38,7 +39,7 @@ extension SidebarState {
         if let selectedWorkspace {
             expandColorSection(containing: selectedWorkspace)
             revealStatusGroup(containing: selectedWorkspace, list: list, resolvedHexByStatusId: resolvedHexByStatusId,
-                              workspaceGroups: workspaceGroups)
+                              workspaceGroups: workspaceGroups, revealWorkspaces: revealWorkspaces)
         }
     }
 
@@ -47,10 +48,11 @@ extension SidebarState {
         list: WorkspaceStatusList,
         resolvedHexByStatusId: [String: String],
         selectedWorkspace: Workspace?,
-        workspaceGroups: [WorkspaceGroup]
+        workspaceGroups: [WorkspaceGroup],
+        wasUninitialized: Bool? = nil // (#cm-110.4)
     ) {
         reconcileStatusGroupOrder(list: list)
-        guard statusGroups == nil else { return }
+        guard wasUninitialized ?? (statusGroups == nil) else { return } // (#cm-110.4)
         prepareStatusGroupsForSelection(list: list, resolvedHexByStatusId: resolvedHexByStatusId,
                                         selectedWorkspace: selectedWorkspace, workspaceGroups: workspaceGroups)
     }
@@ -59,38 +61,50 @@ extension SidebarState {
         containing workspace: Workspace,
         list: WorkspaceStatusList,
         resolvedHexByStatusId: [String: String],
-        workspaceGroups: [WorkspaceGroup]
+        workspaceGroups: [WorkspaceGroup],
+        revealWorkspaces: Bool = true
     ) {
-        let groupId = workspaceGroups.first { $0.liveAnchorWorkspaceId == workspace.id }?.id ?? workspace.groupId
-        let grouped = WorkspaceGroupStatusProjection(groups: workspaceGroups,
-            workspaces: [.init(id: workspace.id, groupId: groupId, isPinned: workspace.isPinned)], list: list)
-        if let statusId = grouped.statusIdByWorkspaceId[workspace.id], var next = statusGroups {
-            next.reveal(statusId: statusId)
-            if next != statusGroups { setStatusGroups(next) }
-            return
+        guard var next = statusGroups else { return }
+        // A selected member is a one-row sample; the absent anchor is not evidence that its live group disappeared.
+        let groupsById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
+        let storedGroup = workspaceGroups.first { $0.liveAnchorWorkspaceId == workspace.id }?.id ?? workspace.groupId
+        // Restore prepares selection before registering its context; retain the same raw-membership fallback as rendering.
+        let groupId = workspaceGroups.isEmpty ? storedGroup : storedGroup.flatMap { groupsById[$0] == nil ? nil : $0 }
+        let tree = WorkspaceGroupTree(groups: workspaceGroups)
+        let root = groupId.flatMap { groupsById[tree.outermost(of: $0)] }
+        let item = VerticalTabsSidebar.statusGroupProjectionItem(workspace, list: list,
+            groupId: groupId, isPinned: root?.isPinned ?? workspace.isPinned)
+        guard let projection = VerticalTabsSidebar.statusGroupProjection(items: [item],
+            list: list, colorHexes: resolvedHexByStatusId, controlsEnabled: true,
+            workspaceGroups: workspaceGroups) else { return }
+        let statusId = projection.workspaceGroups?.statusIdByWorkspaceId[workspace.id]
+            ?? projection.groups.first(where: { $0.memberWorkspaceIds.contains(workspace.id) })?.statusId
+        if let statusId { next.reveal(statusId: statusId) }
+        else if revealWorkspaces, WorkspaceTodoFeature.isEnabled, next.sectionOrder != nil, !item.isPinned {
+            next.revealWorkspaces()
         }
-        guard var next = statusGroups,
-              let projection = WorkspaceStatusGroupProjection.project(
-                workspaces: VerticalTabsSidebar.statusGroupProjectionItems(tabs: [workspace], list: list, groups: workspaceGroups),
-                list: list, resolvedHexByStatusId: resolvedHexByStatusId, storedOrder: nil
-              ),
-              let group = projection.groups.first(where: { $0.memberWorkspaceIds.contains(workspace.id) }) else { return }
-        next.reveal(statusId: group.statusId)
         if next != statusGroups { setStatusGroups(next) }
     }
 
-    func prepareStatusGroupsForSelection(selectedWorkspace: Workspace?) {
-        let groups = selectedWorkspace.flatMap { AppDelegate.shared?.tabManagerFor(tabId: $0.id)?.workspaceGroups } ?? []
+    func prepareStatusGroupsForSelection(selectedWorkspace: Workspace?, revealWorkspaces: Bool = true) {
+        let manager = selectedWorkspace.flatMap { AppDelegate.shared?.tabManagerFor(tabId: $0.id) }
+        if let manager { prepareWorkspaceSections(tabManager: manager) }
+        let groups = manager?.workspaceGroups ?? []
         prepareStatusGroupsForSelection(list: AppDelegate.statusListInUse,
                                         resolvedHexByStatusId: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:],
-                                        selectedWorkspace: selectedWorkspace, workspaceGroups: groups)
+                                        selectedWorkspace: selectedWorkspace, workspaceGroups: groups,
+                                        revealWorkspaces: revealWorkspaces)
     }
 
-    func prepareStatusGroupsOnListArrival(selectedWorkspace: Workspace?) {
-        let groups = selectedWorkspace.flatMap { AppDelegate.shared?.tabManagerFor(tabId: $0.id)?.workspaceGroups } ?? []
+    func prepareStatusGroupsOnListArrival(selectedWorkspace: Workspace?, tabManager: TabManager? = nil) { // (#cm-110.4)
+        let wasUninitialized = statusGroups == nil // (#cm-110.4) capture before migration seeds the record
+        let manager = tabManager ?? selectedWorkspace.flatMap { AppDelegate.shared?.tabManagerFor(tabId: $0.id) } // (#cm-110.4)
+        if let manager { prepareWorkspaceSections(tabManager: manager) }
+        let groups = manager?.workspaceGroups ?? []
         prepareStatusGroupsOnListArrival(list: AppDelegate.statusListInUse,
                                         resolvedHexByStatusId: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:],
-                                        selectedWorkspace: selectedWorkspace, workspaceGroups: groups)
+                                        selectedWorkspace: selectedWorkspace, workspaceGroups: groups,
+                                        wasUninitialized: wasUninitialized) // (#cm-110.4)
     }
 }
 

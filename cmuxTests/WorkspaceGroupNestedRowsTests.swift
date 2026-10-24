@@ -48,6 +48,7 @@ struct WorkspaceGroupNestedRowsTests {
             case .workspace(let id): return names[id] ?? "?"
             case .colorSectionHeader: return "color"
             case .statusesHeader: return "statuses" // (#cm-110.1)
+            case .workspacesHeader: return "workspaces" // (#cm-110.4)
             case .statusGroupHeader(let statusId): return "status(\(statusId))" // (#cm-110.1)
             }
         }

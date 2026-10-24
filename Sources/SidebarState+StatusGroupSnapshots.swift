@@ -20,30 +20,19 @@ extension VerticalTabsSidebar {
 @MainActor
 extension SidebarState {
     func statusGroupsForSnapshot(tabManager: TabManager) -> WorkspaceStatusGroupsState? {
+        guard prepareWorkspaceSections(tabManager: tabManager) else { return statusGroups }
         reconcileStatusGroupOrder(list: AppDelegate.statusListInUse)
-        let items = VerticalTabsSidebar.statusRenderItemsForSnapshot(tabManager: tabManager, state: self).items
-        let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: statusGroups?.order)
-        let saved = SidebarStatusAreaLayout(items: items, tabs: tabManager.tabs,
-            groups: tabManager.workspaceGroups, statusProjection: projection).saving(state: statusGroups)
+        let saved = statusGroups?.canonicalizingSectionOrder()
         if saved != statusGroups { setStatusGroups(saved) }
         return statusGroups
     }
 
-    /// Re-saves where the Statuses area sits before an ordinary reorder moves rows, so it stays put when the row
-    /// it was saved under leaves. Statuses-aware drops save their own placement and do not call this. (#cm-110.1)
-    /// Returns the state it replaced, for `settleStatusAreaAfterMove` to put back when the move does not happen.
+    /// Resolves the two-section order before an ordinary reorder; no item can become a section's anchor.
+    /// Returns the resolved state for a failed move's rollback.
     @discardableResult
     func reanchorStatusAreaBeforeMove(tabManager: TabManager, movingWorkspaceIds: [UUID], movingGroupIds: [UUID]) -> WorkspaceStatusGroupsState? {
-        let previous = statusGroups
-        guard statusGroups != nil else { return previous }
-        let items = VerticalTabsSidebar.statusRenderItemsForSnapshot(tabManager: tabManager, state: self).items
-        guard items.contains(where: { if case .statusesHeader = $0 { return true }; return false }) else { return previous }
-        let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups, storedOrder: statusGroups?.order)
-        let saved = SidebarStatusAreaLayout(items: items, tabs: tabManager.tabs,
-            groups: tabManager.workspaceGroups, statusProjection: projection)
-            .saving(state: statusGroups, movingWorkspaceIds: Set(movingWorkspaceIds), movingGroupIds: Set(movingGroupIds))
-        if saved != statusGroups { setStatusGroups(saved) }
-        return previous
+        prepareWorkspaceSections(tabManager: tabManager)
+        return statusGroups
     }
 
     /// Puts back what `reanchorStatusAreaBeforeMove` replaced when the reorder moved nothing or failed. (#cm-110.1)

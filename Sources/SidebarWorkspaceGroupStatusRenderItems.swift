@@ -48,12 +48,15 @@ struct SidebarWorkspaceGroupStatusRenderItems {
             }
             area.append(contentsOf: rows)
         }
-        var items = colorSections.applying(to: normal)
-        if folds.last == true || (folds.aboveRow == nil && folds.belowRow == nil) { items += area }
-        else {
-            items = SidebarStatusAreaLayout(items: items, tabs: tabs, groups: groups, statusProjection: projection)
-                .placing(area: area, state: folds)
-        }
-        return .init(items: items, numberedWorkspaceIndexById: numbering)
+        let normalItems = colorSections.applying(to: normal)
+        let layout = SidebarStatusAreaLayout(items: normalItems, tabs: tabs, groups: groups, statusProjection: projection)
+        let order = folds.sectionOrder ?? layout.legacySectionOrder(state: folds)
+        let pins = Array(normalItems.prefix(layout.pinnedBoundary))
+        let ordinary = Array(normalItems.dropFirst(layout.pinnedBoundary))
+        let workspaces: [SidebarWorkspaceRenderItem] = [.workspacesHeader]
+            + (folds.workspacesCollapsed == true ? [] : ordinary)
+        let sections = order == .statusesFirst ? area + workspaces : workspaces + area
+        return .init(items: pins + sections, numberedWorkspaceIndexById: numbering,
+            workspacesSectionMemberIds: layout.workspacesSectionMemberIds)
     }
 }

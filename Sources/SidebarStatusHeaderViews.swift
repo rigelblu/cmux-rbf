@@ -12,6 +12,16 @@ enum SidebarStatusHeaderText {
         String(localized: "sidebar.statusesArea.title", defaultValue: "Statuses")
     }
 
+    static var workspacesAreaTitle: String {
+        String(localized: "sidebar.workspacesArea.title", defaultValue: "Workspaces")
+    }
+
+    static func workspacesAreaLabel(isCollapsed: Bool) -> String {
+        String.localizedStringWithFormat(
+            String(localized: "sidebar.workspacesArea.accessibility", defaultValue: "Workspaces, %@"),
+            stateWord(isCollapsed: isCollapsed))
+    }
+
     static func stateWord(isCollapsed: Bool) -> String {
         isCollapsed
             ? String(localized: "sidebar.statusGroup.collapsed", defaultValue: "collapsed")
@@ -48,6 +58,10 @@ enum SidebarStatusHeaderText {
     /// What pressing the chevron does: "Collapse status group" while open, "Expand status group" while folded.
     static func chevronLabel(kind: SidebarStatusHeaderKind, isCollapsed: Bool) -> String {
         switch (kind, isCollapsed) {
+        case (.workspacesArea, true):
+            return String(localized: "sidebar.workspacesArea.chevron.expand", defaultValue: "Expand workspaces area")
+        case (.workspacesArea, false):
+            return String(localized: "sidebar.workspacesArea.chevron.collapse", defaultValue: "Collapse workspaces area")
         case (.statusesArea, true):
             return String(localized: "sidebar.statusesArea.chevron.expand", defaultValue: "Expand statuses area")
         case (.statusesArea, false):
@@ -141,33 +155,9 @@ struct SidebarStatusesAreaSwiftUIHeader: View, Equatable {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-                .padding(.horizontal, SidebarWorkspaceListMetrics.rowOuterHorizontalPadding)
-                .padding(.bottom, 4)
-            HStack(spacing: 7) {
-                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .frame(width: 10)
-                Text(SidebarStatusHeaderText.statusesAreaTitle)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                if unreadCount > 0 {
-                    statusUnreadBadge(count: unreadCount, fontScale: 1, globalFontMagnificationPercent: 100)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 2)
-            .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26)
-            .contentShape(Rectangle())
-            .onTapGesture { onToggle() }
-            .padding(.horizontal, SidebarWorkspaceListMetrics.rowOuterHorizontalPadding)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(SidebarStatusHeaderText.statusesAreaLabel(groupCount: groupCount, isCollapsed: isCollapsed))
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { onToggle() }
+        SidebarSectionSwiftUIHeader(title: SidebarStatusHeaderText.statusesAreaTitle,
+            label: SidebarStatusHeaderText.statusesAreaLabel(groupCount: groupCount, isCollapsed: isCollapsed),
+            identifier: "sidebarStatusesArea", isCollapsed: isCollapsed, unreadCount: unreadCount, onToggle: onToggle)
     }
 }
 
@@ -208,7 +198,7 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
                 .foregroundStyle(Color(nsColor: palette.primaryTextColor))
                 .lineLimit(1)
             if unreadCount > 0 {
-                statusUnreadBadge(count: unreadCount, fontScale: fontScale,
+                SidebarStatusUnreadBadge(count: unreadCount, fontScale: fontScale,
                                   globalFontMagnificationPercent: globalFontMagnificationPercent)
             }
             Spacer(minLength: 0)
@@ -263,18 +253,3 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
     }
 }
 
-/// Same capsule metrics as workspace-group headers, with no store reference below the list boundary.
-@MainActor
-private func statusUnreadBadge(count: Int, fontScale: CGFloat, globalFontMagnificationPercent: Int) -> some View {
-    let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: fontScale)
-    return Text("\(count)")
-        .font(.system(size: GlobalFontMagnification.scaledSize(metrics.unreadFontSize,
-                                                            percent: globalFontMagnificationPercent), weight: .semibold))
-        .foregroundStyle(.white)
-        .padding(.horizontal, metrics.unreadHorizontalPadding)
-        .padding(.vertical, metrics.unreadVerticalPadding)
-        .background(Capsule().fill(Color.accentColor))
-        .accessibilityLabel(Text(String.localizedStringWithFormat(
-            String(localized: "workspaceGroup.unread.a11y", defaultValue: "%lld unread"), count
-        )))
-}

@@ -12056,6 +12056,7 @@ struct VerticalTabsSidebar: View, Equatable {
         let colorSectionProjection: SidebarWorkspaceColorSectionProjection
         let statusGroupProjection: WorkspaceStatusGroupProjection? // (#cm-110.1)
         let statusGroupFolds: WorkspaceStatusGroupsState // (#cm-110.1)
+        let workspacesSectionMemberIds: Set<UUID> // (#cm-110.4)
         /// What each status group's header shows, read once here above the lists so no row reads the status store. (#cm-110.1)
         let statusGroupPresentationById: [String: SidebarStatusGroupPresentation] // (#cm-110.1)
         let workspaceRenderItems: [SidebarWorkspaceRenderItem]
@@ -12259,6 +12260,7 @@ struct VerticalTabsSidebar: View, Equatable {
             colorSectionProjection: colorSectionProjection,
             statusGroupProjection: statusGroupProjection, // (#cm-110.1)
             statusGroupFolds: sidebarState.statusGroups ?? WorkspaceStatusGroupsState(), // (#cm-110.1)
+            workspacesSectionMemberIds: statusRenderItems.workspacesSectionMemberIds, // (#cm-110.4)
             statusGroupPresentationById: Self.statusGroupPresentations(projection: statusGroupProjection), // (#cm-110.1)
             workspaceRenderItems: workspaceRenderItems,
             visibleWorkspaceRowIds: visibleWorkspaceRowIds,
@@ -12296,7 +12298,7 @@ struct VerticalTabsSidebar: View, Equatable {
         // snapshots, and it is not gated on `isPresented`. The store is read here, in the sidebar's parent; no row reads
         // it. The action runs from `onChange`, never from the body.
         .onChange(of: workspaceStatusListRevision) { _, _ in
-            sidebarState.prepareStatusGroupsOnListArrival(selectedWorkspace: tabManager.selectedTab) // (#cm-110.1)
+            sidebarState.prepareStatusGroupsOnListArrival(selectedWorkspace: tabManager.selectedTab, tabManager: tabManager) // (#cm-110.4) captures first-list state before migration
             refreshWorkspaceSnapshots(workspaceIds: Set(tabManager.tabs.map(\.id)))
         }
         .overlay(alignment: .trailing) {
@@ -12861,6 +12863,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 )
             case .statusesHeader: // (#cm-110.1)
                 return sidebarStatusesAreaTableConfiguration(renderContext: renderContext) // (#cm-110.1)
+            case .workspacesHeader: // (#cm-110.4)
+                return sidebarWorkspacesAreaTableConfiguration(renderContext: renderContext) // (#cm-110.4)
             case .statusGroupHeader(let statusId): // (#cm-110.1)
                 return sidebarStatusGroupTableConfiguration(statusId: statusId, renderContext: renderContext) // (#cm-110.1)
             case .workspace(let workspaceId):
@@ -14627,6 +14631,8 @@ struct VerticalTabsSidebar: View, Equatable {
                     Self.statusColorHeaderRow(section: section, colorScheme: renderContext.environment.colorScheme, collectTargets: shouldCollectWorkspaceDropTargets, toggle: colorHeaderToggle, frameChanged: statusHeaderRows.colorFrameChanged, disappeared: statusHeaderRows.colorDisappeared, paint: statusHeaderRows.colors[item.id] ?? .none) // (#cm-110.1)
                 case .statusesHeader: // (#cm-110.1)
                     statusHeaderRows.area // (#cm-110.1)
+                case .workspacesHeader: // (#cm-110.4)
+                    statusHeaderRows.workspaces // (#cm-110.4)
                 case .statusGroupHeader(let statusId): // (#cm-110.1)
                     if let row = statusHeaderRows.groups[statusId] { row } // (#cm-110.1)
                 case .workspace(let workspaceId):

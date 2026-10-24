@@ -57,7 +57,7 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
         let f = Fixture()
         let ids = f.tabs.map(\.id)
         let result = try render(f)
-        #expect(result.items.map(\.id) == [.statusesArea(), .statusGroup("parked"), .workspace(f.before.id),
+        #expect(result.items.map(\.id) == [.workspacesArea(), .statusesArea(), .statusGroup("parked"), .workspace(f.before.id), // (#cm-110.4) supersedes cm-110.1's single-area layout
             .group(f.groups[0].id), .workspace(f.member.id), .workspace(f.after.id), .statusGroup("doing")])
         #expect(f.tabs.map(\.id) == ids)
         #expect(result.numberedWorkspaceIndexById == SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(from: base(f)))
@@ -67,10 +67,10 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
         var f = Fixture()
         f.before.customColor = nil; f.after.customColor = nil
         let original = base(f).map(\.id), tabIds = f.tabs.map(\.id)
-        #expect(try render(f).items.map(\.id) == [.workspace(f.before.id), .workspace(f.after.id), .statusesArea(),
+        #expect(try render(f).items.map(\.id) == [.workspacesArea(), .workspace(f.before.id), .workspace(f.after.id), .statusesArea(), // (#cm-110.4) supersedes cm-110.1's single-area layout
             .statusGroup("parked"), .group(f.groups[0].id), .workspace(f.member.id), .statusGroup("doing")])
         f.groups[0].statusId = nil; f.groups[0].customColor = nil
-        #expect(try render(f).items.map(\.id) == original + [.statusesArea(), .statusGroup("parked"), .statusGroup("doing")])
+        #expect(try render(f).items.map(\.id) == [.workspacesArea()] + original + [.statusesArea(), .statusGroup("parked"), .statusGroup("doing")]) // (#cm-110.4) supersedes cm-110.1's single-area layout
         #expect(f.tabs.map(\.id) == tabIds)
     }
 
@@ -82,7 +82,7 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
         child.statusId = "doing"
         childAnchor.groupId = child.id; childMember.groupId = child.id
         f.groups.append(child); f.tabs.insert(contentsOf: [childAnchor, childMember], at: 3)
-        #expect(try render(f).items.map(\.id) == [.statusesArea(), .statusGroup("parked"), .workspace(f.before.id),
+        #expect(try render(f).items.map(\.id) == [.workspacesArea(), .statusesArea(), .statusGroup("parked"), .workspace(f.before.id), // (#cm-110.4) supersedes cm-110.1's single-area layout
             .group(f.groups[0].id), .workspace(f.member.id), .group(child.id), .workspace(childMember.id),
             .workspace(f.after.id), .statusGroup("doing")])
         #expect(f.groups[1].parentGroupId == f.groups[0].id)
@@ -91,7 +91,7 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
 
     @Test func theGroupsOwnFoldRemainsClosedUnderItsStatus() throws {
         var f = Fixture(); f.groups[0].isCollapsed = true
-        #expect(try render(f).items.map(\.id) == [.statusesArea(), .statusGroup("parked"), .workspace(f.before.id),
+        #expect(try render(f).items.map(\.id) == [.workspacesArea(), .statusesArea(), .statusGroup("parked"), .workspace(f.before.id), // (#cm-110.4) supersedes cm-110.1's single-area layout
             .group(f.groups[0].id), .workspace(f.after.id), .statusGroup("doing")])
         #expect(f.groups[0].isCollapsed)
     }
@@ -100,8 +100,8 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
     func foldingTheStatusOrAreaHidesTheEntireGroup(_ area: Bool) throws {
         let f = Fixture()
         let folds = WorkspaceStatusGroupsState(areaCollapsed: area, collapsedStatusIds: ["parked"])
-        let expected: [SidebarWorkspaceRenderItemID] = area ? [.statusesArea()] :
-            [.statusesArea(), .statusGroup("parked"), .statusGroup("doing")]
+        let expected: [SidebarWorkspaceRenderItemID] = area ? [.workspacesArea(), .statusesArea()] : // (#cm-110.4) supersedes cm-110.1's single-area layout
+            [.workspacesArea(), .statusesArea(), .statusGroup("parked"), .statusGroup("doing")] // (#cm-110.4) supersedes cm-110.1's single-area layout
         #expect(try render(f, folds: folds).items.map(\.id) == expected)
     }
 
@@ -132,7 +132,7 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
         let p = try projection(f)
         #expect(!p.contains(workspaceId: f.member.id))
         #expect(p.group(for: "doing")?.memberWorkspaceIds.isEmpty == true)
-        #expect(try render(f).items.map(\.id) == [.statusesArea(), .statusGroup("parked"), .workspace(f.before.id),
+        #expect(try render(f).items.map(\.id) == [.workspacesArea(), .statusesArea(), .statusGroup("parked"), .workspace(f.before.id), // (#cm-110.4) supersedes cm-110.1's single-area layout
             .group(f.groups[0].id), .workspace(f.member.id), .workspace(f.after.id), .statusGroup("doing")])
     }
 
@@ -143,7 +143,7 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
                                   anchor: .empty(id), customColor: "#765432", iconSymbol: nil)
         empty.statusId = "parked"; f.groups = [empty]; f.tabs = []
         #expect(base(f).map(\.id) == [.group(id)])
-        #expect(try render(f).items.map(\.id) == [.statusesArea(), .statusGroup("parked"), .group(id), .statusGroup("doing")])
+        #expect(try render(f).items.map(\.id) == [.workspacesArea(), .statusesArea(), .statusGroup("parked"), .group(id), .statusGroup("doing")]) // (#cm-110.4) supersedes cm-110.1's single-area layout
     }
 
     @Test func debugHeadersReportOwnStatusAndTheirRealParent() throws {

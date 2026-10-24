@@ -17,6 +17,14 @@ struct SidebarStatusRenderItemsResolution {
     let items: [SidebarWorkspaceRenderItem]
     /// Numbered from the items before any projection, so the area never changes a ⌘ number (`04:90`).
     let numberedWorkspaceIndexById: [UUID: Int]
+    let workspacesSectionMemberIds: Set<UUID>
+
+    init(items: [SidebarWorkspaceRenderItem], numberedWorkspaceIndexById: [UUID: Int],
+         workspacesSectionMemberIds: Set<UUID> = []) {
+        self.items = items
+        self.numberedWorkspaceIndexById = numberedWorkspaceIndexById
+        self.workspacesSectionMemberIds = workspacesSectionMemberIds
+    }
 }
 
 // All of cm-110.1's sidebar wiring that is more than a call site lives here, as functions with explicit
@@ -33,23 +41,23 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         var items: [WorkspaceStatusGroupProjectionItem] = []
         items.reserveCapacity(tabs.count)
         for tab in tabs {
-            let normalizedColorHex: String? = tab.customColor.flatMap { WorkspaceColorHex.normalized($0) }
-            items.append(
-                WorkspaceStatusGroupProjectionItem(
-                    workspaceId: tab.id,
-                    groupId: groups.isEmpty ? tab.groupId : (memberships[tab.id] ?? nil),
-                    isPinned: tab.isPinned,
-                    isStatusHidden: tab.todoState.statusHidden,
-                    normalizedColorHex: normalizedColorHex,
-                    resolution: tab.statusResolution(list: list)
-                )
-            )
+            items.append(statusGroupProjectionItem(tab, list: list,
+                groupId: groups.isEmpty ? tab.groupId : (memberships[tab.id] ?? nil), isPinned: tab.isPinned))
         }
         return items
     }
 
     /// The status groups of the loose workspaces, or `nil` when no area shows: Workspace Todo Controls off (`04:91`,
     /// `09:434`: a list in the file then changes nothing), no list in use, or a list with no statuses.
+    /// Builds the same immutable input for rendering and for a selection whose group context is already known.
+    static func statusGroupProjectionItem(_ workspace: Workspace, list: WorkspaceStatusList,
+        groupId: UUID?, isPinned: Bool) -> WorkspaceStatusGroupProjectionItem {
+        .init(workspaceId: workspace.id, groupId: groupId, isPinned: isPinned,
+            isStatusHidden: workspace.todoState.statusHidden,
+            normalizedColorHex: workspace.customColor.flatMap(WorkspaceColorHex.normalized),
+            resolution: workspace.statusResolution(list: list))
+    }
+
     static func statusGroupProjection(
         items: [WorkspaceStatusGroupProjectionItem],
         list: WorkspaceStatusList,
@@ -264,6 +272,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         let collapsed: Bool
         switch kind {
         case .statusesArea: collapsed = folds.areaCollapsed
+        case .workspacesArea: collapsed = folds.workspacesCollapsed == true
         case .statusGroup(let id): collapsed = folds.collapsedStatusIds.contains(id)
         }
         let model = statusHeaderModel(
@@ -378,6 +387,11 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             name = SidebarStatusHeaderText.statusesAreaTitle
             depth = 0
             holdsGroups = true
+        case .workspacesArea:
+            identity = SidebarStatusHeaderIdentity.workspacesAreaUUID
+            name = SidebarStatusHeaderText.workspacesAreaTitle
+            depth = 0
+            holdsGroups = true
         case .statusGroup(let statusId):
             identity = SidebarStatusHeaderIdentity.uuid(forStatusId: statusId)
             name = presentation?.name ?? statusId
@@ -485,9 +499,12 @@ extension VerticalTabsSidebar { // (#cm-110.1)
     /// Capture the store above the lazy list boundary. Rows hold only this action and immutable values.
     func makeStatusHeaderToggleAction() -> @MainActor (SidebarStatusHeaderKind) -> Void {
         let state = sidebarState
+        let manager = tabManager
         return { kind in
+            state.prepareWorkspaceSections(tabManager: manager)
             switch kind {
             case .statusesArea: state.toggleStatusesArea()
+            case .workspacesArea: state.toggleWorkspacesArea()
             case .statusGroup(let id): state.toggleStatusGroup(id: id)
             }
         }

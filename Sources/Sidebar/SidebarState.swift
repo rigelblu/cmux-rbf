@@ -24,7 +24,7 @@ final class SidebarState: ObservableObject {
         statusGroups: WorkspaceStatusGroupsState? = WorkspaceStatusGroupsState() // (#cm-110.1)
     ) {
         self.isVisible = isVisible
-        self.statusGroups = statusGroups // (#cm-110.1)
+        self.statusGroups = statusGroups?.canonicalizingSectionOrder() // (#cm-110.4)
         let sanitized = SessionPersistencePolicy.sanitizedSidebarWidth(Double(persistedWidth))
         self.persistedWidth = CGFloat(sanitized)
         self.collapsedColorSectionHexes = Set(
@@ -38,7 +38,7 @@ final class SidebarState: ObservableObject {
     }
 
     func setStatusGroups(_ value: WorkspaceStatusGroupsState?) { // (#cm-110.1)
-        statusGroups = value // (#cm-110.1)
+        statusGroups = value?.canonicalizingSectionOrder() // (#cm-110.4)
         statusGroupRecordDidChange() // (#cm-110.1)
     } // (#cm-110.1)
 

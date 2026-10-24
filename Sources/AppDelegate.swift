@@ -554,6 +554,9 @@ final class CmuxMainThreadTurnProfiler {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, NSMenuItemValidation, NSMenuDelegate, CmuxConfigStoreReloadEnvironment {
     nonisolated(unsafe) static var shared: AppDelegate?
+#if DEBUG // (#cm-110.4)
+    let sidebarDebugActions = SidebarDebugActions() // (#cm-110.4)
+#endif // (#cm-110.4)
     /// Stateless control-socket syscall layer (CmuxControlSocket); composition-root owned.
     nonisolated let socketTransport = SocketTransport()
     /// Owns the About Titlebar Debug subsystem (CmuxAppKitSupportUI); composition-root
@@ -4584,7 +4587,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         )
         context.sidebarState.restoreCollapsedColorSections(snapshot.sidebar.colorSectionCollapsedHexes)
         context.sidebarState.setStatusGroups(snapshot.sidebar.statusGroups) // (#cm-110.1)
-        context.sidebarState.prepareStatusGroupsForSelection(selectedWorkspace: context.tabManager.selectedTab) // (#cm-110.1)
+        context.sidebarState.prepareWorkspaceSections(tabManager: context.tabManager) // (#cm-110.4)
+        context.sidebarState.prepareStatusGroupsForSelection(selectedWorkspace: context.tabManager.selectedTab, revealWorkspaces: false) // (#cm-110.4) Restore retains the saved Workspaces fold; Statuses keeps its legacy reveal.
         context.sidebarSelectionState.selection = snapshot.sidebar.selection.sidebarSelection
 
         if let restoredFrame = resolvedWindowFrame(from: snapshot), let window {
@@ -5065,6 +5069,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     )
                 )
                 hasher.combine(liveRoute.sidebar.isVisible)
+                hasher.combine(liveRoute.sidebar.statusGroups?.sectionOrder?.rawValue) // (#cm-110.4)
+                hasher.combine(liveRoute.sidebar.statusGroups?.workspacesCollapsed) // (#cm-110.4)
                 hasher.combine(
                     Int(
                         SessionPersistencePolicy.sanitizedSidebarWidth(
@@ -10665,7 +10671,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ), // (#cm-110.1)
             statusGroups: sessionWindowSnapshot == nil ? WorkspaceStatusGroupsState() : sessionWindowSnapshot?.sidebar.statusGroups // (#cm-110.1)
         )
-        sidebarState.prepareStatusGroupsForSelection(selectedWorkspace: tabManager.selectedTab) // (#cm-110.1)
+        sidebarState.prepareWorkspaceSections(tabManager: tabManager) // (#cm-110.4)
+        sidebarState.prepareStatusGroupsForSelection(selectedWorkspace: tabManager.selectedTab, revealWorkspaces: sessionWindowSnapshot == nil) // (#cm-110.4) Restoring the existing selection is not a Workspaces reveal event.
         tabManager.revealSelectedWorkspaceInSidebar = { [weak sidebarState] workspace in
             sidebarState?.prepareStatusGroupsForSelection(selectedWorkspace: workspace) // (#cm-110.1)
         }

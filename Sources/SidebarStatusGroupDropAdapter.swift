@@ -100,7 +100,7 @@ extension VerticalTabsSidebar {
             controlsEnabled: controlsEnabled, hasUserStatusList: hasUserStatusList) { return join } // (#cm-110.8)
         let rootPoint = CGPoint(x: targets.map(\.frame.minX).min() ?? point.x, y: point.y)
         let lastMeasuredBottom = request.targets.filter { $0.frame.width > 0 && $0.frame.height > 0 }.map(\.frame.maxY).max()
-        let belowLastArea = request.areaIsLast && request.targets.contains { $0.kind == .statusesArea }
+        let belowLastArea = request.areaIsLast && request.targets.contains { $0.workspaceId == SidebarStatusHeaderIdentity.statusesAreaUUID } // (#cm-110.4) section provenance no longer uses the legacy area kind
             && lastMeasuredBottom.map { point.y > $0 } == true
         switch decision { // (#cm-110.8)
         case .refused: return .refused
@@ -127,7 +127,7 @@ extension VerticalTabsSidebar {
             let ordinaryTargets = targets.filter { target in
                 guard let item = snapshot.workspaceRenderItems.first(where: { $0.id == (target.renderItemId ?? .workspace(target.workspaceId)) }) else { return true }
                 switch item {
-                case .statusesHeader, .statusGroupHeader: return false
+                case .statusesHeader, .workspacesHeader, .statusGroupHeader: return false
                 case .workspace(let id): return boundary != .aboveArea || !projection.contains(workspaceId: id)
                 default: return true
                 }
@@ -403,12 +403,14 @@ extension VerticalTabsSidebar {
     static func workspaceStatusDropTargets(items: [SidebarWorkspaceRenderItem],
         measured: [SidebarWorkspaceReorderDropOverlay.Target], useContentFrames: Bool = true) -> [SidebarWorkspaceReorderDropTarget] {
         let byId = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        let hasWorkspaceSections = items.contains { $0.id == .workspacesArea() } // (#cm-110.4) includes headers outside the measured viewport
         return measured.compactMap { target in
             let rowId = target.renderItemId ?? .workspace(target.workspaceId)
             guard let item = byId[rowId] else { return nil }
             let kind: SidebarWorkspaceReorderDropTargetKind
             switch item {
-            case .statusesHeader: kind = .statusesArea
+            case .statusesHeader: kind = hasWorkspaceSections ? .workspaceSectionHeader : .statusesArea // (#cm-110.4)
+            case .workspacesHeader: kind = .workspaceSectionHeader // (#cm-110.4)
             case .statusGroupHeader(let id): kind = .statusGroupHeader(statusId: id)
             case .colorSectionHeader: kind = .colorSectionHeader
             default: kind = .workspace
