@@ -5071,6 +5071,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 hasher.combine(liveRoute.sidebar.isVisible)
                 hasher.combine(liveRoute.sidebar.statusGroups?.sectionOrder?.rawValue) // (#cm-110.4)
                 hasher.combine(liveRoute.sidebar.statusGroups?.workspacesCollapsed) // (#cm-110.4)
+                hasher.combine(liveRoute.sidebar.statusGroups?.pinnedCollapsed) // (#cm-110.5)
                 hasher.combine(
                     Int(
                         SessionPersistencePolicy.sanitizedSidebarWidth(

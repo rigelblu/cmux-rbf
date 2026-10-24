@@ -151,10 +151,12 @@ struct SidebarTabStatusLandingTests {
         }
     }
 
+    /// The Statuses area sits first (#cm-110.5), so the Workspaces header is the row under the last status row. Since `#cm-110.4` the area can only be
+    /// first or last, and last leaves no row under it, so the fixture's default layout no longer has this gap.
     @Test(arguments: SidebarNestedStatusDropFixture.Renderer.allCases, [CGFloat(0.25), 0.5, 0.75])
     func theGapUnderTheLastStatusRowGoesWithTheRowAbove(_ renderer: SidebarNestedStatusDropFixture.Renderer, _ fraction: CGFloat) async throws {
         try await AppContextSerialGate.withExclusiveAppContext {
-            let f = try F(scene: .f1); defer { f.close() }; await f.applyRows()
+            let f = try F(scene: .f1, sectionOrder: .statusesFirst); defer { f.close() }; await f.applyRows() // (#cm-110.5)
             let targets = f.targets(renderer)
             let point = try f.point(.gapBeforeP, fraction: fraction, side: .left, targets: targets)
             let workspace = newWorkspace(f)

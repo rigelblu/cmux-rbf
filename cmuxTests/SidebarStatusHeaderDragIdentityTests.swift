@@ -1,6 +1,9 @@
 import AppKit
 import CmuxFoundation
+import CmuxNotifications
+import CmuxSettings
 import CmuxSidebar
+import CmuxUpdater
 import CmuxWorkspaces
 import Foundation
 import SwiftUI
@@ -68,6 +71,87 @@ struct SidebarStatusHeaderDragIdentityTests {
     @Test(arguments: kinds)
     func reverseMapUsesOnlyTheCurrentList(_ kind: SidebarStatusHeaderKind) {
         #expect(SidebarStatusHeaderIdentity.kind(forDragId: SidebarStatusHeaderIdentity.uuid(for: kind), list: Self.list) == kind)
+    }
+
+    @Test func pinnedAreaRefusesPasteboardWriter() async throws { // (#cm-110.5)
+        let (controller, container) = await Self.mount(kind: .pinnedArea)
+        defer { controller.dismantleContainerView(container) }
+        let writer = controller.tableView(container.tableView, pasteboardWriterForRow: 0)
+        #expect(writer == nil, "AppKit must refuse drag writer for .pinnedArea")
+    }
+
+    @Test func pinnedAreaRefusesDragInSharedDropAdapter() async throws { // (#cm-110.5)
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restoreStatusList = try SidebarNestedStatusDropFixture.installStatusListInUse() // (#cm-110.5) the app's real store, not a test-only hook
+            defer { restoreStatusList() }
+            let pinUUID = SidebarStatusHeaderIdentity.pinnedAreaUUID
+            let sidebar = VerticalTabsSidebar(
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: CmuxFeatureFlags(),
+                sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
+                windowId: UUID(), onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
+                observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,
+                selection: .constant(.tabs), selectedTabIds: .constant([]), lastSidebarSelectionIndex: .constant(nil),
+                sidebarRenderWorkerClient: .constant(nil)
+            )
+            #expect(sidebar.activateStatusHeaderDrag(pinUUID) == nil, "Shared drop adapter must refuse activateStatusHeaderDrag for pinnedArea")
+        }
+    }
+
+    @Test func pinnedAreaRefusesToBeginAStatusAwareDrag() async throws { // (#cm-110.5)
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restoreStatusList = try SidebarNestedStatusDropFixture.installStatusListInUse() // (#cm-110.5) the app's real store, not a test-only hook
+            defer { restoreStatusList() }
+            let windowId = UUID()
+            let sidebar = VerticalTabsSidebar(
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: CmuxFeatureFlags(),
+                sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
+                windowId: windowId, onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
+                observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,
+                selection: .constant(.tabs), selectedTabIds: .constant([]), lastSidebarSelectionIndex: .constant(nil),
+                sidebarRenderWorkerClient: .constant(nil)
+            )
+            // A drag already in flight, recorded as the source: a refused begin must leave both as they are.
+            let other = UUID()
+            let session = sidebar.dragState.beginDragging(tabId: other)
+            SidebarStatusGroupDragSource.shared.began(windowId: windowId, session: session, rowId: .workspace(other))
+            defer { sidebar.dragState.finishDrag() }
+            sidebar.beginStatusAwareWorkspaceDrag(SidebarStatusHeaderIdentity.pinnedAreaUUID)
+            #expect(sidebar.dragState.draggedTabId == other, "The refused begin starts no session: the dragged id is still the earlier drag's")
+            #expect(SidebarStatusGroupDragSource.shared.source(windowId: windowId, workspaceId: other, sessionId: session.id, dragState: sidebar.dragState) != nil,
+                "The refused begin records no source: the earlier drag's record is still the latest")
+        }
+    }
+
+    @Test func pinnedAreaRefusesBeginSidebarNativeDrag() async throws { // (#cm-110.5)
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restoreStatusList = try SidebarNestedStatusDropFixture.installStatusListInUse() // (#cm-110.5) the app's real store, not a test-only hook
+            defer { restoreStatusList() }
+            let key = BetaFeaturesCatalogSection().workspaceTodoControls.userDefaultsKey
+            let prev = UserDefaults.standard.object(forKey: key)
+            UserDefaults.standard.set(true, forKey: key)
+            defer { UserDefaults.standard.set(prev, forKey: key) }
+
+            let sidebar = VerticalTabsSidebar(
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: CmuxFeatureFlags(),
+                sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
+                windowId: UUID(), onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
+                observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,
+                selection: .constant(.tabs), selectedTabIds: .constant([]), lastSidebarSelectionIndex: .constant(nil),
+                sidebarRenderWorkerClient: .constant(nil)
+            )
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 200), styleMask: [.borderless], backing: .buffered, defer: false)
+            let view = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
+            window.contentView = view
+            let event = NSEvent.mouseEvent(with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            let began = sidebar.beginSidebarNativeDrag(
+                dragId: SidebarStatusHeaderIdentity.pinnedAreaUUID,
+                sourceView: view,
+                event: event,
+                draggingFrame: NSRect(x: 0, y: 0, width: 100, height: 30),
+                dragImage: NSImage(size: NSSize(width: 10, height: 10))
+            )
+            #expect(began == false, "Pinned header must refuse beginSidebarNativeDrag")
+        }
     }
     @Test func unknownWorkspaceAndRemovedStatusIdsAreNotHeaders() {
         #expect(SidebarStatusHeaderIdentity.kind(forDragId: UUID(), list: Self.list) == nil)

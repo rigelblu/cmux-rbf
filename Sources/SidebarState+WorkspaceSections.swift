@@ -35,4 +35,10 @@ extension SidebarState {
         next.toggleWorkspaces()
         setStatusGroups(next)
     }
+
+    func togglePinnedArea() { // (#cm-110.5)
+        guard var next = statusGroups else { return }
+        next.togglePinned()
+        setStatusGroups(next)
+    }
 }

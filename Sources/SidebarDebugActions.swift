@@ -8,11 +8,13 @@ final class SidebarDebugActions {
     enum Header: String, CaseIterable {
         case statuses
         case workspaces
+        case pinned // (#cm-110.5)
 
         var id: UUID {
             switch self {
             case .statuses: return SidebarStatusHeaderIdentity.statusesAreaUUID
             case .workspaces: return SidebarStatusHeaderIdentity.workspacesAreaUUID
+            case .pinned: return SidebarStatusHeaderIdentity.pinnedAreaUUID // (#cm-110.5)
             }
         }
 
@@ -20,6 +22,7 @@ final class SidebarDebugActions {
             switch self {
             case .statuses: return "statusesHeader"
             case .workspaces: return "workspacesHeader"
+            case .pinned: return "pinnedHeader" // (#cm-110.5)
             }
         }
     }

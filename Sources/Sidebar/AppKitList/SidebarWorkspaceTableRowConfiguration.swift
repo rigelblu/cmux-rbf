@@ -41,6 +41,12 @@ struct SidebarWorkspaceTableRowConfiguration {
     let appKitWorkspaceUnreadRebuild: (@MainActor (SidebarUnreadSnapshot) -> SidebarWorkspaceRowModel)?
     let appKitGroupHeaderUnreadRebuild: (@MainActor (SidebarUnreadSnapshot) -> SidebarGroupHeaderRowModel)?
 
+    /// The workspaces this row stands for when a tab is dropped beside it, in any order; `nil` means the default for the row kind. A folded group, section or status group stands for its hidden members, and a model-empty group for none. Not part of row equality. // (#cm-110.5)
+    var dropTabIds: [UUID]? // (#cm-110.5)
+
+    /// Whether a pinned group (or a group inside one) holds this row, so it is in the pinned run without being pinned itself; a tab dropped beside it is kept below the run. Not part of row equality. // (#cm-110.5)
+    var isPinnedByGroup = false // (#cm-110.5)
+
     private let environment: SidebarWorkspaceTableEnvironmentSnapshot
     private let equivalenceValue: Any
     private let isEquivalentValue: (Any) -> Bool
@@ -227,7 +233,7 @@ struct SidebarWorkspaceTableRowConfiguration {
                 workspace: appKitWorkspaceRowWorkspace,
                 rebuild: appKitWorkspaceRowRebuild,
                 unreadRebuild: rebuild
-            )
+            ).carryingDropInfo(from: self) // (#cm-110.5)
         }
         if let rebuild = appKitGroupHeaderUnreadRebuild,
            let actions = appKitGroupHeaderActions {
@@ -242,7 +248,7 @@ struct SidebarWorkspaceTableRowConfiguration {
                     environment: environment, // (#cm-110.1)
                     unreadDependencyWorkspaceIds: appKitUnreadDependencyWorkspaceIds, // (#cm-110.1)
                     unreadRebuild: rebuild // (#cm-110.1)
-                ) // (#cm-110.1)
+                ).carryingDropInfo(from: self) // (#cm-110.1) (#cm-110.5)
             } // (#cm-110.1)
             return Self(
                 groupHeaderModel: model,
@@ -250,7 +256,7 @@ struct SidebarWorkspaceTableRowConfiguration {
                 environment: environment,
                 unreadDependencyWorkspaceIds: appKitUnreadDependencyWorkspaceIds,
                 unreadRebuild: rebuild
-            )
+            ).carryingDropInfo(from: self) // (#cm-110.5)
         }
         return self
     }
@@ -272,8 +278,16 @@ struct SidebarWorkspaceTableRowConfiguration {
             environment: environment,
             equivalenceValue: id,
             isEquivalentValue: { [id] in ($0 as? SidebarWorkspaceRenderItemID) == id }
-        )
+        ).carryingDropInfo(from: self) // (#cm-110.5)
     }
+
+    /// This row with `other`'s drop information: a rebuilt row keeps what its builder set. // (#cm-110.5)
+    private func carryingDropInfo(from other: Self) -> Self { // (#cm-110.5)
+        var copy = self // (#cm-110.5)
+        copy.dropTabIds = other.dropTabIds // (#cm-110.5)
+        copy.isPinnedByGroup = other.isPinnedByGroup // (#cm-110.5)
+        return copy // (#cm-110.5)
+    } // (#cm-110.5)
 
     var estimatedHeight: CGFloat {
         if isColorSectionHeader { return 26 }
@@ -317,6 +331,9 @@ extension SidebarWorkspaceTableRowConfiguration { // (#cm-110.1)
         case .workspacesArea: // (#cm-110.4)
             syntheticUUID = SidebarStatusHeaderIdentity.workspacesAreaUUID // (#cm-110.4)
             rowId = .workspacesArea() // (#cm-110.4)
+        case .pinnedArea: // (#cm-110.5)
+            syntheticUUID = SidebarStatusHeaderIdentity.pinnedAreaUUID // (#cm-110.5)
+            rowId = .pinnedArea() // (#cm-110.5)
         } // (#cm-110.1)
         self.id = rowId // (#cm-110.1)
         self.workspaceId = syntheticUUID // (#cm-110.1)
@@ -324,7 +341,7 @@ extension SidebarWorkspaceTableRowConfiguration { // (#cm-110.1)
         self.isGroupHeader = false // (#cm-110.1)
         self.isColorSectionHeader = false // (#cm-110.1)
         self.statusHeaderKind = statusHeaderKind // (#cm-110.1)
-        self.isPinned = false // (#cm-110.1)
+        self.isPinned = statusHeaderKind == .pinnedArea // (#cm-110.5)
         self.colorSectionToggle = colorSectionToggle // (#cm-110.1)
         self.environment = environment // (#cm-110.1)
         self.makeContent = { _, _ in AnyView(EmptyView()) } // (#cm-110.1)

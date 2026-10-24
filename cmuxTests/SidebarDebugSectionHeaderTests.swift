@@ -20,19 +20,27 @@ struct SidebarDebugSectionHeaderTests {
     @Test func namedHeadersHaveDistinctStableDebugIdentitiesAndKinds() {
         let statuses = SidebarDebugActions.Header.statuses
         let workspaces = SidebarDebugActions.Header.workspaces
+        let pinned = SidebarDebugActions.Header.pinned
         #expect(statuses.id == SidebarStatusHeaderIdentity.statusesAreaUUID)
+        #expect(workspaces.id == SidebarStatusHeaderIdentity.workspacesAreaUUID)
+        #expect(pinned.id == SidebarStatusHeaderIdentity.pinnedAreaUUID)
+        #expect(pinned.id != statuses.id)
+        #expect(pinned.id != workspaces.id)
         #expect(workspaces.id != statuses.id)
         #expect(workspaces.id == SidebarDebugActions.Header(rawValue: "workspaces")?.id)
+        #expect(pinned.id == SidebarDebugActions.Header(rawValue: "pinned")?.id)
         #expect(workspaces.rowKind == "workspacesHeader")
         #expect(statuses.rowKind == "statusesHeader")
-        #expect(SidebarDebugActions.Header(rawValue: "pinned") == nil)
+        #expect(pinned.rowKind == "pinnedHeader")
     }
 
     @Test func aMissingHeaderRefusesWithoutManufacturingRows() {
         let registry = SidebarDebugActions()
         let windowId = UUID()
+        #expect(!registry.setCollapsed(true, header: .pinned, windowId: windowId))
         #expect(!registry.setCollapsed(true, header: .workspaces, windowId: windowId))
         #expect(registry.rows([], windowId: windowId).isEmpty)
+        #expect(SidebarDebugActions.identity("pinned", items: [.statusesHeader]) == nil)
         #expect(SidebarDebugActions.identity("workspaces", items: [.statusesHeader]) == nil)
         #expect(SidebarDebugActions.identity("statuses", items: [.statusesHeader]) == SidebarStatusHeaderIdentity.statusesAreaUUID)
         #expect(SidebarDebugActions.identity("statuses", items: []) == nil)
@@ -151,6 +159,8 @@ struct SidebarDebugSectionHeaderTests {
             _ = tabs.addWorkspace(title: "Loose", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
             var refusalGroups: [UUID] = []
             if verifyRefusal {
+                let pinned = tabs.addWorkspace(title: "Pinned", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
+                pinned.isPinned = true
                 let rootMember = tabs.addWorkspace(title: "Root member", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
                 let root = try #require(tabs.createWorkspaceGroup(name: "Root", childWorkspaceIds: [rootMember.id]))
                 let nestedMember = tabs.addWorkspace(title: "Nested member", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
@@ -257,20 +267,25 @@ struct SidebarDebugSectionHeaderTests {
                     let originalTabs = tabs.tabs.map(\.id), originalGroups = tabs.workspaceGroups
                     let originalState = state.statusGroups
                     for id in refusalGroups {
-                        for target in ["workspaces", "statuses"] {
+                        for target in ["workspaces", "statuses", "pinned"] {
                             for zone in ["upper", "lower"] {
                                 let result = try drop("group:" + id.uuidString, target, zone)
                                 #expect(!result.performed && result.plan == nil && result.paint == nil,
-                                    "Both root and nested group headers must be refused on either section header")
+                                    "Both root and nested group headers must be refused on all section headers")
                                 #expect(tabs.tabs.map(\.id) == originalTabs && tabs.workspaceGroups == originalGroups)
                                 #expect(state.statusGroups == originalState)
                             }
                         }
                     }
+                    let workspace = try #require(tabs.tabs.first(where: { !$0.isPinned }))
+                    for target in ["workspaces", "pinned"] {
+                        for zone in ["upper", "lower"] {
+                            let workspaceRefused = try drop("workspace:" + workspace.id.uuidString, target, zone)
+                            #expect(!workspaceRefused.performed && workspaceRefused.plan == nil)
+                            #expect(tabs.tabs.map(\.id) == originalTabs && tabs.workspaceGroups == originalGroups)
+                        }
+                    }
                 }
-                let workspace = try #require(tabs.tabs.first)
-                let workspaceRefused = try drop("workspace:" + workspace.id.uuidString, "workspaces", "lower")
-                #expect(!workspaceRefused.performed && workspaceRefused.plan == nil)
             }
         }
     }

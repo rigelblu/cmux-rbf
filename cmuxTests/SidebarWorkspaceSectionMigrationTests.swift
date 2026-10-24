@@ -253,5 +253,43 @@ struct SidebarWorkspaceSectionMigrationTests {
             #expect(window.sidebar.statusGroups?.last == !swap)
         }
     }
+
+    @Test func pinnedFoldAutosaveInvalidatesFingerprint() async throws { // (#cm-110.5)
+        try await AppContextSerialGate.withExclusiveAppContext {
+            _ = NSApplication.shared
+            let app = AppDelegate()
+            let windowId = UUID()
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            let tab = manager.addWorkspace(title: "Pinned", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
+            tab.isPinned = true
+            let previousPresence = MobileWorkspaceListObserver.subscriberPresenceOverrideForTesting
+            app.registerMainWindowContextForTesting(windowId: windowId, tabManager: manager)
+            defer {
+                app.unregisterMainWindowContextForTesting(windowId: windowId)
+                app.forgetRecoverableMainWindowRoute(windowId: windowId)
+                MobileWorkspaceListObserver.subscriberPresenceOverrideForTesting = previousPresence
+            }
+            let context = try #require(app.mainWindowContexts.values.first { $0.windowId == windowId })
+            let state = context.sidebarState
+            state.setStatusGroups(.init(sectionOrder: .workspacesFirst, workspacesCollapsed: false, pinnedCollapsed: false))
+            let before = try #require(app.sessionAutosaveFingerprint(includeScrollback: false,
+                restorableAgentIndex: .empty, surfaceResumeBindingIndex: .empty))
+            state.togglePinnedArea()
+            let after = try #require(app.sessionAutosaveFingerprint(includeScrollback: false,
+                restorableAgentIndex: .empty, surfaceResumeBindingIndex: .empty))
+            #expect(after != before, "A pinned fold action alone must invalidate the actual app autosave fingerprint")
+        }
+    }
+
+    @Test func restoreWithPinnedWorkspaceSelected_retainsPinnedFold() async throws { // (#cm-110.5)
+        try await withList { manager in
+            let tab = manager.tabs[0]
+            tab.isPinned = true
+            let state = SidebarState(statusGroups: .init(sectionOrder: .workspacesFirst, workspacesCollapsed: false, pinnedCollapsed: true))
+            #expect(state.statusGroups?.pinnedCollapsed == true)
+            state.prepareStatusGroupsForSelection(selectedWorkspace: tab, revealWorkspaces: false)
+            #expect(state.statusGroups?.pinnedCollapsed == true, "Restore with a pinned workspace selected must not unfold pinned rows")
+        }
+    }
 #endif
 }

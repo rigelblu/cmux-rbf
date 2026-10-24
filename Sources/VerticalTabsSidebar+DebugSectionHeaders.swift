@@ -9,7 +9,9 @@ extension VerticalTabsSidebar {
         return [.init(header: .statuses, isCollapsed: { state.statusGroups?.areaCollapsed ?? false },
             toggle: { toggle(.statusesArea) }),
             .init(header: .workspaces, isCollapsed: { state.statusGroups?.workspacesCollapsed == true },
-                toggle: { toggle(.workspacesArea) })]
+                toggle: { toggle(.workspacesArea) }),
+            .init(header: .pinned, isCollapsed: { state.statusGroups?.pinnedCollapsed == true }, // (#cm-110.5)
+                toggle: { toggle(.pinnedArea) })]
     }
 }
 #endif

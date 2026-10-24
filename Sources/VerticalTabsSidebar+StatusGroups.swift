@@ -18,12 +18,14 @@ struct SidebarStatusRenderItemsResolution {
     /// Numbered from the items before any projection, so the area never changes a ⌘ number (`04:90`).
     let numberedWorkspaceIndexById: [UUID: Int]
     let workspacesSectionMemberIds: Set<UUID>
+    let pinnedSectionMemberIds: Set<UUID> // (#cm-110.5)
 
     init(items: [SidebarWorkspaceRenderItem], numberedWorkspaceIndexById: [UUID: Int],
-         workspacesSectionMemberIds: Set<UUID> = []) {
+         workspacesSectionMemberIds: Set<UUID> = [], pinnedSectionMemberIds: Set<UUID> = []) {
         self.items = items
         self.numberedWorkspaceIndexById = numberedWorkspaceIndexById
         self.workspacesSectionMemberIds = workspacesSectionMemberIds
+        self.pinnedSectionMemberIds = pinnedSectionMemberIds
     }
 }
 
@@ -273,13 +275,14 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         switch kind {
         case .statusesArea: collapsed = folds.areaCollapsed
         case .workspacesArea: collapsed = folds.workspacesCollapsed == true
+        case .pinnedArea: collapsed = folds.pinnedCollapsed == true // (#cm-110.5)
         case .statusGroup(let id): collapsed = folds.collapsedStatusIds.contains(id)
         }
         let model = statusHeaderModel(
             kind: kind, presentation: presentation, memberCount: memberCount,
             unreadCount: 0, isCollapsed: collapsed, environment: environment, isBeingDragged: isBeingDragged
         )
-        return SidebarWorkspaceTableRowConfiguration(
+        var configuration = SidebarWorkspaceTableRowConfiguration(
             statusHeaderModel: model, statusHeaderKind: kind,
             actions: statusHeaderActions(onFocusAnchor: onFocusAnchor),
             colorSectionToggle: onToggle,
@@ -291,6 +294,9 @@ extension VerticalTabsSidebar { // (#cm-110.1)
                 return fresh
             }
         )
+        // A header stands for no workspace, unless it is folded: then it stands for the members it hides. // (#cm-110.5)
+        configuration.dropTabIds = collapsed ? Array(memberIds) : [] // (#cm-110.5)
+        return configuration
     }
 
     /// What each status group's header shows, by status id. The parent builds it once per pass, so no row reads the
@@ -390,6 +396,11 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         case .workspacesArea:
             identity = SidebarStatusHeaderIdentity.workspacesAreaUUID
             name = SidebarStatusHeaderText.workspacesAreaTitle
+            depth = 0
+            holdsGroups = true
+        case .pinnedArea: // (#cm-110.5)
+            identity = SidebarStatusHeaderIdentity.pinnedAreaUUID
+            name = SidebarStatusHeaderText.pinnedAreaTitle
             depth = 0
             holdsGroups = true
         case .statusGroup(let statusId):
@@ -505,6 +516,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             switch kind {
             case .statusesArea: state.toggleStatusesArea()
             case .workspacesArea: state.toggleWorkspacesArea()
+            case .pinnedArea: state.togglePinnedArea()
             case .statusGroup(let id): state.toggleStatusGroup(id: id)
             }
         }

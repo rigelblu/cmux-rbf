@@ -1155,6 +1155,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // bundles and fall back to their rendered workspace id.
         let workspaceId: UUID?
         if let kind = rowConfiguration.statusHeaderKind { // (#cm-110.1)
+            guard kind != .pinnedArea else { return nil } // (#cm-110.5) Pinned header never drags
             workspaceId = SidebarStatusHeaderIdentity.uuid(for: kind) // (#cm-110.1)
         } else if rowConfiguration.isGroupHeader { // (#cm-110.1)
             workspaceId = workspaceIdForDrag(rowConfiguration, actions: actions)
@@ -2924,7 +2925,12 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             actions.didMoveBonsplitToWorkspace(workspaceId) // (#cm-110.10)
             return true // (#cm-110.10)
         } // (#cm-110.10)
-        bonsplit.performNewWorkspaceMove = { insertionIndex, _, transfer in
+        bonsplit.performNewWorkspaceMove = { [weak self] rowPosition, _, transfer in
+            // The planner's index counts rows, and a header, a folded row or a status row is not a tab: find the line in the tab order by the workspaces beside it. // (#cm-110.5)
+            let insertionIndex = self.map { // (#cm-110.5)
+                SidebarDropPlanner().newWorkspacePlacement(atRowPosition: rowPosition, targets: $0.dropTargetGeometry.bonsplitTargetBridge.targets) // (#cm-110.5)
+                    .tabIndex(in: $0.workspaceIds) // (#cm-110.5)
+            } ?? rowPosition // (#cm-110.5)
             guard let workspaceId = actions.moveBonsplitToNewWorkspace(insertionIndex, transfer) else {
                 return false
             }

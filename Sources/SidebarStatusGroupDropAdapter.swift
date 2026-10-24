@@ -411,6 +411,7 @@ extension VerticalTabsSidebar {
             switch item {
             case .statusesHeader: kind = hasWorkspaceSections ? .workspaceSectionHeader : .statusesArea // (#cm-110.4)
             case .workspacesHeader: kind = .workspaceSectionHeader // (#cm-110.4)
+            case .pinnedHeader: kind = .workspaceSectionHeader // (#cm-110.5)
             case .statusGroupHeader(let id): kind = .statusGroupHeader(statusId: id)
             case .colorSectionHeader: kind = .colorSectionHeader
             default: kind = .workspace

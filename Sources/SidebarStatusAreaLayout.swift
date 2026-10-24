@@ -14,6 +14,7 @@ struct SidebarStatusAreaLayout {
     private let projectedGroupAnchors: Set<String>
     /// Includes members hidden by inner folds, for the ordinary section's folded unread badge.
     let workspacesSectionMemberIds: Set<UUID>
+    let pinnedSectionMemberIds: Set<UUID> // (#cm-110.5)
 
     init(items: [SidebarWorkspaceRenderItem], tabs: [Workspace] = [], groups: [WorkspaceGroup] = [],
          statusProjection: WorkspaceStatusGroupProjection? = nil) {
@@ -54,6 +55,8 @@ struct SidebarStatusAreaLayout {
                     owners[.workspace(member)] = key
                     if isPinned { pinned.insert(.workspace(member)) }
                 }
+            case .pinnedHeader:
+                pinned.insert(item.id)
             case .statusesHeader, .workspacesHeader, .statusGroupHeader: break
             }
         }
@@ -77,6 +80,7 @@ struct SidebarStatusAreaLayout {
             }
             return workspace.isPinned ? workspace.id : nil
         })
+        pinnedSectionMemberIds = pinnedWorkspaceIds // (#cm-110.5)
         workspacesSectionMemberIds = Set(tabs.map(\.id))
             .subtracting(pinnedWorkspaceIds).subtracting(byMember.keys)
         statusIdByGroup = statusProjection?.workspaceGroups?.statusIdByGroupId ?? [:]
@@ -164,7 +168,7 @@ struct SidebarStatusAreaLayout {
             case .colorSectionHeader(let section):
                 let members = section.memberWorkspaceIds
                 if !members.isEmpty && members.allSatisfy(movingWorkspaceIds.contains) { moving.insert(owner) } else { staying.insert(owner) }
-            case .statusesHeader, .workspacesHeader, .statusGroupHeader: break
+            case .pinnedHeader, .statusesHeader, .workspacesHeader, .statusGroupHeader: break
             }
         }
         return wholeGroups.union(moving.subtracting(staying))
@@ -185,7 +189,9 @@ struct SidebarStatusAreaLayout {
             }
             return .init(rowId: target.workspaceId, frame: target.frame,
                          topLevelRowId: statusId == nil && !isArea ? owner(of: rowId) : nil,
-                         statusId: statusId, isStatusesArea: isArea, isPinned: pinnedRows.contains(rowId), isWorkspacesArea: rowId == .workspacesArea())
+                         statusId: statusId, isStatusesArea: isArea,
+                         isPinned: pinnedRows.contains(rowId) || rowId == .pinnedArea(), // (#cm-110.5)
+                         isWorkspacesArea: rowId == .workspacesArea())
         }
     }
 }

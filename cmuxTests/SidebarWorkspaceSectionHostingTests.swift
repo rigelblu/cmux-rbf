@@ -24,6 +24,10 @@ struct SidebarWorkspaceSectionHostingTests {
     func appKitClickChevronAndAXPressUseSharedSectionToggle(_ activation: Activation) async throws {
         try await mount(appKit: true, activation: activation)
     }
+    @Test(arguments: [Activation.chevron, .ax])
+    func appKitPinnedClickChevronAndAXPressUseSharedSectionToggle(_ activation: Activation) async throws { // (#cm-110.5)
+        try await mount(appKit: true, activation: activation, pinned: true)
+    }
     /// Checks hosting and the supplied callback. The production parent tap/AX callback remains human Scenario64.
     @Test func swiftUIHeaderFactoryHostsSnapshotsAndForwardsProvidedToggle() async throws {
         try await AppContextSerialGate.withExclusiveAppContext {
@@ -56,7 +60,39 @@ struct SidebarWorkspaceSectionHostingTests {
             #expect(state.statusGroups?.workspacesCollapsed == false)
         }
     }
-    private func mount(appKit: Bool, activation: Activation) async throws {
+    @Test func swiftUIPinnedHeaderFactoryHostsSnapshotsAndForwardsProvidedToggle() async throws { // (#cm-110.5)
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let state = SidebarState(statusGroups: .init(areaCollapsed: true, collapsedStatusIds: ["parked"],
+                sectionOrder: .statusesFirst, pinnedCollapsed: false))
+            func header() throws -> SidebarSectionSwiftUIHeader {
+                VerticalTabsSidebar.sidebarPinnedAreaHeaderRow(folds: try #require(state.statusGroups),
+                    memberIds: [], unreadSnapshot: .init(summaryByWorkspaceId: [:]),
+                    onToggle: { state.togglePinnedArea() })
+            }
+            let realHeader = try header()
+            #expect(realHeader.identifier == "sidebarPinnedArea" && !realHeader.isCollapsed)
+            let host = NSHostingView(rootView: realHeader.frame(width: 280))
+            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 280, height: 80),
+                styleMask: .borderless, backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            defer { window.contentView = nil; window.close() }
+            SidebarLazyLayoutScaleTests.turnMainRunLoopOnce(layingOut: window)
+            await Task.yield()
+            #expect(host.fittingSize.height > 0)
+            realHeader.onToggle()
+            #expect(state.statusGroups?.pinnedCollapsed == true)
+            #expect(state.statusGroups?.areaCollapsed == true && state.statusGroups?.collapsedStatusIds == ["parked"])
+            let folded = try header()
+            #expect(folded.isCollapsed)
+            host.rootView = folded.frame(width: 280)
+            SidebarLazyLayoutScaleTests.turnMainRunLoopOnce(layingOut: window)
+            folded.onToggle()
+            #expect(state.statusGroups?.pinnedCollapsed == false)
+        }
+    }
+
+    private func mount(appKit: Bool, activation: Activation, pinned: Bool = false) async throws {
         try await AppContextSerialGate.withExclusiveAppContext {
             _ = NSApplication.shared
             let suite = "SidebarWorkspaceSectionHostingTests.\(UUID().uuidString)"
@@ -89,7 +125,8 @@ struct SidebarWorkspaceSectionHostingTests {
             #expect(flags.isAppKitSidebarListEnabled == appKit)
             defaults.set(CmuxExtensionSidebarSelection.defaultProviderId, forKey: CmuxExtensionSidebarSelection.defaultsKey)
             let tabs = TabManager(autoWelcomeIfNeeded: false)
-            _ = tabs.addWorkspace(title: "Loose", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
+            let tab = tabs.addWorkspace(title: pinned ? "Pinned" : "Loose", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
+            if pinned { tab.isPinned = true }
             let windowId = UUID()
             let previousPresence = MobileWorkspaceListObserver.subscriberPresenceOverrideForTesting
             delegate.registerMainWindowContextForTesting(windowId: windowId, tabManager: tabs)
@@ -122,17 +159,19 @@ struct SidebarWorkspaceSectionHostingTests {
             defer { window.contentView = nil; window.close() }
             let deadline = Date().addingTimeInterval(5)
             var header: SidebarGroupHeaderTableCellView?
+            let identifier = pinned ? "sidebarPinnedArea" : "sidebarWorkspacesArea"
             repeat {
                 SidebarLazyLayoutScaleTests.turnMainRunLoopOnce(layingOut: window)
                 await Task.yield()
-                header = Self.findCell(window.contentView!)
+                header = Self.findCell(window.contentView!, identifier: identifier)
             } while header == nil && Date() < deadline
-            let actual = try #require(header, "The production renderer must expose its actual Workspaces header")
-            #expect(state.statusGroups?.workspacesCollapsed == false)
+            let actual = try #require(header, "The production renderer must expose its actual header (\(identifier))")
+            let isCollapsed = { pinned ? (state.statusGroups?.pinnedCollapsed == true) : (state.statusGroups?.workspacesCollapsed == true) }
+            #expect(isCollapsed() == false)
             if activation == .ax {
                 #expect(actual.accessibilityPerformPress())
             } else if activation == .chevron {
-                let cell = try #require(Self.findCell(window.contentView!))
+                let cell = try #require(Self.findCell(window.contentView!, identifier: identifier))
                 let chevron = try #require(cell.subviews.compactMap { $0 as? SidebarHeaderGlyphButton }.first)
                 chevron.performClick(nil)
             }
@@ -140,18 +179,23 @@ struct SidebarWorkspaceSectionHostingTests {
             repeat {
                 SidebarLazyLayoutScaleTests.turnMainRunLoopOnce(layingOut: window)
                 await Task.yield()
-            } while state.statusGroups?.workspacesCollapsed != true && Date() < foldedDeadline
-            #expect(state.statusGroups?.workspacesCollapsed == true, "Visible header event must reach the shared state action")
+            } while !isCollapsed() && Date() < foldedDeadline
+            #expect(isCollapsed() == true, "Visible header event must reach the shared state action")
             let rows = VerticalTabsSidebar.statusRenderItemsForSnapshot(tabManager: tabs, state: state).items.map(\.id)
-            #expect(rows.contains(.workspacesArea()) && rows.contains(.statusesArea()))
+            if pinned {
+                #expect(rows.contains(.pinnedArea()))
+            } else {
+                #expect(rows.contains(.workspacesArea()) && rows.contains(.statusesArea()))
+            }
             #expect(!tabs.tabs.contains { rows.contains(.workspace($0.id)) })
-            #expect(registry.setCollapsed(false, header: .workspaces, windowId: windowId))
-            #expect(state.statusGroups?.workspacesCollapsed == false)
+            let targetHeader: SidebarDebugActions.Header = pinned ? .pinned : .workspaces
+            #expect(registry.setCollapsed(false, header: targetHeader, windowId: windowId))
+            #expect(isCollapsed() == false)
         }
     }
-    private static func findCell(_ view: NSView) -> SidebarGroupHeaderTableCellView? {
-        if let cell = view as? SidebarGroupHeaderTableCellView, cell.accessibilityIdentifier() == "sidebarWorkspacesArea" { return cell }
-        return view.subviews.lazy.compactMap { findCell($0) }.first
+    private static func findCell(_ view: NSView, identifier: String = "sidebarWorkspacesArea") -> SidebarGroupHeaderTableCellView? {
+        if let cell = view as? SidebarGroupHeaderTableCellView, cell.accessibilityIdentifier() == identifier { return cell }
+        return view.subviews.lazy.compactMap { findCell($0, identifier: identifier) }.first
     }
 }
 #endif

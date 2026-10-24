@@ -34,6 +34,10 @@ struct SidebarWorkspaceRenderItemID: Hashable {
         Self(kind: 6, uuid: SidebarStatusHeaderIdentity.workspacesAreaUUID, colorKey: 0) // (#cm-110.4)
     } // (#cm-110.4)
 
+    static func pinnedArea() -> Self { // (#cm-110.5)
+        Self(kind: 7, uuid: SidebarStatusHeaderIdentity.pinnedAreaUUID, colorKey: 0) // (#cm-110.5)
+    } // (#cm-110.5)
+
     static func statusGroup(_ statusId: String) -> Self { // (#cm-110.1)
         Self(kind: 5, uuid: SidebarStatusHeaderIdentity.uuid(forStatusId: statusId), colorKey: 0) // (#cm-110.1)
     } // (#cm-110.1)

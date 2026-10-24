@@ -2904,6 +2904,7 @@
 		CM1103170000000000000001 /* SidebarDebugHeaderDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM1103180000000000000002 /* SidebarDebugHeaderDropTests.swift */; }; // (#cm-110.1)
 		CM110105070000000000000001 /* SidebarDebugRowSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM110105070000000000000002 /* SidebarDebugRowSnapshots.swift */; };
 		6C83BEA0863A43B4A42ED6E5 /* SidebarDebugSectionHeaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 547C5EEF39174C69820A34F7 /* SidebarDebugSectionHeaderTests.swift */; }; // (#cm-110.4)
+		B8E27F4A1C6D49503A7E92D1 /* SidebarNewWorkspaceTabIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A41B7C5E9F4026A8B1C0E7 /* SidebarNewWorkspaceTabIndexTests.swift */; }; // (#cm-110.5)
 		CM1103430000000000000001 /* SidebarDebugStatusGapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CM1103440000000000000002 /* SidebarDebugStatusGapTests.swift */; }; // (#cm-110.1)
 		A12481700000000000000001 /* SidebarDerivedStateScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12481700000000000000002 /* SidebarDerivedStateScaleTests.swift */; };
 		EA1F00000000000000000003 /* SidebarDirectoryText.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1F00000000000000000004 /* SidebarDirectoryText.swift */; };
@@ -6956,6 +6957,7 @@
 		CM1103180000000000000002 /* SidebarDebugHeaderDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarDebugHeaderDropTests.swift; sourceTree = "<group>"; }; // (#cm-110.1)
 		CM110105070000000000000002 /* SidebarDebugRowSnapshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarDebugRowSnapshots.swift"; sourceTree = "<group>"; };
 		547C5EEF39174C69820A34F7 /* SidebarDebugSectionHeaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarDebugSectionHeaderTests.swift"; sourceTree = "<group>"; }; // (#cm-110.4)
+		D3A41B7C5E9F4026A8B1C0E7 /* SidebarNewWorkspaceTabIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarNewWorkspaceTabIndexTests.swift"; sourceTree = "<group>"; }; // (#cm-110.5)
 		CM1103440000000000000002 /* SidebarDebugStatusGapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarDebugStatusGapTests.swift"; sourceTree = "<group>"; }; // (#cm-110.1)
 		A12481700000000000000002 /* SidebarDerivedStateScaleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarDerivedStateScaleTests.swift; sourceTree = "<group>"; };
 		EA1F00000000000000000004 /* SidebarDirectoryText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarDirectoryText.swift; sourceTree = "<group>"; };
@@ -12260,6 +12262,7 @@
 				CM1103140000000000000002 /* SidebarStatusHeaderCommitTests.swift */,
 				CM1103180000000000000002 /* SidebarDebugHeaderDropTests.swift */,
 				547C5EEF39174C69820A34F7 /* SidebarDebugSectionHeaderTests.swift */, // (#cm-110.4)
+				D3A41B7C5E9F4026A8B1C0E7 /* SidebarNewWorkspaceTabIndexTests.swift */, // (#cm-110.5)
 				8208C0C71E9442AF8F88C49F /* SidebarWorkspaceSectionHostingTests.swift */, // (#cm-110.4)
 				6200F8F07A8C4F239D314A98 /* SidebarWorkspaceSectionMigrationTests.swift */, // (#cm-110.4)
 				B49AEBFEA32A4880B1D97BF0 /* SidebarWorkspaceSectionsTests.swift */, // (#cm-110.4)
@@ -16641,6 +16644,7 @@
 				9BE45B94B05D471FA386203D /* SidebarCloudWorkspaceBadgeTests.swift in Sources */,
 				CM1103170000000000000001 /* SidebarDebugHeaderDropTests.swift in Sources */,
 				6C83BEA0863A43B4A42ED6E5 /* SidebarDebugSectionHeaderTests.swift in Sources */, // (#cm-110.4)
+				B8E27F4A1C6D49503A7E92D1 /* SidebarNewWorkspaceTabIndexTests.swift in Sources */, // (#cm-110.5)
 				CM1103430000000000000001 /* SidebarDebugStatusGapTests.swift in Sources */,
 				A12481700000000000000001 /* SidebarDerivedStateScaleTests.swift in Sources */,
 				9212A0069212A0069212A006 /* SidebarEmptyAreaWindowDragTests.swift in Sources */,

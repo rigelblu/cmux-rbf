@@ -16,12 +16,13 @@ import Testing
 /// Real per-window model, both production target builders, and the actual guarded status-aware commit seam.
 @MainActor
 final class SidebarNestedStatusDropFixture {
-    enum Scene: String, CaseIterable, Sendable { case f1, f2b, gap, r3, r3Before }
+    enum Scene: String, CaseIterable, Sendable { case f1, f2b, gap, r3, r3Before, interleaved } // (#cm-110.5) `interleaved`: tabs l1, c1 (Parked), l2, c2 (Parked), u, so a status group sits between loose rows in the tab order
     enum Renderer: String, CaseIterable, Sendable { case native, swiftUI }
     enum Side: String, CaseIterable, Sendable { case left, right; var x: CGFloat { self == .left ? 60 : 180 } }
     enum Role: String, CaseIterable, Sendable {
         case outside, own, ownLast, colorOnlyOwn, colorOnlyOwnLast, otherStatus, plainColor, pinned, grouped, pinnedMatching, groupedMatching, groupedColor
     }
+    /// `gapBeforeP` is the gap under c3, the last status row. What sits under it depends on the section order (#cm-110.5): with `sectionOrder` unset the Statuses area is last (nothing below c3), with `.statusesFirst` the Workspaces header is the next row, where before `#cm-110.4` it was P's header.
     enum Zone: String, Sendable { case header, quietHeader, firstTop, lowerC2, lastEdge, memberGap, statusGap, gapBeforeP, belowAll }
     struct Held: Equatable {
         let own: String?, cmux: WorkspaceTaskStatus?, hidden: Bool, color: String?, pin: Bool, group: UUID?
@@ -46,6 +47,7 @@ final class SidebarNestedStatusDropFixture {
     var controls = true
     var projectsWorkspaceGroups = false
     var resolutions: [String] = [], writes: [Write] = [], reorderCalls = 0, ordinaryCalls = 0
+    var newWorkspaceIndexes: [Int] = [] // (#cm-110.5) the tab index a tab dropped into a new workspace is made at
     var writesBeforeReorder: [Int] = [], freshReorderMembers: [[UUID]] = []
     var orderAtWrites: [[UUID]] = []
     var ordinaryOverride: ((SidebarWorkspaceReorderDropPlan) -> Bool)?
@@ -56,7 +58,7 @@ final class SidebarNestedStatusDropFixture {
         .init(id: "done", name: "Done", color: "2: DONE")], source: .file)
     let hexes = ["parked": "#555555", "next": "#111111", "done": "#222222"]
 
-    init(scene: Scene, role: Role = .outside, folded: Bool = false, empty: Bool = false) throws {
+    init(scene: Scene, role: Role = .outside, folded: Bool = false, empty: Bool = false, sectionOrder: WorkspaceSectionOrder? = nil) throws { // (#cm-110.5)
         self.scene = scene; self.role = role
         let isR3 = scene == .r3 || scene == .r3Before
         suite = "cmux.p5.nested.\(UUID().uuidString)"; defaults = try #require(UserDefaults(suiteName: suite))
@@ -64,7 +66,7 @@ final class SidebarNestedStatusDropFixture {
             settings: UserDefaultsSettingsClient(defaults: defaults), closeTabWarningDefaults: defaults)
         manager = model
         var data: [String: Workspace] = [:]
-        for key in isR3 ? ["l1","pa","qa","c1"] : ["u","l1","color","c1","c2","c3","n1","n2","pinA","pinB","pa","qa"] {
+        for key in isR3 ? ["l1","pa","qa","c1"] : ["u","l1","l2","color","c1","c2","c3","n1","n2","pinA","pinB","pa","qa"] { // (#cm-110.5) `l2`
             let workspace = Workspace(); workspace.hideTaskStatus(); data[key] = workspace
         }
         model.tabs = Array(data.keys.sorted().compactMap { data[$0] })
@@ -93,7 +95,8 @@ final class SidebarNestedStatusDropFixture {
         if role == .groupedColor { data["qa"]?.setCustomColor("#555555") }
         let nested = ["pAnchor","pa","qAnchor","qa"]
         let keys: [String]
-        if isR3 { keys = ["l1"] + nested + ["c1"] }
+        if scene == .interleaved { keys = ["l1","c1","l2","c2","u"] } // (#cm-110.5)
+        else if isR3 { keys = ["l1"] + nested + ["c1"] }
         else {
             let prefix = ["pinA","pinB","u","l1","color"]
             let statuses = scene == .gap ? ["c1","c2","c3","n1","n2"] : ["n1","n2","c1","c2","c3"]
@@ -103,12 +106,15 @@ final class SidebarNestedStatusDropFixture {
         named = data
         state = SidebarState(statusGroups: .init(collapsedStatusIds: folded ? ["parked","not-listed"] : ["not-listed"],
             order: scene == .gap ? ["parked","next","done","not-listed"] : ["next","done","parked","not-listed"],
-            last: scene == .f2b || scene == .r3, belowRow: scene == .f1 || scene == .gap || scene == .r3Before ? "group:\(parent.uuidString)" : nil))
+            last: scene == .f2b || scene == .r3 || scene == .interleaved, belowRow: scene == .f1 || scene == .gap || scene == .r3Before ? "group:\(parent.uuidString)" : nil,
+            sectionOrder: sectionOrder)) // (#cm-110.5)
         container = controller.makeContainerView()
         window = NSWindow(contentRect: NSRect(x: 0,y: 0,width: 240,height: 1400),styleMask: .borderless,backing: .buffered,defer: false)
         window.isReleasedWhenClosed = false; window.contentView = container
         model.windowId = windowId
     }
+    /// A window that has already run once: the legacy record resolved into a section order, as the app does at the first action. // (#cm-110.5)
+    func resolveSections() { _ = state.prepareWorkspaceSections(renderItems: { self.rendered() }) } // (#cm-110.5)
     func w(_ key: String) -> Workspace { named[key]! }
     var source: Workspace {
         switch role {
@@ -317,7 +323,7 @@ final class SidebarNestedStatusDropFixture {
             },movingWorkspaceCount: { _ in 1 },endWorkspaceDrag: {},isValidWorkspaceDrag: { true },
             updateWorkspaceDrag: { _,_,_ in nil },performWorkspaceDrop: { _,_,_ in false },commitWorkspaceDropPlan: { _ in false },
             clearWorkspaceDropIndicator: {},currentDropIndicator: { nil },currentDropIndicatorScope: { .raw },canPerformBonsplitAction: { _,_ in false },
-            moveBonsplitToExistingWorkspace: { _,_ in false },moveBonsplitToNewWorkspace: { _,_ in nil },didMoveBonsplitToWorkspace: { _ in },
+            moveBonsplitToExistingWorkspace: { _,_ in false },moveBonsplitToNewWorkspace: { [self] index,_ in newWorkspaceIndexes.append(index); return UUID() },didMoveBonsplitToWorkspace: { _ in }, // (#cm-110.5)
             updateDragAutoscroll: {},setBonsplitDropTargetCollectionActive: { _ in },setBonsplitDropIndicator: { _ in })
         actions.usesStatusHeaderDropTargets = { true }
         actions.resolveTabStatusLanding = { [self] point, targets, headersOnly in // (#cm-110.10)
@@ -346,5 +352,28 @@ final class SidebarNestedStatusDropFixture {
             checklistSetItemState: { _,_ in },checklistRemoveItem: { _ in },checklistAddItem: { _ in },checklistEditItem: { _,_ in },checklistMoveItem: { _,_ in },
             checklistOpenPane: {},checklistAddAttachments: { _ in },checklistRemoveAttachment: { _,_ in },checklistOpenAttachments: { _,_ in },
             onChecklistPopoverPresentedChange: { _ in },onBeginChecklistItemEdit: { _ in },onEndChecklistItemEdit: { _ in },applyTodoStatus: { _ in },hideTodoStatus: {},commitRename: { _ in })
+    }
+}
+
+extension SidebarNestedStatusDropFixture {
+    /// Puts a one-status list (`parked`) in the app's real store, as `SidebarWorkspaceSectionMigrationTests` does, so `AppDelegate.statusListInUse` reads it; the returned closure puts the delegate back. Call it inside `AppContextSerialGate.withExclusiveAppContext` and restore with `defer`. Without a list in use the header-drag refusals are never reached (a cut of each guard still passes), so the tests need it. (#cm-110.5)
+    static func installStatusListInUse() throws -> () -> Void {
+        let suite = "cmux.statuslist.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("cmux.json")
+        try ##"{"workspaceStatuses":[{"id":"parked","name":"Parked","extends":"todo","color":"#112233"}]}"##.write(to: file, atomically: true, encoding: .utf8)
+        let store = WorkspaceStatusListStore(fileURL: file, defaults: defaults, resolveColor: { $0 }, paletteFingerprint: { "fixed" }, clock: ContinuousClock())
+        store.load()
+        try #require(store.list.source != .cmux, "The store holds the file's list")
+        let previous = AppDelegate.shared, delegate = AppDelegate()
+        delegate.workspaceStatusListStore = store
+        AppDelegate.shared = delegate
+        return {
+            AppDelegate.shared = previous
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: directory)
+        }
     }
 }

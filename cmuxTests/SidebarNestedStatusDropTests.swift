@@ -91,7 +91,8 @@ struct SidebarNestedStatusDropTests {
 
     private func checkStatusDrop(_ e: Example, clickFirst: Bool = false, measuredLegacyControl: Bool = false) async throws {
         try await AppContextSerialGate.withExclusiveAppContext {
-            let f = try F(scene: e.scene,role: e.role,folded: e.folded,empty: e.empty)
+            // (#cm-110.5) 02_decisions 2026-10-20: "the area never sits between two workspace items", so the gap under the last status row is above a section header: put the area first for that cell
+            let f = try F(scene: e.scene,role: e.role,folded: e.folded,empty: e.empty,sectionOrder: e.zone == .gapBeforeP ? .statusesFirst : nil)
             defer { f.close() }
             if e.zone == .quietHeader { f.source.setOwnStatus(try #require(f.list.entry(id: "parked")),list: f.list); f.source.setCustomColor(f.hexes["parked"]) }
             await f.applyRows()
@@ -181,6 +182,7 @@ struct SidebarNestedStatusDropTests {
         try await AppContextSerialGate.withExclusiveAppContext {
             let f = try F(scene: .f2b,role: e.role); defer { f.close() }
             await f.applyRows(); try f.begin(row: .workspace(f.source.id))
+            f.resolveSections() // (#cm-110.5) a window that has already run once: the legacy record is resolved into a section order, as the app does at the first action (02_decisions 2026-10-24: "The first launch resolves the old record … before anything writes")
             let targets = f.targets(e.renderer), point = try f.point(.belowAll,fraction: 0,side: e.side,targets: targets)
             let before = f.held, raw = f.manager.tabs.map(\.id), groups = f.manager.workspaceGroups, record = f.state.statusGroups
             let source = f.source.id, possible = try f.route(point: point,targets: targets)
@@ -204,7 +206,9 @@ struct SidebarNestedStatusDropTests {
                 else if e.role == .groupedMatching || e.role == .groupedColor {
                     #expect(f.projection()?.group(for: "parked")?.memberWorkspaceIds.contains(source) == true && f.state.statusGroups == record)
                 } else {
-                    #expect(row == rows.count-1 && row > area && f.state.statusGroups?.last == false && f.state.statusGroups?.belowRow == "workspace:\(source.uuidString)")
+                    // 02_decisions 2026-10-24 ruling (5): "with `Statuses` second, a workspace dropped below every row lands last in `Workspaces`, no status set"
+                    // 02_decisions 2026-10-24 (the `sectionOrder` entry): "the old `aboveRow`, `belowRow` and `last` stay, written as a copy of the order (first: `aboveRow` `\"top\"`, `last` false; second: `last` true)"
+                    #expect(row == area - 1 && f.state.statusGroups?.sectionOrder == .workspacesFirst && f.state.statusGroups?.last == true)
                 }
                 #expect(f.held.filter { $0.key != source } == before.filter { $0.key != source })
                 #expect(f.manager.workspaceGroups == groups)
@@ -248,7 +252,8 @@ struct SidebarNestedStatusDropTests {
             let selected = f.manager.selectedTabId, original = try #require(f.state.statusGroups)
             for renderer in F.Renderer.allCases {
                 let typed = VerticalTabsSidebar.workspaceStatusDropTargets(items: f.rendered(),measured: f.targets(renderer))
-                #expect(typed.contains { $0.kind == .statusesArea } && typed.contains { $0.kind == .statusGroupHeader(statusId: "parked") })
+                // 02_decisions 2026-10-23 (cm-110.4): "the `Workspaces` header folds and drags exactly like the `Statuses` header", so with the sections the `Statuses` header is typed as a section header
+                #expect(typed.contains { $0.kind == .workspaceSectionHeader } && typed.contains { $0.kind == .statusGroupHeader(statusId: "parked") })
             }
             let header = try #require(f.rows.first { $0.id == .statusGroup("parked") }), model = try #require(header.appKitGroupHeaderModel)
             #expect(model.depth == 1 && !model.hasOwnWorkspace && !model.isAnchorActive && !model.isPinned)
@@ -335,46 +340,76 @@ struct SidebarNestedStatusDropTests {
                 let frame = try #require(targets.first { $0.workspaceId == SidebarStatusHeaderIdentity.statusesAreaUUID }?.frame)
                 point = .init(x: e.side.x,y: frame.minY+frame.height*0.25)
             } else { point = try f.point(.belowAll,fraction: 0,side: e.side,targets: targets) }
+            if e.upper { try await assertAboveAreaRefused(f,point: point,targets: targets); return }
             let possible = try f.route(point: point,targets: targets), plan = try #require(possible, "Nested child header has an explicit outer-area root destination")
-            #expect(plan.indicator == (e.upper ? .init(tabId: SidebarStatusHeaderIdentity.statusesAreaUUID,edge: .top) : .init(tabId: nil,edge: .bottom)) && plan.indicatorScope == .raw)
+            #expect(plan.indicator == .init(tabId: nil,edge: .bottom) && plan.indicatorScope == .raw)
             #expect(f.commit(plan), "The production composition must perform the model reparent itself")
             #expect(f.manager.workspaceGroups.first { $0.id == f.q }?.parentGroupId == nil)
             let actualRoots = f.manager.sidebarReorderWorkspaceIds(forDraggedWorkspaceId: nil,usesTopLevelRows: true)
-            let qRoot = try #require(actualRoots.firstIndex(of: f.w("qAnchor").id))
-            if e.upper && e.parentAfter {
-                let pRoot = try #require(actualRoots.firstIndex(of: f.w("pAnchor").id))
-                #expect(qRoot < pRoot)
-            } else { #expect(actualRoots.last == f.w("qAnchor").id) }
-            if e.parentAfter {
-                let rows = f.rendered().map(\.id), area = try #require(rows.firstIndex(of: .statusesArea()))
-                let parentRow = try #require(rows.firstIndex(of: .group(f.p))), childRow = try #require(rows.firstIndex(of: .group(f.q)))
-                let parentMember = try #require(rows.firstIndex(of: .workspace(f.w("pa").id))), childMember = try #require(rows.firstIndex(of: .workspace(f.w("qa").id)))
-                #expect(parentRow > area && parentMember > area)
-                if e.upper { #expect(childRow < area && childMember < area) }
-                else { #expect(childRow > parentMember && rows.last == .workspace(f.w("qa").id)) }
-                #expect(f.state.statusGroups?.aboveRow == (e.upper ? "group:\(f.q.uuidString)" : "workspace:\(f.w("l1").id.uuidString)"))
-                #expect(f.state.statusGroups?.belowRow == "group:\(f.p.uuidString)" && f.state.statusGroups?.last == false)
-                #expect(f.state.statusGroups?.order == original.order && f.state.statusGroups?.collapsedStatusIds == original.collapsedStatusIds)
-            } else if e.upper {
-                let rows = f.rendered().map(\.id), area = try #require(rows.firstIndex(of: .statusesArea()))
-                let parentRow = try #require(rows.firstIndex(of: .group(f.p))), childRow = try #require(rows.firstIndex(of: .group(f.q)))
-                let childMemberRow = try #require(rows.firstIndex(of: .workspace(f.w("qa").id)))
-                #expect(parentRow < childRow && childRow < area && childMemberRow < area && f.state.statusGroups?.last == true)
-                #expect(f.state.statusGroups?.aboveRow == "group:\(f.q.uuidString)" && f.state.statusGroups?.belowRow == nil)
-                #expect(f.state.statusGroups?.order == original.order && f.state.statusGroups?.collapsedStatusIds == original.collapsedStatusIds)
-            } else { assertChildPlacement(f,original: original) }
+            #expect(actualRoots.last == f.w("qAnchor").id)
+            assertChildPlacement(f,original: original)
             #expect(f.manager.workspaceGroups.first { $0.id == f.p } == parent)
             #expect(f.held == before && f.writes.isEmpty && f.resolutions.isEmpty)
         
         }
     }
+    /// A child group header dropped below every row becomes a root group at the end of `Workspaces`: above the `Statuses` header, which is last.
+    // 02_decisions 2026-10-24 ruling (5): "with `Statuses` second, a workspace dropped below every row lands last in `Workspaces`, no status set"
+    // 02_decisions 2026-10-24 (the `sectionOrder` entry): "the old `aboveRow`, `belowRow` and `last` stay, written as a copy of the order (first: `aboveRow` `\"top\"`, `last` false; second: `last` true)"
     private func assertChildPlacement(_ f: F,original: WorkspaceStatusGroupsState) {
         let rows = f.rendered().map(\.id), area = rows.firstIndex(of: .statusesArea())!
-        #expect(rows.firstIndex(of: .group(f.p))! < area && rows.firstIndex(of: .workspace(f.w("pa").id))! < area)
-        #expect(rows.firstIndex(of: .group(f.q))! > area && rows.firstIndex(of: .workspace(f.w("qa").id))! > area)
-        #expect(f.state.statusGroups?.aboveRow == "group:\(f.p.uuidString)" && f.state.statusGroups?.belowRow == "group:\(f.q.uuidString)")
-        #expect(f.state.statusGroups?.last == false && f.state.statusGroups?.order == original.order
+        let parentMember = rows.firstIndex(of: .workspace(f.w("pa").id))!, child = rows.firstIndex(of: .group(f.q))!, childMember = rows.firstIndex(of: .workspace(f.w("qa").id))
+        #expect(rows.firstIndex(of: .group(f.p))! < parentMember && parentMember < child, "P and its member stay put; Q is a root group after them")
+        #expect(childMember.map { $0 > child && $0 == area - 1 } ?? (child == area - 1), "Q (with its member, if shown) is the last of Workspaces, right above the Statuses header")
+        #expect(f.state.statusGroups?.sectionOrder == .workspacesFirst && f.state.statusGroups?.last == true && f.state.statusGroups?.order == original.order
             && f.state.statusGroups?.collapsedStatusIds == original.collapsedStatusIds)
+    }
+    /// The `Statuses` header is not a boundary between workspace items: a child group header dropped on it gets no plan, so no line, and nothing moves.
+    // 02_decisions 2026-10-24 ruling (18): "a workspace group's header dropped on the `Workspaces` header or on the `Statuses` header is refused, with no line … a header drop never reorders the sections or moves a group out of its parent"
+    private func assertAboveAreaRefused(_ f: F,point: CGPoint,targets: [SidebarWorkspaceReorderDropOverlay.Target]) async throws {
+        f.resolveSections() // (#cm-110.5) the record a window has after its first action
+        let held = f.held, order = f.manager.tabs.map(\.id), groups = f.manager.workspaceGroups, record = f.state.statusGroups
+        let selected = f.manager.selectedTabId, selectedIds = f.selected
+        let possible = try f.route(point: point,targets: targets)
+        #expect(possible == nil, "A group header dropped on the Statuses header is refused: no plan, no line")
+        if let possible { #expect(!f.commit(possible)) }
+        #expect(f.held == held && f.manager.tabs.map(\.id) == order && f.manager.workspaceGroups == groups)
+        #expect(f.state.statusGroups == record && f.manager.selectedTabId == selected && f.selected == selectedIds)
+        #expect(f.writes.isEmpty && f.resolutions.isEmpty && f.ordinaryCalls == 0)
+    }
+    private enum SectionHeader: CaseIterable, Sendable {
+        case pinned, workspaces, statuses
+        var id: UUID {
+            switch self {
+            case .pinned: return SidebarStatusHeaderIdentity.pinnedAreaUUID
+            case .workspaces: return SidebarStatusHeaderIdentity.workspacesAreaUUID
+            case .statuses: return SidebarStatusHeaderIdentity.statusesAreaUUID
+            }
+        }
+    }
+    private enum SectionDropSource: CaseIterable, Sendable { case plainWorkspace, rootGroupHeader, childGroupHeader }
+    /// A section header row is not a tab position: hovering the middle of the `Pinned`, `Workspaces` or `Statuses` header plans no drop, draws no line and writes no record, whatever is being dragged. (#cm-110.5)
+    // 10_expected-results.md and brief step 2 (#cm-110.5): "Header rows are not tab positions"; 02_decisions 2026-10-24 ruling (18): "a workspace group's header dropped on the `Workspaces` header or on the `Statuses` header is refused, with no line"
+    @Test(arguments: SectionHeader.allCases, SectionDropSource.allCases)
+    private func theMiddleOfASectionHeaderPlansNoDropForAnySource(_ header: SectionHeader,_ source: SectionDropSource) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            for renderer in F.Renderer.allCases { for side in F.Side.allCases {
+            let f = try F(scene: .f1); defer { f.close() }
+            f.resolveSections() // the record a window has after its first action, so the three section headers show
+            await f.applyRows()
+            let items = f.rendered()
+            try #require(items.contains { if case .pinnedHeader = $0 { true } else { false } } && items.contains { if case .workspacesHeader = $0 { true } else { false } }
+                && items.contains { if case .statusesHeader = $0 { true } else { false } }, "Pinned, Workspaces and Statuses headers are all shown")
+            switch source {
+            case .plainWorkspace: f.selected = [f.source.id]; try f.begin(row: .workspace(f.source.id))
+            case .rootGroupHeader: try f.begin(row: .group(f.p))
+            case .childGroupHeader: try f.begin(row: .group(f.q))
+            }
+            let targets = f.targets(renderer)
+            let frame = try #require(targets.first { $0.workspaceId == header.id }?.frame, "The \(header) header row is a measured target")
+            try await assertAboveAreaRefused(f,point: .init(x: side.x,y: frame.midY),targets: targets)
+            }}
+        }
     }
     private enum ChildGuard: CaseIterable, Equatable, Sendable { case selectedBlock, inheritedPin, ownPin, emptyChild }
     @Test(arguments: ChildGuard.allCases, Self.guardBoundaries)
@@ -403,9 +438,11 @@ struct SidebarNestedStatusDropTests {
                 try #require(!f.manager.tabs.contains { $0.groupId == f.q })
             }
             await f.applyRows(); try f.begin(row: .group(f.q))
+            f.resolveSections() // (#cm-110.5) a window that has already run once: the legacy record is resolved into a section order, as the app does at the first action (02_decisions 2026-10-24: "The first launch resolves the old record … before anything writes")
             let held = f.held, order = f.manager.tabs.map(\.id), groups = f.manager.workspaceGroups
             let record = f.state.statusGroups, selected = f.manager.selectedTabId, selectedIds = f.selected
             let targets = f.targets(e.renderer), point = try childGuardPoint(f,e,targets)
+            if e.upper { try await assertAboveAreaRefused(f,point: point,targets: targets); return }
             let plan = try f.route(point: point,targets: targets)
             if (invalid == .ownPin || invalid == .emptyChild) && !e.upper {
                 // Core's pinned-source unrelated result retains the exact existing ordinary continuation.
@@ -418,21 +455,6 @@ struct SidebarNestedStatusDropTests {
                 #expect(f.state.statusGroups == record && f.manager.selectedTabId == selected && f.selected == selectedIds)
                 #expect(f.writes.isEmpty && f.resolutions.isEmpty && f.ordinaryCalls == (plan == nil ? 0 : 1))
                 if plan == nil { #expect(f.manager.tabs.map(\.id) == order) }
-                return
-            }
-            if invalid == .emptyChild && e.upper {
-                let accepted = try #require(plan)
-                guard case .statusAreaBoundaryDrop(let boundary,_) = accepted.action else { Issue.record("Expected retained empty-child area continuation"); return }
-                #expect(boundary.boundary == .aboveArea)
-                let rowsBefore = f.rendered().map(\.id)
-                let layout = SidebarStatusAreaLayout(items: f.rendered(),tabs: f.manager.tabs,groups: f.manager.workspaceGroups,statusProjection: f.projection())
-                let canonical = layout.saving(state: record)
-                let handled = f.commit(accepted)
-                #expect(handled)
-                #expect(f.state.statusGroups == canonical && f.rendered().map(\.id) == rowsBefore)
-                #expect(f.held == held && f.manager.tabs.map(\.id) == order && f.manager.workspaceGroups == groups)
-                #expect(f.manager.selectedTabId == selected && f.selected == selectedIds)
-                #expect(f.writes.isEmpty && f.resolutions.isEmpty && f.ordinaryCalls == 1)
                 return
             }
             if let plan { let handled = f.commit(plan); #expect(!handled) }
@@ -448,7 +470,9 @@ struct SidebarNestedStatusDropTests {
         try await AppContextSerialGate.withExclusiveAppContext {
             let f = try F(scene: .r3); defer { f.close() }
             await f.applyRows(); try f.begin(row: .group(f.q))
+            f.resolveSections() // (#cm-110.5) a window that has already run once: the legacy record is resolved into a section order, as the app does at the first action (02_decisions 2026-10-24: "The first launch resolves the old record … before anything writes")
             let targets = f.targets(e.renderer), point = try childGuardPoint(f,e,targets)
+            if e.upper { try await assertAboveAreaRefused(f,point: point,targets: targets); return }
             let accepted = try f.route(point: point,targets: targets)
             let plan = try #require(accepted,"Positive current child-root plan control precedes each invalidation")
             guard case .statusAreaBoundaryDrop(_,let capturedToken) = plan.action else { Issue.record("Expected the real admitted boundary action"); return }
@@ -504,9 +528,11 @@ struct SidebarNestedStatusDropTests {
             try #require(!f.rendered().contains { $0.id == .workspace(f.w("qa").id) })
             if selection == .member { try #require(f.manager.selectedTabId == f.w("qa").id) }
             try f.begin(row: .group(f.q))
+            f.resolveSections() // (#cm-110.5) the record a window has after its first action
             let held = f.held, groups = f.manager.workspaceGroups, record = try #require(f.state.statusGroups)
             let selected = f.manager.selectedTabId, selectedIds = f.selected
             let targets = f.targets(e.renderer), point = try childGuardPoint(f,e,targets)
+            if e.upper { try await assertAboveAreaRefused(f,point: point,targets: targets); return }
             let accepted = try f.route(point: point,targets: targets), plan = try #require(accepted)
             #expect(f.commit(plan))
             #expect(f.manager.workspaceGroups.first { $0.id == f.q }?.parentGroupId == nil)
@@ -518,12 +544,9 @@ struct SidebarNestedStatusDropTests {
             let rows = f.rendered().map(\.id), area = try #require(rows.firstIndex(of: .statusesArea()))
             let q = try #require(rows.firstIndex(of: .group(f.q))), p = try #require(rows.firstIndex(of: .group(f.p)))
             #expect(p < area && !rows.contains(.workspace(f.w("qa").id)))
-            if e.upper {
-                #expect(q < area && f.state.statusGroups?.aboveRow == "group:\(f.q.uuidString)" && f.state.statusGroups?.last == true)
-            } else {
-                #expect(q == rows.count-1 && q > area && f.state.statusGroups?.aboveRow == "group:\(f.p.uuidString)"
-                    && f.state.statusGroups?.belowRow == "group:\(f.q.uuidString)" && f.state.statusGroups?.last == false)
-            }
+            // 02_decisions 2026-10-24 ruling (5): "with `Statuses` second, a workspace dropped below every row lands last in `Workspaces`, no status set"
+            // 02_decisions 2026-10-24 (the `sectionOrder` entry): "the old `aboveRow`, `belowRow` and `last` stay, written as a copy of the order (first: `aboveRow` `\"top\"`, `last` false; second: `last` true)"
+            #expect(q == area - 1 && q > p && f.state.statusGroups?.sectionOrder == .workspacesFirst && f.state.statusGroups?.last == true)
             #expect(f.state.statusGroups?.order == record.order && f.state.statusGroups?.collapsedStatusIds == record.collapsedStatusIds)
         }
     }
@@ -543,6 +566,7 @@ struct SidebarNestedStatusDropTests {
             let source = try #require(f.scope.source(windowId: f.windowId,workspaceId: id,sessionId: token,dragState: f.drag))
             try #require(source.kind == .workspaceGroupHeader(groupId: f.q))
             try #require(f.manager.workspaceGroups.first { $0.id == f.q }?.parentGroupId == f.p)
+            f.resolveSections() // (#cm-110.5) a window that has already run once: the legacy record is resolved into a section order, as the app does at the first action (02_decisions 2026-10-24: "The first launch resolves the old record … before anything writes")
             let layout = SidebarStatusAreaLayout(items: f.rendered(),tabs: f.manager.tabs,groups: f.manager.workspaceGroups,statusProjection: f.projection())
             f.state.setStatusGroups(layout.saving(state: f.state.statusGroups))
             let record = f.state.statusGroups, held = f.held, groups = f.manager.workspaceGroups, order = f.manager.tabs.map(\.id)
@@ -580,6 +604,7 @@ struct SidebarNestedStatusDropTests {
             let originalTail = try #require(f.manager.tabs.firstIndex { $0.id == tail.id })
             try #require(originalChildLast < originalTail && f.manager.workspaceGroups.first { $0.id == f.q }?.parentGroupId == f.p)
             await f.applyRows(); try f.begin(row: .group(f.q))
+            f.resolveSections() // (#cm-110.5) a window that has already run once: the legacy record is resolved into a section order, as the app does at the first action (02_decisions 2026-10-24: "The first launch resolves the old record … before anything writes")
             let sourceId = try #require(f.sourceId), token = try #require(f.token)
             let source = try #require(f.scope.source(windowId: f.windowId,workspaceId: sourceId,sessionId: token,dragState: f.drag))
             try #require(source.kind == .workspaceGroupHeader(groupId: f.q))

@@ -30,12 +30,13 @@ struct SidebarStatusAreaLastBoundaryRoutingTests {
         f.assertCanonicalEndPaintHandoff(plan)
         #expect(f.perform(plan), "The actual model must perform the accepted drop")
         #expect(f.source.groupId == nil, "Below the whole Statuses area leaves Q and P on either half")
-        #expect(f.rendered().last?.id == .workspace(f.source.id))
+        // 02_decisions 2026-10-24 ruling (5): "with `Statuses` second, a workspace dropped below every row lands last in `Workspaces`, no status set"
         let rows = f.rendered()
         let sourceRow = try #require(rows.firstIndex { $0.id == .workspace(f.source.id) })
         let areaRow = try #require(rows.firstIndex { $0.id == .statusesArea() })
         let qaRow = try #require(rows.firstIndex { $0.id == .workspace(f.qa.id) })
-        #expect(qaRow < areaRow && areaRow < sourceRow, "Unmoved P/Q stay above the area and the detached source lands below")
+        #expect(sourceRow == areaRow - 1, "The detached source is the last row of Workspaces, right above the Statuses header")
+        #expect(qaRow < sourceRow && sourceRow < areaRow, "Unmoved P/Q stay above the detached source, and the source stays above the area")
         #expect(f.held() == held && f.unmovedIds == otherOrder && f.manager.workspaceGroups == groups)
         #expect(f.state.statusGroups?.order == folds.order && f.state.statusGroups?.collapsedStatusIds == folds.collapsedStatusIds
             && f.state.statusGroups?.areaCollapsed == folds.areaCollapsed)
@@ -76,7 +77,8 @@ struct SidebarStatusAreaLastBoundaryRoutingTests {
         let rows = control.rendered()
         let source = try #require(rows.firstIndex { $0.id == .workspace(control.source.id) })
         let areaRow = try #require(rows.firstIndex { $0.id == .statusesArea() })
-        try #require(pinned ? source < areaRow : source > areaRow)
+        // 02_decisions 2026-10-24 ruling (5): below every row lands last in `Workspaces`, above a last `Statuses` area; a pinned row stays in `Pinned` (2026-10-23, cm-110.5)
+        try #require(source < areaRow)
     }
 
     private struct Held: Equatable {
@@ -165,7 +167,8 @@ struct SidebarStatusAreaLastBoundaryRoutingTests {
             try #require(manager.workspaceGroups.first { $0.id == q }?.parentGroupId == p)
             try #require(rows.contains { $0.id == .workspace(qa.id) })
             let ordinaryRows = rows.filter { row in
-                switch row { case .statusesHeader, .statusGroupHeader: return false; default: return true }
+                // 02_decisions 2026-10-23 (cm-110.4/.5): the `Workspaces` and `Pinned` headers are section headers like `Statuses`, not ordinary rows
+                switch row { case .statusesHeader, .statusGroupHeader, .workspacesHeader, .pinnedHeader: return false; default: return true }
             }
             try #require(ordinaryRows.last?.id == .workspace(qa.id))
             if shape == .emptyGroups { try #require(projection.groups.allSatisfy { $0.memberWorkspaceIds.isEmpty }) }

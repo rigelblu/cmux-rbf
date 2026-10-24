@@ -13,11 +13,14 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
     public var sectionOrder: WorkspaceSectionOrder?
     /// Missing records start unfolded; absence is retained while migration is pending.
     public var workspacesCollapsed: Bool?
+    /// Missing records start unfolded; absence means unfolded. (#cm-110.5)
+    public var pinnedCollapsed: Bool?
 
     /// Creates a record; a new window starts with the area and every status open.
     public init(areaCollapsed: Bool = false, collapsedStatusIds: Set<String> = [],
                 order: [String]? = nil, last: Bool? = nil, aboveRow: String? = nil, belowRow: String? = nil,
-                sectionOrder: WorkspaceSectionOrder? = nil, workspacesCollapsed: Bool? = nil) {
+                sectionOrder: WorkspaceSectionOrder? = nil, workspacesCollapsed: Bool? = nil,
+                pinnedCollapsed: Bool? = nil) { // (#cm-110.5)
         self.areaCollapsed = areaCollapsed
         self.collapsedStatusIds = collapsedStatusIds
         self.order = order
@@ -26,6 +29,7 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
         self.belowRow = belowRow
         self.sectionOrder = sectionOrder
         self.workspacesCollapsed = workspacesCollapsed
+        self.pinnedCollapsed = pinnedCollapsed // (#cm-110.5)
         self = canonicalizingSectionOrder()
     }
 
@@ -34,6 +38,7 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
         case collapsedStatusIds
         case order, last, aboveRow, belowRow
         case sectionOrder, workspacesCollapsed
+        case pinnedCollapsed // (#cm-110.5)
     }
 
     public init(from decoder: any Decoder) throws {
@@ -48,6 +53,7 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
         sectionOrder = try values.decodeIfPresent(String.self, forKey: .sectionOrder)
             .flatMap(WorkspaceSectionOrder.init(rawValue:))
         workspacesCollapsed = try values.decodeIfPresent(Bool.self, forKey: .workspacesCollapsed)
+        pinnedCollapsed = try values.decodeIfPresent(Bool.self, forKey: .pinnedCollapsed) // (#cm-110.5)
         self = canonicalizingSectionOrder()
     }
 
@@ -62,6 +68,7 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
         if state.last != true { try values.encodeIfPresent(state.belowRow, forKey: .belowRow) }
         try values.encodeIfPresent(state.sectionOrder?.rawValue, forKey: .sectionOrder)
         try values.encodeIfPresent(state.workspacesCollapsed, forKey: .workspacesCollapsed)
+        try values.encodeIfPresent(state.pinnedCollapsed, forKey: .pinnedCollapsed) // (#cm-110.5)
     }
 
     /// Retains the old decoder's top/end placement as a copy of an already resolved order.
@@ -86,6 +93,16 @@ public struct WorkspaceStatusGroupsState: Codable, Equatable, Sendable {
     /// Toggles only the ordinary workspace section, retaining all inner folds.
     public mutating func toggleWorkspaces() {
         workspacesCollapsed = !(workspacesCollapsed ?? false)
+    }
+
+    /// Toggles the pinned section fold, retaining all inner folds. (#cm-110.5)
+    public mutating func togglePinned() {
+        pinnedCollapsed = !(pinnedCollapsed ?? false)
+    }
+
+    /// Reveals a pinned workspace by unfolding the pinned section. (#cm-110.5)
+    public mutating func revealPinned() {
+        pinnedCollapsed = false
     }
 
     /// Reveals an ordinary selected workspace without changing the Statuses folds.

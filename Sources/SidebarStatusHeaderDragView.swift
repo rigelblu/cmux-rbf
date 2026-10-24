@@ -73,6 +73,7 @@ private struct SidebarStatusHeaderDragView<Content: View>: View {
 struct SidebarStatusHeaderSwiftUIRows {
     let area: AnyView
     let workspaces: AnyView
+    let pinned: AnyView // (#cm-110.5)
     let groups: [String: AnyView]
     let colors: [SidebarWorkspaceRenderItemID: SidebarStatusHeaderDropPaint]
     let colorFrameChanged: (SidebarWorkspaceRenderItemID, CGRect) -> Void
@@ -94,6 +95,20 @@ extension VerticalTabsSidebar {
         let predicate = SidebarTabDropIndicatorPredicate()
         let rowIds = statusHeaderIndicatorRows(draggedId: draggedId, items: renderContext.workspaceRenderItems)
             ?? renderContext.sidebarReorderIds
+        func handleHeaderFrameChanged(kind: SidebarStatusHeaderKind, frame: CGRect) {
+            let id = SidebarStatusHeaderIdentity.uuid(for: kind)
+            let row: SidebarWorkspaceRenderItemID
+            switch kind {
+            case .statusesArea: row = .statusesArea()
+            case .workspacesArea: row = .workspacesArea()
+            case .pinnedArea: row = .pinnedArea()
+            case .statusGroup(let id): row = .statusGroup(id)
+            }
+            if kind == .pinnedArea {
+                monitor.setWorkspaceDragEnabled(false, for: row) // (#cm-110.5)
+            }
+            monitor.updateFrame(frame, for: row, workspaceId: id)
+        }
         func wrapped<V: View>(_ view: V, kind: SidebarStatusHeaderKind) -> AnyView {
             let id = SidebarStatusHeaderIdentity.uuid(for: kind)
             let row: SidebarWorkspaceRenderItemID
@@ -101,23 +116,31 @@ extension VerticalTabsSidebar {
             switch kind {
             case .statusesArea: row = .statusesArea(); level = 0
             case .workspacesArea: row = .workspacesArea(); level = 0
+            case .pinnedArea: row = .pinnedArea(); level = 0 // (#cm-110.5)
             case .statusGroup(let id): row = .statusGroup(id); level = 1
             }
-            let isSource = draggedId == id
+            let isSource = kind != .pinnedArea && draggedId == id // (#cm-110.5)
             return AnyView(SidebarStatusHeaderDragView(content: view, id: id, collectTargets: collectTargets,
                 dragged: isSource,
                 top: !isSource && predicate.topVisible(forTabId: id, draggedTabId: draggedId, dropIndicator: indicator, tabIds: rowIds),
                 bottom: !isSource && predicate.bottomVisible(forTabId: id, draggedTabId: draggedId,
                     dropIndicator: indicator, tabIds: rowIds, indicatorScope: .raw),
                 inset: SidebarNestedDropLine.inset(level: level, availableWidth: renderContext.listWidth),
-                frameChanged: { frame in monitor.updateFrame(frame, for: row, workspaceId: id) },
+                frameChanged: { frame in
+                    handleHeaderFrameChanged(kind: kind, frame: frame)
+                },
                 disappeared: { monitor.removeFrame(for: row) }))
         }
         let area = wrapped(Self.sidebarStatusesAreaHeaderRow(renderContext: renderContext,
             unreadSnapshot: unreadSnapshot, onToggle: { toggle(.statusesArea) }), kind: .statusesArea)
-        let workspaces = wrapped(Self.sidebarWorkspacesAreaHeaderRow(folds: renderContext.statusGroupFolds,
+        let workspacesHeader = Self.sidebarWorkspacesAreaHeaderRow(folds: renderContext.statusGroupFolds,
             memberIds: renderContext.workspacesSectionMemberIds,
-            unreadSnapshot: unreadSnapshot, onToggle: { toggle(.workspacesArea) }), kind: .workspacesArea)
+            unreadSnapshot: unreadSnapshot, onToggle: { toggle(.workspacesArea) })
+        let workspaces = wrapped(workspacesHeader, kind: .workspacesArea)
+        let pinnedHeader = Self.sidebarPinnedAreaHeaderRow(folds: renderContext.statusGroupFolds, // (#cm-110.5)
+            memberIds: renderContext.pinnedSectionMemberIds,
+            unreadSnapshot: unreadSnapshot, onToggle: { toggle(.pinnedArea) })
+        let pinned = wrapped(pinnedHeader, kind: .pinnedArea)
         var groups: [String: AnyView] = [:]
         for group in renderContext.statusGroupProjection?.groups ?? [] {
             let id = group.statusId
@@ -134,11 +157,14 @@ extension VerticalTabsSidebar {
             colors[item.id] = .forRow(id, draggedId: draggedId, indicator: indicator,
                 rowIds: rowIds, level: 0, availableWidth: renderContext.listWidth)
         }
-        return .init(area: area, workspaces: workspaces, groups: groups, colors: colors, colorFrameChanged: { row, frame in
+        return .init(area: area, workspaces: workspaces, pinned: pinned,
+                     groups: groups, colors: colors, colorFrameChanged: { row, frame in
             guard let id = row.colorHeaderDropIdentity else { return }
             monitor.setWorkspaceDragEnabled(false, for: row)
             monitor.updateFrame(frame, for: row, workspaceId: id)
-        }, colorDisappeared: { monitor.removeFrame(for: $0) })
+        }, colorDisappeared: { row in
+            monitor.removeFrame(for: row)
+        })
     }
 
     func makeStatusColorHeaderToggle() -> (String) -> Void {

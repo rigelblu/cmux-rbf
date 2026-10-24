@@ -215,7 +215,7 @@ struct WorkspaceGroupTests {
                 break
             case .workspace(let workspaceId):
                 visibleWorkspaceIds.append(workspaceId)
-            case .statusesHeader, .workspacesHeader, .statusGroupHeader: // (#cm-110.4)
+            case .statusesHeader, .workspacesHeader, .pinnedHeader, .statusGroupHeader: // (#cm-110.4) (#cm-110.5)
                 break // (#cm-110.1)
             }
         }

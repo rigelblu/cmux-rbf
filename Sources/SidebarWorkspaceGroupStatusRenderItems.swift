@@ -53,10 +53,17 @@ struct SidebarWorkspaceGroupStatusRenderItems {
         let order = folds.sectionOrder ?? layout.legacySectionOrder(state: folds)
         let pins = Array(normalItems.prefix(layout.pinnedBoundary))
         let ordinary = Array(normalItems.dropFirst(layout.pinnedBoundary))
+        let pinnedSection: [SidebarWorkspaceRenderItem]
+        if !pins.isEmpty {
+            pinnedSection = folds.pinnedCollapsed == true ? [.pinnedHeader] : [.pinnedHeader] + pins
+        } else {
+            pinnedSection = []
+        }
         let workspaces: [SidebarWorkspaceRenderItem] = [.workspacesHeader]
             + (folds.workspacesCollapsed == true ? [] : ordinary)
         let sections = order == .statusesFirst ? area + workspaces : workspaces + area
-        return .init(items: pins + sections, numberedWorkspaceIndexById: numbering,
-            workspacesSectionMemberIds: layout.workspacesSectionMemberIds)
+        return .init(items: pinnedSection + sections, numberedWorkspaceIndexById: numbering,
+            workspacesSectionMemberIds: layout.workspacesSectionMemberIds,
+            pinnedSectionMemberIds: layout.pinnedSectionMemberIds)
     }
 }
