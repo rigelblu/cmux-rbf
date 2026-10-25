@@ -35,6 +35,7 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
             || method == "remote.tmux.root_frames"
             || method == "remote.tmux.window" // (#cm-110.1)
             || method == "debug.sidebar.rows" // (#cm-110.1)
+            || method == "debug.sidebar.move_group" // (#cm-110.3)
             || method == "debug.sidebar.drop" { // (#cm-110.1)
             self = .socketWorker(mainThreadCallable: false)
             return

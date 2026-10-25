@@ -95,6 +95,40 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         )
     }
 
+    /// The nested groups the sidebar draws under a status group instead of inside their parent (#cm-110.3), read from the same
+    /// projection the renderer uses, so the built-in list and Workspace Todo Controls off give none. Every layer that
+    /// asks "is this group hidden by its parent's fold" reads this one answer (the row walk, the ⌘ numbers, the
+    /// selection moves), never a stored status on its own.
+    static func groupsShownUnderAStatus(tabs: [Workspace], groups: [WorkspaceGroup]) -> Set<UUID> {
+        // A nested root needs a nested group with a stored status; the projection decides the rest. Saves the
+        // projection's cost in every window that has none.
+        guard groups.contains(where: { $0.parentGroupId != nil && $0.statusId != nil }) else { return [] }
+        return currentStatusGroupProjection(tabs: tabs, groups: groups)?.workspaceGroups?.nestedRootGroupIds ?? []
+    }
+
+    /// The base items of the list, before the status area takes its rows: the nested walk draws a group shown under a
+    /// status even when its parent is folded, so the status area can pick its rows from the walk. (#cm-110.3)
+    static func baseRenderItems(
+        tabs: [Workspace],
+        groupsById: [UUID: WorkspaceGroup],
+        orderedGroups: [WorkspaceGroup],
+        effectiveMembership: [UUID: UUID?]? = nil,
+        statusGroupProjection: WorkspaceStatusGroupProjection?
+    ) -> [SidebarWorkspaceRenderItem] {
+        SidebarWorkspaceRenderItem.renderItems(tabs: tabs, groupsById: groupsById, orderedGroups: orderedGroups,
+            effectiveMembership: effectiveMembership,
+            groupsShownUnderAStatus: statusGroupProjection?.workspaceGroups?.nestedRootGroupIds ?? [])
+    }
+
+    /// The workspaces a folded group's badge sums: everything inside it except the rows shown under a status, which
+    /// show their own unread where they are (ruling (23), #cm-110.3). A group inside a projected root keeps all of its
+    /// own, and Mark All Read and Delete Group still use every workspace inside.
+    static func foldedGroupBadgeWorkspaceIds(group: WorkspaceGroup, memberWorkspaceIds: [UUID],
+        projection: WorkspaceStatusGroupProjection?) -> [UUID] {
+        guard let grouped = projection?.workspaceGroups, grouped.rootIdByGroupId[group.id] == nil else { return memberWorkspaceIds }
+        return memberWorkspaceIds.filter { grouped.statusIdByWorkspaceId[$0] == nil }
+    }
+
     /// Colors a status names have no color group among the unpinned rows; empty when no area shows.
     static func statusColorHexesWithoutColorGroup(
         for projection: WorkspaceStatusGroupProjection?,

@@ -1802,6 +1802,7 @@ class TerminalController {
         case "debug.sidebar.drop": return v2Result(id: request.id, v2DebugSidebarDrop(params: request.params)) // (#cm-110.1)
         case "debug.sidebar.rows": // (#cm-110.1)
             return v2Result(id: request.id, v2DebugSidebarRows(params: request.params)) // (#cm-110.1)
+        case "debug.sidebar.move_group": return v2Result(id: request.id, v2DebugSidebarMoveGroup(params: request.params)) // (#cm-110.3)
         case "debug.sidebar.simulate_drag":
             return v2Result(id: request.id, v2DebugSidebarSimulateDrag(params: request.params))
         case "debug.cloudtree.gallery":

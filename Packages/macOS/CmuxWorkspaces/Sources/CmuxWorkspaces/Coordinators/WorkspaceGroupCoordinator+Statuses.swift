@@ -16,7 +16,7 @@ extension WorkspaceGroupCoordinator {
         guard let index = model.workspaceGroups.firstIndex(where: { $0.id == groupId }) else { return false }
         var group = model.workspaceGroups[index]
         guard (actions ?? currentGroupStatusActions).apply(action, to: &group) else { return false }
-        if model.workspaceGroups[index] != group { model.workspaceGroups[index] = group }
+        write(group, at: index)
         return true
     }
 
@@ -31,14 +31,22 @@ extension WorkspaceGroupCoordinator {
         var group = model.workspaceGroups[index]
         group.statusId = statusId
         group.customColor = hex
-        if model.workspaceGroups[index] != group { model.workspaceGroups[index] = group }
+        write(group, at: index)
     }
 
     /// A color pick uses the same pair writer even when the hex itself has not changed (legacy groups have no status).
     func applyWorkspaceGroupColor(at index: Int, hex: String?) {
         var group = model.workspaceGroups[index]
         currentGroupStatusActions.applyColor(hex, to: &group)
+        write(group, at: index)
+    }
+
+    /// Writes a group the status writers changed, then brings a selection back out of a fold if the group stopped being drawn
+    /// under its status (ruling (27), #cm-110.3). The shown set is taken before the write.
+    private func write(_ group: WorkspaceGroup, at index: Int) {
+        let shownBefore = model.groupIdsShownUnderAStatus()
         if model.workspaceGroups[index] != group { model.workspaceGroups[index] = group }
+        model.expandSelectionIfItsGroupLeftItsStatus(shownBefore: shownBefore)
     }
 
     private var currentGroupStatusActions: WorkspaceGroupStatusActions {

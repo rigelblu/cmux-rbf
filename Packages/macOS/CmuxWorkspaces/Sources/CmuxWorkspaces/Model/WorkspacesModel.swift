@@ -45,6 +45,12 @@ public final class WorkspacesModel<Tab: WorkspaceTabRepresenting> {
     @ObservationIgnored
     private weak var host: (any WorkspacesHosting<Tab>)?
 
+    /// The nested groups the sidebar draws under a status group, which the model cannot know: it has no status list
+    /// and no Workspace Todo Controls setting. The app sets it from the same projection the renderer uses; unset
+    /// means no group is drawn away from its parent, so every fold behaves as it always has. (#cm-110.3)
+    @ObservationIgnored
+    public var groupIdsShownUnderAStatus: @MainActor () -> Set<UUID> = { [] }
+
 #if DEBUG
     /// Receives each line the nested operations log for a refused move; only a test sets it (#cm-106).
     @ObservationIgnored
