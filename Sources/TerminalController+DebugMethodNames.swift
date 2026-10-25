@@ -51,6 +51,7 @@ extension TerminalController {
         "debug.sidebar.simulate_drag",
         "debug.sidebar.rows", // (#cm-110.1)
         "debug.sidebar.drop", // (#cm-110.1)
+        "debug.sidebar.move_group", // (#cm-110.3)
         "debug.mobile.transport.disconnect",
         "debug.mobile.transport.reconnect_loop",
         "mobile.dev_stack_auth.configure",

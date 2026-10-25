@@ -14,18 +14,19 @@ enum SidebarNestedWorkspaceRows {
     }
 
     /// The render items of a nested window: a header, then the rows inside it, a folded group hiding everything
-    /// inside at every level.
+    /// inside at every level, except a group shown under a status (#cm-110.3).
     static func items(
         tabs: [Workspace],
         groupsById: [UUID: WorkspaceGroup],
         orderedGroups: [WorkspaceGroup]?,
-        effectiveMembership: [UUID: UUID?]
+        effectiveMembership: [UUID: UUID?],
+        groupsShownUnderAStatus: Set<UUID> = [] // (#cm-110.3)
     ) -> [SidebarWorkspaceRenderItem] {
         let groups = orderedGroups ?? groupsById.values.sorted { $0.id.uuidString < $1.id.uuidString }
         let workspaces = tabs.map {
             WorkspaceGroupWorkspaceItem(id: $0.id, groupId: effectiveMembership[$0.id] ?? nil, isPinned: $0.isPinned)
         }
-        return WorkspaceGroupRowWalk.rows(groups: groups, workspaces: workspaces).compactMap { row in
+        return WorkspaceGroupRowWalk.rows(groups: groups, workspaces: workspaces, groupsShownUnderAStatus: groupsShownUnderAStatus).compactMap { row in // (#cm-110.3)
             switch row.kind {
             case .header(let groupId):
                 guard let group = groupsById[groupId] else { return nil }

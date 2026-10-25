@@ -1124,10 +1124,13 @@ extension WorkspaceShortcutEligibility {
     ///   That asymmetry is why `#cm-28` reached for `groupId != nil` — it was the
     ///   only fact in reach at the call site, and the rule got shaped by what was
     ///   convenient to read rather than by what it meant.
+    /// - Parameter groupsShownUnderAStatus: the nested groups the sidebar draws under a status group. Their parent's fold
+    ///   does not hide them, so their rows keep their numbers (#cm-110.3, ruling (21)).
     static func resolve(
         workspaces: [Workspace],
         groups: [WorkspaceGroup],
-        todoControlsEnabled: Bool
+        todoControlsEnabled: Bool,
+        groupsShownUnderAStatus: Set<UUID> = [] // (#cm-110.3)
     ) -> WorkspaceShortcutEligibility {
         // Keyed exactly the way `SidebarWorkspaceRenderItem.renderItems` keys it,
         // and both flags resolved through the *same* lookup, so this rule and the
@@ -1138,7 +1141,7 @@ extension WorkspaceShortcutEligibility {
         // alone would make it a numberless visible row — the shape `#cm-37` exists
         // to remove.
         let groupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
-        let hiddenGroupIds = WorkspaceGroupRowWalk.groupIdsUnderAFoldedGroup(groups: groups) // (#cm-106) no number under a folded ancestor
+        let hiddenGroupIds = WorkspaceGroupRowWalk.groupIdsUnderAFoldedGroup(groups: groups, groupsShownUnderAStatus: groupsShownUnderAStatus) // (#cm-106) no number under a folded ancestor; (#cm-110.3) a group shown under a status is shown, so its rows keep theirs (ruling (21))
         return resolve(candidates: workspaces.map { workspace in
             let group = workspace.groupId.flatMap { groupsById[$0] }
             return Candidate(
@@ -1167,7 +1170,8 @@ extension TabManager {
         WorkspaceShortcutEligibility.resolve(
             workspaces: tabs,
             groups: workspaceGroups,
-            todoControlsEnabled: WorkspaceTodoFeature.isEnabled
+            todoControlsEnabled: WorkspaceTodoFeature.isEnabled,
+            groupsShownUnderAStatus: workspaces.groupIdsShownUnderAStatus() // (#cm-110.3) the one answer the rows are drawn from
         )
     }
 }

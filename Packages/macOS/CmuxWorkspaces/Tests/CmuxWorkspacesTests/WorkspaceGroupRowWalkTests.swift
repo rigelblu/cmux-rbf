@@ -153,4 +153,99 @@ struct WorkspaceGroupRowWalkTests {
         let flat = [WorkspaceGroup(id: UUID(), name: "F", isCollapsed: true, isPinned: false, anchor: .empty(UUID()), customColor: nil, iconSymbol: nil)]
         #expect(WorkspaceGroupRowWalk.groupIdsUnderAFoldedGroup(groups: flat).isEmpty)
     }
+
+    // MARK: - A nested root drawn under a status (#cm-110.3)
+
+    private func groups(_ lab: Labels, _ window: NestWindow, folded: Set<String> = []) -> [WorkspaceGroup] {
+        window.groups.map { g in
+            WorkspaceGroup(id: g.id, name: lab.name(g.id), isCollapsed: folded.contains(lab.name(g.id)), isPinned: g.isPinned,
+                           anchor: g.anchorWorkspaceId.map { .workspace($0) } ?? .empty(g.id), customColor: nil, iconSymbol: nil, parentGroupId: g.parentId)
+        }
+    }
+
+    private func walk(_ lab: Labels, _ window: NestWindow, folded: Set<String> = [], shown: Set<String>) -> [String] {
+        let items = window.tabs.map { WorkspaceGroupWorkspaceItem(id: $0.id, groupId: $0.groupId, isPinned: $0.isPinned) }
+        return WorkspaceGroupRowWalk.rows(groups: groups(lab, window, folded: folded), workspaces: items,
+                                          groupsShownUnderAStatus: Set(shown.map { lab.idByName[$0]! })).map { row in
+            switch row.kind {
+            case .header(let id): return "\(row.depth):H(\(lab.name(id)))"
+            case .workspace(let id): return "\(row.depth):\(lab.name(id))"
+            }
+        }
+    }
+
+    /// u | P[p: r1, Q[q: n1, n2], r2] | v, with Q shown under a status.
+    private func parentWithShownRoot(_ lab: inout Labels) -> NestWindow {
+        NestWindow(
+            tabs: [lab.ws("u"), lab.ws("p", in: "P"), lab.ws("r1", in: "P"), lab.ws("q", in: "Q"), lab.ws("n1", in: "Q"), lab.ws("n2", in: "Q"), lab.ws("r2", in: "P"), lab.ws("v")],
+            groups: [lab.group("P", own: "p"), lab.group("Q", parent: "P", own: "q")]
+        )
+    }
+
+    @Test
+    func aFoldedParentStillListsTheRootShownUnderAStatusAndHidesItsOtherRows() {
+        var lab = Labels()
+        let window = parentWithShownRoot(&lab)
+        #expect(walk(lab, window, folded: ["P"], shown: ["Q"]) == ["0:u", "0:H(P)", "1:H(Q)", "2:n1", "2:n2", "0:v"])
+        // Without the status the folded parent hides it, as it always has.
+        #expect(walk(lab, window, folded: ["P"], shown: []) == ["0:u", "0:H(P)", "0:v"])
+        // Unfolded: the same rows as without the set, in the same places.
+        #expect(walk(lab, window, shown: ["Q"]) == walk(lab, window))
+    }
+
+    @Test
+    func theRootsOwnFoldAndTheFoldsInsideItStillHideWhatTheyHide() {
+        var lab = Labels()
+        let window = NestWindow(
+            tabs: [lab.ws("p", in: "P"), lab.ws("q", in: "Q"), lab.ws("n1", in: "Q"), lab.ws("m", in: "M"), lab.ws("m1", in: "M")],
+            groups: [lab.group("P", own: "p"), lab.group("Q", parent: "P", own: "q"), lab.group("M", parent: "Q", own: "m")]
+        )
+        #expect(walk(lab, window, folded: ["P", "Q"], shown: ["Q"]) == ["0:H(P)", "1:H(Q)"])
+        #expect(walk(lab, window, folded: ["P", "M"], shown: ["Q"]) == ["0:H(P)", "1:H(Q)", "2:n1", "2:H(M)"])
+    }
+
+    @Test
+    func aRootTwoLevelsDownAFoldedParentIsFoundAndAFoldedGroupBetweenDoesNotHideIt() {
+        var lab = Labels()
+        let window = NestWindow(
+            tabs: [lab.ws("p", in: "P"), lab.ws("a", in: "A"), lab.ws("a1", in: "A"), lab.ws("q", in: "Q"), lab.ws("n1", in: "Q")],
+            groups: [lab.group("P", own: "p"), lab.group("A", parent: "P", own: "a"), lab.group("Q", parent: "A", own: "q")]
+        )
+        #expect(walk(lab, window, folded: ["A"], shown: ["Q"]) == ["0:H(P)", "1:H(A)", "2:H(Q)", "3:n1"])
+        // The parent folded too: A's own header is hidden with the rest of P's rows, the root still comes out.
+        #expect(walk(lab, window, folded: ["P", "A"], shown: ["Q"]) == ["0:H(P)", "2:H(Q)", "3:n1"])
+    }
+
+    @Test
+    func aGroupBelowAFoldedParentIsHiddenUnlessItIsTheRootOrInsideIt() {
+        var lab = Labels()
+        let window = NestWindow(
+            tabs: [lab.ws("p", in: "P"), lab.ws("a", in: "A"), lab.ws("q", in: "Q"), lab.ws("m", in: "M")],
+            groups: [lab.group("P", own: "p"), lab.group("A", parent: "P", own: "a"), lab.group("Q", parent: "P", own: "q"), lab.group("M", parent: "Q", own: "m")]
+        )
+        func hidden(_ folded: Set<String>, shown: Set<String>) -> Set<String> {
+            Set(WorkspaceGroupRowWalk.groupIdsUnderAFoldedGroup(groups: groups(lab, window, folded: folded), groupsShownUnderAStatus: Set(shown.map { lab.idByName[$0]! })).map { lab.name($0) })
+        }
+        #expect(hidden(["P"], shown: []) == ["A", "Q", "M"])
+        #expect(hidden(["P"], shown: ["Q"]) == ["A"])
+        // The root's own fold hides what is inside it, and a fold below the root does too.
+        #expect(hidden(["P", "Q"], shown: ["Q"]) == ["A", "M"])
+        #expect(hidden(["P", "M"], shown: ["Q"]) == ["A"])
+    }
+
+    @Test
+    func anEmptyRootShownUnderAStatusIsListedFirstAmongItsParentsRows() {
+        var lab = Labels()
+        let window = NestWindow(
+            tabs: [lab.ws("p", in: "P"), lab.ws("a", in: "P"), lab.ws("b", in: "P")],
+            groups: [lab.group("P", own: "p"), lab.group("E", parent: "P")]
+        )
+        #expect(walk(lab, window, folded: ["P"], shown: ["E"]) == ["0:H(P)", "1:H(E)"])
+        // Ruling (26): it sorts where its parent's run starts, so it comes before a sibling root that has rows.
+        let sibling = NestWindow(
+            tabs: [lab.ws("p", in: "P"), lab.ws("a", in: "P"), lab.ws("m", in: "M"), lab.ws("m1", in: "M")],
+            groups: [lab.group("P", own: "p"), lab.group("M", parent: "P", own: "m"), lab.group("E", parent: "P")]
+        )
+        #expect(walk(lab, sibling, folded: ["P"], shown: ["E", "M"]) == ["0:H(P)", "1:H(E)", "1:H(M)", "2:m1"])
+    }
 }

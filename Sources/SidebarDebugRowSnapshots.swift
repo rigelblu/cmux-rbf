@@ -37,13 +37,16 @@ struct SidebarDebugRow: Equatable {
                 let parent = parentGroupId(groupId)
                 let containingStatus = insideStatusArea && currentStatusId == statusIdByGroupId[groupId]
                     ? currentStatusId : nil
+                // A nested root drawn under a status reads as a top-level group does: under that status (ruling (25), #cm-110.3).
+                // A group inside a projected parent keeps its real parent.
+                let isDrawnRoot = containingStatus != nil && parent.map { statusIdByGroupId[$0] == nil } ?? true
                 if parent == nil && containingStatus == nil {
                     insideStatusArea = false
                     currentStatusId = nil
                 }
                 rows.append(SidebarDebugRow(
                     kind: "groupHeader", id: groupId.uuidString, title: groupName(groupId),
-                    header: parent?.uuidString ?? containingStatus,
+                    header: isDrawnRoot ? containingStatus : (parent?.uuidString ?? containingStatus),
                     folded: groupIsFolded(groupId), statusId: groupStatusId(groupId)
                 ))
             case .colorSectionHeader(let section):

@@ -77,4 +77,33 @@ extension TerminalController {
         }
     }
 }
+
+// `debug.sidebar.move_group`: `Move Group to`, for the agent lane (`cm-110.3`, Scenario 78 reading five). No CLI or socket
+// method moves a group into another, and none is added outside a debug build: this calls the model operation the menu
+// calls. `{group_id, parent_id?}`; a missing `parent_id` is `Top Level`. (#cm-110.3)
+extension TerminalController {
+    nonisolated func v2DebugSidebarMoveGroup(params: [String: Any]) -> V2CallResult {
+        v2MainSync {
+            guard let app = AppDelegate.shared else {
+                return .err(code: "internal_error", message: "AppDelegate not available", data: nil)
+            }
+            let tabManager: TabManager?
+            if let windowId = v2UUID(params, "window_id") {
+                tabManager = app.tabManagerFor(windowId: windowId)
+            } else {
+                tabManager = self.tabManager
+            }
+            guard let tabManager else { return .err(code: "not_found", message: "TabManager not found", data: nil) }
+            guard let groupId = v2UUID(params, "group_id") else {
+                return .err(code: "invalid_params", message: "debug.sidebar.move_group requires group_id", data: nil)
+            }
+            let parentId = v2UUID(params, "parent_id")
+            if params["parent_id"] != nil, parentId == nil {
+                return .err(code: "invalid_params", message: "parent_id is not a group id", data: nil)
+            }
+            let result = tabManager.moveWorkspaceGroup(groupId: groupId, intoParent: parentId)
+            return .ok(["result": "\(result)"])
+        }
+    }
+}
 #endif

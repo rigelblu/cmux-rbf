@@ -224,16 +224,35 @@ extension WorkspacesModel {
 
     /// Nested `expandWorkspaceGroupForSelectionIfNeeded`: opens the selected workspace's group
     /// and every group above it. A selected group header workspace keeps its own group as it is.
+    /// A group the sidebar draws under a status does not open what is above it (ruling (22), #cm-110.3): its parent's fold
+    /// does not hide it, so opening the parent would change a fold nobody asked to change; the sidebar reveals the
+    /// status group instead.
     func nestedExpandWorkspaceGroupForSelectionIfNeeded() {
         guard let selectedTabId,
               let groupId = tabs.first(where: { $0.id == selectedTabId })?.groupId else { return }
         let tree = nestedGroupTree()
         let own = workspaceGroups.first { $0.id == groupId }?.anchorWorkspaceId == selectedTabId
-        for id in (own ? [] : [groupId]) + tree.ancestors(of: groupId) {
+        let shown = groupIdsShownUnderAStatus()
+        var upward = [groupId] + tree.ancestors(of: groupId)
+        if let root = upward.firstIndex(where: shown.contains) { upward = Array(upward[...root]) } // (#cm-110.3)
+        for id in own ? Array(upward.dropFirst()) : upward {
             if let index = workspaceGroups.firstIndex(where: { $0.id == id }), workspaceGroups[index].isCollapsed {
                 workspaceGroups[index].isCollapsed = false
             }
         }
+    }
+
+    /// Ruling (27, #cm-110.3): a group that was drawn under a status and no longer is goes back inside its parent, so a
+    /// selection inside it that a fold above now hides is brought back out: the folded groups above the selection open, as
+    /// `Move Group to` into a folded group does. `shownBefore` is the answer taken before the change that cleared the status;
+    /// a selection elsewhere, or a change that keeps the group drawn under a status, opens nothing.
+    func expandSelectionIfItsGroupLeftItsStatus(shownBefore: Set<UUID>) {
+        guard !shownBefore.isEmpty, let selectedTabId,
+              let groupId = tabs.first(where: { $0.id == selectedTabId })?.groupId else { return }
+        let left = shownBefore.subtracting(groupIdsShownUnderAStatus())
+        guard !left.isEmpty else { return }
+        guard ([groupId] + nestedGroupTree().ancestors(of: groupId)).contains(where: left.contains) else { return }
+        nestedExpandWorkspaceGroupForSelectionIfNeeded()
     }
 
     /// Nested `moveWorkspaceGroupMembersAfterAnchors`: each named workspace that is not its

@@ -40,9 +40,12 @@ extension VerticalTabsSidebar {
         // The AppKit controller applies the current unread snapshot after row
         // construction, keeping this root projection outside Observation.
         let unreadSnapshot = SidebarUnreadSnapshot()
+        // A folded parent's badge leaves out the rows shown under a status (ruling (23), #cm-110.3).
+        let badgeWorkspaceIds = Self.foldedGroupBadgeWorkspaceIds(group: group, memberWorkspaceIds: memberWorkspaceIds,
+            projection: renderContext.statusGroupProjection)
         let anchorUnreadCount: Int = {
             if group.isCollapsed {
-                return memberWorkspaceIds.reduce(0) { partial, workspaceId in
+                return badgeWorkspaceIds.reduce(0) { partial, workspaceId in
                     partial + unreadSnapshot.unreadCount(forWorkspaceId: workspaceId)
                 }
             }
@@ -148,14 +151,14 @@ extension VerticalTabsSidebar {
                 .union(liveAnchorId.map { [$0] } ?? []),
             unreadRebuild: {
                 [model, liveAnchorId,
-                 isCollapsed = group.isCollapsed, memberWorkspaceIds,
+                 isCollapsed = group.isCollapsed, badgeWorkspaceIds,
                  nonAnchorMemberIds] snapshot in
                 // Membership and collapse are structural row inputs, so their
                 // changes rebuild this configuration. Reuse the render context's
                 // indexed members instead of rescanning every tab per unread row.
                 var fresh = model
                 fresh.anchorUnreadCount = isCollapsed
-                    ? memberWorkspaceIds.reduce(0) {
+                    ? badgeWorkspaceIds.reduce(0) {
                         $0 + snapshot.unreadCount(forWorkspaceId: $1)
                     }
                     : liveAnchorId.map { snapshot.unreadCount(forWorkspaceId: $0) } ?? 0
@@ -241,9 +244,12 @@ extension VerticalTabsSidebar {
         )
         let cwdContextMenuItems = resolvedConfig?.contextMenuItems ?? []
         let newWorkspacePlacement = resolvedConfig?.newWorkspacePlacement
+        // A folded parent's badge leaves out the rows shown under a status (ruling (23), #cm-110.3).
+        let badgeWorkspaceIds = Self.foldedGroupBadgeWorkspaceIds(group: group, memberWorkspaceIds: memberWorkspaceIds,
+            projection: renderContext.statusGroupProjection)
         let anchorUnreadCount: Int = {
             if group.isCollapsed {
-                return memberWorkspaceIds.reduce(0) { partial, workspaceId in
+                return badgeWorkspaceIds.reduce(0) { partial, workspaceId in
                     partial + (unreadSummariesByWorkspaceId[workspaceId]?.unreadCount ?? 0)
                 }
             }

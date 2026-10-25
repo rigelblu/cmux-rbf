@@ -61,13 +61,15 @@ enum SidebarWorkspaceRenderItem {
         tabs: [Workspace],
         groupsById: [UUID: WorkspaceGroup],
         orderedGroups: [WorkspaceGroup]? = nil,
-        effectiveMembership: [UUID: UUID?]? = nil
+        effectiveMembership: [UUID: UUID?]? = nil,
+        groupsShownUnderAStatus: Set<UUID> = [] // (#cm-110.3)
     ) -> [SidebarWorkspaceRenderItem] {
         guard !tabs.isEmpty || !groupsById.isEmpty else { return [] }
         let effectiveMembershipByWorkspaceId = effectiveMembership
             ?? effectiveGroupIdByWorkspaceId(tabs: tabs, groupsById: groupsById)
         if SidebarNestedWorkspaceRows.hasNestedGroup(groupsById) { // (#cm-106)
-            return SidebarNestedWorkspaceRows.items(tabs: tabs, groupsById: groupsById, orderedGroups: orderedGroups, effectiveMembership: effectiveMembershipByWorkspaceId)
+            return SidebarNestedWorkspaceRows.items(tabs: tabs, groupsById: groupsById, orderedGroups: orderedGroups, effectiveMembership: effectiveMembershipByWorkspaceId,
+                groupsShownUnderAStatus: groupsShownUnderAStatus) // (#cm-110.3)
         }
         var items: [SidebarWorkspaceRenderItem] = []
         items.reserveCapacity(tabs.count + groupsById.count)

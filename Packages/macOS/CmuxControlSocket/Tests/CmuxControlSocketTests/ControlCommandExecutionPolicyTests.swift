@@ -126,6 +126,17 @@ struct ControlCommandExecutionPolicyTests {
 #endif // (#cm-110.1)
     } // (#cm-110.1)
 
+    /// `debug.sidebar.move_group` has its case in the socket worker's switch beside `rows` and `drop`; on the main lane the
+    /// running app answered `method_not_found`, as it did for `rows`. DEBUG-only like the case. (#cm-110.3)
+    @Test func theDebugSidebarMoveGroupMethodRunsOnTheWorkerInDebugBuildsOnly() { // (#cm-110.3)
+        let policy = ControlCommandExecutionPolicy(forMethod: "debug.sidebar.move_group") // (#cm-110.3)
+#if DEBUG // (#cm-110.3)
+        #expect(policy == .socketWorker(mainThreadCallable: false)) // (#cm-110.3)
+#else // (#cm-110.3)
+        #expect(policy == .mainActor) // (#cm-110.3)
+#endif // (#cm-110.3)
+    } // (#cm-110.3)
+
     @Test func v2ResolutionReadsRunOnTheWorkerAndAreMainThreadCallable() {
         // Tranche D (issue #5757): the implicit handle-normalization reads.
         // One controlResolveOnMain hop (refresh + witness + ref minting),

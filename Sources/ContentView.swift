@@ -12177,14 +12177,15 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
             items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name, depth: rowDepthById[$0.id] ?? 0) }
         )
-        let baseWorkspaceRenderItems = SidebarWorkspaceRenderItem.renderItems(
+        let statusGroupProjection = Self.currentStatusGroupProjection(tabs: tabs, groups: workspaceGroups, storedOrder: sidebarState.statusGroups?.order) // (#cm-110.1) (#cm-110.2) (#cm-110.3) before the base items: the walk reads it
+        let baseWorkspaceRenderItems = Self.baseRenderItems( // (#cm-110.3)
             tabs: tabs,
             groupsById: workspaceGroupById,
             orderedGroups: workspaceGroups,
-            effectiveMembership: workspaceGroupIdByWorkspaceId
+            effectiveMembership: workspaceGroupIdByWorkspaceId,
+            statusGroupProjection: statusGroupProjection
         )
         let _ = workspaceColorPaletteRevision
-        let statusGroupProjection = Self.currentStatusGroupProjection(tabs: tabs, groups: workspaceGroups, storedOrder: sidebarState.statusGroups?.order) // (#cm-110.1) (#cm-110.2)
         let colorSectionProjection = Self.colorSectionProjection( // (#cm-110.1)
             workspaces: tabs.map {
                 SidebarWorkspaceColorSectionWorkspaceSnapshot(
@@ -12302,6 +12303,7 @@ struct VerticalTabsSidebar: View, Equatable {
         // it. The action runs from `onChange`, never from the body.
         .onChange(of: workspaceStatusListRevision) { _, _ in
             sidebarState.prepareStatusGroupsOnListArrival(selectedWorkspace: tabManager.selectedTab, tabManager: tabManager) // (#cm-110.4) captures first-list state before migration
+            tabManager.revealSelectionIfItsGroupLeftItsStatus() // (#cm-110.3) ruling (27): a status taken out of the list
             refreshWorkspaceSnapshots(workspaceIds: Set(tabManager.tabs.map(\.id)))
         }
         .overlay(alignment: .trailing) {
@@ -12327,6 +12329,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 .receive(on: DispatchQueue.main)
         ) { _ in
             workspaceColorPaletteRevision &+= 1
+            tabManager.revealSelectionIfItsGroupLeftItsStatus() // (#cm-110.3) ruling (27): Workspace Todo Controls is a defaults setting
         }
         .onChange(of: isPresented) { _, presented in
             if presented {

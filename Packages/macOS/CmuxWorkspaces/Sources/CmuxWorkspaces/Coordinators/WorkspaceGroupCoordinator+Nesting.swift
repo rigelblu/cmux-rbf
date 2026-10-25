@@ -244,11 +244,20 @@ extension WorkspaceGroupCoordinator {
         let nextCollapsed = !model.workspaceGroups[index].isCollapsed
         if nextCollapsed {
             let tree = model.nestedGroupTree()
-            let inside = Set([groupId] + tree.descendants(of: groupId))
+            let below = tree.descendants(of: groupId)
+            let inside = Set([groupId] + below)
             let anchorId = model.workspaceGroups[index].liveAnchorWorkspaceId
+            // A group the sidebar draws under a status is not hidden by this fold, so it stays selected and keeps its
+            // multi-selection (ruling (7), #cm-110.3). Its own fold, when it is the one folding, hides all of it.
+            let shown = model.groupIdsShownUnderAStatus()
+            var staysShown = Set<UUID>()
+            for root in below where shown.contains(root) { staysShown.formUnion([root] + tree.descendants(of: root)) }
             let hiddenIds = Set(
                 model.tabs
-                    .filter { tab in tab.groupId.map(inside.contains) == true && tab.id != anchorId }
+                    .filter { tab in
+                        guard let tabGroup = tab.groupId else { return false }
+                        return inside.contains(tabGroup) && !staysShown.contains(tabGroup) && tab.id != anchorId
+                    }
                     .map(\.id)
             )
             // The selection moves to the group's own workspace, and stays where it is when there is none.

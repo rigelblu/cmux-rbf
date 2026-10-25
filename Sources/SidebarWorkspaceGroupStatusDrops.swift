@@ -37,6 +37,9 @@ extension VerticalTabsSidebar {
         let typed = workspaceStatusDropTargets(items: snapshot.workspaceRenderItems, measured: targets)
             .filter { $0.frame.width > 0 && $0.frame.height > 0 }.sorted { $0.frame.minY < $1.frame.minY }
         let tree = WorkspaceGroupTree(groups: snapshot.workspaceGroups)
+        /// The group a row belongs to for "is this still the same block": the root drawn under the status, so two nested
+        /// roots of one parent are two blocks, not one (#cm-110.3).
+        func block(_ id: UUID) -> UUID { grouped.rootIdByGroupId[id] ?? tree.outermost(of: id) }
         func group(_ row: SidebarWorkspaceReorderDropTarget) -> UUID? {
             row.groupId.flatMap { grouped.statusIdByGroupId[$0] == nil ? nil : $0 }
         }
@@ -58,16 +61,17 @@ extension VerticalTabsSidebar {
             return projection.groups.first { $0.memberWorkspaceIds.contains(id) }?.statusId
         }
         let index: Int
+        var gapSharesAnAncestor = false // (#cm-110.3) ruling (28)
         if let hit = typed.firstIndex(where: { point.y >= $0.frame.minY && point.y <= $0.frame.maxY }) {
             index = hit
             guard let id = group(typed[index]) else { return nil }
             if point.y >= typed[index].frame.midY {
-                let root = tree.outermost(of: id)
+                let root = block(id) // (#cm-110.3)
                 // A scrolled-out follower still counts; visible measurements only locate the pointer.
                 let model = snapshot.workspaceRenderItems
                 let modelIndex = model.firstIndex { $0.headerDropIdentity == typed[index].workspaceId }
                 let next = modelIndex.flatMap { $0 + 1 < model.count ? model[$0 + 1] : nil }
-                let nextRoot = next.flatMap(modelGroup).map { tree.outermost(of: $0) }
+                let nextRoot = next.flatMap(modelGroup).map(block) // (#cm-110.3)
                 if nextRoot != root {
                     if next.flatMap(modelStatus) != grouped.statusIdByGroupId[id] { return nil }
                 }
@@ -75,10 +79,14 @@ extension VerticalTabsSidebar {
         } else if let previous = typed.indices.dropLast().first(where: {
             point.y > typed[$0].frame.maxY && point.y < typed[$0 + 1].frame.minY
         }), let before = group(typed[previous]) {
-            let sameRoot = group(typed[previous + 1]).map { tree.outermost(of: before) == tree.outermost(of: $0) } == true
+            let sameRoot = group(typed[previous + 1]).map { block(before) == block($0) } == true // (#cm-110.3)
             if !sameRoot {
                 guard let statusId = grouped.statusIdByGroupId[before], status(typed[previous + 1]) == statusId else { return nil }
-                if point.y >= (typed[previous].frame.maxY + typed[previous + 1].frame.minY) / 2 {
+                // Two roots under one top-level ancestor, adjacent: by ruling (24) a drop here lands after both, outside that
+                // ancestor's whole run, and no line between them could show it. The status landing is refused with no
+                // line (ruling (28)); only a join of the root above, from the right-hand half, is left. // (#cm-110.3)
+                gapSharesAnAncestor = group(typed[previous + 1]).map { tree.outermost(of: before) == tree.outermost(of: $0) } == true
+                if !gapSharesAnAncestor, point.y >= (typed[previous].frame.maxY + typed[previous + 1].frame.minY) / 2 {
                     guard sourceKind == .workspace, let token, controlsEnabled, hasUserStatusList,
                           snapshot.isWorkspace(draggedId) else { return .refused } // (#cm-110.10)
                     // The lower gap is a status landing after this group, rather than a loose-slot permutation before the next row.
@@ -100,7 +108,7 @@ extension VerticalTabsSidebar {
         guard let base = workspaceLegacyBaseReorderPlan(point: point, targets: targets, snapshot: snapshot,
             draggedTabId: draggedId, foreignDraggedIsPinned: nil),
               case .reorder(_, false, let destination?) = base.action,
-              grouped.statusIdByGroupId[destination] != nil else { return nil }
+              grouped.statusIdByGroupId[destination] != nil else { return gapSharesAnAncestor ? .refused : nil } // (#cm-110.3)
         return .plan(base)
     }
 
@@ -114,15 +122,15 @@ extension VerticalTabsSidebar {
         let grouped = projection.workspaceGroups
         let projectedSource = grouped?.statusIdByWorkspaceId[dragged.id] != nil
         let targetInvolvesGroup: Bool
+        // The top-level rows that stand for a root drawn under this status: a nested root stands as its top-level
+        // ancestor's whole run, so a loose workspace dropped first lands before that run (ruling (24), #cm-110.3).
+        let statusRootReferences = Self.topLevelReferences(ofRootsUnder: plan.statusId, groups: tabManager.workspaceGroups, grouped: grouped)
         switch plan.placement {
         case .first:
             let roots = tabManager.sidebarReorderWorkspaceIds(forDraggedWorkspaceId: dragged.id, usesTopLevelRows: true)
             let first = roots.first { id in
                 id != dragged.id && (projection.group(for: plan.statusId)?.memberWorkspaceIds.contains(id) == true
-                    || tabManager.workspaceGroups.contains { group in
-                        grouped?.statusIdByGroupId[group.id] == plan.statusId
-                            && (group.liveAnchorWorkspaceId ?? group.id) == id
-                    })
+                    || statusRootReferences.contains(id))
             }
             targetInvolvesGroup = first.map { id in
                 tabManager.workspaceGroups.contains { ($0.liveAnchorWorkspaceId ?? $0.id) == id }
@@ -158,11 +166,7 @@ extension VerticalTabsSidebar {
         let reference: UUID?, insertBefore: Bool
         switch plan.placement {
         case .first:
-            let groupRoots = Set(groups.compactMap { group -> UUID? in
-                guard tree.parent(of: group.id) == nil, grouped?.statusIdByGroupId[group.id] == plan.statusId else { return nil }
-                return rootReference(forGroup: group.id)
-            })
-            reference = remaining.first { status.memberWorkspaceIds.contains($0) || groupRoots.contains($0) }
+            reference = remaining.first { status.memberWorkspaceIds.contains($0) || statusRootReferences.contains($0) } // (#cm-110.3)
             insertBefore = true
         case .member(let target, let before):
             guard let targetReference = memberRootReference(target) else { return false }
@@ -186,6 +190,20 @@ extension VerticalTabsSidebar {
             }
         }
         return true
+    }
+
+    /// The top-level row reference (the anchor of the outermost group) of every root drawn under `statusId`, nested or not.
+    /// (#cm-110.3) `cm-110.2` took only top-level roots; a nested root's run sits inside its top-level ancestor's.
+    private static func topLevelReferences(ofRootsUnder statusId: String, groups: [WorkspaceGroup],
+        grouped: WorkspaceGroupStatusProjection?) -> Set<UUID> {
+        guard let grouped else { return [] }
+        let tree = WorkspaceGroupTree(groups: groups)
+        let byId = Dictionary(groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return Set(groups.compactMap { group -> UUID? in
+            guard grouped.rootGroupIds.contains(group.id), grouped.statusIdByGroupId[group.id] == statusId,
+                  let top = byId[tree.outermost(of: group.id)] else { return nil }
+            return top.liveAnchorWorkspaceId ?? top.id
+        })
     }
 
     static func workspaceProjectedStatusDropLineLevel(for plan: SidebarWorkspaceReorderDropPlan,

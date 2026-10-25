@@ -5,9 +5,9 @@ extension VerticalTabsSidebar {
     /// Rebuild from current values at an event boundary, never from a row or a body mutation.
     static func statusRenderItemsForSnapshot(tabManager: TabManager, state: SidebarState) -> SidebarStatusRenderItemsResolution {
         let tabs = tabManager.tabs, groups = tabManager.workspaceGroups
-        let base = SidebarWorkspaceRenderItem.renderItems(tabs: tabs,
-            groupsById: Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) }), orderedGroups: groups)
         let projection = currentStatusGroupProjection(tabs: tabs, groups: groups, storedOrder: state.statusGroups?.order)
+        let base = baseRenderItems(tabs: tabs, groupsById: Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) }),
+            orderedGroups: groups, statusGroupProjection: projection) // (#cm-110.3) the walk needs the projection first
         let colors = colorSectionProjection(workspaces: tabs.map {
             SidebarWorkspaceColorSectionWorkspaceSnapshot(id: $0.id, groupId: $0.groupId,
                 isPinned: $0.isPinned, customColor: $0.customColor)

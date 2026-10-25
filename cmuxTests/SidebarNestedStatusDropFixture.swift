@@ -143,8 +143,8 @@ final class SidebarNestedStatusDropFixture {
     }
     func rendered() -> [SidebarWorkspaceRenderItem] {
         let projected = projection(), groups = manager.workspaceGroups
-        let base = SidebarWorkspaceRenderItem.renderItems(tabs: manager.tabs,
-            groupsById: Dictionary(uniqueKeysWithValues: groups.map { ($0.id,$0) }),orderedGroups: groups)
+        let base = VerticalTabsSidebar.baseRenderItems(tabs: manager.tabs, // (#cm-110.3) the production builder: a nested root under a status is drawn from the walk
+            groupsById: Dictionary(uniqueKeysWithValues: groups.map { ($0.id,$0) }),orderedGroups: groups,statusGroupProjection: projected)
         return VerticalTabsSidebar.resolveRenderItems(colorSectionProjection: colors(projected),baseItems: base,
             statusGroupProjection: projected,folds: state.statusGroups ?? .init(),tabs: manager.tabs,groups: groups).items
     }

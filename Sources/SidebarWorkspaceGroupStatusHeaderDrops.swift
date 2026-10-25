@@ -12,6 +12,10 @@ struct SidebarWorkspaceGroupStatusHeaderDrops {
         guard case .workspaceGroupHeader(let groupId) = source.kind else { return nil }
         switch decision {
         case .statusGroup(let requested):
+            // A nested group already drawn under this status has nowhere to go among its rows: no line, it springs back
+            // (ruling (16a), #cm-110.3). Dropped on another status it takes that one.
+            if let grouped = snapshot.statusGroupProjection?.workspaceGroups, grouped.nestedRootGroupIds.contains(groupId),
+               grouped.statusIdByGroupId[groupId] == requested.statusId { return .refused }
             guard let token, let group = snapshot.workspaceGroups.first(where: { $0.id == groupId }),
                   !group.isEmpty, group.liveAnchorWorkspaceId == source.workspaceId,
                   snapshot.tabs.contains(where: { $0.id == source.workspaceId && $0.groupId == groupId }),
@@ -52,7 +56,14 @@ struct SidebarWorkspaceGroupStatusHeaderDrops {
         }
         func run(_ group: WorkspaceGroup) -> SidebarStatusGroupHeaderPlacementPlan.Row? {
             let reference = group.liveAnchorWorkspaceId ?? group.id
-            guard let order = positions[reference] else { return nil }
+            // An empty nested group has no place of its own: it takes its nearest parent's, where that run starts (ruling (26), #cm-110.3).
+            var placed: WorkspaceGroup? = group
+            var found: Int?
+            while let candidate = placed, found == nil {
+                found = positions[candidate.liveAnchorWorkspaceId ?? candidate.id]
+                placed = tree.parent(of: candidate.id).flatMap { parent in snapshot.workspaceGroups.first { $0.id == parent } }
+            }
+            guard let order = found else { return nil }
             let descendants = Set([group.id] + tree.descendants(of: group.id))
             let members = snapshot.tabs.filter { $0.groupId.map(descendants.contains) == true }.map(\.id)
             let visible = snapshot.workspaceRenderItems.compactMap { item -> UUID? in
@@ -72,7 +83,11 @@ struct SidebarWorkspaceGroupStatusHeaderDrops {
                   tab.groupId == nil, !tab.isPinned else { return nil }
             rows.append(.init(referenceId: id, workspaceIds: [id], isGroup: false, order: order))
         }
-        for group in roots where projection.workspaceGroups?.statusIdByGroupId[group.id] == statusId {
+        // Every root drawn under this status, a nested one too: its run sits inside its top-level ancestor's run, and a
+        // top-level group's header cannot pass it (#cm-110.3, `cm-110.8` rulings (6) to (13)).
+        let drawnRoots = projection.workspaceGroups?.rootGroupIds ?? []
+        for group in snapshot.workspaceGroups where drawnRoots.contains(group.id)
+            && projection.workspaceGroups?.statusIdByGroupId[group.id] == statusId {
             guard let row = run(group) else { return nil }
             rows.append(row)
         }

@@ -696,6 +696,12 @@ class TabManager: ObservableObject {
         // from the very first insertion, matching the legacy @Published
         // observer timing.
         workspaces.attach(host: self)
+        // The model cannot know which nested groups the sidebar draws under a status; this is the sidebar's own answer,
+        // from the same projection (weak: the model is owned by this manager). (#cm-110.3)
+        workspaces.groupIdsShownUnderAStatus = { [weak self] in
+            guard let self else { return [] }
+            return VerticalTabsSidebar.groupsShownUnderAStatus(tabs: self.tabs, groups: self.workspaceGroups)
+        }
         workspaceReordering.attach(host: self)
         workspaceGrouping.attach(host: self)
         // The SwiftUI app root needs a command-routing fallback before AppKit
