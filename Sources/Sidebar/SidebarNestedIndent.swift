@@ -18,3 +18,32 @@ enum SidebarNestedIndent {
         return CGFloat(min(levels, fittingLevels)) * step
     }
 }
+
+/// The one level the rows under the `Pinned` and `Workspaces` headers sit in at, the way status groups sit under
+/// `Statuses` (#cm-110.12). It is part of a row's `depth`, so both renderers draw it from the same number. A window
+/// with no section headers (no status list in use, or Workspace Todo Controls off) has none and draws what it drew.
+extension SidebarNestedIndent {
+    static let sectionLevels = 1 // (#cm-110.12)
+
+    /// Every row drawn under a `Pinned` or `Workspaces` header: what follows one of those headers, up to the next
+    /// `Statuses` or status group header. `Statuses` and the rows under it are not in it. (#cm-110.12)
+    @MainActor
+    static func sectionIndentedItemIds(in items: [SidebarWorkspaceRenderItem]) -> Set<SidebarWorkspaceRenderItemID> {
+        var ids = Set<SidebarWorkspaceRenderItemID>()
+        var underASection = false
+        for item in items {
+            switch item {
+            case .pinnedHeader, .workspacesHeader: underASection = true
+            case .statusesHeader, .statusGroupHeader: underASection = false
+            case .groupHeader, .colorSectionHeader, .workspace: if underASection { ids.insert(item.id) }
+            }
+        }
+        return ids
+    }
+
+    /// `sectionLevels` when the list shows section headers, else 0. (#cm-110.12)
+    @MainActor
+    static func sectionIndent(in items: [SidebarWorkspaceRenderItem]) -> Int {
+        items.contains { if case .workspacesHeader = $0 { return true } else { return false } } ? sectionLevels : 0
+    }
+}

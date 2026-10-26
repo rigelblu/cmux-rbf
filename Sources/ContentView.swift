@@ -12064,9 +12064,19 @@ struct VerticalTabsSidebar: View, Equatable {
         let visibleWorkspaceRowIds: [UUID]
         /// How many groups hold each row, by workspace id or group id; empty in a window with no nested group (#cm-106).
         let rowDepthById: [UUID: Int]
+        /// The rows drawn under the `Pinned` or `Workspaces` header, which sit `sectionIndent` levels further in; both are
+        /// empty or 0 when the list shows no section header (#cm-110.12).
+        let sectionIndentedItemIds: Set<SidebarWorkspaceRenderItemID> // (#cm-110.12)
+        let sectionIndent: Int // (#cm-110.12)
         /// The list's width, set from the viewport above the lazy boundary where the SwiftUI list has one, so a row's
         /// indent can stop at 40% of it; nil elsewhere (#cm-106).
         var listWidth: CGFloat? = nil
+
+        /// How many levels further in a row sits for the section it is drawn under: `sectionIndent` for a row under the
+        /// `Pinned` or `Workspaces` header, else 0 (#cm-110.12).
+        func sectionIndentLevels(of item: SidebarWorkspaceRenderItemID) -> Int { // (#cm-110.12)
+            sectionIndentedItemIds.contains(item) ? sectionIndent : 0 // (#cm-110.12)
+        } // (#cm-110.12)
 
         /// The same context with the list's width set (#cm-106).
         func withListWidth(_ width: CGFloat) -> WorkspaceListRenderContext {
@@ -12268,7 +12278,9 @@ struct VerticalTabsSidebar: View, Equatable {
             statusGroupPresentationById: Self.statusGroupPresentations(projection: statusGroupProjection), // (#cm-110.1)
             workspaceRenderItems: workspaceRenderItems,
             visibleWorkspaceRowIds: visibleWorkspaceRowIds,
-            rowDepthById: rowDepthById
+            rowDepthById: rowDepthById,
+            sectionIndentedItemIds: SidebarNestedIndent.sectionIndentedItemIds(in: workspaceRenderItems), // (#cm-110.12)
+            sectionIndent: SidebarNestedIndent.sectionIndent(in: workspaceRenderItems) // (#cm-110.12)
         )
         let _ = SidebarProfilingSignposts.end(signpost)
 #if DEBUG // (#cm-110.1)
@@ -12854,7 +12866,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 let header = SidebarWorkspaceColorSectionHeader(
                     section: section,
                     colorScheme: renderContext.environment.colorScheme,
-                    onToggle: { sidebarState.toggleColorSection(hex: section.id.normalizedHex) }
+                    onToggle: { sidebarState.toggleColorSection(hex: section.id.normalizedHex) },
+                    indentLevels: renderContext.sectionIndentLevels(of: item.id) // (#cm-110.12)
                 )
                 var configuration = SidebarWorkspaceTableRowConfiguration(
                     id: .colorSection(section.id),
@@ -14640,7 +14653,7 @@ struct VerticalTabsSidebar: View, Equatable {
                         sidebarWorkspaceGroupRow(snapshot: snapshot)
                     }
                 case .colorSectionHeader(let section):
-                    Self.statusColorHeaderRow(section: section, colorScheme: renderContext.environment.colorScheme, collectTargets: shouldCollectWorkspaceDropTargets, toggle: colorHeaderToggle, frameChanged: statusHeaderRows.colorFrameChanged, disappeared: statusHeaderRows.colorDisappeared, paint: statusHeaderRows.colors[item.id] ?? .none) // (#cm-110.1)
+                    Self.statusColorHeaderRow(section: section, colorScheme: renderContext.environment.colorScheme, indentLevels: renderContext.sectionIndentLevels(of: item.id), collectTargets: shouldCollectWorkspaceDropTargets, toggle: colorHeaderToggle, frameChanged: statusHeaderRows.colorFrameChanged, disappeared: statusHeaderRows.colorDisappeared, paint: statusHeaderRows.colors[item.id] ?? .none) // (#cm-110.1) (#cm-110.12)
                 case .statusesHeader: // (#cm-110.1)
                     statusHeaderRows.area // (#cm-110.1)
                 case .workspacesHeader: // (#cm-110.4)
@@ -14887,7 +14900,7 @@ struct VerticalTabsSidebar: View, Equatable {
             return false
         }
         dragAutoScrollController.updateFromDragLocation()
-        let level = Self.workspaceProjectedStatusDropLineLevel(for: plan, depthById: renderContext.rowDepthById, projection: renderContext.statusGroupProjection) // (#cm-106) (#cm-110.2)
+        let level = Self.dropLineLevel(for: plan, renderContext: renderContext) // (#cm-106) (#cm-110.2) (#cm-110.12)
         guard dragState.dropIndicator != plan.indicator ||
                 dragState.dropIndicatorScope != plan.indicatorScope ||
                 dragState.dropIndicatorLevel != level else {
@@ -14934,7 +14947,7 @@ struct VerticalTabsSidebar: View, Equatable {
             workspaceGroups: renderContext.workspaceGroups,
             visibleWorkspaceRowIds: renderContext.visibleWorkspaceRowIds
         ),
-        level: Self.workspaceProjectedStatusDropLineLevel(for: plan, depthById: renderContext.rowDepthById, projection: renderContext.statusGroupProjection)) // (#cm-106) (#cm-110.2)
+        level: Self.dropLineLevel(for: plan, renderContext: renderContext)) // (#cm-106) (#cm-110.2) (#cm-110.12)
     }
 
     private func performWorkspaceReorderDrop(
@@ -15564,7 +15577,10 @@ struct VerticalTabsSidebar: View, Equatable {
             inferredTaskStatus: workspaceSnapshot.taskStatusInput.inferred,
             activeTodoOverride: workspaceSnapshot.taskStatusInput.activeOverride,
             isTodoStatusHidden: workspaceSnapshot.taskStatusInput.isHidden,
-            depth: Self.rowDepth(of: tab.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection), // (#cm-106) (#cm-110.1)
+            depth: Self.rowDepth(of: tab.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection,
+                sectionIndent: renderContext.sectionIndentLevels(of: .workspace(tab.id)),
+                heldLevels: (renderContext.workspaceGroupIdByWorkspaceId[tab.id] ?? nil) != nil
+                    || renderContext.colorSectionProjection.sectionByWorkspaceId[tab.id] != nil ? 1 : 0), // (#cm-106) (#cm-110.1) (#cm-110.12)
             dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil, // (#cm-106)
             listWidth: renderContext.listWidth
         )

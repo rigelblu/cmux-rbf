@@ -417,11 +417,13 @@ struct SidebarWorkspaceColorSectionHeader: View, Equatable {
     let section: SidebarWorkspaceColorSection
     let colorScheme: ColorScheme
     let onToggle: () -> Void
+    /// How many levels in the header sits: one under the `Pinned` or `Workspaces` header, like the group headers beside it (#cm-110.12).
+    var indentLevels: Int = 0 // (#cm-110.12)
 
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.section == rhs.section && lhs.colorScheme == rhs.colorScheme
+        lhs.section == rhs.section && lhs.colorScheme == rhs.colorScheme && lhs.indentLevels == rhs.indentLevels // (#cm-110.12)
     }
 
     var body: some View {
@@ -449,6 +451,7 @@ struct SidebarWorkspaceColorSectionHeader: View, Equatable {
             )
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .padding(.horizontal, SidebarWorkspaceListMetrics.rowOuterHorizontalPadding)
+            .padding(.leading, SidebarNestedIndent.points(levels: indentLevels, availableWidth: nil)) // (#cm-110.12) one level reads 12 pt at any width
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)

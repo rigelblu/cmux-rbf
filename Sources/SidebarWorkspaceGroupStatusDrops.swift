@@ -206,9 +206,12 @@ extension VerticalTabsSidebar {
         })
     }
 
+    /// `sectionIndent` is how far in the `Pinned` and `Workspaces` rows sit (#cm-110.12): a group's depth in `depthById`
+    /// does not count it, and a projected group's depth already counts `Statuses`, so only the first gets it.
     static func workspaceProjectedStatusDropLineLevel(for plan: SidebarWorkspaceReorderDropPlan,
-        depthById: [UUID: Int], projection: WorkspaceStatusGroupProjection?) -> Int? {
-        let depths = depthById.merging(projection?.workspaceGroups?.depthById ?? [:]) { _, projected in projected }
-        return SidebarNestedDropLine.level(for: plan, depthById: depths)
+        depthById: [UUID: Int], projection: WorkspaceStatusGroupProjection?, sectionIndent: Int = 0) -> Int? {
+        let depths = depthById.mapValues { $0 + sectionIndent } // (#cm-110.12)
+            .merging(projection?.workspaceGroups?.depthById ?? [:]) { _, projected in projected }
+        return SidebarNestedDropLine.level(for: plan, depthById: depths, sectionIndent: sectionIndent) // (#cm-110.12)
     }
 }

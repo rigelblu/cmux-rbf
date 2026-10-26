@@ -191,34 +191,44 @@ struct WorkspaceGroupNestedMountedSidebarTests {
         return (manager, ids[0], ids[1], ids[2], ids[3], p, q, r)
     }
 
-    @Test func aRowTwoOrThreeLevelsDeepIsDrawnTwoOrThreeStepsIn() async throws {
-        let nested = try threeLevelWindow()
-        let mounted = try await mount(nested.manager)
-        defer { close(mounted) }
-        func frames(_ id: UUID) throws -> (background: CGFloat, title: CGFloat) {
-            let cell = try #require(workspaceCell(mounted, id), "the row of \(id) is in the list")
-            cell.layoutSubtreeIfNeeded()
-            return (cell.backgroundFrameForTesting.minX, cell.titleFrameForTesting.minX)
+    /// A window with section headers (a status list in use and Workspace Todo Controls on) draws every group header one level
+    /// further in than its group's depth, because its rows sit under the `Workspaces` header (#cm-110.12; Decisions, the
+    /// 2026-10-26 entry on section rows, which supersedes Q6 of 2026-10-24). A window without them draws the depths it always
+    /// drew. The test installs the list and the setting itself: left alone, it read whatever `cmux.json` the host had.
+    @Test(arguments: [true, false])
+    func aRowTwoOrThreeLevelsDeepIsDrawnTwoOrThreeStepsIn(sectioned: Bool) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(controls: sectioned) // (#cm-110.12)
+            defer { restore() }
+            let nested = try threeLevelWindow()
+            let mounted = try await mount(nested.manager)
+            defer { close(mounted) }
+            @MainActor func frames(_ id: UUID) throws -> (background: CGFloat, title: CGFloat) {
+                let cell = try #require(workspaceCell(mounted, id), "the row of \(id) is in the list")
+                cell.layoutSubtreeIfNeeded()
+                return (cell.backgroundFrameForTesting.minX, cell.titleFrameForTesting.minX)
+            }
+            let topFrames = try frames(nested.u)
+            let top = topFrames.background
+            let depth1 = try frames(nested.w1).background
+            let depth2 = try frames(nested.w2).background
+            let depth3 = try frames(nested.w3).background
+            // Each level sits one step further in than the one above it (a step is 12 points; the sidebar is wide
+            // enough for the cap of 40% of its width to be out of the way at depth 3).
+            #expect(depth1 - top == 12, "depth 1: \(depth1 - top) points in")
+            #expect(depth2 - top == 24, "depth 2: \(depth2 - top) points in")
+            #expect(depth3 - top == 36, "depth 3: \(depth3 - top) points in")
+            // The content moves with the background: the title starts as far in as the row does.
+            let titleTop = topFrames.title
+            #expect(try frames(nested.w1).title - titleTop == 12, "title at depth 1")
+            #expect(try frames(nested.w2).title - titleTop == 24, "title at depth 2")
+            #expect(try frames(nested.w3).title - titleTop == 36, "title at depth 3")
+            // The headers: P at the top, Q one in, R two in; one more each under a `Workspaces` header (#cm-110.12).
+            let section = sectioned ? SidebarNestedIndent.sectionLevels : 0
+            #expect(headerCell(mounted, nested.p)?.currentModelForTesting?.depth == 0 + section, "P, sectioned: \(sectioned)")
+            #expect(headerCell(mounted, nested.q)?.currentModelForTesting?.depth == 1 + section, "Q, sectioned: \(sectioned)")
+            #expect(headerCell(mounted, nested.r)?.currentModelForTesting?.depth == 2 + section, "R, sectioned: \(sectioned)")
         }
-        let topFrames = try frames(nested.u)
-        let top = topFrames.background
-        let depth1 = try frames(nested.w1).background
-        let depth2 = try frames(nested.w2).background
-        let depth3 = try frames(nested.w3).background
-        // Each level sits one step further in than the one above it (a step is 12 points; the sidebar is wide
-        // enough for the cap of 40% of its width to be out of the way at depth 3).
-        #expect(depth1 - top == 12, "depth 1: \(depth1 - top) points in")
-        #expect(depth2 - top == 24, "depth 2: \(depth2 - top) points in")
-        #expect(depth3 - top == 36, "depth 3: \(depth3 - top) points in")
-        // The content moves with the background: the title starts as far in as the row does.
-        let titleTop = topFrames.title
-        #expect(try frames(nested.w1).title - titleTop == 12, "title at depth 1")
-        #expect(try frames(nested.w2).title - titleTop == 24, "title at depth 2")
-        #expect(try frames(nested.w3).title - titleTop == 36, "title at depth 3")
-        // The headers: P at the top, Q one in, R two in.
-        #expect(headerCell(mounted, nested.p)?.currentModelForTesting?.depth == 0)
-        #expect(headerCell(mounted, nested.q)?.currentModelForTesting?.depth == 1)
-        #expect(headerCell(mounted, nested.r)?.currentModelForTesting?.depth == 2)
     }
 
     // MARK: - The press preview
@@ -310,30 +320,48 @@ struct WorkspaceGroupNestedMountedSidebarTests {
     private func levelOf(_ cell: SidebarWorkspaceRowTableCellView?) -> String? { cell?.accessibilityValue() as? String }
     private func levelOf(_ cell: SidebarGroupHeaderTableCellView?) -> String? { cell?.accessibilityValue() as? String }
 
-    @Test func inAWindowWithNoNestedGroupALooseRowAndAHeaderSayLevel1AndAMemberRowSaysLevel2() async throws {
-        let flat = try flatWindow()
-        #expect(!flat.manager.workspaces.hasNestedWorkspaceGroup)
-        let mounted = try await mount(flat.manager)
-        defer { close(mounted) }
-        #expect(levelOf(workspaceCell(mounted, flat.selected)) == "Level 1", "a row in no group")
-        #expect(levelOf(headerCell(mounted, flat.own)) == "Level 1", "a header with a workspace")
-        #expect(levelOf(headerCell(mounted, flat.empty)) == "Level 1, No workspace of its own", "a header with none")
-        #expect(levelOf(workspaceCell(mounted, flat.other)) == "Level 2", "a row directly in a top-level group")
-        // Telling the level changes nothing that is drawn: the drawing's depth stays 0 in this window.
-        #expect(workspaceCell(mounted, flat.other)?.currentModelForMeasurement?.depth == 0)
+    /// The level text follows the row's depth, so a window with section headers (a status list in use and Workspace Todo Controls on)
+    /// says one level more for every row under `Pinned` or `Workspaces` (#cm-110.12; Decisions, the 2026-10-26 entry on section rows,
+    /// which supersedes Q6 of 2026-10-24). Both arms install the list and the setting themselves: left alone, these read what another
+    /// suite's test had installed at that moment.
+    @Test(arguments: [true, false])
+    func inAWindowWithNoNestedGroupALooseRowAndAHeaderSayLevel1AndAMemberRowSaysLevel2(sectioned: Bool) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(controls: sectioned) // (#cm-110.12)
+            defer { restore() }
+            let section = sectioned ? SidebarNestedIndent.sectionLevels : 0 // (#cm-110.12)
+            let flat = try flatWindow()
+            #expect(!flat.manager.workspaces.hasNestedWorkspaceGroup)
+            let mounted = try await mount(flat.manager)
+            defer { close(mounted) }
+            #expect(levelOf(workspaceCell(mounted, flat.selected)) == "Level \(1 + section)", "a row in no group")
+            #expect(levelOf(headerCell(mounted, flat.own)) == "Level \(1 + section)", "a header with a workspace")
+            #expect(levelOf(headerCell(mounted, flat.empty)) == "Level \(1 + section), No workspace of its own", "a header with none")
+            #expect(levelOf(workspaceCell(mounted, flat.other)) == "Level \(2 + section)", "a row directly in a top-level group")
+            // Telling the level changes nothing that is drawn: the drawing's depth stays 0 in a window with no section header, and a
+            // member of a group is the one step the row holds plus the section's under a header.
+            let heldStep = sectioned ? 1 + section : 0 // (#cm-110.12)
+            #expect(workspaceCell(mounted, flat.other)?.currentModelForMeasurement?.depth == heldStep)
+        }
     }
 
-    @Test func inAThreeLevelWindowEveryRowSaysOneLevelDeeperThanTheHeaderThatHoldsIt() async throws {
-        let nested = try threeLevelWindow()
-        let mounted = try await mount(nested.manager)
-        defer { close(mounted) }
-        #expect(levelOf(workspaceCell(mounted, nested.u)) == "Level 1")
-        #expect(levelOf(headerCell(mounted, nested.p)) == "Level 1")
-        #expect(levelOf(workspaceCell(mounted, nested.w1)) == "Level 2")
-        #expect(levelOf(headerCell(mounted, nested.q)) == "Level 2")
-        #expect(levelOf(workspaceCell(mounted, nested.w2)) == "Level 3")
-        #expect(levelOf(headerCell(mounted, nested.r)) == "Level 3")
-        #expect(levelOf(workspaceCell(mounted, nested.w3)) == "Level 4")
+    @Test(arguments: [true, false])
+    func inAThreeLevelWindowEveryRowSaysOneLevelDeeperThanTheHeaderThatHoldsIt(sectioned: Bool) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(controls: sectioned) // (#cm-110.12)
+            defer { restore() }
+            let section = sectioned ? SidebarNestedIndent.sectionLevels : 0 // (#cm-110.12)
+            let nested = try threeLevelWindow()
+            let mounted = try await mount(nested.manager)
+            defer { close(mounted) }
+            #expect(levelOf(workspaceCell(mounted, nested.u)) == "Level \(1 + section)")
+            #expect(levelOf(headerCell(mounted, nested.p)) == "Level \(1 + section)")
+            #expect(levelOf(workspaceCell(mounted, nested.w1)) == "Level \(2 + section)")
+            #expect(levelOf(headerCell(mounted, nested.q)) == "Level \(2 + section)")
+            #expect(levelOf(workspaceCell(mounted, nested.w2)) == "Level \(3 + section)")
+            #expect(levelOf(headerCell(mounted, nested.r)) == "Level \(3 + section)")
+            #expect(levelOf(workspaceCell(mounted, nested.w3)) == "Level \(4 + section)")
+        }
     }
 
     @Test func aHeaderWithNoWorkspaceOfItsOwnHasTheFoldHelpThroughTheMountedCell() async throws {
