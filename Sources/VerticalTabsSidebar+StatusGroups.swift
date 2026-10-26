@@ -198,16 +198,33 @@ extension VerticalTabsSidebar { // (#cm-110.1)
 
     /// A row's indent level. The nested-group depths stay the only thing in `rowDepthById`, because an empty map
     /// is how the drop lines know a window holds no nested group (`SidebarNestedDropLine.level`); a row in a status
-    /// group takes its depth from here instead.
+    /// group takes its depth from here instead. A row under the `Pinned` or `Workspaces` header sits `sectionIndent`
+    /// levels further in (#cm-110.12); `heldLevels` is the one step a member of a group or color group already has in a
+    /// window whose depth map is empty. With no section header both leave a row's depth as it was.
     static func rowDepth(
         of workspaceId: UUID,
         rowDepthById: [UUID: Int],
-        statusGroupProjection: WorkspaceStatusGroupProjection?
+        statusGroupProjection: WorkspaceStatusGroupProjection?,
+        sectionIndent: Int = 0, // (#cm-110.12)
+        heldLevels: Int = 0 // (#cm-110.12)
     ) -> Int {
         if let depth = statusGroupProjection?.workspaceGroups?.depthById[workspaceId] { return depth }
-        if let depth = rowDepthById[workspaceId] { return depth }
+        if let depth = rowDepthById[workspaceId] { return depth + sectionIndent } // (#cm-110.12)
         if statusGroupProjection?.contains(workspaceId: workspaceId) == true { return statusMemberDepth }
-        return 0
+        return sectionIndent > 0 ? heldLevels + sectionIndent : 0 // (#cm-110.12)
+    }
+
+    /// A group header's display depth in this list: its group depth, plus the `Pinned` or `Workspaces` level it sits under (#cm-110.12).
+    /// Both header builders (the AppKit model and the SwiftUI snapshot) take it from here.
+    static func groupHeaderDepth(of groupId: UUID, renderContext: WorkspaceListRenderContext) -> Int { // (#cm-110.12)
+        rowDepth(of: groupId, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection,
+            sectionIndent: renderContext.sectionIndentLevels(of: .group(groupId)))
+    }
+
+    /// The level a drop line lands at in this list, for the workspace drags, the tab landings and the debug drop alike (#cm-110.12).
+    static func dropLineLevel(for plan: SidebarWorkspaceReorderDropPlan, renderContext: WorkspaceListRenderContext) -> Int? { // (#cm-110.12)
+        workspaceProjectedStatusDropLineLevel(for: plan, depthById: renderContext.rowDepthById,
+            projection: renderContext.statusGroupProjection, sectionIndent: renderContext.sectionIndent)
     }
 
     // MARK: Drag

@@ -173,13 +173,14 @@ extension VerticalTabsSidebar {
     }
 
     static func statusColorHeaderRow(section: SidebarWorkspaceColorSection, colorScheme: ColorScheme,
+        indentLevels: Int = 0, // (#cm-110.12)
         collectTargets: Bool, toggle: @escaping (String) -> Void,
         frameChanged: @escaping (SidebarWorkspaceRenderItemID, CGRect) -> Void,
         disappeared: @escaping (SidebarWorkspaceRenderItemID) -> Void,
         paint: SidebarStatusHeaderDropPaint = .none) -> some View {
         let row = SidebarWorkspaceRenderItemID.colorSection(section.id)
         let header = SidebarWorkspaceColorSectionHeader(section: section, colorScheme: colorScheme,
-            onToggle: { toggle(section.id.normalizedHex) })
+            onToggle: { toggle(section.id.normalizedHex) }, indentLevels: indentLevels) // (#cm-110.12)
             .sidebarWorkspaceFrameAnchor(id: row.colorHeaderDropIdentity!, isEnabled: collectTargets)
             .overlay(alignment: .top) {
                 if paint.top { Rectangle().fill(cmuxAccentColor()).frame(height: 2).padding(.leading, paint.inset).padding(.horizontal, 8) }

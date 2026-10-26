@@ -7,21 +7,27 @@ import Foundation
 /// renderers: the number of groups that hold the rows it lands among. A window with no nested group has none, and
 /// its lines are drawn as before.
 enum SidebarNestedDropLine {
-    /// The level a plan lands at, or nil in a window with no nested group (`depthById` is empty then).
+    /// The level a plan lands at, or nil in a window with no nested group (`depthById` is empty then) and no section header.
     /// - A top-level plan, or a loose row dropped among loose rows: 0.
     /// - A workspace or a nested header placed in a group: one more than that group's depth.
     /// - A header with no workspace of its own, placed among the groups beside it: its own depth.
-    static func level(for plan: SidebarWorkspaceReorderDropPlan, depthById: [UUID: Int]) -> Int? {
+    /// - With section headers (`sectionIndent` > 0, #cm-110.12) every one of these sits that much further in, and a
+    ///   window with no nested group has a level too: `depthById` holds each group's depth already counting it.
+    static func level(for plan: SidebarWorkspaceReorderDropPlan, depthById: [UUID: Int], sectionIndent: Int = 0) -> Int? {
         if let level = SidebarStatusHeaderDropAdapter.lineLevel(for: plan.action) { return level } // (#cm-110.1)
-        guard !depthById.isEmpty else { return nil }
+        guard !depthById.isEmpty || sectionIndent > 0 else { return nil } // (#cm-110.12)
         switch plan.action {
         case .reorder(_, _, let group?):
-            return depthById[group].map { $0 + 1 }
+            return depthById[group].map { $0 + 1 } ?? (sectionIndent > 0 ? sectionIndent + 1 : nil) // (#cm-110.12)
         case .reorder:
-            return 0
+            return sectionIndent // (#cm-110.12)
         case .reorderGroup:
-            return depthById[plan.draggedWorkspaceId] ?? 0
-        case .crossWindow, .colorSection, .statusGroupMove, .reorderStatusGroup, .moveStatusesArea, .statusGroupDrop, .statusAreaBoundaryDrop: // (#cm-110.1)
+            return depthById[plan.draggedWorkspaceId] ?? sectionIndent // (#cm-110.12)
+        case .crossWindow:
+            return sectionIndent > 0 ? sectionIndent : nil // (#cm-110.12)
+        case .colorSection:
+            return sectionIndent > 0 ? sectionIndent + 1 : nil // (#cm-110.12) a color group's members sit one in from its header
+        case .statusGroupMove, .reorderStatusGroup, .moveStatusesArea, .statusGroupDrop, .statusAreaBoundaryDrop: // (#cm-110.1)
             return nil
         }
     }

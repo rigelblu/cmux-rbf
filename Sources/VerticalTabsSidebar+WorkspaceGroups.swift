@@ -128,7 +128,7 @@ extension VerticalTabsSidebar {
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
             colorSchemeIsDark: renderContext.environment.colorScheme == .dark,
-            depth: Self.rowDepth(of: group.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection), // (#cm-106) (#cm-110.2)
+            depth: Self.groupHeaderDepth(of: group.id, renderContext: renderContext), // (#cm-106) (#cm-110.2) (#cm-110.12)
             hasOwnWorkspace: headerOnlyLook.hasOwnWorkspace, // (#cm-106)
             isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
             holdsGroups: renderContext.workspaceGroups.contains { $0.parentGroupId == group.id }, // (#cm-106) (#cm-110.2)
@@ -330,7 +330,7 @@ extension VerticalTabsSidebar {
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
             shouldCollectWorkspaceDropTargets: shouldCollectWorkspaceDropTargets,
-            depth: Self.rowDepth(of: group.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection), // (#cm-106) (#cm-110.2)
+            depth: Self.groupHeaderDepth(of: group.id, renderContext: renderContext), // (#cm-106) (#cm-110.2) (#cm-110.12)
             hasOwnWorkspace: headerOnlyLook.hasOwnWorkspace, // (#cm-106)
             isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
             moveMenu: WorkspaceGroupMoveMenu.menu(for: group.id, groups: renderContext.workspaceGroups), // (#cm-106)
