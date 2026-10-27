@@ -217,6 +217,9 @@ Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at 
 - Drop a workspace on a status group to set that status and its color. A pinned workspace stays pinned.
 - Drag a status group, or the **Statuses** header, to reorder; the order survives a relaunch.
 - Click a header to fold it; a folded header shows the unread count inside.
+- Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Statuses**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups.
+- A whole workspace group, nested or not, takes a status and sits under it with everything inside. Drop its header on a status group, or set it from its Status menu or Group Color.
+- Drag a tab out of a workspace onto a status group to make a new workspace already on that status.
 
 ## 🟠⋯ Organize workspace groups inside larger groups
 
