@@ -6,6 +6,27 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.34.1 (2026-10-26) — #cm-110.2, #cm-110.8, #cm-110.10, #cm-110.4, #cm-110.5, #cm-110.3, #cm-110.12
+
+*Put whole workspace groups, nested groups and dragged-out tabs under a status, and keep pinned rows, my workspaces and my statuses in three sections of their own.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-21 - feat | put a whole workspace group under a status and see it there with everything inside it (#cm-110.2). A group has its own status: its header shows the status's glyph and band, and a top-level group sits under its status group with every workspace inside it. Set it from the header's Status menu, Group Color (a status's color picks the status), the glyph's popover, ⌘; / ⌘⇧; or the palette with its anchor selected, or `cmux workspace-group set-color`. Clearing it puts the group back where it was, with no color
+- 2026-10-22 - feat | drag a whole workspace group onto a status to set it, the way I drag a workspace (#cm-110.8). Drop a group's header on a status header or between its rows. A nested or pinned group takes the status and stays where it is; an empty group is refused
+- 2026-10-23 - feat | drag a tab out of a workspace straight onto a status, and get a new workspace already under that status (#cm-110.10). Drop the tab on a status group's header or between its rows; elsewhere the tab drop works as before
+- 2026-10-24 - feat | keep my workspaces and my statuses in two sections of their own, so moving the Statuses header never mixes them (#cm-110.4). Workspaces with no status sit under a new **Workspaces** header. Drag either header to swap the two sections; fold each on its own. The order and folds are saved per window, and a window whose Statuses area sat at the top keeps it there
+- 2026-10-25 - feat | keep my pinned workspaces together in a Pinned section at the top, whatever their status (#cm-110.5). A **Pinned** header sits above both sections when anything is pinned; a pinned workspace with a status keeps its color group there and goes to its status group when unpinned. Pinned folds but does not drag
+- 2026-10-25 - feat | see my nested workspaces under a status, still nested, each with its own status (#cm-110.3). A group inside another group that has a status shows under that status with everything inside it, and clears back into its parent at its place. A member keeps its own status inside its group
+- 2026-10-26 - feat | see my pinned workspaces and my workspaces set one level in under their headers, the way the status groups sit under Statuses (#cm-110.12). Rows under **Pinned** and **Workspaces** sit 12 pt in, members one step further; **Statuses** does not move. With no section headers the sidebar is flush, as before
+
+## 🟠⋯ Known Issues
+- The older SwiftUI sidebar's Pinned header and the indent of its color group headers have no live check: a remote flag picks the renderer, and no local build can open that sidebar (#cm-110.5, #cm-110.12)
+- A status group reads empty while all of its rows are pinned (#cm-110.5)
+- A group header's status glyph is not yet measured against its band (agent Scenario 55 could not take the 2x reading), and a dotted glyph reads faint there; tracked with the dark-color folder icon as #cm-110.9
+- A tab dropped between an open group's member rows splits the group, as upstream does; tracked as #cm-110.11
+- Still from v0.34.0: the day-one fold copy does not run in a window where the earlier build first ran with no status list in use (#cm-110.1, Known Unknowns 22.2)
+- Released on Tom's word of 2026-10-26, "Release now": agent Scenario 74's control and its downgrade reading, which need the build before #cm-110.4 in the same tag, were not run; the downgrade is covered by a unit test that decodes the new record with a frozen copy of v0.34.0's state type
+
 # 🔵⋯ v0.34.0 (2026-10-20) — #cm-110.1, with #cm-73 in progress
 
 *See my workspaces grouped by status in the sidebar, and set a status by dropping a workspace on its group.*
