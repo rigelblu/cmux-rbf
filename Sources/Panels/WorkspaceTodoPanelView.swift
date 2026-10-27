@@ -165,24 +165,26 @@ private struct WorkspaceTodoPaneContent: View {
         let statusColorHexes = AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:]
         let pane = WorkspaceStatusPaneState.make(
             resolution: held, inferred: inferred, list: statusList, controlsEnabled: todoControlsEnabled, // (#cm-109.3)
+            statusHidden: todoState.statusHidden, // (#cm-110.13)
             colorHexes: statusColorHexes // (#cm-109.3)
         )
         let hasOverride = pane.hasOverride
         let progress = todoState.checklist.checklistProgressSummary
         let headerTitle = WorkspaceTodoPaneHeaderTitle.title(paneTitle: paneTitle)
         // His word for the status when it has one, else upstream's function (cmux's own name). (#cm-109)
-        let headerStatusLabel = pane.hisWord ?? WorkspaceTodoPaneHeaderStatusLabel.displayName(
-            effective: todoControlsEnabled ? held.effective : nil,
-            hasOverride: hasOverride
+        // None replaces both through the pane's pure header choice. (#cm-110.13)
+        let headerStatus = pane.header( // (#cm-110.13)
+            effective: held.effective, statusHidden: todoState.statusHidden, controlsEnabled: todoControlsEnabled // (#cm-110.13)
         )
 
         VStack(alignment: .leading, spacing: 0) {
             header(
                 title: headerTitle,
-                effective: todoControlsEnabled ? held.effective : nil,
+                effective: headerStatus.status, // (#cm-110.13)
+                isNone: headerStatus.isNone, // (#cm-110.13)
                 inferred: inferred,
                 hasOverride: hasOverride,
-                statusLabel: headerStatusLabel,
+                statusLabel: headerStatus.label, // (#cm-110.13)
                 pane: pane, // (#cm-109)
                 progress: progress
             )
@@ -251,6 +253,7 @@ private struct WorkspaceTodoPaneContent: View {
     private func header(
         title: String,
         effective: WorkspaceTaskStatus?,
+        isNone: Bool, // (#cm-110.13)
         inferred: WorkspaceTaskStatus,
         hasOverride: Bool,
         statusLabel: String?,
@@ -272,7 +275,8 @@ private struct WorkspaceTodoPaneContent: View {
                         contrastBackground: WindowAppearanceSnapshot.resolvedColor(.windowBackgroundColor, for: colorScheme), // (#cm-109.7)
                         name: pane.hisWord, // (#cm-109) his word for a status in effect; cmux's name otherwise
                         icon: pane.icon, // (#cm-109.3)
-                        colorHex: pane.colorHex // (#cm-109.3)
+                        colorHex: pane.colorHex, // (#cm-109.3) // (#cm-110.13)
+                        isNone: isNone // (#cm-110.13)
                     )
                     .contentShape(Rectangle().inset(by: -3))
                 }

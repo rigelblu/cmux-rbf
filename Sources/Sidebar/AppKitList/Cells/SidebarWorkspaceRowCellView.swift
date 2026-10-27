@@ -452,28 +452,32 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             mediaCameraView.contentTintColor = .systemGreen
         }
 
-        // Manual task-status glyph (legacy `SidebarWorkspaceManualStatusIndicatorMenu`):
-        // only a human-set status draws row chrome; automatic status stays out.
-        let showsStatusGlyph = model.todoControlsEnabled
-            && snapshot.hasManualTaskStatus
-            && snapshot.taskStatus != nil
+        let indicator = SidebarWorkspaceManualTaskStatusIndicatorModel( // (#cm-110.13)
+            featureEnabled: model.todoControlsEnabled, // (#cm-110.13)
+            taskStatus: snapshot.taskStatus, // (#cm-110.13)
+            hasManualOverride: snapshot.hasManualTaskStatus, // (#cm-110.13)
+            isHidden: snapshot.taskStatusInput.isHidden // (#cm-110.13)
+        ) // (#cm-110.13)
+        let showsStatusGlyph = indicator.showsIndicator // (#cm-110.13)
         statusGlyphButton.isHidden = !showsStatusGlyph
-        if showsStatusGlyph, let taskStatus = snapshot.taskStatus {
+        if showsStatusGlyph { // (#cm-110.13)
+            let menuModel = snapshot.statusMenuModel(controlsEnabled: model.todoControlsEnabled) // (#cm-110.13)
             // (#cm-109.3) His entry for the status shown: the picker's checked entry row, as the glyph's name is.
-            let checkedEntry = WorkspaceStatusPresentation.checkedEntry(in: snapshot.todoStatusMenuModel?.picker)
+            let checkedEntry = WorkspaceStatusPresentation.checkedEntry(in: menuModel?.picker) // (#cm-110.13)
             let rowBackground = Self.rowContrastBackground(model: model, palette: palette) // (#cm-109.7)
             statusGlyphButton.configure(
                 model: .init(
-                    status: taskStatus,
-                    hasOverride: true,
+                    status: snapshot.taskStatus ?? .todo, // (#cm-110.13)
+                    hasOverride: !indicator.isNone, // (#cm-110.13)
                     usesMonochrome: model.isActive,
                     fontScale: model.fontScale,
                     colorScheme: palette.colorScheme,
-                    name: WorkspaceStatusPresentation.checkedName(in: snapshot.todoStatusMenuModel?.picker), // (#cm-109)
+                    name: indicator.isNone ? WorkspaceStatusPresentation.noneTitle : WorkspaceStatusPresentation.checkedName(in: menuModel?.picker), // (#cm-110.13)
                     icon: checkedEntry?.icon, // (#cm-109.3)
-                    colorHex: checkedEntry.flatMap { snapshot.todoStatusMenuModel?.colorHexes[$0.id] }, // (#cm-109.3)
+                    colorHex: checkedEntry.flatMap { menuModel?.colorHexes[$0.id] }, // (#cm-109.3) // (#cm-110.13)
                     contrastBackground: rowBackground, // (#cm-109.7)
-                    drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: snapshot.taskStatus) // (#cm-109.7)
+                    drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: snapshot.taskStatus), // (#cm-109.7) // (#cm-110.13)
+                    isNone: indicator.isNone // (#cm-110.13)
                 ),
                 monochromeColor: palette.secondary(0.8),
                 neutralColor: palette.secondary(0.8)
@@ -677,6 +681,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     var titleFrameForTesting: NSRect { titleView.frame }
     var statusGlyphButtonForTesting: NSView { statusGlyphButton } // (#cm-109.3)
     var statusGlyphModelForTesting: SidebarRowTaskStatusGlyphButton.Model? { statusGlyphButton.currentModelForTesting } // (#cm-109.7)
+    var currentModelForTesting: SidebarWorkspaceRowModel? { model } // (#cm-110.13)
+    var statusPopoverModelForTesting: SidebarWorkspaceStatusPopoverModel? { statusPopoverModel() } // (#cm-110.13)
+    var statusPopoverForTesting: SidebarWorkspaceStatusPopover? { // (#cm-110.13)
+        statusPopoverModel().map { statusPopoverView($0) } // (#cm-110.13)
+    } // (#cm-110.13)
+    var isStatusPopoverShownForTesting: Bool { statusPopoverPresenter.isShown } // (#cm-110.13)
     var handForTesting: NSImageView? { handImageView } // (#cm-109.3)
     var handOutlineForTesting: NSView? { handOutlineView } // (#cm-109.7)
     var leadingSpinnerForTesting: GPUSpinnerNSView? { leadingSpinner } // (#cm-109.3)
@@ -1082,7 +1092,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
     private func statusPopoverModel() -> SidebarWorkspaceStatusPopoverModel? {
         // (#cm-109) No popover when the snapshot holds no picker.
-        guard let menuModel = model?.snapshot.todoStatusMenuModel, let picker = menuModel.picker else { return nil }
+        guard let model else { return nil } // (#cm-110.13)
+        let snapshot = model.snapshot // (#cm-110.13)
+        guard let menuModel = snapshot.statusMenuModel(controlsEnabled: model.todoControlsEnabled), // (#cm-110.13)
+              let picker = menuModel.picker else { return nil } // (#cm-110.13)
         return SidebarWorkspaceStatusPopoverModel(
             inferred: menuModel.inferred,
             activeOverride: menuModel.activeOverride,
@@ -1092,7 +1105,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     }
 
     private func statusPopoverContent(_ popoverModel: SidebarWorkspaceStatusPopoverModel) -> AnyView {
-        AnyView(SidebarWorkspaceStatusPopover(
+        AnyView(statusPopoverView(popoverModel)) // (#cm-110.13)
+    } // (#cm-110.13)
+
+    private func statusPopoverView(_ popoverModel: SidebarWorkspaceStatusPopoverModel) -> SidebarWorkspaceStatusPopover { // (#cm-110.13)
+        SidebarWorkspaceStatusPopover( // (#cm-110.13)
             model: popoverModel,
             onSelectLane: { [weak self] action in
                 self?.actions?.applyTodoStatus(action)
@@ -1103,7 +1120,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             onClose: { [weak self] in
                 self?.statusPopoverPresenter.close()
             }
-        ))
+        ) // (#cm-110.13)
     }
 
     /// Glyph click toggles the status popover (min width 200, max height

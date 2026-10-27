@@ -39,7 +39,7 @@ struct StatusGroupDropPerformerTests {
                 .init(id: "done", name: "Done", color: "2: DONE")
             ], source: .file)
             all = [selectedOther, dragged, a, b]
-            dragged.hideTaskStatus(); dragged.setCustomColor("#ABCDEF")
+            dragged.clearTaskStatusOverride(); dragged.setCustomColor("#ABCDEF")
             selectedOther.hideTaskStatus(); selectedOther.setCustomColor("#AABBCC")
             for member in [a, b] {
                 member.setOwnStatus(list.entry(id: "parked")!, list: list)

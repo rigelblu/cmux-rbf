@@ -85,6 +85,7 @@ final class SidebarNestedStatusDropFixture {
             guard let workspace = data[key] else { continue }
             if empty { continue }
             if !((key == "c1" && role == .colorOnlyOwn) || (key == "c3" && role == .colorOnlyOwnLast)) { workspace.setOwnStatus(statusList.entry(id: "parked")!, list: statusList) }
+            else { workspace.clearTaskStatusOverride() }
             workspace.setCustomColor("#555555")
         }
         for key in ["n1","n2"] { if let workspace = data[key] { workspace.setOwnStatus(statusList.entry(id: "next")!, list: statusList); workspace.setCustomColor("#111111") } }
@@ -92,7 +93,7 @@ final class SidebarNestedStatusDropFixture {
         if let a = data["pinA"], let b = data["pinB"] { model.setPinned(a,pinned: true); model.setPinned(b,pinned: true) }
         if role == .pinnedMatching { data["pinA"]?.setOwnStatus(statusList.entry(id: "parked")!,list: statusList) }
         if role == .groupedMatching { data["qa"]?.setOwnStatus(statusList.entry(id: "parked")!,list: statusList) }
-        if role == .groupedColor { data["qa"]?.setCustomColor("#555555") }
+        if role == .groupedColor { data["qa"]?.clearTaskStatusOverride(); data["qa"]?.setCustomColor("#555555") }
         let nested = ["pAnchor","pa","qAnchor","qa"]
         let keys: [String]
         if scene == .interleaved { keys = ["l1","c1","l2","c2","u"] } // (#cm-110.5)

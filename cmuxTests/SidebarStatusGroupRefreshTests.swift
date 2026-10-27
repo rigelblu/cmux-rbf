@@ -57,8 +57,8 @@ struct SidebarStatusGroupRefreshTests {
             let workspace = tabs.addWorkspace(
                 title: "Auto PR", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false
             )
-            workspace.customColor = "#2C81D9"
             workspace.clearTaskStatusOverride()
+            workspace.customColor = "#2C81D9"
             #expect(!workspace.todoState.statusHidden)
             let panelId = try #require(workspace.focusedPanelId)
             let windowId = UUID()

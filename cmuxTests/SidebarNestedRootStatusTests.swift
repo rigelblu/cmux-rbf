@@ -658,7 +658,7 @@ struct SidebarNestedRootStatusTests {
         let suite: String
     }
 
-    private func descendants<View: NSView>(of type: View.Type, in root: NSView?) -> [View] {
+    func descendants<View: NSView>(of type: View.Type, in root: NSView?) -> [View] {
         guard let root else { return [] }
         var matches: [View] = []
         if let match = root as? View { matches.append(match) }
@@ -666,7 +666,7 @@ struct SidebarNestedRootStatusTests {
         return matches
     }
 
-    private func drain(_ window: NSWindow, iterations: Int = 40) async {
+    func drain(_ window: NSWindow, iterations: Int = 40) async {
         for _ in 0..<iterations {
             window.contentView?.layoutSubtreeIfNeeded()
             _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.001))
@@ -676,7 +676,7 @@ struct SidebarNestedRootStatusTests {
 
     /// The same mount `WorkspaceGroupNestedMountedSidebarTests` uses: the real `ContentView`, the AppKit table, the shared
     /// notification store (its `sidebarUnread` is what the table reads).
-    private func mountWindow(_ manager: TabManager) async throws -> MountedWindow {
+    func mountWindow(_ manager: TabManager) async throws -> MountedWindow {
         _ = NSApplication.shared
         let suite = "SidebarNestedRootStatusTests.mounted"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -701,7 +701,7 @@ struct SidebarNestedRootStatusTests {
         return MountedWindow(window: window, table: container.tableView, defaults: defaults, suite: suite)
     }
 
-    private func closeWindow(_ mounted: MountedWindow) {
+    func closeWindow(_ mounted: MountedWindow) {
         mounted.window.contentView = nil
         mounted.window.close()
         mounted.defaults.removePersistentDomain(forName: mounted.suite)

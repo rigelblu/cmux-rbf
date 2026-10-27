@@ -451,10 +451,11 @@ struct WorkspaceStatusSocketTests {
         #expect(list.problems.isEmpty)
     }
 
-    @Test func theListSaysWhetherTheControlsAreOn() throws {
-        try underList(Self.hisText) {
-            // The host's gate is a beta setting, off by default; the true side is the package's test of the answer.
-            try #require(!WorkspaceTodoFeature.isEnabled, "this test needs the status controls off in the test host")
+    @Test func theListSaysWhetherTheControlsAreOn() async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(source: Self.hisText, controls: false)
+            defer { restore() }
+            try #require(!WorkspaceTodoFeature.isEnabled, "fixture must turn the status controls off")
             let list = TerminalController.shared.controlWorkspaceStatusList()
             #expect(list.controlsEnabled == false)
         }

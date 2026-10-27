@@ -96,7 +96,7 @@ struct SidebarWorkspaceSectionsTests {
         #expect(rows.firstIndex(of: .workspace(a.id))! < rows.firstIndex(of: .workspace(b.id))!)
     }
     @Test func colorOnlyStatusMemberIsInStatuses() throws {
-        let w = Workspace(); w.customColor = "#112233"
+        let w = Workspace(); w.clearTaskStatusOverride(); w.customColor = "#112233"
         try assertSection(.workspace(w.id), statuses: true, tabs: [w])
     }
     @Test func unprojectedStatusUsesWorkspacesUnlessItsColorProjects() throws {
@@ -136,7 +136,7 @@ struct SidebarWorkspaceSectionsTests {
         try assertSection(.workspace(b.id), statuses: false, tabs: [a, b], groups: [g])
     }
     @Test func emptyWorkspacesStillHasItsHeader() {
-        let w = Workspace(); w.customColor = "#112233"
+        let w = Workspace(); w.clearTaskStatusOverride(); w.customColor = "#112233"
         #expect(render([w]).items.map(\.id).contains(.workspacesArea()))
     }
     @Test func noListOrControlsOffKeepsLegacyLayout() {
@@ -155,7 +155,7 @@ struct SidebarWorkspaceSectionsTests {
         }
     }
     @Test func foldingOneSectionLeavesTheOtherVisible() {
-        let a = Workspace(), b = Workspace(); b.customColor = "#112233"
+        let a = Workspace(), b = Workspace(); b.clearTaskStatusOverride(); b.customColor = "#112233"
         let state = SidebarState(statusGroups: .init(sectionOrder: .workspacesFirst))
         state.toggleWorkspacesArea()
         let first = render([a, b], folds: state.statusGroups!).items.map(\.id)

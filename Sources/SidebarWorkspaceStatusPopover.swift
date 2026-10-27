@@ -47,6 +47,8 @@ struct SidebarWorkspaceCompactStatusMenuModel: Equatable {
     /// The color the app resolved for each status of the list, by id, for the glyph's color. `[:]` by default, since
     /// upstream's tests build this model. (#cm-109.3)
     var colorHexes: [String: String] = [:]
+    /// The snapshot's None choice, shared with the glyph wrapper. (#cm-110.13)
+    var isNone: Bool = false // (#cm-110.13)
 }
 
 extension SidebarWorkspaceCompactStatusMenuModel {
@@ -110,7 +112,7 @@ extension WorkspaceTodoStatusLane {
         }
         lanes.append(WorkspaceTodoStatusLane(
             status: nil,
-            title: String(localized: "sidebar.status.none", defaultValue: "None (hide status)"),
+            title: WorkspaceStatusPresentation.noneTitle, // (#cm-110.13)
             isSelected: isHidden,
             action: .hide, // (#cm-109)
             isNone: true
@@ -173,7 +175,7 @@ struct SidebarWorkspaceStatusPopover: View {
     let model: SidebarWorkspaceStatusPopoverModel
     /// Applies a row's action through the shared status action path. (#cm-109)
     let onSelectLane: @MainActor (WorkspaceStatusPickAction) -> Void
-    /// Opts the workspace out (None): hide the status glyph.
+    /// Chooses None for the workspace. (#cm-110.13)
     let onSelectNone: @MainActor () -> Void
     let onClose: @MainActor () -> Void
 
@@ -199,7 +201,7 @@ struct SidebarWorkspaceStatusPopover: View {
         _highlightedIndex = State(initialValue: lanes.firstIndex(where: { $0.isSelected && $0.action != nil }) ?? 0)
     }
 
-    private var lanes: [WorkspaceTodoStatusLane] {
+    var lanes: [WorkspaceTodoStatusLane] { // (#cm-110.13)
         model.lanesOverride ?? WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109) (#cm-110.2)
     }
 

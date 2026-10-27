@@ -61,7 +61,7 @@ enum WorkspaceTodoActions {
         WorkspaceTodoFeature.markUsed()
     }
 
-    /// Opts each workspace out of the status feature (None).
+    /// Puts each workspace on None (no status) and clears its color, except from the phone. (#cm-110.13)
     static func hideStatus(for workspaces: [Workspace]) {
         guard WorkspaceTodoFeature.isEnabled else { return }
         guard !workspaces.isEmpty else { return }

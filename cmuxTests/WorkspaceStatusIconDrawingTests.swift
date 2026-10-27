@@ -284,7 +284,7 @@ struct WorkspaceStatusIconDrawingTests {
         #expect(lane.icon == .shape(.threeQuarters) && lane.colorHex == "#336699")
 
         let pane = WorkspaceStatusPaneState.make(
-            resolution: resolution, inferred: inferred, list: Self.list, controlsEnabled: true, colorHexes: Self.hexes
+            resolution: resolution, inferred: inferred, list: Self.list, controlsEnabled: true, statusHidden: false, colorHexes: Self.hexes
         )
         #expect(pane.icon == .shape(.threeQuarters) && pane.colorHex == "#336699")
         #expect(pane.colorHexes == Self.hexes)
@@ -294,15 +294,15 @@ struct WorkspaceStatusIconDrawingTests {
     /// On Auto the pane's header shows his entry for what cmux detects; with no entry for it, today's glyph.
     @Test func aPaneOnAutoShowsHisEntryForWhatCmuxDetectsAndNothingWhenTheListHasNone() {
         let onTodo = WorkspaceStatusPaneState.make(
-            resolution: .detected(.todo), inferred: .todo, list: Self.list, controlsEnabled: true, colorHexes: Self.hexes
+            resolution: .detected(.todo), inferred: .todo, list: Self.list, controlsEnabled: true, statusHidden: false, colorHexes: Self.hexes
         )
         #expect(onTodo.icon == nil && onTodo.colorHex == nil, "the list has no entry whose id is todo")
         let onReview = WorkspaceStatusPaneState.make(
-            resolution: .detected(.review), inferred: .review, list: Self.list, controlsEnabled: true, colorHexes: Self.hexes
+            resolution: .detected(.review), inferred: .review, list: Self.list, controlsEnabled: true, statusHidden: false, colorHexes: Self.hexes
         )
         #expect(onReview.icon == .shape(.threeQuarters) && onReview.colorHex == "#336699")
         let cmuxFive = WorkspaceStatusPaneState.make(
-            resolution: .detected(.review), inferred: .review, list: .cmuxFive, controlsEnabled: true
+            resolution: .detected(.review), inferred: .review, list: .cmuxFive, controlsEnabled: true, statusHidden: false
         )
         #expect(cmuxFive.icon == nil && cmuxFive.colorHex == nil, "with no list, today's glyph")
     }
@@ -1276,3 +1276,136 @@ struct WorkspaceStatusIconDrawingTests {
     } // (#cm-109.7)
 }
 
+
+/// None is a presentation state, never a word accepted by the status-file icon parser.
+@MainActor
+@Suite("None status glyph", .serialized)
+struct WorkspaceNoneGlyphTests {
+    @Test func appKitNoneUsesNeutralOrSelectedColorEvenWhenTheDetectedStatusHasAColor() {
+        for selected in [false, true] {
+            let model = SidebarRowTaskStatusGlyphButton.Model(
+                status: .done, hasOverride: false, usesMonochrome: selected,
+                fontScale: 1, colorScheme: .light, colorHex: "#00FF00", isNone: true
+            )
+            let color = SidebarRowTaskStatusGlyphButton.rawBaseColor(
+                model: model, monochromeColor: .white, neutralColor: .black
+            )
+            #expect(color == (selected ? NSColor.white : NSColor.black), "None uses the neutral or selected glyph color")
+        }
+    }
+
+    @Test func appKitNoneDrawsAFilledThreePointDotInsteadOfTheDetectedGlyph() throws {
+        let context = try #require(CGContext(
+            data: nil, width: 44, height: 36, bitsPerComponent: 8, bytesPerRow: 176,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        SidebarRowTaskStatusGlyphButton.drawGlyph(
+            model: .init(status: .done, hasOverride: false, usesMonochrome: false,
+                         fontScale: 4, colorScheme: .light, icon: .shape(.check), isNone: true),
+            color: NSColor.black.cgColor, tickColor: NSColor.white.cgColor,
+            in: context, bounds: CGRect(x: 0, y: 0, width: 44, height: 36)
+        )
+        let image = try #require(context.makeImage())
+        let ink = WorkspaceStatusIconDrawing.measureInkRect(image, imageSize: CGSize(width: 44, height: 36))
+        #expect(abs(ink.height - 12) <= 1, "None dot must be 3 pt high at scale 4; actual height \(ink.height)")
+        #expect(abs(ink.width - 12) <= 1, "None dot must be 3 pt wide at scale 4; actual width \(ink.width)")
+        #expect(abs(ink.midX - 22) <= 0.5 && abs(ink.midY - 18) <= 0.5, "None dot is centered")
+        let bytes = image.dataProvider!.data! as Data
+        #expect(bytes[(18 * 44 + 22) * 4 + 3] == 255, "None dot has a filled center")
+    }
+
+    @Test func swiftUINoneModelReplacesTheDetectedGlyphWithANeutralDot() {
+        let glyph = SidebarWorkspaceTaskStatusGlyph(
+            status: .done, hasOverride: false, usesMonochrome: false,
+            monochromeColor: .white, neutralColor: .black, fontScale: 1,
+            contrastBackground: nil, icon: .shape(.check), isNone: true
+        )
+        #expect(glyph.model.showsDot, "SwiftUI None draws the dot")
+        #expect(glyph.model.colorRole == .neutral, "SwiftUI None uses the neutral color role")
+        #expect(!glyph.model.showsCheckmark, "SwiftUI None must not draw the detected Done checkmark")
+    }
+
+    @Test func swiftUINoneDrawsTheDotAtRowAndHeaderScales() throws {
+        for scale in [CGFloat(1), 13.0 / 9.0] {
+            let glyph = SidebarWorkspaceTaskStatusGlyph(
+                status: .done, hasOverride: false, usesMonochrome: false,
+                monochromeColor: .white, neutralColor: .black, fontScale: scale,
+                contrastBackground: nil, icon: .shape(.check), isNone: true
+            )
+            let renderer = ImageRenderer(content: glyph)
+            renderer.scale = 4
+            let cg = try #require(renderer.cgImage)
+            let ink = WorkspaceStatusIconDrawing.measureInkRect(
+                cg, imageSize: CGSize(width: 11 * scale, height: 9 * scale)
+            )
+            #expect(abs(ink.height - 3 * scale) <= 0.5, "SwiftUI None dot has 3 pt diameter at scale \(scale); actual height \(ink.height)")
+            #expect(abs(ink.width - 3 * scale) <= 0.5, "SwiftUI None dot has 3 pt diameter; actual width \(ink.width)")
+            #expect(abs(ink.midX - 5.5 * scale) <= 0.25 && abs(ink.midY - 4.5 * scale) <= 0.25, "SwiftUI None dot is centered")
+        }
+    }
+}
+
+@MainActor
+@Suite("SwiftUI None row", .serialized)
+struct WorkspaceNoneSwiftUIRowTests {
+    func menu(_ workspace: Workspace) throws -> SidebarWorkspaceManualStatusIndicatorMenu {
+        let row = WorkspaceNoneRowTests().model(workspace)
+        let decision = SidebarWorkspaceManualTaskStatusIndicatorModel(
+            featureEnabled: row.todoControlsEnabled, taskStatus: row.snapshot.taskStatus,
+            hasManualOverride: row.snapshot.hasManualTaskStatus, isHidden: row.snapshot.taskStatusInput.isHidden
+        )
+        try #require(decision.showsIndicator)
+        let model = try #require(row.snapshot.statusMenuModel(controlsEnabled: row.todoControlsEnabled))
+        return SidebarWorkspaceManualStatusIndicatorMenu(
+            status: row.snapshot.taskStatus ?? .todo, model: model, workspaceId: workspace.id,
+            applyTodoStatus: { _, _ in }, hideTodoStatus: { _ in }, usesMonochrome: false,
+            monochromeColor: .white, neutralColor: .black, fontScale: 1, contrastBackground: nil
+        )
+    }
+
+    @Test func swiftUINoneRowUsesTheCapturedPickerAndDrawsDot() throws {
+        let workspace = Workspace(); workspace.hideTaskStatus()
+        let menu = try menu(workspace)
+        let glyph = menu.statusGlyph
+        #expect(glyph.isNone && glyph.model.showsDot, "the SwiftUI row must pass None into its glyph")
+        #expect(glyph.name == "None", "the SwiftUI row must name the dot None")
+        #expect(!glyph.hasOverride, "None is not a manual status")
+        let picker = try #require(menu.model.picker)
+        #expect(WorkspaceTodoStatusLane.lanes(picker: picker).last?.isSelected == true)
+    }
+
+    @Test func swiftUIManualRowKeepsNextsNameAndIcon() throws {
+        let workspace = Workspace()
+        workspace.setOwnStatus(try #require(WorkspaceNoneRowTests.list.entry(id: "next")), list: WorkspaceNoneRowTests.list)
+        let glyph = try menu(workspace).statusGlyph
+        #expect(!glyph.isNone && glyph.hasOverride)
+        #expect(glyph.name == "Next" && glyph.icon == .shape(.half))
+    }
+    @Test func swiftUIContentViewRowDrawsNoneButtonWhereAutoIsEmpty() async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(source: WorkspaceNoneRowTests.source, controls: true)
+            defer { restore() }
+            let workspace = Workspace()
+            _ = workspace.setCustomTitle("None row wiring")
+            @MainActor func renderedRow() throws -> Data {
+                let model = WorkspaceNoneRowTests().model(workspace)
+                let entrances = WorkspaceStatusEntrancesTests()
+                let input = entrances.rowInput(model.snapshot, settings: model.settings, workspaceId: workspace.id)
+                let row = TabItemView(
+                    snapshot: entrances.rowSnapshot(input),
+                    actions: SidebarWorkspaceContextMenuWindowTargetsTests.actions(currentWindowMoveTargets: { [] })
+                )
+                let renderer = ImageRenderer(content: row.environment(\.colorScheme, .light).frame(width: 320, height: 80))
+                renderer.scale = 2
+                let image = try #require(renderer.cgImage, "the actual TabItemView must render")
+                return try #require(image.dataProvider?.data) as Data
+            }
+            workspace.hideTaskStatus()
+            let none = try renderedRow()
+            workspace.clearTaskStatusOverride()
+            let auto = try renderedRow()
+            #expect(none != auto, "the actual ContentView SwiftUI row must draw the None button where Auto is empty")
+        }
+    }
+
+}

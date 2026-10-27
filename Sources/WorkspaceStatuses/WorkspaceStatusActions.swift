@@ -44,7 +44,7 @@ struct WorkspaceStatusActions {
 
     /// Sets an action on every target. The steps, in order, for a status: set it; stop if the origin is the
     /// phone; take the list's entry, and stop when there is none or it has no `color`; resolve the color, and stop
-    /// when this app has no such color; write it. Auto and None write no color.
+    /// when this app has no such color; write it. Auto and None clear color except from the phone. (#cm-110.13)
     ///
     /// - Parameters:
     ///   - action: What was asked for.
@@ -60,10 +60,14 @@ struct WorkspaceStatusActions {
         if requireControls && !controlsEnabled { return .controlsOff }
         switch action {
         case .auto:
-            for workspace in workspaces { workspace.clearTaskStatusOverride() }
+            WorkspaceStatusOrigin.$current.withValue(origin) { // (#cm-110.13)
+                for workspace in workspaces { workspace.clearTaskStatusOverride() } // (#cm-110.13)
+            } // (#cm-110.13)
             return .set
         case .hide:
-            for workspace in workspaces { workspace.hideTaskStatus() }
+            WorkspaceStatusOrigin.$current.withValue(origin) { // (#cm-110.13)
+                for workspace in workspaces { workspace.hideTaskStatus() } // (#cm-110.13)
+            } // (#cm-110.13)
             return .set
         case .status(let id):
             let entry = list.entry(id: id)

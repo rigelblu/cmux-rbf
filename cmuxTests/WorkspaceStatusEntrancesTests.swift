@@ -247,9 +247,9 @@ struct WorkspaceStatusEntrancesTests {
 
     // MARK: - Entrance row 3: the row input
 
-    private func rowInput(_ snapshot: SidebarWorkspaceSnapshotBuilder.Snapshot, settings: SidebarTabItemSettingsSnapshot) -> SidebarWorkspaceRowInput {
+    func rowInput(_ snapshot: SidebarWorkspaceSnapshotBuilder.Snapshot, settings: SidebarTabItemSettingsSnapshot, workspaceId: UUID = UUID()) -> SidebarWorkspaceRowInput {
         SidebarWorkspaceRowInput(
-            workspaceId: UUID(), groupId: nil, isColorSectionMember: false, index: 0, workspaceCount: 1,
+            workspaceId: workspaceId, groupId: nil, isColorSectionMember: false, index: 0, workspaceCount: 1,
             workspace: snapshot, isActive: false, isMultiSelected: false, hasUserCustomTitle: false,
             hasCustomTitle: false, hasCustomDescription: false, customTitle: nil, workspaceShortcutDigit: nil,
             workspaceShortcutModifierSymbol: "⌘", canCloseWorkspace: true, unreadCount: 0, latestNotificationText: nil,
@@ -261,7 +261,7 @@ struct WorkspaceStatusEntrancesTests {
         )
     }
 
-    private func rowSnapshot(_ input: SidebarWorkspaceRowInput) -> SidebarWorkspaceRowSnapshot {
+    func rowSnapshot(_ input: SidebarWorkspaceRowInput) -> SidebarWorkspaceRowSnapshot {
         let list = SidebarWorkspaceRowsSnapshot(
             workspaceRowsById: [input.workspaceId: input], groupRowsById: [:],
             selectedContextTargetIds: [input.workspaceId], anchorWorkspaceIds: [],
@@ -337,10 +337,11 @@ struct WorkspaceStatusEntrancesTests {
         let (settings, cleanUp) = settings()
         defer { cleanUp() }
         let workspace = Workspace()
-        workspace.setOwnStatus(try #require(Self.hisList.entry(id: "parked")))
+        workspace.setOwnStatus(try #require(Self.hisList.entry(id: "parked")), list: Self.hisList)
         let panelId = try #require(workspace.focusedPanelId)
         workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
-        #expect(workspace.inferredTaskStatus == .needsAttention, "no wait was detected, so the test proves nothing")
+        // The fixture checks upstream's live inference, independent of another suite's installed status list.
+        #expect(workspace.inferredTaskStatus(list: .cmuxFive) == .needsAttention, "no wait was detected, so the test proves nothing")
         let snapshot = factory(workspace, list: Self.hisList, settings: settings).makeSnapshot()
         #expect(snapshot.hasManualTaskStatus, "his status is held through the wait but the glyph is not drawn")
         #expect(snapshot.taskStatus == .todo, "the glyph shows \(String(describing: snapshot.taskStatus)), not the status he holds")
@@ -423,26 +424,28 @@ struct WorkspaceStatusEntrancesTests {
         ]
         for ((name, resolution), want) in zip(sixResolutions(), expected) {
             let inferred = resolution.effective
-            let pane = WorkspaceStatusPaneState.make(resolution: resolution, inferred: inferred, list: Self.hisList, controlsEnabled: true)
+            let pane = WorkspaceStatusPaneState.make(resolution: resolution, inferred: inferred, list: Self.hisList, controlsEnabled: true, statusHidden: false)
             #expect(pane.hasOverride == want.hasOverride, "\(name): hasOverride")
             #expect(pane.cmuxOverride == want.cmux, "\(name): cmuxOverride")
             #expect(pane.hisWord == want.word, "\(name): hisWord")
-            let off = WorkspaceStatusPaneState.make(resolution: resolution, inferred: inferred, list: Self.hisList, controlsEnabled: false)
+            let off = WorkspaceStatusPaneState.make(resolution: resolution, inferred: inferred, list: Self.hisList, controlsEnabled: false, statusHidden: false)
             #expect(!off.hasOverride && off.hisWord == nil, "\(name): the controls are off")
         }
     }
 
-    /// The pane builds its rows with `isHidden: false`, as the release's popover hosts did: on a workspace that starts
-    /// on None, with cmux's five, Auto is the checked row and None is not.
-    @Test func thePanesRowsForAWorkspaceOnNoneHaveAutoChecked() {
+    /// (#cm-110.13) Changed deliberately: the pane's picker agrees with None, as the row's picker does.
+    @Test func thePanesRowsForAWorkspaceOnNoneHaveNoneChecked() {
+        let workspace = Workspace()
+        workspace.hideTaskStatus()
         let pane = WorkspaceStatusPaneState.make(
-            resolution: .resolve(override: nil, own: nil, inferred: .todo, list: .cmuxFive),
-            inferred: .todo, list: .cmuxFive, controlsEnabled: true
+            resolution: workspace.statusResolution(list: .cmuxFive),
+            inferred: workspace.inferredTaskStatus(list: .cmuxFive), list: .cmuxFive, controlsEnabled: true,
+            statusHidden: workspace.todoState.statusHidden
         )
         let lanes = WorkspaceTodoStatusLane.lanes(picker: pane.picker)
-        #expect(lanes.first?.isSelected == true)
-        #expect(lanes.last?.isNone == true && lanes.last?.isSelected == false)
-        #expect(lanes == WorkspaceTodoStatusLane.lanes(inferred: .todo, activeOverride: nil, isHidden: false))
+        #expect(lanes.first?.isSelected == false, "None must not check Auto in the pane")
+        #expect(lanes.last?.isNone == true && lanes.last?.isSelected == true, "the pane must check None")
+        #expect(lanes == WorkspaceTodoStatusLane.lanes(inferred: .todo, activeOverride: nil, isHidden: true))
     }
 
     /// `checkedName`, over the same six: the name on the checked entry row, and nothing for a greyed row or none.
@@ -1622,4 +1625,479 @@ struct WorkspaceStatusEntrancesTests {
         let extra = outlineInk - handInk // (#cm-109.7)
         #expect(extra >= 1.0 && extra <= 1.5, "the outline is \(extra) pt wider than the hand (\(handInk)), expected about 1.0") // (#cm-109.7)
     } // (#cm-109.7)
+}
+
+@MainActor
+@Suite("None workspace rows", .serialized)
+struct WorkspaceNoneRowTests {
+    static let list = WorkspaceStatusList(entries: [
+        .init(id: "parked", name: "Parked", extends: .todo, color: "#112233"),
+        .init(id: "next", name: "Next", extends: .working, color: "#334455", icon: .shape(.half)),
+        .init(id: "done", name: "Done")
+    ], source: .file)
+    static let source = ##"{"workspaceStatuses":[{"id":"parked","name":"Parked","extends":"todo","color":"#112233"},{"id":"next","name":"Next","extends":"working","icon":"half","color":"#334455"},{"id":"done","name":"Done"}]}"##
+
+    func model(_ workspace: Workspace, controls: Bool = true, dark: Bool = false) -> SidebarWorkspaceRowModel {
+        let suite = "WorkspaceNoneRowTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let snapshot = SidebarWorkspaceSnapshotFactory(
+            workspace: workspace, settings: settings, showsAgentActivity: false, todoControlsEnabled: controls,
+            statusList: Self.list, statusColorHexes: ["next": "#334455", "parked": "#112233"]
+        ).makeSnapshot()
+        return SidebarWorkspaceRowModel(
+            workspaceId: workspace.id, index: 0, snapshot: snapshot, settings: settings,
+            isActive: false, isMultiSelected: false, hasUserCustomTitle: false, canCloseWorkspace: false,
+            accessibilityWorkspaceCount: 1, unreadCount: 0, latestNotificationText: nil,
+            showsAgentActivity: false, rowSpacing: 0, isBeingDragged: false,
+            topDropIndicatorVisible: false, bottomDropIndicatorVisible: false, isGrouped: false,
+            isColorSectionMember: false, isFirstRow: true, shortcutHintText: nil, showsShortcutHints: false,
+            colorSchemeIsDark: dark, contrastBackgroundHex: dark ? "#202020" : "#FFFFFF",
+            globalFontMagnificationPercent: 100, isChecklistExpanded: false,
+            checklistAddFieldActivationToken: 0, isChecklistPopoverPresented: false, editingChecklistItemId: nil,
+            todoControlsEnabled: controls, isMetadataExpanded: false, isMarkdownExpanded: false
+        )
+    }
+
+    func cell(_ model: SidebarWorkspaceRowModel) -> SidebarWorkspaceRowTableCellView {
+        let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 320, height: 40))
+        cell.configurePresentation(model: model)
+        cell.layout()
+        return cell
+    }
+
+    func expectDot(_ cell: SidebarWorkspaceRowTableCellView) throws {
+        #expect(!cell.statusGlyphButtonForTesting.isHidden, "None must show its glyph button")
+        let glyph = try #require(cell.statusGlyphModelForTesting, "None must configure its glyph model")
+        #expect(glyph.isNone, "None must draw the dot")
+        let row = try #require(cell.currentModelForTesting)
+        let shared = SidebarWorkspaceManualTaskStatusIndicatorModel(
+            featureEnabled: row.todoControlsEnabled, taskStatus: row.snapshot.taskStatus,
+            hasManualOverride: row.snapshot.hasManualTaskStatus, isHidden: row.snapshot.taskStatusInput.isHidden
+        )
+        #expect(shared.showsIndicator, "the shared SwiftUI row decision must admit None")
+    }
+
+    @Test func newWorkspaceOnNoneShowsDot() throws {
+        let workspace = Workspace()
+        #expect(workspace.todoState.statusHidden)
+        let cell = cell(model(workspace))
+        try expectDot(cell)
+        let glyph = try #require(cell.statusGlyphModelForTesting)
+        let context = try #require(CGContext(data: nil, width: 44, height: 36, bitsPerComponent: 8, bytesPerRow: 176,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.scaleBy(x: 4, y: 4)
+        SidebarRowTaskStatusGlyphButton.drawGlyph(model: glyph, color: NSColor.black.cgColor,
+            tickColor: NSColor.white.cgColor, in: context, bounds: CGRect(x: 0, y: 0, width: 11, height: 9))
+        let image = try #require(context.makeImage())
+        let ink = WorkspaceStatusIconDrawing.measureInkRect(image, imageSize: CGSize(width: 44, height: 36))
+        #expect(abs(ink.width - 12) <= 1 && abs(ink.height - 12) <= 1,
+                "the real factory row must draw a 3 pt dot, not a status glyph or dash")
+        #expect(abs(ink.midX - 22) <= 0.5 && abs(ink.midY - 18) <= 0.5)
+    }
+
+    @Test func pickingNextReplacesDotWithItsGlyph() throws {
+        let workspace = Workspace()
+        workspace.setOwnStatus(try #require(Self.list.entry(id: "next")), list: Self.list)
+        let cell = cell(model(workspace))
+        #expect(!cell.statusGlyphButtonForTesting.isHidden)
+        let glyph = try #require(cell.statusGlyphModelForTesting)
+        #expect(!glyph.isNone && glyph.icon == .shape(.half) && glyph.name == "Next")
+    }
+
+    @Test func pickingAutoLeavesAnEmptySlot() {
+        let workspace = Workspace(); workspace.clearTaskStatusOverride()
+        let row = model(workspace)
+        #expect(cell(row).statusGlyphButtonForTesting.isHidden)
+        #expect(!SidebarWorkspaceManualTaskStatusIndicatorModel(
+            featureEnabled: true, taskStatus: row.snapshot.taskStatus,
+            hasManualOverride: row.snapshot.hasManualTaskStatus, isHidden: row.snapshot.taskStatusInput.isHidden
+        ).showsIndicator)
+    }
+
+    @Test func pickingNoneAgainRestoresDot() throws {
+        let workspace = Workspace()
+        workspace.setOwnStatus(try #require(Self.list.entry(id: "next")), list: Self.list)
+        workspace.hideTaskStatus()
+        try expectDot(cell(model(workspace)))
+    }
+
+    @Test func controlsOffShowsNeitherDotNorStatusGlyph() throws {
+        let workspace = Workspace()
+        for choice in ["none", "next", "auto"] {
+            if choice == "next" { workspace.setOwnStatus(try #require(Self.list.entry(id: "next")), list: Self.list) }
+            if choice == "auto" { workspace.clearTaskStatusOverride() }
+            let row = model(workspace, controls: false)
+            #expect(cell(row).statusGlyphButtonForTesting.isHidden, "controls off: \(choice)")
+            #expect(!SidebarWorkspaceManualTaskStatusIndicatorModel(
+                featureEnabled: false, taskStatus: row.snapshot.taskStatus,
+                hasManualOverride: row.snapshot.hasManualTaskStatus, isHidden: row.snapshot.taskStatusInput.isHidden
+            ).showsIndicator)
+        }
+    }
+
+    @Test func noneAndNextHaveTheSameTitlePositionAndGlyphGap() throws {
+        let workspace = Workspace()
+        let cell = cell(model(workspace))
+        let noneX = cell.titleFrameForTesting.minX
+        let noneGap = noneX - cell.statusGlyphButtonForTesting.frame.maxX
+        workspace.setOwnStatus(try #require(Self.list.entry(id: "next")), list: Self.list)
+        cell.configurePresentation(model: model(workspace)); cell.layout()
+        #expect(noneX == cell.titleFrameForTesting.minX, "None and Next reserve the same glyph slot")
+        #expect(noneGap == cell.titleFrameForTesting.minX - cell.statusGlyphButtonForTesting.frame.maxX,
+                "None and Next have the same gap to the title")
+    }
+
+    @Test func noneHasItsNameAccessibleButtonAndContrastFloorInLightAndDark() throws {
+        for dark in [false, true] {
+            let cell = cell(model(Workspace(), dark: dark))
+            let glyph = try #require(cell.statusGlyphModelForTesting, "None needs a configured glyph")
+            #expect(glyph.name == "None")
+            let background = try #require(glyph.contrastBackground, "None must use the row's contrast background")
+            let color = SidebarRowTaskStatusGlyphButton.statusColor(
+                model: glyph, monochromeColor: .secondaryLabelColor, neutralColor: .secondaryLabelColor
+            )
+            #expect(cmuxContrastRatio(foreground: color, background: background) >= 3 - 0.001)
+            #expect(cell.statusGlyphButtonForTesting.accessibilityLabel() == "Status: None")
+            #expect(cell.statusGlyphButtonForTesting.accessibilityRole() == .button)
+        }
+    }
+
+    @Test func nonePopoverExistsAndChecksNone() throws {
+        let workspace = Workspace(); workspace.hideTaskStatus()
+        let popover = try #require(cell(model(workspace)).statusPopoverModelForTesting, "None must have a status popover")
+        let lanes = WorkspaceTodoStatusLane.lanes(picker: popover.picker)
+        #expect(lanes.last?.isNone == true && lanes.last?.isSelected == true)
+        #expect(lanes.first?.isSelected == false)
+    }
+
+    @Test func noneWithDetectedDoneStaysUndimmedAndKeepsStripSuppression() throws {
+        let manager = TabManager(autoWelcomeIfNeeded: false)
+        let workspace = try #require(manager.selectedWorkspace)
+        let panel = try #require(workspace.focusedPanelId)
+        workspace.panelGitBranches[panel] = SidebarGitBranchState(branch: "done", isDirty: false)
+        workspace.panelPullRequests[panel] = SidebarPullRequestState(
+            number: 1, label: "PR #1", url: URL(string: "https://example.com/pr/1")!, status: .merged, branch: "done"
+        )
+        workspace.hideTaskStatus()
+        let row = model(workspace)
+        #expect(row.snapshot.taskStatusInput.inferred == .done, "fixture must detect Done")
+        #expect(row.snapshot.taskStatus == nil && !row.snapshot.hasManualTaskStatus)
+        #expect(SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: row.snapshot.taskStatus) == 1)
+        #expect(SidebarWorkspaceRowVisualPalette.suppressesAccentStrip(attentionTaskStatus: row.snapshot.attentionTaskStatus))
+        try expectDot(cell(row))
+    }
+
+    private final class PopoverCloseWitness: NSObject {
+        weak var popover: NSPopover?
+        var requested = false
+        @objc func willShow(_ notification: Notification) {
+            if popover == nil { popover = notification.object as? NSPopover }
+        }
+        @objc func willClose(_ notification: Notification) { requested = true }
+    }
+
+    @Test func dotPressOpensPopoverAndRefreshKeepsItOpen() async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let workspace = Workspace(); workspace.hideTaskStatus()
+            let row = model(workspace)
+            let actions = SidebarWorkspaceRowSuspensionTests.makeActions(model: row, workspace: workspace)
+            let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 320, height: 40))
+            cell.configure(model: row, actions: actions, isPointerHovering: false,
+                           contextMenuDidOpen: {}, contextMenuDidClose: {})
+            cell.layout()
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 200),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.contentView = cell
+            defer { window.contentView = nil; window.close() }
+            window.orderFront(nil)
+            let close = PopoverCloseWitness()
+            NotificationCenter.default.addObserver(close, selector: #selector(PopoverCloseWitness.willShow(_:)),
+                                                   name: NSPopover.willShowNotification, object: nil)
+            defer { NotificationCenter.default.removeObserver(close) }
+            #expect(cell.statusGlyphButtonForTesting.accessibilityPerformPress())
+            #expect(cell.isStatusPopoverShownForTesting, "the dot must open the real status popover")
+            let popover = try #require(close.popover, "capture the popover this dot opened")
+            NotificationCenter.default.addObserver(close, selector: #selector(PopoverCloseWitness.willClose(_:)),
+                                                   name: NSPopover.willCloseNotification, object: popover)
+            let previous = try #require(cell.currentModelForTesting)
+            var refreshed = previous
+            refreshed.isActive.toggle()
+            #expect(refreshed != previous, "refresh must exercise applyModel instead of the equality fast path")
+            // The live table refresh calls this path: SidebarWorkspaceTableController.swift:2512 -> :2540.
+            cell.configure(model: refreshed, actions: actions, isPointerHovering: false,
+                           contextMenuDidOpen: {}, contextMenuDidClose: {})
+            #expect(cell.isStatusPopoverShownForTesting && !close.requested,
+                    "refresh must retain the None anchor and popover model without requesting an animated close")
+        }
+    }
+
+    enum Placement { case workspaces, pinned, plainGroup, statusGroup, retainedColor }
+
+    private func mounted(_ placement: Placement, checkHeader: Bool = false, click: Bool = false) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(source: Self.source, controls: true)
+            defer { restore() }
+            let manager = TabManager(autoWelcomeIfNeeded: false, createInitialWorkspace: false)
+            let active = Workspace(), target = Workspace()
+            _ = active.setCustomTitle("active"); _ = target.setCustomTitle("none-target")
+            active.clearTaskStatusOverride(); target.hideTaskStatus()
+            manager.tabs = [active, target]; manager.selectedTabId = active.id
+            var group: UUID?
+            switch placement {
+            case .workspaces: break
+            case .pinned: manager.setPinned(target, pinned: true)
+            case .plainGroup, .statusGroup:
+                group = try #require(manager.createWorkspaceGroup(name: "None group", childWorkspaceIds: [target.id]))
+                if placement == .statusGroup {
+                    #expect(WorkspaceGroupStatusUIActions.app(tabManager: manager, controlsEnabled: true)
+                        .applyGroup(.status(id: "parked"), groupId: group!))
+                }
+            case .retainedColor:
+                target.setOwnStatus(try #require(Self.list.entry(id: "next")), list: Self.list)
+                target.hideTaskStatus()
+                manager.applyWorkspaceColor("#334455", to: [target])
+            }
+            let harness = SidebarNestedRootStatusTests()
+            let mounted = try await harness.mountWindow(manager)
+            defer { harness.closeWindow(mounted) }
+            if click {
+                mounted.window.orderFront(nil)
+                await harness.drain(mounted.window, iterations: 4)
+            }
+            let cells = harness.descendants(of: SidebarWorkspaceRowTableCellView.self, in: mounted.table)
+            let cell = try #require(cells.first { $0.currentModelForTesting?.workspaceId == target.id },
+                                    "the sidebar must configure the target's real row")
+            if checkHeader {
+                let header = try #require(harness.descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table)
+                    .first { $0.currentModelForTesting?.groupId == group })
+                let model = try #require(header.currentModelForTesting)
+                #expect(model.groupStatusGlyph == nil && model.statusGlyph == nil)
+                #expect(model.iconSymbol == RenderableSystemSymbol.defaultWorkspaceGroupIcon && header.iconImageForTesting != nil,
+                        "a group on None keeps its folder and no status glyph")
+            } else {
+                try expectDot(cell)
+            }
+            if placement == .statusGroup {
+                let header = try #require(harness.descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table)
+                    .first { $0.currentModelForTesting?.groupId == group })
+                #expect(header.currentModelForTesting?.groupStatusGlyph?.name == "Parked")
+            }
+            if placement == .retainedColor {
+                #expect(target.customColor == "#334455")
+                let headers = harness.descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table)
+                let row = mounted.table.row(for: cell)
+                let preceding = headers.filter { mounted.table.row(for: $0) < row }.max {
+                    mounted.table.row(for: $0) < mounted.table.row(for: $1)
+                }
+                #expect(preceding?.currentModelForTesting?.statusHeaderKind == .workspacesArea,
+                        "None wearing Next color must stay in Workspaces, under no status group")
+            }
+            if click {
+                let before = manager.selectedTabId
+                let glyph = cell.statusGlyphButtonForTesting
+                let point = glyph.convert(CGPoint(x: glyph.bounds.midX, y: glyph.bounds.midY), to: nil)
+                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                    let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                        timestamp: 0, windowNumber: mounted.window.windowNumber, context: nil,
+                        eventNumber: 0, clickCount: 1, pressure: 1))
+                    if type == .leftMouseDown { glyph.mouseDown(with: event) } else { glyph.mouseUp(with: event) }
+                }
+                #expect(manager.selectedTabId == before, "clicking the dot must not select its row")
+                #expect(cell.isStatusPopoverShownForTesting)
+            }
+        }
+    }
+
+    @Test func noneInWorkspacesShowsDot() async throws { try await mounted(.workspaces) }
+    @Test func noneInPinnedShowsDot() async throws { try await mounted(.pinned) }
+    @Test func noneInAPlainWorkspaceGroupShowsDot() async throws { try await mounted(.plainGroup) }
+    @Test func noneInAGroupUnderParkedShowsDot() async throws { try await mounted(.statusGroup) }
+    @Test func noneWearingNextColorShowsDotInWorkspaces() async throws { try await mounted(.retainedColor) }
+    @Test func groupHeaderOnNoneKeepsFolderAndNoGlyph() async throws { try await mounted(.plainGroup, checkHeader: true) }
+    @Test func clickingTheDotDoesNotSelectItsRow() async throws { try await mounted(.workspaces, click: true) }
+
+    /// H68.2: exercise the mounted row's real capabilities, rather than substituting a status writer in the fixture.
+    @Test(arguments: ["popover", "menu", "palette"])
+    func pickingNextThroughTheMountedEntranceWritesAndPersistsItsColor(_ entrance: String) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(source: Self.source, controls: true)
+            defer { restore() }
+            let suite = "WorkspaceNoneRowTests.color-pick.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let customizations = WorkspaceCustomizationStore(defaults: defaults,
+                storageKey: "customizations", legacyStorageKey: "legacy-customizations")
+            let manager = TabManager(autoWelcomeIfNeeded: false, workspaceCustomizationStore: customizations)
+            let workspace = try #require(manager.selectedWorkspace)
+            workspace.hideTaskStatus()
+            let delegate = try #require(AppDelegate.shared)
+            let windowId = delegate.registerMainWindowContextForTesting(tabManager: manager)
+            defer { delegate.unregisterMainWindowContextForTesting(windowId: windowId) }
+            let harness = SidebarNestedRootStatusTests()
+            let mounted = try await harness.mountWindow(manager)
+            defer { harness.closeWindow(mounted) }
+            let cell = try #require(harness.descendants(of: SidebarWorkspaceRowTableCellView.self, in: mounted.table)
+                .first { $0.currentModelForTesting?.workspaceId == workspace.id })
+            try #require(workspace.customColor == nil && workspace.todoState.statusHidden)
+            switch entrance {
+            case "popover":
+                let popover = try #require(cell.statusPopoverForTesting)
+                let next = try #require(popover.lanes.first { $0.id == "next" })
+                popover.onSelectLane(try #require(next.action))
+                popover.onClose()
+            case "menu":
+                let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero,
+                    modifierFlags: [], timestamp: 0, windowNumber: mounted.window.windowNumber,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                let menu = try #require(cell.menu(for: event))
+                let statuses = try #require(menu.items.first { $0.title == String(localized: "contextMenu.workspaceStatus", defaultValue: "Status") }?.submenu)
+                let index = try #require(statuses.items.firstIndex { $0.title == "Next" })
+                statuses.performActionForItem(at: index)
+            default:
+                var registry = CommandPaletteHandlerRegistry()
+                WorkspaceTodoPaletteCommands.registerHandlers(in: &registry, tabManager: manager)
+                let pick = try #require(registry.handler(for: "palette.workspaceStatus.next"))
+                pick()
+            }
+            #expect(workspace.todoState.ownStatus?.id == "next" && !workspace.todoState.statusHidden,
+                    "\(entrance): Next must reach the live workspace")
+            #expect(workspace.customColor == "#334455", "\(entrance): Next must write its resolved color")
+            await harness.drain(mounted.window)
+            #expect(workspace.customColor == "#334455", "\(entrance): row reconciliation must retain Next's color")
+            if case .value(let color)? = customizations.customization(for: workspace.stableId)?.customColor {
+                #expect(color == "#334455", "\(entrance): Workspace Color persistence must agree")
+            } else {
+                Issue.record("\(entrance): Next must persist its resolved color; actual customization \(String(describing: customizations.customization(for: workspace.stableId)?.customColor))")
+            }
+        }
+    }
+}
+
+@MainActor
+@Suite("None todo pane header", .serialized)
+struct WorkspaceNonePaneHeaderTests {
+    private func workingWorkspace() throws -> (TabManager, Workspace) {
+        let manager = TabManager(autoWelcomeIfNeeded: false)
+        let workspace = try #require(manager.selectedWorkspace)
+        let panel = try #require(workspace.focusedPanelId)
+        workspace.agentLifecycleStatesByPanelId[panel] = ["agent": .running]
+        workspace.hideTaskStatus()
+        #expect(workspace.inferredTaskStatus(list: .cmuxFive) == .working, "fixture must detect Working")
+        return (manager, workspace)
+    }
+
+    private func pane(_ workspace: Workspace, controls: Bool = true, list: WorkspaceStatusList = .cmuxFive)
+        -> (WorkspaceStatusPaneState, WorkspaceStatusPaneState.Header) {
+        let inferred = workspace.inferredTaskStatus(list: list)
+        let resolution = workspace.statusResolution(list: list, inferred: inferred)
+        let pane = WorkspaceStatusPaneState.make(
+            resolution: resolution, inferred: inferred, list: list,
+            controlsEnabled: controls, statusHidden: workspace.todoState.statusHidden
+        )
+        return (pane, pane.header(effective: resolution.effective,
+                                 statusHidden: workspace.todoState.statusHidden, controlsEnabled: controls))
+    }
+
+    @Test func noneHeaderReplacesDetectedWorkingWithDotAndNoneLabel() throws {
+        let (manager, workspace) = try workingWorkspace()
+        defer { withExtendedLifetime(manager) {} }
+        let (_, header) = pane(workspace)
+        #expect(header.isNone, "None header must draw the dot")
+        #expect(header.status != .working, "None header must not draw detected Working")
+        #expect(header.label == "None", "None header must replace the detected status label")
+    }
+
+    @Test func noneHeaderPopoverChecksNoneInsteadOfAuto() throws {
+        let (manager, workspace) = try workingWorkspace()
+        defer { withExtendedLifetime(manager) {} }
+        let (pane, _) = pane(workspace)
+        let lanes = WorkspaceTodoStatusLane.lanes(picker: pane.picker)
+        #expect(lanes.last?.isNone == true && lanes.last?.isSelected == true, "None header popover checks None")
+        #expect(lanes.first?.isSelected == false, "None header popover must not check Auto")
+    }
+
+    @Test func noneHeaderWithControlsOffShowsNoDotGlyphOrLabel() throws {
+        let (manager, workspace) = try workingWorkspace()
+        defer { withExtendedLifetime(manager) {} }
+        let (_, header) = pane(workspace, controls: false)
+        #expect(header.status == nil && !header.isNone && header.label == nil)
+    }
+
+    @Test func pickingNextInThePaneRetainsNextsGlyphAndName() throws {
+        let workspace = Workspace()
+        workspace.setOwnStatus(try #require(WorkspaceNoneRowTests.list.entry(id: "next")), list: WorkspaceNoneRowTests.list)
+        let (pane, header) = pane(workspace, list: WorkspaceNoneRowTests.list)
+        #expect(header.status == .working && !header.isNone && header.label == "Next")
+        #expect(pane.icon == .shape(.half))
+    }
+}
+
+@MainActor
+@Suite("None status strings", .serialized)
+struct WorkspaceNoneStringsTests {
+    private func expectNone(_ lanes: [WorkspaceTodoStatusLane]) throws {
+        let none = try #require(lanes.last)
+        #expect(none.isNone && none.title == "None", "the real surface must call the choice None")
+        #expect(none.status == nil && none.icon == nil, "the menu's None choice has no icon")
+    }
+
+    @Test func workspaceStatusSubmenuCallsTheChoiceNone() throws {
+        let workspace = Workspace(); workspace.hideTaskStatus()
+        try expectNone(workspace.statusMenuLanes(list: WorkspaceNoneRowTests.list, colorHexes: [:]))
+    }
+
+    @Test func statusPopoverCallsTheChoiceNone() throws {
+        let fixture = WorkspaceNoneRowTests()
+        let workspace = Workspace(); workspace.hideTaskStatus()
+        let model = try #require(fixture.cell(fixture.model(workspace)).statusPopoverModelForTesting)
+        let popover = SidebarWorkspaceStatusPopover(model: model, onSelectLane: { _ in }, onSelectNone: {}, onClose: {})
+        try expectNone(popover.lanes)
+    }
+
+    @Test func rowInputsStatusLanesCallTheChoiceNone() throws {
+        let fixture = WorkspaceNoneRowTests(), entrances = WorkspaceStatusEntrancesTests()
+        let workspace = Workspace(); workspace.hideTaskStatus()
+        let model = fixture.model(workspace)
+        let input = entrances.rowInput(model.snapshot, settings: model.settings)
+        try expectNone(entrances.rowSnapshot(input).contextMenu.todoStatusLanes)
+    }
+
+    @Test func appKitDotTooltipAndAccessibleNameSayPlainNone() {
+        let fixture = WorkspaceNoneRowTests()
+        let cell = fixture.cell(fixture.model(Workspace()))
+        #expect(cell.statusGlyphButtonForTesting.toolTip == "None", "the dot tooltip must omit inferred/manual suffixes")
+        #expect(cell.statusGlyphButtonForTesting.accessibilityLabel() == "Status: None")
+    }
+
+    @Test func swiftUIRowAndHeaderDotTooltipsSayPlainNone() throws {
+        let menu = try WorkspaceNoneSwiftUIRowTests().menu(Workspace())
+        #expect(menu.tooltip == "None", "the row's outer button must not replace the dot's None tooltip")
+        #expect(menu.statusGlyph.tooltip == "None", "SwiftUI row glyph tooltip must say None")
+        let headerGlyph = SidebarWorkspaceTaskStatusGlyph(
+            status: .working, hasOverride: false, usesMonochrome: false, monochromeColor: .primary,
+            neutralColor: .secondary, fontScale: 13.0 / 9.0, contrastBackground: nil, isNone: true
+        )
+        #expect(headerGlyph.tooltip == "None", "the header's tooltip and accessibility name must say None")
+    }
+
+    @Test func builtNoneAndCompactLabelHaveAllTwentyLocales() throws {
+        let expected = [
+            "en": "None", "ar": "لا شيء", "bs": "Nijedan", "da": "Ingen", "de": "Kein Status",
+            "es": "Ninguno", "fr": "Aucun", "it": "Nessuno", "ja": "なし", "km": "គ្មាន",
+            "ko": "없음", "nb": "Ingen", "pl": "Brak", "pt-BR": "Nenhum", "ru": "Нет",
+            "th": "ไม่มี", "tr": "Yok", "uk": "Немає", "zh-Hans": "无", "zh-Hant": "無"
+        ]
+        for (locale, none) in expected {
+            let path = try #require(Bundle.main.path(forResource: locale, ofType: "lproj"), "built locale \(locale)")
+            let bundle = try #require(Bundle(path: path))
+            #expect(bundle.localizedString(forKey: "workspaceGroup.status.none", value: nil, table: nil) == none,
+                    "None translation for \(locale)")
+            let format = bundle.localizedString(forKey: "sidebar.status.compactLabel", value: nil, table: nil)
+            #expect(format.contains("%@"), "built compact label for \(locale)")
+            #expect(String(format: format, none).contains(none))
+        }
+        #expect(expected.count == 20)
+    }
 }

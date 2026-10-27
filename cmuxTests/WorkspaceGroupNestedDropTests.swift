@@ -22,6 +22,16 @@ import Testing
 struct WorkspaceGroupNestedDropTests {
     private let suiteName = "WorkspaceGroupNestedDropTests.shared"
 
+    /// These fixtures assert group-only root levels and end-of-list lines, with status controls off.
+    /// Hold that context through mounting, dragging and teardown so sibling status suites cannot replace it.
+    private func withStatusContext(_ body: @MainActor () async throws -> Void) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restore = try SidebarNestedRootStatusTests.installStatusList(controls: false)
+            defer { restore() }
+            try await body()
+        }
+    }
+
     private struct Mounted {
         let window: NSWindow
         let table: NSTableView
@@ -270,148 +280,162 @@ struct WorkspaceGroupNestedDropTests {
     // MARK: - Scenario 27
 
     @Test func aWorkspaceAtTheBottomEdgeOfChildAGoesToAOnTheRightAndToPOnTheLeft() async throws {
-        let cases: [(half: Half, expected: [String])] = [
-            (.right, ["P:0", "A:1", "a1:2", "a2:2", "L:2", "p1:1"]),
-            (.left, ["P:0", "A:1", "a1:2", "a2:2", "L:1", "p1:1"])
-        ]
-        for testCase in cases {
-            let w = try window()
-            #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "a2:2", "p1:1"], "the window the entrances build")
-            let mounted = try await mount(w.manager)
-            defer { close(mounted); cleanUp(mounted, dragged: w.l) }
-            #expect(try hover(mounted, dragging: w.l, over: .workspace(w.a2), .bottomEdge, testCase.half), "a drop is planned")
-            #expect(release(mounted, dragged: w.l), "the controller handled the drop")
-            await drain(mounted.window)
-            #expect(rows(w) == testCase.expected, "half \(testCase.half)")
+        try await withStatusContext {
+            let cases: [(half: Half, expected: [String])] = [
+                (.right, ["P:0", "A:1", "a1:2", "a2:2", "L:2", "p1:1"]),
+                (.left, ["P:0", "A:1", "a1:2", "a2:2", "L:1", "p1:1"])
+            ]
+            for testCase in cases {
+                let w = try window()
+                #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "a2:2", "p1:1"], "the window the entrances build")
+                let mounted = try await mount(w.manager)
+                defer { close(mounted); cleanUp(mounted, dragged: w.l) }
+                #expect(try hover(mounted, dragging: w.l, over: .workspace(w.a2), .bottomEdge, testCase.half), "a drop is planned")
+                #expect(release(mounted, dragged: w.l), "the controller handled the drop")
+                await drain(mounted.window)
+                #expect(rows(w) == testCase.expected, "half \(testCase.half)")
+            }
         }
     }
 
     @Test func theDropLineIsIndentedToTheLevelTheDropLandsAt() async throws {
-        let w = try window()
-        let mounted = try await mount(w.manager)
-        defer { close(mounted); cleanUp(mounted, dragged: w.l) }
-        // The step from the top level to the level of P's rows, and to the level of A's rows, read from the rows.
-        let top = try backgroundX(mounted, w.l)
-        let depth1 = try backgroundX(mounted, w.p1)
-        let depth2 = try backgroundX(mounted, w.a2)
-        func lineX(over target: Row, _ zone: Zone, _ half: Half) throws -> CGFloat {
-            #expect(try hover(mounted, dragging: w.l, over: target, zone, half), "a drop is planned")
-            let lines = drawnLines(mounted)
-            #expect(lines.count == 1, "one line is drawn: \(lines)")
-            return try #require(lines.first).x
+        try await withStatusContext {
+            let w = try window()
+            let mounted = try await mount(w.manager)
+            defer { close(mounted); cleanUp(mounted, dragged: w.l) }
+            // The step from the top level to the level of P's rows, and to the level of A's rows, read from the rows.
+            let top = try backgroundX(mounted, w.l)
+            let depth1 = try backgroundX(mounted, w.p1)
+            let depth2 = try backgroundX(mounted, w.a2)
+            @MainActor func lineX(over target: Row, _ zone: Zone, _ half: Half) throws -> CGFloat {
+                #expect(try hover(mounted, dragging: w.l, over: target, zone, half), "a drop is planned")
+                let lines = drawnLines(mounted)
+                #expect(lines.count == 1, "one line is drawn: \(lines)")
+                return try #require(lines.first).x
+            }
+            // The edge below A's last row: right half is A's level (2), left half is P's (1). Below P's last row, the
+            // left half is the top level (0).
+            let atA = try lineX(over: .workspace(w.a2), .bottomEdge, .right)
+            let atP = try lineX(over: .workspace(w.a2), .bottomEdge, .left)
+            let atTop = try lineX(over: .workspace(w.p1), .bottomEdge, .left)
+            #expect(atP - atTop == depth1 - top, "P's level is one step in from the top level: line \(atP - atTop), rows \(depth1 - top)")
+            #expect(atA - atTop == depth2 - top, "A's level is two steps in: line \(atA - atTop), rows \(depth2 - top)")
+            #expect(depth2 - top > depth1 - top && depth1 - top > 0)
         }
-        // The edge below A's last row: right half is A's level (2), left half is P's (1). Below P's last row, the
-        // left half is the top level (0).
-        let atA = try lineX(over: .workspace(w.a2), .bottomEdge, .right)
-        let atP = try lineX(over: .workspace(w.a2), .bottomEdge, .left)
-        let atTop = try lineX(over: .workspace(w.p1), .bottomEdge, .left)
-        #expect(atP - atTop == depth1 - top, "P's level is one step in from the top level: line \(atP - atTop), rows \(depth1 - top)")
-        #expect(atA - atTop == depth2 - top, "A's level is two steps in: line \(atA - atTop), rows \(depth2 - top)")
-        #expect(depth2 - top > depth1 - top && depth1 - top > 0)
     }
 
     @Test func aNestedHeaderMovesAmongItsParentsRowsAndNowhereElse() async throws {
-        let w = try window()
-        let aAnchor = try #require(w.manager.workspaceGroupAnchor(for: w.a)?.id)
-        let mounted = try await mount(w.manager)
-        defer { close(mounted); cleanUp(mounted, dragged: aAnchor) }
-        // Outside P: no plan, no line, nothing changes.
-        #expect(try !hover(mounted, dragging: aAnchor, over: .workspace(w.l), .lower, .right))
-        #expect(drawnLines(mounted).isEmpty)
-        #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "a2:2", "p1:1"])
-        // Below p1, a row of P: A goes there.
-        #expect(try hover(mounted, dragging: aAnchor, over: .workspace(w.p1), .bottomEdge, .right))
-        #expect(release(mounted, dragged: aAnchor))
-        await drain(mounted.window)
-        #expect(rows(w) == ["L:0", "P:0", "p1:1", "A:1", "a1:2", "a2:2"])
+        try await withStatusContext {
+            let w = try window()
+            let aAnchor = try #require(w.manager.workspaceGroupAnchor(for: w.a)?.id)
+            let mounted = try await mount(w.manager)
+            defer { close(mounted); cleanUp(mounted, dragged: aAnchor) }
+            // Outside P: no plan, no line, nothing changes.
+            #expect(try !hover(mounted, dragging: aAnchor, over: .workspace(w.l), .lower, .right))
+            #expect(drawnLines(mounted).isEmpty)
+            #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "a2:2", "p1:1"])
+            // Below p1, a row of P: A goes there.
+            #expect(try hover(mounted, dragging: aAnchor, over: .workspace(w.p1), .bottomEdge, .right))
+            #expect(release(mounted, dragged: aAnchor))
+            await drain(mounted.window)
+            #expect(rows(w) == ["L:0", "P:0", "p1:1", "A:1", "a1:2", "a2:2"])
+        }
     }
 
     // MARK: - The line at every level, on every kind of cell
 
     @Test func theDropLineStepsInOneLevelAtATimeOnAThreeLevelWindow() async throws {
-        let w = try threeLevelWindow()
-        #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "B:2", "b1:3", "p1:1"])
-        let mounted = try await mount(w.manager)
-        defer { close(mounted); cleanUp(mounted, dragged: w.l) }
-        let b1 = try #require(w.names.first { $0.value == "b1" }?.key)
-        let background = [
-            try backgroundX(mounted, w.l), try backgroundX(mounted, w.p1), try backgroundX(mounted, w.a1), try backgroundX(mounted, b1)
-        ]
-        func lineX(over target: Row, _ zone: Zone, _ half: Half) throws -> CGFloat {
-            #expect(try hover(mounted, dragging: w.l, over: target, zone, half), "a drop is planned")
-            let lines = drawnLines(mounted)
-            #expect(lines.count == 1, "one line is drawn: \(lines)")
-            return try #require(lines.first).x
+        try await withStatusContext {
+            let w = try threeLevelWindow()
+            #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "B:2", "b1:3", "p1:1"])
+            let mounted = try await mount(w.manager)
+            defer { close(mounted); cleanUp(mounted, dragged: w.l) }
+            let b1 = try #require(w.names.first { $0.value == "b1" }?.key)
+            let background = [
+                try backgroundX(mounted, w.l), try backgroundX(mounted, w.p1), try backgroundX(mounted, w.a1), try backgroundX(mounted, b1)
+            ]
+            @MainActor func lineX(over target: Row, _ zone: Zone, _ half: Half) throws -> CGFloat {
+                #expect(try hover(mounted, dragging: w.l, over: target, zone, half), "a drop is planned")
+                let lines = drawnLines(mounted)
+                #expect(lines.count == 1, "one line is drawn: \(lines)")
+                return try #require(lines.first).x
+            }
+            // Below b1: right half is B (level 3). Left half leaves B and A, to P (level 1). Below p1: the top level (0).
+            let level3 = try lineX(over: .workspace(b1), .bottomEdge, .right)
+            let level1 = try lineX(over: .workspace(b1), .bottomEdge, .left)
+            let level0 = try lineX(over: .workspace(w.p1), .bottomEdge, .left)
+            #expect(level1 - level0 == background[1] - background[0], "level 1: line \(level1 - level0), rows \(background[1] - background[0])")
+            #expect(level3 - level0 == background[3] - background[0], "level 3: line \(level3 - level0), rows \(background[3] - background[0])")
+            // Level 2: the lower half of A's header joins A, first among its rows.
+            let level2 = try lineX(over: .header(w.a), .lower, .right)
+            #expect(level2 - level0 == background[2] - background[0], "level 2: line \(level2 - level0), rows \(background[2] - background[0])")
         }
-        // Below b1: right half is B (level 3). Left half leaves B and A, to P (level 1). Below p1: the top level (0).
-        let level3 = try lineX(over: .workspace(b1), .bottomEdge, .right)
-        let level1 = try lineX(over: .workspace(b1), .bottomEdge, .left)
-        let level0 = try lineX(over: .workspace(w.p1), .bottomEdge, .left)
-        #expect(level1 - level0 == background[1] - background[0], "level 1: line \(level1 - level0), rows \(background[1] - background[0])")
-        #expect(level3 - level0 == background[3] - background[0], "level 3: line \(level3 - level0), rows \(background[3] - background[0])")
-        // Level 2: the lower half of A's header joins A, first among its rows.
-        let level2 = try lineX(over: .header(w.a), .lower, .right)
-        #expect(level2 - level0 == background[2] - background[0], "level 2: line \(level2 - level0), rows \(background[2] - background[0])")
     }
 
     @Test func aLineOnAHeaderCellIsIndentedToTheLevelOfTheDrop() async throws {
-        let w = try window()
-        let mounted = try await mount(w.manager)
-        defer { close(mounted); cleanUp(mounted, dragged: w.l) }
-        // The boundary before p1 is a place among P's rows: its line is on p1's cell. The boundary before A's header is
-        // the same level: its line is on the header cell. The two lines are drawn at the same x.
-        #expect(try hover(mounted, dragging: w.l, over: .workspace(w.p1), .upper, .right))
-        let onWorkspace = drawnLines(mounted)
-        #expect(onWorkspace.count == 1)
-        #expect(try hover(mounted, dragging: w.l, over: .header(w.a), .upper, .right))
-        let onHeader = drawnLines(mounted)
-        #expect(onHeader.count == 1)
-        #expect(onHeader.first?.row.hasPrefix("header") == true, "the line is on the header's cell: \(onHeader)")
-        #expect(onHeader.first?.x == onWorkspace.first?.x, "header line \(String(describing: onHeader.first?.x)), workspace line \(String(describing: onWorkspace.first?.x))")
+        try await withStatusContext {
+            let w = try window()
+            let mounted = try await mount(w.manager)
+            defer { close(mounted); cleanUp(mounted, dragged: w.l) }
+            // The boundary before p1 is a place among P's rows: its line is on p1's cell. The boundary before A's header is
+            // the same level: its line is on the header cell. The two lines are drawn at the same x.
+            #expect(try hover(mounted, dragging: w.l, over: .workspace(w.p1), .upper, .right))
+            let onWorkspace = drawnLines(mounted)
+            #expect(onWorkspace.count == 1)
+            #expect(try hover(mounted, dragging: w.l, over: .header(w.a), .upper, .right))
+            let onHeader = drawnLines(mounted)
+            #expect(onHeader.count == 1)
+            #expect(onHeader.first?.row.hasPrefix("header") == true, "the line is on the header's cell: \(onHeader)")
+            #expect(onHeader.first?.x == onWorkspace.first?.x, "header line \(String(describing: onHeader.first?.x)), workspace line \(String(describing: onWorkspace.first?.x))")
+        }
     }
 
     @Test func theEndOfListLineIsDrawnAtTheTopLevelAndAGroupsEndLineByItsLastRow() async throws {
-        let w = try window()
-        let mounted = try await mount(w.manager)
-        defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
-        let end = mounted.container.emptyDropIndicatorView
-        // Dragged from inside A, below the last row (p1, a row of P): the left half is the top level: the end-of-list line.
-        #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .left))
-        #expect(!end.isHidden, "the end-of-list line is drawn")
-        #expect(end.frame.minX == SidebarReorderIndicatorView.horizontalInset, "at the top level it starts at the sidebar's edge: \(end.frame)")
-        #expect(drawnLines(mounted).count == 1, "only the end-of-list line is drawn")
-        // The right half is P: the line is drawn by the last row's cell, one level in, and not by the end-of-list view.
-        #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .right))
-        #expect(end.isHidden)
-        let lines = drawnLines(mounted)
-        #expect(lines.count == 1)
-        #expect(lines.first?.row != "end of list")
-        #expect((lines.first?.x ?? 0) > end.superview!.convert(NSPoint(x: end.frame.minX, y: 0), to: nil).x, "inside P the line starts further in: \(lines)")
+        try await withStatusContext {
+            let w = try window()
+            let mounted = try await mount(w.manager)
+            defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
+            let end = mounted.container.emptyDropIndicatorView
+            // Dragged from inside A, below the last row (p1, a row of P): the left half is the top level: the end-of-list line.
+            #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .left))
+            #expect(!end.isHidden, "the end-of-list line is drawn")
+            #expect(end.frame.minX == SidebarReorderIndicatorView.horizontalInset, "at the top level it starts at the sidebar's edge: \(end.frame)")
+            #expect(drawnLines(mounted).count == 1, "only the end-of-list line is drawn")
+            // The right half is P: the line is drawn by the last row's cell, one level in, and not by the end-of-list view.
+            #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .right))
+            #expect(end.isHidden)
+            let lines = drawnLines(mounted)
+            #expect(lines.count == 1)
+            #expect(lines.first?.row != "end of list")
+            #expect((lines.first?.x ?? 0) > end.superview!.convert(NSPoint(x: end.frame.minX, y: 0), to: nil).x, "inside P the line starts further in: \(lines)")
+        }
     }
 
     @Test func aGroupsLineRowsAreTheRowsOfItsWholeRun() async throws {
-        let w = try threeLevelWindow()
-        let mounted = try await mount(w.manager)
-        defer { close(mounted) }
-        let visible = (0..<mounted.table.numberOfRows).compactMap { row -> UUID? in
-            switch mounted.table.view(atColumn: 0, row: row, makeIfNecessary: false) {
-            case let cell as SidebarWorkspaceRowTableCellView: return cell.currentModelForMeasurement?.workspaceId
-            case let cell as SidebarGroupHeaderTableCellView: return cell.currentModelForTesting?.anchorWorkspaceId
-            default: return nil
+        try await withStatusContext {
+            let w = try threeLevelWindow()
+            let mounted = try await mount(w.manager)
+            defer { close(mounted) }
+            let visible = (0..<mounted.table.numberOfRows).compactMap { row -> UUID? in
+                switch mounted.table.view(atColumn: 0, row: row, makeIfNecessary: false) {
+                case let cell as SidebarWorkspaceRowTableCellView: return cell.currentModelForMeasurement?.workspaceId
+                case let cell as SidebarGroupHeaderTableCellView: return cell.currentModelForTesting?.anchorWorkspaceId
+                default: return nil
+                }
             }
+            #expect(visible.count == 7, "seven rows are drawn")
+            let model = w.manager.workspaces
+            let run = SidebarNestedDropLine.runRowIds(groupId: w.p, tabs: w.manager.tabs, groups: model.workspaceGroups, visibleRowIds: visible)
+            // P's run: its header, A's header, a1, B's header, b1 and p1: every row but the loose L.
+            #expect(run == Array(visible.dropFirst()), "the run of P is every row under it, at every level: \(String(describing: run))")
+            let inner = SidebarNestedDropLine.runRowIds(groupId: w.a, tabs: w.manager.tabs, groups: model.workspaceGroups, visibleRowIds: visible)
+            #expect(inner?.count == 4, "A's run: its header, a1, B's header, b1")
+            // A window with no nested group keeps the direct members: the function answers nothing and the caller does as before.
+            let flat = TabManager(autoWelcomeIfNeeded: false)
+            flat.addWorkspace(autoWelcomeIfNeeded: false)
+            let group = try #require(flat.createWorkspaceGroup(name: "F", childWorkspaceIds: [flat.tabs[1].id]))
+            #expect(SidebarNestedDropLine.runRowIds(groupId: group, tabs: flat.tabs, groups: flat.workspaceGroups, visibleRowIds: flat.tabs.map(\.id)) == nil)
         }
-        #expect(visible.count == 7, "seven rows are drawn")
-        let model = w.manager.workspaces
-        let run = SidebarNestedDropLine.runRowIds(groupId: w.p, tabs: w.manager.tabs, groups: model.workspaceGroups, visibleRowIds: visible)
-        // P's run: its header, A's header, a1, B's header, b1 and p1: every row but the loose L.
-        #expect(run == Array(visible.dropFirst()), "the run of P is every row under it, at every level: \(String(describing: run))")
-        let inner = SidebarNestedDropLine.runRowIds(groupId: w.a, tabs: w.manager.tabs, groups: model.workspaceGroups, visibleRowIds: visible)
-        #expect(inner?.count == 4, "A's run: its header, a1, B's header, b1")
-        // A window with no nested group keeps the direct members: the function answers nothing and the caller does as before.
-        let flat = TabManager(autoWelcomeIfNeeded: false)
-        flat.addWorkspace(autoWelcomeIfNeeded: false)
-        let group = try #require(flat.createWorkspaceGroup(name: "F", childWorkspaceIds: [flat.tabs[1].id]))
-        #expect(SidebarNestedDropLine.runRowIds(groupId: group, tabs: flat.tabs, groups: flat.workspaceGroups, visibleRowIds: flat.tabs.map(\.id)) == nil)
     }
 
     // MARK: - A line the table paints, and releases that go through the real table
@@ -422,99 +446,111 @@ struct WorkspaceGroupNestedDropTests {
     }
 
     @Test func aWorkspaceLeavingItsChildGroupWhereItStandsHasALinePaintedOnTheNextRowThatStays() async throws {
-        // `L | P[A[a1, a2], p1]`: a2, the last row of A, onto its own lower-left half or onto the upper half of p1 leaves A and
-        // stays where it is in P. The line is the top of p1: a line under a1 would be the top of a2, the dragged row, which the
-        // table never paints on.
-        let gestures: [(Row, Zone, Half)] = [(.workspace(try window().a2), .lower, .left), (.workspace(try window().p1), .upper, .right)]
-        for index in gestures.indices {
-            let w = try window()
-            let mounted = try await mount(w.manager)
-            defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
-            let target: Row = index == 0 ? .workspace(w.a2) : .workspace(w.p1)
-            #expect(try hover(mounted, dragging: w.a2, over: target, gestures[index].1, gestures[index].2), "a drop is planned")
-            #expect(lineKeys(mounted) == ["\(w.p1) top"], "one line, on the top of p1: \(lineKeys(mounted))")
-            #expect(release(mounted, dragged: w.a2), "the controller handled the drop")
-            await drain(mounted.window)
-            #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "a2:1", "p1:1"], "a2 is a row of P, where it stood")
+        try await withStatusContext {
+            // `L | P[A[a1, a2], p1]`: a2, the last row of A, onto its own lower-left half or onto the upper half of p1 leaves A and
+            // stays where it is in P. The line is the top of p1: a line under a1 would be the top of a2, the dragged row, which the
+            // table never paints on.
+            let gestures: [(Row, Zone, Half)] = [(.workspace(try window().a2), .lower, .left), (.workspace(try window().p1), .upper, .right)]
+            for index in gestures.indices {
+                let w = try window()
+                let mounted = try await mount(w.manager)
+                defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
+                let target: Row = index == 0 ? .workspace(w.a2) : .workspace(w.p1)
+                #expect(try hover(mounted, dragging: w.a2, over: target, gestures[index].1, gestures[index].2), "a drop is planned")
+                #expect(lineKeys(mounted) == ["\(w.p1) top"], "one line, on the top of p1: \(lineKeys(mounted))")
+                #expect(release(mounted, dragged: w.a2), "the controller handled the drop")
+                await drain(mounted.window)
+                #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "a2:1", "p1:1"], "a2 is a row of P, where it stood")
+            }
         }
     }
 
     @Test func severalSelectedRowsDroppedAtTheEndOfAChildGroupAllJoinItWhenReleased() async throws {
-        let w = try window()
-        let mounted = try await mount(w, selecting: [w.l, w.p1])
-        defer { close(mounted); cleanUp(mounted, dragged: w.l) }
-        #expect(try hover(mounted, dragging: w.l, over: .workspace(w.a2), .bottomEdge, .right), "a drop is planned")
-        #expect(reportedSelection(mounted) == [w.l, w.p1], "the selection is still both rows when the drag hovers")
-        #expect(lineKeys(mounted).count == 1, "one line: \(lineKeys(mounted))")
-        #expect(release(mounted, dragged: w.l), "the controller handled the drop")
-        await drain(mounted.window)
-        #expect(rows(w) == ["P:0", "A:1", "a1:2", "a2:2", "L:2", "p1:2"], "both selected rows are in A")
+        try await withStatusContext {
+            let w = try window()
+            let mounted = try await mount(w, selecting: [w.l, w.p1])
+            defer { close(mounted); cleanUp(mounted, dragged: w.l) }
+            #expect(try hover(mounted, dragging: w.l, over: .workspace(w.a2), .bottomEdge, .right), "a drop is planned")
+            #expect(reportedSelection(mounted) == [w.l, w.p1], "the selection is still both rows when the drag hovers")
+            #expect(lineKeys(mounted).count == 1, "one line: \(lineKeys(mounted))")
+            #expect(release(mounted, dragged: w.l), "the controller handled the drop")
+            await drain(mounted.window)
+            #expect(rows(w) == ["P:0", "A:1", "a1:2", "a2:2", "L:2", "p1:2"], "both selected rows are in A")
+        }
     }
 
     @Test func severalSelectedRowsDroppedAtATopLevelPlaceAllGoToTheTopLevelWhenReleased() async throws {
-        let w = try window()
-        let mounted = try await mount(w, selecting: [w.l, w.a2])
-        defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
-        // Below p1, the last row, on the left half: the top level.
-        #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .left), "a drop is planned")
-        #expect(reportedSelection(mounted) == [w.l, w.a2], "the selection is still both rows when the drag hovers")
-        #expect(lineKeys(mounted).count == 1, "one line: \(lineKeys(mounted))")
-        #expect(release(mounted, dragged: w.a2), "the controller handled the drop")
-        await drain(mounted.window)
-        #expect(rows(w) == ["P:0", "A:1", "a1:2", "p1:1", "L:0", "a2:0"], "both selected rows are at the top level, at the end")
+        try await withStatusContext {
+            let w = try window()
+            let mounted = try await mount(w, selecting: [w.l, w.a2])
+            defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
+            // Below p1, the last row, on the left half: the top level.
+            #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .left), "a drop is planned")
+            #expect(reportedSelection(mounted) == [w.l, w.a2], "the selection is still both rows when the drag hovers")
+            #expect(lineKeys(mounted).count == 1, "one line: \(lineKeys(mounted))")
+            #expect(release(mounted, dragged: w.a2), "the controller handled the drop")
+            await drain(mounted.window)
+            #expect(rows(w) == ["P:0", "A:1", "a1:2", "p1:1", "L:0", "a2:0"], "both selected rows are at the top level, at the end")
+        }
     }
 
     @Test func oneRowDroppedAtATopLevelPlaceGoesToTheTopLevelWhenReleased() async throws {
-        let w = try window()
-        let mounted = try await mount(w.manager)
-        defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
-        #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .left), "a drop is planned")
-        #expect(release(mounted, dragged: w.a2), "the controller handled the drop")
-        await drain(mounted.window)
-        #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "p1:1", "a2:0"], "a2 is at the top level, at the end")
+        try await withStatusContext {
+            let w = try window()
+            let mounted = try await mount(w.manager)
+            defer { close(mounted); cleanUp(mounted, dragged: w.a2) }
+            #expect(try hover(mounted, dragging: w.a2, over: .workspace(w.p1), .bottomEdge, .left), "a drop is planned")
+            #expect(release(mounted, dragged: w.a2), "the controller handled the drop")
+            await drain(mounted.window)
+            #expect(rows(w) == ["L:0", "P:0", "A:1", "a1:2", "p1:1", "a2:0"], "a2 is at the top level, at the end")
+        }
     }
 
     @Test func aFlatWindowGetsNoLineLevelAndItsLinesAreDrawnAsBefore() async throws {
-        let manager = TabManager(autoWelcomeIfNeeded: false)
-        for _ in 0..<2 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
-        let ids = manager.tabs.map(\.id)
-        let group = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ids[2]]))
-        manager.selectWorkspace(manager.tabs[0])
-        let mounted = try await mount(manager)
-        defer { close(mounted); cleanUp(mounted, dragged: ids[0]) }
-        // The line above a group's header starts at the sidebar's inset. The line for joining the group is the top line of its
-        // first member's cell, also at the sidebar's inset: nothing is indented in a window with no nested group.
-        func origin(_ view: NSView) -> CGFloat { view.convert(NSPoint(x: 0, y: 0), to: nil).x }
-        let base = origin(try #require(descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table).first))
-        #expect(try hover(mounted, dragging: ids[0], over: .header(group), .upper, .right))
-        #expect(drawnLines(mounted).map(\.x) == [base + SidebarReorderIndicatorView.horizontalInset])
-        #expect(try hover(mounted, dragging: ids[0], over: .header(group), .lower, .right))
-        #expect(drawnLines(mounted).map(\.x) == [base + SidebarReorderIndicatorView.horizontalInset])
-        #expect(SidebarNestedDropLine.level(
-            for: SidebarWorkspaceReorderDropPlan(draggedWorkspaceId: ids[0], indicator: nil, action: .reorder(targetIndex: 0, usesTopLevelRows: false, explicitGroupId: nil)),
-            depthById: [:]
-        ) == nil, "a window with no nested group has no line level")
+        try await withStatusContext {
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            for _ in 0..<2 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
+            let ids = manager.tabs.map(\.id)
+            let group = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ids[2]]))
+            manager.selectWorkspace(manager.tabs[0])
+            let mounted = try await mount(manager)
+            defer { close(mounted); cleanUp(mounted, dragged: ids[0]) }
+            // The line above a group's header starts at the sidebar's inset. The line for joining the group is the top line of its
+            // first member's cell, also at the sidebar's inset: nothing is indented in a window with no nested group.
+            func origin(_ view: NSView) -> CGFloat { view.convert(NSPoint(x: 0, y: 0), to: nil).x }
+            let base = origin(try #require(descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table).first))
+            #expect(try hover(mounted, dragging: ids[0], over: .header(group), .upper, .right))
+            #expect(drawnLines(mounted).map(\.x) == [base + SidebarReorderIndicatorView.horizontalInset])
+            #expect(try hover(mounted, dragging: ids[0], over: .header(group), .lower, .right))
+            #expect(drawnLines(mounted).map(\.x) == [base + SidebarReorderIndicatorView.horizontalInset])
+            #expect(SidebarNestedDropLine.level(
+                for: SidebarWorkspaceReorderDropPlan(draggedWorkspaceId: ids[0], indicator: nil, action: .reorder(targetIndex: 0, usesTopLevelRows: false, explicitGroupId: nil)),
+                depthById: [:]
+            ) == nil, "a window with no nested group has no line level")
+        }
     }
 
     @Test func aFlatWindowsBottomLineOnAGroupHeaderKeepsTheMemberIndentItHadBeforeNestedGroups() async throws {
-        // A group with nothing in it, last in the list: joining it draws the line under its header, which a flat window has
-        // always started one member indent in. A line level of 0 for a flat window would start it at the sidebar's inset.
-        let manager = TabManager(autoWelcomeIfNeeded: false)
-        manager.addWorkspace(autoWelcomeIfNeeded: false)
-        let loose = manager.tabs[0].id
-        let group = try #require(manager.createWorkspaceGroup(name: "E", childWorkspaceIds: []))
-        manager.selectWorkspace(manager.tabs[0])
-        let mounted = try await mount(manager)
-        defer { close(mounted); cleanUp(mounted, dragged: loose) }
-        func origin(_ view: NSView) -> CGFloat { view.convert(NSPoint(x: 0, y: 0), to: nil).x }
-        let base = origin(try #require(descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table).first))
-        #expect(try hover(mounted, dragging: loose, over: .header(group), .lower, .right), "a drop is planned")
-        let lines = drawnLines(mounted)
-        #expect(lines.count == 1, "one line: \(lines)")
-        #expect(lines.first?.row.hasPrefix("header") == true && lines.first?.edge == "bottom", "the line is the bottom of the header cell: \(lines)")
-        #expect(
-            lines.first?.x == base + SidebarReorderIndicatorView.horizontalInset + SidebarWorkspaceGroupHeaderMetrics.memberScopedDropIndicatorLeadingInset,
-            "a flat window's header bottom line starts one member indent in: \(lines), base \(base)"
-        )
+        try await withStatusContext {
+            // A group with nothing in it, last in the list: joining it draws the line under its header, which a flat window has
+            // always started one member indent in. A line level of 0 for a flat window would start it at the sidebar's inset.
+            let manager = TabManager(autoWelcomeIfNeeded: false)
+            manager.addWorkspace(autoWelcomeIfNeeded: false)
+            let loose = manager.tabs[0].id
+            let group = try #require(manager.createWorkspaceGroup(name: "E", childWorkspaceIds: []))
+            manager.selectWorkspace(manager.tabs[0])
+            let mounted = try await mount(manager)
+            defer { close(mounted); cleanUp(mounted, dragged: loose) }
+            func origin(_ view: NSView) -> CGFloat { view.convert(NSPoint(x: 0, y: 0), to: nil).x }
+            let base = origin(try #require(descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table).first))
+            #expect(try hover(mounted, dragging: loose, over: .header(group), .lower, .right), "a drop is planned")
+            let lines = drawnLines(mounted)
+            #expect(lines.count == 1, "one line: \(lines)")
+            #expect(lines.first?.row.hasPrefix("header") == true && lines.first?.edge == "bottom", "the line is the bottom of the header cell: \(lines)")
+            #expect(
+                lines.first?.x == base + SidebarReorderIndicatorView.horizontalInset + SidebarWorkspaceGroupHeaderMetrics.memberScopedDropIndicatorLeadingInset,
+                "a flat window's header bottom line starts one member indent in: \(lines), base \(base)"
+            )
+        }
     }
 }

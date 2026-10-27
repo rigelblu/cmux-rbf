@@ -31,6 +31,7 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
                                        anchorWorkspaceId: anchor.id, customColor: "#765432", iconSymbol: nil)
             group.statusId = "parked"
             anchor.groupId = group.id; member.groupId = group.id
+            before.clearTaskStatusOverride(); after.clearTaskStatusOverride()
             before.customColor = "#765432"; after.customColor = "#765432"
             anchor.customColor = "#008800"; member.customColor = "#008800"
             groups = [group]; tabs = [before, anchor, member, after]

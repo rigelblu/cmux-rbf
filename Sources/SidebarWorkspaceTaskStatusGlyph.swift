@@ -50,8 +50,16 @@ struct SidebarWorkspaceTaskStatusGlyphModel: Equatable {
     let colorRole: ColorRole
     /// Done renders a checkmark over the filled circle.
     let showsCheckmark: Bool
+    let showsDot: Bool // (#cm-110.13)
 
-    init(status: WorkspaceTaskStatus) {
+    init(status: WorkspaceTaskStatus, isNone: Bool = false) { // (#cm-110.13)
+        showsDot = isNone // (#cm-110.13)
+        if isNone { // (#cm-110.13)
+            fillFraction = 0 // (#cm-110.13)
+            colorRole = .neutral // (#cm-110.13)
+            showsCheckmark = false // (#cm-110.13)
+            return // (#cm-110.13)
+        } // (#cm-110.13)
         switch status {
         case .todo:
             fillFraction = 0
@@ -86,10 +94,10 @@ struct SidebarWorkspaceTaskStatusGlyphModel: Equatable {
         defaultValue: "%@ — inferred"
     )
 
-    /// The localized tooltip: lane name plus whether it was set manually or
-    /// inferred from live signals.
-    static func tooltip(status: WorkspaceTaskStatus, hasOverride: Bool, name: String? = nil) -> String {
-        String(
+    /// None uses its plain localized name; other statuses include their origin. (#cm-110.13)
+    static func tooltip(status: WorkspaceTaskStatus, hasOverride: Bool, name: String? = nil, isNone: Bool = false) -> String { // (#cm-110.13)
+        if isNone { return WorkspaceStatusPresentation.noneTitle } // (#cm-110.13)
+        return String( // (#cm-110.13)
             format: hasOverride ? manualTooltipFormat : inferredTooltipFormat,
             locale: .current,
             name ?? status.displayName // (#cm-109) his name for the status when the row has one
@@ -97,23 +105,25 @@ struct SidebarWorkspaceTaskStatusGlyphModel: Equatable {
     }
 }
 
-/// Policy for the sidebar row's restored status indicator. Rows only show a
-/// glyph for a human-set status while the remote todo-controls flag is on;
-/// inferred/automatic status stays out of the row chrome.
+/// Shared row policy: None and a human-set status draw a glyph while controls (#cm-110.13)
+/// are on; Auto keeps an empty slot. (#cm-110.13)
 struct SidebarWorkspaceManualTaskStatusIndicatorModel: Equatable {
     let featureEnabled: Bool
     let taskStatus: WorkspaceTaskStatus?
     let hasManualOverride: Bool
+    var isHidden: Bool = false // (#cm-110.13)
+
+    var isNone: Bool { featureEnabled && isHidden } // (#cm-110.13)
 
     var showsIndicator: Bool {
-        featureEnabled && hasManualOverride && taskStatus != nil
+        isNone || (featureEnabled && hasManualOverride && taskStatus != nil) // (#cm-110.13)
     }
 }
 
 // MARK: - Row status menu
 
-/// The interactive wrapper used only by sidebar workspace rows with a
-/// manual status override. It keeps the restored row glyph compact while
+/// The interactive wrapper for sidebar workspace rows on None or a manual (#cm-110.13)
+/// status. It keeps the row glyph compact while (#cm-110.13)
 /// sending every selection through the shared workspace todo action path.
 struct SidebarWorkspaceManualStatusIndicatorMenu: View {
     let status: WorkspaceTaskStatus
@@ -132,7 +142,8 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
 
     /// His name for the status shown, from the picker's checked row; cmux's own name when the picker has none. (#cm-109)
     private var statusName: String {
-        WorkspaceStatusPresentation.checkedName(in: model.picker) ?? status.displayName
+        if model.isNone { return WorkspaceStatusPresentation.noneTitle } // (#cm-110.13)
+        return WorkspaceStatusPresentation.checkedName(in: model.picker) ?? status.displayName // (#cm-110.13)
     }
 
     /// His entry for the status shown: the picker's checked entry row. `nil` for a status the list leaves out, which
@@ -145,23 +156,33 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
         String(localized: "sidebar.status.compactLabel", defaultValue: "Status: \(statusName)")
     }
 
+    var tooltip: String { // (#cm-110.13)
+        if model.isNone { return WorkspaceStatusPresentation.noneTitle } // (#cm-110.13)
+        return String(localized: "sidebar.status.compactTooltip", defaultValue: "Change workspace status") // (#cm-110.13)
+    } // (#cm-110.13)
+
+    var statusGlyph: SidebarWorkspaceTaskStatusGlyph { // (#cm-110.13)
+        SidebarWorkspaceTaskStatusGlyph( // (#cm-110.13)
+            status: status, // (#cm-110.13)
+            hasOverride: !model.isNone, // (#cm-110.13)
+            usesMonochrome: usesMonochrome, // (#cm-110.13)
+            monochromeColor: monochromeColor, // (#cm-110.13)
+            neutralColor: neutralColor, // (#cm-110.13)
+            fontScale: fontScale, // (#cm-110.13)
+            contrastBackground: contrastBackground, // (#cm-109.7) // (#cm-110.13)
+            drawnAlpha: drawnAlpha, // (#cm-109.7) // (#cm-110.13)
+            name: statusName, // (#cm-109) // (#cm-110.13)
+            icon: checkedEntry?.icon, // (#cm-109.3) // (#cm-110.13)
+            colorHex: checkedEntry.flatMap { model.colorHexes[$0.id] }, // (#cm-109.3) // (#cm-110.13)
+            isNone: model.isNone // (#cm-110.13)
+        ) // (#cm-110.13)
+    } // (#cm-110.13)
+
     var body: some View {
         Button {
             isStatusPopoverPresented.toggle()
         } label: {
-            SidebarWorkspaceTaskStatusGlyph(
-                status: status,
-                hasOverride: true,
-                usesMonochrome: usesMonochrome,
-                monochromeColor: monochromeColor,
-                neutralColor: neutralColor,
-                fontScale: fontScale,
-                contrastBackground: contrastBackground, // (#cm-109.7)
-                drawnAlpha: drawnAlpha, // (#cm-109.7)
-                name: statusName, // (#cm-109)
-                icon: checkedEntry?.icon, // (#cm-109.3)
-                colorHex: checkedEntry.flatMap { model.colorHexes[$0.id] } // (#cm-109.3)
-            )
+            statusGlyph // (#cm-110.13)
             .padding(.horizontal, 2)
             .padding(.vertical, 2)
             .contentShape(Rectangle())
@@ -169,7 +190,7 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
         .buttonStyle(.plain)
         .background(statusPopoverHost)
         .fixedSize(horizontal: true, vertical: true)
-        .safeHelp(String(localized: "sidebar.status.compactTooltip", defaultValue: "Change workspace status"))
+        .safeHelp(tooltip) // (#cm-110.13)
         .accessibilityLabel(labelText)
         .accessibilityIdentifier("SidebarWorkspaceManualStatusIndicatorMenu")
     }
@@ -208,9 +229,8 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
 // MARK: - Glyph view
 
 /// The custom-drawn circular progress-pie status glyph shown in the todo
-/// pane's header, the status popover's lane rows, and the sidebar row only
-/// when a manual workspace status is set. Automatic status never draws a row
-/// glyph. Drawn in a fixed-width slot
+/// pane's header, the status popover's lane rows, and sidebar rows on None or (#cm-110.13)
+/// a manual status. None draws a dot; Auto draws no row glyph. Drawn in a fixed-width slot (#cm-110.13)
 /// (~9pt base, font-scaled). Modeled on `PullRequestOpenIcon`/
 /// `PullRequestMergedIcon` (custom `Path` drawing, caller passes resolved
 /// colors; no store access).
@@ -234,6 +254,9 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     /// The color the app resolved for his entry, or `nil` to use `status`'s color role. (#cm-109.3)
     var colorHex: String? = nil
 
+    /// None replaces the status, icon and color with the neutral dot. (#cm-110.13)
+    var isNone: Bool = false // (#cm-110.13)
+
     @Environment(\.colorScheme) private var colorScheme
 
     private static let baseSize: CGFloat = 9
@@ -245,8 +268,8 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     private static let strokeWidth: CGFloat = 1
     private static let attentionStrokeWidth: CGFloat = 1.4
 
-    private var model: SidebarWorkspaceTaskStatusGlyphModel {
-        SidebarWorkspaceTaskStatusGlyphModel(status: status)
+    var model: SidebarWorkspaceTaskStatusGlyphModel { // (#cm-110.13)
+        SidebarWorkspaceTaskStatusGlyphModel(status: status, isNone: isNone) // (#cm-110.13)
     }
 
     /// The color the glyph starts from, before any contrast floor: the same one the AppKit glyph starts from. (#cm-109.7)
@@ -255,7 +278,7 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
         env.colorScheme = colorScheme // (#cm-109.7)
         let glyphModel = SidebarRowTaskStatusGlyphButton.Model( // (#cm-109.7)
             status: status, hasOverride: hasOverride, usesMonochrome: usesMonochrome, fontScale: fontScale, // (#cm-109.7)
-            colorScheme: colorScheme, colorHex: colorHex // (#cm-109.7)
+            colorScheme: colorScheme, colorHex: colorHex, isNone: isNone // (#cm-109.7) // (#cm-110.13)
         ) // (#cm-109.7)
         return SidebarRowTaskStatusGlyphButton.rawBaseColor( // (#cm-109.7)
             model: glyphModel, // (#cm-109.7)
@@ -285,7 +308,6 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
 
     var body: some View {
         let size = Self.baseSize * fontScale
-        let tooltip = SidebarWorkspaceTaskStatusGlyphModel.tooltip(status: status, hasOverride: hasOverride, name: name)
         glyphBody // (#cm-109.3)
         .frame(width: size, height: size)
         // Fixed-width slot so titles align whether or not the pie is drawn
@@ -295,11 +317,18 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
         .accessibilityLabel(tooltip)
     }
 
+    var tooltip: String { // (#cm-110.13)
+        SidebarWorkspaceTaskStatusGlyphModel.tooltip(status: status, hasOverride: hasOverride, name: name, isNone: isNone) // (#cm-110.13)
+    } // (#cm-110.13)
+
     /// The drawn shape: a named icon through the one drawing function, in a `Canvas`; otherwise upstream's circle,
     /// pie and checkmark. (#cm-109.3)
     @ViewBuilder
     private var glyphBody: some View {
-        if let icon {
+        if model.showsDot { // (#cm-110.13)
+            SidebarStatusNoneShape() // (#cm-110.13)
+                .fill(statusColor) // (#cm-110.13)
+        } else if let icon { // (#cm-110.13)
             let color = statusColor
             let tick = checkmarkColor
             let size = Self.baseSize * fontScale // (#cm-109.6)
@@ -384,6 +413,17 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
         return Color(nsColor: tick) // (#cm-109.7)
     }
 }
+
+/// The None dot shares its geometry between the AppKit and SwiftUI glyphs. (#cm-110.13)
+struct SidebarStatusNoneShape: Shape { // (#cm-110.13)
+    func path(in rect: CGRect) -> Path { // (#cm-110.13)
+        var path = Path() // (#cm-110.13)
+        let diameter = min(rect.width, rect.height) / 3 // (#cm-110.13)
+        path.addEllipse(in: CGRect(x: rect.midX - diameter / 2, y: rect.midY - diameter / 2, // (#cm-110.13)
+                                   width: diameter, height: diameter)) // (#cm-110.13)
+        return path // (#cm-110.13)
+    } // (#cm-110.13)
+} // (#cm-110.13)
 
 /// A pie slice from 12 o'clock sweeping clockwise by `fraction` of the circle.
 struct SidebarStatusPieShape: Shape {

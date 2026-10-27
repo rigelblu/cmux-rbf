@@ -126,10 +126,8 @@ public struct WorkspaceStatusGroupProjection: Equatable, Sendable {
         // A pinned workspace, and one in a workspace group, joins no status group (04:11, 04:71)
         guard !item.isPinned, item.groupId == nil else { return nil }
 
-        // A workspace on None (statusHidden true) goes by its color only (09:472)
-        if item.isStatusHidden {
-            return statusIdMatchingColor(item.normalizedColorHex, in: list, resolvedHexByStatusId: resolvedHexByStatusId)
-        }
+        // None is no status, whatever color the workspace wears (Decisions 2026-10-27). (#cm-110.13)
+        guard !item.isStatusHidden else { return nil } // (#cm-110.13)
 
         switch item.resolution {
         case .ownInEffect(let entry):

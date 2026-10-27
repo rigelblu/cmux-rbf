@@ -1,9 +1,12 @@
 import Foundation
 import Testing
 
-// No app import needed: this guard asserts against the checked-in sources,
-// so it fails red on any tree where the row glyph is present regardless of
-// how the app target compiles.
+import CmuxWorkspaces
+#if canImport(cmux_DEV)
+@testable import cmux_DEV
+#elseif canImport(cmux)
+@testable import cmux
+#endif
 
 /// Regression guard: sidebar workspace rows may render a compact manual
 /// task-status glyph, but must not bring back automatic status circles or a
@@ -106,15 +109,28 @@ struct SidebarWorkspaceRowStatusGlyphRemovalTests {
         }
     }
 
+    @MainActor
     @Test
-    func workspaceRowIndicatorUsesManualOnlyPolicy() throws {
-        let contentViewSource = try Self.sourceText("Sources/ContentView.swift")
-        let snapshotSource = try Self.sourceText("Sources/SidebarWorkspaceSnapshotBuilder.swift")
-        #expect(contentViewSource.contains("manualTaskStatusIndicator.showsIndicator"))
-        #expect(contentViewSource.contains("SidebarWorkspaceManualStatusIndicatorMenu"))
-        #expect(contentViewSource.contains("workspaceSnapshot.hasManualTaskStatus"))
-        #expect(contentViewSource.contains("workspaceSnapshot.todoStatusMenuModel"))
-        #expect(snapshotSource.contains("hasManualTaskStatus"))
-        #expect(snapshotSource.contains("todoStatusMenuModel"))
+    func workspaceRowIndicatorAllowsManualOrNoneButNotAuto() throws {
+        let harness = WorkspaceNoneRowTests()
+        let workspace = Workspace()
+        workspace.hideTaskStatus()
+        let none = harness.cell(harness.model(workspace))
+        #expect(!none.statusGlyphButtonForTesting.isHidden, "None must show its mark through the real factory and cell")
+        #expect(none.statusGlyphModelForTesting?.isNone == true, "None must replace the detected status glyph")
+
+        workspace.setOwnStatus(try #require(WorkspaceNoneRowTests.list.entry(id: "next")), list: WorkspaceNoneRowTests.list)
+        let manual = harness.cell(harness.model(workspace))
+        #expect(!manual.statusGlyphButtonForTesting.isHidden)
+        #expect(manual.statusGlyphModelForTesting?.name == "Next")
+        #expect(manual.statusGlyphModelForTesting?.isNone == false)
+
+        workspace.clearTaskStatusOverride()
+        let auto = harness.cell(harness.model(workspace))
+        #expect(auto.statusGlyphButtonForTesting.isHidden, "Auto must keep the row's status slot empty")
+
+        workspace.hideTaskStatus()
+        let disabled = harness.cell(harness.model(workspace, controls: false))
+        #expect(disabled.statusGlyphButtonForTesting.isHidden, "controls off must hide the None mark too")
     }
 }

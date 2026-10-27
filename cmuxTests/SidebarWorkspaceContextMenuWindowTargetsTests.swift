@@ -135,7 +135,7 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
     }
 
     @MainActor
-    private static func actions(
+    static func actions( // (#cm-110.13)
         currentWindowMoveTargets: @escaping () -> [SidebarWorkspaceWindowMoveTarget]
     ) -> SidebarWorkspaceRowActions {
         SidebarWorkspaceRowActions(

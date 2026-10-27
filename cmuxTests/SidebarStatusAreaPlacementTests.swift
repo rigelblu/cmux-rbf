@@ -186,7 +186,7 @@ struct SidebarStatusAreaPlacementTests {
         let list = WorkspaceStatusList(entries: [WorkspaceStatusEntry(id: "a", name: "A", extends: .todo),
                                                 WorkspaceStatusEntry(id: "b", name: "B", extends: .working)], source: .file)
         let member = UUID()
-        let item = WorkspaceStatusGroupProjectionItem(workspaceId: member, isStatusHidden: true,
+        let item = WorkspaceStatusGroupProjectionItem(workspaceId: member, isStatusHidden: false,
             normalizedColorHex: "#AABBCC", resolution: .detected(.todo))
         let projection = try #require(VerticalTabsSidebar.statusGroupProjection(items: [item], list: list,
             colorHexes: ["a": "#AABBCC", "b": "#AABBCC"], controlsEnabled: true, storedOrder: ["b", "a"], workspaceGroups: []))
