@@ -16703,13 +16703,13 @@ struct TabItemView: View, Equatable {
                 let manualTaskStatusIndicator = SidebarWorkspaceManualTaskStatusIndicatorModel(
                     featureEnabled: todoControlsEnabled,
                     taskStatus: workspaceSnapshot.taskStatus,
-                    hasManualOverride: workspaceSnapshot.hasManualTaskStatus
+                    hasManualOverride: workspaceSnapshot.hasManualTaskStatus, // (#cm-110.13)
+                    isHidden: workspaceSnapshot.taskStatusInput.isHidden // (#cm-110.13)
                 )
-                if let taskStatus = workspaceSnapshot.taskStatus,
-                   let statusMenuModel = workspaceSnapshot.todoStatusMenuModel,
+                if let statusMenuModel = workspaceSnapshot.statusMenuModel(controlsEnabled: todoControlsEnabled), // (#cm-110.13)
                    manualTaskStatusIndicator.showsIndicator {
                     SidebarWorkspaceManualStatusIndicatorMenu(
-                        status: taskStatus,
+                        status: workspaceSnapshot.taskStatus ?? .todo, // (#cm-110.13)
                         model: statusMenuModel,
                         workspaceId: workspaceId,
                         applyTodoStatus: actions.applyTodoStatus,
@@ -16719,7 +16719,7 @@ struct TabItemView: View, Equatable {
                         neutralColor: activeSecondaryColor(0.8),
                         fontScale: fontScale, // (#cm-109.7)
                         contrastBackground: rowContrastBackground, // (#cm-109.7)
-                        drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: taskStatus) // (#cm-109.7)
+                        drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7) // (#cm-110.13)
                     )
                     .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                     .transition(.opacity)

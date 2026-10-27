@@ -187,14 +187,14 @@ import Testing
             expectedStatusGroupId: nil
         ),
         MembershipTestCase(
-            name: "workspace on None (statusHidden true) goes by color",
+            name: "workspace on None joins no group despite a matching color",
             resolution: .ownInEffect(F.parked),
             colorHex: "#00aaff",
             isStatusHidden: true,
             isPinned: false,
             groupId: nil,
             list: F.toms,
-            expectedStatusGroupId: "next"
+            expectedStatusGroupId: nil
         ),
         MembershipTestCase(
             name: "detected done with no done entry goes by its color (parked color)",

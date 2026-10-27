@@ -20,9 +20,9 @@ final class WorkspaceTodoState: ObservableObject {
     /// One of his own statuses, from the `workspaceStatuses` list, or `nil`. Never set together with
     /// `statusOverride`, which stays the only home of a cmux status set by hand. (#cm-109)
     @Published var ownStatus: WorkspaceOwnStatus?
-    /// When true, this workspace opts out of the status feature: no glyph is
-    /// drawn before the title (a "None" state, distinct from Auto which still
-    /// infers and shows a glyph). Selecting Auto or any lane clears it.
+    /// When true, this workspace is on None. With status controls on, its row (#cm-110.13)
+    /// draws a dot in the glyph's slot; Auto keeps that slot empty but still infers status. (#cm-110.13)
+    /// Selecting Auto or any lane clears this flag. (#cm-110.13)
     @Published var statusHidden: Bool = true
     /// The persisted checklist, in display order.
     @Published var checklist: [WorkspaceChecklistItem] = []

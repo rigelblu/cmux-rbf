@@ -100,7 +100,7 @@ struct StatusAreaDropPerformerTests {
     @Test(arguments: [false, true])
     func leavingAWorkspaceGroupProjectsTheUnchangedExistingStatusOrColorRatherThanForcingLoosePlacement(_ colorOnly: Bool) throws {
         let f = Fixture(.groupedMember)
-        if colorOnly { f.source.setCustomColor("#555555") }
+        if colorOnly { f.source.clearTaskStatusOverride(); f.source.setCustomColor("#555555") }
         else { f.source.setOwnStatus(f.list.entry(id: "parked")!, list: f.list) }
         let held = Held(f.source), record = f.state.statusGroups
         try #require(f.projection()?.contains(workspaceId: f.source.id) == false)

@@ -155,20 +155,31 @@ extension Workspace {
     } // (#cm-109.4)
 
     /// Returns the status to automatic by clearing the manual override (and
-    /// any None opt-out), so the glyph shows the inferred lane again.
+    /// any None opt-out), and clears its color for a Mac pick. (#cm-110.13)
     func clearTaskStatusOverride() {
         todoState.ownStatus = nil // (#cm-109)
         todoState.statusHidden = false
         todoState.statusOverride = nil
+        clearPickedTaskStatusColor() // (#cm-110.13)
     }
 
-    /// Opts this workspace out of the status feature: no glyph is drawn before
-    /// the title (the "None" state, distinct from Auto). Clears any override.
+    /// Sets None: the neutral dot replaces the status glyph. Clears the override and, on this Mac, its color. (#cm-110.13)
     func hideTaskStatus() {
         todoState.ownStatus = nil // (#cm-109)
         todoState.statusOverride = nil
         todoState.statusHidden = true
+        clearPickedTaskStatusColor() // (#cm-110.13)
     }
+
+    /// Every explicit None/Auto entrance reaches here; automatic lapse cleanup does not. (#cm-110.13)
+    private func clearPickedTaskStatusColor() { // (#cm-110.13)
+        guard WorkspaceStatusOrigin.current != .phone else { return } // (#cm-110.13)
+        if let manager = AppDelegate.shared?.tabManagerFor(tabId: id) { // (#cm-110.13)
+            manager.applyWorkspaceColor(nil, to: [self]) // (#cm-110.13)
+        } else { // (#cm-110.13)
+            setCustomColor(nil) // (#cm-110.13)
+        } // (#cm-110.13)
+    } // (#cm-110.13)
 
     /// Cycles the effective status one lane forward (round-robin
     /// todo → working → needs-attention → review → done → todo) by pinning a

@@ -201,7 +201,7 @@ struct WorkspaceStatusActionsTests {
 
     // MARK: - Auto, None, controls, targets
 
-    @Test func autoAndNoneLeaveTheColorAndClearTheStatus() {
+    @Test func autoAndNoneClearTheColorAndTheStatus() {
         let workspace = Workspace()
         let writes = Writes()
         let actions = Self.actions(writes: writes)
@@ -209,13 +209,21 @@ struct WorkspaceStatusActionsTests {
         #expect(workspace.customColor == "#555555")
         actions.apply(.auto, to: [workspace], requireControls: false)
         Self.expectHolds(workspace, override: nil, own: nil, hidden: false, "Auto")
-        #expect(workspace.customColor == "#555555")
+        #expect(workspace.customColor == nil, "Auto clears the color")
         actions.apply(.status(id: "done"), to: [workspace], requireControls: false)
         #expect(workspace.customColor == "#222222")
         actions.apply(.hide, to: [workspace], requireControls: false)
         Self.expectHolds(workspace, override: nil, own: nil, hidden: true, "None")
-        #expect(workspace.customColor == "#222222")
+        #expect(workspace.customColor == nil, "None clears the color")
         #expect(writes.all.count == 2)
+    }
+
+    @Test(arguments: [WorkspaceStatusPickAction.auto, .hide])
+    func anExplicitPhoneActionKeepsItsColor(_ action: WorkspaceStatusPickAction) {
+        let workspace = Workspace()
+        workspace.setCustomColor("#ABCDEF")
+        Self.actions(origin: .phone).apply(action, to: [workspace], requireControls: false)
+        #expect(workspace.customColor == "#ABCDEF", "an explicitly supplied phone origin must survive the shared clear path")
     }
 
     // "The Workspace Color menu leaves the status alone" (Expected Results line 57) is tested in

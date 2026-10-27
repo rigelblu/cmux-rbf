@@ -3,7 +3,7 @@ import CmuxAppKitSupportUI // (#cm-109.7)
 import CmuxWorkspaces
 import SwiftUI
 
-// MARK: - Manual status glyph
+// MARK: - None and manual status glyph (#cm-110.13)
 
 /// Pure-AppKit port of `SidebarWorkspaceTaskStatusGlyph` for the row's title
 /// line: circle outline + progress pie + Done checkmark, drawn with the exact
@@ -28,6 +28,8 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         var contrastBackground: NSColor? = nil // (#cm-109.7)
         /// The alpha the row draws its content at (Done dims it), which the floor measures at. (#cm-109.7)
         var drawnAlpha: CGFloat = 1 // (#cm-109.7)
+        /// None replaces the status, icon and color with the neutral dot. (#cm-110.13)
+        var isNone: Bool = false // (#cm-110.13)
     }
 
     private nonisolated static let baseSize: CGFloat = 9 // (#cm-109.3)
@@ -54,12 +56,14 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         toolTip = SidebarWorkspaceTaskStatusGlyphModel.tooltip(
             status: model.status,
             hasOverride: model.hasOverride,
-            name: model.name
+            name: model.name, // (#cm-110.13)
+            isNone: model.isNone // (#cm-110.13)
         )
         setAccessibilityRole(.button)
+        let statusName = model.isNone ? WorkspaceStatusPresentation.noneTitle : (model.name ?? model.status.displayName) // (#cm-110.13)
         setAccessibilityLabel(String(
             localized: "sidebar.status.compactLabel",
-            defaultValue: "Status: \(model.name ?? model.status.displayName)"
+            defaultValue: "Status: \(statusName)" // (#cm-110.13)
         ))
         setAccessibilityIdentifier("SidebarWorkspaceManualStatusIndicatorMenu")
         if changed {
@@ -80,6 +84,7 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
     /// color for the status, else `status`'s own role. The SwiftUI glyph reads this too, so the two draw the same color. (#cm-109.7)
     static func rawBaseColor(model: Model, monochromeColor: NSColor, neutralColor: NSColor) -> NSColor { // (#cm-109.7)
         if model.usesMonochrome { return monochromeColor } // (#cm-109.7)
+        if model.isNone { return neutralColor } // (#cm-110.13)
         if let hex = model.colorHex, // (#cm-109.7)
            let color = WorkspaceTabColorSettings.displayNSColor(hex: hex, colorScheme: model.colorScheme, forceBright: false) { // (#cm-109.7)
             return color // (#cm-109.7)
@@ -154,6 +159,12 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
             width: size,
             height: size
         )
+        if model.isNone { // (#cm-110.13)
+            context.addPath(SidebarStatusNoneShape().path(in: circleRect).cgPath) // (#cm-110.13)
+            context.setFillColor(color) // (#cm-110.13)
+            context.fillPath() // (#cm-110.13)
+            return // (#cm-110.13)
+        } // (#cm-110.13)
         // (#cm-109.3) A named icon draws its own shape; a symbol draws its mask; anything else draws upstream's, below. (#cm-109.6)
         if let icon = model.icon { // (#cm-109.3)
             switch icon { // (#cm-109.6)

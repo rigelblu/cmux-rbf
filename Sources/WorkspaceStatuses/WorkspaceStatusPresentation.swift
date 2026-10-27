@@ -5,6 +5,10 @@ import Foundation
 /// The words and the row adapter for the status pickers and the palette (#cm-109.2). Pure: a list or a picker state
 /// goes in and values come out; nothing here reads the store.
 enum WorkspaceStatusPresentation {
+    static var noneTitle: String { // (#cm-110.13)
+        String(localized: "workspaceGroup.status.none", defaultValue: "None") // (#cm-110.13)
+    } // (#cm-110.13)
+
     /// A label as text: his word, or cmux's own localized name for a cmux status.
     static func text(_ label: WorkspaceStatusLabel) -> String {
         switch label {
@@ -83,9 +87,8 @@ enum WorkspaceStatusPresentation {
     }
 }
 
-/// What the todo pane works out from the resolution (#cm-109): pure, so a test can call it. The pane's popover rows are
-/// built with `isHidden: false`, as the release's popover hosts did (none of them passed the flag): a workspace on None
-/// shows Auto checked there, as before.
+/// What the todo pane works out from the resolution: pure, so a test can call it. (#cm-110.13)
+/// The popover reads the workspace's None flag, agreeing with the header and the row's picker. (#cm-110.13)
 struct WorkspaceStatusPaneState: Equatable {
     /// Whether a status is in effect and the controls are on (the glyph's "set manually").
     let hasOverride: Bool
@@ -102,11 +105,29 @@ struct WorkspaceStatusPaneState: Equatable {
     /// The color the app resolved for each status of the list, by id, for the popover's lanes. (#cm-109.3)
     var colorHexes: [String: String] = [:]
 
+    struct Header: Equatable { // (#cm-110.13)
+        let status: WorkspaceTaskStatus? // (#cm-110.13)
+        let isNone: Bool // (#cm-110.13)
+        let label: String? // (#cm-110.13)
+    } // (#cm-110.13)
+
+    /// The header's draw choice, kept pure so the pane and its tests use one answer. (#cm-110.13)
+    func header(effective: WorkspaceTaskStatus, statusHidden: Bool, controlsEnabled: Bool) -> Header { // (#cm-110.13)
+        guard controlsEnabled else { return Header(status: nil, isNone: false, label: nil) } // (#cm-110.13)
+        if statusHidden { // (#cm-110.13)
+            return Header(status: .todo, isNone: true, label: WorkspaceStatusPresentation.noneTitle) // (#cm-110.13)
+        } // (#cm-110.13)
+        return Header(status: effective, isNone: false, label: hisWord ?? WorkspaceTodoPaneHeaderStatusLabel.displayName( // (#cm-110.13)
+            effective: effective, hasOverride: hasOverride // (#cm-110.13)
+        )) // (#cm-110.13)
+    } // (#cm-110.13)
+
     static func make(
         resolution: WorkspaceStatusResolution,
         inferred: WorkspaceTaskStatus,
         list: WorkspaceStatusList,
         controlsEnabled: Bool,
+        statusHidden: Bool, // (#cm-110.13)
         colorHexes: [String: String] = [:]
     ) -> Self {
         let cmuxOverride: WorkspaceTaskStatus?
@@ -123,7 +144,7 @@ struct WorkspaceStatusPaneState: Equatable {
             hasOverride: controlsEnabled && resolution.inEffect != nil,
             cmuxOverride: cmuxOverride,
             hisWord: hisWord,
-            picker: WorkspaceStatusPicker().rows(resolution: resolution, inferred: inferred, isHidden: false, list: list),
+            picker: WorkspaceStatusPicker().rows(resolution: resolution, inferred: inferred, isHidden: statusHidden, list: list), // (#cm-110.13)
             icon: shown?.icon,
             colorHex: shown.flatMap { colorHexes[$0.id] },
             colorHexes: colorHexes
@@ -167,7 +188,7 @@ extension WorkspaceTodoStatusLane {
             case .hide:
                 return WorkspaceTodoStatusLane(
                     status: nil,
-                    title: String(localized: "sidebar.status.none", defaultValue: "None (hide status)"),
+                    title: WorkspaceStatusPresentation.noneTitle, // (#cm-110.13)
                     isSelected: row.isChecked,
                     action: row.action,
                     isNone: true

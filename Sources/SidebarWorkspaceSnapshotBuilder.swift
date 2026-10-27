@@ -83,6 +83,20 @@ struct SidebarWorkspaceSnapshotBuilder {
         /// Whether the raised hand indicator should show. (#cm-109.3)
         var showsRaisedHand: Bool = false // (#cm-109.3)
 
+        /// One menu decision for both renderers, their popovers, and tests. (#cm-110.13)
+        func statusMenuModel(controlsEnabled: Bool) -> SidebarWorkspaceCompactStatusMenuModel? { // (#cm-110.13)
+            guard controlsEnabled else { return nil } // (#cm-110.13)
+            guard taskStatusInput.isHidden else { return todoStatusMenuModel } // (#cm-110.13)
+            guard let picker = taskStatusInput.picker else { return nil } // (#cm-110.13)
+            return SidebarWorkspaceCompactStatusMenuModel( // (#cm-110.13)
+                inferred: taskStatusInput.inferred, // (#cm-110.13)
+                activeOverride: taskStatusInput.activeOverride, // (#cm-110.13)
+                picker: picker, // (#cm-110.13)
+                colorHexes: taskStatusInput.colorHexes, // (#cm-110.13)
+                isNone: true // (#cm-110.13)
+            ) // (#cm-110.13)
+        } // (#cm-110.13)
+
         func accessibilityLabel(index: Int, workspaceCount: Int) -> String {
             let position = String(
                 localized: "accessibility.workspacePosition",
