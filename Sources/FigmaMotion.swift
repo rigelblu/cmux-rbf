@@ -40,6 +40,9 @@ enum FigmaMotion {
           perfOffset += perf() - perfHeld; dateOffset += date() - dateHeld; frozen = false;
         }
       }
+      // WebKit caches the preview page before cmux's freeze message reaches this frame
+      // (Scenario 234, 2026-10-29), so the frame holds its clock from its own pagehide.
+      window.addEventListener('pagehide', function () { clock('freeze'); });
       window.addEventListener('message', function (e) {
         // Child clock reports travel through their own parent, never an arbitrary window.
         if (e.data && e.data.cmuxClockReport === true) {
