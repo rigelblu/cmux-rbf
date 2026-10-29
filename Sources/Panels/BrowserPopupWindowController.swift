@@ -486,6 +486,13 @@ private final class PopupUIDelegate: BrowserPDFPreviewActionUIDelegate {
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
+        // cmux-rbf #cm-73.39: a popup's window.open or new-window link never opens the Figma preview page.
+        if FigmaPreviewPageGuard.refusesPageRoute(to: navigationAction.request.url) {
+#if DEBUG
+            cmuxDebugLog("popup.createWebView kind=refuseFigmaPreviewPage")
+#endif
+            return nil
+        }
         if let url = navigationAction.request.url {
             if navigationAction.navigationType == .linkActivated,
                navigationAction.targetFrame?.isMainFrame != false,
@@ -778,6 +785,15 @@ private final class PopupUIDelegate: BrowserPDFPreviewActionUIDelegate {
 
         guard let url = navigationAction.request.url else {
             decisionHandler(.allow)
+            return
+        }
+
+        // cmux-rbf #cm-73.39: a popup never shows the Figma preview page, in any frame.
+        if !FigmaPreviewPageGuard.popupAllowsNavigation(to: url) {
+#if DEBUG
+            cmuxDebugLog("popup.decidePolicy kind=refuseFigmaPreviewPage")
+#endif
+            decisionHandler(.cancel)
             return
         }
 

@@ -9,8 +9,8 @@ private final class FigmaCLIBundleToken {}
 ///
 /// **The child sees only the environment built here.** `HOME` and
 /// `CFFIXED_USER_HOME` both point at a folder of the test's own: `HOME` alone
-/// does not move the home folder Foundation reports, and the CLI writes its
-/// page under that folder. Nothing here reads Tom's `~/.config/cmux/cmux.json`
+/// does not move the home folder Foundation reports. Since `cm-73.39` the CLI
+/// writes no page there; the tests check that it does not. Nothing here reads Tom's `~/.config/cmux/cmux.json`
 /// or reaches the real cmux socket.
 @Suite("FigmaCLIOutput", .serialized)
 struct FigmaCLIOutputTests {
@@ -186,12 +186,11 @@ struct FigmaCLIOutputTests {
         let stdout: String
         let stderr: String
         let requests: [StandInSocket.Request]
-        /// Whether the read view's page landed under the test's own home folder.
+        /// Whether a read-view page file appeared under the test's own home folder;
+        /// since `cm-73.39` the app serves the page and the CLI writes none.
         let pageInstalledInTestHome: Bool
         /// The test's own home folder, as the child was told it.
         let home: String
-        /// What that file holds after the command, if it exists.
-        let pageContents: String?
 
         var gotos: [StandInSocket.Request] { requests.filter { $0.method == "figma.goto" } }
         var opens: [StandInSocket.Request] { requests.filter { $0.method == "browser.open_split" } }
@@ -231,24 +230,12 @@ struct FigmaCLIOutputTests {
         }
     }
 
-    /// The page already on disk in the test's home when the command starts.
-    private enum PageSeed {
-        case none
-        /// An old build's page.
-        case stale
-        /// An old build's page, in a folder the command may not write to.
-        case staleInReadOnlyFolder
-    }
-
-    private static let stalePage = "<!doctype html><title>an old build</title>"
-
     /// Runs `cmux <arguments>` against a stand-in socket that answers through `reply`.
     /// With `listening` false the socket path is set and nothing listens on it.
     private func drive(
         _ arguments: [String],
         listening: Bool = true,
         environment extraEnvironment: [String: String] = [:],
-        page seed: PageSeed = .none,
         reply: @escaping @Sendable (String, String?) -> String = FigmaCLIOutputTests.unexpected
     ) throws -> Run {
         let fileManager = FileManager.default
@@ -259,17 +246,8 @@ struct FigmaCLIOutputTests {
         let pageFolder = home.appendingPathComponent("Library/Application Support/cmux", isDirectory: true)
         let page = pageFolder.appendingPathComponent("figma-embed.html")
         defer {
-            // The folder may have been made read-only; the temp home cannot be removed until it is not.
-            try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pageFolder.path)
             try? fileManager.removeItem(at: home)
             unlink(socketPath)
-        }
-        if seed != .none {
-            try fileManager.createDirectory(at: pageFolder, withIntermediateDirectories: true)
-            try Self.stalePage.write(to: page, atomically: true, encoding: .utf8)
-        }
-        if seed == .staleInReadOnlyFolder {
-            try fileManager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: pageFolder.path)
         }
 
         let standIn = listening ? try StandInSocket(path: socketPath, reply: reply) : nil
@@ -302,8 +280,7 @@ struct FigmaCLIOutputTests {
             stderr: String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "",
             requests: standIn?.requests ?? [],
             pageInstalledInTestHome: fileManager.fileExists(atPath: page.path),
-            home: home.path,
-            pageContents: try? String(contentsOf: page, encoding: .utf8)
+            home: home.path
         )
     }
 
@@ -347,19 +324,20 @@ struct FigmaCLIOutputTests {
         #expect(object?["surface_ref"] as? String == "surface:3", "\(run.stdout)")
     }
 
-    @Test("open asks for a pane with no address bar, loading cmux's page for a frame, installed in the home it was given")
+    @Test("open asks for a pane with no address bar, loading cmux's page for a frame, writing no page file")
     func openAsksForAPaneWithNoAddressBar() throws {
         let run = try drive(["figma", "open", Self.frameLink], reply: Self.openReply(createdSplit: true))
         let params = try #require(run.opens.first?.params)
         #expect(run.opens.count == 1)
         #expect(params["show_omnibar"] as? Bool == false)
         let address = try #require(params["url"] as? String)
-        #expect(address.hasPrefix("file://"), "\(address)")
+        #expect(address.hasPrefix("cmux-figma://cmux/figma-embed.html?embed="), "\(address)") // cmux-rbf #cm-73.39
         #expect(address.contains("figma-embed.html?embed="), "\(address)")
         let embedded = URLComponents(string: address)?.queryItems?.first { $0.name == "embed" }?.value ?? ""
         #expect(embedded.hasPrefix("https://embed.figma.com/design/KEY/slug?"), "\(embedded)")
         #expect(embedded.contains("node-id=12-2"), "\(embedded)")
-        #expect(run.pageInstalledInTestHome, "the page was not written under the test's own home")
+        // A guard against a page writer coming back: nothing in the CLI writes one today.
+        #expect(!run.pageInstalledInTestHome, "cm-73.39: the CLI writes no page; the app serves it")
     }
 
     @Test("open sends no theme in the address it loads")
@@ -529,71 +507,6 @@ struct FigmaCLIOutputTests {
         let run = try drive(["figma", "goto", "12-2", "--surface", "id-5"], reply: Self.gotoReply([other]))
         fails(run, with: "surface id-5 is not showing a Figma file")
         #expect(run.gotos.isEmpty)
-    }
-
-    // MARK: - The page on disk
-
-    @Test("every open puts this build's page on disk, the editor branch included")
-    func openInstallsThePage() throws {
-        for link in [Self.editorLink, Self.frameLink] {
-            let run = try drive(["figma", "open", link], page: .stale, reply: Self.openReply(createdSplit: true))
-            #expect(run.status == 0, "\(link): \(run.stderr)")
-            #expect(run.pageContents == FigmaWrapperPage.html, "\(link): \(run.pageContents ?? "no file")")
-        }
-    }
-
-    @Test("every goto puts this build's page on disk")
-    func gotoInstallsThePage() throws {
-        let run = try drive(["figma", "goto", "12-2"], page: .stale, reply: Self.gotoReply([Self.figmaPane(8)]))
-        #expect(run.status == 0, "\(run.stderr)")
-        #expect(run.pageContents == FigmaWrapperPage.html, "\(run.pageContents ?? "no file")")
-    }
-
-    @Test("a whole-file open still works when the page cannot be written, because nothing there loads it")
-    func editorOpenSurvivesAnUnwritablePage() throws {
-        let run = try drive(
-            ["figma", "open", Self.editorLink],
-            page: .staleInReadOnlyFolder,
-            reply: Self.openReply(createdSplit: true)
-        )
-        #expect(run.status == 0, "\(run.stderr)")
-        #expect(run.stdout == "OK surface=surface:3 pane=pane:2 placement=split\n")
-        #expect(run.opens.count == 1)
-        #expect(run.pageContents == Self.stalePage, "the folder was meant to stay unwritten")
-    }
-
-    @Test("a frame open fails and sends nothing when the page cannot be written")
-    func frameOpenFailsOnAnUnwritablePage() throws {
-        let run = try drive(
-            ["figma", "open", Self.frameLink],
-            page: .staleInReadOnlyFolder,
-            reply: Self.openReply(createdSplit: true)
-        )
-        expectPageWriteFailure(run)
-        #expect(run.requests.isEmpty, "\(run.requests.map(\.method))")
-    }
-
-    @Test("goto fails and moves nothing when the page cannot be written")
-    func gotoFailsOnAnUnwritablePage() throws {
-        let run = try drive(
-            ["figma", "goto", "12-2"],
-            page: .staleInReadOnlyFolder,
-            reply: Self.gotoReply([Self.figmaPane(8)])
-        )
-        expectPageWriteFailure(run)
-        #expect(run.gotos.isEmpty, "\(run.requests.map(\.method))")
-    }
-
-    /// One readable line that names the page and says the read view needs it,
-    /// with Foundation's short description after it, not its whole error.
-    private func expectPageWriteFailure(_ run: Run, sourceLocation: SourceLocation = #_sourceLocation) {
-        let prefix = "Error: the read view cannot open without its page "
-            + "\(run.home)/Library/Application Support/cmux/figma-embed.html, which cannot be written: "
-        #expect(run.status == 1, "\(run.stderr)", sourceLocation: sourceLocation)
-        #expect(run.stderr.hasPrefix(prefix), "\(run.stderr)", sourceLocation: sourceLocation)
-        #expect(run.stderr.dropLast().contains("\n") == false, "\(run.stderr)", sourceLocation: sourceLocation)
-        #expect(!run.stderr.contains("Error Domain"), "\(run.stderr)", sourceLocation: sourceLocation)
-        #expect(run.stdout.isEmpty, "\(run.stdout)", sourceLocation: sourceLocation)
     }
 
     // MARK: - Which pane open splits beside
@@ -881,7 +794,8 @@ struct FigmaCLIOutputTests {
         #expect(run.gotos.first?.params["node"] as? String == "1-2")
         #expect(run.gotos.first?.params["purpose"] as? String == "fit")
         #expect(presses(run).isEmpty && evals(run).isEmpty, "\(run.requests.map(\.method))")
-        #expect(run.pageInstalledInTestHome, "the read view's page is on disk, as goto leaves it")
+        // A guard against a page writer coming back: nothing in the CLI writes one today.
+        #expect(!run.pageInstalledInTestHome, "cm-73.39: the CLI writes no page; the app serves it")
     }
 
     @Test("fit with no Figma pane gives goto's refusal and sends nothing to a page")

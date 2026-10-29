@@ -227,15 +227,18 @@ public struct BrowserURLAllowlistPolicy: Equatable, Sendable {
     /// and are denied while a managed list is active — except `file:`, which
     /// ``allows(_:)`` governs through ``allowsLocalFiles`` (WebKit itself
     /// never lets a web origin navigate to a local file).
+    /// cmux-rbf #cm-73.39: `cmux-figma` is also always allowed below; the app's `FigmaPreviewPageGuard`, not this list, stops pages reaching it.
     public static let trustedInternalSchemes: Set<String> = [
         "about", "applewebdata", "blob", "cmux-browser-action", "cmux-diff-viewer",
+        "cmux-figma", // cmux-rbf #cm-73.39: the Figma preview page, so cmux's own loads of it are trusted
         "data", "file", "javascript"
     ]
 
     /// Schemes for cmux-owned documents that WebKit may request while showing
     /// a blocked/error document. These remain available to page-policy checks.
     private static let alwaysAllowedDocumentSchemes: Set<String> = [
-        "about", "applewebdata", "cmux-browser-action", "cmux-diff-viewer"
+        "about", "applewebdata", "cmux-browser-action", "cmux-diff-viewer",
+        "cmux-figma" // cmux-rbf #cm-73.39: a list turned on later does not block an open Figma preview
     ]
 
     /// The effective source.

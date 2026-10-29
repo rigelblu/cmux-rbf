@@ -358,7 +358,7 @@ struct FigmaFitEntranceWorkspaceTests {
 
     @Test func openPlacementSetsTheMarkForADesignFileWithNoAddressBar() throws {
         let wrapperEmbed = FigmaPaneURL.wrapperURL(
-            FigmaPaneURL.wrapperFileURL(),
+            FigmaPaneURL.previewPageURL,
             embedding: URL(string: "https://embed.figma.com/design/KEY/name?node-id=1-2")!
         )
         let cases: [(url: URL, omnibar: Bool, fits: Bool)] = [

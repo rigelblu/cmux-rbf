@@ -23,7 +23,7 @@ enum FigmaTabMark {
     static func applies(
         address: URL?,
         showsAddressBar: Bool,
-        wrapper: URL = FigmaPaneURL.wrapperFileURL()
+        wrapper: URL = FigmaPaneURL.previewPageURL
     ) -> Bool {
         guard !showsAddressBar, let address else { return false }
         return FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
@@ -36,7 +36,7 @@ enum FigmaTabMark {
         own: Data?,
         address: URL?,
         showsAddressBar: Bool,
-        wrapper: URL = FigmaPaneURL.wrapperFileURL()
+        wrapper: URL = FigmaPaneURL.previewPageURL
     ) -> Data? {
         if let own { return own }
         return applies(address: address, showsAddressBar: showsAddressBar, wrapper: wrapper)

@@ -12,8 +12,9 @@ import Foundation
 /// **Why it reads its own query string** rather than being generated per open:
 /// the pane's URL is the file binding, so everything `goto` and a restart need
 /// has to be *in* that URL. Making the page static and the URL carry the
-/// payload gets both — one file on disk, no per-pane temp files to clean up,
-/// and a binding that survives a restart.
+/// payload gets both — one page, no per-pane temp files to clean up, and a
+/// binding that survives a restart. Since `cm-73.39` the app serves it from
+/// memory under `cmux-figma://cmux/figma-embed.html`; nothing writes it to disk.
 enum FigmaWrapperPage {
 
     /// The two decisions the page makes about the address it frames, as plain
@@ -75,21 +76,4 @@ enum FigmaWrapperPage {
       })();
     </script>
     """
-
-    /// Write the page if it is missing or out of date, and return its URL.
-    ///
-    /// Rewritten whenever the contents differ so a stale copy cannot outlive a
-    /// change to the page — it is under a kilobyte, so comparing and rewriting
-    /// costs nothing worth optimising.
-    @discardableResult
-    static func install(at url: URL = FigmaPaneURL.wrapperFileURL()) throws -> URL {
-        let existing = try? String(contentsOf: url, encoding: .utf8)
-        guard existing != html else { return url }
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try html.write(to: url, atomically: true, encoding: .utf8)
-        return url
-    }
 }
