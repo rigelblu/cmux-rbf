@@ -2,11 +2,16 @@ import SwiftUI
 import AppKit
 
 struct SidebarWorkspaceTrailingStatusSlot: View {
+    /// A spinner on the right, at the edge or beside the badge. (cm-128.1)
     let showsSpinner: Bool
     let showsBadge: Bool
     let unreadCount: Int
     let side: CGFloat
-    let width: CGFloat
+    let spinnerSide: CGFloat
+    /// The slot's width: both trailing marks and their gap, never less than the close button. (#cm-128.1)
+    let slotWidth: CGFloat
+    /// The close button's own width.
+    let closeButtonWidth: CGFloat
     let height: CGFloat
     let badgeFont: Font
     let badgeFillColor: Color
@@ -22,25 +27,27 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            if showsSpinner {
-                SidebarWorkspaceLoadingSpinner(side: side, color: spinnerColor, tooltip: spinnerTooltip)
-                    .opacity(canCloseWorkspace && showsCloseButton ? 0 : 1)
-                    .transition(.opacity)
-            } else if showsBadge {
-                SidebarWorkspaceUnreadBadge(
-                    unreadCount: unreadCount,
-                    side: side,
-                    font: badgeFont,
-                    fillColor: badgeFillColor,
-                    textColor: badgeTextColor
-                )
-                .opacity(canCloseWorkspace && showsCloseButton ? 0 : 1)
-                .transition(.opacity)
+            // cm-128.1: the badge takes the edge; the spinner sits beside it, or alone at the edge.
+            HStack(spacing: SidebarWorkspaceSlotResolution.trailingMarkGap) {
+                if showsSpinner {
+                    SidebarWorkspaceLoadingSpinner(side: spinnerSide, color: spinnerColor, tooltip: spinnerTooltip)
+                }
+                if showsBadge {
+                    SidebarWorkspaceUnreadBadge(
+                        unreadCount: unreadCount,
+                        side: side,
+                        font: badgeFont,
+                        fillColor: badgeFillColor,
+                        textColor: badgeTextColor
+                    )
+                }
             }
+            .opacity(canCloseWorkspace && showsCloseButton ? 0 : 1)
+            .transition(.opacity)
             if canCloseWorkspace {
                 Button(action: closeAction) {
                     CmuxSystemSymbolImage(magnified: "xmark", pointSize: closeButtonFontSize, weight: .medium, tint: closeButtonColor)
-                        .frame(width: width, height: height, alignment: .center)
+                        .frame(width: closeButtonWidth, height: height, alignment: .center)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -50,6 +57,6 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
                 .accessibilityHidden(!showsCloseButton)
             }
         }
-        .frame(width: width, height: height, alignment: .trailing)
+        .frame(width: slotWidth, height: height, alignment: .trailing)
     }
 }

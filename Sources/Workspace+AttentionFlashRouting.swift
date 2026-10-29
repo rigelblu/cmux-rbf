@@ -3,10 +3,12 @@ import Foundation
 
 @MainActor
 extension Workspace {
-    /// Installs visual-BEL routing at the terminal's authoritative owner.
-    /// Ownership changes replace this callback during surface transfer, so a
+    /// Installs the terminal callbacks that depend on its authoritative owner: visual-BEL routing, explicit input, and
+    /// pane input for agent waits.
+    /// Ownership changes replace these callbacks during surface transfer, so a
     /// background bell never needs an app-wide surface or focus scan.
-    func installTerminalVisualBellRouting(for terminalPanel: TerminalPanel) {
+    func installTerminalOwnerRouting(for terminalPanel: TerminalPanel) {
+        terminalPanel.surface.installAgentPaneInputHandler(workspaceId: id) // cm-128.1
         terminalPanel.surface.onExplicitInput = { [weak self, weak terminalPanel] in
             guard let self, let terminalPanel else { return }
             // The user (or a socket client) took over the pane: never replay a

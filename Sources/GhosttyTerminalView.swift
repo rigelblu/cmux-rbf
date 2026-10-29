@@ -7099,8 +7099,12 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         // Rendering is driven by Ghostty's wakeups/renderer.
     }
 
+    /// - Parameters:
+    ///   - countsAsPaneInput: False for modifier-only events, which are never typing. (cm-128.1)
+    ///   - isCommittedText: True for text committed by an input method, whose control characters are not physical keys. (cm-128.1)
     @discardableResult
-    private func sendGhosttyKey(_ surface: ghostty_surface_t, _ keyEvent: ghostty_input_key_s) -> Bool {
+    private func sendGhosttyKey(_ surface: ghostty_surface_t, _ keyEvent: ghostty_input_key_s,
+                                countsAsPaneInput: Bool = true, isCommittedText: Bool = false) -> Bool {
 #if DEBUG
         Self.debugGhosttySurfaceKeyEventObserver?(keyEvent)
 #endif
@@ -7110,14 +7114,42 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
            manualNamedKeyConsumedKeyUps.remove(keyCode) != nil {
             return true
         }
+        // cm-128.1: a key accepted into a pane with an open wait, or a running agent that may be interrupted, is reported
+        // to the agent journal. With neither, this costs one weak load and two Bool reads.
+        let isAgentEscape = !isCommittedText && keyEvent.keycode == 0x35
+        let observesAgentInput = countsAsPaneInput && keyEvent.action != GHOSTTY_ACTION_RELEASE
+            && terminalSurface?.agentInputState.requiresKeyInspection(isEscape: isAgentEscape) == true
+        let isGhosttyBinding: Bool
+        let isAgentBinding: Bool
+        if observesAgentInput {
+            var bindingFlags = ghostty_binding_flags_e(0)
+            // Binding state must be sampled before dispatch advances a key sequence.
+            isGhosttyBinding = ghostty_surface_key_is_binding(surface, keyEvent, &bindingFlags)
+            isAgentBinding = TerminalAgentInputState.countsAsBinding(
+                isBinding: isGhosttyBinding,
+                isPerformable: (bindingFlags.rawValue & GHOSTTY_BINDING_FLAGS_PERFORMABLE.rawValue) != 0,
+                isEscape: isAgentEscape
+            )
+        } else {
+            isGhosttyBinding = false
+            isAgentBinding = false
+        }
+        func noteAgentInput() {
+            guard observesAgentInput,
+                  let action = terminalSurface?.agentInputState.acceptKey(isEscape: isAgentEscape, isBinding: isAgentBinding) else { return }
+            terminalSurface?.onAgentPaneInput?(action)
+        }
         if let keyName = terminalSurface?.manualInputKeyName(for: keyEvent) {
             var bindingFlags = ghostty_binding_flags_e(0)
-            if !ghostty_surface_key_is_binding(surface, keyEvent, &bindingFlags) {
+            // cm-128.1: reuse the binding state already sampled for the agent filter instead of asking Ghostty twice.
+            let isBinding = observesAgentInput ? isGhosttyBinding : ghostty_surface_key_is_binding(surface, keyEvent, &bindingFlags)
+            if !isBinding {
                 if terminalSurface?.enqueueManualInputNamedKey(keyName) == true {
                     if let keyCode = UInt16(exactly: keyEvent.keycode) {
                         manualNamedKeyConsumedKeyUps.insert(keyCode)
                     }
                     terminalSurface?.didAcceptExplicitInput()
+                    noteAgentInput()
                     return true
                 }
             }
@@ -7127,6 +7159,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         }
         if handled, keyEvent.action != GHOSTTY_ACTION_RELEASE {
             terminalSurface?.didAcceptExplicitInput()
+            noteAgentInput()
         }
         return handled
     }
@@ -7254,7 +7287,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             keyEvent.text = nil
             keyEvent.composing = false
             keyEvent.unshifted_codepoint = 0
-            _ = sendGhosttyKey(surface, keyEvent)
+            _ = sendGhosttyKey(surface, keyEvent, countsAsPaneInput: false) // cm-128.1: a modifier change is not typing
         }
 
         let selectionActive = ghostty_surface_has_selection(surface)
@@ -13679,7 +13712,7 @@ extension GhosttyNSView: NSTextInputClient {
         keyEvent.composing = false
         text.withCString { pointer in
             keyEvent.text = pointer
-            _ = sendGhosttyKey(surface, keyEvent)
+            _ = sendGhosttyKey(surface, keyEvent, isCommittedText: true) // cm-128.1: committed text is never a physical Escape
         }
     }
 
@@ -13699,7 +13732,7 @@ extension GhosttyNSView: NSTextInputClient {
         keyEvent.unshifted_codepoint = 0
         keyEvent.composing = false
         keyEvent.text = nil
-        _ = sendGhosttyKey(surface, keyEvent)
+        _ = sendGhosttyKey(surface, keyEvent, isCommittedText: true) // cm-128.1: committed text is never a physical Escape
     }
 
     /// External accessibility/dictation tools should commit plain text, but
