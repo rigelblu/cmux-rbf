@@ -394,6 +394,7 @@ extension DockSplitStore {
         panelId: UUID,
         runtime: Workspace.DetachedAgentRuntimeState?
     ) {
+        (panels[panelId] as? TerminalPanel)?.surface.updateAgentInputPhase(runtime?.agentLifecycleStates ?? [:]) // cm-128.1: the pane's key-filter phase
         let needsInput = runtime?.agentLifecycleStates.values.contains(.needsInput) == true
         agentNeedsInputAttention.setAttention(needsInput, forSurfaceId: panelId)
     }

@@ -1,4 +1,5 @@
 import Bonsplit
+import CmuxAgentJournal // cm-128.1: journal types for the PID sweep
 import CmuxSettings
 import CmuxCore
 import Darwin
@@ -33,6 +34,10 @@ extension Workspace {
         get { sidebarAgentRuntimeObservation.agentLifecycleStatesByPanelId }
         set {
             sidebarAgentRuntimeObservation.setAgentLifecycleStatesByPanelId(newValue)
+            // cm-128.1: the map is the only writer of each pane's key-filter phase.
+            for (panelId, panel) in panels {
+                (panel as? TerminalPanel)?.surface.updateAgentInputPhase(newValue[panelId] ?? [:])
+            }
             endWaitIfNoAgentWaits() // (#cm-109)
         }
     }
@@ -203,9 +208,13 @@ extension Workspace {
     }
 
     @discardableResult
-    func clearStaleAgentPIDs(refreshPorts: Bool = true) -> Bool {
+    func clearStaleAgentPIDs(refreshPorts: Bool = true,
+                           journal: AgentJournalLifecycleCenter = .shared, // cm-128.1: where a swept session's end is journaled
+                           liveness: AgentSessionLivenessResolver = AgentSessionLivenessResolver()) -> Bool {
         var didChange = false
         for (key, pid) in agentPIDs where !isRecordedAgentPIDLive(key: key, pid: pid) {
+            journalSessionEnd(forAgentPIDKey: key, pid: pid, panelId: agentPIDPanelIdsByKey[key],
+                              journal: journal, liveness: liveness)
             if clearAgentPID(key: key, clearStatus: true, refreshPorts: false) {
                 didChange = true
             }
@@ -218,7 +227,9 @@ extension Workspace {
     }
 
     @discardableResult
-    func clearStaleAgentPIDs(panelId: UUID, refreshPorts: Bool = true) -> Bool {
+    func clearStaleAgentPIDs(panelId: UUID, refreshPorts: Bool = true,
+                           journal: AgentJournalLifecycleCenter = .shared, // cm-128.1: where a swept session's end is journaled
+                           liveness: AgentSessionLivenessResolver = AgentSessionLivenessResolver()) -> Bool {
         let keys = agentPIDKeysByPanelId[panelId] ?? []
         var didChange = false
         for key in keys {
@@ -228,9 +239,12 @@ extension Workspace {
                 }
                 continue
             }
-            if !isRecordedAgentPIDLive(key: key, pid: pid),
-               clearAgentPID(key: key, panelId: panelId, clearStatus: true, refreshPorts: false) {
-                didChange = true
+            if !isRecordedAgentPIDLive(key: key, pid: pid) {
+                journalSessionEnd(forAgentPIDKey: key, pid: pid, panelId: panelId,
+                                  journal: journal, liveness: liveness)
+                if clearAgentPID(key: key, panelId: panelId, clearStatus: true, refreshPorts: false) {
+                    didChange = true
+                }
             }
         }
         if didChange {
@@ -238,6 +252,25 @@ extension Workspace {
             AppDelegate.shared?.notificationStore?.clearNotifications(forTabId: id, surfaceId: panelId)
         }
         return didChange
+    }
+
+    /// Journals `sessionEnded` for a swept agent PID, so the wait it left on the pane ends with it. (cm-128.1)
+    /// Only a confirmed absent PID or a different generation counts: a PID whose identity was never
+    /// recorded and is still present stays unproven, and the sweep clears it without ending the session.
+    private func journalSessionEnd(forAgentPIDKey key: String, pid: pid_t, panelId: UUID?,
+                                   journal: AgentJournalLifecycleCenter, liveness: AgentSessionLivenessResolver) {
+        let statusKey = agentStatusKey(forAgentPIDKey: key)
+        guard let panelId, AgentHibernationLifecycleStatusKeys.isAllowed(statusKey),
+              liveness.processLiveness(pid: Int(pid), recorded: agentPIDProcessIdentitiesByKey[key]) == .dead else { return }
+        let source = FeedCoordinator.source(forLifecycleStatusKey: statusKey)
+        guard let sessionId = liveness.sessionId(forPIDKey: key, source: source, workspaceId: id,
+                                                 surfaceId: panelId, pid: Int(pid)) else { return }
+        // A live matching process for this source and session keeps it, whichever pane hosts it (herdr included).
+        guard liveness.liveness(source: source, sessionId: sessionId) != .alive else { return }
+        journal.observe(AgentJournalEventDraft(kind: .sessionEnded,
+            occurredAtMs: Int64(Date().timeIntervalSince1970 * 1000), source: source, agentKey: statusKey,
+            sessionId: sessionId, workspaceId: id.uuidString, surfaceId: panelId.uuidString,
+            nativeEvent: "PIDProcessGone"))
     }
 
     func clearAllAgentPIDs(refreshPorts: Bool = true) {

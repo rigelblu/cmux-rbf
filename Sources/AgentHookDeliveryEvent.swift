@@ -81,6 +81,11 @@ struct AgentHookDeliveryEvent: Sendable {
            (subcommand == "pre-tool-use" || subcommand == "post-tool-use") {
             return true
         }
+        // cm-128.1: Claude's `PostToolUse` fires for every tool call. Losing one under load leaves a hand showing, never hides
+        // an answer, so it takes the replaceable reservation like Codex's. Form tools reach the Feed through the direct hook.
+        if agent == "claude", subcommand == "post-tool-use" {
+            return true
+        }
         guard agent == "claude", subcommand == "pre-tool-use",
               let data = payload.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

@@ -52,6 +52,16 @@ extension CMUXCLI {
             ),
         ]
         hooks["PostToolUse"] = [
+            // cm-128.1: every tool completion is offered to the permission pairing, queued so it adds no wait to the tool call;
+            // the form tools also reach the Feed directly, which resolves them by native tool id in bypass mode.
+            Self.claudeQueuedHookGroup(
+                subcommand: "post-tool-use"
+            ),
+            Self.claudeHookGroup(
+                matcher: "AskUserQuestion|ExitPlanMode",
+                command: "\(hookCLI) hooks feed --source claude",
+                timeout: 125
+            ),
             Self.claudeQueuedHookGroup(
                 matcher: "PushNotification",
                 subcommand: "push-notification"

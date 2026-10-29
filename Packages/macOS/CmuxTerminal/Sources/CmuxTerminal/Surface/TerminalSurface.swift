@@ -250,6 +250,11 @@ public final class TerminalSurface: Identifiable, ObservableObject {
     @MainActor public var onManualVisibilityChanged: (@MainActor (Bool) -> Void)?
     /// Requests owner-scoped visual bell attention without activating the app.
     @MainActor public var onVisualBell: (@MainActor () -> Void)?
+    /// Non-observable cached agent phase and Escape sequence state for the input path. (cm-128.1)
+    @MainActor public var agentInputState = TerminalAgentInputState()
+    /// Routes accepted human input to the current pane's journal owner. (cm-128.1)
+    /// The Boolean requests an unknown phase after an eligible physical Escape.
+    @MainActor public var onAgentPaneInput: (@MainActor (Bool) -> Void)?
     /// Routes accepted explicit user input to the surface's current panel owner.
     @MainActor public var onExplicitInput: (@MainActor () -> Void)?
     /// Notifies the owner when explicit input cancels a deferred auto-resume.

@@ -558,6 +558,11 @@ extension FeedCoordinator {
         lifecycleStatusKeyOverrides[source] ?? source
     }
 
+    /// The feed `source` that reports under a lifecycle status key: the inverse of ``lifecycleStatusKey(forSource:)``. (cm-128.1)
+    static func source(forLifecycleStatusKey statusKey: String) -> String {
+        lifecycleStatusKeyOverrides.first { $0.value == statusKey }?.key ?? statusKey
+    }
+
     /// Returns the Feed-owned status/lifecycle slot for one agent source.
     /// Keeping this transient overlay separate from the agent's own slot makes
     /// concurrent hook updates and overlapping Feed decisions independent.

@@ -279,6 +279,8 @@ struct ClaudeHookSessionRecord: Codable {
     var autoNameRecentMessages: [AutoNamingTranscriptMessage]?
     var autoNameMessageSequence: Int?
     var hadPendingBackgroundWorkAtStop: Bool?
+    var editorMode: String? = nil // cm-128.1: Claude's editor mode at SessionStart, read by the journal consumer
+    var pendingClaudePermissions: [ClaudePendingPermission]? = nil // cm-128.1: permissions waiting for their tool to complete
     /// Unsandboxed Cursor shell calls that cmux asked Cursor to gate. The
     /// after/failure hooks do not carry a native approval decision, so the
     /// command identity is the only safe completion correlation available.
@@ -1576,6 +1578,9 @@ final class ClaudeHookSessionStore {
                 updateLastNotificationStatus: false,
                 runtimeStatus: nil,
                 updateRuntimeStatus: false,
+                // cm-128.1: startup, resume and clear begin with nothing pending (false); `compact` continues the same turn, so it
+                // keeps the cache, where nil means activity since the last Stop.
+                hadPendingBackgroundWorkAtStop: normalizedSource == "compact" ? nil : false,
                 now: now
             )
             state.sessions[normalizedSessionId] = record
@@ -1779,7 +1784,7 @@ final class ClaudeHookSessionStore {
         }
     }
 
-    private func makeSessionRecord(
+    func makeSessionRecord( // cm-128.1: internal, for the permission store extension
         state: ClaudeHookSessionStoreFile,
         sessionId: String,
         workspaceId: String,
@@ -2028,6 +2033,14 @@ final class ClaudeHookSessionStore {
         }
         if updateRuntimeStatus {
             record.runtimeStatus = runtimeStatus
+        }
+        // cm-128.1: a prompt or a tool call is activity since the last Stop, so the Stop's pending-work answer is stale (nil).
+        if hookEventName == "UserPromptSubmit" || hookEventName == "PreToolUse" {
+            record.hadPendingBackgroundWorkAtStop = nil
+        }
+        // cm-128.1: a new turn or a Stop ends every pending permission pairing; they are cleared with the record, not in a second rewrite.
+        if hookEventName == "UserPromptSubmit" || hookEventName == "Stop" {
+            record.pendingClaudePermissions = nil
         }
         if let hadPendingBackgroundWorkAtStop {
             record.hadPendingBackgroundWorkAtStop = hadPendingBackgroundWorkAtStop
@@ -27726,6 +27739,10 @@ struct CMUXCLI {
         let hookCwd = relayOrigin ? nil : parsedInput.cwd
         let hookTranscriptPath = relayOrigin ? nil : parsedInput.transcriptPath
         let sessionStore = ClaudeHookSessionStore()
+        // cm-128.1: prompt and Stop clear a session's pending permissions in their own record update; a session's end does it here.
+        if subcommand == "session-end", let sessionId = parsedInput.sessionId {
+            try? sessionStore.clearClaudePermissions(sessionId: sessionId)
+        }
         func localClaudePID(mapped: ClaudeHookSessionRecord?) -> Int? {
             guard !relayOrigin else { return nil }
             return mapped?.pid ?? observedHookAgentPID
@@ -27860,6 +27877,10 @@ struct CMUXCLI {
                 return
             }
             if let acceptedSessionId {
+                // cm-128.1: snapshot the editor mode at SessionStart, for the Escape filter's vim rule.
+                let editorMode = parsedInput.rawObject?[Self.claudeEditorModePayloadKey] as? String
+                    ?? claudeEditorMode(cwd: hookCwd, environment: env)
+                try? sessionStore.updateClaudeEditorMode(sessionId: acceptedSessionId, editorMode: editorMode)
                 publishAgentSurfaceResumeBinding(
                     client: client,
                     workspaceId: workspaceId,
@@ -28475,13 +28496,11 @@ struct CMUXCLI {
                 notifyPending = false
             case "idle_prompt":
                 notifyCategory = .idleReminder
-                // The cached Stop-time flag is not stale in practice: a completed
-                // background task re-invokes claude (new turn -> fresh Stop with
-                // empty background_tasks refreshes the cache before any later
-                // idle_prompt), and no fresh Stop means the work is still running,
-                // so pending=true is correct. Deliberately no freshness heuristic;
-                // permission_prompt is never gated by this flag.
-                notifyPending = (mappedSession?.hadPendingBackgroundWorkAtStop == true)
+                // cm-128.1: a prompt or tool observation invalidates the previous Stop.
+                // Until the current turn records another Stop, an idle reminder
+                // cannot prove the pane safe to hibernate after Escape.
+                // cm-128.1: a session with no record gives no evidence of activity, so it is not pending.
+                notifyPending = mappedSession.map { $0.hadPendingBackgroundWorkAtStop != false } ?? false
             default:
                 // No (or unknown) notification_type: fall back to the summarizer's
                 // cue classification so older clients still gate under the right
@@ -28492,9 +28511,10 @@ struct CMUXCLI {
                     notifyPending = false
                 case "Waiting":
                     notifyCategory = .idleReminder
-                    notifyPending = (mappedSession?.hadPendingBackgroundWorkAtStop == true)
+                    notifyPending = mappedSession.map { $0.hadPendingBackgroundWorkAtStop != false } ?? false
                 case "Completed":
                     notifyCategory = .turnComplete
+                    // cm-128.1: as at base. A completion is not an idle nag, so a Stop that was never recorded is not pending.
                     notifyPending = (mappedSession?.hadPendingBackgroundWorkAtStop == true)
                 default:
                     notifyCategory = .other
@@ -28604,6 +28624,12 @@ struct CMUXCLI {
                     pendingWork: notifyPending), client: client)
             }
             printClaudeHookAck()
+        case "post-tool-use":
+            // cm-128.1: only a recorded permission can resolve here. The form-specific
+            // Feed hook owns native tool-id resolutions in bypass mode.
+            didSendFeedTelemetry = true
+            try runClaudePostToolUseHook(client: client, telemetry: telemetry, parsedInput: parsedInput,
+                sessionStore: sessionStore, routing: hookRouting)
         case "push-notification": try runClaudePushNotificationHook(client: client, telemetry: telemetry, parsedInput: parsedInput, sessionStore: sessionStore, routing: hookRouting, markFeedTelemetryHandled: { didSendFeedTelemetry = true }, sendFeedTelemetry: sendClaudeFeedTelemetry)
         case "session-end":
             telemetry.breadcrumb("claude-hook.session-end")
@@ -39940,7 +39966,22 @@ export default CMUXSessionRestore;
         if let value = causalEvidence.turnIdentity { eventDict["turn_id"] = value }
         if let value = causalEvidence.requestIdentity { eventDict["request_id"] = value }
         if let value = Self.semanticOccurredAtMs(stdinObj) { eventDict["occurred_at_ms"] = value }
-        if let value = firstString(in: stdinObj, keys: ["agent_id", "agentId"]) { eventDict["agent_id"] = value }
+        if let value = firstString(in: stdinObj, keys: ["agent_id", "agentId"]) {
+            // cm-128.1: Claude's helper id travels as `helper_agent_id`, so the Feed keeps its own request id.
+            eventDict[source == "claude" ? "helper_agent_id" : "agent_id"] = value
+        }
+        if source == "claude", rawEvent == "PermissionRequest", !toolName.isEmpty,
+           let input = toolRequestInput, let fingerprint = ClaudePendingPermission.fingerprint(toolName: toolName, input: input),
+           let workspaceId = eventDict["workspace_id"] as? String,
+           let surfaceId = env["CMUX_SURFACE_ID"], !surfaceId.isEmpty {
+            // cm-128.1: persist before feed.push blocks: the tool can finish after a
+            // terminal answer while the PermissionRequest hook still waits.
+            let permission = ClaudePendingPermission(toolName: toolName, inputFingerprint: fingerprint,
+                requestId: requestId,
+                agentId: firstString(in: stdinObj, keys: ["agent_id", "agentId"]))
+            try? ClaudeHookSessionStore(processEnv: env).rememberClaudePermission(sessionId: sessionId,
+                workspaceId: workspaceId, surfaceId: surfaceId, permission: permission)
+        }
 
         // Sync. For actionable events we block within the agent's shortest
         // declared 120s hook deadline while waiting for the user's Feed click.

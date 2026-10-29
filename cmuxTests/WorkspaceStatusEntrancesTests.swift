@@ -865,96 +865,69 @@ struct WorkspaceStatusEntrancesTests {
     }
 
 
-    /// Piece 4 (#cm-109.4): Slot resolution gives hand priority over spinner and badge,
-    /// spinner priority over badge, and trailing close button suppresses all trailing slot items.
-    @Test func slotResolutionPicksHandOverSpinnerAndBadgeAndRespectsCloseButton() {
-        // 1. No hand, no spinner, no badge
-        let empty = SidebarWorkspaceSlotResolution.resolve(
-            showsHand: false,
-            showsSpinner: false,
-            unreadCount: 0,
-            loadingSpinnerPosition: .leading,
-            notificationBadgePosition: .leading,
-            showsCloseButton: false
-        )
-        #expect(empty == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: false)) // (#cm-109.3)
+    /// cm-128.1 (changed on purpose, was `slotResolutionPicksHandOverSpinnerAndBadgeAndRespectsCloseButton`): nothing hides
+    /// another mark. The badge keeps the leading slot alone; a spinner set left draws in the agent-mark group after the
+    /// glyph and the hand; with both set right the badge sits at the edge and the spinner beside it; the close button
+    /// replaces both trailing marks.
+    @Test func slotResolutionShowsEveryPresentMarkAndRespectsCloseButton() {
+        func resolve(hand: Bool = false, spinner: Bool = false, unread: Int = 0,
+                     spinnerAt: SidebarIndicatorPosition = .leading, badgeAt: SidebarIndicatorPosition = .leading,
+                     close: Bool = false) -> SidebarWorkspaceSlotResolution {
+            SidebarWorkspaceSlotResolution.resolve(
+                showsHand: hand, showsSpinner: spinner, unreadCount: unread,
+                loadingSpinnerPosition: spinnerAt, notificationBadgePosition: badgeAt, showsCloseButton: close
+            )
+        }
+        func marks(_ r: SidebarWorkspaceSlotResolution) -> String {
+            "leading=\(r.leading) trailing=\(r.trailing) inner=\(r.trailingInner) markSpinner=\(r.markSpinner) hand=\(r.showsHand)"
+        }
+        // 1. Nothing present.
+        #expect(resolve() == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: false))
+        // 2. A leading badge holds the leading slot.
+        #expect(resolve(unread: 3) == SidebarWorkspaceSlotResolution(leading: .badge, trailing: .none, showsHand: false))
+        // 3. A left spinner leaves the leading slot for the agent-mark group.
+        let spinnerLeft = resolve(spinner: true, unread: 3)
+        #expect(spinnerLeft == SidebarWorkspaceSlotResolution(leading: .badge, trailing: .none, markSpinner: true, showsHand: false), "\(marks(spinnerLeft))")
+        let spinnerLeftNoBadge = resolve(spinner: true)
+        #expect(spinnerLeftNoBadge == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, markSpinner: true, showsHand: false), "\(marks(spinnerLeftNoBadge))")
+        // 4. The hand hides neither the badge nor the spinner, on any side.
+        let handLeft = resolve(hand: true, spinner: true, unread: 3)
+        #expect(handLeft == SidebarWorkspaceSlotResolution(leading: .badge, trailing: .none, markSpinner: true, showsHand: true), "\(marks(handLeft))")
+        let handRight = resolve(hand: true, spinner: true, unread: 3, spinnerAt: .trailing, badgeAt: .trailing)
+        #expect(handRight == SidebarWorkspaceSlotResolution(leading: .none, trailing: .badge, trailingInner: .spinner, showsHand: true), "\(marks(handRight))")
+        // 5. Both right, no hand: badge at the edge, spinner beside it. Either alone takes the edge.
+        let bothRight = resolve(spinner: true, unread: 3, spinnerAt: .trailing, badgeAt: .trailing)
+        #expect(bothRight == SidebarWorkspaceSlotResolution(leading: .none, trailing: .badge, trailingInner: .spinner, showsHand: false), "\(marks(bothRight))")
+        #expect(resolve(spinner: true, spinnerAt: .trailing) == SidebarWorkspaceSlotResolution(leading: .none, trailing: .spinner, showsHand: false))
+        #expect(resolve(unread: 3, badgeAt: .trailing) == SidebarWorkspaceSlotResolution(leading: .none, trailing: .badge, showsHand: false))
+        // 6. The close button replaces both trailing marks, hand or not; left-side marks stay.
+        let closeBothRight = resolve(hand: true, spinner: true, unread: 3, spinnerAt: .trailing, badgeAt: .trailing, close: true)
+        #expect(closeBothRight == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true), "\(marks(closeBothRight))")
+        let closeLeft = resolve(hand: true, spinner: true, unread: 3, close: true)
+        #expect(closeLeft == SidebarWorkspaceSlotResolution(leading: .badge, trailing: .none, markSpinner: true, showsHand: true), "\(marks(closeLeft))")
+        // 7. Opposite sides keep each mark on its own side.
+        let spinnerRightBadgeLeft = resolve(hand: true, spinner: true, unread: 3, spinnerAt: .trailing, badgeAt: .leading)
+        #expect(spinnerRightBadgeLeft == SidebarWorkspaceSlotResolution(leading: .badge, trailing: .spinner, showsHand: true), "\(marks(spinnerRightBadgeLeft))")
+        let spinnerLeftBadgeRight = resolve(hand: true, spinner: true, unread: 3, spinnerAt: .leading, badgeAt: .trailing)
+        #expect(spinnerLeftBadgeRight == SidebarWorkspaceSlotResolution(leading: .none, trailing: .badge, markSpinner: true, showsHand: true), "\(marks(spinnerLeftBadgeRight))")
+    }
 
-        // 2. Badge in leading slot
-        let badgeLeading = SidebarWorkspaceSlotResolution.resolve(
-            showsHand: false,
-            showsSpinner: false,
-            unreadCount: 3,
-            loadingSpinnerPosition: .leading,
-            notificationBadgePosition: .leading,
-            showsCloseButton: false
-        )
-        #expect(badgeLeading == SidebarWorkspaceSlotResolution(leading: .badge, trailing: .none, showsHand: false)) // (#cm-109.3)
-
-        // 3. Spinner beats badge in leading slot
-        let spinnerLeading = SidebarWorkspaceSlotResolution.resolve(
-            showsHand: false,
-            showsSpinner: true,
-            unreadCount: 3,
-            loadingSpinnerPosition: .leading,
-            notificationBadgePosition: .leading,
-            showsCloseButton: false
-        )
-        #expect(spinnerLeading == SidebarWorkspaceSlotResolution(leading: .spinner, trailing: .none, showsHand: false)) // (#cm-109.3)
-
-        // 4. Hand suppresses spinner and badge in slots; showsHand is true (#cm-109.3)
-        let handLeading = SidebarWorkspaceSlotResolution.resolve(
-            showsHand: true,
-            showsSpinner: true,
-            unreadCount: 3,
-            loadingSpinnerPosition: .leading,
-            notificationBadgePosition: .leading,
-            showsCloseButton: false
-        )
-        #expect(handLeading == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
-
-        // 5. Hand suppresses spinner and badge when loadingSpinnerPosition is trailing (#cm-109.3)
-        let handTrailing = SidebarWorkspaceSlotResolution.resolve(
-            showsHand: true,
-            showsSpinner: true,
-            unreadCount: 3,
-            loadingSpinnerPosition: .trailing,
-            notificationBadgePosition: .trailing,
-            showsCloseButton: false
-        )
-        #expect(handTrailing == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
-
-        // 6. Close button with hand: slots empty, showsHand is true (#cm-109.3)
-        let handTrailingClosed = SidebarWorkspaceSlotResolution.resolve(
-            showsHand: true,
-            showsSpinner: true,
-            unreadCount: 3,
-            loadingSpinnerPosition: .trailing,
-            notificationBadgePosition: .trailing,
-            showsCloseButton: true
-        )
-        #expect(handTrailingClosed == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
-
-        // 7. Close button does not suppress hand; slots remain empty (#cm-109.3)
-        let handLeadingClosed = SidebarWorkspaceSlotResolution.resolve(
-            showsHand: true,
-            showsSpinner: true,
-            unreadCount: 3,
-            loadingSpinnerPosition: .leading,
-            notificationBadgePosition: .trailing,
-            showsCloseButton: true
-        )
-        #expect(handLeadingClosed == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
-
-        // 8. Hand on with spinner and badge on opposite sides and close button off -> both slots .none (#cm-109.3)
-        let handOppositeSides = SidebarWorkspaceSlotResolution.resolve( // (#cm-109.3)
-            showsHand: true, // (#cm-109.3)
-            showsSpinner: true, // (#cm-109.3)
-            unreadCount: 3, // (#cm-109.3)
-            loadingSpinnerPosition: .trailing, // (#cm-109.3)
-            notificationBadgePosition: .leading, // (#cm-109.3)
-            showsCloseButton: false // (#cm-109.3)
-        ) // (#cm-109.3)
-        #expect(handOppositeSides == SidebarWorkspaceSlotResolution(leading: .none, trailing: .none, showsHand: true)) // (#cm-109.3)
+    /// cm-128.1: the title reserves badge + gap + spinner at the trailing edge when both show there, and never less than
+    /// the close button that replaces them on hover.
+    @Test func trailingReserveCoversBothMarksAndTheCloseButton() {
+        func reserve(_ trailing: SidebarWorkspaceSlotResolution.SlotContent,
+                     _ inner: SidebarWorkspaceSlotResolution.SlotContent,
+                     close: CGFloat = 16) -> CGFloat {
+            SidebarWorkspaceSlotResolution.trailingReserve(
+                trailing: trailing, trailingInner: inner, badgeSide: 16, spinnerSide: 12, closeButtonWidth: close
+            )
+        }
+        #expect(reserve(.badge, .spinner) == 16 + SidebarWorkspaceSlotResolution.trailingMarkGap + 12)
+        #expect(reserve(.badge, .spinner, close: 40) == 40)
+        #expect(reserve(.badge, .none) == 16)
+        #expect(reserve(.spinner, .none) == 16)
+        #expect(reserve(.none, .none) == 16)
+        #expect(SidebarWorkspaceSlotResolution.trailingMarkGap == 6)
     }
 
     /// Piece 4 (#cm-109.4): Snapshot and ContextMenuImmediateFields capture showsRaisedHand.
@@ -1098,7 +1071,7 @@ struct WorkspaceStatusEntrancesTests {
 
         let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40))
         cell.configurePresentation(model: initialModel)
-        #expect(cell.leadingSpinnerForTesting?.isHidden == false)
+        #expect(cell.markSpinnerForTesting?.isHidden == false)
         #expect(cell.handForTesting?.isHidden != false) // (#cm-109.3)
 
         // 2. Under his list, hand becomes active, winning over the existing spinner and badge.
@@ -1149,8 +1122,13 @@ struct WorkspaceStatusEntrancesTests {
 
         let hand = try #require(cell.handForTesting) // (#cm-109.3)
         #expect(hand.isHidden == false)
-        #expect(cell.leadingSpinnerForTesting?.isHidden == true)
-        #expect(cell.leadingBadgeForTesting.isHidden == true)
+        // cm-128.1: the hand hides neither mark. The badge keeps the leading slot; the left spinner draws after the hand.
+        let markSpinner = try #require(cell.markSpinnerForTesting)
+        #expect(markSpinner.isHidden == false)
+        #expect(cell.leadingBadgeForTesting.isHidden == false)
+        #expect(cell.leadingBadgeForTesting.frame.maxX <= hand.frame.minX)
+        #expect(abs(markSpinner.frame.minX - (hand.frame.maxX + 8)) < 0.001, "spinner minX \(markSpinner.frame.minX), hand maxX \(hand.frame.maxX)")
+        #expect(cell.titleFrameForTesting.minX >= markSpinner.frame.maxX)
         let standardSpinnerSide = max(10, 12 * waitingModel.fontScale)
         #expect(abs(hand.frame.size.width - standardSpinnerSide) < 0.001)
         #expect(abs(hand.frame.size.height - standardSpinnerSide) < 0.001)
@@ -1384,13 +1362,12 @@ struct WorkspaceStatusEntrancesTests {
         } // (#cm-109.3)
     } // (#cm-109.3)
 
-    /// Piece 4 (#cm-109.4, review #3): A leading slot with an active spinner and a leading badge
-    /// candidate under no list preserves upstream's 16·fs unread badge width, preventing title shift.
-    @Test func swiftUISlotWidthPreservesUnreadBadgeWidthWhenSpinnerIsLeadingWithoutHand() throws {
+    /// Piece 4 (#cm-109.4): the leading slot holds the unread badge alone, at upstream's 16·fs width, with the
+    /// spinner set left or not, so the title never shifts as agents start and stop.
+    @Test func swiftUISlotWidthKeepsTheBadgeWidthWhenTheSpinnerIsSetLeft() throws {
         for fontSize in stride(from: 10.0, through: 20.0, by: 0.5) {
             let fontScale = fontSize / 12.5
             let scaledUnreadBadgeSize = 16 * fontScale
-            let scaledLoadingSpinnerSize = max(10, 12 * fontScale)
             let resolution = SidebarWorkspaceSlotResolution.resolve(
                 showsHand: false,
                 showsSpinner: true,
@@ -1399,25 +1376,16 @@ struct WorkspaceStatusEntrancesTests {
                 notificationBadgePosition: .leading,
                 showsCloseButton: false
             )
-            #expect(resolution.leading == .spinner)
-            let side = SidebarWorkspaceSlotResolution.leadingSlotSide( // (#cm-109.3)
-                leadingBadgeCandidate: true, // (#cm-109.3)
-                scaledUnreadBadgeSize: scaledUnreadBadgeSize, // (#cm-109.3)
-                scaledLoadingSpinnerSize: scaledLoadingSpinnerSize // (#cm-109.3)
-            ) // (#cm-109.3)
-            #expect(abs(side - scaledUnreadBadgeSize) < 0.001, "leading slot side \(side) must preserve upstream badge width \(scaledUnreadBadgeSize) at font size \(fontSize)")
+            // cm-128.1 (grill Q28): the left spinner moved after the glyph; this asserted leading == .spinner
+            #expect(resolution.leading == .badge)
+            #expect(resolution.markSpinner)
 
             let leadingSlot = SidebarWorkspaceLeadingStatusSlot( // (#cm-109.3)
-                showsBadge: resolution.leading == .badge, // (#cm-109.3)
-                showsSpinner: resolution.leading == .spinner, // (#cm-109.3)
                 unreadCount: 3,
-                side: side,
-                spinnerSide: scaledLoadingSpinnerSize,
+                side: scaledUnreadBadgeSize,
                 badgeFont: .system(size: 9 * fontScale),
                 badgeFillColor: .blue,
-                badgeTextColor: .white,
-                spinnerColor: .secondaryLabelColor,
-                spinnerTooltip: ""
+                badgeTextColor: .white
             )
             let host = NSHostingView(rootView: leadingSlot)
             host.frame = NSRect(x: 0, y: 0, width: 100, height: 100)
@@ -1578,7 +1546,7 @@ struct WorkspaceStatusEntrancesTests {
             let model = try waitingHandModel(dark: dark, isActive: false, standIn: dark ? "#333846" : "#C2C0CB", waiting: false) // (#cm-109.7)
             let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40)) // (#cm-109.7)
             cell.configurePresentation(model: model) // (#cm-109.7)
-            let spinner = try #require(cell.leadingSpinnerForTesting) // (#cm-109.7)
+            let spinner = try #require(cell.markSpinnerForTesting) // (#cm-109.7)
             #expect(spinner.isHidden == false, "dark: \(dark)") // (#cm-109.7)
             let expected = SidebarRowPalette(model: model).secondary(0.55) // (#cm-109.7)
             #expect(isSameColor(spinner.color, expected), "dark: \(dark)") // (#cm-109.7)
@@ -1586,6 +1554,97 @@ struct WorkspaceStatusEntrancesTests {
             #expect(!isSameColor(spinner.color, resolvedSystemYellow(dark: dark)), "dark: \(dark)") // (#cm-109.7)
         } // (#cm-109.7)
     } // (#cm-109.7)
+
+    /// cm-128.1: a laid-out AppKit row for an agent mark scenario. `waiting` raises the hand, `running` starts the spinner,
+    /// `status` shows the status glyph; the two positions are the sidebar settings under test.
+    private func markRowCell(
+        spinnerAt: SidebarIndicatorPosition, badgeAt: SidebarIndicatorPosition, unread: Int,
+        waiting: Bool, running: Bool, status: WorkspaceTaskStatus? = nil
+    ) throws -> SidebarWorkspaceRowTableCellView {
+        let suite = "WorkspaceStatusEntrancesTests.marks.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(spinnerAt.rawValue, forKey: "sidebarLoadingSpinnerPosition")
+        defaults.set(badgeAt.rawValue, forKey: "sidebarNotificationBadgePosition")
+        let rowSettings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+        var states: [String: AgentHibernationLifecycleState] = [:]
+        if waiting { states["waiter"] = .needsInput }
+        if running { states["runner"] = .running }
+        workspace.agentLifecycleStatesByPanelId[panelId] = states
+        if let status { workspace.setTaskStatusOverride(status) }
+        let snapshot = factory(workspace, list: Self.hisList, settings: rowSettings, showsAgentActivity: true).makeSnapshot()
+        #expect(snapshot.showsRaisedHand == waiting)
+        #expect((snapshot.activeCodingAgentCount > 0) == running)
+        let model = SidebarWorkspaceRowModel(
+            workspaceId: workspace.id, index: 0, snapshot: snapshot, settings: rowSettings, isActive: false,
+            isMultiSelected: false, hasUserCustomTitle: false, canCloseWorkspace: true, accessibilityWorkspaceCount: 1,
+            unreadCount: unread, latestNotificationText: nil, showsAgentActivity: true, rowSpacing: 8, isBeingDragged: false,
+            topDropIndicatorVisible: false, bottomDropIndicatorVisible: false, isGrouped: false, isColorSectionMember: false,
+            isFirstRow: true, shortcutHintText: nil, showsShortcutHints: false, colorSchemeIsDark: true,
+            globalFontMagnificationPercent: 100, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
+            isChecklistPopoverPresented: false, editingChecklistItemId: nil, todoControlsEnabled: true,
+            isMetadataExpanded: false, isMarkdownExpanded: false
+        )
+        let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40))
+        cell.configurePresentation(model: model)
+        cell.layout()
+        return cell
+    }
+
+    /// cm-128.1 (Scenario 17, AppKit row): with the spinner set to the left it draws after the status glyph, beside the
+    /// hand and after it; the badge keeps the leading slot alone, and the name starts after the last mark.
+    @Test func appKitLeftSpinnerDrawsAfterTheGlyphBesideTheHandAndTheBadgeKeepsTheLeadingSlot() throws {
+        let cell = try markRowCell(spinnerAt: .leading, badgeAt: .leading, unread: 3, waiting: true, running: true, status: .review)
+        let badge = cell.leadingBadgeForTesting
+        let glyph = cell.statusGlyphButtonForTesting
+        let hand = try #require(cell.handForTesting)
+        let spinner = try #require(cell.markSpinnerForTesting)
+        #expect(!badge.isHidden && !glyph.isHidden && !hand.isHidden && !spinner.isHidden)
+        #expect(badge.frame.maxX <= glyph.frame.minX, "badge \(badge.frame), glyph \(glyph.frame)")
+        #expect(glyph.frame.maxX <= hand.frame.minX, "glyph \(glyph.frame), hand \(hand.frame)")
+        #expect(abs(spinner.frame.minX - (hand.frame.maxX + 8)) < 0.001, "spinner \(spinner.frame), hand \(hand.frame)")
+        #expect(cell.titleFrameForTesting.minX >= spinner.frame.maxX)
+        #expect(cell.trailingSpinnerForTesting?.isHidden != false)
+
+        let spinnerOnly = try markRowCell(spinnerAt: .leading, badgeAt: .leading, unread: 0, waiting: false, running: true, status: .review)
+        let onlySpinner = try #require(spinnerOnly.markSpinnerForTesting)
+        #expect(!onlySpinner.isHidden)
+        #expect(onlySpinner.frame.minX >= spinnerOnly.statusGlyphButtonForTesting.frame.maxX, "the spinner follows the glyph, not the leading slot")
+        #expect(spinnerOnly.titleFrameForTesting.minX >= onlySpinner.frame.maxX)
+    }
+
+    /// cm-128.1 (Scenario 17, AppKit row): both set to the right, the badge sits at the row's edge, the spinner beside it
+    /// with the 6-pt gap, and the title stops before the spinner. Nothing leads.
+    @Test func appKitRightBadgeAndSpinnerBothShowWithTheBadgeAtTheEdge() throws {
+        let cell = try markRowCell(spinnerAt: .trailing, badgeAt: .trailing, unread: 3, waiting: true, running: true, status: .review)
+        let badge = cell.trailingBadgeForTesting
+        let spinner = try #require(cell.trailingSpinnerForTesting)
+        #expect(!badge.isHidden && !spinner.isHidden)
+        #expect(cell.leadingBadgeForTesting.isHidden)
+        #expect(cell.markSpinnerForTesting?.isHidden != false)
+        #expect(abs(spinner.frame.maxX + 6 - badge.frame.minX) < 0.001, "spinner \(spinner.frame), badge \(badge.frame)")
+        #expect(cell.titleFrameForTesting.maxX <= spinner.frame.minX, "title \(cell.titleFrameForTesting), spinner \(spinner.frame)")
+        let hand = try #require(cell.handForTesting)
+        #expect(!hand.isHidden)
+        #expect(cell.titleFrameForTesting.minX >= hand.frame.maxX)
+    }
+
+    /// cm-128.1: hovering the row swaps both trailing marks for the close button, and the title must not move: it reserves the
+    /// marks' width at rest, not the width of what is visible. (Mutation proof: reserve from the visible marks and this fails.)
+    @Test func hoveringTheRowDoesNotMoveTheTitleWhenBothTrailingMarksShow() throws {
+        let cell = try markRowCell(spinnerAt: .trailing, badgeAt: .trailing, unread: 3, waiting: false, running: true)
+        let resting = cell.titleFrameForTesting
+        #expect(!cell.trailingBadgeForTesting.isHidden && cell.trailingSpinnerForTesting?.isHidden == false)
+        cell.enforcePointerHovering(true)
+        cell.layout()
+        #expect(cell.trailingBadgeForTesting.isHidden && cell.trailingSpinnerForTesting?.isHidden != false, "the close button replaces both marks")
+        #expect(cell.titleFrameForTesting == resting, "hovered title \(cell.titleFrameForTesting), resting \(resting)")
+        cell.enforcePointerHovering(false)
+        cell.layout()
+        #expect(cell.titleFrameForTesting == resting)
+    }
 
     /// The ink width of `view` as drawn, in points: the columns with alpha above `threshold`, at 8 px per point.
     private func inkWidth(of view: NSView, threshold: CGFloat) throws -> CGFloat { // (#cm-109.7)
