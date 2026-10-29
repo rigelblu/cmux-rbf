@@ -7266,10 +7266,8 @@ struct ContentView: View {
             )
             // cmux-rbf (#cm-73.3): the palette uses the key's target selection. Reject a revert of this hunk on upstream sync.
             snapshot.setBool(CommandPaletteContextKeys.workspaceCanSwitchFigmaPage, workspace.figmaPageSwitchTarget() != nil)
-            // cmux-rbf (#cm-73.32): palette motion availability and playing state.
-            let motionTarget = workspace.figmaMotionTarget()
-            snapshot.setBool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion, motionTarget != nil)
-            snapshot.setBool(CommandPaletteContextKeys.workspaceFigmaMotionIsPlaying, motionTarget?.isFigmaMotionPlaying == true)
+            // cmux-rbf (#cm-73.37): Loading disables both entries; availability controls visibility.
+            Self.populateFigmaMotionContext(&snapshot, target: workspace.figmaMotionTarget())
             // cmux-rbf #cm-73.2a
             snapshot.setBool(
                 CommandPaletteContextKeys.workspaceCanToggleDesignFocus,
@@ -8651,6 +8649,7 @@ struct ContentView: View {
         )
         // cmux-rbf (#cm-73.32): one shared action behind button, shortcut and palette. Reject a revert of this hunk on upstream sync.
         contributions.append(Self.figmaMotionCommandContribution())
+        contributions.append(Self.figmaShowStillCommandContribution()) // cmux-rbf (#cm-73.37)
         // cmux-rbf #cm-73.2a
         contributions.append(
             CommandPaletteCommandContribution(

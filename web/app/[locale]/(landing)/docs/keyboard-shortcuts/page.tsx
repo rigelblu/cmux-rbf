@@ -41,6 +41,8 @@ export default function KeyboardShortcutsPage() {
       <p>{t("paneResizeDescription")}</p>
       <p>{t("figmaSwitchDescription")}</p>
       <p>{t("figmaMotionDescription")}</p>
+      {/* cmux-rbf (#cm-73.37): Show Still has its own shortcut. */}
+      <p>{t("figmaShowStillDescription")}</p>
 
       <DocsHeading level={2} id="shortcut-chords" className="scroll-mt-24">{t("chordsTitle")}</DocsHeading>
       <p>

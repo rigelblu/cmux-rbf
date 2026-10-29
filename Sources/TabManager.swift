@@ -4617,6 +4617,10 @@ class TabManager: ObservableObject {
     }
 
     // cmux-rbf (#cm-73.32): workspace only; one shared action toggles Figma prototype motion. Reject a revert of this hunk on upstream sync.
+    // cmux-rbf (#cm-73.37)
+    @discardableResult
+    func showFigmaStill() -> Bool { selectedWorkspace?.showFigmaStill() ?? false }
+
     @discardableResult
     func toggleFigmaMotion() -> Bool {
         selectedWorkspace?.toggleFigmaMotion() ?? false

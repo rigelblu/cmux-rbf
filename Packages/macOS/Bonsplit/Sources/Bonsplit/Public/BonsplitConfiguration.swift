@@ -480,10 +480,6 @@ extension BonsplitConfiguration {
         public var figmaPreview: String
         /// cmux-rbf #cm-73.3: names the editor half of the Figma page switch.
         public var figmaEditor: String
-        /// cmux-rbf (#cm-73.32): tooltip for playing prototype motion in Figma preview.
-        public var figmaPlayMotion: String
-        /// cmux-rbf (#cm-73.32): tooltip for showing still read view in Figma preview.
-        public var figmaShowStill: String
         /// Names the column command.
         public var boardColumn: String
         /// Names the row command.
@@ -508,8 +504,6 @@ extension BonsplitConfiguration {
             pairExit: String = "Exit Design Focus", // cmux-rbf #cm-73.16
             figmaPreview: String = "Preview", // cmux-rbf #cm-73.3
             figmaEditor: String = "Editor", // cmux-rbf #cm-73.3
-            figmaPlayMotion: String = "Play motion", // cmux-rbf (#cm-73.32)
-            figmaShowStill: String = "Show still", // cmux-rbf (#cm-73.32)
             boardColumn: String = "Lay Boards in a Column",
             boardRow: String = "Lay Boards in a Row",
             boardPin: String = "Keep Board Layout on Flip",
@@ -526,8 +520,6 @@ extension BonsplitConfiguration {
             self.pairExit = pairExit // cmux-rbf #cm-73.16
             self.figmaPreview = figmaPreview // cmux-rbf #cm-73.3
             self.figmaEditor = figmaEditor // cmux-rbf #cm-73.3
-            self.figmaPlayMotion = figmaPlayMotion // cmux-rbf (#cm-73.32)
-            self.figmaShowStill = figmaShowStill // cmux-rbf (#cm-73.32)
             self.boardColumn = boardColumn
             self.boardRow = boardRow
             self.boardPin = boardPin

@@ -57,6 +57,7 @@ enum FigmaWrapperPage {
     </style>
     <script>
     \(addressScript)
+    \(FigmaPlayScript.script) // cmux-rbf (#cm-73.37)
     </script>
     <script>
       (function () {
@@ -66,6 +67,11 @@ enum FigmaWrapperPage {
         if (!src) { return; }
         var frame = document.createElement('iframe');
         frame.setAttribute('allowfullscreen', '');
+        // cmux-rbf (#cm-73.37): a marked frame opens directly in the frozen player.
+        if (params.get('motion') === '1' && /^https:\\/\\/embed\\.figma\\.com\\/(design|file|proto)\\//i.test(src)) {
+          frame.name = 'cmux-freeze';
+          src = cmuxProtoAddress(src, 'e5e5e5');
+        }
         frame.src = cmuxThemedAddress(src, dark);
         var attach = function () { document.body.appendChild(frame); };
         if (document.readyState === 'loading') {

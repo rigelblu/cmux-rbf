@@ -133,6 +133,7 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     /// Switches the visible Figma pane between its retained preview and editor.
     case switchFigmaPreviewAndEditor
     /// cmux-rbf #cm-73.32: Toggles prototype motion on the visible Figma preview pane.
+    case showFigmaStill // cmux-rbf (#cm-73.37)
     case toggleFigmaMotion
     /// Increases every terminal font size in the selected workspace.
     case increaseWorkspaceTerminalFontSize
