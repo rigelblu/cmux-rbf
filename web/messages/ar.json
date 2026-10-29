@@ -1401,7 +1401,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: التبديل بين المعاينة والمحرّر",
-      "figmaMotionDescription": "(غير مرتبط) — Figma: تشغيل الحركة / إظهار صورة ثابتة",
+      "figmaShowStillDescription": "(غير مرتبط) — Figma: إظهار صورة ثابتة",
+      "figmaMotionDescription": "(غير مرتبط) — Figma: تشغيل / إيقاف الحركة مؤقتًا",
       "title": "اختصارات لوحة المفاتيح",
       "description": "جميع اختصارات لوحة المفاتيح المتاحة في cmux، مجمعة حسب الفئة.",
       "metaDescription": "جميع اختصارات لوحة مفاتيح cmux لمساحات العمل والأسطح والألواح المقسمة والمتصفح والإشعارات والبحث وإدارة النوافذ على macOS.",

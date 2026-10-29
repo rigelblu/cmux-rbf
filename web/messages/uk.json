@@ -1385,7 +1385,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Перемкнути попередній перегляд і редактор",
-      "figmaMotionDescription": "(не призначено) — Figma: Відтворити рух / показати нерухомий кадр",
+      "figmaShowStillDescription": "(не призначено) — Figma: Показати статичний вигляд",
+      "figmaMotionDescription": "(не призначено) — Figma: Відтворити / призупинити рух",
       "title": "Клавіатурні скорочення",
       "description": "Усі клавіатурні скорочення cmux, згруповані за категоріями.",
       "metaTitle": "Клавіатурні скорочення",

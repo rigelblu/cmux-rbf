@@ -1369,12 +1369,6 @@ struct TabBarView: View {
                 onChooseFigmaPage: { page in
                     guard splitViewController.isInteractive else { return }
                     controller.requestFigmaPage(page)
-                },
-                // cmux-rbf (#cm-73.32)
-                figmaMotionState: splitViewController.pairFigmaMotionState,
-                onToggleFigmaMotion: {
-                    guard splitViewController.isInteractive else { return }
-                    controller.requestToggleFigmaMotion()
                 }
             )
         }

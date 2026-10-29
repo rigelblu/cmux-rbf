@@ -269,7 +269,7 @@ enum FigmaUsage {
                         The link Figma's Share button copies with nothing selected carries node-id=0-1 and opens the editor too.
                         A link to one frame opens the read view on that frame.
       goto <node-id>    Move the open Figma pane to that frame, in the read view. Accepts 12-2 or 12:2.
-                        --motion marks the frame as having motion so the Play button shows.
+                        --motion opens the player frozen on its first state, with play/pause and still controls.
                         --play marks it and plays its Figma Motion loop once loaded.
                         goto counts a browser pane that shows a Figma file and has no address bar.
                         A Figma file in a browser pane with its address bar showing is left alone.

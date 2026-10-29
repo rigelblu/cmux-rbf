@@ -324,73 +324,16 @@ enum FigmaPlayScript {
     }
     """#
 
-    /// Helper JavaScript for restoring the still read view.
-    /// Replaces iframe element only when current src contains `/proto/`.
-    /// The still embed address is validated through `cmuxFramableAddress` and themed through `cmuxThemedAddress`.
-    static let restoreStillCode = #"""
-    function cmuxRestoreStill() {
-      var cur = document.querySelector('iframe');
-      if (!cur || !cur.src || cur.src.indexOf('/proto/') === -1) return false;
-      var params = new URLSearchParams(location.search);
-      var embed = params.get('embed');
-      var stillEmbed = typeof cmuxFramableAddress === 'function' ? cmuxFramableAddress(embed) : embed;
-      if (!stillEmbed) return false;
-      var dark = matchMedia('(prefers-color-scheme: dark)').matches;
-      var stillFrame = document.createElement('iframe');
-      stillFrame.setAttribute('allowfullscreen', '');
-      stillFrame.src = typeof cmuxThemedAddress === 'function' ? cmuxThemedAddress(stillEmbed, dark) : stillEmbed;
-      cur.parentNode.replaceChild(stillFrame, cur);
-      return true;
+    // cmux-rbf (#cm-73.37): inverse of cmuxProtoAddress; callers set www.figma.com.
+    static let stillAddressScript = #"""
+    function cmuxStillAddress(src) {
+      var mark = src.indexOf('?');
+      var base = (mark >= 0 ? src.slice(0, mark) : src).replace('/proto/', '/design/');
+      var kept = (mark >= 0 ? src.slice(mark + 1) : '').split('&').filter(function (p) {
+        return p && ['hide-ui', 'scaling', 'starting-point-node-id', 'bg-color', 'page-selector'].indexOf(p.split('=')[0]) < 0;
+      });
+      kept.push('page-selector=0');
+      return base + '?' + kept.join('&');
     }
     """#
-
-    static func playScript(canvasBg: String = "e5e5e5") -> String {
-        """
-        (function () {
-          var oldFrame = document.querySelector('iframe');
-          if (!oldFrame) return false;
-          \(script)
-          var protoSrc = cmuxProtoAddress(oldFrame.src, '\(canvasBg)');
-          if (!protoSrc) return false;
-          var newFrame = document.createElement('iframe');
-          newFrame.setAttribute('allowfullscreen', '');
-          newFrame.src = protoSrc;
-          oldFrame.parentNode.replaceChild(newFrame, oldFrame);
-          \(restoreStillCode)
-          if (window.__cmuxPlayRestore) {
-            window.removeEventListener('pageshow', window.__cmuxPlayRestore);
-            delete window.__cmuxPlayRestore;
-          }
-          window.__cmuxPlayRestore = function (event) {
-            if (event.persisted) {
-              cmuxRestoreStill();
-              if (window.__cmuxPlayRestore) {
-                window.removeEventListener('pageshow', window.__cmuxPlayRestore);
-                delete window.__cmuxPlayRestore;
-              }
-            }
-          };
-          window.addEventListener('pageshow', window.__cmuxPlayRestore);
-          return true;
-        })();
-        """
-    }
-
-    static let stillScript = """
-    (function () {
-      if (window.__cmuxPlayRestore) {
-        window.removeEventListener('pageshow', window.__cmuxPlayRestore);
-        delete window.__cmuxPlayRestore;
-      }
-      \(restoreStillCode)
-      return cmuxRestoreStill();
-    })();
-    """
-
-    static let isPlayingScript = """
-    (function () {
-      var frame = document.querySelector('iframe');
-      return !!(frame && frame.src && frame.src.indexOf('/proto/') !== -1);
-    })();
-    """
 }

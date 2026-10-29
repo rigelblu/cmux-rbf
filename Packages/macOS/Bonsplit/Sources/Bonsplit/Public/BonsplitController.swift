@@ -950,13 +950,7 @@ public final class BonsplitController {
         delegate?.pairFigmaPage(for: self)
     }
 
-    /// cmux-rbf (#cm-73.32): reads the host's Figma preview motion state without retaining its observable model.
-    public func pairFigmaMotionState() -> PairFigmaMotionState {
-        delegate?.pairFigmaMotionState(for: self) ?? .hidden
-    }
-
-    /// cmux-rbf #cm-73.3: requests a different side in the displayed Design Focus pair.
-    /// - Parameter page: The side chosen in the hover row.
+    /// cmux-rbf #cm-73.3: requests a different side in the displayed pair.
     public func requestFigmaPage(_ page: PairFigmaPage) {
         guard internalController.isPairZoomed, internalController.zoomedPaneId == nil,
               let current = pairFigmaPage(), current != page else { return }
@@ -964,18 +958,10 @@ public final class BonsplitController {
         refreshPairFigmaPage()
     }
 
-    /// cmux-rbf (#cm-73.32): requests toggling motion in the displayed Design Focus pair.
-    public func requestToggleFigmaMotion() {
-        guard internalController.isPairZoomed, internalController.zoomedPaneId == nil else { return }
-        delegate?.splitTabBarDidToggleFigmaMotion(self)
-    }
-
-    /// cmux-rbf #cm-73.3: refreshes the hover row after a host-side Figma navigation or switch.
+    // cmux-rbf (#cm-73.37): preview playback has no header state.
     public func refreshPairFigmaPage() {
         let page = pairFigmaPage()
         if internalController.pairFigmaPage != page { internalController.pairFigmaPage = page }
-        let motion = pairFigmaMotionState()
-        if internalController.pairFigmaMotionState != motion { internalController.pairFigmaMotionState = motion }
     }
 
     /// Requests a board arrangement in the displayed pair.

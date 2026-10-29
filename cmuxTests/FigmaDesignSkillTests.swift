@@ -65,7 +65,7 @@ With your Figma MCP tools, create a new Figma Design file, passing `planKey` and
 Run `cmux figma open '<the new file's link>'`. Its answer ends with `orientation=vertical` or `orientation=horizontal`: the shape of the pane the file landed in. If the answer has no `orientation=`, take `vertical`.
 
 ## 5. Draw the design in that file
-Draw it with your Figma MCP tools in the file you just made, by its file key. Draw in no other file. Lay its boards out for the orientation step 4 gave: `vertical`, one column, top to bottom; `horizontal`, one row, left to right. Then run `cmux figma fit --surface <the surface cmux figma open printed>`. If it fails, say so in one line and stop; switch or focus nothing. When a frame you drew has motion, point at it with `cmux figma goto <node> --motion` (or `--play` to start it).
+Draw it with your Figma MCP tools in the file you just made, by its file key. Draw in no other file. Lay its boards out for the orientation step 4 gave: `vertical`, one column, top to bottom; `horizontal`, one row, left to right. Then run `cmux figma fit --surface <the surface cmux figma open printed>`. If it fails, say so in one line and stop; switch or focus nothing. When a frame you drew has motion, point at it with `cmux figma goto <node> --motion`; it opens frozen on its first state with play/pause and still-view controls on the preview. Use `--play` only to show it running.
 
 ## Re-lay the boards
 For `layout vertical` and `layout horizontal` only; steps 1 to 5 don't apply.
