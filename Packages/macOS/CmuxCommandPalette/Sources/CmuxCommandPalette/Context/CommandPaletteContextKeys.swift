@@ -36,6 +36,9 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     public static let workspaceCanSwitchFigmaPage = CommandPaletteContextKeys(rawValue: "workspace.canSwitchFigmaPage")
     // cmux-rbf #cm-73.32
     /// Whether a visible workspace Figma preview pane can toggle prototype motion.
+    // cmux-rbf (#cm-73.37)
+    public static let workspaceHasFigmaMotion = CommandPaletteContextKeys(rawValue: "workspace.hasFigmaMotion")
+    public static let workspaceFigmaMotionHasPlayer = CommandPaletteContextKeys(rawValue: "workspace.figmaMotionHasPlayer")
     public static let workspaceCanToggleFigmaMotion = CommandPaletteContextKeys(rawValue: "workspace.canToggleFigmaMotion")
     /// Whether the active Figma preview pane motion is currently playing.
     public static let workspaceFigmaMotionIsPlaying = CommandPaletteContextKeys(rawValue: "workspace.figmaMotionIsPlaying")

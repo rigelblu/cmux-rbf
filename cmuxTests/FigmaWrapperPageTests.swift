@@ -103,7 +103,7 @@ struct FigmaWrapperPageTests {
 
     /// Runs the page's own loader in JavaScriptCore with just enough browser to
     /// load it, and returns the address it put on the frame, or nil if it framed nothing.
-    private func framedAddress(embed: String, darkPane: Bool) throws -> String? {
+    private func framedAddress(embed: String, darkPane: Bool, motion: Bool = false, expectedName: String? = nil) throws -> String? {
         // Both scripts come out of the page itself, so a page that lost the
         // address functions cannot pass on the strength of this file's copy.
         let scripts = FigmaWrapperPage.html.components(separatedBy: "<script>")
@@ -112,9 +112,10 @@ struct FigmaWrapperPageTests {
         let context = try #require(JSContext())
         context.setObject(embed, forKeyedSubscript: "EMBED" as NSString)
         context.setObject(darkPane, forKeyedSubscript: "DARK" as NSString)
+        context.setObject(motion, forKeyedSubscript: "MOTION" as NSString)
         context.evaluateScript(functions)
         context.evaluateScript("""
-        location = { search: '?embed=' + encodeURIComponent(EMBED) };
+        location = { search: '?embed=' + encodeURIComponent(EMBED) + (MOTION ? '&motion=1' : '') };
         URLSearchParams = function (search) {
           var map = {};
           search.replace(/^\\?/, '').split('&').forEach(function (pair) {
@@ -138,9 +139,21 @@ struct FigmaWrapperPageTests {
         };
         """)
         context.evaluateScript(loader)
+        if let expectedName {
+            #expect(context.evaluateScript("frames[0].name")?.toString() == expectedName, "marked frame must be named cmux-freeze before insertion")
+        }
         let framed = context.evaluateScript("frames.length ? frames[0].src : null")
         guard let framed, !framed.isNull, !framed.isUndefined else { return nil }
         return framed.toString()
+    }
+
+    // cmux-rbf (#cm-73.37)
+    @Test func markedFrameOpensDirectlyInNamedFrozenPlayer() throws {
+        let address = try #require(try framedAddress(
+            embed: "https://embed.figma.com/design/KEY/slug?node-id=12-2", darkPane: false,
+            motion: true, expectedName: "cmux-freeze"
+        ))
+        #expect(URL(string: address)?.path == "/proto/KEY/slug", "marked open must build the player without loading still first")
     }
 
     @Test("the page themes the frame from the pane's own scheme, whatever theme the address carries")
@@ -263,116 +276,4 @@ struct FigmaWrapperPageTests {
         #expect(components.path == "/proto/KEY/design-file-slug")
     }
 
-    @Test("synthetic pageshow with persisted: true restores still read view and removes listener")
-    func pageshowPersistedRestoresStill() throws {
-        let context = try #require(JSContext())
-        context.evaluateScript(FigmaWrapperPage.addressScript)
-        let embed = "https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2"
-        context.evaluateScript("""
-        location = { search: '?embed=' + encodeURIComponent('\(embed)') };
-        URLSearchParams = function (search) {
-          var map = {};
-          search.replace(/^\\?/, '').split('&').forEach(function (pair) {
-            var at = pair.indexOf('=');
-            if (at >= 0) { map[decodeURIComponent(pair.slice(0, at))] = decodeURIComponent(pair.slice(at + 1)); }
-          });
-          this.get = function (name) { return name in map ? map[name] : null; };
-        };
-        matchMedia = function (query) { return { matches: false }; };
-        listeners = {};
-        window = {
-          addEventListener: function (type, fn) { listeners[type] = fn; },
-          removeEventListener: function (type, fn) { if (listeners[type] === fn) { delete listeners[type]; } }
-        };
-        currentFrame = {
-          src: 'https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2',
-          setAttribute: function (k, v) { this[k] = v; },
-          parentNode: {
-            replaceChild: function (newChild, oldChild) {
-              replaced = newChild;
-              currentFrame = newChild;
-            }
-          }
-        };
-        replaced = null;
-        document = {
-          querySelector: function (sel) { return sel === 'iframe' ? currentFrame : null; },
-          createElement: function (tag) {
-            return {
-              src: '',
-              setAttribute: function (k, v) { this[k] = v; },
-              parentNode: currentFrame.parentNode
-            };
-          }
-        };
-        """)
-        let play = context.evaluateScript(FigmaPlayScript.playScript(canvasBg: "e5e5e5"))
-        #expect(play?.toBool() == true)
-        #expect(context.evaluateScript("currentFrame.src.indexOf('/proto/') !== -1")?.toBool() == true)
-        #expect(context.evaluateScript("typeof window.__cmuxPlayRestore")?.toString() == "function")
-
-        // Fire pageshow with persisted: false -> no restore
-        context.evaluateScript("listeners['pageshow']({ persisted: false })")
-        #expect(context.evaluateScript("currentFrame.src.indexOf('/proto/') !== -1")?.toBool() == true)
-        #expect(context.evaluateScript("typeof window.__cmuxPlayRestore")?.toString() == "function")
-
-        // Fire pageshow with persisted: true -> restores still and deletes __cmuxPlayRestore
-        context.evaluateScript("listeners['pageshow']({ persisted: true })")
-        #expect(context.evaluateScript("currentFrame.src.indexOf('/design/') !== -1")?.toBool() == true)
-        #expect(context.evaluateScript("currentFrame.src.indexOf('/proto/') === -1")?.toBool() == true)
-        #expect(context.evaluateScript("typeof window.__cmuxPlayRestore")?.toString() == "undefined")
-        #expect(context.evaluateScript("typeof listeners['pageshow']")?.toString() == "undefined")
-    }
-
-    @Test("stillScript is idempotent: does not replace iframe when not playing")
-    func stillScriptIsIdempotent() throws {
-        let context = try #require(JSContext())
-        context.evaluateScript(FigmaWrapperPage.addressScript)
-        let embed = "https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2"
-        context.evaluateScript("""
-        window = this;
-        location = { search: '?embed=' + encodeURIComponent('\(embed)') };
-        URLSearchParams = function (search) {
-          var map = {};
-          search.replace(/^\\?/, '').split('&').forEach(function (pair) {
-            var at = pair.indexOf('=');
-            if (at >= 0) { map[decodeURIComponent(pair.slice(0, at))] = decodeURIComponent(pair.slice(at + 1)); }
-          });
-          this.get = function (name) { return name in map ? map[name] : null; };
-        };
-        matchMedia = function (query) { return { matches: false }; };
-        replacedCount = 0;
-        currentFrame = {
-          src: 'https://embed.figma.com/design/KEY/slug?embed-host=cmux&node-id=12-2',
-          setAttribute: function (k, v) { this[k] = v; },
-          parentNode: {
-            replaceChild: function (newChild, oldChild) {
-              replacedCount++;
-              currentFrame = newChild;
-            }
-          }
-        };
-        document = {
-          querySelector: function (sel) { return sel === 'iframe' ? currentFrame : null; },
-          createElement: function (tag) {
-            return {
-              src: '',
-              setAttribute: function (k, v) { this[k] = v; },
-              parentNode: currentFrame.parentNode
-            };
-          }
-        };
-        """)
-        let result = context.evaluateScript(FigmaPlayScript.stillScript)
-        #expect(context.exception == nil)
-        #expect(result?.toBool() == false)
-        #expect(context.evaluateScript("replacedCount")?.toInt32() == 0)
-
-        // Control: the same script does replace a playing frame, so the still case above is a real refusal.
-        context.evaluateScript("currentFrame.src = 'https://embed.figma.com/proto/KEY/slug?node-id=12-2';")
-        let replaced = context.evaluateScript(FigmaPlayScript.stillScript)
-        #expect(context.exception == nil)
-        #expect(replaced?.toBool() == true)
-        #expect(context.evaluateScript("replacedCount")?.toInt32() == 1)
-    }
 }

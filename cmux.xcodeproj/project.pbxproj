@@ -1249,6 +1249,7 @@
 		CC0033E15A1B2C3D4E5F0013 /* CmuxDiffComments in Frameworks */ = {isa = PBXBuildFile; productRef = CC0033E15A1B2C3D4E5F0011 /* CmuxDiffComments */; };
 		9648F1A20000000000000002 /* CmuxDiffViewerURLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9648F1A10000000000000001 /* CmuxDiffViewerURLSchemeHandler.swift */; };
 		807339000000000000000004 /* FigmaPreviewPageSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807339000000000000000003 /* FigmaPreviewPageSchemeHandler.swift */; };
+		73B379000000000000000004 /* FigmaMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B379000000000000000003 /* FigmaMotion.swift */; };
 		D1320AA0D1320AA0D1320AA2 /* CmuxDockTilePlugin.plugin in Copy Dock Tile Plugin */ = {isa = PBXBuildFile; fileRef = D1320AA0D1320AA0D1320AA5 /* CmuxDockTilePlugin.plugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C54860040000000000000001 /* CmuxDurableDeepLinkRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54860040000000000000002 /* CmuxDurableDeepLinkRestoreTests.swift */; };
 		E7E000000000000000000005 /* CmuxEventBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E000000000000000000006 /* CmuxEventBus.swift */; };
@@ -1773,6 +1774,7 @@
 		807390000000000000000008 /* FigmaOutlineIcon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000007 /* FigmaOutlineIcon.svg */; };
 		807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */; };
 		807339000000000000000002 /* FigmaPreviewPageSchemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807339000000000000000001 /* FigmaPreviewPageSchemeTests.swift */; };
+		73A379000000000000000002 /* FigmaMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A379000000000000000001 /* FigmaMotionTests.swift */; };
 		807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807333000000000000000001 /* FigmaPageSwitchTests.swift */; };
 		807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000F /* FigmaPaletteCommandTests.swift */; };
 		807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000001 /* FigmaPaneBackTests.swift */; };
@@ -5412,6 +5414,7 @@
 		A5FB1206 /* CmuxConfigWorkspaceActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxConfigWorkspaceActionTests.swift; sourceTree = "<group>"; };
 		9648F1A10000000000000001 /* CmuxDiffViewerURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/CmuxDiffViewerURLSchemeHandler.swift; sourceTree = "<group>"; };
 		807339000000000000000003 /* FigmaPreviewPageSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaPreviewPageSchemeHandler.swift; sourceTree = "<group>"; };
+		73B379000000000000000003 /* FigmaMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaMotion.swift; sourceTree = "<group>"; };
 		D1320AA0D1320AA0D1320AA5 /* CmuxDockTilePlugin.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CmuxDockTilePlugin.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
 		C54860040000000000000002 /* CmuxDurableDeepLinkRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxDurableDeepLinkRestoreTests.swift; sourceTree = "<group>"; };
 		E7E000000000000000000006 /* CmuxEventBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxEventBus.swift; sourceTree = "<group>"; };
@@ -5864,6 +5867,7 @@
 		807390000000000000000007 /* FigmaOutlineIcon.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = FigmaOutlineIcon.svg; sourceTree = "<group>"; };
 		807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSessionRestoreTests.swift; sourceTree = "<group>"; };
 		807339000000000000000001 /* FigmaPreviewPageSchemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPreviewPageSchemeTests.swift; sourceTree = "<group>"; };
+		73A379000000000000000001 /* FigmaMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaMotionTests.swift; sourceTree = "<group>"; };
 		807333000000000000000001 /* FigmaPageSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSwitchTests.swift; sourceTree = "<group>"; };
 		80739000000000000000000F /* FigmaPaletteCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaletteCommandTests.swift; sourceTree = "<group>"; };
 		807335000000000000000001 /* FigmaPaneBackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneBackTests.swift; sourceTree = "<group>"; };
@@ -10437,6 +10441,7 @@
 				A9F100000000000000000013 /* AgentSessionWebRendererCoordinator.swift */,
 				9648F1A10000000000000001 /* CmuxDiffViewerURLSchemeHandler.swift */,
 				807339000000000000000003 /* FigmaPreviewPageSchemeHandler.swift */,
+				73B379000000000000000003 /* FigmaMotion.swift */,
 				D1FFC0DE000000000000B001 /* DiffCommentsBridge.swift */,
 				D1FFC0DE000000000000E001 /* DiffSidecarBridge.swift */,
 				A28B087F0000000000000002 /* DiffViewerEditableFocusMessageHandler.swift */,
@@ -11718,6 +11723,7 @@
 				807311000000000000000005 /* FigmaLoadBarSignalTests.swift */,
 				807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */,
 				807339000000000000000001 /* FigmaPreviewPageSchemeTests.swift */,
+				73A379000000000000000001 /* FigmaMotionTests.swift */,
 				807335000000000000000001 /* FigmaPaneBackTests.swift */,
 				807333000000000000000001 /* FigmaPageSwitchTests.swift */,
 				807314000000000000000003 /* FigmaHiddenUnloadTests.swift */,
@@ -13706,6 +13712,7 @@
 				C0DEF0A10000000000000001 /* CmuxConfigUI.swift in Sources */,
 				9648F1A20000000000000002 /* CmuxDiffViewerURLSchemeHandler.swift in Sources */,
 				807339000000000000000004 /* FigmaPreviewPageSchemeHandler.swift in Sources */,
+				73B379000000000000000004 /* FigmaMotion.swift in Sources */,
 				E7E000000000000000000005 /* CmuxEventBus.swift in Sources */,
 				E7E00000000000000000000D /* CmuxEventLogWriter.swift in Sources */,
 				E7E000000000000000000007 /* CmuxEventPublishing.swift in Sources */,
@@ -16372,6 +16379,7 @@
 				807316000000000000000402 /* FigmaNewFileLinkTests.swift in Sources */,
 				807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */,
 				807339000000000000000002 /* FigmaPreviewPageSchemeTests.swift in Sources */,
+				73A379000000000000000002 /* FigmaMotionTests.swift in Sources */,
 				807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */,
 				807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */,
 				807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */,

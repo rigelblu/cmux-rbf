@@ -16,6 +16,14 @@ struct FigmaPageShortcutTests {
         #expect(action.defaultStroke == nil)
         #expect(action.defaultShortcut == nil)
         #expect(action.group == .panes)
-        #expect(action.displayName == "Figma: Play Motion / Show Still")
+        #expect(action.displayName == "Figma: Play / Pause Motion")
+    }
+    // cmux-rbf (#cm-73.37)
+    @Test func showStillShortcutExistsWithNoDefault() throws {
+        let action = try #require(ShortcutAction(rawValue: "showFigmaStill"))
+        #expect(action.defaultShortcut == nil)
+        #expect(action.group == .panes)
+        #expect(action.displayName == "Figma: Show Still")
     }
 }
+

@@ -1402,7 +1402,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Przełącz podgląd i edytor",
-      "figmaMotionDescription": "(nieprzypisany) — Figma: Odtwórz ruch / pokaż klatkę",
+      "figmaShowStillDescription": "(nieprzypisany) — Figma: Pokaż klatkę",
+      "figmaMotionDescription": "(nieprzypisany) — Figma: Odtwórz / wstrzymaj ruch",
       "title": "Skróty klawiszowe",
       "description": "Wszystkie skróty klawiszowe dostępne w cmux, pogrupowane według kategorii.",
       "metaDescription": "Wszystkie skróty klawiszowe cmux dla workspace'ów, surface'ów, dzielonych paneli, przeglądarki, powiadomień, wyszukiwania i zarządzania oknami na macOS.",

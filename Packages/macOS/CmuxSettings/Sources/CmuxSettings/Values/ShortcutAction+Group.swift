@@ -37,8 +37,9 @@ extension ShortcutAction {
         case .focusLeft, .focusRight, .focusUp, .focusDown,
              .focusPreviousPane, .focusNextPane,
              .splitLeft, .splitRight, .splitUp, .splitDown,
+             // cmux-rbf (#cm-73.37): both motion actions belong to Panes.
              // cmux-rbf #cm-73.2a
-             .toggleSplitZoom, .switchFigmaPreviewAndEditor, .toggleFigmaMotion, .toggleDesignFocus, .flipDesignFocusLayout, .increaseWorkspaceTerminalFontSize,
+             .toggleSplitZoom, .switchFigmaPreviewAndEditor, .toggleFigmaMotion, .showFigmaStill, .toggleDesignFocus, .flipDesignFocusLayout, .increaseWorkspaceTerminalFontSize,
              .decreaseWorkspaceTerminalFontSize, .resetWorkspaceTerminalFontSize,
              .equalizeSplits, .equalizeSplitWidths, .equalizeSplitHeights,
              .resizePaneLeft, .resizePaneRight, .resizePaneUp, .resizePaneDown,
