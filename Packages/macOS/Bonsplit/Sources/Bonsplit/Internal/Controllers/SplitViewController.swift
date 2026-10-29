@@ -58,7 +58,6 @@ final class SplitViewController {
     var pairFigmaPage: PairFigmaPage?
 
     // cmux-rbf (#cm-73.32): value snapshot for the hover row motion button.
-    var pairFigmaMotionState: PairFigmaMotionState = .hidden
 
     // cmux-rbf #cm-73.2a
     func setPairHeaderHover(_ hovering: Bool, pane: PaneID) {

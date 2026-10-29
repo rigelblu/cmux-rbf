@@ -395,26 +395,30 @@ that a frame left playing comes back still; a board it no longer holds, such as 
 restored after a restart, loads again from its address.
 The history is not saved, so after a restart Back starts from the side that shows.
 
-A frame with Figma Motion can play in Preview. Play loads the same frame in Figma's
-prototype view, with no Figma bar, fitted to the pane on a light grey canvas, and its
-motion loops; Show Still goes back to the read view. In Design Focus the Play
-button sits first in the row that shows while the pointer is on the pair header, and it
-shows only on a frame the agent marked as having motion (`cmux figma goto <node> --motion`).
-The palette entry Figma: Play Motion (Figma: Show Still while playing) works on any frame
-of a design file's Preview, marked or not. Neither shows on a FigJam board or a slide deck.
-Play lasts while Preview stays on that frame: a switch to Editor, a pointing, a clicked
-Figma link, Back or Forward stops it, and Back, Forward, a restart and `cmux figma fit`
-show the frame still. Play and Show Still add no step to the history.
+A frame marked with `cmux figma goto <node> --motion` opens in Figma's player,
+frozen on its first state. The pill at the bottom centre of Preview shows ▶ and ■.
+Both cells are disabled until the player draws. ▶ plays without reloading; ❚❚ pauses;
+▶ resumes from that point. ■ shows the still read view with Figma's zoom. ▶ there
+loads the player again. The pill shows on marked frames and whenever the player
+shows, including an unmarked frame played from the palette. Design Focus's hover
+row has no motion button. FigJam boards, slide decks and Editor have no pill.
 
-The motion toggle action, `toggleFigmaMotion`, has no default shortcut binding; bind it
-in Settings › Keyboard Shortcuts or `cmux.json`:
+The palette offers Figma: Play Motion / Figma: Pause Motion and Figma: Show Still.
+Show Still is hidden in the still view; both entries are disabled while loading.
+Leaving for Editor, another frame, workspace or tab pauses the player; a cached
+return stays paused there. A reload, restart or `cmux figma fit` opens a marked
+frame frozen at the start, and an unmarked frame still. Neither action adds history.
+
+The actions `toggleFigmaMotion` (play/pause) and `showFigmaStill` have no default
+keys. Bind them in Settings › Keyboard Shortcuts or `cmux.json`:
 
 ```json
 {
   "shortcuts": {
     "bindings": {
       "switchFigmaPreviewAndEditor": "opt+shift+cmd+c",
-      "toggleFigmaMotion": "opt+shift+cmd+m"
+      "toggleFigmaMotion": "opt+shift+cmd+m",
+      "showFigmaStill": "opt+shift+cmd+s"
     }
   }
 }

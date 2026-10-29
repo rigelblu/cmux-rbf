@@ -1213,8 +1213,8 @@ struct FigmaPaneBackTests {
         #expect(!FigmaPaneURL.hasMotionMark(inWrapper: try #require(pane.currentURL), wrapper: page))
     }
 
-    @Test("the exchange to editor runs Still and stores isPlaying: false")
-    func exchangeToEditorRunsStillAndStoresNotPlaying() async throws {
+    @Test("the exchange to editor freezes the retained player without replacing its iframe")
+    func exchangeToEditorFreezesRetainedPlayer() async throws {
         let page = try wrapper()
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
@@ -1234,6 +1234,7 @@ struct FigmaPaneBackTests {
           return frame.src;
         })()
         """#)
+        _ = try await previewView.evaluateJavaScript("window.__cmuxMotion = { command: function(action) { window.leaveCommand = action; return {state: 'paused'}; } };")
         pane.isFigmaMotionPlaying = true
 
         let initialSrc = try await previewView.evaluateJavaScript("document.querySelector('iframe')?.src") as? String
@@ -1246,7 +1247,8 @@ struct FigmaPaneBackTests {
 
         // Outgoing previewView had stillScript run: iframe is no longer /proto/
         let outgoingSrc = try await previewView.evaluateJavaScript("document.querySelector('iframe')?.src") as? String
-        #expect(outgoingSrc?.contains("/proto/") == false)
+        #expect(outgoingSrc?.contains("/proto/") == true)
+        #expect(try await previewView.evaluateJavaScript("window.leaveCommand") as? String == "freeze")
 
         // Switch back to preview
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -1254,7 +1256,7 @@ struct FigmaPaneBackTests {
         #expect(!pane.isFigmaMotionPlaying)
     }
 
-    @Test("goto --play during in-flight load binds to target navigation and plays when finished")
+    @Test("goto --play during in-flight load binds run to the matching commit")
     func gotoPlayDuringInFlightLoadBindsToTargetNavigation() throws {
         let page = try wrapper()
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
@@ -1281,8 +1283,8 @@ struct FigmaPaneBackTests {
         #expect(pane.pendingFigmaPlayNavigation === targetNav)
         #expect(pane.figmaPlayRequestCount == requestsBefore)
 
-        // The matching navigation finishes -> clears pending navigation and requests Play once
-        pane.navigationDelegate?.didFinish?(pane.webView, targetNav)
+        // cmux-rbf (#cm-73.37): run is set at the matching commit, before the frame asks.
+        pane.navigationDelegate?.didCommit?(pane.webView, targetNav)
         #expect(pane.pendingFigmaPlayNavigation == nil)
         #expect(pane.figmaPlayRequestCount == requestsBefore + 1)
     }

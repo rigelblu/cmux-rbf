@@ -3719,15 +3719,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     // MARK: - Initialization
 
     // cmux-rbf (#cm-73.32): the motion action ships with no key, so its tooltip names a shortcut
-    // only once one is bound; the shared `tooltip()` would append "(None)".
-    static func figmaMotionTooltip(
-        _ base: String,
-        shortcut: StoredShortcut = KeyboardShortcutSettings.shortcut(for: .toggleFigmaMotion)
-    ) -> String {
-        guard !shortcut.isUnbound else { return base }
-        return "\(base) (\(KeyboardShortcutSettings.Action.toggleFigmaMotion.displayedShortcutString(for: shortcut)))"
-    }
-
     static func currentSplitButtonTooltips() -> BonsplitConfiguration.SplitButtonTooltips {
         BonsplitConfiguration.SplitButtonTooltips(
             newTerminal: KeyboardShortcutSettings.Action.newSurface.tooltip("New Terminal"),
@@ -3748,12 +3739,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             figmaPreview: String(localized: "figma.page.preview", defaultValue: "Preview"),
             figmaEditor: String(localized: "figma.page.editor", defaultValue: "Editor"),
             // cmux-rbf (#cm-73.32)
-            figmaPlayMotion: figmaMotionTooltip(
-                String(localized: "figma.motion.play", defaultValue: "Play motion")
-            ),
-            figmaShowStill: figmaMotionTooltip(
-                String(localized: "figma.motion.still", defaultValue: "Show still")
-            ),
             boardColumn: String(localized: "figma.board.column", defaultValue: "Lay Boards in a Column"),
             boardRow: String(localized: "figma.board.row", defaultValue: "Lay Boards in a Row"),
             boardPin: String(localized: "figma.board.keepLayoutOnFlip", defaultValue: "Keep Board Layout on Flip"),
@@ -5287,9 +5272,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             )
         }
         panelSubscriptions[browserPanel.id] = subscription
-        // cmux-rbf (#cm-73.32): motion state changes refresh the Design Focus hover row.
+        // cmux-rbf (#cm-73.37): the live palette must re-read Loading/play/pause after a page report.
         browserPanel.onFigmaMotionStateChange = { [weak self] in
-            self?.bonsplitController.refreshPairFigmaPage()
+            self?.owningTabManager?.objectWillChange.send()
         }
         browserPanel.onMediaActivityChanged = { [weak self, weak browserPanel] _ in
             guard let self, let browserPanel else { return }
@@ -12197,21 +12182,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         return true
     }
 
-    // cmux-rbf (#cm-73.32): hover row button shows only for marked preview of a design file in Design Focus.
-    func pairFigmaMotionState(for controller: BonsplitController) -> PairFigmaMotionState {
-        guard controller === bonsplitController, isDesignFocusActive,
-              let panel = figmaMotionTarget(),
-              let address = panel.currentURL ?? panel.webView.url,
-              FigmaPaneURL.hasMotionMark(inWrapper: address, wrapper: panel.figmaPageWrapper) else {
-            return .hidden
-        }
-        return panel.isFigmaMotionPlaying ? .playing : .still
-    }
-
-    // cmux-rbf (#cm-73.32): pair header motion button toggles motion and focuses the Figma panel.
-    func splitTabBarDidToggleFigmaMotion(_ controller: BonsplitController) {
-        guard let panel = figmaMotionTarget() else { return }
-        if toggleFigmaMotion() { focusPanel(panel.id) }
+    // cmux-rbf (#cm-73.37): the second shared motion action.
+    @discardableResult
+    func showFigmaStill() -> Bool {
+        guard let panel = figmaMotionTarget(), panel.figmaMotionState.canShowStill else { return false }
+        panel.showFigmaStill()
+        noteFigmaPageUse(panel.id)
+        return true
     }
 
     // cmux-rbf #cm-73.2a
