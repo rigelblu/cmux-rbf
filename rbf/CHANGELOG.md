@@ -6,6 +6,17 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 
 # 🔵⋯ [Unreleased]
 
+# 🔵⋯ v0.34.2 (2026-10-29) — #cm-110.13
+
+*See a quiet dot on a workspace with no status, and have None keep it out of every status group.*
+
+## 🟠⋯ Added for End Users
+- 2026-10-29 - feat | see a quiet dot on a workspace with no status, and have None keep it out of every status group, whatever its color (#cm-110.13). A workspace on **None** shows a small filled dot where a status glyph sits, on its sidebar row and in the todo pane's header. Click the dot to open the status popover, with **None** checked; the click does not select the row. The Status menus say "None". A workspace on None sits under **Workspaces**, never in a status group, whatever its color; before, a colored workspace on None sat in its color's status group. Picking None or Auto clears the workspace's color, except when the pick comes from the phone. Group headers are unchanged
+
+## 🟠⋯ Known Issues
+- Agent Scenario 81 is still pending, with four readings owed: the dot's "no stroke" is not checked on its own; one reading is taken from a single row, not a mounted sidebar; "leaves Next unless cmux detects Done or Review" is not checked; and six readings build the row's model inside the test around a real snapshot (#cm-110.13)
+- With Workspace Todo Controls off, no test yet guards that a row cmux detects as Done stays undimmed; tracked as #cm-110.17
+
 # 🔵⋯ v0.34.1 (2026-10-26) — #cm-110.2, #cm-110.8, #cm-110.10, #cm-110.4, #cm-110.5, #cm-110.3, #cm-110.12
 
 *Put whole workspace groups, nested groups and dragged-out tabs under a status, and keep pinned rows, my workspaces and my statuses in three sections of their own.*

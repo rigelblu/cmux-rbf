@@ -220,6 +220,7 @@ Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at 
 - Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Statuses**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups.
 - A whole workspace group, nested or not, takes a status and sits under it with everything inside. Drop its header on a status group, or set it from its Status menu or Group Color.
 - Drag a tab out of a workspace onto a status group to make a new workspace already on that status.
+- Since v0.34.2 a workspace on **None** shows a small dot in the status glyph's place and sits under **Workspaces**, never in a status group, whatever its color. Click the dot to pick a status.
 
 ## 🟠⋯ Organize workspace groups inside larger groups
 
