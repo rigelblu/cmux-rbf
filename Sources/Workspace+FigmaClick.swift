@@ -9,7 +9,7 @@ import Foundation
 /// witness has a fixed signature and cannot take them as parameters, so it takes
 /// them from here; only tests change the values.
 struct FigmaClickEnvironment {
-    var page: URL = FigmaPaneURL.wrapperFileURL()
+    var page: URL = FigmaPaneURL.previewPageURL
     var defaults: UserDefaults = .standard
 }
 
@@ -22,17 +22,16 @@ extension Workspace {
     /// - Parameters:
     ///   - sourcePanelId: the panel the link was clicked in; a new Figma tab
     ///     opens where `cmux figma open` puts one, relative to it.
-    ///   - page: where the read view's page lives. A parameter so a test never
-    ///     touches the real `Application Support` folder.
+    ///   - page: the read view's page the addresses are built on and recognised by.
     ///   - defaults: read for whether cmux's browser is on and for the URL
     ///     policy. A parameter so a test never flips the shared setting.
     func openClickedFigmaLink(
         _ url: URL,
         sourcePanelId: UUID,
-        page: URL = FigmaPaneURL.wrapperFileURL(),
+        page: URL = FigmaPaneURL.previewPageURL,
         defaults: UserDefaults = .standard
     ) -> Bool {
-        // First, before the page is written or an address built: with the
+        // First, before an address is built: with the
         // browser off, making a pane hands its address to the system browser,
         // and the caller would then open the link a second time.
         guard BrowserAvailabilitySettings.isEnabled(defaults: defaults) else { return false }
@@ -76,7 +75,7 @@ extension Workspace {
             // `BrowserPanel`; `focusPanel` does that in one synchronous step.
             focusPanel(paneId)
             guard let panel = panels[paneId] as? BrowserPanel else { return false }
-            // Wrapper installation and URL policy above gate the shared goto action.
+            // The URL policy above gates the shared goto action.
             return panel.gotoFigmaNode(node, wrapper: page, defaults: defaults) // cmux-rbf #cm-73.3
 
         case .bringForward(let paneId):
@@ -129,11 +128,9 @@ extension Workspace {
         return found
     }
 
-    /// What the pane should load, with the read view's page written. **The click
-    /// follows `open` on the write**: a link that names no frame needs no page,
-    /// so a failed write is ignored; a link that names a frame cannot open
-    /// without it, and the caller opens the link as it did before.
-    // cmux-rbf #cm-73.16: shared read-view installation and URL policy for the header menu.
+    /// What the pane should load. The read view's page is served from memory
+    /// (`cm-73.39`), so nothing is written here.
+    // cmux-rbf #cm-73.16: shared read-view address and URL policy for the header menu.
     func figmaClickDestination(
         for link: URL,
         node: String?,
@@ -147,11 +144,6 @@ extension Workspace {
         // that `navigate` and the socket's `browser.open_split` ask first.
         guard BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination.url) else {
             return nil
-        }
-        do {
-            try FigmaWrapperPage.install(at: page)
-        } catch {
-            if case .embed = destination { return nil }
         }
         return destination
     }

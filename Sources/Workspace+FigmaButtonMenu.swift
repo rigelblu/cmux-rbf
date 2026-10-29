@@ -18,7 +18,7 @@ extension Workspace {
     func figmaButtonMenu(
         inPane pane: PaneID,
         folder: String? = nil,
-        page: URL = FigmaPaneURL.wrapperFileURL(),
+        page: URL = FigmaPaneURL.previewPageURL,
         defaults: UserDefaults = .standard,
         // cmux-rbf #cm-73.17: test seams never send to a process or install in real home.
         agentRegistry: AgentChatSessionRegistry? = nil,
@@ -131,7 +131,7 @@ extension Workspace {
                 address: address,
                 focus: true,
                 defaults: defaults,
-                // Even a read-view refusal hands Figma's link to the browser, never the local wrapper.
+                // Even a refusal hands Figma's own link to the browser, never cmux's read-view address. cmux-rbf #cm-73.39: the read view itself is no longer refused (trusted internal scheme).
                 openExternally: { _ in openExternally(entry.link) }
             )
         case .notOurs:

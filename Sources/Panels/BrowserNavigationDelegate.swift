@@ -43,6 +43,9 @@ import WebKit
     var lastAttemptedURL: URL?
     private(set) var activeErrorPageDisplayURL: URL?
     private(set) var activePolicyBlockedURL: URL?
+    /// cmux-rbf #cm-73.39: Figma preview-page navigations the guard cancelled, newest last, the last 8 kept.
+    /// A test reads it as the positive sign that the guard decided.
+    private(set) var refusedFigmaPreviewPageURLs: [URL] = []
     private let basicAuthPromptCoordinator = BrowserHTTPBasicAuthPromptCoordinator()
     private let clientCertificateAuthenticationController = BrowserClientCertificateAuthenticationController()
     weak var owner: BrowserPanel?
@@ -418,6 +421,21 @@ import WebKit
                 if isMainFrame {
                     blockURLAllowlistNavigation(url, in: webView)
                 }
+                return
+            }
+            // cmux-rbf #cm-73.39: the Figma preview page loads only in the main frame, and only as
+            // cmux's own trusted load, Back/Forward or Reload; anything a page starts is cancelled.
+            if FigmaPreviewPageGuard.isPreviewScheme(url),
+               !FigmaPreviewPageGuard.allowsNavigation(
+                   targetFrameIsMain: navigationAction.targetFrame?.isMainFrame,
+                   isTrustedLoad: isTrustedInternal,
+                   navigationType: navigationAction.navigationType
+               ) {
+#if DEBUG
+                cmuxDebugLog("browser.nav.decidePolicy.action kind=refuseFigmaPreviewPage url=\(browserNavigationDebugURL(url))")
+#endif
+                refusedFigmaPreviewPageURLs = Array((refusedFigmaPreviewPageURLs + [url]).suffix(8))
+                decisionHandler(.cancel)
                 return
             }
         }

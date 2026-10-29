@@ -35,7 +35,7 @@ enum FigmaClickRoute {
     static func answer(
         for link: URL,
         panes: [Pane],
-        wrapper: URL = FigmaPaneURL.wrapperFileURL()
+        wrapper: URL = FigmaPaneURL.previewPageURL
     ) -> Answer {
         guard FigmaFileLink.isEditorLink(link),
               let key = FigmaPaneURL.fileKey(fromPaneURL: link, wrapper: wrapper)

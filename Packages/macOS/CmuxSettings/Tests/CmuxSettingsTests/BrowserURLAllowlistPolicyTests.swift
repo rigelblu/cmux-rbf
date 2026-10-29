@@ -48,6 +48,18 @@ struct BrowserURLAllowlistPolicyTests {
         #expect(!policy.allows(try #require(URL(string: "https://outside.example"))))
     }
 
+    // cmux-rbf #cm-73.39: the Figma preview page is cmux's own document, like the diff viewer.
+    @Test func theFigmaPreviewPageIsATrustedInternalScheme() {
+        #expect(BrowserURLAllowlistPolicy.trustedInternalSchemes.contains("cmux-figma"))
+    }
+
+    // cmux-rbf #cm-73.39: a list turned on later does not block an open Figma preview.
+    @Test func theFigmaPreviewPageStaysOpenUnderAManagedList() throws {
+        let policy = BrowserURLAllowlistPolicy(managedPatterns: ["internal.example.com"])
+        let page = try #require(URL(string: "cmux-figma://cmux/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY"))
+        #expect(policy.allows(page))
+    }
+
     @Test func anEmptyManagedArrayFailsClosedForRemoteOrigins() throws {
         let policy = BrowserURLAllowlistPolicy(managedPatterns: [])
         #expect(policy.isManaged)

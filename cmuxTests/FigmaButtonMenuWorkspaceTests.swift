@@ -191,24 +191,32 @@ import Testing
         try select("Enter Design Focus", in: menu)
         #expect(w.isDesignFocusActive)
     }
-    // cmux-rbf #cm-73.16: R6, a refused local read view hands out only Figma's own link.
-    @Test func refusedReadViewOpensFigmaLinkExternally() throws {
+    // cmux-rbf #cm-73.16 R6, amended for #cm-73.39: the read view is cmux's own page on a trusted
+    // internal scheme, not a local file, so a forced local-file ban no longer refuses it. Read opens
+    // the read view in a new tab and hands nothing to the system browser.
+    @Test func readViewOpensUnderALocalFileBan() throws {
         let w = Workspace(); defer { w.teardownAllPanels() }
         let pane = try #require(w.bonsplitController.allPaneIds.first)
         let name = "figma-read-refusal-\(UUID())"
         let defaults = try #require(LocalFileRefusingDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         defaults.set(false, forKey: BrowserAvailabilitySettings.disabledKey)
+        try #require(!BrowserURLAllowlistPolicy(defaults: defaults).allowsLocalFiles)
         let link = URL(string: "https://www.figma.com/design/A/Read?node-id=8-7")!
         w.figmaFiles.show(try FigmaPaneURL.destination(for: link).url)
-        let entry = try #require(w.figmaFiles.entries.first)
+        try #require(w.figmaFiles.entries.first?.view == .read)
         var handedOff: [URL] = []
         let before = w.bonsplitController.allTabIds.count
+        let beforePanels = Set(w.panels.keys)
         let menu = w.figmaButtonMenu(inPane: pane, defaults: defaults, openExternally: { handedOff.append($0) })
         try select("Read", in: menu)
-        #expect(handedOff == [entry.link])
-        #expect(!handedOff.contains { $0.isFileURL })
-        #expect(w.bonsplitController.allTabIds.count == before)
+        #expect(handedOff.isEmpty, "\(handedOff)")
+        #expect(w.bonsplitController.allTabIds.count == before + 1)
+        let added = try #require(w.panels.values.compactMap { $0 as? BrowserPanel }.first { !beforePanels.contains($0.id) })
+        let address = try #require(panelAddress(added).flatMap(URL.init(string:)))
+        #expect(FigmaPaneURL.isWrapperPage(address, wrapper: FigmaPaneURL.previewPageURL), "\(address)")
+        #expect(address.scheme == FigmaPaneURL.previewPageScheme, "\(address)")
+        #expect(FigmaPaneURL.node(fromPaneURL: address) == "8-7", "\(address)")
     }
 
     // Immutable overrides over Foundation's thread-safe preference store; no extra mutable state.
