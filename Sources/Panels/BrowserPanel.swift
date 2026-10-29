@@ -5780,8 +5780,8 @@ final class BrowserPanel: Panel, ObservableObject {
               let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper)
         else { return false }
         let shouldMarkMotion = motion || play || (purpose == .fit && FigmaPaneURL.hasMotionMark(inWrapper: address, wrapper: wrapper))
-        guard let destination = try? FigmaPaneURL.destination(for: document, node: node, motion: shouldMarkMotion, wrapper: wrapper),
-              BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination.url)
+        // cmux-rbf (#cm-73.39): no URL-policy check here; a node always yields cmux's own trusted preview page.
+        guard let destination = try? FigmaPaneURL.destination(for: document, node: node, motion: shouldMarkMotion, wrapper: wrapper)
         else { return false }
         // Preview fit reloads only Preview; editor fitting is handled by the CLI's key path.
         if purpose == .fit, !FigmaPaneURL.isWrapperPage(address, wrapper: wrapper) {
