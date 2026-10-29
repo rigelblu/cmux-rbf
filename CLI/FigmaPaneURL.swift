@@ -204,8 +204,9 @@ enum FigmaPaneURL {
     /// An address on the legacy file page, moved to ``previewPageURL`` with the
     /// same query; any other address as given.
     ///
-    /// Applied where an address comes in — a restored pane, and the panel's load
-    /// funnel — so restored history and WebKit agree on one address.
+    /// Applied where an address comes in — a restored pane, `navigate(to:)` before
+    /// its policy check, and the panel's load funnel — so restored history and
+    /// WebKit agree on one address.
     static func upgradingLegacyPage(_ address: URL) -> URL {
         guard address.isFileURL, isSamePage(address, wrapperFileURL()),
               let legacy = URLComponents(url: address, resolvingAgainstBaseURL: false),
