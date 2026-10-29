@@ -330,8 +330,11 @@ enum FigmaPlayScript {
       var mark = src.indexOf('?');
       var base = (mark >= 0 ? src.slice(0, mark) : src).replace('/proto/', '/design/');
       var kept = (mark >= 0 ? src.slice(mark + 1) : '').split('&').filter(function (p) {
-        return p && ['hide-ui', 'scaling', 'starting-point-node-id', 'bg-color', 'page-selector'].indexOf(p.split('=')[0]) < 0;
+        return p && ['hide-ui', 'scaling', 'starting-point-node-id', 'bg-color', 'page-selector', 'viewer'].indexOf(p.split('=')[0]) < 0;
       });
+      // Figma's redirect from embed.figma.com/proto/… carries no viewer=1, and its read view
+      // draws an empty page without it (Scenario 232, measured 2026-10-29).
+      kept.push('viewer=1');
       kept.push('page-selector=0');
       return base + '?' + kept.join('&');
     }

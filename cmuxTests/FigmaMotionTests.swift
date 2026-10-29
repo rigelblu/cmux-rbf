@@ -157,6 +157,18 @@ struct FigmaMotionTests {
         #expect(text(c, "performance.now()") == "30")
         #expect(text(c, "Date.now()") == "10010", "Date uses wall time minus its own frozen span")
     }
+    // Scenario 234: WebKit caches the preview page before cmux's `freeze` message reaches
+    // Figma's frame, so the frame holds its own clock when its document is hidden.
+    @Test func playingFrameHoldsItsClockFromItsOwnPagehide() throws {
+        let c = try clock()
+        c.evaluateScript("listeners.message({source:window.parent,data:{cmuxClockCommand:true,mode:'run'}}); perfTime+=4000; wallTime+=4000")
+        #expect(text(c, "performance.now()") == "4020")
+        c.evaluateScript("if (listeners.pagehide) listeners.pagehide({persisted:true}); perfTime+=8500; wallTime+=8500")
+        #expect(text(c, "performance.now()") == "4020", "the clock must hold from the moment the page was hidden")
+        #expect(text(c, "Date.now()") == "14000", "Date must hold from the moment the page was hidden")
+        c.evaluateScript("listeners.message({source:window.parent,data:{cmuxClockCommand:true,mode:'run'}}); perfTime+=10; wallTime+=10")
+        #expect(text(c, "performance.now()") == "4030", "play after return resumes from where it was left")
+    }
     @Test func loginAndInterstitialKeepRealClock() throws {
         for path in ["/login", "/embed/interstitial", "/design/KEY/slug"] {
             let c = try clock(path: path)
@@ -195,6 +207,26 @@ struct FigmaMotionTests {
         #expect(q["page-selector"] == "0" && q["node-id"] == "12-2")
         #expect(q["theme"] == "dark" && q["footer"] == "false" && q["embed-host"] == "cmux")
         for key in ["hide-ui", "scaling", "starting-point-node-id", "bg-color"] { #expect(q[key] == nil) }
+    }
+    // Scenario 232: Figma's redirect from `embed.figma.com/proto/…` carries no `viewer=1`, and
+    // `www.figma.com/design?embed-host=…` without it draws an empty page (measured 2026-10-29).
+    // The first address is the one read off a frame that opened in the player; the second, one
+    // that opened in the read view and was played, already carries it.
+    @Test func stillAddressAlwaysAsksForFigmasViewerOnce() throws {
+        let addresses = [
+            "https://www.figma.com/proto/OlnsbHBaQ6WeIU3lx8Qsnn/slug?bg-color=e5e5e5&content-scaling=fixed&embed-host=cmux&footer=0&hide-ui=1&kind=proto&node-id=106-426&scaling=contain&starting-point-node-id=106-426&theme=light&version=2",
+            "https://www.figma.com/proto/OlnsbHBaQ6WeIU3lx8Qsnn/slug?embed-host=cmux&footer=0&kind=file&node-id=106-426&theme=light&version=2&viewer=1&hide-ui=1&bg-color=e5e5e5&scaling=contain&starting-point-node-id=106-426"
+        ]
+        for href in addresses {
+            let c = try clock(path: "/proto/OlnsbHBaQ6WeIU3lx8Qsnn/slug")
+            c.evaluateScript("location.href = '\(href)'; listeners.message({source:window.parent,data:{cmuxClockCommand:true,kind:'still'}})")
+            let address = try #require(text(c, "replaced"))
+            let u = try #require(URLComponents(string: address))
+            #expect(u.host == "www.figma.com" && u.path == "/design/OlnsbHBaQ6WeIU3lx8Qsnn/slug")
+            let items = u.queryItems ?? []
+            #expect(items.filter { $0.name == "viewer" }.map(\.value) == ["1"], "Figma draws an empty read view without viewer=1: \(address)")
+            #expect(items.contains { $0.name == "node-id" && $0.value == "106-426" } && items.contains { $0.name == "page-selector" && $0.value == "0" })
+        }
     }
 
     private static let browser = #"""
