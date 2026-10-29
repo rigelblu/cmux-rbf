@@ -16659,7 +16659,7 @@ struct TabItemView: View, Equatable {
         ) // (#cm-109.3)
         let leadingSlotActive = slotResolution.leading != .none // (#cm-109.3)
         let trailingStatusActive = slotResolution.trailing != .none // (#cm-109.3)
-        let titleRowSpacing: CGFloat = slotResolution.leading == .spinner ? 6 : 8 // (#cm-109.3)
+        let titleRowSpacing: CGFloat = 8 // (#cm-128.1) no spinner leads any more, so no 6 pt case
         let badgeFont = magnifiedFont(scaledFontSize(9), weight: .semibold)
         let spinnerTooltip = SidebarWorkspaceLoadingTooltip.text(count: workspaceSnapshot.activeCodingAgentCount)
         // Must match the AppKit cell, which derives this from the palette's
@@ -16671,13 +16671,8 @@ struct TabItemView: View, Equatable {
             HStack(alignment: .sidebarTitleFirstLineCenter, spacing: titleRowSpacing) {
 
                 if leadingSlotActive {
-                    let badgeOnLeading = unreadCount > 0 && settings.notificationBadgePosition == .leading // (#cm-109.4)
-                    let leadingSlotSide = SidebarWorkspaceSlotResolution.leadingSlotSide( // (#cm-109.4)
-                        leadingBadgeCandidate: badgeOnLeading, // (#cm-109.3)
-                        scaledUnreadBadgeSize: scaledUnreadBadgeSize, // (#cm-109.4)
-                        scaledLoadingSpinnerSize: scaledLoadingSpinnerSize // (#cm-109.4)
-                    ) // (#cm-109.4)
-                    SidebarWorkspaceLeadingStatusSlot(showsBadge: slotResolution.leading == .badge, showsSpinner: slotResolution.leading == .spinner, unreadCount: unreadCount, side: leadingSlotSide, spinnerSide: scaledLoadingSpinnerSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip) // (#cm-109.3)
+                    // cm-128.1: the leading slot holds the unread badge alone, so it is always the badge's width.
+                    SidebarWorkspaceLeadingStatusSlot(unreadCount: unreadCount, side: scaledUnreadBadgeSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor) // (#cm-109.3)
                 }
 
                 if workspaceSnapshot.isPinned {
@@ -16738,6 +16733,12 @@ struct TabItemView: View, Equatable {
                     .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
                 } // (#cm-109.3)
 
+                // cm-128.1: the spinner set to the left draws after the glyph and the hand, beside them.
+                if slotResolution.markSpinner {
+                    SidebarWorkspaceLoadingSpinner(side: scaledLoadingSpinnerSize, color: spinnerColor, tooltip: spinnerTooltip)
+                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
+                }
+
                 SidebarCloudWorkspaceBadgeView(label: workspaceSnapshot.cloudWorkspaceLabel, pointSize: scaledFontSize(10), tint: activeSecondaryColor(0.7))
 
                 if isEditing {
@@ -16782,7 +16783,7 @@ struct TabItemView: View, Equatable {
                 }
 
                 if trailingStatusActive || canCloseWorkspace {
-                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, side: scaledUnreadBadgeSize, width: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace) // (#cm-109.3)
+                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, side: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, slotWidth: SidebarWorkspaceSlotResolution.trailingReserve(trailing: slotResolution.trailing, trailingInner: slotResolution.trailingInner, badgeSide: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, closeButtonWidth: scaledCloseButtonWidth), closeButtonWidth: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace) // (#cm-109.3)
                 }
             }
 

@@ -211,6 +211,56 @@ extension AgentNotificationRegressionTests {
         #expect(recorder.banners == 1)
         #expect(recorder.unreadWhenBannerPosted)
     }
+    /// cm-128.1 (Q22, Scenario 26): his accepted key in the pane cancels the open Feed card. The blocked Feed call ends
+    /// `.unavailable` (the waiter registry's terminal result for an invalidated request) instead of waiting out its timeout.
+    @Test(arguments: ["claude", "codex"])
+    func acceptedPaneInputCancelsTheOpenFeedWait(source: String) async throws {
+        let fixture = try makeFixture()
+        defer { fixture.restore() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let journal = AgentJournalLifecycleCenter(databaseURL: root.appendingPathComponent("journal.sqlite"))
+        let previousStore = FeedCoordinator.shared.store
+        let previousJournal = FeedCoordinator.shared.notificationJournal
+        let previousObserver = FeedCoordinatorTestHooks.notificationPostObserver
+        let previousCenter = FeedCoordinator.shared.notificationCenterForTesting
+        defer {
+            FeedCoordinatorTestHooks.notificationPostObserver = previousObserver
+            FeedCoordinator.shared.restoreInstallationForTesting(store: previousStore,
+                journal: previousJournal, center: previousCenter)
+        }
+        FeedCoordinator.shared.install(store: WorkstreamStore(ringCapacity: 10), notificationJournal: journal)
+        let banner = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        defer { banner.continuation.finish() }
+        let requestID = UUID().uuidString
+        let workspaceID = fixture.source.id
+        let surfaceID = fixture.panelId
+        fixture.source.surfaceResumeBindingsByPanelId[surfaceID] = SurfaceResumeBindingSnapshot(
+            name: source, kind: source, command: "agent resume", checkpointId: "feed-session", source: "agent-hook", updatedAt: 1)
+        FeedCoordinatorTestHooks.notificationPostObserver = { _, request in
+            MainActor.assumeIsolated {
+                guard request == requestID else { return }
+                banner.continuation.yield(())
+            }
+        }
+        let event = WorkstreamEvent(sessionId: try #require(FeedWorkstreamIdentifier(agentID: source, sessionID: "feed-session")).rawValue,
+            hookEventName: .permissionRequest, source: source,
+            workspaceId: workspaceID.uuidString, surfaceId: surfaceID.uuidString,
+            toolName: "Tool", requestId: requestID)
+        let blocked = Task.detached {
+            let result = FeedCoordinator.shared.ingestBlocking(event: event, waitTimeout: 15)
+            banner.continuation.finish()
+            return result
+        }
+        var iterator = banner.stream.makeAsyncIterator()
+        #expect(await iterator.next() != nil, "the Feed wait never posted its banner")
+        journal.resolvePaneInput(workspaceId: workspaceID, surfaceId: surfaceID, isEscape: false)
+        guard case .unavailable = await blocked.value else {
+            Issue.record("Accepted pane input must cancel the open Feed wait")
+            return
+        }
+    }
+
     @Test(arguments: ["claude", "codex"])
     func feedToolResultDoesNotReopenSettledCompletion(source: String) throws {
         let workspace = UUID().uuidString

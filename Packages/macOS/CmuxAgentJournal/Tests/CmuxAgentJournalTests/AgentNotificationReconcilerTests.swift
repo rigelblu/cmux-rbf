@@ -9,12 +9,12 @@ struct AgentNotificationReconcilerTests {
     private func event(_ sequence: Int64, _ kind: AgentJournalEventKind, source: String,
                        turn: String? = "turn-1", request: String? = nil, pending: Bool = false,
                        notify: Bool = true, occurredAt: Int64? = nil, nativeID: String? = nil,
-                       surfaceID: String? = nil) -> AgentJournalEvent {
+                       surfaceID: String? = nil, nativeEvent: String? = nil) -> AgentJournalEvent {
         AgentJournalEvent(sequence: sequence, committedAtMs: 1000 + sequence,
             draft: AgentJournalEventDraft(eventId: "event-\(sequence)", kind: kind,
                 occurredAtMs: occurredAt ?? sequence, source: source, agentKey: source,
                 sessionId: "session", workspaceId: workspace, surfaceId: surfaceID ?? surface,
-                pendingWork: pending, attention: AgentAttentionContext(eventIdentity: nativeID,
+                pendingWork: pending, nativeEvent: nativeEvent, attention: AgentAttentionContext(eventIdentity: nativeID,
                     turnIdentity: turn, requestIdentity: request,
                     notification: notify ? AgentJournalNotification(title: "Agent", subtitle: "",
                         body: "Ready", category: kind == .turnCompleted ? "turn-complete" : "needs-permission") : nil)))
@@ -328,4 +328,112 @@ struct AgentNotificationReconcilerTests {
         #expect(reconciler.lifecycleEvent(late).draft.declaredPhase == .idle)
     }
 
+    @Test(arguments: ["claude", "codex"])
+    func runningAfterQuestionPreservesWaitUntilExplicitAnswer(source: String) throws {
+        var reconciler = AgentNotificationReconciler()
+        let wait = reconciler.apply(event(1, .questionRequested, source: source, request: "r", occurredAt: 30))
+        var work = event(2, .stateChanged, source: source, notify: false, occurredAt: 40).draft
+        work.declaredPhase = .running
+        let running = AgentJournalEvent(sequence: 2, committedAtMs: 2, draft: work)
+        _ = reconciler.apply(running)
+        #expect(reconciler.lifecycleEvent(running).draft.declaredPhase == .needsInput)
+        let answer = event(3, .attentionResolved, source: source, request: "r", notify: false, occurredAt: 50)
+        #expect(reconciler.apply(answer).invalidatedCorrelationKeys == [try #require(wait.identity)])
+        #expect(reconciler.lifecycleEvent(answer).draft.declaredPhase == .running)
+    }
+
+    @Test(arguments: ["claude", "codex"])
+    func queuedWorkBeforeApprovalIsStaleUntilExplicitAnswer(source: String) throws {
+        var reconciler = AgentNotificationReconciler()
+        let wait = reconciler.apply(event(1, .approvalRequested, source: source, request: "r", occurredAt: 30))
+        var work = event(2, .stateChanged, source: source, notify: false, occurredAt: 20).draft
+        work.declaredPhase = .running
+        let queued = AgentJournalEvent(sequence: 2, committedAtMs: 2, draft: work)
+        #expect(reconciler.apply(queued).disposition == .stale)
+        #expect(reconciler.lifecycleEvent(queued).draft.declaredPhase == .needsInput)
+        let answer = event(3, .attentionResolved, source: source, request: "r", notify: false, occurredAt: 40)
+        #expect(reconciler.apply(answer).invalidatedCorrelationKeys == [try #require(wait.identity)])
+        #expect(reconciler.lifecycleEvent(answer).draft.declaredPhase == .running)
+    }
+
+    @Test(arguments: ["PermissionRequest", "AskUserQuestion", "ExitPlanMode"])
+    func quickAnswerSuppressesLateClaudeNotificationPair(nativeEvent: String) {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(event(1, .questionRequested, source: "claude", turn: nil,
+                                  request: "feed-uuid", occurredAt: 0, nativeEvent: nativeEvent))
+        let answer = event(2, .attentionResolved, source: "claude", turn: nil, notify: false, occurredAt: 2000)
+        _ = reconciler.apply(answer)
+        var work = event(3, .stateChanged, source: "claude", turn: nil, notify: false, occurredAt: 3000).draft
+        work.declaredPhase = .running
+        _ = reconciler.apply(AgentJournalEvent(sequence: 3, committedAtMs: 3, draft: work))
+        for sequence: Int64 in 4...5 {
+            let reminder = event(sequence, .approvalRequested, source: "claude", turn: nil,
+                                 occurredAt: 6000 + sequence, nativeEvent: "Notification")
+            let decision = reconciler.apply(reminder)
+            #expect(!decision.projectsLifecycle)
+            #expect(decision.identity == nil)
+            #expect(decision.disposition == .observation)
+        }
+        #expect(reconciler.lifecycleEvent(answer).draft.declaredPhase == .running)
+    }
+
+    @Test(arguments: [Int64(10000), 115000])
+    func laterClaudeNotificationStillOpensRealWait(elapsed: Int64) {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(event(1, .approvalRequested, source: "claude", turn: nil,
+                                  request: "feed-uuid", occurredAt: 0, nativeEvent: "PermissionRequest"))
+        _ = reconciler.apply(event(2, .attentionResolved, source: "claude", turn: nil, notify: false, occurredAt: 2000))
+        let reminder = event(3, .approvalRequested, source: "claude", turn: nil,
+                             occurredAt: elapsed, nativeEvent: "Notification")
+        #expect(reconciler.apply(reminder).disposition == .accepted)
+        #expect(reconciler.lifecycleEvent(event(4, .attentionResolved, source: "claude", turn: "wrong", notify: false)).draft.declaredPhase == .needsInput)
+    }
+
+    @Test func claudeNotificationWithoutFeedStillOpensWait() {
+        var reconciler = AgentNotificationReconciler()
+        let reminder = event(1, .approvalRequested, source: "claude", turn: nil, nativeEvent: "Notification")
+        #expect(reconciler.apply(reminder).disposition == .accepted)
+    }
+
+    @Test func toolIdentityCannotResolveFeedQuestionIdentity() {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(event(1, .questionRequested, source: "claude", turn: nil, request: "tool-id", notify: false))
+        _ = reconciler.apply(event(2, .questionRequested, source: "claude", turn: nil, request: "feed-uuid"))
+        for sequence: Int64 in 3...4 {
+            _ = reconciler.apply(event(sequence, .approvalRequested, source: "claude", turn: nil))
+        }
+        for sequence: Int64 in 5...9 {
+            var work = event(sequence, .stateChanged, source: "claude", turn: nil, notify: false).draft
+            work.declaredPhase = .running
+            _ = reconciler.apply(AgentJournalEvent(sequence: sequence, committedAtMs: sequence, draft: work))
+        }
+        let wrong = event(10, .attentionResolved, source: "claude", turn: nil, request: "tool-id", notify: false)
+        #expect(reconciler.apply(wrong).invalidatedCorrelationKeys.isEmpty)
+        #expect(reconciler.lifecycleEvent(wrong).draft.declaredPhase == .needsInput)
+    }
+
+    @Test func openRequestCountDistinguishesNilTurnWaitFromNoWait() {
+        var reconciler = AgentNotificationReconciler()
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
+        _ = reconciler.apply(event(1, .approvalRequested, source: "claude", turn: nil))
+        let open = reconciler.openRequests(source: "claude", sessionId: "session")
+        #expect(open.count == 1)
+        #expect(open.identified.isEmpty)
+        #expect(open.unidentifiedTurn == nil)
+        #expect(open.nativeTurn == nil)
+        _ = reconciler.apply(event(2, .attentionResolved, source: "claude", turn: nil, notify: false))
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
+    }
+
+    @Test func openRequestsExposesIdentitiesAndNativeTurnWithoutMixingSessions() {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(event(1, .questionRequested, source: "codex", request: "z"))
+        _ = reconciler.apply(event(2, .approvalRequested, source: "codex", request: "a"))
+        let open = reconciler.openRequests(source: "codex", sessionId: "session")
+        #expect(open.identified == ["a", "z"])
+        #expect(open.count == 2)
+        #expect(open.nativeTurn == "turn-1")
+        #expect(open.unidentifiedTurn == nil)
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
+    }
 }

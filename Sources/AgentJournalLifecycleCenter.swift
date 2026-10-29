@@ -24,6 +24,8 @@ final class AgentJournalLifecycleCenter: Sendable {
         case append(AgentJournalEventDraft)
         case recordAliases(workspaces: [String: String], surfaces: [String: String])
         case startupReplay
+        // cm-128.1: accepted human input on a pane, resolved on this worker so the key path never touches the journal.
+        case paneInput(workspaceId: UUID, surfaceId: UUID, isEscape: Bool, occurredAtMs: Int64)
 
         var admissionID: UUID? {
             switch self {
@@ -39,10 +41,17 @@ final class AgentJournalLifecycleCenter: Sendable {
     private let consumerTask: Task<Void, Never>?
 
     convenience init() {
-        self.init(databaseURL: Self.defaultDatabaseURL())
+        self.init(databaseURL: Self.defaultDatabaseURL(), usesVimEditor: Self.hookStoreRecordsVimEditor)
     }
 
-    init(databaseURL: URL?) {
+    /// Whether the hook store recorded vim as a Claude session's editor mode. It reads the real `$HOME`, so only the shared
+    /// center uses it; a center built with another journal assumes the default editor unless it is given its own reader. (cm-128.1)
+    private static let hookStoreRecordsVimEditor: @Sendable (String, String) -> Bool = { source, sessionId in
+        source == "claude" && AgentChatHookSessionStore().entry(agentSource: source, sessionID: sessionId)?.editorMode == "vim"
+    }
+
+    /// - Parameter usesVimEditor: Whether a session's editor mode is vim, asked on the journal worker (cm-128.1).
+    init(databaseURL: URL?, usesVimEditor: @escaping @Sendable (String, String) -> Bool = { _, _ in false }) {
         guard let databaseURL else {
             self.lazyStore = nil
             self.operations = nil
@@ -58,6 +67,9 @@ final class AgentJournalLifecycleCenter: Sendable {
         let operationContinuation = channel.continuation
         self.consumerTask = Task.detached(priority: .utility) {
             let reducer = AgentLifecycleReducer()
+            // cm-128.1: pane input resolution and each Claude session's vim editor mode, kept on the worker.
+            let inputResolver = AgentPaneInputResolver()
+            var editorModes: [String: Bool] = [:]
             let replayPolicy = AgentJournalReplayPolicy()
             var state = AgentLifecycleReducerState()
             var notifications = AgentNotificationReconciler()
@@ -97,7 +109,25 @@ final class AgentJournalLifecycleCenter: Sendable {
                 if decision.disposition != .stale, decision.projectsLifecycle,
                    let application = Self.reduceIngest(notifications.lifecycleEvent(canonical), aliases: eventAliases,
                        reducer: reducer, state: &state) {
-                    await MainActor.run { Self.apply(application.assignment, workspaceHint: application.workspaceHint) }
+                    // cm-128.1: push the pane's Claude vim editor mode onto its surface, so the Escape filter asks for two presses.
+                    let selected = inputResolver.newestSession(surfaceId: canonical.draft.surfaceId ?? "", state: state)
+                    var usesVim = false
+                    if let selected, selected.source == "claude" {
+                        if editorModes[selected.sessionId] == nil || canonical.kind == .sessionStarted {
+                            editorModes[selected.sessionId] = usesVimEditor(selected.source, selected.sessionId)
+                        }
+                        usesVim = editorModes[selected.sessionId] ?? false
+                    }
+                    let selectedUsesVim = usesVim
+                    await MainActor.run {
+                        Self.apply(application.assignment, workspaceHint: application.workspaceHint)
+                        if let surfaceId = UUID(uuidString: application.assignment.surfaceId) {
+                            GhosttyApp.terminalSurfaceRegistry.terminalSurface(id: surfaceId)?.agentInputState.usesVimEditor = selectedUsesVim
+                        }
+                    }
+                    if canonical.kind == .sessionEnded, let sessionId = canonical.draft.sessionId {
+                        editorModes.removeValue(forKey: sessionId)
+                    }
                 }
                 Self.clearInvalidatedNotifications(canonical, decision: decision)
                 let notificationEvent = Self.canonicalized(decision.notificationEvent ?? canonical, aliases: eventAliases)
@@ -202,6 +232,10 @@ final class AgentJournalLifecycleCenter: Sendable {
                         cmuxDebugLog("agentJournal.aliases.error \(String(describing: error))")
 #endif
                     }
+                case .paneInput(let workspaceId, let surfaceId, let isEscape, let occurredAtMs): // cm-128.1
+                    let drafts = inputResolver.drafts(workspaceId: workspaceId, surfaceId: surfaceId,
+                        isEscape: isEscape, state: state, notifications: notifications, occurredAtMs: occurredAtMs)
+                    for draft in drafts { await submit(draft, id: nil, store: store) }
                 case .startupReplay:
                     guard let replayAliases = resolver(store) else { continue }
                     let assignments = Self.reduceStartupReplay(
@@ -291,6 +325,12 @@ final class AgentJournalLifecycleCenter: Sendable {
 #endif
             return "ERROR: agent journal append failed"
         }
+    }
+
+    /// Resolves pane input on the ordered journal worker, never on the key-down path. (cm-128.1)
+    func resolvePaneInput(workspaceId: UUID, surfaceId: UUID, isEscape: Bool) {
+        operations?.yield(.paneInput(workspaceId: workspaceId, surfaceId: surfaceId,
+            isEscape: isEscape, occurredAtMs: Int64(Date().timeIntervalSince1970 * 1000)))
     }
 
     /// Queues a diagnostic event for the owned journal consumer without

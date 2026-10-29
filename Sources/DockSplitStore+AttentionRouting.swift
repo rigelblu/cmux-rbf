@@ -58,6 +58,7 @@ extension DockSplitStore {
     func installAttentionRouting(for panel: any Panel) {
         guard let terminal = panel as? TerminalPanel else { return }
         let ownerTabManager = AppDelegate.shared?.dockReferenceTabManager(for: self)
+        terminal.surface.installAgentPaneInputHandler(workspaceId: workspaceId) // cm-128.1
         terminal.surface.onExplicitInput = { [weak self, weak terminal, weak ownerTabManager] in
             guard let self, let terminal,
                   let mountedTerminal = self.panels[terminal.id] as? TerminalPanel,

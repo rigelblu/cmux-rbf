@@ -8,6 +8,11 @@ internal import CryptoKit
 /// so duplicate stops cannot swallow a later real approval. Replay observes state
 /// through this same fold, but the caller never dispatches replay effects.
 public struct AgentNotificationReconciler: Sendable {
+    /// How long after a Feed-backed wait is retired Claude's generic permission reminder still counts as its echo. (cm-128.1)
+    private static let lateReminderWindowMs: Int64 = 10_000
+    /// Claude native events the Feed turns into a wait of its own. (cm-128.1)
+    private static let feedAttentionNativeEvents: Set<String> = ["PermissionRequest", "AskUserQuestion", "ExitPlanMode"]
+
     private struct Session: Sendable {
         var occurredAtMs: Int64 = -1
         var sequence: Int64 = 0
@@ -29,6 +34,8 @@ public struct AgentNotificationReconciler: Sendable {
         var starts: Set<String> = []
         var resolvedRequests: Set<String> = []
         var completionTurns: [String: String] = [:]
+        /// The newest Feed-backed wait of this Claude session, for recognising its late reminder. (cm-128.1)
+        var latestFeedAttention: (identity: String, occurredAtMs: Int64)?
 
         /// The agent continues after the user's decision: a settled turn is live again.
         mutating func resumeWork() {
@@ -48,6 +55,28 @@ public struct AgentNotificationReconciler: Sendable {
 
     /// Creates an empty reconciler, suitable for live ingestion or journal replay.
     public init() {}
+
+    /// Returns the open requests and native turn of one provider session. (cm-128.1)
+    /// - Parameters:
+    ///   - source: Stable producer slug, such as `claude`.
+    ///   - sessionId: The provider's native session identity.
+    /// - Returns: Sorted request IDs, the single id-less request's native turn,
+    ///   the session's native turn, and the total count. The count distinguishes
+    ///   an id-less request with a nil native turn from no open request.
+    public func openRequests(source: String, sessionId: String) -> (
+        identified: [String], unidentifiedTurn: String?, nativeTurn: String?, count: Int
+    ) {
+        guard let session = sessions[Self.key([source, sessionId])] else {
+            return ([], nil, nil, 0)
+        }
+        let unidentifiedCount = session.attentionIdentities.count - session.attentionRequestIDs.count
+        return (
+            session.attentionRequestIDs.values.sorted(),
+            unidentifiedCount == 1 ? session.nativeTurn : nil,
+            session.nativeTurn,
+            session.attentionIdentities.count
+        )
+    }
 
     /// Observes one committed semantic event and classifies its candidate.
     /// - Parameter event: A journal event with causal evidence from its adapter.
@@ -135,6 +164,16 @@ public struct AgentNotificationReconciler: Sendable {
             return .init(.accepted, identity: identity,
                 notificationEvent: AgentJournalEvent(sequence: event.sequence, committedAtMs: event.committedAtMs, draft: reminder),
                 projectsLifecycle: false)
+        }
+        if draft.source == "claude", draft.kind == .approvalRequested,
+           draft.nativeEvent == "Notification", context?.requestIdentity == nil,
+           session.attentionIdentities.isEmpty,
+           let latest = session.latestFeedAttention,
+           draft.occurredAtMs >= latest.occurredAtMs,
+           draft.occurredAtMs - latest.occurredAtMs < Self.lateReminderWindowMs {
+            // cm-128.1: Claude's delayed permission reminder may arrive after the terminal
+            // answer. A later prompt without Feed evidence must still open a wait.
+            return .init(.observation, projectsLifecycle: false)
         }
         let independentRequest = isAttention && context?.requestIdentity != nil && session.phase == .needsInput
         if !independentRequest && (draft.occurredAtMs < session.occurredAtMs
@@ -275,6 +314,12 @@ public struct AgentNotificationReconciler: Sendable {
         if [.approvalRequested, .questionRequested, .planReviewRequested].contains(draft.kind) {
             session.attentionIdentities.insert(identity)
             if let request = context?.requestIdentity { session.attentionRequestIDs[identity] = request }
+            // cm-128.1: remember the newest Feed-backed wait, so its late reminder is not mistaken for a new one.
+            if draft.source == "claude",
+               draft.nativeEvent.map(Self.feedAttentionNativeEvents.contains) == true,
+               draft.occurredAtMs >= (session.latestFeedAttention?.occurredAtMs ?? -1) {
+                session.latestFeedAttention = (identity, draft.occurredAtMs)
+            }
         }
         if draft.kind == .turnCompleted { session.completionIdentity = identity }
         sessions[sessionKey] = session
