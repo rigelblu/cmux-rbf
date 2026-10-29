@@ -31,7 +31,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let contentContainer = SidebarRowContentContainerView()
     // Title line
     private let leadingBadge = SidebarRowUnreadBadgeView()
-    private var leadingSpinner: GPUSpinnerNSView?
+    private var markSpinner: GPUSpinnerNSView?
     private var handImageView: NSImageView? // (#cm-109.3)
     private var handOutlineView: WaitingHandOutlineView? // (#cm-109.7)
     private let pinImageView = NSImageView()
@@ -44,6 +44,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let cloudImageView = NSImageView()
     private let trailingBadge = SidebarRowUnreadBadgeView()
     private var trailingSpinner: GPUSpinnerNSView?
+    /// The trailing marks as they show with no close button: the title reserves their width, so hover does not move it. (#cm-128.1)
+    private var restingTrailingMarks: (outer: SidebarWorkspaceSlotResolution.SlotContent, inner: SidebarWorkspaceSlotResolution.SlotContent) = (.none, .none)
     private let closeButton = SidebarHeaderGlyphButton()
     // Detail slots
     private let descriptionView = SidebarRowTextView(lines: 12)
@@ -275,7 +277,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
     func setPresentationActive(_ isActive: Bool) {
         isPresentationActive = isActive
-        leadingSpinner?.isPresentationActive = isActive
+        markSpinner?.isPresentationActive = isActive
         trailingSpinner?.isPresentationActive = isActive
     }
 
@@ -689,7 +691,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     var isStatusPopoverShownForTesting: Bool { statusPopoverPresenter.isShown } // (#cm-110.13)
     var handForTesting: NSImageView? { handImageView } // (#cm-109.3)
     var handOutlineForTesting: NSView? { handOutlineView } // (#cm-109.7)
-    var leadingSpinnerForTesting: GPUSpinnerNSView? { leadingSpinner } // (#cm-109.3)
+    var markSpinnerForTesting: GPUSpinnerNSView? { markSpinner } // (#cm-109.3)
     var trailingSpinnerForTesting: GPUSpinnerNSView? { trailingSpinner } // (#cm-109.3)
     var leadingBadgeForTesting: SidebarRowUnreadBadgeView { leadingBadge } // (#cm-109.3)
     var trailingBadgeForTesting: SidebarRowUnreadBadgeView { trailingBadge } // (#cm-109.3)
@@ -716,8 +718,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
         let leadingBadgeVisible = slotResolution.leading == .badge // (#cm-109.3)
         let trailingBadgeVisible = slotResolution.trailing == .badge // (#cm-109.3)
-        let leadingSpinnerVisible = slotResolution.leading == .spinner // (#cm-109.3)
-        let trailingSpinnerVisible = slotResolution.trailing == .spinner // (#cm-109.3)
+        let markSpinnerVisible = slotResolution.markSpinner // (#cm-128.1)
+        let trailingSpinnerVisible = slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner // (#cm-128.1)
+        let restingResolution = showsCloseNow ? SidebarWorkspaceSlotResolution.resolve( // (#cm-128.1)
+            showsHand: slotResolution.showsHand, showsSpinner: spinnerVisible, unreadCount: model.unreadCount, // (#cm-128.1)
+            loadingSpinnerPosition: model.settings.loadingSpinnerPosition, // (#cm-128.1)
+            notificationBadgePosition: model.settings.notificationBadgePosition, showsCloseButton: false // (#cm-128.1)
+        ) : slotResolution // (#cm-128.1)
+        restingTrailingMarks = (restingResolution.trailing, restingResolution.trailingInner) // (#cm-128.1)
         leadingBadge.isHidden = !leadingBadgeVisible // (#cm-109.3)
         trailingBadge.isHidden = !trailingBadgeVisible // (#cm-109.3)
         if !leadingBadge.isHidden {
@@ -728,9 +736,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
 
         let spinnerColor = palette.secondary(0.55)
-        leadingSpinner = Self.updateSpinner(
-            existing: leadingSpinner,
-            visible: leadingSpinnerVisible,
+        markSpinner = Self.updateSpinner(
+            existing: markSpinner,
+            visible: markSpinnerVisible,
             color: spinnerColor,
             colorScheme: palette.colorScheme,
             presentationActive: isPresentationActive,
@@ -751,7 +759,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                 String(localized: "sidebar.agentActivity.tooltip.many", defaultValue: "Loading (%lld active tasks)"),
                 agentCount
             )
-        leadingSpinner?.toolTip = tooltip
+        markSpinner?.toolTip = tooltip
         trailingSpinner?.toolTip = tooltip
 
         let handVisible = slotResolution.showsHand // (#cm-109.3)
@@ -1263,9 +1271,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let spacing: CGFloat = 4
 
         // Title line
-        let leadingSpinnerActive = leadingSpinner?.isHidden == false // (#cm-109.3)
-        let titleRowSpacing: CGFloat = (model.settings.loadingSpinnerPosition == .leading
-            && leadingSpinnerActive) ? 6 : 8 // (#cm-109.3)
+        let titleRowSpacing: CGFloat = 8 // (#cm-128.1) no spinner leads any more, so no 6 pt case
         var x = leading
         let badgeSide = 16 * model.fontScale
         let spinnerSide = max(10, 12 * model.fontScale)
@@ -1279,16 +1285,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             )
         }
 
-        let leadingSlotActive = (!leadingBadge.isHidden) || leadingSpinnerActive // (#cm-109.3)
+        let leadingSlotActive = !leadingBadge.isHidden // (#cm-128.1) the badge alone holds the leading slot
         if leadingSlotActive {
-            let side = !leadingBadge.isHidden ? badgeSide : spinnerSide
-            if !leadingBadge.isHidden {
-                place(leadingBadge, size: NSSize(width: side, height: side), centerY: firstLineCenter)
-            }
-            if let spinner = leadingSpinner, !spinner.isHidden {
-                place(spinner, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
-            }
-            x += side + titleRowSpacing
+            place(leadingBadge, size: NSSize(width: badgeSide, height: badgeSide), centerY: firstLineCenter)
+            x += badgeSide + titleRowSpacing
         }
         if !pinImageView.isHidden {
             let side = model.scaled(9) + 4
@@ -1317,6 +1317,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             } // (#cm-109.7)
             x += spinnerSide + titleRowSpacing // (#cm-109.3)
         } // (#cm-109.3)
+        // cm-128.1: the left spinner draws after the glyph and the hand, beside them.
+        if let spinner = markSpinner, !spinner.isHidden {
+            place(spinner, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
+            x += spinnerSide + titleRowSpacing
+        }
 
         x = cloudImageView.layoutLeadingSidebarWorkspaceAccessory(
             minX: x, centerY: firstLineCenter, side: model.scaled(10) + 4, spacing: titleRowSpacing, apply: apply
@@ -1326,7 +1331,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let closeWidth = max(16, closeHit)
         let trailingSpinnerActive = trailingSpinner?.isHidden == false // (#cm-109.3)
         let trailingSlotActive = !trailingBadge.isHidden || trailingSpinnerActive || model.canCloseWorkspace // (#cm-109.3)
-        let titleMaxX = trailingSlotActive ? (trailing - closeWidth - titleRowSpacing) : trailing
+        let trailingReserve = SidebarWorkspaceSlotResolution.trailingReserve(
+            trailing: restingTrailingMarks.outer, trailingInner: restingTrailingMarks.inner,
+            badgeSide: badgeSide, spinnerSide: spinnerSide, closeButtonWidth: closeWidth
+        ) // (#cm-128.1)
+        let titleMaxX = trailingSlotActive ? (trailing - trailingReserve - titleRowSpacing) : trailing
         let titleWidth = max(10, titleMaxX - x)
         let renameField = renameSession?.field
         let titleHeight = renameField.map { ceil($0.intrinsicContentSize.height) }
@@ -1350,8 +1359,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                     )
                 }
                 if let spinner = trailingSpinner, !spinner.isHidden {
+                    // cm-128.1: beside the badge when both show on the right, at the edge when alone.
+                    let edgeOffset = trailingBadge.isHidden ? 0 : badgeSide + SidebarWorkspaceSlotResolution.trailingMarkGap
                     spinner.frame = NSRect(
-                        x: trailing - spinnerSide, y: firstLineCenter - spinnerSide / 2,
+                        x: trailing - edgeOffset - spinnerSide, y: firstLineCenter - spinnerSide / 2,
                         width: spinnerSide, height: spinnerSide
                     )
                 }

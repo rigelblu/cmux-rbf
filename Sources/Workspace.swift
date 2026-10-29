@@ -4967,7 +4967,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             }
             self.lastTerminalConfigInheritanceFontSizeLineage = lineage
         }
-        installTerminalVisualBellRouting(for: terminalPanel)
+        installTerminalOwnerRouting(for: terminalPanel)
         terminalPanel.onRequestWorkspacePaneFlash = { [weak self, weak terminalPanel] reason in
             guard let self, let terminalPanel else { return }
             let panelID = self.surfaceOwnershipTarget(for: terminalPanel.id)?.containerPanelID

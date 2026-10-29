@@ -25,6 +25,11 @@ struct AgentChatHookSessionStore: Sendable {
         let pid: Int?
         /// When the hook store last updated the record.
         let updatedAt: Date?
+        /// Editor mode captured by Claude's SessionStart hook. (cm-128.1)
+        var editorMode: String? = nil
+        /// Start time of the process generation the hook recorded `pid` for. (cm-128.1)
+        var pidStartSeconds: Int64? = nil
+        var pidStartMicroseconds: Int64? = nil
     }
 
     private let homeDirectory: URL
@@ -61,7 +66,10 @@ struct AgentChatHookSessionStore: Sendable {
                 workingDirectory: Self.nonEmpty(entry["cwd"] as? String),
                 transcriptPath: Self.nonEmpty(entry["transcriptPath"] as? String),
                 pid: entry["pid"] as? Int,
-                updatedAt: updatedAt
+                updatedAt: updatedAt,
+                editorMode: Self.nonEmpty(entry["editorMode"] as? String),
+                pidStartSeconds: (entry["pidStartSeconds"] as? NSNumber)?.int64Value,
+                pidStartMicroseconds: (entry["pidStartMicroseconds"] as? NSNumber)?.int64Value
             )
         }
     }
