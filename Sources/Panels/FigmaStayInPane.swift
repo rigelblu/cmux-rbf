@@ -24,7 +24,7 @@ enum FigmaStayInPane {
         paneURL: URL?,
         isOmnibarVisible: Bool,
         target: URL?,
-        wrapper: URL = FigmaPaneURL.wrapperFileURL()
+        wrapper: URL = FigmaPaneURL.previewPageURL
     ) -> Bool {
         guard !isOmnibarVisible, let paneURL, let target else { return false }
         guard FigmaPaneURL.isWrapperPage(paneURL, wrapper: wrapper) else { return false }

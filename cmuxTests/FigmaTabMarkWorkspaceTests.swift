@@ -23,7 +23,7 @@ import Testing
 @Suite("FigmaTabMarkWorkspace", .serialized)
 struct FigmaTabMarkWorkspaceTests {
 
-    private static let readView = URL(string: FigmaPaneURL.wrapperFileURL().absoluteString
+    private static let readView = URL(string: FigmaPaneURL.previewPageURL.absoluteString
         + "?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY%2Fa")!
     private static let figmaFile = URL(string: "https://www.figma.com/design/KEY/a")!
 

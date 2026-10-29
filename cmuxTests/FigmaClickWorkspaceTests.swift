@@ -11,9 +11,9 @@ import struct CmuxSettings.AppCatalogSection
 @testable import cmux
 #endif
 
-/// The `Workspace` method that acts on ``FigmaClickRoute``. Every test passes a
-/// temporary page folder and its own `UserDefaults` suite, so none touches
-/// `~/Library/Application Support/cmux` or the shared browser setting. The panes
+/// The `Workspace` method that acts on ``FigmaClickRoute``. Every test builds on
+/// the served read-view page production loads (`cm-73.39`; nothing is written)
+/// and its own `UserDefaults` suite, so none touches the shared browser setting. The panes
 /// the fixture builds never fall back to the system browser. The pane a click
 /// makes still reads the shared browser setting inside `newBrowserSurface`: if
 /// the browser is turned off in `.standard` while these run, that pane's address
@@ -22,22 +22,17 @@ import struct CmuxSettings.AppCatalogSection
 @Suite("FigmaClickWorkspace", .serialized)
 struct FigmaClickWorkspaceTests {
 
-    /// One workspace holding a terminal, with a page folder and defaults of its own.
+    /// One workspace holding a terminal, with defaults of its own.
     @MainActor
     private final class Fixture {
         let workspace = Workspace()
-        let folder: URL
-        let page: URL
+        let page = FigmaPaneURL.previewPageURL
         let defaults: UserDefaults
         private let suiteName = "figma-click-workspace-tests-\(UUID().uuidString)"
         let terminalId: UUID
 
         init() throws {
             _ = NSApplication.shared
-            folder = FileManager.default.temporaryDirectory
-                .appendingPathComponent("cmux-figma-click-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            page = folder.appendingPathComponent("figma-embed.html")
             defaults = UserDefaults(suiteName: suiteName)!
             defaults.removePersistentDomain(forName: suiteName)
             defaults.set(false, forKey: BrowserAvailabilitySettings.disabledKey)
@@ -48,7 +43,6 @@ struct FigmaClickWorkspaceTests {
         func cleanup() {
             workspace.teardownAllPanels()
             defaults.removePersistentDomain(forName: suiteName)
-            try? FileManager.default.removeItem(at: folder)
         }
 
         var panelCount: Int { workspace.panels.count }
@@ -183,7 +177,7 @@ struct FigmaClickWorkspaceTests {
 
             let moved = try #require(f.loading(pane))
             #expect(moved == (try f.address("\(key)/old-name", node: "12-2")))
-            #expect(moved.hasPrefix("file://"))
+            #expect(moved.hasPrefix("cmux-figma://cmux/figma-embed.html?")) // cmux-rbf #cm-73.39
             #expect(f.workspace.focusedPanelId == pane.id)
             #expect(f.panelCount == panels)
             #expect(f.tabCount == tabs)
@@ -282,7 +276,7 @@ struct FigmaClickWorkspaceTests {
         }
     }
 
-    @Test("W8 cmux's browser turned off: false, no page written, nothing added")
+    @Test("W8 cmux's browser turned off: false, nothing added")
     func w8BrowserOff() throws {
         try withFixture { f in
             f.defaults.set(true, forKey: BrowserAvailabilitySettings.disabledKey)
@@ -290,53 +284,8 @@ struct FigmaClickWorkspaceTests {
 
             #expect(!f.click("\(key)/name?node-id=12-2"))
 
-            #expect(!FileManager.default.fileExists(atPath: f.page.path))
             #expect(f.panelCount == panels)
             #expect(f.tabCount == tabs)
-        }
-    }
-
-    /// A page whose folder cannot be made: a file sits where the folder would go.
-    private func unwritable(_ f: Fixture) throws -> URL {
-        let blocker = f.folder.appendingPathComponent("blocker")
-        try Data().write(to: blocker)
-        let page = blocker.appendingPathComponent("figma-embed.html")
-        #expect(throws: (any Error).self) { try FigmaWrapperPage.install(at: page) }
-        return page
-    }
-
-    @Test("W9 the page cannot be written and the link names a frame: false, and nothing is added")
-    func w9UnwritablePageFrame() throws {
-        try withFixture { f in
-            let page = try unwritable(f)
-            let panels = f.panelCount, tabs = f.tabCount
-
-            let took = f.workspace.openClickedFigmaLink(
-                URL(string: "\(key)/name?node-id=12-2")!, sourcePanelId: f.terminalId, page: page, defaults: f.defaults
-            )
-
-            #expect(!took)
-            #expect(f.panelCount == panels)
-            #expect(f.tabCount == tabs)
-        }
-    }
-
-    @Test("W10 the page cannot be written and the link names no frame: the editor tab still opens")
-    func w10UnwritablePageNoFrame() throws {
-        try withFixture { f in
-            let page = try unwritable(f)
-            let before = f.browserPanelIds
-            let panels = f.panelCount
-
-            let took = f.workspace.openClickedFigmaLink(
-                URL(string: "\(key)/name")!, sourcePanelId: f.terminalId, page: page, defaults: f.defaults
-            )
-
-            #expect(took)
-            #expect(f.panelCount == panels + 1)
-            let added = try #require(f.workspace.panels.values.compactMap { $0 as? BrowserPanel }
-                .first { !before.contains($0.id) })
-            #expect(added.currentURL?.absoluteString == "\(key)/name")
         }
     }
 
@@ -357,7 +306,6 @@ struct FigmaClickWorkspaceTests {
             let addedPane = try #require(f.workspace.paneId(forPanelId: added.id))
             #expect(addedPane != terminalPane)
             #expect(f.workspace.bonsplitController.allPaneIds.count == 2)
-            #expect(FileManager.default.fileExists(atPath: f.page.path))
         }
     }
 
@@ -394,7 +342,6 @@ struct FigmaClickWorkspaceTests {
             #expect(f.loading(pane) == before)
             #expect(f.panelCount == panels)
             #expect(f.tabCount == tabs)
-            #expect(!FileManager.default.fileExists(atPath: f.page.path))
         }
     }
 

@@ -91,11 +91,9 @@ struct FigmaPageSwitchTests {
         return panel
     }
 
+    /// cmux-rbf #cm-73.39: the page production loads, served from memory, not a temporary file.
     private func wrapper() throws -> URL {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cm73-switch-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("figma-embed.html")
+        FigmaPaneURL.previewPageURL
     }
 
     @Test("The shared action targets the visible Figma pane from the terminal and in Design Focus")
@@ -143,7 +141,6 @@ struct FigmaPageSwitchTests {
     @Test("First switch makes the editor on the preview's node without fitting")
     func firstEditorUsesPreviewNodeAndDoesNotFit() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let panel = panel(on: preview)
         defer { panel.close() }
@@ -159,7 +156,6 @@ struct FigmaPageSwitchTests {
     @Test("Switching both ways preserves each live document and zoom")
     func bothSidesKeepDocuments() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let panel = panel(on: preview)
         defer { panel.close() }
@@ -202,7 +198,6 @@ struct FigmaPageSwitchTests {
     @Test("A editor opened first gets the first-page preview and keeps its editor")
     func firstPreviewUsesFirstPage() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let panel = panel(on: document)
         defer { panel.close() }
         let editor = panel.webView
@@ -243,7 +238,6 @@ struct FigmaPageSwitchTests {
     @Test("Explicit ordinary-pane goto and preview fit reload keep the one view")
     func ordinaryPaneGotoAndFit() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let panel = BrowserPanel(workspaceId: UUID(), chromeVisibility: .visible, websiteDataStore: .nonPersistent())
         defer { panel.close() }
         panel.publishObservedDocumentURL(document)
@@ -259,7 +253,6 @@ struct FigmaPageSwitchTests {
     @Test("Memory pressure retains the hidden preview's last board address")
     func memoryPressureRemembersHiddenBoard() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "47-9", wrapper: page).url
         let panel = panel(on: preview)
         defer { panel.close() }
@@ -276,7 +269,6 @@ struct FigmaPageSwitchTests {
     @Test("A preview fit reload preserves the discarded editor address")
     func previewFitPreservesDiscardedEditorAddress() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "47-9", wrapper: page).url
         let panel = panel(on: preview)
         defer { panel.close() }
@@ -300,7 +292,6 @@ struct FigmaPageSwitchTests {
     @Test("Open in Figma opens the editor beside the preview and reports its navigation start")
     func openInFigmaOpensEditorBesidePreview() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let panel = panel(on: preview)
         defer { panel.close() }
@@ -556,26 +547,27 @@ struct FigmaPageSwitchTests {
         #expect(other.workspace.focusedPanelId == other.terminal)
     }
 
-    @Test("Injected defaults can reject goto before the pane moves")
-    func gotoRespectsInjectedDefaults() throws {
+    // cmux-rbf #cm-73.39: the read view is cmux's own page on a trusted internal scheme, not a local
+    // file, so a forced local-file ban (injected here) no longer stops goto.
+    @Test("A forced local-file ban does not stop goto: the pane moves to the read view")
+    func gotoMovesUnderALocalFileBan() throws {
         let suite = "cm73-goto-policy-\(UUID().uuidString)"
         let defaults = try #require(FigmaForcedDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(false, forKey: ManagedDevicePolicyKey.browserAllowLocalFiles.rawValue)
         try #require(!BrowserURLAllowlistPolicy(defaults: defaults).allowsLocalFiles)
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let panel = panel(on: document)
         defer { panel.close() }
-        let address = panel.currentURL
-        #expect(!panel.gotoFigmaNode("12-2", wrapper: page, defaults: defaults))
-        #expect(panel.currentURL == address)
+        let expected = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
+        #expect(panel.gotoFigmaNode("12-2", wrapper: page, defaults: defaults))
+        #expect(panel.currentURL == expected)
+        #expect(panel.currentURL.map { FigmaPaneURL.isWrapperPage($0, wrapper: page) } == true)
     }
 
     @Test("Pointing releases the old Editor from either side", arguments: [false, true], ["12-2", "81-9"])
     func pointingReleasesEditor(showEditor: Bool, node: String) throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: preview)
         defer { pane.close() }
@@ -684,7 +676,6 @@ struct FigmaPageSwitchTests {
     @Test("A nil WebKit URL cannot erase the pending pointed Preview")
     func pendingPreviewSurvivesNilObservedURL() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let pane = BrowserPanel(
             workspaceId: UUID(), initialURL: document, renderInitialNavigation: false,
             chromeVisibility: .hidden, websiteDataStore: .nonPersistent()
@@ -707,7 +698,6 @@ struct FigmaPageSwitchTests {
     @Test("Pointing unhooks and deallocates the Editor from either side", arguments: [false, true])
     func pointingReleasesEditorFromEitherSide(showEditor: Bool) async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = BrowserPanel(
             workspaceId: UUID(), initialURL: preview, renderInitialNavigation: false,
@@ -786,7 +776,6 @@ struct FigmaPageSwitchTests {
     @Test("Pointing with the address bar revealed releases the held Editor")
     func pointWithRevealedAddressBarReleasesEditor() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: preview)
         defer { pane.close() }
@@ -806,7 +795,6 @@ struct FigmaPageSwitchTests {
     @Test("Open in Figma moves a held Editor to the board and keeps the clicked Preview behind")
     func openInFigmaMovesHeldEditorAndKeepsPreview() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: preview)
         defer { pane.close() }
@@ -832,7 +820,6 @@ struct FigmaPageSwitchTests {
     @Test("An Editor moving to another file releases the previous file's Preview")
     func editorFileChangeReleasesPreviousPreview() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let preview = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: preview)
         defer { pane.close() }

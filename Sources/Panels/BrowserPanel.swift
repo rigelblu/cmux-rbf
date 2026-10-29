@@ -1025,6 +1025,7 @@ private let browserEmbeddedNavigationSchemes: Set<String> = [
     "applewebdata",
     "blob",
     "cmux-diff-viewer",
+    "cmux-figma", // cmux-rbf #cm-73.39: the Figma preview page; FigmaPreviewPageGuard keeps web pages off it
     "data",
     "file",
     "http",
@@ -2025,7 +2026,7 @@ final class BrowserPanel: Panel, ObservableObject {
     private var retainedFigmaPage: RetainedFigmaPage?
     // Memory pressure releases the document, but the next switch still knows its address.
     private var discardedFigmaPageAddress: URL?
-    var figmaPageWrapper = FigmaPaneURL.wrapperFileURL()
+    var figmaPageWrapper = FigmaPaneURL.previewPageURL // cmux-rbf #cm-73.39: the served page, not the legacy file
     var retainedFigmaPageAddress: URL? { retainedFigmaPage?.address ?? discardedFigmaPageAddress }
     // cmux-rbf (#cm-73.32): Play state for this panel (reset to still on every exchange), and whether a goto --play is waiting for load. Reject a revert of this hunk on upstream sync.
     var isFigmaMotionPlaying: Bool = false
@@ -3140,6 +3141,13 @@ final class BrowserPanel: Panel, ObservableObject {
             configuration.setURLSchemeHandler(
                 CmuxDiffViewerURLSchemeHandler.shared,
                 forURLScheme: CmuxDiffViewerURLSchemeHandler.scheme
+            )
+        }
+        // cmux-rbf #cm-73.39: the Figma preview page, served from memory.
+        if configuration.urlSchemeHandler(forURLScheme: FigmaPaneURL.previewPageScheme) == nil {
+            configuration.setURLSchemeHandler(
+                FigmaPreviewPageSchemeHandler.shared,
+                forURLScheme: FigmaPaneURL.previewPageScheme
             )
         }
         // Review-comment persistence + TextBox attach for diff viewer pages.
@@ -4697,6 +4705,9 @@ final class BrowserPanel: Panel, ObservableObject {
     }
 
     func restoreSessionSnapshot(_ snapshot: SessionBrowserPanelSnapshot) {
+        // cmux-rbf #cm-73.39: an older build's `file://` preview addresses become the served page here,
+        // before restored history records them, so it and WebKit agree on one address.
+        let snapshot = snapshot.upgradingLegacyFigmaPreviewPage()
         releaseRetainedFigmaPage()
         figmaHistory.reset() // cmux-rbf #cm-73.3: cross-side history is not saved; a restart starts it again.
         keepLoaded = snapshot.keepLoaded
@@ -4835,9 +4846,11 @@ final class BrowserPanel: Panel, ObservableObject {
     // cmux-rbf #cm-73.16: document observations publish through the same seam in KVO and integration tests.
     func publishObservedDocumentURL(_ observedURL: URL?) {
         // cmux-rbf #cm-73.3: WebKit may clear its URL while the requested Preview is still loading. Keep that pending address available to the shared switch. Reject a revert of this hunk on upstream sync.
+        // cmux-rbf #cm-73.39: the served page is not a local file, so its pending load is the attempted one.
+        let pendingServedPage = navigationDelegate?.lastAttemptedURL.flatMap { FigmaPreviewPageGuard.isPreviewScheme($0) ? $0 : nil }
         if observedURL == nil,
-           let pending = pendingTrustedLocalFileURL,
-           currentURL == pending,
+           let pending = currentURL,
+           pending == pendingTrustedLocalFileURL || pending == pendingServedPage,
            FigmaPaneURL.isWrapperPage(pending, wrapper: figmaPageWrapper) {
             return
         }
@@ -5716,7 +5729,7 @@ final class BrowserPanel: Panel, ObservableObject {
 
     // cmux-rbf (#cm-73.3): one owner for switching and every goto entrance. Reject a revert of this hunk on upstream sync.
     @discardableResult
-    func switchFigmaPreviewAndEditor(wrapper: URL = FigmaPaneURL.wrapperFileURL()) -> Bool {
+    func switchFigmaPreviewAndEditor(wrapper: URL = FigmaPaneURL.previewPageURL) -> Bool {
         guard let address = currentURL ?? webView.url,
               FigmaTabMark.applies(address: address, showsAddressBar: isOmnibarVisible, wrapper: wrapper),
               let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper) else { return false }
@@ -5748,7 +5761,7 @@ final class BrowserPanel: Panel, ObservableObject {
     @discardableResult
     func gotoFigmaNode(
         _ node: String,
-        wrapper: URL = FigmaPaneURL.wrapperFileURL(),
+        wrapper: URL = FigmaPaneURL.previewPageURL,
         defaults: UserDefaults = .standard,
         purpose: FigmaGotoPurpose = .point,
         motion: Bool = false,
@@ -5769,7 +5782,6 @@ final class BrowserPanel: Panel, ObservableObject {
         }
         // Explicit --surface accepts ordinary panes; they keep WebKit's own Back.
         if isOmnibarVisible {
-            do { try FigmaWrapperPage.install(at: wrapper) } catch { return false }
             figmaPageWrapper = wrapper
             currentURL = destination.url
             let nav = navigate(to: destination.url)
@@ -6140,9 +6152,6 @@ final class BrowserPanel: Panel, ObservableObject {
         guard BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination),
               let outgoingView = webView as? CmuxWebView,
               let address = currentURL ?? webView.url else { return nil }
-        if preview {
-            do { try FigmaWrapperPage.install(at: wrapper) } catch { return nil }
-        }
         let wasBusy = figmaHistoryBusy
         figmaHistoryBusy = true
         defer { figmaHistoryBusy = wasBusy }
@@ -6288,6 +6297,9 @@ final class BrowserPanel: Panel, ObservableObject {
         recordTypedNavigation: Bool = false,
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> WKNavigation? {
+        // cmux-rbf #cm-73.39: an older build's `file://` preview address becomes the served page before
+        // any check, so a local-file ban or allowlist judges the address that will load.
+        let url = FigmaPaneURL.upgradingLegacyPage(url)
         // cmux-rbf (#cm-73.3): a different file cannot keep the old file behind its switch. Reject a revert of this hunk on upstream sync.
         if (retainedFigmaPage != nil || discardedFigmaPageAddress != nil || figmaHistory.isActive),
            FigmaPaneURL.fileKey(fromPaneURL: url, wrapper: figmaPageWrapper) != currentURL.flatMap({ FigmaPaneURL.fileKey(fromPaneURL: $0, wrapper: figmaPageWrapper) }) {
@@ -6388,6 +6400,12 @@ final class BrowserPanel: Panel, ObservableObject {
         trustedInternalNavigation: Bool = false,
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> WKNavigation? {
+        // cmux-rbf #cm-73.39: an older build's `file://` preview address loads the served page, same query.
+        var request = request
+        if let legacy = request.url {
+            let upgraded = FigmaPaneURL.upgradingLegacyPage(legacy)
+            if upgraded != legacy { request.url = upgraded }
+        }
         guard let url = request.url else {
             onNavigationStarted?(nil)
             return nil
@@ -6613,6 +6631,14 @@ final class BrowserPanel: Panel, ObservableObject {
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) {
         guard let url = request.url else {
+            onNavigationStarted?(nil)
+            return
+        }
+        // cmux-rbf #cm-73.39: a web page's request never reaches the Figma preview page, old or new address.
+        if FigmaPreviewPageGuard.refusesPageRoute(to: url) {
+            #if DEBUG
+            cmuxDebugLog("browser.nav.requestNavigation.refused kind=figmaPreviewPage url=\(browserNavigationDebugURL(url))")
+            #endif
             onNavigationStarted?(nil)
             return
         }
@@ -7212,6 +7238,14 @@ extension BrowserPanel {
         bypassInsecureHTTPHostOnce: String? = nil,
         designFocusAsker: DesignFocusRouting.Asker = .page // cmux-rbf #cm-73.2a
     ) {
+        // cmux-rbf #cm-73.39: no new tab opens on the Figma preview page, old or new address;
+        // the new tab's first load would be marked trusted.
+        if FigmaPreviewPageGuard.refusesPageRoute(to: request.url) {
+            #if DEBUG
+            cmuxDebugLog("browser.newTab.open.refused kind=figmaPreviewPage url=\(browserNavigationDebugURL(request.url))")
+            #endif
+            return
+        }
         guard let seed = browserNewTabNavigationSeed(
             from: request,
             bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce
@@ -9565,6 +9599,13 @@ final class BrowserUIDelegate: BrowserPDFPreviewActionUIDelegate {
             "windowFeatures={\(windowFeaturesSummary)}"
         )
 #endif
+        // cmux-rbf #cm-73.39: a page's window.open or new-window link never opens the Figma preview page.
+        if FigmaPreviewPageGuard.refusesPageRoute(to: navigationAction.request.url) {
+#if DEBUG
+            cmuxDebugLog("browser.nav.createWebView.action kind=refuseFigmaPreviewPage")
+#endif
+            return nil
+        }
         if let url = navigationAction.request.url {
             if navigationAction.navigationType == .linkActivated,
                navigationAction.targetFrame?.isMainFrame != false,

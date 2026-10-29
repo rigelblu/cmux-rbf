@@ -15,7 +15,7 @@ struct FigmaHiddenUnloadTests {
     private static let figmaEditorURL = URL(string: "https://www.figma.com/design/KEY/a")!
     private static let ordinaryURL = URL(string: "https://example.com/")!
     private static var figmaReadViewURL: URL {
-        var components = URLComponents(url: FigmaPaneURL.wrapperFileURL(), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: FigmaPaneURL.previewPageURL, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "embed", value: "https://embed.figma.com/design/KEY/a")]
         return components.url!
     }
