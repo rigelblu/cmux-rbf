@@ -132,6 +132,21 @@ struct PopoverKeyWindowElevator: NSViewRepresentable {
 /// - While shown, the root view is rebuilt only when the Equatable `model`
 ///   actually changes, so unrelated parent re-renders don't re-lay-out the
 ///   popover (the 100% CPU loop behind #3010).
+#if DEBUG
+@MainActor
+protocol TodoPopoverHostCoordinatorTestable: AnyObject {
+    var maxHeight: CGFloat { get }
+    var popoverForTesting: NSPopover? { get }
+    var contentSizeForTesting: NSSize? { get }
+}
+
+@MainActor
+final class TodoPopoverHostTestProbe {
+    static weak var lastCoordinator: TodoPopoverHostCoordinatorTestable?
+    static var screenVisibleFrameOverrideForTesting: NSRect?
+}
+#endif
+
 struct SidebarWorkspaceTodoPopoverHost<Model: Equatable, PopoverContent: View>: NSViewRepresentable {
     @Binding var isPresented: Bool
     /// The value snapshot the popover renders. Rebuilding the content is
@@ -151,7 +166,11 @@ struct SidebarWorkspaceTodoPopoverHost<Model: Equatable, PopoverContent: View>: 
     let content: (Model, @escaping @MainActor () -> Void) -> PopoverContent
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(isPresented: $isPresented)
+        let coordinator = Coordinator(isPresented: $isPresented)
+#if DEBUG
+        TodoPopoverHostTestProbe.lastCoordinator = coordinator
+#endif
+        return coordinator
     }
 
     // NOTE: the coordinator's `isPresented` binding is REFRESHED on every
@@ -225,6 +244,10 @@ struct SidebarWorkspaceTodoPopoverHost<Model: Equatable, PopoverContent: View>: 
         var minWidth: CGFloat = 200
         var maxHeight: CGFloat = 480
         var preferredEdge: NSRectEdge = .maxX
+#if DEBUG
+        var popoverForTesting: NSPopover? { popover }
+        var contentSizeForTesting: NSSize? { popover?.contentSize }
+#endif
 
         private let hostingController: NSHostingController<AnyView> = {
             NSHostingController(rootView: AnyView(EmptyView()))
@@ -406,10 +429,43 @@ struct SidebarWorkspaceTodoPopoverHost<Model: Equatable, PopoverContent: View>: 
             let fitting = hostingController.view.fittingSize
             guard fitting.width > 0, fitting.height > 0 else { return }
             guard let popover else { return }
+            let available: CGFloat
+            if let anchorView, let window = anchorView.window {
+                let winRect = anchorView.convert(anchorView.bounds, to: nil)
+                let screenRect = window.convertToScreen(winRect)
+                let screen = window.screen ?? NSScreen.main
+#if DEBUG
+                let screenVisibleFrame = TodoPopoverHostTestProbe.screenVisibleFrameOverrideForTesting ?? (screen?.visibleFrame ?? .zero)
+#else
+                let screenVisibleFrame = screen?.visibleFrame ?? .zero
+#endif
+                available = availableScreenHeight(
+                    anchorRect: screenRect,
+                    screenVisibleFrame: screenVisibleFrame,
+                    preferredEdge: preferredEdge
+                )
+            } else {
+                let screen = NSScreen.main
+#if DEBUG
+                let screenVisibleFrame = TodoPopoverHostTestProbe.screenVisibleFrameOverrideForTesting ?? (screen?.visibleFrame ?? .zero)
+#else
+                let screenVisibleFrame = screen?.visibleFrame ?? .zero
+#endif
+                available = availableScreenHeight(
+                    anchorRect: .zero,
+                    screenVisibleFrame: screenVisibleFrame,
+                    preferredEdge: preferredEdge
+                )
+            }
+            let targetHeight = ceil(min(fitting.height, maxHeight, available))
             CmuxPopoverMutation.setContentSize(NSSize(
                 width: ceil(max(fitting.width, minWidth)),
-                height: ceil(min(fitting.height, maxHeight))
+                height: max(1, targetHeight)
             ), on: popover)
         }
     }
 }
+
+#if DEBUG
+extension SidebarWorkspaceTodoPopoverHost.Coordinator: TodoPopoverHostCoordinatorTestable {}
+#endif
