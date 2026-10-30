@@ -140,6 +140,63 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
 
     @State private var isStatusPopoverPresented = false
 
+    init(
+        status: WorkspaceTaskStatus,
+        model: SidebarWorkspaceCompactStatusMenuModel,
+        workspaceId: UUID,
+        applyTodoStatus: @escaping (WorkspaceStatusPickAction, [UUID]) -> Void,
+        hideTodoStatus: @escaping ([UUID]) -> Void,
+        usesMonochrome: Bool,
+        monochromeColor: Color,
+        neutralColor: Color,
+        fontScale: CGFloat,
+        contrastBackground: NSColor?,
+        drawnAlpha: CGFloat = 1
+    ) {
+        self.status = status
+        self.model = model
+        self.workspaceId = workspaceId
+        self.applyTodoStatus = applyTodoStatus
+        self.hideTodoStatus = hideTodoStatus
+        self.usesMonochrome = usesMonochrome
+        self.monochromeColor = monochromeColor
+        self.neutralColor = neutralColor
+        self.fontScale = fontScale
+        self.contrastBackground = contrastBackground
+        self.drawnAlpha = drawnAlpha
+        self._isStatusPopoverPresented = State(initialValue: false)
+    }
+
+#if DEBUG
+    init(
+        status: WorkspaceTaskStatus,
+        model: SidebarWorkspaceCompactStatusMenuModel,
+        workspaceId: UUID,
+        applyTodoStatus: @escaping (WorkspaceStatusPickAction, [UUID]) -> Void,
+        hideTodoStatus: @escaping ([UUID]) -> Void,
+        usesMonochrome: Bool,
+        monochromeColor: Color,
+        neutralColor: Color,
+        fontScale: CGFloat,
+        contrastBackground: NSColor?,
+        drawnAlpha: CGFloat = 1,
+        isPresentedForTesting: Bool
+    ) {
+        self.status = status
+        self.model = model
+        self.workspaceId = workspaceId
+        self.applyTodoStatus = applyTodoStatus
+        self.hideTodoStatus = hideTodoStatus
+        self.usesMonochrome = usesMonochrome
+        self.monochromeColor = monochromeColor
+        self.neutralColor = neutralColor
+        self.fontScale = fontScale
+        self.contrastBackground = contrastBackground
+        self.drawnAlpha = drawnAlpha
+        self._isStatusPopoverPresented = State(initialValue: isPresentedForTesting)
+    }
+#endif
+
     /// His name for the status shown, from the picker's checked row; cmux's own name when the picker has none. (#cm-109)
     private var statusName: String {
         if model.isNone { return WorkspaceStatusPresentation.noneTitle } // (#cm-110.13)
@@ -208,7 +265,7 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
                     colorHexes: model.colorHexes // (#cm-109.3)
                 ),
                 minWidth: 200,
-                maxHeight: 400,
+                maxHeight: SidebarWorkspaceStatusPopover.uncappedMaxHeight,
                 preferredEdge: .maxY
             ) { model, close in
                 SidebarWorkspaceStatusPopover(
