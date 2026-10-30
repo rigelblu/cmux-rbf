@@ -252,7 +252,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         contentContainer.addSubview(branchIconView)
         contentContainer.addSubview(checklistSection)
         statusPopoverPresenter.minWidth = 200
-        statusPopoverPresenter.maxHeight = 400
+        statusPopoverPresenter.maxHeight = SidebarWorkspaceStatusPopover.uncappedMaxHeight
 
         topDropIndicator.wantsLayer = true
         bottomDropIndicator.wantsLayer = true
@@ -689,6 +689,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         statusPopoverModel().map { statusPopoverView($0) } // (#cm-110.13)
     } // (#cm-110.13)
     var isStatusPopoverShownForTesting: Bool { statusPopoverPresenter.isShown } // (#cm-110.13)
+    var statusPopoverPresenterForTesting: SidebarRowSwiftUIPopoverPresenter { statusPopoverPresenter }
+    func toggleStatusPopoverForTesting() { toggleStatusPopover() }
     var handForTesting: NSImageView? { handImageView } // (#cm-109.3)
     var handOutlineForTesting: NSView? { handOutlineView } // (#cm-109.7)
     var markSpinnerForTesting: GPUSpinnerNSView? { markSpinner } // (#cm-109.3)

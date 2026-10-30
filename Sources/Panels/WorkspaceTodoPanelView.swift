@@ -15,6 +15,7 @@ import SwiftUI
 /// opens the same `SidebarWorkspaceStatusPopover` through the shared
 /// NSPopover host, anchored in-pane.
 struct WorkspaceTodoPanelView: View {
+    static let statusPopoverMaxHeight = SidebarWorkspaceStatusPopover.uncappedMaxHeight
     @ObservedObject var panel: WorkspaceTodoPanel
     let isFocused: Bool
     let onRequestPanelFocus: () -> Void
@@ -291,7 +292,7 @@ private struct WorkspaceTodoPaneContent: View {
                             colorHexes: pane.colorHexes // (#cm-109.3)
                         ),
                         minWidth: 200,
-                        maxHeight: 400,
+                        maxHeight: WorkspaceTodoPanelView.statusPopoverMaxHeight,
                         preferredEdge: .maxY
                     ) { model, close in
                         SidebarWorkspaceStatusPopover(

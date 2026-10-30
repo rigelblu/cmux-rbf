@@ -17,8 +17,13 @@ final class SidebarWorkspaceGroupStatusPopoverHost {
         button.focusRingType = .none
         button.setAccessibilityIdentifier("SidebarWorkspaceGroupStatusIndicatorMenu")
         button.onClick = { [weak self] in self?.toggle() }
-        presenter.maxHeight = 400
+        presenter.maxHeight = SidebarWorkspaceStatusPopover.uncappedMaxHeight
     }
+#if DEBUG
+    func toggleForTesting() { toggle() }
+    var presenterForTesting: SidebarRowSwiftUIPopoverPresenter { presenter }
+    var buttonForTesting: NSView { button }
+#endif
     func install(in view: NSView) { view.addSubview(button) }
     func configure(menu: SidebarWorkspaceGroupStatusMenu?, showsGlyph: Bool, name: String? = nil,
                    apply: @escaping (WorkspaceStatusPickAction) -> Void) {
@@ -69,6 +74,43 @@ struct SidebarWorkspaceGroupStatusGlyphButton: View {
     let apply: (WorkspaceStatusPickAction) -> Void
     @State private var isPresented = false
 
+    init(
+        glyph: SidebarWorkspaceGroupStatusGlyph,
+        menu: SidebarWorkspaceGroupStatusMenu?,
+        fontScale: CGFloat,
+        colorScheme: ColorScheme,
+        band: SidebarGroupHeaderBandPalette,
+        apply: @escaping (WorkspaceStatusPickAction) -> Void
+    ) {
+        self.glyph = glyph
+        self.menu = menu
+        self.fontScale = fontScale
+        self.colorScheme = colorScheme
+        self.band = band
+        self.apply = apply
+        self._isPresented = State(initialValue: false)
+    }
+
+#if DEBUG
+    init(
+        glyph: SidebarWorkspaceGroupStatusGlyph,
+        menu: SidebarWorkspaceGroupStatusMenu?,
+        fontScale: CGFloat,
+        colorScheme: ColorScheme,
+        band: SidebarGroupHeaderBandPalette,
+        apply: @escaping (WorkspaceStatusPickAction) -> Void,
+        isPresentedForTesting: Bool
+    ) {
+        self.glyph = glyph
+        self.menu = menu
+        self.fontScale = fontScale
+        self.colorScheme = colorScheme
+        self.band = band
+        self.apply = apply
+        self._isPresented = State(initialValue: isPresentedForTesting)
+    }
+#endif
+
     var body: some View {
         Button { isPresented.toggle() } label: {
             Image(nsImage: glyph.image(fontScale: fontScale, colorScheme: colorScheme, band: band))
@@ -80,7 +122,7 @@ struct SidebarWorkspaceGroupStatusGlyphButton: View {
         .background {
             if let menu {
                 SidebarWorkspaceTodoPopoverHost(isPresented: $isPresented, model: menu.popoverModel,
-                                                minWidth: 200, maxHeight: 400, preferredEdge: .maxX) { model, close in
+                                                minWidth: 200, maxHeight: SidebarWorkspaceStatusPopover.uncappedMaxHeight, preferredEdge: .maxX) { model, close in
                     SidebarWorkspaceGroupStatusPopoverContent(model: model, apply: apply, close: close)
                 }
             }
