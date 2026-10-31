@@ -52,7 +52,8 @@ struct WorkspaceGroupNestedHandOverGuardTests {
         "isGlobalPinnedRow",
         "assignGroup",
         "normalizeWorkspaceGroupRunsPreservingOrder",
-        "expandWorkspaceGroupForSelectionIfNeeded",
+        "expandWorkspaceGroups(containing:)", // (#cm-110.14)
+        "expandWorkspaceGroups(above:)", // (#cm-110.14)
         "syncWorkspaceGroupsOrderToAnchorOrder",
         "moveWorkspaceGroupMembersAfterAnchors",
         "dissolveGroupsAnchoredBy: which groups keep the header",
@@ -110,7 +111,8 @@ struct WorkspaceGroupNestedHandOverGuardTests {
         "WorkspacesModel+GroupInvariants.swift#dissolveGroupsAnchoredBy",
         "WorkspacesModel+GroupInvariants.swift#dissolveGroupsAnchoredBy",
         "WorkspacesModel+GroupInvariants.swift#dissolveGroupsAnchoredBy",
-        "WorkspacesModel+GroupInvariants.swift#expandWorkspaceGroupForSelectionIfNeeded",
+        "WorkspacesModel+MoveReveal.swift#expandWorkspaceGroups", // (#cm-110.14)
+        "WorkspacesModel+MoveReveal.swift#expandWorkspaceGroups", // (#cm-110.14)
         "WorkspacesModel+GroupInvariants.swift#moveWorkspaceGroupMembersAfterAnchors",
         "WorkspacesModel+GroupInvariants.swift#normalizeWorkspaceGroupRunsPreservingOrder",
         "WorkspacesModel+GroupInvariants.swift#promoteAnchorOrRemoveGroupsAnchoredBy",
@@ -125,7 +127,8 @@ struct WorkspaceGroupNestedHandOverGuardTests {
 
     /// Checks above that exercise a function with no hand-over line of its own (they reach one that does).
     static let flatChecksThatAreNotSites: Set<String> = [
-        "normalizeWorkspaceGroupContiguity"
+        "normalizeWorkspaceGroupContiguity",
+        "expandWorkspaceGroupForSelectionIfNeeded" // (#cm-110.14) it calls expandWorkspaceGroups(containing:), which hands over
     ]
 
     /// Finds, in the package's non-test sources, the lines that decide between the flat code and the nested code:
@@ -240,7 +243,6 @@ struct WorkspaceGroupNestedHandOverGuardTests {
         "WorkspacesModel+GroupInvariants.swift#assignGroup": "hands over at hasNestedWorkspaceGroup",
         "WorkspacesModel+GroupInvariants.swift#normalizeWorkspaceGroupRunsPreservingOrder": "hands over at hasNestedWorkspaceGroup",
         "WorkspacesModel+GroupInvariants.swift#normalizeWorkspaceGroupContiguity": "one level is right here because it reads groupId only to clear a groupId that names no group (rule 6), and then calls normalizeWorkspaceGroupRunsPreservingOrder and syncWorkspaceGroupsOrderToAnchorOrder, which both hand over",
-        "WorkspacesModel+GroupInvariants.swift#expandWorkspaceGroupForSelectionIfNeeded": "hands over at hasNestedWorkspaceGroup",
         "WorkspacesModel+GroupInvariants.swift#syncWorkspaceGroupsOrderToAnchorOrder": "hands over at hasNestedWorkspaceGroup",
         "WorkspacesModel+GroupInvariants.swift#moveWorkspaceGroupMembersAfterAnchors": "hands over at hasNestedWorkspaceGroup",
         "WorkspacesModel+GroupInvariants.swift#dissolveGroupsAnchoredBy": "hands over at keepsHeaderWhenEmptied(",

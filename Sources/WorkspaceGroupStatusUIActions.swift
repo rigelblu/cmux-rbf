@@ -20,9 +20,9 @@ struct WorkspaceGroupStatusUIActions {
     }
 
     @discardableResult
-    func applyGroup(_ action: WorkspaceStatusPickAction, groupId: UUID) -> Bool {
+    func applyGroup(_ action: WorkspaceStatusPickAction, groupId: UUID, cause: MoveRevealCause = .status) -> Bool {
         guard controlsEnabled, writer.list.source != .cmux else { return false }
-        return tabManager.workspaceGrouping.setWorkspaceGroupStatus(groupId: groupId, action: action, actions: writer)
+        return tabManager.setWorkspaceGroupStatus(groupId: groupId, action: action, actions: writer, cause: cause) // (#cm-110.14)
     }
 
     @discardableResult
@@ -42,7 +42,7 @@ struct WorkspaceGroupStatusUIActions {
         if writer.list.source != .cmux, let groupId = selectedGroupId {
             let group = tabManager.workspaceGroups.first { $0.id == groupId }
             if let target = WorkspaceGroupStatusCycle().target(statusId: group?.statusId, list: writer.list) {
-                return applyGroup(.status(id: target), groupId: groupId)
+                return applyGroup(.status(id: target), groupId: groupId, cause: .cycle(subject: groupId)) // (#cm-110.14)
             }
             return false
         } else if let workspaceCycle { workspaceCycle(workspace) }

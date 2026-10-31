@@ -20888,13 +20888,13 @@ struct CMUXCLI {
         switch action {
 #if DEBUG // (#cm-110.1)
         case "fold", "unfold": // (#cm-110.4)
-            guard let header = optionValue(remaining, name: "--header"), // (#cm-110.4)
-                  ["statuses", "workspaces", "pinned"].contains(header) else { // (#cm-110.4) (#cm-110.5)
-                throw CLIError(message: "DEBUG sidebar fold/unfold requires --header statuses|workspaces|pinned") // (#cm-110.4) (#cm-110.5)
+            let foldStatus = optionValue(remaining, name: "--status") // (#cm-110.14) one status group, by its id
+            guard foldStatus != nil || optionValue(remaining, name: "--header").map({ ["statuses", "workspaces", "pinned"].contains($0) }) == true else { // (#cm-110.4) (#cm-110.5)
+                throw CLIError(message: "DEBUG sidebar fold/unfold requires --header statuses|workspaces|pinned or --status <id>") // (#cm-110.4) (#cm-110.5) (#cm-110.14)
             } // (#cm-110.4)
             let windowRaw = windowOverride ?? optionValue(remaining, name: "--window") // (#cm-110.4)
             if let window = try normalizeWindowHandle(windowRaw, client: client) { params["window_id"] = window } // (#cm-110.4)
-            params["fold_header"] = header // (#cm-110.4)
+            if let foldStatus { params["fold_status"] = foldStatus } else { params["fold_header"] = optionValue(remaining, name: "--header") } // (#cm-110.4) (#cm-110.14)
             params["folded"] = action == "fold" // (#cm-110.4)
             print(jsonString(try client.sendV2(method: "debug.sidebar.rows", params: params))) // (#cm-110.4)
             return // (#cm-110.4)

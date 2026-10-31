@@ -80,6 +80,16 @@ extension VerticalTabsSidebar {
     static func commitTabStatusLanding(_ landing: SidebarTabStatusLanding, newWorkspace: Workspace,
         tabManager: TabManager, sidebarState: SidebarState, actions: WorkspaceStatusActions,
         currentProjection: (() -> WorkspaceStatusGroupProjection?)? = nil) -> Bool {
+        // A tab dropped on a status group is a drop, and a drop never moves the view (#cm-110.14).
+        tabManager.committingDrop {
+            commitTabStatusLandingUnwrapped(landing, newWorkspace: newWorkspace, tabManager: tabManager,
+                sidebarState: sidebarState, actions: actions, currentProjection: currentProjection)
+        }
+    }
+
+    private static func commitTabStatusLandingUnwrapped(_ landing: SidebarTabStatusLanding, newWorkspace: Workspace,
+        tabManager: TabManager, sidebarState: SidebarState, actions: WorkspaceStatusActions,
+        currentProjection: (() -> WorkspaceStatusGroupProjection?)?) -> Bool {
         switch landing.plan.action {
         case .statusGroupDrop(let value, _):
             let projection = currentProjection ?? { currentStatusGroupProjection(tabs: tabManager.tabs, groups: tabManager.workspaceGroups,

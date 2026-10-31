@@ -228,10 +228,16 @@ extension WorkspacesModel {
     /// does not hide it, so opening the parent would change a fold nobody asked to change; the sidebar reveals the
     /// status group instead.
     func nestedExpandWorkspaceGroupForSelectionIfNeeded() {
-        guard let selectedTabId,
-              let groupId = tabs.first(where: { $0.id == selectedTabId })?.groupId else { return }
+        guard let selectedTabId else { return }
+        nestedExpandWorkspaceGroups(containing: selectedTabId) // (#cm-110.14) one walk for a selection and for a move
+    }
+
+    /// The walk above, for any workspace: opens its group and every group above it, stopping at a group drawn under a status. A
+    /// workspace behind a group's name keeps its own group as it is. (#cm-110.14)
+    func nestedExpandWorkspaceGroups(containing workspaceId: UUID) {
+        guard let groupId = tabs.first(where: { $0.id == workspaceId })?.groupId else { return }
         let tree = nestedGroupTree()
-        let own = workspaceGroups.first { $0.id == groupId }?.anchorWorkspaceId == selectedTabId
+        let own = workspaceGroups.first { $0.id == groupId }?.anchorWorkspaceId == workspaceId
         let shown = groupIdsShownUnderAStatus()
         var upward = [groupId] + tree.ancestors(of: groupId)
         if let root = upward.firstIndex(where: shown.contains) { upward = Array(upward[...root]) } // (#cm-110.3)
