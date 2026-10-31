@@ -9,8 +9,9 @@ import Foundation
 ///
 /// **Why `fit` has two ways.** In Figma's editor, `⇧1` (the trusted key
 /// `browser.press` sends for `!`) zooms to fit with no reload. The read view has
-/// no zoom to fit, from anyone, so it is loaded again on the node its address
-/// already names, which Figma centers: the same board, or the whole page (`0-1`).
+/// no zoom to fit, from anyone, so the CLI sends `figma.goto` with `purpose: fit`
+/// for the node its address already names, the same board or the whole page (`0-1`),
+/// and the app re-fits in place: Figma's own frame redraws, and cmux's page is not loaded again.
 /// Never a different node: a fit re-centers what is showing (Tom, 2026-10-20).
 enum FigmaFit {
 
@@ -24,7 +25,7 @@ enum FigmaFit {
     enum Decision: Equatable {
         /// Press `⇧1` in the editor.
         case pressFit
-        /// Load the read view again on this node: the one the pane's address names.
+        /// Send `figma.goto` with `purpose: fit` for this node, the one the pane's address names. The app re-fits the preview in place.
         case reloadNode(String)
         /// Do nothing, and say why.
         case refuse(String)
@@ -75,6 +76,15 @@ enum FigmaFit {
         if let workspaceID, let selectedWorkspaceID, workspaceID != selectedWorkspaceID { return false }
         return true
     }
+
+    /// The refusal when the read view shows Figma's Log in page, an error or anything else that is not a board
+    /// (`cm-73.44`): the app answers `invalid_state` with `data.reason: notboard`, and the CLI says it in English.
+    static func notBoardRefusal(handle: String) -> String {
+        "the Figma pane shows Figma's Log in page or an error, not a board (surface \(handle)), so fit moved nothing"
+    }
+
+    /// The `data.reason` the app puts in that `invalid_state`.
+    static let notBoardReason = "notboard"
 
     /// The refusal when a text field in the page has focus.
     static func typingRefusal(handle: String) -> String {

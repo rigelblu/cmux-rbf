@@ -276,8 +276,9 @@ enum FigmaUsage {
                         --surface <handle> also moves a browser pane that goto does not count,
                         and picks one when more than one Figma pane is open.
       fit               Center the open Figma pane on all its boards, as Figma's own zoom to fit does.
-                        In the editor it presses ! (Figma's Shift+1); in the read view it loads the board or page it shows again.
+                        In the editor it presses ! (Figma's Shift+1); in the read view it has Figma redraw the board it shows, in place, with no reload of the pane.
                         Run it after you draw or move boards. It works on Figma design files only.
+                        It moves nothing on Figma's Log in page.
                         It sends no key to a pane that is not showing, or while a text field in the pane has focus.
                         Counts the same pane goto does. --surface <handle> picks one.
       folder            Print the default Figma folder as projectId, planKey and url.

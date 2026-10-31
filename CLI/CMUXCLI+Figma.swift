@@ -320,9 +320,10 @@ extension CMUXCLI {
     /// `cmux figma fit [--surface <ref>]`: center the open Figma pane on all its boards.
     ///
     /// **Two ways, with the shared app-side goto for the preview.** In Figma's editor it sends `browser.press`
-    /// with `!`, the trusted `⇧1`; in the read view, which has no zoom to fit, it
-    /// loads the view again on the node it shows, as `goto <that node>` does. Which way, and
-    /// every refusal, is ``FigmaFit/decide(handle:paneAddress:document:isShowing:)``.
+    /// with `!`, the trusted `⇧1`; in the read view, which has no zoom to fit, it sends `figma.goto` with
+    /// `purpose: fit`, which the app answers with the panel's re-fit: Figma's own frame redraws in place on
+    /// the node it shows (`cm-73.44`). Which way, and every refusal, is
+    /// ``FigmaFit/decide(handle:paneAddress:document:isShowing:)``.
     ///
     /// **A trusted `!` types into Figma's text editing** (measured 2026-10-20), which
     /// would edit the file, so the editor way first asks the page what has focus and
@@ -353,10 +354,15 @@ extension CMUXCLI {
 
         case .reloadNode(let node):
             _ = try figmaDestination(for: pane.document, node: node)
-            payload = try client.sendV2(
-                method: "figma.goto",
-                params: ["surface_id": pane.surfaceID, "node": node, "purpose": "fit"]
-            )
+            do {
+                payload = try client.sendV2(
+                    method: "figma.goto",
+                    params: ["surface_id": pane.surfaceID, "node": node, "purpose": "fit"]
+                )
+            } catch let error as CLIError where error.v2Code == "invalid_state" && error.v2Reason == FigmaFit.notBoardReason {
+                // cmux-rbf (#cm-73.44): the preview shows Figma's Log in page or an error, which a redraw would break.
+                throw CLIError(message: FigmaFit.notBoardRefusal(handle: pane.handle))
+            }
 
         case .pressFit:
             Thread.sleep(forTimeInterval: Self.figmaFitSettleSeconds)
