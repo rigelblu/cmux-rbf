@@ -12556,6 +12556,9 @@ struct VerticalTabsSidebar: View, Equatable {
             .onAppear {
                 requestSelectedWorkspaceScroll(scrollProxy, renderContext: renderContext)
             }
+            .onChange(of: sidebarState.selectedRevealScrollToken) { _, _ in // (#cm-110.14) after a status, color or cycle move
+                requestSelectedWorkspaceScroll(scrollProxy, renderContext: renderContext)
+            }
             .onChange(of: tabManager.selectedTabId) { _, _ in
                 requestSelectedWorkspaceScroll(scrollProxy, renderContext: renderContext)
                 // Workspace switches produce no outside click for .transient auto-dismiss; close popovers explicitly.
@@ -12724,6 +12727,7 @@ struct VerticalTabsSidebar: View, Equatable {
             liveRowIds: liveRowIds,
             selectedWorkspaceId: selectedWorkspaceId,
             selectedScrollTargetWorkspaceId: selectedScrollTargetWorkspaceId,
+            selectedRevealScrollToken: sidebarState.selectedRevealScrollToken, // (#cm-110.14)
             isPresented: isPresented,
             unreadSource: sidebarUnread,
             onDeferredClickAwaitingApply: { appKitTableApplyRequestToken &+= 1 }
@@ -15040,6 +15044,11 @@ struct VerticalTabsSidebar: View, Equatable {
     }
 
     private func performWorkspaceReorderPlan(_ plan: SidebarWorkspaceReorderDropPlan) -> Bool {
+        // A drop never moves the view, so nothing it moves asks for a scroll (#cm-110.14).
+        tabManager.committingDrop { performWorkspaceReorderPlanUnwrapped(plan) }
+    }
+
+    private func performWorkspaceReorderPlanUnwrapped(_ plan: SidebarWorkspaceReorderDropPlan) -> Bool { // (#cm-110.14)
         switch plan.action {
         case .statusGroupDrop, .statusAreaBoundaryDrop: return performWorkspaceStatusAwarePlan(plan, performOrdinary: { performWorkspaceReorderPlan($0) }) // (#cm-110.1)
         case .reorderStatusGroup, .moveStatusesArea: return performStatusHeaderReorderPlan(plan) // (#cm-110.1)

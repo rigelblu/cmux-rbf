@@ -26,6 +26,9 @@ struct WorkspaceStatusActions {
     let resolveColor: (String) -> String?
     /// Puts a hex on a workspace the way the Workspace Color menu does.
     let writeColor: (String, Workspace) -> Void
+    /// Runs a write and opens the folds above each workspace it moved (#cm-110.14). The default runs the write alone, so a test
+    /// that builds its own actions needs no window.
+    var revealing: ([Workspace], MoveRevealCause, () -> Void) -> Void = { _, _, write in write() }
 
     /// The write path as the app runs it: the list in use (`list` when given, else the app's), the origin of the
     /// call in progress, the status controls' gate, the palette's resolver and the Workspace Color menu's writer.
@@ -38,6 +41,11 @@ struct WorkspaceStatusActions {
             resolveColor: { WorkspaceTabColorSettings.resolvedColorHex($0) },
             writeColor: { hex, workspace in
                 AppDelegate.shared?.tabManagerFor(tabId: workspace.id)?.applyWorkspaceColor(hex, to: [workspace])
+            },
+            revealing: { workspaces, cause, write in // (#cm-110.14)
+                guard let first = workspaces.first,
+                      let manager = AppDelegate.shared?.tabManagerFor(tabId: first.id) else { return write() }
+                manager.revealingMoves(of: workspaces, cause: cause, write)
             }
         )
     }
@@ -55,9 +63,16 @@ struct WorkspaceStatusActions {
     func apply(
         _ action: WorkspaceStatusPickAction,
         to workspaces: [Workspace],
-        requireControls: Bool
+        requireControls: Bool,
+        cause: MoveRevealCause = .status // (#cm-110.14)
     ) -> ApplyResult {
         if requireControls && !controlsEnabled { return .controlsOff }
+        var result = ApplyResult.set // (#cm-110.14)
+        revealing(workspaces, cause) { result = applyUnrevealed(action, to: workspaces) } // (#cm-110.14) one reveal around the one write path
+        return result
+    }
+
+    private func applyUnrevealed(_ action: WorkspaceStatusPickAction, to workspaces: [Workspace]) -> ApplyResult { // (#cm-110.14)
         switch action {
         case .auto:
             WorkspaceStatusOrigin.$current.withValue(origin) { // (#cm-110.13)

@@ -155,7 +155,7 @@ extension TerminalController: ControlWorkspaceTodoContext {
         case .found(let tabManager, let workspace):
             if let statusRaw {
                 if statusRaw == "none" {
-                    workspace.hideTaskStatus()
+                    WorkspaceStatusActions.app().apply(.hide, to: [workspace], requireControls: false) // (#cm-110.14) the one write path
                 } else {
                     // (#cm-109) one write path: it sets the status and writes its color, or refuses the id
                     if case .unknown(let raw, let accepted) = WorkspaceStatusActions.app().apply(
@@ -165,7 +165,7 @@ extension TerminalController: ControlWorkspaceTodoContext {
                     }
                 }
             } else {
-                workspace.clearTaskStatusOverride()
+                WorkspaceStatusActions.app().apply(.auto, to: [workspace], requireControls: false) // (#cm-110.14)
             }
             // Progressive disclosure: the first successful mutation from any
             // entrypoint turns the sidebar todo UI on.

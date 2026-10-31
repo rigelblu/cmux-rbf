@@ -191,7 +191,7 @@ extension RemoteTmuxController {
             let workspaces = sourceManager.tabs.filter { hostWorkspaceIds.contains($0.id) }
             for workspace in workspaces {
                 guard let detached = sourceManager.detachWorkspace(tabId: workspace.id) else { continue }
-                targetManager.attachWorkspace(detached, select: false)
+                targetManager.attachWorkspace(detached, select: false, revealsMove: false) // cmux-rbf (#cm-110.14): cmux regathers a host's mirror workspaces on its own, and a change cmux makes on its own opens no fold
             }
         }
     }

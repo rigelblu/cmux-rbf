@@ -65,9 +65,7 @@ enum WorkspaceTodoActions {
     static func hideStatus(for workspaces: [Workspace]) {
         guard WorkspaceTodoFeature.isEnabled else { return }
         guard !workspaces.isEmpty else { return }
-        for workspace in workspaces {
-            workspace.hideTaskStatus()
-        }
+        WorkspaceStatusActions.app().apply(.hide, to: workspaces, requireControls: true) // (#cm-110.14) the one write path, so one reveal
         WorkspaceTodoFeature.markUsed()
     }
 

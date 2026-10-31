@@ -8,6 +8,8 @@ struct SidebarWorkspaceTableApplyInput {
     let workspaceIds: [UUID]
     let selectedWorkspaceId: UUID?
     let selectedScrollTargetWorkspaceId: UUID?
+    /// Counts the moves after which the selected row is scrolled into view (#cm-110.14).
+    let selectedRevealScrollToken: Int
     /// Restores the mounted table's viewport after a hidden-presentation pass
     /// mutated the controller snapshot and requires an authoritative reload.
     let forcedReloadViewportOrigin: CGPoint?
@@ -21,6 +23,7 @@ struct SidebarWorkspaceTableApplyInput {
         workspaceIds: [UUID],
         selectedWorkspaceId: UUID?,
         selectedScrollTargetWorkspaceId: UUID?,
+        selectedRevealScrollToken: Int = 0, // (#cm-110.14)
         forcedReloadViewportOrigin: CGPoint? = nil
     ) {
         self.rows = rows
@@ -28,6 +31,7 @@ struct SidebarWorkspaceTableApplyInput {
         self.workspaceIds = workspaceIds
         self.selectedWorkspaceId = selectedWorkspaceId
         self.selectedScrollTargetWorkspaceId = selectedScrollTargetWorkspaceId
+        self.selectedRevealScrollToken = selectedRevealScrollToken // (#cm-110.14)
         self.forcedReloadViewportOrigin = forcedReloadViewportOrigin
     }
 }

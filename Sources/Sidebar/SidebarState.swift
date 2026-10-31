@@ -14,6 +14,10 @@ final class SidebarState: ObservableObject {
     @Published private(set) var collapsedColorSectionHexes: Set<String>
     @Published private(set) var statusGroups: WorkspaceStatusGroupsState? // (#cm-110.1)
     var statusGroupFoldSeedSource: Set<String>? // (#cm-110.1)
+    /// Counts the moves after which the selected workspace is scrolled into view (#cm-110.14).
+    @Published var selectedRevealScrollToken = 0 // (#cm-110.14)
+    /// The status group the previous press of the cycle key opened, so the next press folds it back (#cm-110.14). Not saved.
+    var cycleRecord: StatusGroupCycleRecord? // (#cm-110.14)
     private var visibilityWillChangeOwnerId: UUID?
     private var visibilityWillChange: ((Bool) -> Void)?
 

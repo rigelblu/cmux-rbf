@@ -18,6 +18,15 @@ extension TerminalController {
             guard let tabManager, let windowId = app.windowId(for: tabManager) else {
                 return .err(code: "not_found", message: "TabManager not found", data: nil)
             }
+            if let statusId = params["fold_status"] as? String { // (#cm-110.14) one status group, by id; DEBUG only
+                guard let folded = params["folded"] as? Bool,
+                      let state = app.mainWindowContexts.values.first(where: { $0.windowId == windowId })?.sidebarState,
+                      let current = state.statusGroups else {
+                    return .err(code: "invalid_params", message: "Invalid DEBUG status fold request", data: nil)
+                }
+                if current.collapsedStatusIds.contains(statusId) != folded { state.toggleStatusGroup(id: statusId) }
+                return .ok(["accepted": state.statusGroups?.collapsedStatusIds.contains(statusId) == folded])
+            }
             if let rawHeader = params["fold_header"] as? String {
                 guard let header = SidebarDebugActions.Header(rawValue: rawHeader),
                       let folded = params["folded"] as? Bool else {
