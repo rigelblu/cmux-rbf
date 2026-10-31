@@ -923,10 +923,11 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         // tab change and selection; the guard also holds through the applies that
         // follow while the same selection stays and the tab order stays, so a fold
         // the drop opened that lands in a later apply does not scroll either
-        // (#cm-110.14). A new selection, or a new tab order, ends it.
+        // (#cm-110.14). A new selection, a new tab order, or a new move token ends it: a drop never bumps the token
+        // (`isCommittingDrop`), so a token that changes is a status, color or cycle move made after the drop.
         var suppressForLocalDrop = false // (#cm-110.14)
         if var guardState = localDropScrollGuard { // (#cm-110.14)
-            if guardState.applied, selectedWorkspaceId != guardState.selectedWorkspaceId || workspaceIdsChanged { // (#cm-110.14)
+            if guardState.applied, selectedWorkspaceId != guardState.selectedWorkspaceId || workspaceIdsChanged || revealTokenChanged { // (#cm-110.14)
                 localDropScrollGuard = nil // (#cm-110.14)
             } else { // (#cm-110.14)
                 suppressForLocalDrop = true // (#cm-110.14)
