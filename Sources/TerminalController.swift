@@ -7636,6 +7636,11 @@ class TerminalController {
             }
 
             let browserPanelId = placement.panel.id
+            // cmux-rbf #cm-73.45: a caller that named itself owns the new Figma pane. With no `surface_id` the
+            // source is the focused pane, a guess, so no owner.
+            if case .workspace(let ownerWorkspace) = container, v2UUID(params, "surface_id") != nil {
+                ownerWorkspace.setFigmaPaneOwner(figmaPanelId: browserPanelId, callerPanelId: sourceSurfaceId, via: .open)
+            }
             let targetPaneUUID = container.paneID(
                 forPanelID: browserPanelId
             )?.id
@@ -9694,6 +9699,13 @@ class TerminalController {
             }
             guard panel.gotoFigmaNode(node, purpose: purpose, motion: motion, play: play) else {
                 return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
+            }
+            // cmux-rbf #cm-73.45: the terminal that pointed the pane owns it. A `fit` points it at no new board, and an
+            // unknown, closed or non-terminal caller changes nothing and never fails the goto.
+            if purpose != .fit,
+               let callerSurfaceId = self.v2UUID(params, "caller_surface_id"),
+               let ownerWorkspace = manager.workspacesById[workspaceId] {
+                ownerWorkspace.setFigmaPaneOwner(figmaPanelId: surfaceId, callerPanelId: callerSurfaceId, via: .goto)
             }
             let showingPreview = (panel.currentURL ?? panel.webView.url).map {
                 FigmaPaneURL.isWrapperPage($0, wrapper: panel.figmaPageWrapper)

@@ -205,30 +205,33 @@ extension CMUXCLI {
         // Beside the pane this command ran in, as `browser open-split` does for
         // `--surface`. Without it the app splits beside the workspace's focused
         // pane. `--workspace` names another workspace, where this pane is not.
-        let callerSurface = workspaceOverride == nil
-            ? try normalizeSurfaceHandle(ProcessInfo.processInfo.environment["CMUX_SURFACE_ID"], client: client)
-            : nil
+        // cmux-rbf #cm-73.45: the app also records that pane's terminal as the
+        // owner, so the caller is named by herdr-agent's note before
+        // `CMUX_SURFACE_ID` (`figmaCallerSurfaces`).
+        let callers = workspaceOverride == nil ? try figmaCallerSurfaces(client: client, strict: true) : []
 
-        let payload: [String: Any]
-        if let callerSurface {
-            // A shell keeps the workspace and pane it started in: a tab moved to
-            // another workspace keeps its old `CMUX_WORKSPACE_ID`, and a pane that
-            // has closed leaves a stale id. So the pane goes out alone, and the app
-            // finds its workspace from it. Only when the app answers `not_found`
-            // ask again the way `open` always did: the environment's workspace, no
-            // pane. Any other answer is reported as it is, and a value that is not
-            // a pane id at all (`CMUX_SURFACE_ID=garbage`) fails above, as it does
-            // for the sibling verbs. cmux always exports a UUID there.
+        // A shell keeps the workspace and pane it started in: a tab moved to
+        // another workspace keeps its old `CMUX_WORKSPACE_ID`, and a pane that
+        // has closed leaves a stale id. So the pane goes out alone, and the app
+        // finds its workspace from it. Only when the app answers `not_found`
+        // try the next caller, and after the last ask the way `open` always
+        // did: the environment's workspace, no pane. Any other answer is
+        // reported as it is, and a value that is not a pane id at all
+        // (`CMUX_SURFACE_ID=garbage`) fails above, as it does for the sibling
+        // verbs. cmux always exports a UUID there.
+        var placed: [String: Any]?
+        for caller in callers {
             var beside = params
-            beside["surface_id"] = callerSurface
+            beside["surface_id"] = caller
             do {
-                payload = try client.sendV2(method: "browser.open_split", params: beside)
+                placed = try client.sendV2(method: "browser.open_split", params: beside)
+                break
             } catch let error as CLIError where error.v2Code == "not_found" {
-                payload = try client.sendV2(method: "browser.open_split", params: withWorkspace(params, workspace))
+                continue
             }
-        } else {
-            payload = try client.sendV2(method: "browser.open_split", params: withWorkspace(params, workspace))
         }
+        let payload = try placed
+            ?? client.sendV2(method: "browser.open_split", params: withWorkspace(params, workspace))
         if jsonOutput {
             print(jsonString(formatIDs(payload, mode: idFormat)))
             return
@@ -265,8 +268,13 @@ extension CMUXCLI {
             throw CLIError(message: "cmux figma goto requires a node id")
         }
 
+        // cmux-rbf #cm-73.45: the caller also goes out as `caller_surface_id`, so
+        // the app records it as the pane's owner.
+        // `--surface` never read `CMUX_SURFACE_ID` before, so a bad one there is dropped, not an error.
+        let callers = try figmaCallerSurfaces(client: client, strict: surfaceOverride == nil)
         let pane = try resolveBoundFigmaPane(
             surfaceOverride: surfaceOverride,
+            callers: callers,
             client: client
         )
 
@@ -287,6 +295,7 @@ extension CMUXCLI {
         ]
         if motion { params["motion"] = true }
         if play { params["play"] = true }
+        if let caller = pane.callerSurface { params["caller_surface_id"] = caller }
         let payload = try client.sendV2(
             method: "figma.goto",
             params: params
@@ -324,7 +333,12 @@ extension CMUXCLI {
         jsonOutput: Bool,
         idFormat: CLIIDFormat
     ) throws {
-        let pane = try resolveBoundFigmaPane(surfaceOverride: surfaceOverride, client: client)
+        // `fit` names no caller to the app: it points the pane at no new board.
+        let pane = try resolveBoundFigmaPane(
+            surfaceOverride: surfaceOverride,
+            callers: try figmaCallerSurfaces(client: client, strict: surfaceOverride == nil),
+            client: client
+        )
         let decision = FigmaFit.decide(
             handle: pane.handle,
             paneAddress: pane.address,
@@ -403,6 +417,7 @@ extension CMUXCLI {
     /// ``FigmaGotoPicker``'s rule, so a test can hold it with no socket.
     private func resolveBoundFigmaPane(
         surfaceOverride: String?,
+        callers: [String],
         client: SocketClient
     ) throws -> BoundFigmaPane {
         var addresses: [String: URL] = [:]
@@ -433,7 +448,8 @@ extension CMUXCLI {
                 canonicalID: canonicalIDs[surfaceOverride] ?? surfaceOverride,
                 handle: surfaceOverride,
                 document: document,
-                address: address
+                address: address,
+                callerSurface: figmaFirstKnownCaller(callers, client: client)
             )
         }
 
@@ -446,20 +462,19 @@ extension CMUXCLI {
         if let workspace = try figmaWorkspaceHandle(explicit: nil, client: client) {
             params["workspace_id"] = workspace
         }
-        let listed: [String: Any]
-        if let callerSurface = try normalizeSurfaceHandle(
-            ProcessInfo.processInfo.environment["CMUX_SURFACE_ID"],
-            client: client
-        ) {
+        var listed: [String: Any]?
+        var callerSurface: String?
+        for caller in callers {
             do {
-                listed = try client.sendV2(method: "surface.list", params: ["surface_id": callerSurface])
+                listed = try client.sendV2(method: "surface.list", params: ["surface_id": caller])
+                callerSurface = caller
+                break
             } catch let error as CLIError where error.v2Code == "not_found" {
-                listed = try client.sendV2(method: "surface.list", params: params)
+                continue
             }
-        } else {
-            listed = try client.sendV2(method: "surface.list", params: params)
         }
-        let surfaces = listed["surfaces"] as? [[String: Any]] ?? []
+        let listing = try listed ?? client.sendV2(method: "surface.list", params: params)
+        let surfaces = listing["surfaces"] as? [[String: Any]] ?? []
 
         var panes: [FigmaGotoPicker.Pane] = []
         for surface in surfaces where (surface["type"] as? String) == "browser" {
@@ -482,7 +497,8 @@ extension CMUXCLI {
                 canonicalID: canonicalIDs[pane.id] ?? pane.id,
                 handle: pane.handle,
                 document: document,
-                address: address
+                address: address,
+                callerSurface: callerSurface
             )
         case .refuse(let message):
             throw CLIError(message: message)
@@ -499,6 +515,9 @@ extension CMUXCLI {
         let handle: String
         let document: URL
         let address: URL
+        /// cmux-rbf #cm-73.45: the first caller the app knew, or `nil`. `goto` sends it as
+        /// `caller_surface_id`; `fit` ignores it.
+        let callerSurface: String?
     }
 
     // MARK: - Shared

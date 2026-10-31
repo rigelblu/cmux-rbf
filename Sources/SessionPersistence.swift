@@ -1692,6 +1692,8 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
     var diffViewerToken: String? = nil
     var diffViewerRequestPath: String? = nil
     var figmaPages: SessionFigmaPagesSnapshot? = nil
+    /// cmux-rbf #cm-73.45: the terminal (its `stableSurfaceId`) that last opened or pointed this Figma pane. Added only; decoded when present.
+    var ownerTerminalSurfaceId: UUID? = nil
 
     init(
         urlString: String?,
@@ -1708,7 +1710,8 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         transparentBackground: Bool? = nil,
         diffViewerToken: String? = nil,
         diffViewerRequestPath: String? = nil,
-        figmaPages: SessionFigmaPagesSnapshot? = nil
+        figmaPages: SessionFigmaPagesSnapshot? = nil,
+        ownerTerminalSurfaceId: UUID? = nil
     ) {
         self.urlString = urlString
         self.profileID = profileID
@@ -1725,6 +1728,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         self.diffViewerToken = diffViewerToken
         self.diffViewerRequestPath = diffViewerRequestPath
         self.figmaPages = figmaPages
+        self.ownerTerminalSurfaceId = ownerTerminalSurfaceId
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -1743,6 +1747,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         case diffViewerToken
         case diffViewerRequestPath
         case figmaPages
+        case ownerTerminalSurfaceId
     }
 
     init(from decoder: Decoder) throws {
@@ -1762,6 +1767,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         diffViewerToken = try container.decodeIfPresent(String.self, forKey: .diffViewerToken)
         diffViewerRequestPath = try container.decodeIfPresent(String.self, forKey: .diffViewerRequestPath)
         figmaPages = try? container.decodeIfPresent(SessionFigmaPagesSnapshot.self, forKey: .figmaPages)
+        ownerTerminalSurfaceId = try? container.decodeIfPresent(UUID.self, forKey: .ownerTerminalSurfaceId)
     }
 }
 struct SessionMarkdownPanelSnapshot: Codable, Sendable {
