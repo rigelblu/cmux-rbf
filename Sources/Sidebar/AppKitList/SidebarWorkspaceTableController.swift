@@ -630,7 +630,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         actions: SidebarWorkspaceTableActions,
         workspaceIds nextWorkspaceIds: [UUID],
         selectedWorkspaceId: UUID?,
-        selectedScrollTargetWorkspaceId: UUID?
+        selectedScrollTargetWorkspaceId: UUID?,
+        selectedRevealScrollToken: Int = 0 // (#cm-110.14)
     ) {
         guard isPresentationActive else { return }
         mutationScheduler.stageApply(
@@ -640,6 +641,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 workspaceIds: nextWorkspaceIds,
                 selectedWorkspaceId: selectedWorkspaceId,
                 selectedScrollTargetWorkspaceId: selectedScrollTargetWorkspaceId,
+                selectedRevealScrollToken: selectedRevealScrollToken, // (#cm-110.14)
                 forcedReloadViewportOrigin: pendingForcedReloadViewportOrigin
             )
         )
@@ -908,16 +910,34 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 oldWorkspaceIds: workspaceIds,
                 newWorkspaceIds: nextWorkspaceIds
             )
+        let workspaceIdsChanged = workspaceIds != nextWorkspaceIds // (#cm-110.14)
         workspaceIds = nextWorkspaceIds
         let selectionTargetChanged = self.selectedScrollTargetWorkspaceId != selectedScrollTargetWorkspaceId
         self.selectedScrollTargetWorkspaceId = selectedScrollTargetWorkspaceId
+        let revealTokenChanged = appliedRevealScrollToken != input.selectedRevealScrollToken // (#cm-110.14)
+        appliedRevealScrollToken = input.selectedRevealScrollToken // (#cm-110.14)
         // A drop in this window must not move the viewport: the pointer's
         // release position IS the user's context. The selected-scroll policy
         // cannot tell a local drag reorder from an external index change, so
-        // the drop arms a one-shot suppression consumed by this apply.
-        let suppressForLocalDrop = suppressSelectedScrollAfterLocalDrop
-        suppressSelectedScrollAfterLocalDrop = false
-        if !suppressForLocalDrop, selectionTargetChanged || shouldScrollAfterWorkspaceChange {
+        // the drop arms a guard. The first apply after it carries the drop's own
+        // tab change and selection; the guard also holds through the applies that
+        // follow while the same selection stays and the tab order stays, so a fold
+        // the drop opened that lands in a later apply does not scroll either
+        // (#cm-110.14). A new selection, or a new tab order, ends it.
+        var suppressForLocalDrop = false // (#cm-110.14)
+        if var guardState = localDropScrollGuard { // (#cm-110.14)
+            if guardState.applied, selectedWorkspaceId != guardState.selectedWorkspaceId || workspaceIdsChanged { // (#cm-110.14)
+                localDropScrollGuard = nil // (#cm-110.14)
+            } else { // (#cm-110.14)
+                suppressForLocalDrop = true // (#cm-110.14)
+                if !guardState.applied { // (#cm-110.14)
+                    guardState.applied = true // (#cm-110.14)
+                    guardState.selectedWorkspaceId = selectedWorkspaceId // (#cm-110.14)
+                    localDropScrollGuard = guardState // (#cm-110.14)
+                } // (#cm-110.14)
+            } // (#cm-110.14)
+        } // (#cm-110.14)
+        if !suppressForLocalDrop, selectionTargetChanged || shouldScrollAfterWorkspaceChange || revealTokenChanged {
             scrollSelectedRowToVisibleIfNeeded()
         }
         synchronizeAppKitDropIndicator(actions: actions)
@@ -1748,7 +1768,19 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
     /// One-shot: the next apply comes from this window's own drop, so the
     /// selected-workspace scroll policy must not yank the viewport away from
     /// the release position.
-    private var suppressSelectedScrollAfterLocalDrop = false
+    private struct LocalDropScrollGuard { // (#cm-110.14)
+        var applied = false
+        var selectedWorkspaceId: UUID?
+    }
+
+    /// Armed by this window's own drop; see `flushApply` (#cm-110.14). Replaces the one-shot flag a reorder drop alone armed.
+    private var localDropScrollGuard: LocalDropScrollGuard? // (#cm-110.14)
+    private var appliedRevealScrollToken = 0 // (#cm-110.14)
+
+    /// Holds the selected-row scroll off for the applies that carry this window's own drop, whichever drop it is (#cm-110.14).
+    func armLocalDropScrollGuard() {
+        localDropScrollGuard = LocalDropScrollGuard()
+    }
 
     private func performReorderDrop(
         point: CGPoint,
@@ -1781,7 +1813,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         )
 #endif
         if performed {
-            suppressSelectedScrollAfterLocalDrop = true
+            armLocalDropScrollGuard() // (#cm-110.14)
         }
         retireReorderIndicator()
         return performed
@@ -2920,8 +2952,9 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         } // (#cm-110.10)
         bonsplit.landingPaintUpdate = { landing in actions.tabLandingPaintUpdate?(landing) } // (#cm-110.10)
         bonsplit.paintLandingUpdate = { [weak self] update in self?.paintTabLanding(update) } // (#cm-110.10)
-        bonsplit.performNewWorkspaceLandingMove = { landing, transfer in // (#cm-110.10)
+        bonsplit.performNewWorkspaceLandingMove = { [weak self] landing, transfer in // (#cm-110.10)
             guard let workspaceId = actions.moveBonsplitToNewWorkspaceAtLanding(landing, transfer) else { return false } // (#cm-110.10)
+            self?.armLocalDropScrollGuard() // (#cm-110.14) a tab dropped on a status group is a drop: it never moves the view
             actions.didMoveBonsplitToWorkspace(workspaceId) // (#cm-110.10)
             return true // (#cm-110.10)
         } // (#cm-110.10)

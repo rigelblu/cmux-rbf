@@ -233,6 +233,10 @@ class TabManager: ObservableObject {
     }
     /// Window-owned reveal hook shared by every selection entrypoint.
     var revealSelectedWorkspaceInSidebar: ((Workspace) -> Void)?
+    /// This window's sidebar side of the reveal a move runs (#cm-110.14); `SidebarState.installMoveReveal(on:)` sets it.
+    var sidebarMoveReveal: SidebarMoveReveal? // (#cm-110.14)
+    /// True while a drop commits: a drop never moves the view, so it requests no scroll (#cm-110.14).
+    var isCommittingDrop = false // (#cm-110.14)
     private(set) var isFinalizedForWindowClose = false
     private var recoverableMainWindowRouteOwnerRegistration:
         RecoverableMainWindowRouteOwnerRegistration?
@@ -2096,13 +2100,15 @@ class TabManager: ObservableObject {
         usesTopLevelRows: Bool = false,
         explicitGroupId: UUID? = nil
     ) -> Bool {
-        workspaceReordering.reorderSidebarWorkspace(
+        let handled = workspaceReordering.reorderSidebarWorkspace(
             tabId: tabId,
             toIndex: targetIndex,
             isDragOperation: isDragOperation,
             usesTopLevelRows: usesTopLevelRows,
             explicitGroupId: explicitGroupId
         )
+        if handled, isDragOperation { revealMoved([tabId]) } // (#cm-110.14) a drag is a move he asked for
+        return handled
     }
 
     @discardableResult
@@ -2114,7 +2120,7 @@ class TabManager: ObservableObject {
         usesTopLevelRows: Bool = false,
         explicitGroupId: UUID? = nil
     ) -> Bool {
-        workspaceReordering.reorderSidebarWorkspaces(
+        let handled = workspaceReordering.reorderSidebarWorkspaces(
             tabIds: tabIds,
             draggedTabId: draggedTabId,
             toIndex: targetIndex,
@@ -2122,6 +2128,8 @@ class TabManager: ObservableObject {
             usesTopLevelRows: usesTopLevelRows,
             explicitGroupId: explicitGroupId
         )
+        if handled, isDragOperation { revealMoved(tabIds) } // (#cm-110.14) a drag is a move he asked for
+        return handled
     }
 
     func sidebarReorderUsesTopLevelRows(
@@ -2218,13 +2226,14 @@ class TabManager: ObservableObject {
 
     func setTabColor(tabId: UUID, color: String?) {
         guard let tab = tabs.first(where: { $0.id == tabId }) else { return }
-        applyWorkspaceColor(color, to: [tab])
+        revealingMoves(of: [tab], cause: .color) { applyWorkspaceColor(color, to: [tab]) } // (#cm-110.14)
     }
 
     func applyWorkspaceColor(_ color: String?, toWorkspaceIds workspaceIds: [UUID]) {
         guard !workspaceIds.isEmpty else { return }
         let targetIds = Set(workspaceIds)
-        applyWorkspaceColor(color, to: tabs.filter { targetIds.contains($0.id) })
+        let targets = tabs.filter { targetIds.contains($0.id) }
+        revealingMoves(of: targets, cause: .color) { applyWorkspaceColor(color, to: targets) } // (#cm-110.14)
     }
 
     func applyWorkspacePaletteColor(named name: String, toWorkspaceIds workspaceIds: [UUID]) {
@@ -2256,16 +2265,21 @@ class TabManager: ObservableObject {
     }
 
     func togglePin(tabId: UUID) {
-        workspaceReordering.togglePin(tabId: tabId)
+        guard let tab = tabs.first(where: { $0.id == tabId }) else { return }
+        setPinned(tab, pinned: !tab.isPinned) // (#cm-110.14) one path for a pin, so one reveal
     }
 
     func setPinned(_ tab: Workspace, pinned: Bool) {
+        let changed = tab.isPinned != pinned // (#cm-110.14)
         workspaceReordering.setPinned(tab, pinned: pinned)
+        if changed { revealMoved([tab.id]) } // (#cm-110.14)
     }
 
     @discardableResult
     func setPinned(workspaceIds: [UUID], pinned: Bool) -> [UUID] {
-        workspaceReordering.setPinned(workspaceIds: workspaceIds, pinned: pinned)
+        let changed = workspaceReordering.setPinned(workspaceIds: workspaceIds, pinned: pinned)
+        revealMoved(changed) // (#cm-110.14)
+        return changed
     }
 
     // MARK: - Workspace Groups (WorkspaceGroupCoordinator, CmuxWorkspaces)
@@ -2279,7 +2293,8 @@ class TabManager: ObservableObject {
         collapseSidebarSelection: Bool = true,
         externalID: String? = nil
     ) -> UUID? {
-        workspaceGrouping.createWorkspaceGroup(
+        let groupIdsBefore = Set(workspaceGroups.map(\.id)) // (#cm-110.14)
+        let created = workspaceGrouping.createWorkspaceGroup(
             name: name,
             childWorkspaceIds: childWorkspaceIds,
             anchorWorkingDirectory: anchorWorkingDirectory,
@@ -2287,6 +2302,10 @@ class TabManager: ObservableObject {
             collapseSidebarSelection: collapseSidebarSelection,
             externalID: externalID
         )
+        if let created, !groupIdsBefore.contains(created), let anchor = workspaceGroupAnchor(for: created) { // (#cm-110.14) the folds above a new group open
+            revealMoved([anchor.id] + childWorkspaceIds.filter { id in tabs.first { $0.id == id }?.groupId == created })
+        }
+        return created
     }
 
     @discardableResult
@@ -2302,7 +2321,7 @@ class TabManager: ObservableObject {
         initialBrowserTransparentBackground: Bool = false,
         applyCreationTitleAsCustomTitle: Bool = true
     ) -> Workspace? {
-        workspaceGrouping.createWorkspaceInGroup(
+        let created = workspaceGrouping.createWorkspaceInGroup(
             groupId: groupId,
             placement: explicitPlacement,
             referenceWorkspaceId: referenceWorkspaceId,
@@ -2314,6 +2333,8 @@ class TabManager: ObservableObject {
             initialBrowserTransparentBackground: initialBrowserTransparentBackground,
             applyCreationTitleAsCustomTitle: applyCreationTitleAsCustomTitle
         )
+        if let created { revealMoved([created.id]) } // (#cm-110.14)
+        return created
     }
 
     /// Resolves a group's current anchor, including any member promoted after a close.
@@ -2346,10 +2367,13 @@ class TabManager: ObservableObject {
             placement: placement,
             referenceWorkspaceId: referenceWorkspaceId
         )
+        if tabs.first(where: { $0.id == workspaceId })?.groupId == groupId { revealMoved([workspaceId]) } // (#cm-110.14)
     }
 
     func removeWorkspaceFromGroup(workspaceId: UUID) {
+        let groupBefore = tabs.first(where: { $0.id == workspaceId })?.groupId // (#cm-110.14)
         workspaceGrouping.removeWorkspaceFromGroup(workspaceId: workspaceId)
+        if groupBefore != nil, tabs.first(where: { $0.id == workspaceId })?.groupId != groupBefore { revealMoved([workspaceId]) } // (#cm-110.14)
     }
 
     @discardableResult
@@ -2357,10 +2381,13 @@ class TabManager: ObservableObject {
         groupId: UUID,
         removeGeneratedAnchor: Bool = false
     ) -> WorkspaceGroupUngroupResult {
-        workspaceGrouping.ungroupWorkspaceGroup(
+        let members = tabs.filter { $0.groupId == groupId }.map(\.id) // (#cm-110.14) the direct members take a new place
+        let result = workspaceGrouping.ungroupWorkspaceGroup(
             groupId: groupId,
             removeGeneratedAnchor: removeGeneratedAnchor
         )
+        if case .dissolved = result { revealMoved(members) } // (#cm-110.14)
+        return result
     }
 
     @discardableResult
@@ -2385,11 +2412,11 @@ class TabManager: ObservableObject {
     }
 
     func setWorkspaceGroupPinned(groupId: UUID, isPinned: Bool) {
-        workspaceGrouping.setWorkspaceGroupPinned(groupId: groupId, isPinned: isPinned)
+        revealingGroupMove(groupId, cause: .move) { workspaceGrouping.setWorkspaceGroupPinned(groupId: groupId, isPinned: isPinned) } // (#cm-110.14)
     }
 
     func setWorkspaceGroupColor(groupId: UUID, hex: String?) {
-        workspaceGrouping.setWorkspaceGroupColor(groupId: groupId, hex: hex)
+        revealingGroupMove(groupId, cause: .color) { workspaceGrouping.setWorkspaceGroupColor(groupId: groupId, hex: hex) } // (#cm-110.14)
     }
 
     @discardableResult
@@ -2745,7 +2772,7 @@ class TabManager: ObservableObject {
     }
 
     /// Attach an existing workspace to this window.
-    func attachWorkspace(_ workspace: Workspace, at index: Int? = nil, select: Bool = true) {
+    func attachWorkspace(_ workspace: Workspace, at index: Int? = nil, select: Bool = true, revealsMove: Bool = true) {
         workspace.owningTabManager = self
         wireClosedBrowserTracking(for: workspace)
         let insertIndex: Int = {
@@ -2763,6 +2790,7 @@ class TabManager: ObservableObject {
         if select {
             selectedTabId = workspace.id
         }
+        if revealsMove { revealMoved([workspace.id]) } // (#cm-110.14) every workspace that lands here opens its folds here
     }
 
     // Keep closeTab as convenience alias

@@ -21,6 +21,8 @@ struct SidebarWorkspaceTableView: NSViewRepresentable {
     let liveRowIds: [SidebarWorkspaceRenderItemID]
     let selectedWorkspaceId: UUID?
     let selectedScrollTargetWorkspaceId: UUID?
+    /// Counts the moves after which the selected row is scrolled into view (#cm-110.14).
+    var selectedRevealScrollToken: Int = 0 // (#cm-110.14)
     let isPresented: Bool
     let unreadSource: SidebarUnreadModel
     /// Invoked when a completed row click parks awaiting live actions; the
@@ -64,7 +66,8 @@ struct SidebarWorkspaceTableView: NSViewRepresentable {
             actions: actions,
             workspaceIds: workspaceIds,
             selectedWorkspaceId: selectedWorkspaceId,
-            selectedScrollTargetWorkspaceId: selectedScrollTargetWorkspaceId
+            selectedScrollTargetWorkspaceId: selectedScrollTargetWorkspaceId,
+            selectedRevealScrollToken: selectedRevealScrollToken // (#cm-110.14)
         )
     }
 
