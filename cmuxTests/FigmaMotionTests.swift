@@ -24,7 +24,7 @@ struct FigmaMotionTests {
         return c
     }
     private func drawn(_ c: JSContext) {
-        c.evaluateScript("listeners.message({source: frame.contentWindow, data: {cmuxClockReport:true, player:true, drawn:true, mode:'freeze', hostname:'www.figma.com'}})")
+        c.evaluateScript("listeners.message({source: frame.contentWindow, origin: 'https://www.figma.com', data: {cmuxClockReport:true, player:true, drawn:true, mode:'freeze', hostname:'www.figma.com'}})")
     }
     private func text(_ c: JSContext, _ js: String) -> String? { c.evaluateScript(js)?.toString() }
     private func bool(_ c: JSContext, _ js: String) -> Bool { c.evaluateScript(js)?.toBool() == true }
@@ -35,7 +35,7 @@ struct FigmaMotionTests {
         #expect(bool(c, "elements['cmux-motion-toggle'].disabled && elements['cmux-motion-still'].disabled"), "Loading disables both cells")
         #expect(text(c, "elements['cmux-motion-toggle'].textContent") == "▶")
         #expect(!bool(c, "window.__cmuxMotion.command('toggle')"))
-        c.evaluateScript("listeners.message({source: frame.contentWindow, data: {cmuxClockReport:true,player:true,drawn:false,mode:'freeze',hostname:'www.figma.com'}})")
+        c.evaluateScript("listeners.message({source: frame.contentWindow, origin: 'https://www.figma.com', data: {cmuxClockReport:true,player:true,drawn:false,mode:'freeze',hostname:'www.figma.com'}})")
         #expect(text(c, "window.__cmuxMotion.snapshot().state") == "loading", "undrawn reports cannot end Loading")
     }
     @Test func frozenFirstStateShowsPlayAndEnabledStill() throws {
@@ -105,7 +105,7 @@ struct FigmaMotionTests {
     }
     @Test func stillPlayerNavigationWaitsForFrameClockReadiness() throws {
         let c = try page(marked: false)
-        c.evaluateScript("window.__cmuxMotion.command('toggle'); sent=[]; listeners.message({source:frame.contentWindow,data:{cmuxClockReport:true,player:false,drawn:false,mode:'run',hostname:'www.figma.com',path:'/design/KEY/slug'}})")
+        c.evaluateScript("window.__cmuxMotion.command('toggle'); sent=[]; listeners.message({source:frame.contentWindow,origin:'https://www.figma.com',data:{cmuxClockReport:true,player:false,drawn:false,mode:'run',hostname:'www.figma.com',path:'/design/KEY/slug'}})")
         #expect(text(c, "sent[sent.length-1].kind") == "player", "the last navigation command must reach a newly ready frame")
     }
 
@@ -229,7 +229,8 @@ struct FigmaMotionTests {
         }
     }
 
-    private static let browser = #"""
+    // cmux-rbf (#cm-73.44): internal so FigmaRefitScriptTests runs in the same harness; reports now carry the real `origin`.
+    static let browser = #"""
     window=this; window.frames=[]; elements={}; listeners={}; sent=[]; posted=[];
     window.addEventListener=function(n,f){listeners[n]=f};
     window.webkit={messageHandlers:{cmuxFigmaMotion:{postMessage:function(m){posted.push(m)}}}};

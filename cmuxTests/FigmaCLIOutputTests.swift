@@ -1058,6 +1058,30 @@ struct FigmaCLIOutputTests {
         #expect(presses(run).isEmpty)
     }
 
+    // cmux-rbf (#cm-73.44): the app answers `invalid_state` with `data.reason: notboard` when the preview shows
+    // Figma's Log in page or an error, and the CLI says it in English. Any other failure keeps its own text.
+    @Test("fit on a preview that shows no board gives the English refusal, from the app's notboard reason")
+    func fitRefusesAPreviewThatShowsNoBoard() throws {
+        let base = Self.fitReply([Self.figmaPane(8, link: Self.readLink)])
+        let notBoard: @Sendable (String, String?) -> String = { method, surfaceID in
+            guard method == "figma.goto" else { return base(method, surfaceID) }
+            return Self.json(["id": NSNull(), "ok": false,
+                              "error": ["code": "invalid_state", "message": "Browser operation failed", "data": ["reason": "notboard"]]])
+        }
+        let run = try drive(["figma", "fit"], reply: notBoard)
+        fails(run, with: "the Figma pane shows Figma's Log in page or an error, not a board (surface surface:8), so fit moved nothing")
+        #expect(run.gotos.count == 1 && presses(run).isEmpty, "\(run.requests.map(\.method))")
+
+        let other: @Sendable (String, String?) -> String = { method, surfaceID in
+            guard method == "figma.goto" else { return base(method, surfaceID) }
+            return Self.json(["id": NSNull(), "ok": false,
+                              "error": ["code": "invalid_state", "message": "Something else", "data": ["reason": "elsewise"]]])
+        }
+        let unrelated = try drive(["figma", "fit"], reply: other)
+        #expect(unrelated.status == 1)
+        #expect(!unrelated.stderr.contains("Log in page"), "only the notboard reason is turned into the refusal: \(unrelated.stderr)")
+    }
+
     @Test("fit on a FigJam board or a slide deck is refused and sends nothing, in the editor and the read view")
     func fitRefusesBoardsAndDecks() throws {
         let message = "cmux figma fit works on Figma design files only: surface surface:8 shows a FigJam board or a slide deck"
