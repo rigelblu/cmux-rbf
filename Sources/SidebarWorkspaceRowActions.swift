@@ -39,6 +39,9 @@ struct SidebarWorkspaceRowActions {
     let markRead: ([UUID]) -> Void
     let markUnread: ([UUID]) -> Void
     let clearLatestNotifications: ([UUID]) -> Void
+    /// Clear Agent State over the targets (cm-128.2), and its enabled check, read live when the deferred menu is presented.
+    let clearAgentState: ([UUID]) -> Void
+    let canClearAgentState: ([UUID]) -> Bool
     /// Reads live mute state when a deferred context menu action executes.
     let currentNotificationsMuted: ([UUID]) -> Bool
     let setNotificationsMuted: ([UUID], Bool) -> Void

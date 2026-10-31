@@ -165,6 +165,7 @@ Environment:
 | `right-sidebar` | Control right sidebar visibility, mode, focus, and state reads. |
 | `set-status` | Set a sidebar status pill. |
 | `clear-status` | Remove a sidebar status pill. |
+| `clear-agent-state` | Clear a workspace's agent marks and pills, close its agents' open requests, and mark its notifications read. |
 | `list-status` | List sidebar status pills. |
 | `set-progress` | Set sidebar progress. |
 | `clear-progress` | Clear sidebar progress. |
@@ -940,6 +941,7 @@ the expected text without connecting to a cmux socket.
 - `cmux right-sidebar --help` -> `Usage: cmux right-sidebar <command> [flags]`
 - `cmux set-status --help` -> `Usage: cmux set-status`
 - `cmux clear-status --help` -> `Usage: cmux clear-status`
+- `cmux clear-agent-state --help` -> `Usage: cmux clear-agent-state`
 - `cmux list-status --help` -> `Usage: cmux list-status`
 - `cmux set-progress --help` -> `Usage: cmux set-progress`
 - `cmux clear-progress --help` -> `Usage: cmux clear-progress`

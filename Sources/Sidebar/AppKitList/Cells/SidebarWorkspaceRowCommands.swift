@@ -328,7 +328,7 @@ struct SidebarWorkspaceRowMenuBuilder {
         // must not disappear with it.
         if let notificationStore = commands.notificationStore {
             menu.addItem(.separator())
-            addNotificationItems(to: menu, notificationStore: notificationStore)
+            addNotificationItems(to: menu, tabManager: tabManager, notificationStore: notificationStore)
         }
         menu.addItem(.separator())
         addCopyAndFinderItems(to: menu, tabManager: tabManager)
@@ -700,7 +700,7 @@ struct SidebarWorkspaceRowMenuBuilder {
         })
     }
 
-    private func addNotificationItems(to menu: NSMenu, notificationStore: TerminalNotificationStore) {
+    private func addNotificationItems(to menu: NSMenu, tabManager: TabManager, notificationStore: TerminalNotificationStore) {
         let markReadLabel = label(
             multi: String(localized: "contextMenu.markWorkspacesRead", defaultValue: "Mark Workspaces as Read"),
             single: String(localized: "contextMenu.markWorkspaceRead", defaultValue: "Mark Workspace as Read"))
@@ -736,6 +736,15 @@ struct SidebarWorkspaceRowMenuBuilder {
             for id in commands.contextMenuWorkspaceIds {
                 notificationStore.clearLatestNotification(forTabId: id)
             }
+        })
+        // cm-128.2: the agent half of "this row is telling me something". One label for one or many rows, like its action.
+        menu.addItem(item(
+            String(localized: "contextMenu.clearAgentState", defaultValue: "Clear Agent State"),
+            enabled: tabManager.canClearAgentState(workspaceIds: targetIds)
+        ) { [weak tabManager, weak notificationStore, commands] in
+            guard let tabManager, let notificationStore else { return }
+            tabManager.clearAgentState(workspaceIds: commands.contextMenuWorkspaceIds, notifications: notificationStore)
+            commands.refreshSnapshot()
         })
 
         let submenu = NSMenu()

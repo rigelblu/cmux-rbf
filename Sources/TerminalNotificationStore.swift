@@ -1913,8 +1913,12 @@ final class TerminalNotificationStore: ObservableObject {
         return marked
     }
 
-    func markRead(forTabId tabId: UUID) {
-        inFlightPolicyRequests.discard(forTabId: tabId, surfaceId: nil)
+    /// Marks the workspace's notifications read and dismisses their banners.
+    /// - Parameter keepingOwnUnreadMarks: `true` for Clear Agent State (cm-128.2, Tom 2026-10-31): the clear marks every stored
+    ///   notification read but leaves his own unread marks (manual, pane-derived, restored at launch) and the notification
+    ///   requests still in flight, which discarding would delete rather than mark read.
+    func markRead(forTabId tabId: UUID, keepingOwnUnreadMarks: Bool = false) {
+        if !keepingOwnUnreadMarks { inFlightPolicyRequests.discard(forTabId: tabId, surfaceId: nil) }
         notificationFeedHistory.markRead(inWorkspace: tabId)
         var updated = notifications
         var idsToClear: [String] = []
@@ -1928,11 +1932,13 @@ final class TerminalNotificationStore: ObservableObject {
             notifications = updated
         }
         clearFocusedReadIndicator(forTabId: tabId)
-        clearManualUnread(forTabId: tabId)
-        clearSurfaceManualUnread(forTabId: tabId)
-        clearWorkspacePanelUnread(forTabId: tabId)
-        setPanelDerivedWorkspaceUnread(false, forTabId: tabId)
-        setWorkspaceRestoredUnread(false, forTabId: tabId)
+        if !keepingOwnUnreadMarks {
+            clearManualUnread(forTabId: tabId)
+            clearSurfaceManualUnread(forTabId: tabId)
+            clearWorkspacePanelUnread(forTabId: tabId)
+            setPanelDerivedWorkspaceUnread(false, forTabId: tabId)
+            setWorkspaceRestoredUnread(false, forTabId: tabId)
+        }
         if !idsToClear.isEmpty {
             removeNotificationRequestsAndReleaseSoundReferences(withIdentifiers: idsToClear)
             emitNotificationsDismissed(

@@ -163983,6 +163983,256 @@
         }
       }
     },
+    "contextMenu.clearAgentState": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Agent State"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エージェントの状態をクリア"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "에이전트 상태 지우기"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除代理状态"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agentenstatus löschen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer l’état de l’agent"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مسح حالة الوكيل"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar el estado del agente"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除代理狀態"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obriši stanje agenta"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ryd agentstatus"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancella stato agente"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "សម្អាតស្ថានភាពភ្នាក់ងារ"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tøm agentstatus"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wyczyść stan agenta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpar estado do agente"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сбросить состояние агента"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ล้างสถานะเอเจนต์"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajan Durumunu Temizle"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скинути стан агента"
+          }
+        }
+      }
+    },
+    "cli.error.clearAgentStateRequiresWorkspace": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state requires --workspace <id|ref|index> or a cmux terminal ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state には --workspace <id|ref|index> か cmux のターミナル ($CMUX_WORKSPACE_ID) が必要です"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state에는 --workspace <id|ref|index> 또는 cmux 터미널($CMUX_WORKSPACE_ID)이 필요합니다"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state 需要 --workspace <id|ref|index> 或 cmux 终端 ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state erfordert --workspace <id|ref|index> oder ein cmux-Terminal ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state nécessite --workspace <id|ref|index> ou un terminal cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يتطلب clear-agent-state الخيار --workspace <id|ref|index> أو طرفية cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state requiere --workspace <id|ref|index> o un terminal de cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state 需要 --workspace <id|ref|index> 或 cmux 終端機 ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state zahtijeva --workspace <id|ref|index> ili cmux terminal ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state kræver --workspace <id|ref|index> eller en cmux-terminal ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state richiede --workspace <id|ref|index> o un terminale cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state ត្រូវការ --workspace <id|ref|index> ឬ ស្ថានីយ cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state krever --workspace <id|ref|index> eller en cmux-terminal ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state wymaga --workspace <id|ref|index> lub terminala cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state exige --workspace <id|ref|index> ou um terminal do cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state требует --workspace <id|ref|index> или терминал cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state ต้องใช้ --workspace <id|ref|index> หรือเทอร์มินัล cmux ($CMUX_WORKSPACE_ID)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state için --workspace <id|ref|index> veya bir cmux terminali ($CMUX_WORKSPACE_ID) gerekir"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clear-agent-state потребує --workspace <id|ref|index> або термінал cmux ($CMUX_WORKSPACE_ID)"
+          }
+        }
+      }
+    },
     "contextMenu.clearLatestNotification": {
       "extractionState": "manual",
       "localizations": {
