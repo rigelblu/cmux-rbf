@@ -4971,6 +4971,75 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         )
     }
 
+    // mise (and tools like it) rebuild PATH from a copy saved while .zshrc ran, on every
+    // cd and on later prompts. That copy has the user's own `claude` ahead of cmux's shim
+    // folder, so a tool that looks `claude` up by name (cswap) would start it without
+    // cmux's hooks (cm-128.8). The fake hook below rebuilds at every prompt and cd, which
+    // is stricter than real mise.
+    func testShellIntegrationKeepsAgentShimFolderFirstAfterPathRebuildingHooks() throws {
+        let fileManager = FileManager.default
+        let tmpdir = fileManager.temporaryDirectory
+            .appendingPathComponent("cmux-zsh-shim-first-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: tmpdir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tmpdir) }
+
+        let output = try runPromptInteractiveZsh(
+            cmuxLoadGhosttyIntegration: false,
+            cmuxLoadShellIntegration: true,
+            command: """
+            :
+            print -r -- "L2=$(whence -p claude)" >> "$CMUX_TEST_OUTPUT"
+            cd /tmp && print -r -- "L3=$(whence -p claude)" >> "$CMUX_TEST_OUTPUT"
+            cd /
+            print -r -- "L4=$(whence -p claude)" >> "$CMUX_TEST_OUTPUT"
+            print -r -- "S=$CMUX_CLAUDE_WRAPPER_SHIM_ROOT" >> "$CMUX_TEST_OUTPUT"
+            print -r -- "O=$_cmux_test_saved_path" >> "$CMUX_TEST_OUTPUT"
+            print -r -- "P=$PATH" >> "$CMUX_TEST_OUTPUT"
+            """,
+            extraEnvironment: [
+                "TMPDIR": tmpdir.path,
+            ],
+            userZshRCContents: """
+            /bin/mkdir -p "$HOME/user-bin"
+            print -r -- '#!/bin/sh' > "$HOME/user-bin/claude"
+            /bin/chmod +x "$HOME/user-bin/claude"
+            export PATH="$HOME/user-bin:$PATH"
+            _cmux_test_saved_path="$PATH::$HOME/other/cmux-cli-shims/OTHER-SURFACE"
+            _cmux_test_rebuild_path() { PATH="$_cmux_test_saved_path"; }
+            precmd_functions=(_cmux_test_rebuild_path $precmd_functions)
+            chpwd_functions=(_cmux_test_rebuild_path $chpwd_functions)
+
+            cmux_test_ready() {
+              [[ -e "$CMUX_TEST_READY" ]] && return 0
+              print -r -- "L1=$(whence -p claude)" > "$CMUX_TEST_OUTPUT"
+              : > "$CMUX_TEST_READY"
+              precmd_functions=(${precmd_functions:#cmux_test_ready})
+            }
+            precmd_functions+=(cmux_test_ready)
+            """
+        )
+
+        var values: [String: String] = [:]
+        for line in output.components(separatedBy: "\n") {
+            guard let separator = line.firstIndex(of: "=") else { continue }
+            values[String(line[..<separator])] = String(line[line.index(after: separator)...])
+        }
+        let shimRoot = try XCTUnwrap(values["S"], output)
+        XCTAssertFalse(shimRoot.isEmpty, output)
+        let shimClaude = shimRoot + "/claude"
+
+        XCTAssertEqual(values["L1"], shimClaude, "first prompt: \(output)")
+        XCTAssertEqual(values["L2"], shimClaude, "a later prompt rebuilt PATH (precmd): \(output)")
+        XCTAssertEqual(values["L3"], shimClaude, "cd and a lookup on one line (chpwd): \(output)")
+        XCTAssertEqual(values["L4"], shimClaude, "cd on its own line: \(output)")
+
+        // Only the current surface's folder moves: every other entry keeps its order,
+        // the empty component survives, and another surface's folder stays where it was.
+        let saved = try XCTUnwrap(values["O"], output)
+        let expected = [shimRoot] + saved.components(separatedBy: ":").filter { $0 != shimRoot }
+        XCTAssertEqual(try XCTUnwrap(values["P"], output).components(separatedBy: ":"), expected, output)
+    }
+
     func testShellIntegrationRestoresManagedTermDuringPreexec() throws {
         let output = try runInteractiveZsh(
             cmuxLoadGhosttyIntegration: false,
