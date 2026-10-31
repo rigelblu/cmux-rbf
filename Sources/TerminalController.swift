@@ -2942,6 +2942,8 @@ class TerminalController {
             return v2Result(id: id, self.v2WorkspaceCloudVMBind(params: params))
         case "workspace.set_auto_title":
             return v2Result(id: id, self.v2WorkspaceSetAutoTitle(params: params))
+        case "workspace.clear_agent_state": // cm-128.2
+            return v2Result(id: id, self.v2WorkspaceClearAgentState(params: params))
         case "agent.session_title.seed":
             return v2Result(id: id, self.v2AgentSessionTitleSeed(params: params))
         case "surface.sync_codex_native_title":
@@ -3286,6 +3288,7 @@ class TerminalController {
             "workspace.prompt_submit",
             "workspace.rename",
             "workspace.set_auto_title",
+            "workspace.clear_agent_state", // cm-128.2
             "surface.sync_codex_native_title",
             "workspace.group.list",
             "workspace.group.create",

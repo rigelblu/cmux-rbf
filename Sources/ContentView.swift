@@ -7293,6 +7293,7 @@ struct ContentView: View {
                 CommandPaletteContextKeys.workspaceCanMarkUnread,
                 sidebarUnread.canMarkWorkspaceUnread(forWorkspaceIds: [workspace.id])
             )
+            snapshot.setBool(CommandPaletteContextKeys.workspaceCanClearAgentState, workspace.hasClearableAgentState) // cm-128.2
         }
 
         if let browserTarget = commandPaletteBrowserActionTarget,
@@ -8055,6 +8056,16 @@ struct ContentView: View {
                 keywords: ["workspace", "unread", "notification", "inbox"],
                 when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) },
                 enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanMarkUnread) }
+            )
+        )
+        contributions.append( // cm-128.2
+            CommandPaletteCommandContribution(
+                commandId: "palette.clearAgentState",
+                title: constant(String(localized: "contextMenu.clearAgentState", defaultValue: "Clear Agent State")),
+                subtitle: workspaceSubtitle,
+                keywords: ["agent", "state", "clear", "hand", "running", "reset"],
+                when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) },
+                enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanClearAgentState) }
             )
         )
         appendIdentifierCopyCommandContributions(
@@ -9246,6 +9257,13 @@ struct ContentView: View {
                 return
             }
             notificationStore.markUnread(forTabId: workspaceId)
+        }
+        registry.register(commandId: "palette.clearAgentState") { // cm-128.2
+            guard let workspaceId = tabManager.selectedWorkspace?.id else {
+                NSSound.beep()
+                return
+            }
+            tabManager.clearAgentState(workspaceIds: [workspaceId], notifications: notificationStore)
         }
         registerIdentifierCopyCommandHandlers(
             &registry,
@@ -15832,6 +15850,12 @@ struct VerticalTabsSidebar: View, Equatable {
                 for workspaceId in workspaceIds {
                     notificationStore.clearLatestNotification(forTabId: workspaceId)
                 }
+            },
+            clearAgentState: { workspaceIds in // cm-128.2
+                tabManager.clearAgentState(workspaceIds: workspaceIds, notifications: notificationStore)
+            },
+            canClearAgentState: { workspaceIds in // cm-128.2
+                tabManager.canClearAgentState(workspaceIds: workspaceIds)
             },
             currentNotificationsMuted: { workspaceIds in
                 notificationStore.allWorkspaceNotificationsMuted(forTabIds: workspaceIds)

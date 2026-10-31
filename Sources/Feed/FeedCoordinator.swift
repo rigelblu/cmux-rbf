@@ -355,9 +355,8 @@ final class FeedCoordinator: @unchecked Sendable {
         let finished = waiterRegistry.finish(registration)
         if finished.shouldCancel {
             cancelNotification(requestId: registration.requestID)
-            concludeAttentionOnMain(finished.target)
+            concludeAttentionOnMain(requestId: registration.requestID, groupId: registration.groupID, cleanup: true)
             expireTimedOutItem(finished.itemID)
-            waiterRegistry.cleanupStored(requestID: registration.requestID, groupID: registration.groupID)
         }
         return finished.outcome
     }
@@ -365,9 +364,8 @@ final class FeedCoordinator: @unchecked Sendable {
     func invalidateSemanticRequest(requestId: String, source: String, sessionId: String) {
         guard let (reply, itemID) = waiterRegistry.invalidate(requestID: requestId, source: source, sessionID: sessionId) else { return }
         cancelNotification(requestId: requestId)
-        concludeAttentionOnMain(reply.target)
+        concludeAttentionOnMain(requestId: requestId, groupId: reply.groupID, cleanup: true)
         expireTimedOutItem(itemID)
-        waiterRegistry.cleanupStored(requestID: requestId, groupID: reply.groupID)
     }
 
     private func enqueueZeroWaitAcceptance(
@@ -432,13 +430,15 @@ final class FeedCoordinator: @unchecked Sendable {
             + TimeInterval(components.attoseconds) / 1_000_000_000_000_000_000
     }
 
-    /// Concludes an attention overlay (if any) on the main actor, hopping if
-    /// called from the socket worker thread.
-    private func concludeAttentionOnMain(_ target: FeedAttentionTarget?) {
-        guard let target else { return }
-        let conclude: @Sendable () -> Void = { [target] in
+    /// Consumes the waiter's current attention on the main actor. Reading its target before this hop would let a clear
+    /// detach it and a new request reuse the slot before the old conclusion runs. Cleanup stays after consumption too.
+    private func concludeAttentionOnMain(requestId: String, groupId: UUID, cleanup: Bool = false) {
+        let conclude: @Sendable () -> Void = { [self] in
             MainActor.assumeIsolated {
-                FeedCoordinator.shared.concludeBlockingDecisionAttention(target)
+                if let target = waiterRegistry.takeAttention(requestID: requestId, groupID: groupId) {
+                    concludeBlockingDecisionAttention(target)
+                }
+                if cleanup { waiterRegistry.cleanupStored(requestID: requestId, groupID: groupId) }
             }
         }
         if Thread.isMainThread {
@@ -452,7 +452,7 @@ final class FeedCoordinator: @unchecked Sendable {
     /// item resolved on the main-actor store and wakes any waiter.
     func deliverReply(requestId: String, decision: WorkstreamDecision) {
         let reply = waiterRegistry.resolve(requestID: requestId, decision: decision)
-        concludeAttentionOnMain(reply?.target)
+        if let reply { concludeAttentionOnMain(requestId: requestId, groupId: reply.groupID) }
 
         let resolve: @Sendable () -> Void = { [requestId, decision, reply] in
             MainActor.assumeIsolated {
@@ -567,8 +567,11 @@ extension FeedCoordinator {
     /// Keeping this transient overlay separate from the agent's own slot makes
     /// concurrent hook updates and overlapping Feed decisions independent.
     static func attentionStatusKey(forSource source: String) -> String {
-        "cmux.feed.attention:\(lifecycleStatusKey(forSource: source))"
+        "\(attentionStatusKeyPrefix)\(lifecycleStatusKey(forSource: source))"
     }
+
+    /// What every Feed-owned attention slot key starts with; the rest is the agent's lifecycle key. (cm-128.2)
+    static let attentionStatusKeyPrefix = "cmux.feed.attention:"
 
     /// The localized "Needs input" sidebar status the overlay sets.
     static var needsInputStatusValue: String {
@@ -752,6 +755,36 @@ extension FeedCoordinator {
         if !sharedWorkspaceStatusStillPending {
             owner.clearStatusEntry(key: target.statusKey, panelId: target.panelId)
         }
+    }
+
+    /// Clear Agent State: drops every pending attention overlay on `workspace`'s panels, whatever its refcount, and removes
+    /// each overlay's lifecycle key and "Needs input" pill. The Feed cards stay in the Feed and still work: their waiters keep
+    /// their place, but forget the overlay, so a card answered or timed out after the clear concludes nothing and cannot take
+    /// down the hand a newer decision on the same pane has raised since. (cm-128.2, grill Q4)
+    /// - Returns: The slot keys dropped, each with its panel.
+    @MainActor
+    @discardableResult
+    func drainAttention(inWorkspace workspace: Workspace) -> [(panelId: UUID, statusKey: String)] {
+        func belongs(_ target: FeedAttentionTarget) -> Bool {
+            switch target {
+            case .panel(let id, _): workspace.panels[id] != nil
+            case .workspace(let id, _): id == workspace.id
+            case .dock: false
+            }
+        }
+        let drained = pendingAttentionStates.keys.filter(belongs)
+        guard !drained.isEmpty else { return [] }
+        for target in drained { pendingAttentionStates.removeValue(forKey: target) }
+        waiterRegistry.detachAttention(where: belongs)
+        var dropped: [(panelId: UUID, statusKey: String)] = []
+        for target in drained {
+            if let panelId = target.panelId {
+                workspace.clearAgentLifecycle(key: target.statusKey, panelId: panelId)
+                dropped.append((panelId, target.statusKey))
+            }
+            workspace.statusEntries.removeValue(forKey: target.statusKey)
+        }
+        return dropped
     }
 
     /// Resolves a pending overlay's current mutation owner. A panel target is

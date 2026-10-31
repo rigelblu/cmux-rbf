@@ -98,12 +98,34 @@ final class FeedWaiterRegistry: Sendable {
         }
     }
 
+    /// Makes every pending request whose attention overlay matches forget it, so a later answer, cancel or timeout of the
+    /// request concludes nothing. The request itself stays pending. (cm-128.2)
+    func detachAttention(where matches: (FeedAttentionTarget) -> Bool) {
+        groups.withLock { groups in
+            for (requestID, var group) in groups {
+                guard let target = group.target, matches(target) else { continue }
+                group.target = nil
+                groups[requestID] = group
+            }
+        }
+    }
+
+    /// Takes the current overlay at the main-actor mutation boundary, after a clear can detach a queued conclusion.
+    func takeAttention(requestID: String, groupID: UUID) -> FeedAttentionTarget? {
+        groups.withLock { groups in
+            guard var group = groups[requestID], group.id == groupID else { return nil }
+            let target = group.target
+            group.target = nil
+            groups[requestID] = group
+            return target
+        }
+    }
+
     func resolve(requestID: String, decision: WorkstreamDecision) -> Reply? {
         groups.withLock { groups in
             guard var group = groups[requestID], group.decision == nil, group.terminalResult == nil else { return nil }
             group.decision = decision
             let reply = Reply(requestID: requestID, groupID: group.id, event: group.event, target: group.target)
-            group.target = nil
             groups[requestID] = group
             if group.itemID != nil { for semaphore in group.subscribers.values { semaphore.signal() } }
             return reply
@@ -136,7 +158,6 @@ final class FeedWaiterRegistry: Sendable {
                 group.cleanupClaimed = true
                 group.replyStored = false
                 group.terminalResult = result
-                group.target = nil
             }
             if group.subscribers.isEmpty && group.replyStored {
                 groups.removeValue(forKey: registration.requestID)
@@ -164,7 +185,6 @@ final class FeedWaiterRegistry: Sendable {
             let canonical = FeedWorkstreamIdentifier.canonicalizedRawValue(agentID: source, rawValue: group.event.sessionId)
             guard (FeedWorkstreamIdentifier(rawValue: canonical)?.sessionID ?? group.event.sessionId) == sessionID else { return nil }
             let reply = Reply(requestID: requestID, groupID: group.id, event: group.event, target: group.target)
-            group.target = nil
             group.cleanupClaimed = true
             group.terminalResult = .unavailable
             groups[requestID] = group
