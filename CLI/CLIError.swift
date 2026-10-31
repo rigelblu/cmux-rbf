@@ -28,6 +28,9 @@ struct CLIError: Error, CustomStringConvertible {
     /// failure through the local v2 socket.
     let vmBackendHTTPStatus: Int?
     let socketFailureKind: SocketFailureKind?
+    /// cmux-rbf (#cm-73.44): the `reason` the app put in a v2 error's data, so `fit` can tell a pane that shows
+    /// no board from any other failure without reading display text.
+    let v2Reason: String?
 
     init(
         message: String,
@@ -37,7 +40,8 @@ struct CLIError: Error, CustomStringConvertible {
         v2Retryable: Bool = false,
         vmBackendCode: String? = nil,
         vmBackendHTTPStatus: Int? = nil,
-        socketFailureKind: SocketFailureKind? = nil
+        socketFailureKind: SocketFailureKind? = nil,
+        v2Reason: String? = nil
     ) {
         self.message = message
         self.exitCode = exitCode
@@ -47,6 +51,7 @@ struct CLIError: Error, CustomStringConvertible {
         self.vmBackendCode = vmBackendCode
         self.vmBackendHTTPStatus = vmBackendHTTPStatus
         self.socketFailureKind = socketFailureKind
+        self.v2Reason = v2Reason
     }
 
     var description: String { message }

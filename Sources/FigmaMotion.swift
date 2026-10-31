@@ -11,12 +11,41 @@ enum FigmaMotionState: String {
 enum FigmaMotion {
     static let handlerName = "cmuxFigmaMotion"
 
+    /// cmux-rbf (#cm-73.44): Figma's own fit key, `⇧1`, and where it must not be taken. Heard in
+    /// Figma's frame and on cmux's page. Figma's hidden keyboard input is the canvas's key sink
+    /// (probe 1), so it is not a text field; `FigmaFit.focusGuardScript` draws the same line.
+    static let fitKeyScript = #"""
+    function cmuxIsFitKey(e) {
+      if (!e || e.repeat || e.metaKey || e.altKey || e.ctrlKey) return false;
+      return e.key === '!' || (e.code === 'Digit1' && e.shiftKey === true);
+    }
+    function cmuxIsEditable(t) {
+      if (!t) return false;
+      if (t.isContentEditable) return true;
+      if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA' && t.tagName !== 'SELECT') return false;
+      return !(t.classList && t.classList.contains('focus-target'));
+    }
+    """#
+
     // Installed only in a preview web view, including its retained/replacement views.
     // Login and interstitial documents keep the real clock.
-    static let clockScript = FigmaPlayScript.script + FigmaPlayScript.stillAddressScript + #"""
+    static let clockScript = FigmaPlayScript.script + FigmaPlayScript.stillAddressScript + fitKeyScript + #"""
     (function () {
       if (window === window.parent || !/(^|\.)figma\.com$/i.test(location.hostname)) return;
+      // cmux-rbf (#cm-73.44): this script is for cmux's preview only. When the top page is Figma's own (the pane shows the
+      // editor), its frames get nothing from it: Figma keeps its ⇧1, and no report goes to a page that ignores it.
+      var topOrigin = location.ancestorOrigins && location.ancestorOrigins.length
+        ? location.ancestorOrigins[location.ancestorOrigins.length - 1] : '';
+      if (/^https:\/\/([^\/]+\.)?figma\.com$/i.test(topOrigin)) return;
       var player = location.pathname.indexOf('/proto/') === 0;
+      // cmux-rbf (#cm-73.46, #cm-73.44): which document this is. A back-forward restore keeps it; a re-fit's redraw is a new one.
+      var doc = performance.timeOrigin;
+      // cmux-rbf (#cm-73.46): a still board reports drawn too, so a re-fit knows when Figma has painted.
+      var board = /^\/(design|file)\//.test(location.pathname);
+      // cmux-rbf (#cm-73.44): cmux's page is the only window this frame takes commands from. The origin
+      // is checked too when WebKit gives one for the custom scheme; if it doesn't, the source check stands alone.
+      var parentOrigin = (location.ancestorOrigins && location.ancestorOrigins[0]) || '';
+      var up = parentOrigin === 'cmux-figma://cmux' ? parentOrigin : '*';
       var drawn = false;
       var frozen = player && window.name === 'cmux-freeze';
       var perf = performance.now.bind(performance), date = Date.now.bind(Date);
@@ -29,7 +58,7 @@ enum FigmaMotion {
         Date.now = function () { return frozen ? dateHeld - dateOffset : date() - dateOffset; };
       }
       function report() {
-        window.parent.postMessage({ cmuxClockReport: true, player: player, drawn: drawn,
+        window.parent.postMessage({ cmuxClockReport: true, player: player, drawn: drawn, doc: doc,
           mode: frozen ? 'freeze' : 'run', hostname: location.hostname, path: location.pathname,
           offsetMs: dateOffset + (frozen ? date() - dateHeld : 0) }, '*');
       }
@@ -44,14 +73,19 @@ enum FigmaMotion {
       // (Scenario 234, 2026-10-29), so the frame holds its clock from its own pagehide.
       window.addEventListener('pagehide', function () { clock('freeze'); });
       window.addEventListener('message', function (e) {
-        // Child clock reports travel through their own parent, never an arbitrary window.
-        if (e.data && e.data.cmuxClockReport === true) {
+        // Child clock reports and fit requests travel through their own parent, never an arbitrary window.
+        // cmux-rbf (#cm-73.44): the forwarded copy carries nested: true, set here on the copy so a child can't remove it.
+        if (e.data && (e.data.cmuxClockReport === true || e.data.cmuxKey === 'fit')) {
           for (var i = 0; i < window.frames.length; i++) {
-            if (e.source === window.frames[i]) { window.parent.postMessage(e.data, '*'); return; }
+            if (e.source !== window.frames[i]) continue;
+            if (e.data.cmuxKey === 'fit') { window.parent.postMessage({ cmuxKey: 'fit', nested: true }, up); return; }
+            var copy = Object.assign({}, e.data); copy.nested = true;
+            window.parent.postMessage(copy, '*'); return;
           }
           return;
         }
         if (e.source !== window.parent) return;
+        if (parentOrigin === 'cmux-figma://cmux' && e.origin && e.origin !== 'null' && e.origin !== parentOrigin) return;
         var data = e.data || {};
         if (!data.cmuxClockCommand) return;
         if (data.kind === 'still' || data.kind === 'player') {
@@ -67,10 +101,18 @@ enum FigmaMotion {
       });
       // Candidate paint signal, isolated for Scenario 230's real screenshot check.
       function reportFirstDrawnFrame() {
-        if (!player) return;
+        if (!player && !board) return;
         if (!document.querySelector('canvas')) { requestAnimationFrame(reportFirstDrawnFrame); return; }
         requestAnimationFrame(function () { drawn = true; report(); });
       }
+      // cmux-rbf (#cm-73.44): ⇧1 in Figma's frame is a request to cmux, which redraws the frame; Figma never sees it.
+      // In the player cmux does nothing with it (it fits itself), so a prototype keeps its own Shift+1 key trigger.
+      window.addEventListener('keydown', function (e) {
+        if (player) return;
+        if (!cmuxIsFitKey(e) || cmuxIsEditable(e.target)) return;
+        e.preventDefault();
+        window.parent.postMessage({ cmuxKey: 'fit' }, up);
+      }, true);
       report();
       reportFirstDrawnFrame();
     })();
@@ -89,6 +131,7 @@ enum FigmaMotion {
           if (window.__cmuxMotion) { return window.__cmuxMotion.snapshot(); }
           var labels = \(json);
           var startRunning = \(run ? "true" : "false");
+          \(fitKeyScript)
           \(pageControllerScript)
         })();
         """
@@ -159,7 +202,12 @@ enum FigmaMotion {
         if (kind === 'player') { mode = 'freeze'; send({ mode: mode }); }
       } else {
         if (state() === 'loading') return false;
-        if (action === 'still') {
+        if (action === 'refit') {
+          // cmux-rbf (#cm-73.46): only a drawn, still /design/ or /file/ page redraws. The kept report goes first,
+          // so this reply and the render carry no old drawn report: the next one is the redrawn document's own.
+          if (kind !== 'still' || !lastReport || lastReport.drawn !== true || !/^\/(design|file)\//.test(lastReport.path || '')) return false;
+          lastReport = null; drawn = false; send({ kind: 'still' });
+        } else if (action === 'still') {
           if (kind === 'still') return false;
           kind = 'still'; pendingKind = 'still'; drawn = false; mode = 'freeze'; send({ kind: 'still' });
         } else if (action === 'toggle' || action === 'play') {
@@ -174,9 +222,13 @@ enum FigmaMotion {
     window.__cmuxMotion = { command: command, snapshot: snapshot, colors: colors };
     window.addEventListener('message', function (e) {
       var f = frame(), r = e.data;
-      if (!f || e.source !== f.contentWindow || !r || r.cmuxClockReport !== true) return;
-      if (!/(^|\.)figma\.com$/i.test(r.hostname || '')) return;
-      lastReport = r;
+      if (!f || e.source !== f.contentWindow || !r) return;
+      // cmux-rbf (#cm-73.44): the real origin, not `hostname`, which the sender writes itself.
+      if (!/^https:\/\/(www|embed)\.figma\.com$/.test(e.origin || '')) return;
+      if (r.cmuxKey === 'fit') { post({ action: 'fit' }); return; }
+      if (r.cmuxClockReport !== true) return;
+      // A nested frame's report (the relay always tags it) is read for the player and the pending kind, never kept as the frame's.
+      if (r.nested !== true) lastReport = r;
       if (pendingKind && /^\/(design|file|proto)\//.test(r.path || '')) {
         if ((pendingKind === 'player') === r.player) pendingKind = null;
         else send({ kind: pendingKind });
@@ -187,6 +239,10 @@ enum FigmaMotion {
       }
       render();
     });
+    window.addEventListener('keydown', function (e) {
+      if (!cmuxIsFitKey(e) || cmuxIsEditable(e.target)) return;
+      e.preventDefault(); post({ action: 'fit' });
+    }, true);
     window.addEventListener('pagehide', function () { command('freeze'); });
     window.addEventListener('pageshow', function () { send({}); render(); });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { send({}); render(); });
@@ -194,8 +250,16 @@ enum FigmaMotion {
     return snapshot();
     """#
 
-    static func commandScript(_ action: String) -> String {
-        "window.__cmuxMotion && window.__cmuxMotion.command('\(action)')"
+    /// The page-side commands. `commandScript` interpolates its argument into script
+    /// text, so it takes this closed set and never a string from the socket, the page or the agent.
+    enum Command: String, CaseIterable {
+        case freeze, play, still, toggle
+        // cmux-rbf (#cm-73.46): the frame redraws itself in place.
+        case refit
+    }
+
+    static func commandScript(_ command: Command) -> String {
+        "window.__cmuxMotion && window.__cmuxMotion.command('\(command.rawValue)')"
     }
 }
 

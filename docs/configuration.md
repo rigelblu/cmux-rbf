@@ -395,6 +395,10 @@ that a frame left playing comes back still; a board it no longer holds, such as 
 restored after a restart, loads again from its address.
 The history is not saved, so after a restart Back starts from the side that shows.
 
+About half a second after the pane stops changing size, whatever changed it, Preview centres the board again by having Figma redraw its frame. The loading line runs along the top edge while it redraws, and there is no new Log in. Editor does not do this; press `⇧1` there. `cmux figma fit` runs the same redraw: on a Preview of one board it shows changes inside that board. A new board drawn beside it needs `cmux figma goto <node>`, which reloads the pane: a private file asks for Log in once, and the Editor held behind Preview is dropped.
+
+In Preview, `⇧1` fits everything Preview holds, as it does in Figma's editor, by having Figma redraw its frame. It takes a few seconds, shows the loading line and asks for no new Log in. `cmux figma fit` on a Preview does the same. `⇧1` is Figma's own key: it is not in Settings and not in `cmux.json`.
+
 A frame marked with `cmux figma goto <node> --motion` opens in Figma's player,
 frozen on its first state. The pill at the bottom centre of Preview shows ▶ and ■.
 Both cells are disabled until the player draws. ▶ plays without reloading; ❚❚ pauses;
@@ -406,8 +410,9 @@ row has no motion button. FigJam boards, slide decks and Editor have no pill.
 The palette offers Figma: Play Motion / Figma: Pause Motion and Figma: Show Still.
 Show Still is hidden in the still view; both entries are disabled while loading.
 Leaving for Editor, another frame, workspace or tab pauses the player; a cached
-return stays paused there. A reload, restart or `cmux figma fit` opens a marked
+return stays paused there. A reload or restart opens a marked
 frame frozen at the start, and an unmarked frame still. Neither action adds history.
+The player keeps itself fitted, so `cmux figma fit` and `⇧1` move nothing there.
 
 The actions `toggleFigmaMotion` (play/pause) and `showFigmaStill` have no default
 keys. Bind them in Settings › Keyboard Shortcuts or `cmux.json`:

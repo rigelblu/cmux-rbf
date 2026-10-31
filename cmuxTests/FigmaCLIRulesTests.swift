@@ -237,6 +237,21 @@ struct FigmaCLIRulesTests {
         }
     }
 
+    // cmux-rbf (#cm-73.44), Scenario 309: the read view no longer reloads, and nothing here needs translating.
+    @Test("the help says fit redraws the board in place in the read view, not that it loads it again")
+    func helpDescribesTheInPlaceRedraw() {
+        #expect(FigmaUsage.text.contains("in the read view it has Figma redraw the board it shows, in place, with no reload of the pane."))
+        #expect(!FigmaUsage.text.contains("loads the board or page it shows again"))
+        #expect(FigmaUsage.text.contains("It moves nothing on Figma's Log in page."))
+    }
+
+    @Test("the refusal for a preview that shows no board names the pane and says fit moved nothing")
+    func notBoardRefusalText() {
+        #expect(FigmaFit.notBoardRefusal(handle: "surface:8")
+                == "the Figma pane shows Figma's Log in page or an error, not a board (surface surface:8), so fit moved nothing")
+        #expect(FigmaFit.notBoardReason == "notboard")
+    }
+
     @Test("the help describes --motion and --play for goto")
     func helpDescribesMotionAndPlay() {
         #expect(FigmaUsage.text.contains("--motion"))
