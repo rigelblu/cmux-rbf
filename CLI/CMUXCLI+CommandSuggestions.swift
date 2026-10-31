@@ -71,6 +71,7 @@ extension CMUXCLI {
         "capture-pane",
         "claude-hook",
         "claude-teams",
+        "clear-agent-state",
         "clear-history",
         "clear-log",
         "clear-notifications",

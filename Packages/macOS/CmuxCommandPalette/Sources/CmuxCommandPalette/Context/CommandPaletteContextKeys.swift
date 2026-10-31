@@ -58,6 +58,8 @@ public struct CommandPaletteContextKeys: Hashable, Sendable {
     public static let workspaceCanMarkRead = CommandPaletteContextKeys(rawValue: "workspace.canMarkRead")
     /// Whether mark-unread is available for the workspace.
     public static let workspaceCanMarkUnread = CommandPaletteContextKeys(rawValue: "workspace.canMarkUnread")
+    /// Whether the workspace has an agent mark or agent pill for Clear Agent State to clear. (cm-128.2)
+    public static let workspaceCanClearAgentState = CommandPaletteContextKeys(rawValue: "workspace.canClearAgentState")
     /// Whether the window the palette belongs to has a name the user gave it.
     /// Set whether or not a workspace is selected.
     public static let windowHasName = CommandPaletteContextKeys(rawValue: "window.hasName")

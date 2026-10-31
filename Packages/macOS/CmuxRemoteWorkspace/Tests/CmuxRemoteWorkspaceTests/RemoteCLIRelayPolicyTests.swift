@@ -41,6 +41,25 @@ struct RemoteCLIRelayPolicyTests {
         }
     }
 
+    // cm-128.2: `workspace.clear_agent_state` marks notifications read and ends agent state on local objects, so it is not on the allowlist.
+    @Test("workspace.clear_agent_state is denied, for an owned workspace or not")
+    func deniesClearAgentState() throws {
+        let alias = (remote: UUID(), local: UUID())
+        try withServer(workspaceAliases: [alias.remote: alias.local]) { port, unixServer in
+            for target in [alias.remote, UUID()] {
+                let exchange = try runPolicyRelayExchange(
+                    port: port,
+                    relayID: relayID,
+                    tokenHex: tokenHex,
+                    commandLine: """
+                    {"id":"clear","method":"workspace.clear_agent_state","params":{"workspace_id":"\(target.uuidString)"}}
+                    """
+                )
+                expectDenial(exchange, unixServer, "workspace.clear_agent_state \(target == alias.remote ? "owned" : "unmapped") workspace")
+            }
+        }
+    }
+
     private func withServer(
         workspaceAliases: [UUID: UUID] = [:],
         surfaceAliases: [UUID: UUID] = [:],

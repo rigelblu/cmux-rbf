@@ -386,6 +386,12 @@ extension TabItemView {
         }
         .disabled(!context.hasLatestNotification)
 
+        // cm-128.2: one label for one or many rows; the state is read live, as the menu opens.
+        Button(String(localized: "contextMenu.clearAgentState", defaultValue: "Clear Agent State")) {
+            actions.clearAgentState(targetIds)
+        }
+        .disabled(!actions.canClearAgentState(targetIds))
+
         workspaceNotificationsContextMenu(targetIds)
         Divider()
         Button(copyWorkspaceIDLabel) {

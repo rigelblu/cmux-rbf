@@ -79,7 +79,7 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
     }
 
     @MainActor
-    private static func rowSnapshot(workspaceId: UUID = UUID()) throws -> SidebarWorkspaceRowSnapshot {
+    static func rowSnapshot(workspaceId: UUID = UUID()) throws -> SidebarWorkspaceRowSnapshot {
         let suiteName = "SidebarWorkspaceContextMenuWindowTargetsTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -136,7 +136,9 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
 
     @MainActor
     static func actions( // (#cm-110.13)
-        currentWindowMoveTargets: @escaping () -> [SidebarWorkspaceWindowMoveTarget]
+        currentWindowMoveTargets: @escaping () -> [SidebarWorkspaceWindowMoveTarget] = { [] },
+        clearAgentState: @escaping ([UUID]) -> Void = { _ in }, // cm-128.2
+        canClearAgentState: @escaping ([UUID]) -> Bool = { _ in false } // cm-128.2
     ) -> SidebarWorkspaceRowActions {
         SidebarWorkspaceRowActions(
             select: { _ in },
@@ -168,6 +170,8 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
             markRead: { _ in },
             markUnread: { _ in },
             clearLatestNotifications: { _ in },
+            clearAgentState: clearAgentState,
+            canClearAgentState: canClearAgentState,
             currentNotificationsMuted: { _ in false },
             setNotificationsMuted: { _, _ in },
             openNotification: { _ in },
