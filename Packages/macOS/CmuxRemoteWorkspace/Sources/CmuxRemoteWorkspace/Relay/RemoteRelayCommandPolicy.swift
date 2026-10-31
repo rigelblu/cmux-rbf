@@ -25,6 +25,8 @@ public struct RemoteRelayCommandPolicy: Sendable {
         "preferred_surface_id", "target_panel_id", "target_surface_id",
         "created_panel_id", "created_surface_id", "before_panel_id",
         "before_surface_id", "after_panel_id", "after_surface_id",
+        // cmux-rbf #cm-73.45: `figma.goto`'s caller, scoped like `surface_id` if the method is ever allowlisted.
+        "caller_surface_id",
     ]
     public static let ambiguousIDKeys: Set<String> = ["tab_id"]
     public static let workspaceIDArrayKeys: Set<String> = ["workspace_ids"]
