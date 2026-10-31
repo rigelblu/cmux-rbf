@@ -1927,6 +1927,8 @@ _cmux_precmd() {
 # Shell init (.zprofile/.zshrc) may prepend other dirs after launch.
 # We fix this once on first prompt (after all init files have run), and
 # reinstall cmux-owned wrapper functions in case user startup replaced them.
+# The agent shim folder is then kept first for the rest of the shell's life,
+# see _cmux_keep_agent_shims_first (cm-128.8).
 _cmux_fix_path() {
     local integration_dir="${CMUX_SHELL_INTEGRATION_DIR:-}"
     integration_dir="${integration_dir%/}"
@@ -1942,6 +1944,23 @@ _cmux_fix_path() {
     _cmux_install_cli_wrapper codex _CMUX_CODEX_WRAPPER cmux-codex-wrapper
     _cmux_install_cli_wrapper grok _CMUX_GROK_WRAPPER
     add-zsh-hook -d precmd _cmux_fix_path
+    add-zsh-hook precmd _cmux_keep_agent_shims_first
+    add-zsh-hook chpwd _cmux_keep_agent_shims_first
+}
+
+# mise (and tools like it) rebuild PATH from a copy saved while .zshrc ran, on
+# every cd and on later prompts. That copy can hold the user's own `claude`
+# ahead of the shim folder, so a tool that looks `claude` up by name (cswap)
+# starts it without cmux's hooks. Registered by _cmux_fix_path at the first
+# prompt, so it runs after hooks registered before then or put at the front
+# later, as mise's are; a hook appended after the first prompt still runs after
+# it. Moves only this surface's folder; every other entry keeps its order
+# (cm-128.8).
+_cmux_keep_agent_shims_first() {
+    local shim_root="${CMUX_CLAUDE_WRAPPER_SHIM_ROOT:-}"
+    [[ -n "$shim_root" && "${shim_root:h:t}" == cmux-cli-shims ]] || return 0
+    [[ "$PATH" == "$shim_root" || "$PATH" == "$shim_root":* ]] && return 0
+    PATH="$(_cmux_path_prepend_unique_directory "$shim_root" "${PATH-}")"
 }
 
 _cmux_chpwd() {
