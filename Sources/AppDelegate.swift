@@ -2636,6 +2636,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         tabManager.revealSelectedWorkspaceInSidebar = { [weak sidebarState] workspace in
             sidebarState?.prepareStatusGroupsForSelection(selectedWorkspace: workspace) // (#cm-110.1)
         }
+        sidebarState.installMoveReveal(on: tabManager) // (#cm-110.14)
         self.auth = auth
         self.cloudWorkspaceCoordinator = cloudWorkspaceCoordinator
         self.cloudWorkspaceOperationController = cloudWorkspaceOperationController
@@ -10677,6 +10678,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         tabManager.revealSelectedWorkspaceInSidebar = { [weak sidebarState] workspace in
             sidebarState?.prepareStatusGroupsForSelection(selectedWorkspace: workspace) // (#cm-110.1)
         }
+        sidebarState.installMoveReveal(on: tabManager) // (#cm-110.14)
         let sidebarSelectionState = SidebarSelectionState(
             selection: sessionWindowSnapshot?.sidebar.selection.sidebarSelection ?? .tabs
         )

@@ -7,7 +7,9 @@ extension TabManager {
     /// the top level when `parentId` is nil.
     @discardableResult
     func moveWorkspaceGroup(groupId: UUID, intoParent parentId: UUID?) -> WorkspaceGroupMoveIntoResult {
-        workspaceGrouping.moveWorkspaceGroup(groupId: groupId, intoParent: parentId)
+        let result = workspaceGrouping.moveWorkspaceGroup(groupId: groupId, intoParent: parentId)
+        if case .moved = result { revealMovedGroup(groupId, opensAbove: true) } // (#cm-110.14) the folds above open, never the group's own
+        return result
     }
 
     /// What `Move Group to` offers a group, read when the menu opens.

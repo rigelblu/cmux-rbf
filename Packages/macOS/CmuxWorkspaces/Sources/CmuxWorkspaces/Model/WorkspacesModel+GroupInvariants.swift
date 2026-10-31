@@ -145,19 +145,8 @@ extension WorkspacesModel {
     /// selected row is actually visible in the sidebar. Called from `selectedTabId`'s
     /// didSet hook. No-op when the workspace is ungrouped or its group is already expanded.
     public func expandWorkspaceGroupForSelectionIfNeeded() {
-        if hasNestedWorkspaceGroup { return nestedExpandWorkspaceGroupForSelectionIfNeeded() } // (#cm-106)
-        guard let selectedTabId,
-              let groupId = tabs.first(where: { $0.id == selectedTabId })?.groupId,
-              let index = workspaceGroups.firstIndex(where: { $0.id == groupId }),
-              workspaceGroups[index].isCollapsed else {
-            return
-        }
-        // The anchor is the group header's visible representation, so
-        // focusing it doesn't hide it. Skip auto-expand when the focused
-        // workspace IS the group's anchor — that lets users work in the
-        // anchor while keeping the rest of the group folded away.
-        guard workspaceGroups[index].anchorWorkspaceId != selectedTabId else { return }
-        workspaceGroups[index].isCollapsed = false
+        guard let selectedTabId else { return }
+        expandWorkspaceGroups(containing: selectedTabId) // (#cm-110.14) the one walk, in `+MoveReveal.swift`: flat, or handed over to the nested one
     }
 
     /// Reorder `workspaceGroups` so each group's relative position matches

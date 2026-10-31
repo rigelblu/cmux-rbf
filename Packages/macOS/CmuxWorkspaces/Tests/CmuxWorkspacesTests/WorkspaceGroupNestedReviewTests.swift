@@ -103,6 +103,8 @@ struct WorkspaceGroupNestedReviewTests {
             check("normalizeWorkspaceGroupContiguity") { $0.model.normalizeWorkspaceGroupContiguity() }
             check("syncWorkspaceGroupsOrderToAnchorOrder") { $0.model.syncWorkspaceGroupsOrderToAnchorOrder() }
             check("expandWorkspaceGroupForSelectionIfNeeded") { $0.model.expandWorkspaceGroupForSelectionIfNeeded() }
+            check("expandWorkspaceGroups(containing:)") { w in w.model.expandWorkspaceGroups(containing: ids) } // (#cm-110.14)
+            check("expandWorkspaceGroups(above:)") { w in w.model.expandWorkspaceGroups(above: group.id) } // (#cm-110.14)
             check("moveWorkspaceGroupMembersAfterAnchors") { $0.model.moveWorkspaceGroupMembersAfterAnchors(workspaceIds: desired) }
             check("topLevelWorkspaceIds(for:)") { w in _ = w.model.topLevelWorkspaceIds(for: w.model.tabs) }
             check("sidebarTopLevelWorkspaceIds") { w in _ = w.model.sidebarTopLevelWorkspaceIds(promotingWorkspaceId: ids.first) }

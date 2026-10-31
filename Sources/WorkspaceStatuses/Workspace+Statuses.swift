@@ -65,10 +65,10 @@ extension Workspace {
         ) else { return }
         switch target {
         case .entry(let entry):
-            actions.apply(.status(id: entry.id), to: [self], requireControls: false)
+            actions.apply(.status(id: entry.id), to: [self], requireControls: false, cause: .cycle(subject: id))
         case .cmux(let status):
             // The list has no entry for it, so there is no color to write (Decisions, 2026-10-12, point 13).
-            setTaskStatusOverride(status, list: actions.list)
+            actions.apply(.status(id: status.rawValue), to: [self], requireControls: false, cause: .cycle(subject: id)) // (#cm-110.14)
         }
     }
 
