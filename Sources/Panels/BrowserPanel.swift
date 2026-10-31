@@ -2033,6 +2033,8 @@ final class BrowserPanel: Panel, ObservableObject {
     // cmux-rbf (#cm-73.32): Play state for this panel (reset to still on every exchange), and whether a goto --play is waiting for load. Reject a revert of this hunk on upstream sync.
     // cmux-rbf (#cm-73.37): the served page owns motion; native surfaces mirror its reports.
     var figmaMotionState: FigmaMotionState = .still
+    // cmux-rbf (#cm-73.46, #cm-73.44): what the preview's re-fit holds (the kept report, the in-flight mark, the size watch). Reject a revert of this hunk on upstream sync.
+    var figmaRefit = FigmaRefitState()
     var isFigmaMotionPlaying: Bool {
         get { figmaMotionState == .playing }
         set { figmaMotionState = newValue ? .playing : .still }
@@ -2216,7 +2218,7 @@ final class BrowserPanel: Panel, ObservableObject {
     }
     private var pendingInteractiveBrowserPrompts: [PendingInteractiveBrowserPrompt] = []
     private var isPresentingPendingInteractiveBrowserPrompt = false
-    private var isWebViewVisibleInUI: Bool = false
+    private(set) var isWebViewVisibleInUI: Bool = false // cmux-rbf (#cm-73.46, #cm-73.44): read by the re-fit. Reject a revert of this hunk on upstream sync.
     var isClosingWebViewLifecycle: Bool = false
 
     /// True while a canvas pane hosts this browser's webview inline (in the
@@ -3308,6 +3310,7 @@ final class BrowserPanel: Panel, ObservableObject {
         webView.navigationDelegate = navigationDelegate
         webView.uiDelegate = uiDelegate
         setupObservers(for: webView)
+        bindFigmaRefitObservers(on: webView) // cmux-rbf (#cm-73.46, #cm-73.44): the size watch follows the swap between kept pages. Reject a revert of this hunk on upstream sync.
         setupSameDocumentNavigationMessageHandler(for: webView)
         setupReactGrabMessageHandler(for: webView)
         designModeController.install(on: webView)
@@ -3589,6 +3592,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 )
                 self.cloudAccess.didStart(url: self.navigationDelegate?.lastAttemptedURL)
                 self.figmaLoadBar.begin(target: self.navigationDelegate?.lastAttemptedURL, isErrorPage: self.navigationDelegate?.activeErrorPageDisplayURL != nil) // cmux-rbf (#cm-73.11): a load started. Reject a revert of this hunk on upstream sync.
+                self.figmaRefitLoadDidStart() // cmux-rbf (#cm-73.46, #cm-73.44): that load fits, so a pending size check is dropped. Reject a revert of this hunk on upstream sync.
                 self.isMainFrameProvisionalNavigationActive = true
                 self.refreshBackgroundAppearance()
                 self.applyMuteState(to: webView, reason: "navigationStart")
@@ -3667,6 +3671,8 @@ final class BrowserPanel: Panel, ObservableObject {
                 self.collapseFigmaEditorChromeIfNeeded(in: webView)
                 // cmux-rbf (#cm-73.37): read the page's state, never infer it from an iframe URL.
                 self.refreshFigmaPlayState()
+                self.figmaRefit.markPageFinished() // cmux-rbf (#cm-73.46, #cm-73.44): the Log in tell counts from here. Reject a revert of this hunk on upstream sync.
+                self.figmaPreviewSizeMayHaveChanged(because: "finish", needsOnScreen: false) // cmux-rbf (#cm-73.46, #cm-73.44): a restore of a cached page finishes at a size its frame did not fit at. Reject a revert of this hunk on upstream sync.
             }
         }
         navigationDelegate.didFailNavigation = { [weak self] failedWebView, failedURL, failureMessage, failedNavigation in
@@ -4848,6 +4854,7 @@ final class BrowserPanel: Panel, ObservableObject {
             contentWorld: BrowserSameDocumentNavigationMessageHandler.contentWorld
         )
         sameDocumentNavigationMessageHandler = nil
+        unbindFigmaRefitObservers() // cmux-rbf (#cm-73.46, #cm-73.44). Reject a revert of this hunk on upstream sync.
         resetMediaPlaybackTracking()
         setMediaActivity(isUsingMicrophone: false, isUsingCamera: false, reason: "media_capture_changed")
         webViewCancellables.removeAll()
@@ -5311,6 +5318,7 @@ final class BrowserPanel: Panel, ObservableObject {
         releaseRetainedFigmaPage() // cmux-rbf #cm-73.3
         // cmux-rbf (#cm-73.32): detach motion callback on close
         onFigmaMotionStateChange = nil
+        figmaRefitPanelDidClose() // cmux-rbf (#cm-73.46, #cm-73.44). Reject a revert of this hunk on upstream sync.
         cloudAccess.leave()
         cancelHiddenWebViewDiscard()
         isClosingWebViewLifecycle = true
@@ -5857,18 +5865,20 @@ final class BrowserPanel: Panel, ObservableObject {
         if let action = body["action"] as? String {
             if action == "toggle" { _ = toggleFigmaMotion() }
             if action == "still" { showFigmaStill() }
+            if action == "fit" { refitFigmaPreview(trigger: .key) } // cmux-rbf (#cm-73.46, #cm-73.44). Reject a revert of this hunk on upstream sync.
         } else { applyFigmaMotionSnapshot(body) }
     }
 
     private func applyFigmaMotionSnapshot(_ result: Any?) {
         guard let body = result as? [String: Any], let raw = body["state"] as? String,
               let state = FigmaMotionState(rawValue: raw) else { return }
+        noteFigmaRefitReport(from: body) // cmux-rbf (#cm-73.46, #cm-73.44): keep exactly the report this snapshot carries. Reject a revert of this hunk on upstream sync.
         let changed = figmaMotionState != state
         figmaMotionState = state
         if changed { onFigmaMotionStateChange?() }
     }
 
-    private func sendFigmaMotionCommand(_ action: String, completion: ((Bool) -> Void)? = nil) {
+    func sendFigmaMotionCommand(_ action: FigmaMotion.Command, completion: ((Bool) -> Void)? = nil) {
         let target = webView
         let address = currentURL ?? target.url
         target.evaluateJavaScript(FigmaMotion.commandScript(action)) { [weak self] result, error in
@@ -5884,18 +5894,18 @@ final class BrowserPanel: Panel, ObservableObject {
     func pauseFigmaMotionOnLeave() {
         guard let address = currentURL ?? webView.url,
               FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) else { return }
-        sendFigmaMotionCommand("freeze")
+        sendFigmaMotionCommand(.freeze)
     }
 
     func playFigmaMotion(canvasBg: String = "e5e5e5", completion: ((Bool) -> Void)? = nil) {
         guard figmaMotionState.canToggle else { completion?(false); return }
         figmaPlayRequestCount += 1
-        sendFigmaMotionCommand("play", completion: completion)
+        sendFigmaMotionCommand(.play, completion: completion)
     }
 
     func showFigmaStill(completion: ((Bool) -> Void)? = nil) {
         guard figmaMotionState.canShowStill else { completion?(false); return }
-        sendFigmaMotionCommand("still", completion: completion)
+        sendFigmaMotionCommand(.still, completion: completion)
     }
 
     @discardableResult
@@ -5905,7 +5915,7 @@ final class BrowserPanel: Panel, ObservableObject {
               FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) else { return false }
         isFigmaMotionToggleInFlight = true
         if figmaMotionState != .playing { figmaPlayRequestCount += 1 }
-        sendFigmaMotionCommand("toggle") { [weak self] success in
+        sendFigmaMotionCommand(.toggle) { [weak self] success in
             self?.isFigmaMotionToggleInFlight = false
             completion?(success)
         }
@@ -6187,7 +6197,7 @@ final class BrowserPanel: Panel, ObservableObject {
         )
         // cmux-rbf (#cm-73.37): freeze the retained preview at the exchange. Reject a revert of this hunk on upstream sync.
         if isPreview {
-            outgoingView.evaluateJavaScript(FigmaMotion.commandScript("freeze"), completionHandler: nil) // cmux-rbf (#cm-73.37)
+            outgoingView.evaluateJavaScript(FigmaMotion.commandScript(.freeze), completionHandler: nil) // cmux-rbf (#cm-73.37)
         }
         let incoming = retainedFigmaPage
         // Cancel per-presentation work without stopping or navigating the outgoing document.
