@@ -860,7 +860,8 @@ extension Workspace {
                     transparentBackground: browserPanel.sessionSnapshotTransparentBackground,
                     diffViewerToken: diffViewerComponents?.token,
                     diffViewerRequestPath: diffViewerComponents?.requestPath,
-                    figmaPages: browserPanel.figmaPagesSessionSnapshot()
+                    figmaPages: browserPanel.figmaPagesSessionSnapshot(),
+                    ownerTerminalSurfaceId: browserPanel.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
                 )
             } else if let deferredPanel = panel as? DeferredBrowserPanel {
                 // A deferred panel already owns the exact persisted browser DTO;
@@ -3036,6 +3037,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
 
     /// Last terminal panel used as an inheritance source (typically last focused terminal).
     var lastTerminalConfigInheritancePanelId: UUID?
+    /// cmux-rbf #cm-73.45: the terminal Tom was last in, from his own click or key. Memory only. Design Focus pairs it
+    /// when a Figma pane has no owner. Written only through `recordLastTerminalTomWasIn`.
+    private(set) var lastTerminalPanelIdTomWasIn: UUID?
     /// Last known terminal font lineage from an inheritance source. The
     /// surface owns live lineage; this fallback only survives removal of the
     /// last source panel.
@@ -12415,23 +12419,29 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             for tabIdStr in p.tabIds {
                 guard let surfaceUUID = UUID(uuidString: tabIdStr) else { continue }
                 guard let panelId = panelId(forSurfaceId: surfaceUUID) else { continue }
-                let isTerminal = terminalPanel(for: panelId) != nil
+                let terminal = terminalPanel(for: panelId)
+                let isTerminal = terminal != nil
                 var isFigma = false
+                var owner: UUID?
                 if let browser = browserPanel(for: panelId) {
                     isFigma = browser.isFigmaPaneForHiddenUnload
+                    owner = browser.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
                 } else if let deferred = (panels[panelId] as? DeferredBrowserPanel)?.sessionPanelSnapshot.browser,
                           let address = deferred.urlString.flatMap({ URL(string: $0) }) {
                     isFigma = FigmaTabMark.applies(
                         address: address,
                         showsAddressBar: (deferred.chromeVisibility ?? .visible).isOmnibarVisible
                     )
+                    owner = deferred.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
                 }
                 tabs.append(
                     DesignFocusPair.Tab(
                         id: surfaceUUID,
                         paneId: paneUUID,
                         isTerminal: isTerminal,
-                        isFigma: isFigma
+                        isFigma: isFigma,
+                        stableSurfaceId: terminal?.stableSurfaceId, // cmux-rbf #cm-73.45
+                        ownerTerminalSurfaceId: isFigma ? owner : nil
                     )
                 )
             }
@@ -12451,14 +12461,20 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     func pickDesignFocusPair() -> DesignFocusPair.Selection? {
         let focusedPaneUUID = bonsplitController.focusedPaneId?.id
         let panes = designFocusCandidatePanes()
-        let result = DesignFocusPair.pick(
+        // cmux-rbf #cm-73.45: the terminal Tom was last in, as the tab (surface) id the pick matches on.
+        let lastTerminalTabId = lastTerminalPanelIdTomWasIn.flatMap { surfaceIdFromPanelId($0)?.uuid }
+        let result = DesignFocusPair.pickWithRule(
             isCanvasLayout: layoutMode == .canvas,
             focusedPaneId: focusedPaneUUID,
-            panes: panes
+            panes: panes,
+            lastTerminalTabId: lastTerminalTabId
         )
         switch result {
-        case .success(let selection):
-            return selection
+        case .success(let picked):
+            #if DEBUG
+            cmuxDebugLog("designFocus.pick terminal=\(picked.selection.terminalTab.id.uuidString) via=\(picked.rule.rawValue)")
+            #endif
+            return picked.selection
         case .failure:
             return nil
         }
@@ -14676,6 +14692,12 @@ extension Workspace: BonsplitDelegate {
 
     private func shouldTreatCurrentEventAsExplicitFocusIntent() -> Bool {
         guard let eventType = NSApp.currentEvent?.type else { return false }
+        return Self.isExplicitFocusInputType(eventType)
+    }
+
+    /// The event types that count as a person's own input. Shared by the focus-intent check above and by
+    /// `recordLastTerminalTomWasIn` (cmux-rbf #cm-73.45).
+    static func isExplicitFocusInputType(_ eventType: NSEvent.EventType) -> Bool {
         switch eventType {
         case .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
              .otherMouseDown, .otherMouseUp, .keyDown, .keyUp, .scrollWheel,
@@ -14686,7 +14708,30 @@ extension Workspace: BonsplitDelegate {
         }
     }
 
+    /// cmux-rbf #cm-73.45: how old an input event may be and still count as the one that moved focus. A stale
+    /// last event (Tom pressed Return, then the agent ran `surface.focus`) is still `NSApp.currentEvent`.
+    static let lastTerminalInputMaxAge: TimeInterval = 0.5
+
+    /// cmux-rbf #cm-73.45: records `panelId` as the terminal Tom was last in. The input check sits here, not in the
+    /// callers: `focusPanel` calls `markExplicitFocusIntent` with no check, and every socket focus, split and
+    /// agent-made tab reaches `focusPanel`. Only a terminal counts, and only on a real click, key, scroll or gesture.
+    ///
+    /// The event must be an explicit-input type and recent: `NSApp.currentEvent` is the last event the app took,
+    /// however long ago, so its type alone cannot tell Tom's click from an agent's socket call after it.
+    func recordLastTerminalTomWasIn(
+        _ panelId: UUID,
+        event: NSEvent?,
+        now: TimeInterval = ProcessInfo.processInfo.systemUptime
+    ) {
+        guard let event,
+              Self.isExplicitFocusInputType(event.type),
+              now - event.timestamp < Self.lastTerminalInputMaxAge,
+              panels[panelId] is TerminalPanel else { return }
+        lastTerminalPanelIdTomWasIn = panelId
+    }
+
     private func markExplicitFocusIntent(on panelId: UUID) {
+        recordLastTerminalTomWasIn(panelId, event: NSApp.currentEvent) // cmux-rbf #cm-73.45
         noteFigmaPageUse(panelId) // cmux-rbf #cm-73.3: MRU follows real focus, never an agent goto.
         guard let pending = pendingNonFocusSplitFocusReassert,
               pending.splitPanelId == panelId else {

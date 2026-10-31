@@ -25,17 +25,25 @@ enum DesignFocusPair {
         let paneId: UUID
         let isTerminal: Bool
         let isFigma: Bool
+        /// cmux-rbf #cm-73.45: a terminal tab's restart-stable surface id, what a Figma tab's owner names.
+        let stableSurfaceId: UUID?
+        /// cmux-rbf #cm-73.45: a Figma tab's owner, the stable surface id of the terminal that last opened or pointed it.
+        let ownerTerminalSurfaceId: UUID?
 
         init(
             id: UUID,
             paneId: UUID,
             isTerminal: Bool,
-            isFigma: Bool
+            isFigma: Bool,
+            stableSurfaceId: UUID? = nil,
+            ownerTerminalSurfaceId: UUID? = nil
         ) {
             self.id = id
             self.paneId = paneId
             self.isTerminal = isTerminal
             self.isFigma = isFigma
+            self.stableSurfaceId = stableSurfaceId
+            self.ownerTerminalSurfaceId = ownerTerminalSurfaceId
         }
     }
 
@@ -70,6 +78,14 @@ enum DesignFocusPair {
 
     typealias PickResult = Result<Selection, Refusal>
 
+    /// cmux-rbf #cm-73.45: which rule chose the terminal side. Only the Debug log reads it.
+    enum TerminalRule: String, Equatable, Sendable {
+        case focused
+        case owner
+        case last
+        case nearest
+    }
+
     // cmux-rbf #cm-73.2a
     static let entryAspectRatioLine: CGFloat = 1.0
     static let besideSwitchAspectRatio: CGFloat = 1.1
@@ -97,13 +113,33 @@ enum DesignFocusPair {
     /// Picks the terminal tab and Figma tab to pair, or returns a refusal.
     ///
     /// The focused Figma pane wins; else the Figma pane nearest the focused pane;
-    /// the terminal side is the focused terminal, else the terminal nearest the Figma side;
-    /// nearest is by pane frame centres; no history.
+    /// the terminal side is the focused terminal, else the Figma tab's owner, else the terminal
+    /// Tom was last in, else the terminal nearest the Figma side (see `pickWithRule`);
+    /// nearest is by pane frame centres.
     static func pick(
         isCanvasLayout: Bool,
         focusedPaneId: UUID?,
-        panes: [Pane]
+        panes: [Pane],
+        lastTerminalTabId: UUID? = nil
     ) -> PickResult {
+        pickWithRule(
+            isCanvasLayout: isCanvasLayout,
+            focusedPaneId: focusedPaneId,
+            panes: panes,
+            lastTerminalTabId: lastTerminalTabId
+        ).map(\.selection)
+    }
+
+    /// cmux-rbf #cm-73.45: the terminal side is, in order: the focused terminal; else the terminal that owns the
+    /// chosen Figma tab, wherever it sits (even behind another tab in its pane); else `lastTerminalTabId`, the
+    /// terminal Tom was last in; else the terminal nearest the Figma side. A name that matches no live terminal
+    /// falls to the next rule.
+    static func pickWithRule(
+        isCanvasLayout: Bool,
+        focusedPaneId: UUID?,
+        panes: [Pane],
+        lastTerminalTabId: UUID? = nil
+    ) -> Result<(selection: Selection, rule: TerminalRule), Refusal> {
         if isCanvasLayout {
             return .failure(.canvasLayout)
         }
@@ -159,7 +195,7 @@ enum DesignFocusPair {
 
         // Which terminal pane wins?
         // Focused terminal pane wins (meaning focused pane's selected tab is a terminal);
-        // else terminal pane nearest the Figma side (Figma pane itself has distance 0).
+        // else the owner, else the last terminal, else the nearest (Figma pane itself has distance 0).
         let isFocusedTerminal: Bool
         if let focusedPane,
            let selectedId = focusedPane.selectedTabId,
@@ -170,26 +206,46 @@ enum DesignFocusPair {
             isFocusedTerminal = false
         }
 
-        let chosenTerminalPane: Pane
-        if isFocusedTerminal, let focusedPane {
-            chosenTerminalPane = focusedPane
-        } else {
-            let figmaCenter = center(of: chosenFigmaPane.frame)
-            chosenTerminalPane = terminalPanes.min(by: { p1, p2 in
-                distanceSquared(from: figmaCenter, to: center(of: p1.frame)) <
-                distanceSquared(from: figmaCenter, to: center(of: p2.frame))
-            }) ?? terminalPanes[0]
+        let allTerminalTabs = terminalPanes.flatMap { $0.tabs.filter { $0.isTerminal } }
+        let ownerTab = chosenFigmaTab.ownerTerminalSurfaceId.flatMap { owner in
+            allTerminalTabs.first(where: { $0.stableSurfaceId == owner })
+        }
+        let lastTab = lastTerminalTabId.flatMap { last in
+            allTerminalTabs.first(where: { $0.id == last })
         }
 
         let chosenTerminalTab: Tab
-        if let selectedId = chosenTerminalPane.selectedTabId,
-           let selected = chosenTerminalPane.tabs.first(where: { $0.id == selectedId && $0.isTerminal }) {
-            chosenTerminalTab = selected
+        let rule: TerminalRule
+        if isFocusedTerminal, let focusedPane {
+            rule = .focused
+            if let selectedId = focusedPane.selectedTabId,
+               let selected = focusedPane.tabs.first(where: { $0.id == selectedId && $0.isTerminal }) {
+                chosenTerminalTab = selected
+            } else {
+                chosenTerminalTab = focusedPane.tabs.first(where: { $0.isTerminal })!
+            }
+        } else if let ownerTab {
+            rule = .owner
+            chosenTerminalTab = ownerTab
+        } else if let lastTab {
+            rule = .last
+            chosenTerminalTab = lastTab
         } else {
-            chosenTerminalTab = chosenTerminalPane.tabs.first(where: { $0.isTerminal })!
+            rule = .nearest
+            let figmaCenter = center(of: chosenFigmaPane.frame)
+            let chosenTerminalPane = terminalPanes.min(by: { p1, p2 in
+                distanceSquared(from: figmaCenter, to: center(of: p1.frame)) <
+                distanceSquared(from: figmaCenter, to: center(of: p2.frame))
+            }) ?? terminalPanes[0]
+            if let selectedId = chosenTerminalPane.selectedTabId,
+               let selected = chosenTerminalPane.tabs.first(where: { $0.id == selectedId && $0.isTerminal }) {
+                chosenTerminalTab = selected
+            } else {
+                chosenTerminalTab = chosenTerminalPane.tabs.first(where: { $0.isTerminal })!
+            }
         }
 
-        return .success(Selection(terminalTab: chosenTerminalTab, figmaTab: chosenFigmaTab))
+        return .success((Selection(terminalTab: chosenTerminalTab, figmaTab: chosenFigmaTab), rule))
     }
 }
 

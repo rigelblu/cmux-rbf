@@ -1731,10 +1731,18 @@
 		807300000000000000000032 /* FigmaClickRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000030 /* FigmaClickRoute.swift */; };
 		807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000033 /* FigmaClickRouteTests.swift */; };
 		807300000000000000000039 /* FigmaClickWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000038 /* FigmaClickWorkspaceTests.swift */; };
+		807345000000000000000010 /* FigmaPaneOwnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80734500000000000000000F /* FigmaPaneOwnerTests.swift */; };
 		807300000000000000000022 /* FigmaCLIOutputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000021 /* FigmaCLIOutputTests.swift */; };
 		807300000000000000000018 /* FigmaCLIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000017 /* FigmaCLIRules.swift */; };
 		807300000000000000000019 /* FigmaCLIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000017 /* FigmaCLIRules.swift */; };
 		80730000000000000000001B /* FigmaCLIRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80730000000000000000001A /* FigmaCLIRulesTests.swift */; };
+		807345000000000000000002 /* HerdrPaneNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807345000000000000000001 /* HerdrPaneNote.swift */; };
+		807345000000000000000003 /* HerdrPaneNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807345000000000000000001 /* HerdrPaneNote.swift */; };
+		807345000000000000000005 /* HerdrAttachProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807345000000000000000004 /* HerdrAttachProcess.swift */; };
+		807345000000000000000006 /* HerdrAttachProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807345000000000000000004 /* HerdrAttachProcess.swift */; };
+		807345000000000000000008 /* CMUXCLI+CallerSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807345000000000000000007 /* CMUXCLI+CallerSurface.swift */; };
+		80734500000000000000000A /* HerdrPaneNoteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807345000000000000000009 /* HerdrPaneNoteTests.swift */; };
+		80734500000000000000000C /* FigmaCallerSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80734500000000000000000B /* FigmaCallerSurfaceTests.swift */; };
 		8073000000000000000000F2 /* FigmaDefaultFolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073000000000000000000F1 /* FigmaDefaultFolderTests.swift */; };
 		807317000000000000000202 /* FigmaDesignHandOff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807317000000000000000201 /* FigmaDesignHandOff.swift */; }; // cmux-rbf #cm-73.17
 		807317000000000000000502 /* FigmaDesignHandOffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807317000000000000000501 /* FigmaDesignHandOffTests.swift */; }; // cmux-rbf #cm-73.17
@@ -3876,6 +3884,7 @@
 		807312000000000000000202 /* Workspace+FigmaBoardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807312000000000000000201 /* Workspace+FigmaBoardLayout.swift */; };
 		807316000000000000001402 /* Workspace+FigmaButtonMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000001401 /* Workspace+FigmaButtonMenu.swift */; };
 		807300000000000000000037 /* Workspace+FigmaClick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000036 /* Workspace+FigmaClick.swift */; };
+		80734500000000000000000E /* Workspace+FigmaPaneOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80734500000000000000000D /* Workspace+FigmaPaneOwner.swift */; };
 		807316000000000000000B02 /* Workspace+FigmaFileRecording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000B01 /* Workspace+FigmaFileRecording.swift */; };
 		807390000000000000000002 /* Workspace+FigmaHeaderButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000001 /* Workspace+FigmaHeaderButton.swift */; };
 		F0ACC0DE0000000000000009 /* Workspace+ForkAgentConversationAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0ACC0DE000000000000000A /* Workspace+ForkAgentConversationAvailability.swift */; };
@@ -5829,9 +5838,15 @@
 		807300000000000000000030 /* FigmaClickRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickRoute.swift; sourceTree = "<group>"; };
 		807300000000000000000033 /* FigmaClickRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickRouteTests.swift; sourceTree = "<group>"; };
 		807300000000000000000038 /* FigmaClickWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickWorkspaceTests.swift; sourceTree = "<group>"; };
+		80734500000000000000000F /* FigmaPaneOwnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneOwnerTests.swift; sourceTree = "<group>"; };
 		807300000000000000000021 /* FigmaCLIOutputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIOutputTests.swift; sourceTree = "<group>"; };
 		807300000000000000000017 /* FigmaCLIRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIRules.swift; sourceTree = "<group>"; };
 		80730000000000000000001A /* FigmaCLIRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCLIRulesTests.swift; sourceTree = "<group>"; };
+		807345000000000000000001 /* HerdrPaneNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HerdrPaneNote.swift; sourceTree = "<group>"; };
+		807345000000000000000004 /* HerdrAttachProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HerdrAttachProcess.swift; sourceTree = "<group>"; };
+		807345000000000000000007 /* CMUXCLI+CallerSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+CallerSurface.swift"; sourceTree = "<group>"; };
+		807345000000000000000009 /* HerdrPaneNoteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HerdrPaneNoteTests.swift; sourceTree = "<group>"; };
+		80734500000000000000000B /* FigmaCallerSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaCallerSurfaceTests.swift; sourceTree = "<group>"; };
 		8073000000000000000000F1 /* FigmaDefaultFolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaDefaultFolderTests.swift; sourceTree = "<group>"; };
 		807317000000000000000201 /* FigmaDesignHandOff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaDesignHandOff.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-73.17
 		807317000000000000000501 /* FigmaDesignHandOffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaDesignHandOffTests.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-73.17
@@ -7938,6 +7953,7 @@
 		807312000000000000000201 /* Workspace+FigmaBoardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaBoardLayout.swift"; sourceTree = "<group>"; };
 		807316000000000000001401 /* Workspace+FigmaButtonMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaButtonMenu.swift"; sourceTree = "<group>"; };
 		807300000000000000000036 /* Workspace+FigmaClick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaClick.swift"; sourceTree = "<group>"; };
+		80734500000000000000000D /* Workspace+FigmaPaneOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaPaneOwner.swift"; sourceTree = "<group>"; };
 		807316000000000000000B01 /* Workspace+FigmaFileRecording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaFileRecording.swift"; sourceTree = "<group>"; };
 		807390000000000000000001 /* Workspace+FigmaHeaderButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+FigmaHeaderButton.swift"; sourceTree = "<group>"; };
 		F0ACC0DE000000000000000A /* Workspace+ForkAgentConversationAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+ForkAgentConversationAvailability.swift"; sourceTree = "<group>"; };
@@ -9510,6 +9526,7 @@
 				E3B7A400000000000000020B /* Workspace+WorkspaceSurfaceTreeReading.swift */,
 				CA52C0170000000000000000 /* Workspace+SurfaceNavigation.swift */,
 				807300000000000000000036 /* Workspace+FigmaClick.swift */,
+				80734500000000000000000D /* Workspace+FigmaPaneOwner.swift */,
 				807390000000000000000003 /* ContentView+FigmaCommandPalette.swift */,
 				807390000000000000000001 /* Workspace+FigmaHeaderButton.swift */,
 				80732A000000000000000001 /* DesignFocus.swift */,
@@ -11038,6 +11055,9 @@
 				80730000000000000000000F /* FigmaFileLink.swift */,
 				8073B0000000000000000001 /* FigmaFit.swift */,
 				807300000000000000000017 /* FigmaCLIRules.swift */,
+				807345000000000000000001 /* HerdrPaneNote.swift */,
+				807345000000000000000004 /* HerdrAttachProcess.swift */,
+				807345000000000000000007 /* CMUXCLI+CallerSurface.swift */,
 				807300000000000000000030 /* FigmaClickRoute.swift */,
 				805500000000000000000003 /* BrowserValueTextFormatter.swift */,
 				B9000001A1B2C3D4E5F60719 /* cmux.swift */,
@@ -11715,6 +11735,8 @@
 				807300000000000000000021 /* FigmaCLIOutputTests.swift */,
 				807300000000000000000015 /* FigmaWrapperPageTests.swift */,
 				80730000000000000000001A /* FigmaCLIRulesTests.swift */,
+				807345000000000000000009 /* HerdrPaneNoteTests.swift */,
+				80734500000000000000000B /* FigmaCallerSurfaceTests.swift */,
 				80730000000000000000001F /* FigmaStayInPaneTests.swift */,
 				807310000000000000000003 /* FigmaTabMarkTests.swift */,
 				807310000000000000000005 /* FigmaTabMarkWorkspaceTests.swift */,
@@ -11746,6 +11768,7 @@
 				807390000000000000000009 /* FigmaHeaderButtonTests.swift */,
 				807300000000000000000033 /* FigmaClickRouteTests.swift */,
 				807300000000000000000038 /* FigmaClickWorkspaceTests.swift */,
+				80734500000000000000000F /* FigmaPaneOwnerTests.swift */,
 				80732A000000000000000003 /* DesignFocusPairTests.swift */,
 				80732A000000000000000005 /* DesignFocusRoutingTests.swift */,
 				80732A000000000000000007 /* DesignFocusShortcutTests.swift */,
@@ -15444,6 +15467,7 @@
 				807312000000000000000202 /* Workspace+FigmaBoardLayout.swift in Sources */,
 				807316000000000000001402 /* Workspace+FigmaButtonMenu.swift in Sources */,
 				807300000000000000000037 /* Workspace+FigmaClick.swift in Sources */,
+				80734500000000000000000E /* Workspace+FigmaPaneOwner.swift in Sources */,
 				807316000000000000000B02 /* Workspace+FigmaFileRecording.swift in Sources */,
 				807390000000000000000002 /* Workspace+FigmaHeaderButton.swift in Sources */,
 				F0ACC0DE0000000000000009 /* Workspace+ForkAgentConversationAvailability.swift in Sources */,
@@ -15785,6 +15809,9 @@
 				7520C0DF0000000000000009 /* CodexTurnLifecycleCoordinator.swift in Sources */,
 				FEEDC1A50000000000000001 /* FeedEventClassifier.swift in Sources */,
 				807300000000000000000018 /* FigmaCLIRules.swift in Sources */,
+				807345000000000000000002 /* HerdrPaneNote.swift in Sources */,
+				807345000000000000000005 /* HerdrAttachProcess.swift in Sources */,
+				807345000000000000000008 /* CMUXCLI+CallerSurface.swift in Sources */,
 				807300000000000000000010 /* FigmaFileLink.swift in Sources */,
 				8073B0000000000000000003 /* FigmaFit.swift in Sources */,
 				807300000000000000000002 /* FigmaPaneURL.swift in Sources */,
@@ -16353,9 +16380,14 @@
 				807300000000000000000032 /* FigmaClickRoute.swift in Sources */,
 				807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */,
 				807300000000000000000039 /* FigmaClickWorkspaceTests.swift in Sources */,
+				807345000000000000000010 /* FigmaPaneOwnerTests.swift in Sources */,
 				807300000000000000000022 /* FigmaCLIOutputTests.swift in Sources */,
 				807300000000000000000019 /* FigmaCLIRules.swift in Sources */,
 				80730000000000000000001B /* FigmaCLIRulesTests.swift in Sources */,
+				807345000000000000000003 /* HerdrPaneNote.swift in Sources */,
+				807345000000000000000006 /* HerdrAttachProcess.swift in Sources */,
+				80734500000000000000000A /* HerdrPaneNoteTests.swift in Sources */,
+				80734500000000000000000C /* FigmaCallerSurfaceTests.swift in Sources */,
 				8073000000000000000000F2 /* FigmaDefaultFolderTests.swift in Sources */,
 				807317000000000000000502 /* FigmaDesignHandOffTests.swift in Sources */,
 				807317000000000000000602 /* FigmaDesignSkillTests.swift in Sources */,
