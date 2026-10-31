@@ -146,7 +146,7 @@ struct WorkspaceMoveRevealScrollTests {
         #expect(table.origin == origin, "the drop moved the view from \(origin) to \(table.origin)")
     }
 
-    @Test func aDropWhoseTokenArrivesInALaterApplyDoesNotMoveTheViewEither() async throws {
+    @Test func aScrollTargetChangeInALaterApplyAfterADropDoesNotMoveTheView() async throws {
         let table = Table()
         await start(table)
         let origin = table.origin
@@ -155,6 +155,8 @@ struct WorkspaceMoveRevealScrollTests {
         await settle(table)
         let perform = try #require(table.container.reorderDropView.performDropAtPoint)
         try #require(perform(CGPoint(x: 10, y: 10), []), "the drop was refused")
+        // cm-110.14 fix round 1: this later apply carried token 1. A drop never bumps the token, and a token that changes after a
+        // drop now ends the guard (`aMoveAfterADropStillScrollsTheSelectedRowIntoView`), so the apply carries none.
         // The tab change lands first and spends the one-shot; the fold the drop opened lands in a later apply and flips the
         // scroll target from the group's header (row 2) to the selected row itself (row 35).
         let order = moved(table.selected, to: 35, in: table.ids)
@@ -162,8 +164,7 @@ struct WorkspaceMoveRevealScrollTests {
                                selectedWorkspaceId: table.selected, selectedScrollTargetWorkspaceId: table.ids[0])
         await settle(table)
         table.controller.apply(rows: order.map(row), actions: actions(), workspaceIds: moved(table.selected, to: 20, in: table.ids),
-                               selectedWorkspaceId: table.selected, selectedScrollTargetWorkspaceId: table.selected,
-                               selectedRevealScrollToken: 1)
+                               selectedWorkspaceId: table.selected, selectedScrollTargetWorkspaceId: table.selected)
         await settle(table)
         #expect(table.origin == origin, "the apply that followed the drop moved the view from \(origin) to \(table.origin)")
     }
@@ -185,6 +186,28 @@ struct WorkspaceMoveRevealScrollTests {
                                selectedWorkspaceId: far, selectedScrollTargetWorkspaceId: far)
         await settle(table)
         #expect(table.rowIsInView(far, in: order), "selecting a row after a drop did not scroll to it; the view is at \(table.origin)")
+    }
+
+    @Test func aMoveAfterADropStillScrollsTheSelectedRowIntoView() async throws {
+        let table = Table()
+        await start(table)
+        table.controller.apply(rows: table.ids.map(row), actions: actions(drop: { true }),
+                               workspaceIds: table.ids, selectedWorkspaceId: table.selected, selectedScrollTargetWorkspaceId: table.selected)
+        await settle(table)
+        let perform = try #require(table.container.reorderDropView.performDropAtPoint)
+        try #require(perform(CGPoint(x: 10, y: 10), []), "the drop was refused")
+        // The drop's own apply: its tab change, the same selection, no token (a drop never bumps one).
+        let dropped = moved(table.ids[10], to: 20, in: table.ids)
+        table.controller.apply(rows: dropped.map(row), actions: actions(), workspaceIds: dropped,
+                               selectedWorkspaceId: table.selected, selectedScrollTargetWorkspaceId: table.selected)
+        await settle(table)
+        // Later he sets a status on the selected row: it regroups out of view and the move bumps the token.
+        let order = moved(table.selected, to: 35, in: dropped)
+        table.controller.apply(rows: order.map(row), actions: actions(), workspaceIds: dropped,
+                               selectedWorkspaceId: table.selected, selectedScrollTargetWorkspaceId: table.selected,
+                               selectedRevealScrollToken: 1)
+        await settle(table)
+        #expect(table.rowIsInView(table.selected, in: order), "the selected row is at row 35 and the view is at \(table.origin); a move after a drop should scroll it into view")
     }
 
     @Test func aTabDroppedOnAStatusGroupDoesNotMoveTheView() async throws {
