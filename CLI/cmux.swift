@@ -7897,6 +7897,23 @@ struct CMUXCLI {
             )
             print(response)
 
+        case "clear-agent-state": // cm-128.2
+            let okText = String(localized: "common.ok", defaultValue: "OK")
+            let windowHandle = try normalizeWindowHandle(windowFromArgsOrOverride(commandArgs, windowOverride: windowId), client: client)
+            let workspaceId: String
+            if let workspaceArg = workspaceFromArgsOrEnv(commandArgs, windowOverride: windowId) {
+                workspaceId = try resolveWorkspaceId(workspaceArg, client: client, windowHandle: windowHandle)
+            } else if let windowHandle {
+                workspaceId = try requireCurrentWorkspaceId(windowHandle: windowHandle, client: client, command: "clear-agent-state")
+            } else {
+                throw CLIError(message: String(
+                    localized: "cli.error.clearAgentStateRequiresWorkspace",
+                    defaultValue: "clear-agent-state requires --workspace <id|ref|index> or a cmux terminal ($CMUX_WORKSPACE_ID)"
+                ))
+            }
+            let payload = try client.sendV2(method: "workspace.clear_agent_state", params: ["workspace_id": workspaceId])
+            printV2Payload(payload, jsonOutput: jsonOutput, idFormat: idFormat, fallbackText: okText)
+
         case "list-status":
             let response = try forwardSidebarMetadataCommand(
                 "list_status",
@@ -20226,6 +20243,21 @@ struct CMUXCLI {
 
             Example:
               cmux clear-status build
+            """
+        case "clear-agent-state": // cm-128.2
+            return """
+            Usage: cmux clear-agent-state [flags]
+
+            Clear every agent mark on a workspace: close its agents' open requests, mark
+            its notifications read, and leave each waiting or working agent's state unknown
+            until it signals again. Idle agents and your own unread mark stay as they are.
+
+            Flags:
+              --workspace <id|ref|index>   Target workspace (default: $CMUX_WORKSPACE_ID)
+              --window <id|ref|index>      Window context for workspace refs and indexes
+
+            Example:
+              cmux clear-agent-state --workspace workspace:3
             """
         case "list-status":
             return """
@@ -41557,6 +41589,7 @@ export default CMUXSessionRestore;
           sidebar <validate|reload|select|open> [name]
           set-status <key> <value> [--workspace <id|ref|index>] [--window <id|ref|index>] [--icon <name>] [--color <#hex>] [--priority <n>]
           clear-status <key> [--workspace <id|ref|index>] [--window <id|ref|index>]
+          clear-agent-state [--workspace <id|ref|index>] [--window <id|ref|index>]
           list-status [--workspace <id|ref|index>] [--window <id|ref|index>]
           set-progress <0.0-1.0> [--label <text>] [--workspace <id|ref|index>] [--window <id|ref|index>]
           clear-progress [--workspace <id|ref|index>] [--window <id|ref|index>]
