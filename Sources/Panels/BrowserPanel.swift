@@ -1889,6 +1889,8 @@ final class BrowserPanel: Panel, ObservableObject {
     // cmux-rbf #cm-73.12: never persisted; temporary navigation does not erase the binding.
     var figmaBoardLayoutBinding: FigmaBoardLayoutBinding?
     var keepsBoardLayoutOnFlip = false
+    /// cmux-rbf #cm-73.45: the `stableSurfaceId` of the terminal that last opened or pointed this pane. Saved; never a runtime `id`.
+    var ownerTerminalSurfaceId: UUID?
 
     /// Popup windows owned by this panel (for lifecycle cleanup)
     private var popupControllers: [BrowserPopupWindowController] = []
@@ -4763,6 +4765,7 @@ final class BrowserPanel: Panel, ObservableObject {
         currentURL = restoredURL
 
         restoreFigmaPagesSessionSnapshot(snapshot.figmaPages, showingURL: restoredURL)
+        ownerTerminalSurfaceId = snapshot.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
 
         guard shouldRenderRestoredWebView, let restoredURL else {
             shouldRenderWebView = false

@@ -23,6 +23,24 @@ struct RemoteCLIRelayPolicyTests {
         }
     }
 
+    // cmux-rbf #cm-73.45: `figma.goto` gains `caller_surface_id`; it stays denied, and the key is scoped like `surface_id`.
+    @Test("figma.goto with a caller_surface_id stays denied, and the key is a scoped surface id")
+    func deniesFigmaGotoWithCaller() throws {
+        #expect(RemoteRelayCommandPolicy.surfaceIDKeys.contains("caller_surface_id"))
+        let alias = (remote: UUID(), local: UUID())
+        try withServer(surfaceAliases: [alias.remote: alias.local]) { port, unixServer in
+            let exchange = try runPolicyRelayExchange(
+                port: port,
+                relayID: relayID,
+                tokenHex: tokenHex,
+                commandLine: """
+                {"id":"figma","method":"figma.goto","params":{"surface_id":"\(alias.remote.uuidString)","node":"12-2","caller_surface_id":"\(alias.remote.uuidString)"}}
+                """
+            )
+            expectDenial(exchange, unixServer, "figma.goto owned surface with caller")
+        }
+    }
+
     private func withServer(
         workspaceAliases: [UUID: UUID] = [:],
         surfaceAliases: [UUID: UUID] = [:],

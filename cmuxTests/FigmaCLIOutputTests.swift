@@ -236,12 +236,14 @@ struct FigmaCLIOutputTests {
         _ arguments: [String],
         listening: Bool = true,
         environment extraEnvironment: [String: String] = [:],
+        prepareHome: (URL) throws -> Void = { _ in },
         reply: @escaping @Sendable (String, String?) -> String = FigmaCLIOutputTests.unexpected
     ) throws -> Run {
         let fileManager = FileManager.default
         let id = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
         let home = fileManager.temporaryDirectory.appendingPathComponent("cmux-figma-cli-\(id)", isDirectory: true)
         try fileManager.createDirectory(at: home, withIntermediateDirectories: true)
+        try prepareHome(home) // cmux-rbf #cm-73.45
         let socketPath = "/tmp/cmux-fig-\(id).sock"
         let pageFolder = home.appendingPathComponent("Library/Application Support/cmux", isDirectory: true)
         let page = pageFolder.appendingPathComponent("figma-embed.html")
@@ -705,6 +707,195 @@ struct FigmaCLIOutputTests {
         )
         #expect(run.status == 0, "\(run.stderr)")
         #expect(lists(run).isEmpty, "\(run.requests.map(\.method))")
+    }
+
+    // MARK: - cm-73.45: the caller goto names, and the note that names it
+
+    private static let noteSession = "cm7345"
+    private static let notePane = "p1"
+
+    /// The folder herdr-agent keeps its notes in, under the test's own home.
+    private static func noteFolder(_ home: URL) -> URL {
+        home.appendingPathComponent(".local/state/herdr-agent/panes", isDirectory: true)
+    }
+
+    private static let herdrEnvironment = ["HERDR_SESSION": noteSession, "HERDR_PANE_ID": notePane]
+
+    private static func writeNote(_ home: URL, surface: String, pid: Int32) throws {
+        let folder = noteFolder(home)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let line = "\(surface)\t\(UUID().uuidString)\t\(pid)\n"
+        try line.write(to: folder.appendingPathComponent("\(noteSession).\(notePane)"), atomically: true, encoding: .utf8)
+    }
+
+    /// A stand-in for herdr's attach client: a copy of `/bin/sleep` named `herdr-agent-attach`.
+    private func withAttachProcess(_ body: (Process) throws -> Void) throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("cm-73.45-attach-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let binary = folder.appendingPathComponent("herdr-agent-attach")
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
+        let child = Process()
+        child.executableURL = binary
+        child.arguments = ["60"]
+        try child.run()
+        defer { child.terminate(); child.waitUntilExit() }
+        try body(child)
+    }
+
+    @Test("goto sends the caller it listed by as caller_surface_id")
+    func gotoSendsTheCaller() throws {
+        let run = try drive(
+            ["figma", "goto", "12-2"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.gotoReplyByAsk(byPane: [Self.figmaPane(8)], byWorkspace: [])
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.gotos.first?.params["caller_surface_id"] as? String == Self.callerSurface, "\(run.gotos.first?.params ?? [:])")
+    }
+
+    @Test("goto --surface still names the caller, and still lists nothing")
+    func gotoWithSurfaceSendsTheCaller() throws {
+        let run = try drive(
+            ["figma", "goto", "12-2", "--surface", "id-8"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.gotoReply([Self.ordinaryPane(8)])
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(lists(run).isEmpty, "\(run.requests.map(\.method))")
+        #expect(run.gotos.first?.params["caller_surface_id"] as? String == Self.callerSurface)
+    }
+
+    @Test("goto with no CMUX_SURFACE_ID sends no caller_surface_id")
+    func gotoWithoutACallerSendsNone() throws {
+        let run = try drive(["figma", "goto", "12-2"], reply: Self.gotoReply([Self.figmaPane(8)]))
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.gotos.first?.params["caller_surface_id"] == nil)
+    }
+
+    @Test("fit sends no caller_surface_id, whatever the environment holds")
+    func fitSendsNoCaller() throws {
+        let run = try drive(
+            ["figma", "fit"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)])
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.gotos.count == 1, "\(run.requests.map(\.method))")
+        #expect(run.gotos.first?.params["purpose"] as? String == "fit")
+        #expect(run.gotos.first?.params["caller_surface_id"] == nil)
+    }
+
+    @Test("goto --surface does not fail on a CMUX_SURFACE_ID that is no surface, as before: it drops it")
+    func gotoWithSurfaceIgnoresABadCaller() throws {
+        let run = try drive(
+            ["figma", "goto", "12-2", "--surface", "id-8"],
+            environment: ["CMUX_SURFACE_ID": "garbage"],
+            reply: Self.gotoReply([Self.ordinaryPane(8)])
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.stdout == "OK\n", "\(run.stdout)")
+        #expect(run.gotos.first?.params["caller_surface_id"] == nil)
+    }
+
+    @Test("fit --surface does not fail on a CMUX_SURFACE_ID that is no surface")
+    func fitWithSurfaceIgnoresABadCaller() throws {
+        let run = try drive(
+            ["figma", "fit", "--surface", "id-8"],
+            environment: ["CMUX_SURFACE_ID": "garbage"],
+            reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)])
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.gotos.first?.params["caller_surface_id"] == nil)
+    }
+
+    @Test("goto without --surface fails on a CMUX_SURFACE_ID that is no surface, as it did before")
+    func gotoStillFailsOnABadCaller() throws {
+        let run = try drive(
+            ["figma", "goto", "12-2"],
+            environment: ["CMUX_SURFACE_ID": "garbage"],
+            reply: Self.gotoReply([Self.figmaPane(8)])
+        )
+        #expect(run.status == 1, "\(run.stdout)")
+        #expect(run.stderr.contains("Invalid surface handle: garbage"), "\(run.stderr)")
+        #expect(run.gotos.isEmpty)
+    }
+
+    @Test("fit without --surface fails on a CMUX_SURFACE_ID that is no surface, as it did before")
+    func fitStillFailsOnABadCaller() throws {
+        let run = try drive(
+            ["figma", "fit"],
+            environment: ["CMUX_SURFACE_ID": "garbage"],
+            reply: Self.fitReply([Self.figmaPane(8)])
+        )
+        #expect(run.status == 1, "\(run.stdout)")
+        #expect(run.stderr.contains("Invalid surface handle: garbage"), "\(run.stderr)")
+    }
+
+    @Test("a FIFO planted at the note path does not hang the command: the note is ignored")
+    func fifoAtTheNotePath() throws {
+        let run = try drive(
+            ["figma", "goto", "12-2"],
+            environment: Self.herdrEnvironment.merging(["CMUX_SURFACE_ID": Self.callerSurface]) { $1 },
+            prepareHome: { home in
+                let folder = Self.noteFolder(home)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                #expect(mkfifo(folder.appendingPathComponent("\(Self.noteSession).\(Self.notePane)").path, 0o600) == 0)
+            },
+            reply: Self.gotoReplyByAsk(byPane: [Self.figmaPane(8)], byWorkspace: [])
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.gotos.first?.params["caller_surface_id"] as? String == Self.callerSurface)
+    }
+
+    @Test("a note whose pid is a live herdr-agent-attach names the caller ahead of CMUX_SURFACE_ID")
+    func liveNoteNamesTheCaller() throws {
+        let noted = UUID().uuidString
+        try withAttachProcess { child in
+            let run = try drive(
+                ["figma", "goto", "12-2"],
+                environment: Self.herdrEnvironment.merging(["CMUX_SURFACE_ID": Self.callerSurface]) { $1 },
+                prepareHome: { try Self.writeNote($0, surface: noted, pid: child.processIdentifier) },
+                reply: Self.gotoReplyByAsk(byPane: [Self.figmaPane(8)], byWorkspace: [])
+            )
+            #expect(run.status == 0, "\(run.stderr)")
+            #expect(lists(run).first?.params["surface_id"] as? String == noted, "\(lists(run).map(\.params))")
+            #expect(run.gotos.first?.params["caller_surface_id"] as? String == noted)
+        }
+    }
+
+    @Test("a note whose pid is not an attach is ignored: CMUX_SURFACE_ID names the caller")
+    func staleNoteIsIgnored() throws {
+        let run = try drive(
+            ["figma", "goto", "12-2"],
+            environment: Self.herdrEnvironment.merging(["CMUX_SURFACE_ID": Self.callerSurface]) { $1 },
+            prepareHome: { try Self.writeNote($0, surface: UUID().uuidString, pid: getpid()) },
+            reply: Self.gotoReplyByAsk(byPane: [Self.figmaPane(8)], byWorkspace: [])
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.gotos.first?.params["caller_surface_id"] as? String == Self.callerSurface)
+    }
+
+    @Test("when the app does not know the note's surface, goto retries with CMUX_SURFACE_ID and names that")
+    func unknownNotedSurfaceRetries() throws {
+        let noted = UUID().uuidString
+        let known = Self.gotoReplyByAsk(byPane: [Self.figmaPane(8)], byWorkspace: [])
+        try withAttachProcess { child in
+            let run = try drive(
+                ["figma", "goto", "12-2"],
+                environment: Self.herdrEnvironment.merging(["CMUX_SURFACE_ID": Self.callerSurface]) { $1 },
+                prepareHome: { try Self.writeNote($0, surface: noted, pid: child.processIdentifier) },
+                reply: { method, surfaceID in
+                    if method == "surface.list", surfaceID == noted {
+                        return Self.failure("not_found", "Source surface not found")
+                    }
+                    return known(method, surfaceID)
+                }
+            )
+            #expect(run.status == 0, "\(run.stderr)")
+            #expect(lists(run).compactMap { $0.params["surface_id"] as? String } == [noted, Self.callerSurface])
+            #expect(run.gotos.first?.params["caller_surface_id"] as? String == Self.callerSurface)
+        }
     }
 
     // MARK: - fit
