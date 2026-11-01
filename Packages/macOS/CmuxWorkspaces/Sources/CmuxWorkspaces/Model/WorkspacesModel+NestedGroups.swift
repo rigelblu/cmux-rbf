@@ -235,10 +235,11 @@ extension WorkspacesModel {
     /// The walk above, for any workspace: opens its group and every group above it, stopping at a group drawn under a status. A
     /// workspace behind a group's name keeps its own group as it is. (#cm-110.14)
     func nestedExpandWorkspaceGroups(containing workspaceId: UUID) {
+        guard !workspaceIdsShownInPinned().contains(workspaceId) else { return }
         guard let groupId = tabs.first(where: { $0.id == workspaceId })?.groupId else { return }
         let tree = nestedGroupTree()
         let own = workspaceGroups.first { $0.id == groupId }?.anchorWorkspaceId == workspaceId
-        let shown = groupIdsShownUnderAStatus()
+        let shown = groupIdsShownOutsideParent()
         var upward = [groupId] + tree.ancestors(of: groupId)
         if let root = upward.firstIndex(where: shown.contains) { upward = Array(upward[...root]) } // (#cm-110.3)
         for id in own ? Array(upward.dropFirst()) : upward {
@@ -255,7 +256,7 @@ extension WorkspacesModel {
     func expandSelectionIfItsGroupLeftItsStatus(shownBefore: Set<UUID>) {
         guard !shownBefore.isEmpty, let selectedTabId,
               let groupId = tabs.first(where: { $0.id == selectedTabId })?.groupId else { return }
-        let left = shownBefore.subtracting(groupIdsShownUnderAStatus())
+        let left = shownBefore.subtracting(groupIdsShownOutsideParent())
         guard !left.isEmpty else { return }
         guard ([groupId] + nestedGroupTree().ancestors(of: groupId)).contains(where: left.contains) else { return }
         nestedExpandWorkspaceGroupForSelectionIfNeeded()

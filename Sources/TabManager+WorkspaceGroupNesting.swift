@@ -21,12 +21,20 @@ extension TabManager {
     /// that holds a stored status but is no longer drawn under it is back inside its parent, so a selection inside it that a fold
     /// above now hides is brought back out: the folded groups above the selection open. A change that leaves every group where
     /// it was, and a selection no fold hides, open nothing.
-    func revealSelectionIfItsGroupLeftItsStatus() {
+    func revealSelectionIfItsGroupLeftItsStatus(sectionsStoppedShowing: Bool = false) {
+        if sectionsStoppedShowing, let selected = selectedTab, selected.groupId != nil {
+            let groupsById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
+            if WorkspaceGroupWorkspaceItem(id: selected.id, groupId: selected.groupId, isPinned: selected.isPinned)
+                .sidebarPin(in: groupsById, sectionsShown: true).isPinned {
+                workspaces.expandWorkspaceGroupForSelectionIfNeeded()
+                return
+            }
+        }
         guard workspaces.hasNestedWorkspaceGroup, let selectedId = selectedTabId,
               let groupId = tabs.first(where: { $0.id == selectedId })?.groupId else { return }
         let tree = WorkspaceGroupTree(groups: workspaceGroups)
         let storedStatus = Set(workspaceGroups.filter { $0.statusId != nil }.map(\.id))
-        let shown = workspaces.groupIdsShownUnderAStatus()
+        let shown = workspaces.groupIdsShownOutsideParent()
         let chain = [groupId] + tree.ancestors(of: groupId)
         guard chain.contains(where: { tree.parent(of: $0) != nil && storedStatus.contains($0) && !shown.contains($0) }) else { return }
         workspaces.expandWorkspaceGroupForSelectionIfNeeded()

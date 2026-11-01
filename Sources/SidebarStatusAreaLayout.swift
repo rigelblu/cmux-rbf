@@ -35,17 +35,19 @@ struct SidebarStatusAreaLayout {
         for item in items {
             switch item {
             case .workspace(let id):
-                if let groupId = effectiveGroups[id] ?? nil, let root = rootGroup(groupId) {
-                    owners[item.id] = "group:\(root.id.uuidString)"
-                    if root.isPinned { pinned.insert(item.id) }
+                let placement = WorkspaceGroupWorkspaceItem(id: id, groupId: effectiveGroups[id] ?? nil,
+                    isPinned: tabsById[id]?.isPinned == true).sidebarPin(in: groupsById, sectionsShown: statusProjection != nil)
+                if !placement.isOutsideGroup, let groupId = effectiveGroups[id] ?? nil, let root = rootGroup(groupId) {
+                    owners[item.id] = "group:\((placement.pinRootGroupId ?? root.id).uuidString)"
                 } else {
                     owners[item.id] = "workspace:\(id.uuidString)"
-                    if tabsById[id]?.isPinned == true { pinned.insert(item.id) }
                 }
+                if placement.isPinned { pinned.insert(item.id) }
             case .groupHeader(let id, _):
                 let root = rootGroup(id)
-                owners[item.id] = "group:\((root?.id ?? id).uuidString)"
-                if root?.isPinned == true { pinned.insert(item.id) }
+                let placement = groupsById[id]?.sidebarPin(in: groupsById, sectionsShown: statusProjection != nil)
+                owners[item.id] = "group:\((placement?.pinRootGroupId ?? root?.id ?? id).uuidString)"
+                if placement?.isPinned == true { pinned.insert(item.id) }
             case .colorSectionHeader(let section):
                 let isPinned = section.id.pinTier == .pinned
                 let key = isPinned ? "pinned-color:\(section.id.normalizedHex)" : "color:\(section.id.normalizedHex)"
@@ -75,10 +77,9 @@ struct SidebarStatusAreaLayout {
         for (id, status) in statusProjection?.workspaceGroups?.statusIdByWorkspaceId ?? [:] { byMember[id] = status }
         statusIdByMember = byMember
         let pinnedWorkspaceIds = Set(tabs.compactMap { workspace -> UUID? in
-            if let groupId = effectiveGroups[workspace.id] ?? nil, let root = rootGroup(groupId) {
-                return root.isPinned ? workspace.id : nil
-            }
-            return workspace.isPinned ? workspace.id : nil
+            let placement = WorkspaceGroupWorkspaceItem(id: workspace.id, groupId: effectiveGroups[workspace.id] ?? nil,
+                isPinned: workspace.isPinned).sidebarPin(in: groupsById, sectionsShown: statusProjection != nil)
+            return placement.isPinned ? workspace.id : nil
         })
         pinnedSectionMemberIds = pinnedWorkspaceIds // (#cm-110.5)
         workspacesSectionMemberIds = Set(tabs.map(\.id))

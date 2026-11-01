@@ -21,6 +21,11 @@ public struct WorkspaceStatusGroupProjection: Equatable, Sendable {
         self.statusGroupStatusIds = statusIds
     }
 
+    /// The sidebar's sections show only for a nonempty file list with its controls enabled.
+    public static func showsSections(list: WorkspaceStatusList, controlsEnabled: Bool) -> Bool {
+        controlsEnabled && list.source != .cmux && !list.entries.isEmpty
+    }
+
     public func contains(workspaceId: UUID) -> Bool {
         allMemberWorkspaceIds.contains(workspaceId)
     }
@@ -52,7 +57,7 @@ public struct WorkspaceStatusGroupProjection: Equatable, Sendable {
         storedOrder: [String]? = nil
     ) -> WorkspaceStatusGroupProjection? {
         // With no list in use (source == .cmux, cmux's five) or an empty file list, there is no area at all (09:493, 09:496, 09:512)
-        guard list.source != .cmux, !list.entries.isEmpty else { return nil }
+        guard showsSections(list: list, controlsEnabled: true) else { return nil }
 
         var membersByStatusId: [String: [UUID]] = [:]
         for item in workspaces {

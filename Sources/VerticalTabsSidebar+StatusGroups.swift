@@ -68,7 +68,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         storedOrder: [String]? = nil,
         workspaceGroups: [WorkspaceGroup]
     ) -> WorkspaceStatusGroupProjection? {
-        guard controlsEnabled else { return nil }
+        guard WorkspaceStatusGroupProjection.showsSections(list: list, controlsEnabled: controlsEnabled) else { return nil }
         guard let loose = WorkspaceStatusGroupProjection.project(
             workspaces: items,
             list: list,
@@ -95,15 +95,22 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         )
     }
 
-    /// The nested groups the sidebar draws under a status group instead of inside their parent (#cm-110.3), read from the same
-    /// projection the renderer uses, so the built-in list and Workspace Todo Controls off give none. Every layer that
-    /// asks "is this group hidden by its parent's fold" reads this one answer (the row walk, the ⌘ numbers, the
-    /// selection moves), never a stored status on its own.
-    static func groupsShownUnderAStatus(tabs: [Workspace], groups: [WorkspaceGroup]) -> Set<UUID> {
-        // A nested root needs a nested group with a stored status; the projection decides the rest. Saves the
-        // projection's cost in every window that has none.
-        guard groups.contains(where: { $0.parentGroupId != nil && $0.statusId != nil }) else { return [] }
-        return currentStatusGroupProjection(tabs: tabs, groups: groups)?.workspaceGroups?.nestedRootGroupIds ?? []
+    /// Nested roots whose model parent's fold no longer hides them: status roots and the outermost pinned groups.
+    static func groupsShownOutsideTheirParent(groups: [WorkspaceGroup], projection: WorkspaceStatusGroupProjection?) -> Set<UUID> {
+        guard let projection else { return [] }
+        let byId = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        let pins = groups.filter { group in
+            group.parentGroupId != nil && group.sidebarPin(in: byId, sectionsShown: true).pinRootGroupId == group.id
+        }.map(\.id)
+        return (projection.workspaceGroups?.nestedRootGroupIds ?? []).union(pins)
+    }
+
+    /// Members drawn outside their model group in Pinned; selection/move reveal uses the renderer's placement.
+    static func workspaceIdsShownInPinned(tabs: [Workspace], groups: [WorkspaceGroup]) -> Set<UUID> {
+        guard tabs.contains(where: { $0.isPinned && $0.groupId != nil }) else { return [] }
+        guard currentStatusGroupProjection(tabs: tabs, groups: groups) != nil else { return [] }
+        let groupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        return Set(tabs.filter { WorkspaceGroupWorkspaceItem($0).sidebarPin(in: groupsById, sectionsShown: true).isOutsideGroup }.map(\.id))
     }
 
     /// The base items of the list, before the status area takes its rows: the nested walk draws a group shown under a
@@ -117,16 +124,25 @@ extension VerticalTabsSidebar { // (#cm-110.1)
     ) -> [SidebarWorkspaceRenderItem] {
         SidebarWorkspaceRenderItem.renderItems(tabs: tabs, groupsById: groupsById, orderedGroups: orderedGroups,
             effectiveMembership: effectiveMembership,
-            groupsShownUnderAStatus: statusGroupProjection?.workspaceGroups?.nestedRootGroupIds ?? [])
+            groupsShownUnderAStatus: groupsShownOutsideTheirParent(groups: orderedGroups, projection: statusGroupProjection))
     }
 
-    /// The workspaces a folded group's badge sums: everything inside it except the rows shown under a status, which
-    /// show their own unread where they are (ruling (23), #cm-110.3). A group inside a projected root keeps all of its
-    /// own, and Mark All Read and Delete Group still use every workspace inside.
+    /// A folded badge omits rows drawn separately under a status or in Pinned; group-wide actions keep all members.
     static func foldedGroupBadgeWorkspaceIds(group: WorkspaceGroup, memberWorkspaceIds: [UUID],
-        projection: WorkspaceStatusGroupProjection?) -> [UUID] {
-        guard let grouped = projection?.workspaceGroups, grouped.rootIdByGroupId[group.id] == nil else { return memberWorkspaceIds }
-        return memberWorkspaceIds.filter { grouped.statusIdByWorkspaceId[$0] == nil }
+        projection: WorkspaceStatusGroupProjection?, tabs: [Workspace], groups: [WorkspaceGroup]) -> [UUID] {
+        guard let projection else { return memberWorkspaceIds }
+        let groupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        let tabsById = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0) })
+        let groupChain = Set([group.id] + WorkspaceGroupTree(groups: groups).ancestors(of: group.id))
+        let displayed = memberWorkspaceIds.filter { id in
+            guard let workspace = tabsById[id] else { return true }
+            let pin = WorkspaceGroupWorkspaceItem(workspace).sidebarPin(in: groupsById, sectionsShown: true)
+            guard !pin.isOutsideGroup else { return false }
+            guard let root = pin.pinRootGroupId else { return true }
+            return groupChain.contains(root)
+        }
+        guard let grouped = projection.workspaceGroups, grouped.rootIdByGroupId[group.id] == nil else { return displayed }
+        return displayed.filter { grouped.statusIdByWorkspaceId[$0] == nil }
     }
 
     /// Colors a status names have no color group among the unpinned rows; empty when no area shows.
@@ -156,10 +172,18 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         collapsedHexes: Set<String>,
         statusGroupProjection: WorkspaceStatusGroupProjection?,
         colorHexes: [String: String],
-        paletteEntries: [WorkspaceColorPaletteEntry]
+        paletteEntries: [WorkspaceColorPaletteEntry],
+        groups: [WorkspaceGroup] = []
     ) -> SidebarWorkspaceColorSectionProjection {
-        SidebarWorkspaceColorSectionProjection.project(
-            workspaces: workspaces,
+        let groupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        let displayWorkspaces = workspaces.map { workspace in
+            let pin = WorkspaceGroupWorkspaceItem(id: workspace.id, groupId: workspace.groupId, isPinned: workspace.isPinned)
+                .sidebarPin(in: groupsById, sectionsShown: statusGroupProjection != nil)
+            return SidebarWorkspaceColorSectionWorkspaceSnapshot(id: workspace.id,
+                groupId: pin.isOutsideGroup ? nil : workspace.groupId, isPinned: workspace.isPinned, customColor: workspace.customColor)
+        }
+        return SidebarWorkspaceColorSectionProjection.project(
+            workspaces: displayWorkspaces,
             paletteEntries: paletteEntries,
             collapsedHexes: collapsedHexes,
             excludedWorkspaceIds: statusGroupProjection?.allMemberWorkspaceIds ?? [],
@@ -170,14 +194,16 @@ extension VerticalTabsSidebar { // (#cm-110.1)
     static func colorSectionProjection(
         workspaces: [SidebarWorkspaceColorSectionWorkspaceSnapshot],
         collapsedHexes: Set<String>,
-        statusGroupProjection: WorkspaceStatusGroupProjection?
+        statusGroupProjection: WorkspaceStatusGroupProjection?,
+        groups: [WorkspaceGroup] = []
     ) -> SidebarWorkspaceColorSectionProjection {
         colorSectionProjection(
             workspaces: workspaces,
             collapsedHexes: collapsedHexes,
             statusGroupProjection: statusGroupProjection,
             colorHexes: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:],
-            paletteEntries: WorkspaceTabColorSettings.labeledPaletteEntries()
+            paletteEntries: WorkspaceTabColorSettings.labeledPaletteEntries(),
+            groups: groups
         )
     }
 
@@ -206,8 +232,10 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         rowDepthById: [UUID: Int],
         statusGroupProjection: WorkspaceStatusGroupProjection?,
         sectionIndent: Int = 0, // (#cm-110.12)
-        heldLevels: Int = 0 // (#cm-110.12)
+        heldLevels: Int = 0, // (#cm-110.12)
+        isOutsideGroup: Bool = false // (#cm-110.18)
     ) -> Int {
+        if isOutsideGroup { return heldLevels + sectionIndent }
         if let depth = statusGroupProjection?.workspaceGroups?.depthById[workspaceId] { return depth }
         if let depth = rowDepthById[workspaceId] { return depth + sectionIndent } // (#cm-110.12)
         if statusGroupProjection?.contains(workspaceId: workspaceId) == true { return statusMemberDepth }

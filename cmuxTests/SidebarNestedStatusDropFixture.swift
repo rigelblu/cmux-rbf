@@ -140,7 +140,7 @@ final class SidebarNestedStatusDropFixture {
     func colors(_ projection: WorkspaceStatusGroupProjection?) -> SidebarWorkspaceColorSectionProjection {
         VerticalTabsSidebar.colorSectionProjection(workspaces: manager.tabs.map {
             .init(id: $0.id,groupId: $0.groupId,isPinned: $0.isPinned,customColor: $0.customColor)
-        },collapsedHexes: [],statusGroupProjection: projection,colorHexes: hexes,paletteEntries: [.init(name: "Plain",hex: "#119933")])
+        },collapsedHexes: [],statusGroupProjection: projection,colorHexes: hexes,paletteEntries: [.init(name: "Plain",hex: "#119933")],groups: manager.workspaceGroups)
     }
     func rendered() -> [SidebarWorkspaceRenderItem] {
         let projected = projection(), groups = manager.workspaceGroups
