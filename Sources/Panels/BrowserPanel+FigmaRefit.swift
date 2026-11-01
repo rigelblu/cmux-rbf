@@ -104,7 +104,11 @@ extension BrowserPanel {
     /// The one re-fit: `.size` after the half second, `.key` for `⇧1`, `.cli` for `cmux figma fit`.
     /// Decided from what the panel already holds, so it answers at once and never waits on cmux's page.
     @discardableResult
-    func refitFigmaPreview(trigger: FigmaPreviewRefit.Trigger) -> FigmaPreviewRefit.Answer {
+    func refitFigmaPreview(trigger: FigmaPreviewRefit.Trigger, node: String? = nil) -> FigmaPreviewRefit.Answer {
+        let requestedNode = node.flatMap { FigmaFit.normalizedNode($0) }
+        let shownNode = (currentURL ?? webView.url).flatMap { FigmaPaneURL.node(fromPaneURL: $0, wrapper: figmaPageWrapper) }
+            .flatMap { FigmaFit.normalizedNode($0) }
+        let moveNode = requestedNode == shownNode ? nil : requestedNode
         let decision = FigmaPreviewRefit.decide(
             trigger: trigger,
             remembered: rememberedFigmaSize,
@@ -123,11 +127,11 @@ extension BrowserPanel {
         cmuxDebugLog(
             "figma.refit surface=\(id.uuidString) trigger=\(trigger.rawValue) " +
             "loaded=\(Self.figmaRefitSizeText(rememberedFigmaSize)) now=\(Self.figmaRefitSizeText(webView.bounds.size)) " +
-            "action=\(decision.moves ? "move" : "none") via=frame reason=\(decision.reason.rawValue) " +
+            "action=\(decision.moves ? (moveNode == nil ? "move" : "goto") : "none")\(moveNode.map { " node=\($0)" } ?? "") via=frame reason=\(decision.reason.rawValue) " +
             "drawn=\(report.map { $0.drawn ? "1" : "0" } ?? "none") path=\(report?.path ?? "none")"
         )
 #endif
-        if decision.moves { sendFigmaRefit() }
+        if decision.moves { sendFigmaRefit(node: moveNode) }
         return FigmaPreviewRefit.answer(for: decision)
     }
 
@@ -137,7 +141,7 @@ extension BrowserPanel {
     }
 #endif
 
-    private func sendFigmaRefit() {
+    private func sendFigmaRefit(node: String?) {
         let state = figmaRefit
         state.inFlight = true
         figmaLoadBar.inPlaceEditorOpened()
@@ -146,7 +150,7 @@ extension BrowserPanel {
         state.flightLimit.schedule(after: .seconds(FigmaPreviewRefit.inFlightSeconds)) { [weak self] in
             self?.endFigmaRefit(because: "timeout")
         }
-        sendFigmaMotionCommand(.refit) { [weak self] accepted in
+        sendFigmaMotionCommand(.refit, node: node) { [weak self] accepted in
             guard !accepted else { return }
 #if DEBUG
             if let self {

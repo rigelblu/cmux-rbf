@@ -9690,6 +9690,17 @@ class TerminalController {
               let node = v2String(params, "node"), !node.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
         }
+        // cmux-rbf (#cm-73.46): only explicit --node is strict and can move. Plain fit keeps legacy instance-layer ids.
+        let fitNode: String?
+        if params["fit_node"] != nil {
+            guard purpose == .fit, let rawNode = params["fit_node"] as? String,
+                  let validatedNode = FigmaFit.normalizedNode(rawNode) else {
+                return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
+            }
+            fitNode = validatedNode
+        } else {
+            fitNode = nil
+        }
         // cmux-rbf (#cm-73.32): motion and play flags for Figma prototype motion. Reject a revert of this hunk on upstream sync.
         let motion = v2Bool(params, "motion") ?? false
         let play = v2Bool(params, "play") ?? false
@@ -9699,7 +9710,7 @@ class TerminalController {
             }
             if purpose == .fit, panel.showsFigmaPreview {
                 // cmux-rbf (#cm-73.44): `fit` on a preview is the panel's re-fit, answered at once from what the panel holds. Reject a revert of this hunk on upstream sync.
-                if case .refused(let reason) = panel.refitFigmaPreview(trigger: .cli) {
+                if case .refused(let reason) = panel.refitFigmaPreview(trigger: .cli, node: fitNode) {
                     return .err(code: "invalid_state", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: ["reason": reason.rawValue])
                 }
             } else if !panel.gotoFigmaNode(node, purpose: purpose, motion: motion, play: play) {

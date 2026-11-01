@@ -255,6 +255,80 @@ struct FigmaRefitScriptTests {
 
     // MARK: The page: refit
 
+    @Test func nodeMoveUsesTheStillWwwAddressAndPreservesOtherParameters() throws {
+        for node in ["16-2", "16:2"] {
+            let c = try frame(ancestorOrigin: Self.cmuxOrigin)
+            c.evaluateScript("location.href += '&opaque=keep%2Fme'; listeners.message({source:window.parent,origin:'\(Self.cmuxOrigin)',data:{cmuxClockCommand:true,kind:'still',node:'\(node)'}})")
+            let address = try #require(text(c, "replaced"))
+            let url = try #require(URLComponents(string: address))
+            let q = Dictionary(uniqueKeysWithValues: (url.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+            #expect(url.host == "www.figma.com" && url.path == "/design/KEY/slug")
+            #expect(q["node-id"] == "16-2")
+            #expect(q["theme"] == "dark" && q["footer"] == "false" && q["embed-host"] == "cmux" && q["opaque"] == "keep/me")
+        }
+    }
+
+    @Test func frameRefusesMalformedMoveNodesAndForeignSources() throws {
+        for node in ["", "1", "1-2&x=3", "1-2\n", "x-2", "1-2-3"] {
+            let c = try frame(ancestorOrigin: Self.cmuxOrigin)
+            let json = String(decoding: try JSONSerialization.data(withJSONObject: [node]), as: UTF8.self)
+            c.evaluateScript("listeners.message({source:window.parent,origin:'\(Self.cmuxOrigin)',data:{cmuxClockCommand:true,kind:'still',node:\(json)[0]}})")
+            #expect(text(c, "typeof replaced") == "undefined", "\(node.debugDescription)")
+        }
+        for source in ["{}", "window.parent"] {
+            let c = try frame(ancestorOrigin: Self.cmuxOrigin)
+            c.evaluateScript("listeners.message({source:\(source),origin:'https://evil.example',data:{cmuxClockCommand:true,kind:'still',node:'16-2'}})")
+            #expect(text(c, "typeof replaced") == "undefined")
+        }
+    }
+
+    @Test func pageMoveRewritesOnlyEmbedWithoutLoadingOrAddingHistory() throws {
+        let c = try page(); report(c)
+        c.evaluateScript("""
+        location.search += '&outer=kept'; history={state:{kept:1},replaceState:function(s,t,u){historyCalls.push([s,t,u]);location.search=u.slice(u.indexOf('?'))}};
+        historyCalls=[]; historyPushes=0; history.pushState=function(){historyPushes++}; sent=[]; oldFrame=frame; answer=window.__cmuxMotion.command('refit','16:2');
+        """)
+        #expect(c.exception == nil, "\(String(describing: c.exception))")
+        #expect(text(c, "sent[sent.length-1].node") == "16-2")
+        #expect(text(c, "historyCalls.length") == "1")
+        #expect(text(c, "historyPushes") == "0")
+        #expect(bool(c, "answer && answer.report === null && frame === oldFrame"))
+        let search = try #require(text(c, "location.search"))
+        let url = try #require(URLComponents(string: "cmux-figma://cmux/figma-embed.html" + search))
+        let q = Dictionary(uniqueKeysWithValues: (url.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        #expect(q["outer"] == "kept")
+        let embeddedAddress = try #require(q["embed"])
+        let embed = try #require(URLComponents(string: embeddedAddress))
+        #expect(embed.host == "embed.figma.com")
+        #expect(embed.queryItems?.first { $0.name == "node-id" }?.value == "16-2")
+        #expect(bool(c, "historyCalls[0][0].kept === 1"))
+    }
+
+    @Test func pageRefusesMalformedNodesWithoutSendingOrRewriting() throws {
+        let c = try page(); report(c)
+        c.evaluateScript("sent=[]; rewrites=0; history={replaceState:function(){rewrites++}}")
+        for node in ["", "1-2&x=3", "1-2\n", "bad"] {
+            let json = String(decoding: try JSONSerialization.data(withJSONObject: [node]), as: UTF8.self)
+            #expect(!bool(c, "window.__cmuxMotion.command('refit',\(json)[0])"), "\(node.debugDescription)")
+        }
+        #expect(text(c, "sent.length") == "0")
+        #expect(text(c, "rewrites") == "0")
+    }
+
+    @Test func refusedNodeMoveLeavesTheEmbedAddressAlone() throws {
+        for item in [("/login", false, true), ("/design/KEY/slug", false, false), ("/proto/KEY/slug", true, true)] {
+            let c = try page(marked: item.1)
+            report(c, path: item.0, drawn: item.2, player: item.1)
+            c.evaluateScript("sent=[]; before=location.search; rewrites=0; history={replaceState:function(){rewrites++}}")
+            #expect(!bool(c, "window.__cmuxMotion.command('refit','16-2')"))
+            #expect(bool(c, "location.search === before && rewrites === 0 && sent.length === 0"))
+        }
+        let c = try page(); report(c)
+        c.evaluateScript("window.__cmuxMotion.command('refit'); sent=[]; before=location.search; rewrites=0; history={replaceState:function(){rewrites++}}")
+        #expect(!bool(c, "window.__cmuxMotion.command('refit','16-2')"), "a refit already running stops the move")
+        #expect(bool(c, "location.search === before && rewrites === 0 && sent.length === 0"))
+    }
+
     @Test func refitSendsStillAndClearsTheKeptReportBeforeItSends() throws {
         let c = try page(); report(c)
         c.evaluateScript("sent=[]; refitAnswer = window.__cmuxMotion.command('refit')")

@@ -156,6 +156,27 @@ struct FigmaCLIRulesTests {
 
     // MARK: - The help text
 
+    @Test func fitNodeAcceptsBothSeparatorsAndEitherOptionOrder() {
+        for node in ["16-2", "16:2"] {
+            #expect(parsed("fit", ["--node", node, "--surface", "s"]) == .init(word: node, option: "s"))
+            #expect(parsed("fit", ["--surface", "s", "--node", node]) == .init(word: node, option: "s"))
+        }
+    }
+
+    @Test func fitNodeRefusalsNameTheFlag() {
+        #expect(refusal("fit", ["--node"]) == "--node requires a value")
+        #expect(refusal("fit", ["--node", "12-2", "--node", "16-2"]) == "cmux figma fit accepts --node only once")
+        for node in ["", "12", "-2", "1-2-3", "1:2&x=1", "1-2\n", " 1-2", "１-2", "1/2", "--surface"] {
+            #expect(refusal("fit", ["--node", node]) == "--node requires digits, ':' or '-', then digits", "\(node.debugDescription)")
+        }
+        #expect(refusal("goto", ["--node", "12-2"]) == "cmux figma goto does not support --node")
+    }
+
+    @Test func helpExplainsFitNodeAndEditorIgnoresIt() {
+        #expect(FigmaUsage.text.contains("--node <id>"))
+        #expect(FigmaUsage.text.contains("The editor ignores --node."))
+    }
+
     private var lines: [String] { FigmaUsage.text.components(separatedBy: "\n") }
 
     private func line(containing phrase: String) -> String? { lines.first { $0.contains(phrase) } }

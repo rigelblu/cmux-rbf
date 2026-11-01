@@ -937,6 +937,31 @@ struct FigmaCLIOutputTests {
     }
 
     private func presses(_ run: Run) -> [StandInSocket.Request] { run.requests.filter { $0.method == "browser.press" } }
+
+    @Test func fitNodeRoutesPreviewAndEditorAndRefusesBeforeDiscovery() throws {
+        let read = try drive(["figma", "fit", "--node", "16:2"], reply: Self.fitReply([Self.figmaPane(8, link: Self.readLink)]))
+        #expect(read.status == 0, "\(read.stderr)")
+        #expect(read.gotos.first?.params["node"] as? String == "1-2")
+        #expect(read.gotos.first?.params["fit_node"] as? String == "16:2")
+        #expect(read.gotos.first?.params["purpose"] as? String == "fit")
+        let editor = try drive(["figma", "fit", "--node", "16-2"], reply: Self.fitReply([Self.figmaPane(8)]))
+        #expect(editor.status == 0, "\(editor.stderr)")
+        #expect(presses(editor).first?.params["key"] as? String == "!")
+        #expect(editor.gotos.isEmpty)
+        let invalid = try drive(["figma", "fit", "--node", "16-2&x=1"], reply: Self.fitReply([Self.figmaPane(8)]))
+        fails(invalid, with: "--node requires digits, ':' or '-', then digits")
+        #expect(invalid.requests.isEmpty, "validation precedes pane discovery")
+    }
+
+    @Test func plainFitPreservesAnInstanceLayerAndSendsNoExplicitFitNode() throws {
+        let link = "https://embed.figma.com/design/KEY/slug?node-id=I123-45%3B67-89&embed-host=cmux"
+        let run = try drive(["figma", "fit"], reply: Self.fitReply([Self.figmaPane(8, link: link)]))
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.gotos.first?.params["node"] as? String == "I123-45;67-89")
+        #expect(run.gotos.first?.params["fit_node"] == nil)
+        #expect(run.gotos.first?.params["purpose"] as? String == "fit")
+        #expect(presses(run).isEmpty && evals(run).isEmpty)
+    }
     private func evals(_ run: Run) -> [StandInSocket.Request] { run.requests.filter { $0.method == "browser.eval" } }
 
     /// Nothing that moves the page or types into it was sent.
