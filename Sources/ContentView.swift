@@ -16702,6 +16702,7 @@ struct TabItemView: View, Equatable {
         )
 
         let showsLoadingSpinner = showsAgentActivity && workspaceSnapshot.activeCodingAgentCount > 0
+        let showsMonitoring = showsAgentActivity && workspaceSnapshot.monitoringAgentCount > 0 // (#cm-128.3)
         let showsHand = workspaceSnapshot.showsRaisedHand // (#cm-109.3)
         let slotResolution = SidebarWorkspaceSlotResolution.resolve( // (#cm-109.3)
             showsHand: showsHand, // (#cm-109.3)
@@ -16720,72 +16721,76 @@ struct TabItemView: View, Equatable {
         // primary (white over the corrected fill). Deriving it from the global
         // selection colour instead made the two renderers disagree whenever a
         // custom selectionColor was configured.
-        let spinnerColor = usesInvertedActiveForeground ? rowVisualPalette.primaryTextColor.withAlphaComponent(0.55) : .secondaryLabelColor
+        let spinnerColor = rowVisualPalette.agentActivityColor() // (#cm-128.3)
+        let rowContentAlpha = Double(SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus))
         let rowView = VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .sidebarTitleFirstLineCenter, spacing: titleRowSpacing) {
 
-                if leadingSlotActive {
-                    // cm-128.1: the leading slot holds the unread badge alone, so it is always the badge's width.
-                    SidebarWorkspaceLeadingStatusSlot(unreadCount: unreadCount, side: scaledUnreadBadgeSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor) // (#cm-109.3)
-                }
+                Group { // (#cm-128.3) normal content keeps the Done dim.
+                    if leadingSlotActive {
+                        // cm-128.1: the leading slot holds the unread badge alone, so it is always the badge's width.
+                        SidebarWorkspaceLeadingStatusSlot(unreadCount: unreadCount, side: scaledUnreadBadgeSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor) // (#cm-109.3)
+                    }
 
-                if workspaceSnapshot.isPinned {
-                    CmuxSystemSymbolImage(magnified: "pin.fill", pointSize: scaledFontSize(9), weight: .semibold, tint: activeSecondaryColor(0.8))
-                        .safeHelp(protectedWorkspaceTooltip)
-                }
+                    if workspaceSnapshot.isPinned {
+                        CmuxSystemSymbolImage(magnified: "pin.fill", pointSize: scaledFontSize(9), weight: .semibold, tint: activeSecondaryColor(0.8))
+                            .safeHelp(protectedWorkspaceTooltip)
+                    }
 
-                if workspaceSnapshot.isMuted {
-                    CmuxSystemSymbolImage(magnified: "bell.slash.fill", pointSize: scaledFontSize(9), weight: .semibold, tint: activeSecondaryColor(0.8))
-                        .safeHelp(String(localized: "sidebar.mutedWorkspace.tooltip", defaultValue: "Notifications muted for this workspace"))
-                }
+                    if workspaceSnapshot.isMuted {
+                        CmuxSystemSymbolImage(magnified: "bell.slash.fill", pointSize: scaledFontSize(9), weight: .semibold, tint: activeSecondaryColor(0.8))
+                            .safeHelp(String(localized: "sidebar.mutedWorkspace.tooltip", defaultValue: "Notifications muted for this workspace"))
+                    }
 
-                // Chrome-style media-activity glyphs: a noisy or capturing
-                // background browser pane is surfaced on its workspace row,
-                // styled like the pin indicator. Audio is the must-have signal;
-                // mic/camera follow the macOS orange/green convention.
-                SidebarMediaActivityIndicators(
-                    mediaActivity: workspaceSnapshot.mediaActivity,
-                    symbolPointSize: scaledFontSize(9),
-                    audioColor: activeSecondaryColor(0.8)
-                )
-
-                let manualTaskStatusIndicator = SidebarWorkspaceManualTaskStatusIndicatorModel(
-                    featureEnabled: todoControlsEnabled,
-                    taskStatus: workspaceSnapshot.taskStatus,
-                    hasManualOverride: workspaceSnapshot.hasManualTaskStatus, // (#cm-110.13)
-                    isHidden: workspaceSnapshot.taskStatusInput.isHidden // (#cm-110.13)
-                )
-                if let statusMenuModel = workspaceSnapshot.statusMenuModel(controlsEnabled: todoControlsEnabled), // (#cm-110.13)
-                   manualTaskStatusIndicator.showsIndicator {
-                    SidebarWorkspaceManualStatusIndicatorMenu(
-                        status: workspaceSnapshot.taskStatus ?? .todo, // (#cm-110.13)
-                        model: statusMenuModel,
-                        workspaceId: workspaceId,
-                        applyTodoStatus: actions.applyTodoStatus,
-                        hideTodoStatus: actions.hideTodoStatus,
-                        usesMonochrome: usesInvertedActiveForeground,
-                        monochromeColor: activeSecondaryColor(0.8),
-                        neutralColor: activeSecondaryColor(0.8),
-                        fontScale: fontScale, // (#cm-109.7)
-                        contrastBackground: rowContrastBackground, // (#cm-109.7)
-                        drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7) // (#cm-110.13)
+                    // Chrome-style media-activity glyphs: a noisy or capturing
+                    // background browser pane is surfaced on its workspace row,
+                    // styled like the pin indicator. Audio is the must-have signal;
+                    // mic/camera follow the macOS orange/green convention.
+                    SidebarMediaActivityIndicators(
+                        mediaActivity: workspaceSnapshot.mediaActivity,
+                        symbolPointSize: scaledFontSize(9),
+                        audioColor: activeSecondaryColor(0.8)
                     )
-                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
-                    .transition(.opacity)
-                }
 
-                if slotResolution.showsHand { // (#cm-109.3)
-                    WaitingHandView( // (#cm-109.7)
-                        pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
-                        colorScheme: colorScheme, // (#cm-109.7)
-                        rowBackground: rowContrastBackground, // (#cm-109.7)
-                        drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7)
-                    ) // (#cm-109.3)
-                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
-                    .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
-                    .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
-                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
-                } // (#cm-109.3)
+                    let manualTaskStatusIndicator = SidebarWorkspaceManualTaskStatusIndicatorModel(
+                        featureEnabled: todoControlsEnabled,
+                        taskStatus: workspaceSnapshot.taskStatus,
+                        hasManualOverride: workspaceSnapshot.hasManualTaskStatus, // (#cm-110.13)
+                        isHidden: workspaceSnapshot.taskStatusInput.isHidden // (#cm-110.13)
+                    )
+                    if let statusMenuModel = workspaceSnapshot.statusMenuModel(controlsEnabled: todoControlsEnabled), // (#cm-110.13)
+                       manualTaskStatusIndicator.showsIndicator {
+                        SidebarWorkspaceManualStatusIndicatorMenu(
+                            status: workspaceSnapshot.taskStatus ?? .todo, // (#cm-110.13)
+                            model: statusMenuModel,
+                            workspaceId: workspaceId,
+                            applyTodoStatus: actions.applyTodoStatus,
+                            hideTodoStatus: actions.hideTodoStatus,
+                            usesMonochrome: usesInvertedActiveForeground,
+                            monochromeColor: activeSecondaryColor(0.8),
+                            neutralColor: activeSecondaryColor(0.8),
+                            fontScale: fontScale, // (#cm-109.7)
+                            contrastBackground: rowContrastBackground, // (#cm-109.7)
+                            drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7) // (#cm-110.13)
+                        )
+                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
+                        .transition(.opacity)
+                    }
+
+                    if slotResolution.showsHand { // (#cm-109.3)
+                        WaitingHandView( // (#cm-109.7)
+                            pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
+                            colorScheme: colorScheme, // (#cm-109.7)
+                            rowBackground: rowContrastBackground, // (#cm-109.7)
+                            drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7)
+                        ) // (#cm-109.3)
+                        .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
+                        .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                        .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
+                    } // (#cm-109.3)
+                }
+                .opacity(rowContentAlpha)
 
                 // cm-128.1: the spinner set to the left draws after the glyph and the hand, beside them.
                 if slotResolution.markSpinner {
@@ -16793,180 +16798,169 @@ struct TabItemView: View, Equatable {
                         .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                 }
 
-                SidebarCloudWorkspaceBadgeView(label: workspaceSnapshot.cloudWorkspaceLabel, pointSize: scaledFontSize(10), tint: activeSecondaryColor(0.7))
+                if showsMonitoring { // (#cm-128.3)
+                    SidebarWorkspaceMonitoringWaveform(side: scaledLoadingSpinnerSize, color: spinnerColor)
+                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
+                }
 
-                if isEditing {
-                    SidebarInlineRenameField(
-                        initialText: renameDraft,
-                        fontSize: GlobalFontMagnification.scaledSize(scaledFontSize(12.5), percent: globalFontMagnificationPercent), textColor: selectedWorkspaceForegroundNSColor(opacity: 1.0),
-                        accessibilityLabel: String(
-                            localized: "sidebar.workspace.rename.field.accessibilityLabel",
-                            defaultValue: "Rename workspace"
-                        ),
-                        placeholder: String(
-                            localized: "commandPalette.rename.workspacePlaceholder",
-                            defaultValue: "Workspace name"
-                        ),
-                        onCommit: { newName in
-                            if let title = SidebarInlineRenameCommit().titleToCommit(
-                                draft: newName,
-                                baseline: renameDraft,
-                                baselineHadUserCustomTitle: renameBaselineHadUserCustomTitle
-                            ) {
-                                actions.setCustomTitle(title)
-                            }
-                            isEditing = false
-                        },
-                        onCancel: { isEditing = false }
-                    )
-                    .opacity(workspaceSnapshot.isMuted ? 0.6 : 1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .alignmentGuide(.sidebarTitleFirstLineCenter) { _ in titleFirstLineCenter }
-                    .layoutPriority(1)
-                } else {
-                    Text(displayedTitle)
-                        .font(magnifiedFont(scaledFontSize(12.5), weight: titleFontWeight))
-                        .foregroundColor(activePrimaryTextColor)
+                Group { // (#cm-128.3) normal content keeps the Done dim.
+                    SidebarCloudWorkspaceBadgeView(label: workspaceSnapshot.cloudWorkspaceLabel, pointSize: scaledFontSize(10), tint: activeSecondaryColor(0.7))
+
+                    if isEditing {
+                        SidebarInlineRenameField(
+                            initialText: renameDraft,
+                            fontSize: GlobalFontMagnification.scaledSize(scaledFontSize(12.5), percent: globalFontMagnificationPercent), textColor: selectedWorkspaceForegroundNSColor(opacity: 1.0),
+                            accessibilityLabel: String(
+                                localized: "sidebar.workspace.rename.field.accessibilityLabel",
+                                defaultValue: "Rename workspace"
+                            ),
+                            placeholder: String(
+                                localized: "commandPalette.rename.workspacePlaceholder",
+                                defaultValue: "Workspace name"
+                            ),
+                            onCommit: { newName in
+                                if let title = SidebarInlineRenameCommit().titleToCommit(
+                                    draft: newName,
+                                    baseline: renameDraft,
+                                    baselineHadUserCustomTitle: renameBaselineHadUserCustomTitle
+                                ) {
+                                    actions.setCustomTitle(title)
+                                }
+                                isEditing = false
+                            },
+                            onCancel: { isEditing = false }
+                        )
                         .opacity(workspaceSnapshot.isMuted ? 0.6 : 1)
-                        .lineLimit(titleLineLimit)
-                        .truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .alignmentGuide(.sidebarTitleFirstLineCenter) { _ in titleFirstLineCenter }
                         .layoutPriority(1)
+                    } else {
+                        Text(displayedTitle)
+                            .font(magnifiedFont(scaledFontSize(12.5), weight: titleFontWeight))
+                            .foregroundColor(activePrimaryTextColor)
+                            .opacity(workspaceSnapshot.isMuted ? 0.6 : 1)
+                            .lineLimit(titleLineLimit)
+                            .truncationMode(.tail)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .alignmentGuide(.sidebarTitleFirstLineCenter) { _ in titleFirstLineCenter }
+                            .layoutPriority(1)
+                    }
                 }
+                .opacity(rowContentAlpha)
 
                 if trailingStatusActive || canCloseWorkspace {
-                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, side: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, slotWidth: SidebarWorkspaceSlotResolution.trailingReserve(trailing: slotResolution.trailing, trailingInner: slotResolution.trailingInner, badgeSide: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, closeButtonWidth: scaledCloseButtonWidth), closeButtonWidth: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace) // (#cm-109.3)
+                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, side: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, slotWidth: SidebarWorkspaceSlotResolution.trailingReserve(trailing: slotResolution.trailing, trailingInner: slotResolution.trailingInner, badgeSide: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, closeButtonWidth: scaledCloseButtonWidth), closeButtonWidth: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace, contentAlpha: rowContentAlpha) // (#cm-128.3)
                 }
             }
 
-            if let description = workspaceSnapshot.customDescription {
-                SidebarWorkspaceDescriptionText(
-                    markdown: description,
-                    isActive: usesInvertedActiveForeground,
-                    activeForegroundColor: activeSecondaryColor(0.84),
-                    fontScale: fontScale
-                )
-            }
-
-            if let subtitle = displayedSubtitle {
-                Text(subtitle)
-                    .font(magnifiedFont(scaledFontSize(10)))
-                    .foregroundColor(activeSecondaryColor(0.8))
-                    .lineLimit(subtitleLineLimit)
-                    .truncationMode(.tail)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            let minimalTodoVisibility = SidebarWorkspaceTodoMinimalVisibility(
-                itemCount: workspaceSnapshot.checklistItems.count,
-                addFieldActivationToken: checklistAddFieldActivationToken,
-                isPopoverPresented: isChecklistPopoverPresented,
-                canAddItems: todoControlsEnabled
-            )
-            remoteWorkspaceSection(snapshot: workspaceSnapshot)
-
-            if detailVisibility.showsMetadata {
-                let metadataEntries = workspaceSnapshot.metadataEntries
-                let metadataBlocks = workspaceSnapshot.metadataBlocks
-                if !metadataEntries.isEmpty {
-                    SidebarMetadataRows(
-                        entries: metadataEntries,
+            Group { // (#cm-128.3) details stay at the existing Done opacity.
+                if let description = workspaceSnapshot.customDescription {
+                    SidebarWorkspaceDescriptionText(
+                        markdown: description,
                         isActive: usesInvertedActiveForeground,
-                        activeForegroundColor: activeSecondaryColor(0.95),
-                        activeSecondaryForegroundColor: activeSecondaryColor(0.65),
-                        fontScale: fontScale,
-                        onFocus: { updateSelection() }
+                        activeForegroundColor: activeSecondaryColor(0.84),
+                        fontScale: fontScale
                     )
-                    .transition(.opacity)
                 }
-                if !metadataBlocks.isEmpty {
-                    SidebarMetadataMarkdownBlocks(
-                        blocks: metadataBlocks,
-                        isActive: usesInvertedActiveForeground,
-                        activeForegroundColor: activeSecondaryColor(0.8),
-                        activeSecondaryForegroundColor: activeSecondaryColor(0.65),
-                        fontScale: fontScale,
-                        onFocus: { updateSelection() }
-                    )
-                    .transition(.opacity)
-                }
-            }
 
-            if detailVisibility.showsLog, let latestLog = workspaceSnapshot.latestLog {
-                HStack(alignment: .center, spacing: 4) {
-                    CmuxSystemSymbolImage(magnified: logLevelIcon(latestLog.level), pointSize: scaledFontSize(8), tint: logLevelColor(latestLog.level, isActive: usesInvertedActiveForeground))
-                    Text(latestLog.message)
+                if let subtitle = displayedSubtitle {
+                    Text(subtitle)
                         .font(magnifiedFont(scaledFontSize(10)))
                         .foregroundColor(activeSecondaryColor(0.8))
-                        .lineLimit(1)
+                        .lineLimit(subtitleLineLimit)
                         .truncationMode(.tail)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .transition(.opacity)
-            }
 
-            if detailVisibility.showsProgress, let progress = workspaceSnapshot.progress {
-                VStack(alignment: .leading, spacing: 2) {
-                    let progressFraction = CGFloat(max(0, min(progress.value, 1)))
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(activeProgressTrackColor)
-                        Capsule()
-                            .fill(activeProgressFillColor)
-                            .scaleEffect(x: progressFraction, y: 1, anchor: .leading)
+                let minimalTodoVisibility = SidebarWorkspaceTodoMinimalVisibility(
+                    itemCount: workspaceSnapshot.checklistItems.count,
+                    addFieldActivationToken: checklistAddFieldActivationToken,
+                    isPopoverPresented: isChecklistPopoverPresented,
+                    canAddItems: todoControlsEnabled
+                )
+                remoteWorkspaceSection(snapshot: workspaceSnapshot)
+
+                if detailVisibility.showsMetadata {
+                    let metadataEntries = workspaceSnapshot.metadataEntries
+                    let metadataBlocks = workspaceSnapshot.metadataBlocks
+                    if !metadataEntries.isEmpty {
+                        SidebarMetadataRows(
+                            entries: metadataEntries,
+                            isActive: usesInvertedActiveForeground,
+                            activeForegroundColor: activeSecondaryColor(0.95),
+                            activeSecondaryForegroundColor: activeSecondaryColor(0.65),
+                            fontScale: fontScale,
+                            onFocus: { updateSelection() }
+                        )
+                        .transition(.opacity)
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: max(3, 3 * fontScale))
+                    if !metadataBlocks.isEmpty {
+                        SidebarMetadataMarkdownBlocks(
+                            blocks: metadataBlocks,
+                            isActive: usesInvertedActiveForeground,
+                            activeForegroundColor: activeSecondaryColor(0.8),
+                            activeSecondaryForegroundColor: activeSecondaryColor(0.65),
+                            fontScale: fontScale,
+                            onFocus: { updateSelection() }
+                        )
+                        .transition(.opacity)
+                    }
+                }
 
-                    if let label = progress.label {
-                        Text(label)
-                            .font(magnifiedFont(scaledFontSize(9)))
-                            .foregroundColor(activeSecondaryColor(0.6))
+                if detailVisibility.showsLog, let latestLog = workspaceSnapshot.latestLog {
+                    HStack(alignment: .center, spacing: 4) {
+                        CmuxSystemSymbolImage(magnified: logLevelIcon(latestLog.level), pointSize: scaledFontSize(8), tint: logLevelColor(latestLog.level, isActive: usesInvertedActiveForeground))
+                        Text(latestLog.message)
+                            .font(magnifiedFont(scaledFontSize(10)))
+                            .foregroundColor(activeSecondaryColor(0.8))
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     }
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
-            }
 
-            // Branch + directory row
-            if detailVisibility.showsBranchDirectory {
-                if sidebarBranchLayout == .vertical {
-                    if !workspaceSnapshot.branchDirectoryLines.isEmpty {
-                        HStack(alignment: .top, spacing: 3) {
-                            if sidebarShowGitBranchIcon, workspaceSnapshot.branchLinesContainBranch {
-                                CmuxSystemSymbolImage(magnified: "arrow.triangle.branch", pointSize: scaledFontSize(9), tint: activeSecondaryColor(0.6))
-                            }
-                            VStack(alignment: .leading, spacing: 1) {
-                                ForEach(Array(workspaceSnapshot.branchDirectoryLines.enumerated()), id: \.offset) { _, line in
-                                    if sidebarBranchDirectoryPlacement == .stacked {
-                                        if let branch = line.branch {
-                                            Text(branch)
-                                                .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
-                                                .foregroundColor(activeSecondaryColor(0.75))
-                                                .lineLimit(1)
-                                                .truncationMode(.tail)
-                                        }
-                                        if !line.directoryCandidates.isEmpty {
-                                            SidebarDirectoryText(
-                                                candidates: line.directoryCandidates,
-                                                color: activeSecondaryColor(0.75),
-                                                fontScale: fontScale
-                                            )
-                                        }
-                                    } else {
-                                        HStack(spacing: 3) {
+                if detailVisibility.showsProgress, let progress = workspaceSnapshot.progress {
+                    VStack(alignment: .leading, spacing: 2) {
+                        let progressFraction = CGFloat(max(0, min(progress.value, 1)))
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(activeProgressTrackColor)
+                            Capsule()
+                                .fill(activeProgressFillColor)
+                                .scaleEffect(x: progressFraction, y: 1, anchor: .leading)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: max(3, 3 * fontScale))
+
+                        if let label = progress.label {
+                            Text(label)
+                                .font(magnifiedFont(scaledFontSize(9)))
+                                .foregroundColor(activeSecondaryColor(0.6))
+                                .lineLimit(1)
+                        }
+                    }
+                    .transition(.opacity)
+                }
+
+                // Branch + directory row
+                if detailVisibility.showsBranchDirectory {
+                    if sidebarBranchLayout == .vertical {
+                        if !workspaceSnapshot.branchDirectoryLines.isEmpty {
+                            HStack(alignment: .top, spacing: 3) {
+                                if sidebarShowGitBranchIcon, workspaceSnapshot.branchLinesContainBranch {
+                                    CmuxSystemSymbolImage(magnified: "arrow.triangle.branch", pointSize: scaledFontSize(9), tint: activeSecondaryColor(0.6))
+                                }
+                                VStack(alignment: .leading, spacing: 1) {
+                                    ForEach(Array(workspaceSnapshot.branchDirectoryLines.enumerated()), id: \.offset) { _, line in
+                                        if sidebarBranchDirectoryPlacement == .stacked {
                                             if let branch = line.branch {
                                                 Text(branch)
                                                     .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
                                                     .foregroundColor(activeSecondaryColor(0.75))
                                                     .lineLimit(1)
                                                     .truncationMode(.tail)
-                                            }
-                                            if line.branch != nil, !line.directoryCandidates.isEmpty {
-                                                CmuxSystemSymbolImage(magnified: "circle.fill", pointSize: scaledFontSize(3), tint: activeSecondaryColor(0.6))
-                                                    .padding(.horizontal, 1)
                                             }
                                             if !line.directoryCandidates.isEmpty {
                                                 SidebarDirectoryText(
@@ -16975,140 +16969,153 @@ struct TabItemView: View, Equatable {
                                                     fontScale: fontScale
                                                 )
                                             }
+                                        } else {
+                                            HStack(spacing: 3) {
+                                                if let branch = line.branch {
+                                                    Text(branch)
+                                                        .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
+                                                        .foregroundColor(activeSecondaryColor(0.75))
+                                                        .lineLimit(1)
+                                                        .truncationMode(.tail)
+                                                }
+                                                if line.branch != nil, !line.directoryCandidates.isEmpty {
+                                                    CmuxSystemSymbolImage(magnified: "circle.fill", pointSize: scaledFontSize(3), tint: activeSecondaryColor(0.6))
+                                                        .padding(.horizontal, 1)
+                                                }
+                                                if !line.directoryCandidates.isEmpty {
+                                                    SidebarDirectoryText(
+                                                        candidates: line.directoryCandidates,
+                                                        color: activeSecondaryColor(0.75),
+                                                        fontScale: fontScale
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                } else if sidebarBranchDirectoryPlacement == .stacked,
-                          (workspaceSnapshot.compactGitBranchSummaryText != nil
-                           || !workspaceSnapshot.compactDirectoryCandidates.isEmpty) {
-                    HStack(alignment: .top, spacing: 3) {
-                        if sidebarShowGitBranchIcon, workspaceSnapshot.compactGitBranchSummaryText != nil {
-                            CmuxSystemSymbolImage(magnified: "arrow.triangle.branch", pointSize: scaledFontSize(9), tint: activeSecondaryColor(0.6))
-                        }
-                        VStack(alignment: .leading, spacing: 1) {
-                            if let branchRow = workspaceSnapshot.compactGitBranchSummaryText {
-                                Text(branchRow)
-                                    .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
-                                    .foregroundColor(activeSecondaryColor(0.75))
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
+                    } else if sidebarBranchDirectoryPlacement == .stacked,
+                              (workspaceSnapshot.compactGitBranchSummaryText != nil
+                               || !workspaceSnapshot.compactDirectoryCandidates.isEmpty) {
+                        HStack(alignment: .top, spacing: 3) {
+                            if sidebarShowGitBranchIcon, workspaceSnapshot.compactGitBranchSummaryText != nil {
+                                CmuxSystemSymbolImage(magnified: "arrow.triangle.branch", pointSize: scaledFontSize(9), tint: activeSecondaryColor(0.6))
                             }
-                            if !workspaceSnapshot.compactDirectoryCandidates.isEmpty {
-                                SidebarDirectoryText(
-                                    candidates: workspaceSnapshot.compactDirectoryCandidates,
-                                    color: activeSecondaryColor(0.75),
-                                    fontScale: fontScale
-                                )
+                            VStack(alignment: .leading, spacing: 1) {
+                                if let branchRow = workspaceSnapshot.compactGitBranchSummaryText {
+                                    Text(branchRow)
+                                        .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
+                                        .foregroundColor(activeSecondaryColor(0.75))
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                                if !workspaceSnapshot.compactDirectoryCandidates.isEmpty {
+                                    SidebarDirectoryText(
+                                        candidates: workspaceSnapshot.compactDirectoryCandidates,
+                                        color: activeSecondaryColor(0.75),
+                                        fontScale: fontScale
+                                    )
+                                }
                             }
                         }
-                    }
-                } else if !workspaceSnapshot.compactBranchDirectoryCandidates.isEmpty {
-                    HStack(spacing: 3) {
-                        if sidebarShowGitBranchIcon, workspaceSnapshot.compactGitBranchSummaryText != nil {
-                            CmuxSystemSymbolImage(magnified: "arrow.triangle.branch", pointSize: scaledFontSize(9), tint: activeSecondaryColor(0.6))
-                        }
-                        SidebarDirectoryText(
-                            candidates: workspaceSnapshot.compactBranchDirectoryCandidates,
-                            color: activeSecondaryColor(0.75),
-                            fontScale: fontScale
-                        )
-                    }
-                }
-            }
-
-            // Pull request rows
-            if detailVisibility.showsPullRequests, !workspaceSnapshot.pullRequestRows.isEmpty {
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach(workspaceSnapshot.pullRequestRows) { pullRequest in
-                        let pullRequestNumber = String(pullRequest.number)
-                        let pullRequestTitle = "\(pullRequest.label) #\(pullRequestNumber)"
-                        let rowContent = HStack(alignment: .center, spacing: 4) {
-                            PullRequestStatusIcon(
-                                status: pullRequest.status,
-                                color: pullRequestForegroundColor,
+                    } else if !workspaceSnapshot.compactBranchDirectoryCandidates.isEmpty {
+                        HStack(spacing: 3) {
+                            if sidebarShowGitBranchIcon, workspaceSnapshot.compactGitBranchSummaryText != nil {
+                                CmuxSystemSymbolImage(magnified: "arrow.triangle.branch", pointSize: scaledFontSize(9), tint: activeSecondaryColor(0.6))
+                            }
+                            SidebarDirectoryText(
+                                candidates: workspaceSnapshot.compactBranchDirectoryCandidates,
+                                color: activeSecondaryColor(0.75),
                                 fontScale: fontScale
                             )
-                            Text(pullRequestTitle).underline(settings.makesPullRequestsClickable).lineLimit(1).truncationMode(.tail)
-                            Text(pullRequestStatusLabel(pullRequest.status)).lineLimit(1)
-                            Spacer(minLength: 0)
-                        }
-                        .font(magnifiedFont(scaledFontSize(10), weight: .semibold))
-                        .foregroundColor(pullRequestForegroundColor)
-                        .opacity(pullRequest.isStale ? 0.5 : 1)
-                        if settings.makesPullRequestsClickable {
-                            Button(action: { openPullRequestLink(pullRequest.url) }) { rowContent }
-                                .buttonStyle(.plain)
-                                .tint(pullRequestForegroundColor)
-                                .safeHelp(String(localized: "sidebar.pullRequest.openTooltip", defaultValue: "Open \(pullRequestTitle)"))
-                                .accessibilityIdentifier("SidebarPullRequestRow")
-                        } else {
-                            rowContent.accessibilityElement(children: .combine).accessibilityIdentifier("SidebarPullRequestRow")
                         }
                     }
                 }
-            }
 
-            // Ports row
-            if detailVisibility.showsPorts, !workspaceSnapshot.listeningPorts.isEmpty {
-                HStack(spacing: 4) {
-                    ForEach(workspaceSnapshot.listeningPorts, id: \.self) { port in
-                        let portLabel = SidebarPortDisplayText.label(for: port)
-                        let portTooltip = SidebarPortDisplayText.openTooltip(for: port)
-                        Button(action: {
-                            openPortLink(port)
-                        }) {
-                            Text(portLabel)
-                                .underline()
+                // Pull request rows
+                if detailVisibility.showsPullRequests, !workspaceSnapshot.pullRequestRows.isEmpty {
+                    VStack(alignment: .leading, spacing: 1) {
+                        ForEach(workspaceSnapshot.pullRequestRows) { pullRequest in
+                            let pullRequestNumber = String(pullRequest.number)
+                            let pullRequestTitle = "\(pullRequest.label) #\(pullRequestNumber)"
+                            let rowContent = HStack(alignment: .center, spacing: 4) {
+                                PullRequestStatusIcon(
+                                    status: pullRequest.status,
+                                    color: pullRequestForegroundColor,
+                                    fontScale: fontScale
+                                )
+                                Text(pullRequestTitle).underline(settings.makesPullRequestsClickable).lineLimit(1).truncationMode(.tail)
+                                Text(pullRequestStatusLabel(pullRequest.status)).lineLimit(1)
+                                Spacer(minLength: 0)
+                            }
+                            .font(magnifiedFont(scaledFontSize(10), weight: .semibold))
+                            .foregroundColor(pullRequestForegroundColor)
+                            .opacity(pullRequest.isStale ? 0.5 : 1)
+                            if settings.makesPullRequestsClickable {
+                                Button(action: { openPullRequestLink(pullRequest.url) }) { rowContent }
+                                    .buttonStyle(.plain)
+                                    .tint(pullRequestForegroundColor)
+                                    .safeHelp(String(localized: "sidebar.pullRequest.openTooltip", defaultValue: "Open \(pullRequestTitle)"))
+                                    .accessibilityIdentifier("SidebarPullRequestRow")
+                            } else {
+                                rowContent.accessibilityElement(children: .combine).accessibilityIdentifier("SidebarPullRequestRow")
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .safeHelp(portTooltip)
                     }
-                    Spacer(minLength: 0)
                 }
-                .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
-                .foregroundColor(activeSecondaryColor(0.75))
-                .lineLimit(1)
-            }
 
-            // Rendered whenever there is content, a pending add request, or an OPEN
-            // popover — unmounting dismantles the popover's anchor mid-presentation.
-            if minimalTodoVisibility.showsChecklistSection {
-                SidebarWorkspaceChecklistSection(
-                    items: workspaceSnapshot.checklistItems,
-                    completedCount: workspaceSnapshot.checklistCompletedCount,
-                    totalCount: workspaceSnapshot.checklistTotalCount,
-                    firstUncheckedText: workspaceSnapshot.checklistFirstUncheckedText,
-                    workspaceTitle: workspaceSnapshot.title,
-                    isExpanded: isChecklistExpanded,
-                    addFieldActivationToken: checklistAddFieldActivationToken,
-                    usesPopoverPresentation: settings.workspaceTodoChecklistStyle == .popover,
-                    isPopoverPresented: isChecklistPopoverPresented,
-                    primaryColor: activeSecondaryColor(0.9),
-                    secondaryColor: activeSecondaryColor(0.65),
-                    summaryFont: magnifiedFont(scaledFontSize(10), weight: .semibold, monospacedDigit: true),
-                    itemFont: magnifiedFont(scaledFontSize(10)),
-                    fontScale: fontScale,
-                    canAddItems: todoControlsEnabled,
-                    onToggleExpansion: actions.onToggleChecklistExpansion,
-                    onPopoverPresentedChange: actions.onChecklistPopoverPresentedChange,
-                    onConsumeAddFieldActivation: actions.onConsumeChecklistAddFieldActivation,
-                    actions: actions.checklist
-                )
-                .transition(.opacity)
+                // Ports row
+                if detailVisibility.showsPorts, !workspaceSnapshot.listeningPorts.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(workspaceSnapshot.listeningPorts, id: \.self) { port in
+                            let portLabel = SidebarPortDisplayText.label(for: port)
+                            let portTooltip = SidebarPortDisplayText.openTooltip(for: port)
+                            Button(action: {
+                                openPortLink(port)
+                            }) {
+                                Text(portLabel)
+                                    .underline()
+                            }
+                            .buttonStyle(.plain)
+                            .safeHelp(portTooltip)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .font(magnifiedFont(scaledFontSize(10), design: .monospaced))
+                    .foregroundColor(activeSecondaryColor(0.75))
+                    .lineLimit(1)
+                }
+
+                // Rendered whenever there is content, a pending add request, or an OPEN
+                // popover — unmounting dismantles the popover's anchor mid-presentation.
+                if minimalTodoVisibility.showsChecklistSection {
+                    SidebarWorkspaceChecklistSection(
+                        items: workspaceSnapshot.checklistItems,
+                        completedCount: workspaceSnapshot.checklistCompletedCount,
+                        totalCount: workspaceSnapshot.checklistTotalCount,
+                        firstUncheckedText: workspaceSnapshot.checklistFirstUncheckedText,
+                        workspaceTitle: workspaceSnapshot.title,
+                        isExpanded: isChecklistExpanded,
+                        addFieldActivationToken: checklistAddFieldActivationToken,
+                        usesPopoverPresentation: settings.workspaceTodoChecklistStyle == .popover,
+                        isPopoverPresented: isChecklistPopoverPresented,
+                        primaryColor: activeSecondaryColor(0.9),
+                        secondaryColor: activeSecondaryColor(0.65),
+                        summaryFont: magnifiedFont(scaledFontSize(10), weight: .semibold, monospacedDigit: true),
+                        itemFont: magnifiedFont(scaledFontSize(10)),
+                        fontScale: fontScale,
+                        canAddItems: todoControlsEnabled,
+                        onToggleExpansion: actions.onToggleChecklistExpansion,
+                        onPopoverPresentedChange: actions.onChecklistPopoverPresentedChange,
+                        onConsumeAddFieldActivation: actions.onConsumeChecklistAddFieldActivation,
+                        actions: actions.checklist
+                    )
+                    .transition(.opacity)
+                }
             }
+            .opacity(rowContentAlpha)
         }
-        // Done rows read as settled: dim the row content (not the selection
-        // background) to ~60%; hit-testing is unaffected by opacity.
-        // Deliberately reads `taskStatus` (gated on `statusHidden`), unlike the strip
-        // suppression which reads `attentionTaskStatus` (ungated). Do not unify them.
-        // The decision lives in the palette so both renderers share it.
-        .opacity(
-            SidebarWorkspaceRowVisualPalette
-                .contentAlpha(taskStatus: workspaceSnapshot.taskStatus)
-        )
         // No implicit .animation(value:) on agent-mutable fields: animating a
         // row-height change interpolates the LazyVStack's measured height over
         // every frame of the 0.2s curve, and with dozens of agent sessions some

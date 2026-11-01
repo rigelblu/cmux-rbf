@@ -332,6 +332,37 @@ struct SidebarWorkspaceRowVisualPalette {
         return secondaryBaseColor.withAlphaComponent(max(0, min(opacity, 1)))
     }
 
+    /// Selected activity marks clear 3:1 in continuous color, then step up until their 8-bit pixels do too.
+    /// The spinner and waveform sit outside the Done content dim. Unselected rows keep the system grey. (#cm-128.3)
+    func agentActivityColor() -> NSColor {
+        guard isActive, let fill = backgroundStyle.color else { return .secondaryLabelColor }
+        var lower: CGFloat = 0
+        var upper: CGFloat = 1
+        for _ in 0..<24 {
+            let alpha = (lower + upper) / 2
+            let drawn = cmuxCompositedNSColor(primaryTextColor.withAlphaComponent(alpha), over: fill)
+            if cmuxContrastRatio(foreground: drawn, background: fill) >= 3 {
+                upper = alpha
+            } else {
+                lower = alpha
+            }
+        }
+        let pixelFill = Self.eightBitActivityColor(fill)
+        while upper < 1 {
+            let drawn = cmuxCompositedNSColor(primaryTextColor.withAlphaComponent(upper), over: fill)
+            if cmuxContrastRatio(foreground: Self.eightBitActivityColor(drawn), background: pixelFill) >= 3 { break }
+            upper = min(1, upper + 1 / 255)
+        }
+        return primaryTextColor.withAlphaComponent(upper)
+    }
+
+    private static func eightBitActivityColor(_ color: NSColor) -> NSColor {
+        let rgb = color.usingColorSpace(.sRGB) ?? color
+        return NSColor(srgbRed: (rgb.redComponent * 255).rounded() / 255,
+            green: (rgb.greenComponent * 255).rounded() / 255,
+            blue: (rgb.blueComponent * 255).rounded() / 255, alpha: 1)
+    }
+
     private static func darkenedForWhiteText(_ identityColor: NSColor) -> NSColor {
         let opaqueIdentity = (identityColor.usingColorSpace(.sRGB) ?? identityColor)
             .withAlphaComponent(1)
