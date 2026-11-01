@@ -12,8 +12,14 @@ import Foundation
 /// no zoom to fit, from anyone, so the CLI sends `figma.goto` with `purpose: fit`
 /// for the node its address already names, the same board or the whole page (`0-1`),
 /// and the app re-fits in place: Figma's own frame redraws, and cmux's page is not loaded again.
-/// Never a different node: a fit re-centers what is showing (Tom, 2026-10-20).
+/// With `--node`, the preview moves inside Figma's frame when that node differs; the editor ignores it (Tom, 2026-11-01).
 enum FigmaFit {
+
+    /// Check the complete, untrimmed input before it reaches a URL or script. Both separators name the same node.
+    static func normalizedNode(_ node: String) -> String? {
+        guard node.range(of: "\\A[0-9]+[:-][0-9]+\\z", options: .regularExpression) != nil else { return nil }
+        return node.replacingOccurrences(of: ":", with: "-")
+    }
 
     /// Which way `fit` went, as `--json` carries it.
     enum Mode: String, Equatable {

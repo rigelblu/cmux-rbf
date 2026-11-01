@@ -27,9 +27,26 @@ enum FigmaMotion {
     }
     """#
 
+    /// Shared by the frame and cmux's page. A complete ASCII node is the only value allowed into an address.
+    static let nodeScript = #"""
+    function cmuxFigmaNode(node) {
+      if (typeof node !== 'string') return null;
+      var match = /^[0-9]+[:-][0-9]+$/.exec(node);
+      return match && match[0] === node ? node.replace(':', '-') : null;
+    }
+    function cmuxAddressWithNode(address, node) {
+      var hash = address.indexOf('#'), suffix = hash < 0 ? '' : address.slice(hash);
+      if (hash >= 0) address = address.slice(0, hash);
+      var mark = address.indexOf('?'), base = mark < 0 ? address : address.slice(0, mark);
+      var query = new URLSearchParams(mark < 0 ? '' : address.slice(mark + 1));
+      query.set('node-id', node);
+      return base + '?' + query.toString() + suffix;
+    }
+    """#
+
     // Installed only in a preview web view, including its retained/replacement views.
     // Login and interstitial documents keep the real clock.
-    static let clockScript = FigmaPlayScript.script + FigmaPlayScript.stillAddressScript + fitKeyScript + #"""
+    static let clockScript = FigmaPlayScript.script + FigmaPlayScript.stillAddressScript + fitKeyScript + nodeScript + #"""
     (function () {
       if (window === window.parent || !/(^|\.)figma\.com$/i.test(location.hostname)) return;
       // cmux-rbf (#cm-73.44): this script is for cmux's preview only. When the top page is Figma's own (the pane shows the
@@ -213,8 +230,11 @@ enum FigmaMotion {
         var data = e.data || {};
         if (!data.cmuxClockCommand) return;
         if (data.kind === 'still' || data.kind === 'player') {
+          var node = data.node === undefined ? null : cmuxFigmaNode(data.node);
+          if (data.node !== undefined && (data.kind !== 'still' || node === null)) return;
           endPan(); // cmux-rbf (#cm-73.41): refit also reaches this branch as kind: still.
           var target = data.kind === 'player' ? cmuxProtoAddress(location.href, 'e5e5e5') : cmuxStillAddress(location.href);
+          if (node !== null) target = cmuxAddressWithNode(target, node);
           target = target.replace(/^https:\/\/[^/]+/i, 'https://www.figma.com');
           window.name = data.kind === 'player' ? 'cmux-run' : 'cmux-freeze';
           location.replace(target);
@@ -257,6 +277,7 @@ enum FigmaMotion {
           var labels = \(json);
           var startRunning = \(run ? "true" : "false");
           \(fitKeyScript)
+          \(nodeScript)
           \(pageControllerScript)
         })();
         """
@@ -322,16 +343,28 @@ enum FigmaMotion {
       }
       post(snapshot());
     }
-    function command(action) {
+    function command(action, node) {
       if (action === 'freeze') {
         if (kind === 'player') { mode = 'freeze'; send({ mode: mode }); }
       } else {
         if (state() === 'loading') return false;
         if (action === 'refit') {
+          if (node !== undefined) {
+            node = cmuxFigmaNode(node);
+            if (node === null) return false;
+          }
           // cmux-rbf (#cm-73.46): only a drawn, still /design/ or /file/ page redraws. The kept report goes first,
           // so this reply and the render carry no old drawn report: the next one is the redrawn document's own.
           if (kind !== 'still' || !lastReport || lastReport.drawn !== true || !/^\/(design|file)\//.test(lastReport.path || '')) return false;
-          lastReport = null; drawn = false; send({ kind: 'still' });
+          lastReport = null; drawn = false;
+          if (node === undefined) send({ kind: 'still' });
+          else {
+            send({ kind: 'still', node: node });
+            source = cmuxAddressWithNode(source, node);
+            params = new URLSearchParams(location.search);
+            params.set('embed', source);
+            history.replaceState(history.state, '', location.pathname + '?' + params.toString() + location.hash);
+          }
         } else if (action === 'still') {
           if (kind === 'still') return false;
           kind = 'still'; pendingKind = 'still'; drawn = false; mode = 'freeze'; send({ kind: 'still' });
@@ -385,8 +418,10 @@ enum FigmaMotion {
         case refit
     }
 
-    static func commandScript(_ command: Command) -> String {
-        "window.__cmuxMotion && window.__cmuxMotion.command('\(command.rawValue)')"
+    static func commandScript(_ command: Command, node: String? = nil) -> String {
+        guard let node else { return "window.__cmuxMotion && window.__cmuxMotion.command('\(command.rawValue)')" }
+        guard command == .refit, let node = FigmaFit.normalizedNode(node) else { return "false" }
+        return "window.__cmuxMotion && window.__cmuxMotion.command('\(command.rawValue)', '\(node)')"
     }
 }
 
