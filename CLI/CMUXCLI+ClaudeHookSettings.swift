@@ -36,11 +36,10 @@ extension CMUXCLI {
                 isAsync: true
             ),
         ])
-        hooks["SubagentStop"] = [
-            Self.claudeQueuedHookGroup(
-                subcommand: "feed"
-            ),
-        ]
+        // cmux-rbf: the journal must see a helper start before its parent's Stop. (#cm-128.3)
+        for event in ["SubagentStart", "SubagentStop"] {
+            hooks[event] = [Self.claudeQueuedHookGroup(subcommand: "feed")]
+        }
         hooks["PreToolUse"] = [
             Self.claudeHookGroup(
                 matcher: "CronCreate",

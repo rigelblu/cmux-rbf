@@ -17,6 +17,7 @@ struct ClearAgentStateAvailabilityTests {
         let panel = try #require(workspace.focusedPanelId)
         #expect(!workspace.hasClearableAgentState, "a quiet workspace has nothing to clear")
         for (key, state) in [("claude_code", AgentHibernationLifecycleState.needsInput), ("codex", .running),
+                             ("claude_code", .monitoring),
                              ("cmux.feed.attention:claude_code", .needsInput)] {
             workspace.agentLifecycleStatesByPanelId = [panel: [key: state]]
             #expect(workspace.hasClearableAgentState, "\(key) \(state) must enable it")

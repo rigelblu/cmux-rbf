@@ -319,7 +319,8 @@ final class CmuxFeatureFlags {
     }
 
     var isSidebarWorkspaceAgentSpinnerEnabled: Bool {
-        effectiveValue(for: Self.allFlags[4])
+        // cmux-rbf: agent activity is always visible, regardless of the remote experiment. (#cm-128.3)
+        true
     }
 
     var isComputerUseUXEnabled: Bool {

@@ -5,6 +5,8 @@ public struct WorkspaceTaskStatusSignals: Equatable, Sendable {
     public var anyAgentNeedsInput: Bool
     /// Whether any agent in the workspace is running.
     public var anyAgentRunning: Bool
+    /// Whether any agent has finished its turn and is watching background work.
+    public var anyAgentMonitoring: Bool
     /// Whether any sidebar pull request is open.
     public var anyOpenPullRequest: Bool
     /// Whether the workspace has any sidebar pull requests at all.
@@ -21,10 +23,12 @@ public struct WorkspaceTaskStatusSignals: Equatable, Sendable {
         anyOpenPullRequest: Bool = false,
         hasPullRequests: Bool = false,
         allPullRequestsMergedOrClosed: Bool = false,
-        isGitDirty: Bool = false
+        isGitDirty: Bool = false,
+        anyAgentMonitoring: Bool = false
     ) {
         self.anyAgentNeedsInput = anyAgentNeedsInput
         self.anyAgentRunning = anyAgentRunning
+        self.anyAgentMonitoring = anyAgentMonitoring
         self.anyOpenPullRequest = anyOpenPullRequest
         self.hasPullRequests = hasPullRequests
         self.allPullRequestsMergedOrClosed = allPullRequestsMergedOrClosed

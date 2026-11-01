@@ -19,12 +19,19 @@ public struct AgentNotificationReconciler: Sendable {
         var turn: String = "initial"
         var nativeTurn: String?
         var seenTurns: Set<String> = []
-        var phase: AgentLifecyclePhase = .unknown
+        var phase: AgentLifecyclePhase = .unknown {
+            didSet {
+                // A hand can suspend watching; a settled or failed phase ends it. (#cm-128.3)
+                if phase != .running && phase != .needsInput { watching = false }
+            }
+        }
         var ended = false
         var attentionEpoch: Int64 = 0
         var children: Set<String> = []
         var finishedChildren: Set<String> = []
         var rootStopped = false
+        // cmux-rbf: the root finished watching background work, with no live child. (#cm-128.3)
+        var watching = false
         var pendingCompletion: AgentJournalEvent?
         var delivered: [String: String] = [:]
         // Blocking requests, separate from error and completion history.
@@ -41,6 +48,7 @@ public struct AgentNotificationReconciler: Sendable {
         mutating func resumeWork() {
             rootStopped = false
             pendingCompletion = nil
+            watching = false
             phase = .running
         }
 
@@ -101,6 +109,12 @@ public struct AgentNotificationReconciler: Sendable {
             || draft.kind == .childCompleted || draft.kind == .childFailed
         var requestInvalidations: [String] = []
         if isResolution {
+            // Claude also sends unmatched SubagentStop events after a root Stop. (#cm-128.3)
+            if draft.source == "claude", draft.kind == .childCompleted || draft.kind == .childFailed {
+                guard let child = context?.requestIdentity, session.children.contains(child) else {
+                    return .init(.observation, projectsLifecycle: false)
+                }
+            }
             // A work observation is not a resolution. Only this explicit semantic
             // event can retire an immutable request/child ID behind a newer watermark.
             // A late reply still retires its own request, but it never reopens a
@@ -242,14 +256,20 @@ public struct AgentNotificationReconciler: Sendable {
             session.ended = false
         case .turnStarted:
             session.rootStopped = false
+            let wasWatching = session.watching
+            session.watching = false
             if let key = context?.eventIdentity { session.starts.insert(key) }
-            if incomingTurn != nil || context?.eventIdentity != nil || session.phase != .running {
+            if incomingTurn != nil || context?.eventIdentity != nil || session.phase != .running || wasWatching {
                 session.turn = incomingTurn ?? context?.eventIdentity ?? draft.eventId
                 session.nativeTurn = incomingTurn
             }
             session.phase = .running
             session.ended = false
         case .turnCompleted:
+            // A Claude Stop counts background helpers too: no pending work proves a lost child Stop is settled. (#cm-128.3)
+            if draft.source == "claude", !draft.pendingWork { session.children.removeAll() }
+            // Codex's pending-work signal is always its live-child count. (#cm-128.3)
+            session.watching = draft.source != "codex" && draft.pendingWork && session.children.isEmpty
             session.rootStopped = !draft.pendingWork
             if !draft.pendingWork, !session.children.isEmpty, context?.notification != nil {
                 session.pendingCompletion = event
@@ -273,7 +293,9 @@ public struct AgentNotificationReconciler: Sendable {
             session.phase = .error
         case .sessionEnded:
             session.ended = true
+            session.watching = false
         case .stateChanged:
+            if draft.declaredPhase == .running || draft.declaredPhase == .unknown { session.watching = false }
             if draft.declaredPhase == .running {
                 session.rootStopped = false
                 session.pendingCompletion = nil
@@ -284,6 +306,7 @@ public struct AgentNotificationReconciler: Sendable {
         case .childSpawned:
             if let child = context?.requestIdentity, !session.finishedChildren.contains(child) {
                 session.children.insert(child)
+                session.watching = false
                 if session.phase == .idle || session.phase == .unknown { session.phase = .running }
             }
         case .childCompleted, .childFailed:
@@ -298,7 +321,7 @@ public struct AgentNotificationReconciler: Sendable {
         let boundary: String
         switch draft.kind {
         case .turnCompleted:
-            guard session.phase == .idle else { return .init(.delayed) }
+            guard session.phase == .idle || (session.phase == .running && session.watching) else { return .init(.delayed) }
             boundary = Self.key(["completion", incomingTurn ?? session.turn])
         case .approvalRequested, .questionRequested, .planReviewRequested:
             // A real blocking request is never gated by background work.
@@ -333,23 +356,24 @@ public struct AgentNotificationReconciler: Sendable {
         var draft = event.draft
         guard let sessionID = draft.sessionId,
               let session = sessions[Self.key([draft.source, sessionID])] else { return event }
+        let phase: AgentLifecyclePhase = session.phase == .running && session.watching ? .monitoring : session.phase
         switch draft.kind {
         case .sessionStarted where session.phase != .unknown:
             draft.kind = .stateChanged
-            draft.declaredPhase = session.phase
+            draft.declaredPhase = phase
         case .turnCompleted:
-            if session.phase == .needsInput {
+            if phase == .needsInput || phase == .monitoring {
                 draft.kind = .stateChanged
-                draft.declaredPhase = .needsInput
+                draft.declaredPhase = phase
             } else {
                 draft.pendingWork = session.phase == .running
             }
         case .stateChanged where draft.declaredPhase != nil:
-            draft.declaredPhase = session.phase
+            draft.declaredPhase = phase
         case .idleObserved, .attentionResolved, .childSpawned, .childCompleted, .childFailed:
             draft.occurredAtMs = max(draft.occurredAtMs, session.occurredAtMs)
             draft.kind = .stateChanged
-            draft.declaredPhase = session.phase
+            draft.declaredPhase = phase
         default:
             break
         }

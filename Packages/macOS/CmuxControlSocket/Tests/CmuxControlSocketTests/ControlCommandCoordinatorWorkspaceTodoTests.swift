@@ -138,6 +138,21 @@ struct ControlCommandCoordinatorWorkspaceTodoTests {
         )
     }
 
+    @Test func monitoringHasItsOwnSignalInTheStatusJSON() throws {
+        let (coordinator, context) = makeCoordinator()
+        context.statusResolution = .resolved(windowID: nil, status: ControlWorkspaceTodoStatusSnapshot(
+            workspaceID: UUID(), effective: "todo", inferred: "todo", overrideStatus: nil, overrideInferredAt: nil,
+            signals: .init(anyAgentNeedsInput: false, anyAgentRunning: false, anyOpenPullRequest: false,
+                hasPullRequests: false, allPullRequestsMergedOrClosed: false, isGitDirty: false, anyAgentMonitoring: true)))
+        let result = try #require(coordinator.handle(request("workspace.status.get")))
+        guard case .ok(.object(let payload)) = result, case .object(let signals) = payload["signals"] else {
+            Issue.record("expected a status signals payload, got \(result)")
+            return
+        }
+        #expect(signals["any_agent_monitoring"] == .bool(true))
+        #expect(signals["any_agent_running"] == .bool(false))
+    }
+
     @Test func statusGetShapesOverrideAndSignals() throws {
         let (coordinator, context) = makeCoordinator()
         let workspaceID = UUID()
@@ -156,6 +171,7 @@ struct ControlCommandCoordinatorWorkspaceTodoTests {
         #expect(payload["signals"] == .object([
             "any_agent_needs_input": .bool(false),
             "any_agent_running": .bool(true),
+            "any_agent_monitoring": .bool(false),
             "any_open_pull_request": .bool(false),
             "has_pull_requests": .bool(false),
             "all_pull_requests_merged_or_closed": .bool(false),

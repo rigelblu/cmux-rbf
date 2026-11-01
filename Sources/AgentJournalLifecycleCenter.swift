@@ -296,6 +296,8 @@ final class AgentJournalLifecycleCenter: Sendable {
         let draft: AgentJournalEventDraft
         do {
             draft = try JSONDecoder().decode(AgentJournalEventDraft.self, from: data)
+            // cmux-rbf: only the reconciler may produce monitoring, after journal admission. (#cm-128.3)
+            guard draft.declaredPhase != .monitoring else { return "ERROR: invalid agent journal event" }
         } catch {
             // Stable product-level reply; implementation detail stays in the
             // debug log (the caller's dead-letter keeps the draft itself).

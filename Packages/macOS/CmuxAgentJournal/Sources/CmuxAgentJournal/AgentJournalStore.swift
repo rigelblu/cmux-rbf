@@ -90,6 +90,10 @@ public final class AgentJournalStore: @unchecked Sendable {
         _ draft: AgentJournalEventDraft,
         committedAt: Date = Date()
     ) throws -> AgentJournalAppendOutcome {
+        // cmux-rbf: monitoring exists only in the reconciler's projection, never on disk. (#cm-128.3)
+        if draft.declaredPhase == .monitoring {
+            throw AgentJournalStoreError.invalidDraft("monitoring is a derived phase")
+        }
         if let problem = draft.validationProblem() {
             throw AgentJournalStoreError.invalidDraft(problem)
         }
