@@ -5895,13 +5895,21 @@ final class BrowserPanel: Panel, ObservableObject {
         if changed { onFigmaMotionStateChange?() }
     }
 
-    func sendFigmaMotionCommand(_ action: FigmaMotion.Command, completion: ((Bool) -> Void)? = nil) {
+    func sendFigmaMotionCommand(_ action: FigmaMotion.Command, node: String? = nil, completion: ((Bool) -> Void)? = nil) {
         let target = webView
         let address = currentURL ?? target.url
-        target.evaluateJavaScript(FigmaMotion.commandScript(action)) { [weak self] result, error in
+        let expectedNode = node.flatMap { FigmaFit.normalizedNode($0) }
+        target.evaluateJavaScript(FigmaMotion.commandScript(action, node: node)) { [weak self] result, error in
             MainActor.assumeIsolated {
-                guard let self, self.webView === target,
-                      (self.currentURL ?? target.url) == address else { completion?(false); return }
+                guard let self, self.webView === target else { completion?(false); return }
+                let actual = self.currentURL ?? target.url
+                // cmux-rbf (#cm-73.46): replaceState changes the expected node, while unrelated navigation still fences the reply.
+                let isPreview = actual.map { FigmaPaneURL.isWrapperPage($0, wrapper: self.figmaPageWrapper) } == true
+                let actualNode = actual.flatMap { FigmaPaneURL.node(fromPaneURL: $0) }.flatMap { FigmaFit.normalizedNode($0) }
+                let actualDocument = actual.flatMap { FigmaPaneURL.documentURL(fromPaneURL: $0) }
+                let expectedDocument = address.flatMap { FigmaPaneURL.documentURL(fromPaneURL: $0) }
+                let expectedMove = expectedNode != nil && isPreview && actualNode == expectedNode && actualDocument == expectedDocument
+                guard actual == address || expectedMove else { completion?(false); return }
                 self.applyFigmaMotionSnapshot(result)
                 completion?(error == nil && result is [String: Any])
             }

@@ -62,6 +62,7 @@ extension CMUXCLI {
             )
         } else {
             try runFigmaFit(
+                node: parsed.word,
                 surfaceOverride: parsed.option,
                 client: client,
                 jsonOutput: jsonOutput,
@@ -317,7 +318,7 @@ extension CMUXCLI {
     /// app holds no timer.
     private static let figmaFitSettleSeconds: TimeInterval = 1.0
 
-    /// `cmux figma fit [--surface <ref>]`: center the open Figma pane on all its boards.
+    /// `cmux figma fit [--surface <ref>] [--node <id>]`: fit, or move the preview to that node in place.
     ///
     /// **Two ways, with the shared app-side goto for the preview.** In Figma's editor it sends `browser.press`
     /// with `!`, the trusted `⇧1`; in the read view, which has no zoom to fit, it sends `figma.goto` with
@@ -329,6 +330,7 @@ extension CMUXCLI {
     /// would edit the file, so the editor way first asks the page what has focus and
     /// sends no key when it is a text field.
     private func runFigmaFit(
+        node requestedNode: String?,
         surfaceOverride: String?,
         client: SocketClient,
         jsonOutput: Bool,
@@ -352,12 +354,15 @@ extension CMUXCLI {
         case .refuse(let message):
             throw CLIError(message: message)
 
-        case .reloadNode(let node):
-            _ = try figmaDestination(for: pane.document, node: node)
+        case .reloadNode(let shownNode):
+            _ = try figmaDestination(for: pane.document, node: shownNode)
+            var params: [String: Any] = ["surface_id": pane.surfaceID, "node": shownNode, "purpose": "fit"]
+            // Only an explicit --node requests a move. The shown node may be an instance-layer id.
+            if let requestedNode { params["fit_node"] = requestedNode }
             do {
                 payload = try client.sendV2(
                     method: "figma.goto",
-                    params: ["surface_id": pane.surfaceID, "node": node, "purpose": "fit"]
+                    params: params
                 )
             } catch let error as CLIError where error.v2Code == "invalid_state" && error.v2Reason == FigmaFit.notBoardReason {
                 // cmux-rbf (#cm-73.44): the preview shows Figma's Log in page or an error, which a redraw would break.

@@ -60,7 +60,7 @@ enum FigmaGotoPicker {
 enum FigmaArguments {
 
     struct Parsed: Equatable {
-        /// The link for `open`, the frame id for `goto`.
+        /// The link for `open`, the node for `goto` or `fit --node`.
         let word: String?
         /// The value of `--workspace` for `open`, of `--surface` for `goto`.
         let option: String?
@@ -79,7 +79,7 @@ enum FigmaArguments {
         let message: String
     }
 
-    /// `open` takes `--workspace`; `goto` and `fit` take `--surface`. `fit` takes no word.
+    /// `open` takes `--workspace`; `goto` and `fit` take `--surface`. `fit` takes an optional `--node`, no positional word.
     static func parse(verb: String, args: [String]) throws -> Parsed {
         let flag = verb == "open" ? "--workspace" : "--surface"
         var word: String?
@@ -90,6 +90,20 @@ enum FigmaArguments {
         while index < args.count {
             let arg = args[index]
             if arg.hasPrefix("--") {
+                if verb == "fit", arg == "--node" {
+                    guard word == nil else {
+                        throw Failure(message: "cmux figma fit accepts --node only once")
+                    }
+                    guard index + 1 < args.count else {
+                        throw Failure(message: "--node requires a value")
+                    }
+                    guard FigmaFit.normalizedNode(args[index + 1]) != nil else {
+                        throw Failure(message: "--node requires digits, ':' or '-', then digits")
+                    }
+                    word = args[index + 1]
+                    index += 2
+                    continue
+                }
                 if verb == "goto" && (arg == "--motion" || arg == "--play") {
                     if arg == "--motion" {
                         motion = true
@@ -277,6 +291,8 @@ enum FigmaUsage {
                         and picks one when more than one Figma pane is open.
       fit               Center the open Figma pane on all its boards, as Figma's own zoom to fit does.
                         In the editor it presses ! (Figma's Shift+1); in the read view it has Figma redraw the board it shows, in place, with no reload of the pane.
+                        --node <id> shows that node in the read view without reloading the pane; accepts 12-2 or 12:2.
+                        The editor ignores --node.
                         Run it after you draw or move boards. It works on Figma design files only.
                         It moves nothing on Figma's Log in page.
                         It sends no key to a pane that is not showing, or while a text field in the pane has focus.

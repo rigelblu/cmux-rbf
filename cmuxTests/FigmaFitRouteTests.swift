@@ -3,6 +3,7 @@
 import AppKit
 import Bonsplit
 import CmuxBrowser
+import CMUXDebugLog
 import Foundation
 import Testing
 import WebKit
@@ -28,11 +29,11 @@ struct FigmaFitRouteTests {
     }
 
     /// A preview pane whose page is a controlled document that records the commands cmux sends it.
-    private func fixture() async throws -> Fixture {
+    private func fixture(node: String = "12-2") async throws -> Fixture {
         let manager = TabManager()
         let workspace = try #require(manager.selectedWorkspace)
         let terminal = try #require(workspace.focusedPanelId)
-        let preview = try FigmaPaneURL.destination(for: Self.document, node: "12-2").url
+        let preview = try FigmaPaneURL.destination(for: Self.document, node: node).url
         let figma = try #require(workspace.newBrowserSplit(
             from: terminal, orientation: .horizontal, url: nil, focus: false,
             chromeVisibility: BrowserChromeVisibility(omnibarVisible: false)
@@ -64,7 +65,7 @@ struct FigmaFitRouteTests {
         figma.publishObservedDocumentURL(preview)
         _ = try await figma.webView.evaluateJavaScript("""
         window.commands=[]; window.__loadMarker='same-document';
-        window.__cmuxMotion={command:function(a){commands.push(a); return {state:'still',report:null}}, snapshot:function(){return {state:'still',report:null}}};
+        window.nodes=[]; window.__cmuxMotion={command:function(a,n){commands.push(a);nodes.push(n || null); return {state:'still',report:null}}, snapshot:function(){return {state:'still',report:null}}};
         """)
         try await waitUntilQuiet(figma)
         let marker = try await figma.webView.evaluateJavaScript("window.__loadMarker") as? String
@@ -107,11 +108,17 @@ struct FigmaFitRouteTests {
     }
 
     /// `figma.goto` over the real socket handler, off the main actor so its `v2MainSync` can run.
-    private func fit(_ f: Fixture, purpose: String = "fit") async throws -> [String: Any] {
-        let request: [String: Any] = ["id": 1, "method": "figma.goto", "params": [
+    private func fit(_ f: Fixture, purpose: String = "fit", node: String? = nil) async throws -> [String: Any] {
+        var params: [String: Any] = [
             "window_id": f.windowID.uuidString, "workspace_id": f.workspace.id.uuidString,
-            "surface_id": f.figma.id.uuidString, "node": "12-2", "purpose": purpose
-        ]]
+            "surface_id": f.figma.id.uuidString,
+            "node": f.figma.currentURL.flatMap { FigmaPaneURL.node(fromPaneURL: $0) } ?? "12-2", "purpose": purpose
+        ]
+        if let node {
+            if purpose == "fit" { params["fit_node"] = node }
+            else { params["node"] = node }
+        }
+        let request: [String: Any] = ["id": 1, "method": "figma.goto", "params": params]
         let line = String(decoding: try JSONSerialization.data(withJSONObject: request), as: UTF8.self)
         let response = await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
@@ -151,25 +158,100 @@ struct FigmaFitRouteTests {
         #expect(marker == "same-document", "cmux's page was not reloaded")
     }
 
+    @Test func anotherNodeUsesTheRefitLifecycleWithANodeAndSameNodeUsesPlainRefit() async throws {
+        for node in ["12:2", "16:2"] {
+            let f = try await fixture(); defer { tearDown(f) }
+            let reply = try await fit(f, node: node)
+            #expect(reply["ok"] as? Bool == true)
+            try await waitForCommands(f, count: 1)
+            #expect(try await commands(f) == ["refit"])
+            let seen = try await f.figma.webView.evaluateJavaScript("nodes[0] === null ? 'redraw' : nodes[0]") as? String
+            #expect(seen == (node == "12:2" ? "redraw" : "16-2"))
+            #expect(f.figma.figmaRefit.inFlight)
+            if case .waiting = f.figma.figmaLoadBar.editorWait {} else { Issue.record("the fit loading line did not start") }
+            report(f, path: "/design/KEY/slug", drawn: false)
+            #expect(f.figma.figmaRefit.inFlight)
+            if case .waiting = f.figma.figmaLoadBar.editorWait {} else { Issue.record("an undrawn report ended the loading line") }
+            report(f, path: "/design/KEY/slug")
+            #expect(!f.figma.figmaRefit.inFlight)
+            #expect(f.figma.figmaLoadBar.editorWait == .notWaiting)
+        }
+    }
+
+    @Test func plainFitOnAnInstanceLayerStillRedrawsWithoutStrictNodeValidation() async throws {
+        let f = try await fixture(node: "I123-45;67-89"); defer { tearDown(f) }
+        let address = f.figma.currentURL
+        let reply = try await fit(f)
+        try #require(reply["ok"] as? Bool == true, "plain fit must redraw the existing instance layer: \(reply)")
+        try await waitForCommands(f, count: 1)
+        #expect(try await commands(f) == ["refit"])
+        #expect(try await f.figma.webView.evaluateJavaScript("nodes[0] === null") as? Bool == true)
+        #expect(f.figma.currentURL == address && f.figma.figmaRefit.inFlight)
+    }
+
+    @Test func socketRefusesInvalidFitNodesBeforeAnyScript() async throws {
+        let f = try await fixture(); defer { tearDown(f) }
+        for node in ["1-2&x=1", "1-2\n", "bad"] {
+            let reply = try await fit(f, node: node)
+            #expect(reply["ok"] as? Bool == false)
+            #expect((reply["error"] as? [String: Any])?["code"] as? String == "invalid_params")
+        }
+        try await flush(f)
+        #expect(try await commands(f).isEmpty)
+    }
+
+    @Test func expectedAddressRewriteKeepsTheMoveInFlightAndPublishesTheNode() async throws {
+        let f = try await fixture(); defer { tearDown(f) }
+        _ = try await f.figma.webView.evaluateJavaScript("""
+        window.__cmuxMotion.command=function(a,n){commands.push(a); if(n){var u=new URL(location.href),e=new URL(u.searchParams.get('embed'));e.searchParams.set('node-id',n);u.searchParams.set('embed',e.href);history.replaceState(history.state,'',u.href)};return {state:'still',report:null}}; true;
+        """)
+        _ = try await fit(f, node: "16-2")
+        try await waitForCommands(f, count: 1)
+        try await flush(f)
+        #expect(FigmaPaneURL.node(fromPaneURL: try #require(f.figma.currentURL)) == "16-2")
+        #expect(f.figma.figmaRefit.inFlight, "replaceState is the expected completion, not a refusal")
+        #expect(try await f.figma.webView.evaluateJavaScript("window.__loadMarker") as? String == "same-document")
+    }
+
+#if DEBUG
+    @Test func nodeMoveDebugLineNamesTheActionAndNode() async throws {
+        let f = try await fixture(); defer { tearDown(f) }
+        _ = try await fit(f, node: "16:2")
+        let token = "figma.refit surface=\(f.figma.id.uuidString) "
+        var found = false
+        for _ in 0..<100 {
+            let log = (try? String(contentsOfFile: CMUXDebugLog.DebugEventLog.currentLogPath(), encoding: .utf8)) ?? ""
+            found = log.components(separatedBy: "\n").contains { $0.contains(token) && $0.contains("action=goto") && $0.contains("node=16-2") }
+            if found { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(found, "the Debug move line identifies its node")
+    }
+#endif
+
     @Test func fitWhileTheRedrawRunsAnswersOKAndSendsNothingMore() async throws {
         let f = try await fixture(); defer { tearDown(f) }
         report(f, path: "/design/KEY/slug")
         _ = try await fit(f)
         try await waitForCommands(f, count: 1)
         report(f, path: nil) // the echo of `refit` carries no report
-        let second = try await fit(f)
+        let address = f.figma.currentURL
+        let second = try await fit(f, node: "16-2")
         #expect(second["ok"] as? Bool == true, "redrawing is OK to the agent: \(second)")
         await settle()
         try await flush(f)
         #expect(try await commands(f).filter { $0 == "refit" }.count == 1)
+        #expect(f.figma.currentURL == address)
     }
 
     @Test func fitBeforeFigmaHasDrawnAnswersOKAndIsNeverTheLogInRefusal() async throws {
         let f = try await fixture(); defer { tearDown(f) }
         for path in [nil, "/design/KEY/slug"] as [String?] {
             report(f, path: path, drawn: false)
-            let reply = try await fit(f)
+            let address = f.figma.currentURL
+            let reply = try await fit(f, node: "16-2")
             #expect(reply["ok"] as? Bool == true, "\(String(describing: path)): \(reply)")
+            #expect(f.figma.currentURL == address)
         }
         await settle()
         try await flush(f)
@@ -179,7 +261,8 @@ struct FigmaFitRouteTests {
     @Test func fitOnANonBoardIsInvalidStateWithTheReasonAndSendsNothing() async throws {
         let f = try await fixture(); defer { tearDown(f) }
         report(f, path: "/board/KEY/slug")
-        let reply = try await fit(f)
+        let address = f.figma.currentURL
+        let reply = try await fit(f, node: "16-2")
         try #require(reply["ok"] as? Bool == false, "\(reply)")
         let error = try #require(reply["error"] as? [String: Any])
         #expect(error["code"] as? String == "invalid_state")
@@ -188,13 +271,14 @@ struct FigmaFitRouteTests {
         try await flush(f)
         #expect(try await commands(f).isEmpty, "no script was evaluated")
         #expect(!f.figma.figmaRefit.inFlight)
+        #expect(f.figma.currentURL == address)
     }
 
     @Test func fitOnTheEditorKeepsTodaysPathAndSendsNoRefit() async throws {
         let f = try await fixture(); defer { tearDown(f) }
         report(f, path: "/design/KEY/slug")
         try #require(f.workspace.switchFigmaPreviewAndEditor())
-        let reply = try await fit(f)
+        let reply = try await fit(f, node: "16-2")
         #expect(reply["ok"] as? Bool == true, "\(reply)")
         #expect((reply["result"] as? [String: Any])?["side"] as? String == "editor")
         #expect(!f.figma.figmaRefit.inFlight, "the CLI presses ⇧1 in the editor; the app redraws nothing")

@@ -234,8 +234,8 @@ struct FigmaMotionTests {
     window=this; window.frames=[]; elements={}; listeners={}; sent=[]; posted=[];
     window.addEventListener=function(n,f){listeners[n]=f};
     window.webkit={messageHandlers:{cmuxFigmaMotion:{postMessage:function(m){posted.push(m)}}}};
-    location={search:'?embed='+encodeURIComponent('https://embed.figma.com/design/KEY/slug?node-id=12-2')};
-    URLSearchParams=function(s){var p={}; s.replace(/^\?/,'').split('&').forEach(function(v){var a=v.indexOf('='); p[decodeURIComponent(v.slice(0,a))]=decodeURIComponent(v.slice(a+1))});this.get=function(k){return p[k]||null}};
+    location={pathname:'/figma-embed.html',hash:'',search:'?embed='+encodeURIComponent('https://embed.figma.com/design/KEY/slug?node-id=12-2')};
+    URLSearchParams=function(s){var p={}; s.replace(/^\?/,'').split('&').filter(Boolean).forEach(function(v){var a=v.indexOf('='); p[decodeURIComponent(v.slice(0,a))]=decodeURIComponent(v.slice(a+1).replace(/\+/g,' '))});this.get=function(k){return p[k]||null};this.set=function(k,v){p[k]=String(v)};this.toString=function(){return Object.keys(p).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(p[k])}).join('&')}};
     frame={src:'https://embed.figma.com/proto/KEY/slug?node-id=12-2',contentWindow:{postMessage:function(m){sent.push(m)}}};
     function element(){var e={style:{},appendChild:function(){},setAttribute:function(k,v){this[k]=v}};return e;}
     document={readyState:'complete',querySelector:function(s){return s==='iframe'?frame:null},createElement:element,body:{appendChild:function(e){elements[e.id]=e}},addEventListener:function(){}};
