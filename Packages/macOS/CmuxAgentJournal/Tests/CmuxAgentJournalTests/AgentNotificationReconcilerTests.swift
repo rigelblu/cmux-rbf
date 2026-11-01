@@ -42,10 +42,11 @@ struct AgentNotificationReconcilerTests {
     }
 
     @Test(arguments: ["claude", "codex"])
-    func pendingStopDoesNotConsumeSettledCompletionOrApproval(source: String) {
+    func pendingStopRespectsItsSourceWithoutSwallowingSettledCompletionOrApproval(source: String) {
         var reconciler = AgentNotificationReconciler()
         _ = reconciler.apply(event(1, .turnStarted, source: source, notify: false))
-        #expect(reconciler.apply(event(2, .turnCompleted, source: source, pending: true)).disposition == .delayed)
+        #expect(reconciler.apply(event(2, .turnCompleted, source: source, pending: true)).disposition
+            == (source == "codex" ? .delayed : .accepted))
         let wait = reconciler.apply(event(3, .approvalRequested, source: source, request: "approval", pending: true))
         #expect(wait.disposition == .accepted)
         let done = reconciler.apply(event(4, .turnCompleted, source: source))
@@ -177,7 +178,8 @@ struct AgentNotificationReconcilerTests {
         #expect(reconciler.apply(event(4, .approvalRequested, source: source, request: "old")).disposition == .stale)
     }
 
-    @Test(arguments: ["claude", "codex"])
+    // cmux-rbf: a Claude Stop without pending work proves its children settled. (#cm-128.3)
+    @Test(arguments: ["codex"])
     func delayedParentCompletionIsReleasedByLastChildWithoutTimer(source: String) {
         var reconciler = AgentNotificationReconciler()
         _ = reconciler.apply(event(1, .turnStarted, source: source, notify: false))

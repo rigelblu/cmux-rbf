@@ -161,6 +161,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
             ("SessionStart", "session-start"),
             ("Stop", "stop"),
             ("Stop", "feed"),
+            ("SubagentStart", "feed"),
             ("SubagentStop", "feed"),
             ("SessionEnd", "session-end"),
             ("Notification", "notification"),

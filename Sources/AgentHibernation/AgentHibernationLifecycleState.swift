@@ -5,6 +5,8 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
     case running
     case idle
     case needsInput
+    case monitoring
+    case error
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -22,7 +24,8 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
     }
 
     static func parseCLIValue(_ rawValue: String) -> AgentHibernationLifecycleState? {
-        parse(rawValue)
+        guard let state = parse(rawValue), state != .monitoring, state != .error else { return nil }
+        return state
     }
 
     static func aggregate(
@@ -37,6 +40,8 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
         }
         if states.contains(.running) { return .running }
         if states.contains(.needsInput) { return .needsInput }
+        if states.contains(.monitoring) { return .monitoring }
+        if states.contains(.error) { return .error }
         if states.contains(.unknown) { return .unknown }
         if states.contains(.idle) { return .idle }
         return fallback ?? .unknown
@@ -61,7 +66,7 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
                 return .running
             case .needsInput:
                 hasNeedsInput = true
-            case .unknown:
+            case .unknown, .monitoring, .error:
                 hasUnknown = true
             case .idle:
                 hasIdle = true
@@ -86,6 +91,10 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
             return .running
         case "idle":
             return .idle
+        case "monitoring":
+            return .monitoring
+        case "error":
+            return .error
         case "needsinput", "needs-input":
             return .needsInput
         default:

@@ -3,6 +3,11 @@ import Testing
 
 /// The eight rows of the cycle's table, each with his eleven and with lists that are not his.
 @Suite struct WorkspaceStatusCycleTests {
+    @Test func monitoringAloneKeepsAutoAtTheNotRunningStart() {
+        let signals = WorkspaceTaskStatusSignals(anyAgentMonitoring: true)
+        #expect(WorkspaceStatusCycle().target(resolution: .detected(.todo), list: F.toms, signals: signals) == .entry(F.paused))
+    }
+
     typealias F = WorkspaceStatusFixtures
     typealias Target = WorkspaceStatusCycle.Target
 

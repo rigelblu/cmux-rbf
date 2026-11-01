@@ -11,10 +11,10 @@ struct AgentClearStateResolver: Sendable {
     static let nativeEvent = "ClearAgentState"
 
     /// Whether a phase draws a mark on the row today: the hand (needs input, and error until `.5` gives it its own mark)
-    /// and the spinner. Idle and `unknown` draw none, so a clear leaves those sessions, and an idle pane stays hibernatable.
+    /// and the spinner or waveform. Idle and `unknown` draw none, so a clear leaves those sessions, and an idle pane stays hibernatable.
     static func phaseDrawsMark(_ phase: AgentLifecyclePhase) -> Bool {
         switch phase {
-        case .needsInput, .running, .error: true
+        case .needsInput, .running, .monitoring, .error: true
         case .idle, .unknown: false
         }
     }

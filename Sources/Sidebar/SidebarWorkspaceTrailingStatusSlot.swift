@@ -24,6 +24,8 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
     let closeButtonColor: Color
     let closeButtonFontSize: CGFloat
     let closeAction: () -> Void
+    /// Done dims the badge and close button, while the activity spinner stays undimmed. (#cm-128.3)
+    var contentAlpha: Double = 1
 
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -40,6 +42,7 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
                         fillColor: badgeFillColor,
                         textColor: badgeTextColor
                     )
+                    .opacity(contentAlpha)
                 }
             }
             .opacity(canCloseWorkspace && showsCloseButton ? 0 : 1)
@@ -52,7 +55,7 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
                 }
                 .buttonStyle(.plain)
                 .safeHelp(closeButtonTooltip)
-                .opacity(showsCloseButton ? 1 : 0)
+                .opacity(showsCloseButton ? contentAlpha : 0)
                 .allowsHitTesting(showsCloseButton)
                 .accessibilityHidden(!showsCloseButton)
             }

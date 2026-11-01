@@ -1,10 +1,87 @@
+import CMUXAgentLaunch
 import CmuxAgentJournal
 import Foundation
 import Testing
 
+#if canImport(cmux_DEV)
+@testable import cmux_DEV
+#elseif canImport(cmux)
+@testable import cmux
+#endif
+
 @Suite(.serialized)
 struct ClaudeStopHookPendingWorkTests {
     private typealias Fixture = ClaudeHookAttentionTestFixture
+
+    private func journalDrafts(_ lines: ArraySlice<String>) -> [AgentJournalEventDraft] {
+        lines.compactMap { line in
+            guard line.hasPrefix("agent_journal_append ") else { return nil }
+            return try? JSONDecoder().decode(AgentJournalEventDraft.self,
+                from: Data(line.dropFirst("agent_journal_append ".count).utf8))
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func stopUsesOnlyBackgroundWorkForBothJournalWritesPillAndFallback(pending: Bool) throws {
+        let fixture = try Fixture()
+        try fixture.run(["hooks", "claude", "session-start"], event: "SessionStart")
+        try fixture.run(["hooks", "claude", "prompt-submit"], event: "UserPromptSubmit")
+        let before = fixture.context.state.snapshot().count
+        let tasks: [[String: Any]] = pending ? [["type": "shell", "status": "running", "id": "job"]] : []
+        try fixture.run(["hooks", "claude", "stop"], event: "Stop", extra: [
+            "stop_hook_active": true, "background_tasks": tasks, "last_assistant_message": "Done"
+        ])
+        let lines = fixture.context.state.snapshot().dropFirst(before)
+        let drafts = journalDrafts(lines)
+        let stops = drafts.filter { $0.kind == .turnCompleted }
+        #expect(stops.count == 2)
+        #expect(stops.allSatisfy { $0.pendingWork == pending })
+        #expect(stops.filter { $0.attention?.notification != nil }.count == 1)
+        #expect(!drafts.contains { $0.kind == .stateChanged && $0.declaredPhase == .running })
+        #expect(lines.contains { $0.hasPrefix("set_status claude_code \(pending ? "Running" : "Idle") ") })
+        let record = try fixture.support.readClaudeHookSession("session", context: fixture.context)
+        #expect(record["agentLifecycle"] as? String == (pending ? "running" : "idle"))
+    }
+
+    @Test func everyClaudePromptCarriesItsOwnEventIdentityWithoutANativeTurn() throws {
+        let fixture = try Fixture()
+        try fixture.run(["hooks", "claude", "session-start"], event: "SessionStart")
+        for prompt in ["typed-prompt", "automatic-drain-prompt"] {
+            let before = fixture.context.state.snapshot().count
+            try fixture.run(["hooks", "claude", "prompt-submit"], event: "UserPromptSubmit",
+                extra: ["prompt_id": prompt])
+            let start = try #require(journalDrafts(fixture.context.state.snapshot().dropFirst(before))
+                .first { $0.kind == .turnStarted })
+            #expect(start.attention?.eventIdentity == prompt)
+            #expect(start.attention?.turnIdentity == nil)
+        }
+    }
+
+    @Test(arguments: ["SubagentStart", "SubagentStop", "PreToolUse"])
+    func helperIdentityTravelsThroughFeedOnlyForChildLifecycle(nativeEvent: String) throws {
+        let fixture = try Fixture()
+        try fixture.run(["hooks", "feed", "--source", "claude"], event: nativeEvent, helper: "helper-1",
+            extra: ["agent_type": "general-purpose"])
+        let wire = try #require(fixture.context.state.snapshot().compactMap { line -> [String: Any]? in
+            guard let data = line.data(using: .utf8),
+                  let frame = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  frame["method"] as? String == "feed.push",
+                  let params = frame["params"] as? [String: Any] else { return nil }
+            return params["event"] as? [String: Any]
+        }.first)
+        #expect(wire["helper_agent_id"] as? String == "helper-1")
+        let event = try JSONDecoder().decode(WorkstreamEvent.self, from: JSONSerialization.data(withJSONObject: wire))
+        let isChild = nativeEvent != "PreToolUse"
+        let draft = try #require(AgentFeedSemanticInput(event: event, agentKey: "claude_code",
+            notification: isChild ? nil : AgentJournalNotification(title: "Claude", subtitle: "", body: "Approve",
+                category: "needs-permission"), requestID: "feed-request",
+            workspaceID: UUID(uuidString: fixture.context.workspaceId),
+            surfaceID: UUID(uuidString: fixture.context.surfaceId)).draft())
+        #expect(draft.attention?.requestIdentity == (isChild ? "helper-1" : "feed-request"))
+        if isChild {
+            #expect(draft.kind == (nativeEvent == "SubagentStart" ? .childSpawned : .childCompleted))
+        }
+    }
 
     private func idleEvents(_ fixture: Fixture) throws -> [AgentJournalEventDraft] {
         let before = fixture.context.state.snapshot().count

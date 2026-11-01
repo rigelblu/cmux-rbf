@@ -251,7 +251,8 @@ import Testing
         mediaActivity: BrowserMediaActivity = BrowserMediaActivity(),
         activeCodingAgentCount: Int = 0,
         attentionTaskStatus: WorkspaceTaskStatus? = nil,
-        showsRaisedHand: Bool = false
+        showsRaisedHand: Bool = false,
+        taskStatus: WorkspaceTaskStatus? = nil
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         var s = SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey ?? Self.presentationKey(),
@@ -281,7 +282,7 @@ import Testing
             listeningPorts: listeningPorts,
             finderDirectoryPath: finderDirectoryPath,
             mediaActivity: mediaActivity,
-            taskStatus: nil,
+            taskStatus: taskStatus,
             todoStatusMenuModel: nil,
             hasManualTaskStatus: false,
             attentionTaskStatus: attentionTaskStatus,

@@ -63,6 +63,7 @@ def generated_claude_hook_settings() -> str:
             queued("feed"),
             direct(f"{direct_cli} hooks claude auto-name", 120, asynchronous=True),
         ],
+        "SubagentStart": [queued("feed")],
         "SubagentStop": [queued("feed")],
         "SessionEnd": [queued("session-end")],
         "Notification": [queued("notification")],
@@ -651,7 +652,7 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
         failures,
     )
     hooks = settings.get("hooks", {})
-    expected_hooks = {"SessionStart", "Stop", "SubagentStop", "SessionEnd", "Notification", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest"}
+    expected_hooks = {"SessionStart", "Stop", "SubagentStart", "SubagentStop", "SessionEnd", "Notification", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest"}
     expect(set(hooks.keys()) == expected_hooks, f"unexpected hook keys: {hooks.keys()}, expected {expected_hooks}", failures)
     for hook_name, expected_subcommand in {
         "SessionStart": "session-start",
@@ -822,7 +823,7 @@ def test_live_socket_merges_user_settings_into_hooks(failures: list[str]) -> Non
         failures,
     )
     expected_hooks = {
-        "SessionStart", "Stop", "SubagentStop", "SessionEnd",
+        "SessionStart", "Stop", "SubagentStart", "SubagentStop", "SessionEnd",
         "Notification", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest",
     }
     expect(
