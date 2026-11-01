@@ -5862,6 +5862,23 @@ final class BrowserPanel: Panel, ObservableObject {
               let actual = view.url ?? currentURL,
               FigmaPaneURL.isWrapperPage(actual, wrapper: figmaPageWrapper),
               let body = body as? [String: Any] else { return }
+        // cmux-rbf (#cm-73.41): a pan report never updates motion or re-fit state, in any build.
+        if body["panReport"] is [String: Any] {
+            #if DEBUG
+            if let report = body["panReport"] as? [String: Any] {
+                if report["phase"] as? String == "start" {
+                    let axis = report["axis"] as? String ?? "free"
+                    let dx = (report["dx"] as? NSNumber)?.doubleValue ?? 0
+                    let dy = (report["dy"] as? NSNumber)?.doubleValue ?? 0
+                    cmuxDebugLog("figma.pan surface=\(id) start axis=\(axis) dx=\(dx) dy=\(dy)")
+                } else if report["phase"] as? String == "end" {
+                    let steps = (report["steps"] as? NSNumber)?.intValue ?? 0
+                    cmuxDebugLog("figma.pan surface=\(id) end steps=\(steps)")
+                }
+            }
+            #endif
+            return
+        }
         if let action = body["action"] as? String {
             if action == "toggle" { _ = toggleFigmaMotion() }
             if action == "still" { showFigmaStill() }

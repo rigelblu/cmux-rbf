@@ -399,6 +399,10 @@ About half a second after the pane stops changing size, whatever changed it, Pre
 
 In Preview, `⇧1` fits everything Preview holds, as it does in Figma's editor, by having Figma redraw its frame. It takes a few seconds, shows the loading line and asks for no new Log in. `cmux figma fit` on a Preview does the same. `⇧1` is Figma's own key: it is not in Settings and not in `cmux.json`.
 
+In Preview, two fingers on the touchpad pan the design without clicking. Hold `⇧`
+to lock the pan to the first direction you move while holding `⇧`, across or down; let go to pan freely.
+`⇧` locks a mouse drag to one axis the same way.
+
 A frame marked with `cmux figma goto <node> --motion` opens in Figma's player,
 frozen on its first state. The pill at the bottom centre of Preview shows ▶ and ■.
 Both cells are disabled until the player draws. ▶ plays without reloading; ❚❚ pauses;
