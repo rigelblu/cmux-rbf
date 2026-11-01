@@ -394,12 +394,14 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
         if model.hasNestedWorkspaceGroup { return nestedToggleWorkspaceGroupCollapsed(groupId: groupId) } // (#cm-106)
         let nextCollapsed = !model.workspaceGroups[index].isCollapsed
         if nextCollapsed {
+            let staysShown = model.workspaceIdsShownInPinned()
             guard let anchorId = model.workspaceGroups[index].liveAnchorWorkspaceId else {
                 setWorkspaceGroupCollapsed(groupId: groupId, isCollapsed: nextCollapsed)
                 return
             }
             if let selectedTabId = model.selectedTabId,
                selectedTabId != anchorId,
+               !staysShown.contains(selectedTabId),
                let selectedTab = model.tabs.first(where: { $0.id == selectedTabId }),
                selectedTab.groupId == groupId,
                let anchor = model.tabs.first(where: { $0.id == anchorId }) {
@@ -411,7 +413,7 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
             // on workspaces the user can no longer see.
             let hiddenMemberIds: Set<UUID> = Set(
                 model.tabs
-                    .filter { $0.groupId == groupId && $0.id != anchorId }
+                    .filter { $0.groupId == groupId && $0.id != anchorId && !staysShown.contains($0.id) }
                     .map(\.id)
             )
             if !hiddenMemberIds.isEmpty,

@@ -45,11 +45,16 @@ public final class WorkspacesModel<Tab: WorkspaceTabRepresenting> {
     @ObservationIgnored
     private weak var host: (any WorkspacesHosting<Tab>)?
 
-    /// The nested groups the sidebar draws under a status group, which the model cannot know: it has no status list
-    /// and no Workspace Todo Controls setting. The app sets it from the same projection the renderer uses; unset
+    /// The nested groups the sidebar draws outside their parent, under a status or in Pinned (#cm-110.18).
+    /// The app supplies its projection (the model has no status list or controls setting); unset
     /// means no group is drawn away from its parent, so every fold behaves as it always has. (#cm-110.3)
     @ObservationIgnored
-    public var groupIdsShownUnderAStatus: @MainActor () -> Set<UUID> = { [] }
+    public var groupIdsShownOutsideParent: @MainActor () -> Set<UUID> = { [] }
+
+    /// Members drawn separately in Pinned, whose model groups do not hide them (#cm-110.18).
+    /// The app supplies its projection; without one, selection and move reveal keep their ordinary group behavior.
+    @ObservationIgnored
+    public var workspaceIdsShownInPinned: @MainActor () -> Set<UUID> = { [] }
 
 #if DEBUG
     /// Receives each line the nested operations log for a refused move; only a test sets it (#cm-106).

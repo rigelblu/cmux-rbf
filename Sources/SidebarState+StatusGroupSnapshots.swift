@@ -11,7 +11,7 @@ extension VerticalTabsSidebar {
         let colors = colorSectionProjection(workspaces: tabs.map {
             SidebarWorkspaceColorSectionWorkspaceSnapshot(id: $0.id, groupId: $0.groupId,
                 isPinned: $0.isPinned, customColor: $0.customColor)
-        }, collapsedHexes: state.collapsedColorSectionHexes, statusGroupProjection: projection)
+        }, collapsedHexes: state.collapsedColorSectionHexes, statusGroupProjection: projection, groups: groups)
         return resolveRenderItems(colorSectionProjection: colors, baseItems: base, statusGroupProjection: projection,
             folds: state.statusGroups ?? .init(), tabs: tabs, groups: groups)
     }

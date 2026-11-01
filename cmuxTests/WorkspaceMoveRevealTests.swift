@@ -459,7 +459,7 @@ struct WorkspaceMoveRevealTests {
         }
     }
 
-    @Test func pinningANestedGroupInsideAnUnpinnedParentOpensNothing() async throws {
+    @Test func pinningANestedGroupOpensPinnedAndKeepsItsOwnAndItsParentsFolds() async throws {
         try await inNested { rig, world in
             let m = rig.manager
             m.selectWorkspace(world.w("u"))
@@ -468,8 +468,10 @@ struct WorkspaceMoveRevealTests {
             let before = rig.state.statusGroups
             m.toggleWorkspaceGroupPinned(groupId: world.n)
             try #require(world.group(world.n).isPinned && world.group(world.n).parentGroupId == world.r, "N is pinned and still inside R")
-            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); N is still drawn inside R")
-            #expect(rig.state.statusGroups == before, "Pinned changed for a group that did not move")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "the hoisted group keeps its own and its parent's folds")
+            var expected = before
+            expected?.pinnedCollapsed = false
+            #expect(rig.state.statusGroups == expected, "the nested group's pin opens Pinned (#cm-110.18)")
         }
     }
 
@@ -639,7 +641,7 @@ struct WorkspaceMoveRevealTests {
     static func pinListSource(_ name: String) -> String? { name == "builtin" ? "{}" : nil }
 
     @Test(arguments: WorkspaceMoveRevealTests.pinLists)
-    func pinningAMemberOfAFoldedGroupChangesNoFold(_ listName: String) async throws {
+    func pinningAMemberOfAFoldedGroupOnlyOpensPinnedWithAUserList(_ listName: String) async throws {
         try await inNested(list: Self.pinListSource(listName)) { rig, world in
             if listName == "builtin" { try #require(AppDelegate.statusListInUse.source == .cmux, "the built-in list is in use") }
             let m = rig.manager
@@ -649,13 +651,15 @@ struct WorkspaceMoveRevealTests {
             let before = rig.state.statusGroups
             m.setPinned(world.w("n1"), pinned: true)
             try #require(world.w("n1").isPinned && world.w("n1").groupId == world.n, "n1 is pinned and still in N")
-            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); the pin did not move the row")
-            #expect(rig.state.statusGroups == before, "Pinned changed for a row that did not move")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); pinning this member must not unfold R or N")
+            var expected = before
+            if listName == "listed" { expected?.pinnedCollapsed = false }
+            #expect(rig.state.statusGroups == expected, "only Pinned opens when the member is drawn there (#cm-110.18)")
         }
     }
 
     @Test(arguments: WorkspaceMoveRevealTests.pinLists)
-    func pinningMembersByIdFromTheCliChangesNoFold(_ listName: String) async throws {
+    func pinningMembersByIdFromTheCliOnlyOpensPinnedWithAUserList(_ listName: String) async throws {
         try await inNested(list: Self.pinListSource(listName)) { rig, world in
             if listName == "builtin" { try #require(AppDelegate.statusListInUse.source == .cmux, "the built-in list is in use") }
             let m = rig.manager
@@ -665,8 +669,10 @@ struct WorkspaceMoveRevealTests {
             let before = rig.state.statusGroups
             let changed = m.setPinned(workspaceIds: [world.w("n1").id], pinned: true)
             try #require(changed == [world.w("n1").id] && world.w("n1").groupId == world.n, "n1 is pinned and still in N")
-            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); the pin did not move the row")
-            #expect(rig.state.statusGroups == before, "Pinned changed for a row that did not move")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); pinning this member must not unfold R or N")
+            var expected = before
+            if listName == "listed" { expected?.pinnedCollapsed = false }
+            #expect(rig.state.statusGroups == expected, "only Pinned opens when the member is drawn there (#cm-110.18)")
         }
     }
 

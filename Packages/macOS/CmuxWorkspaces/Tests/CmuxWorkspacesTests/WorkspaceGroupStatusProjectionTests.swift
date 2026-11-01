@@ -120,7 +120,7 @@ struct WorkspaceGroupStatusProjectionTests {
     @Test func descendantsFollowTheRootsPlacementAndAddTwoLevels() {
         let root = group(status: "doing")
         let child = group(parent: root.id)
-        let member = WorkspaceGroupWorkspaceItem(id: UUID(), groupId: child.id, isPinned: true)
+        let member = WorkspaceGroupWorkspaceItem(id: UUID(), groupId: child.id, isPinned: false)
         let anchor = WorkspaceGroupWorkspaceItem(id: root.anchorWorkspaceId, groupId: root.id, isPinned: false)
         let result = WorkspaceGroupStatusProjection(groups: [root, child], workspaces: [anchor, member], list: list)
         #expect(result.statusIdByGroupId == [root.id: "doing", child.id: "doing"])

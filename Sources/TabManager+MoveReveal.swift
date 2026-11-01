@@ -75,14 +75,14 @@ extension TabManager {
     }
 
     /// Where the sidebar draws a group, not what is stored on it (#cm-110.14, fix round 2): a status or a pin written on a nested group
-    /// that stays drawn inside its parent moves nothing.
+    /// that stays drawn inside its parent moves nothing; a nested pin drawn in Pinned changes its section (#cm-110.18).
     private struct GroupPlace: Equatable {
         /// The status group it is drawn under, only when it is a status root itself.
         var statusId: String?
-        /// The section it is in: the outermost group's pin.
+        /// Its drawn pin tier from the shared sidebar placement.
         var isPinned: Bool
-        // The group it is drawn inside is not compared: a nested group leaves or enters its parent only when it becomes or stops
-        // being a status root, and a root always has a status, so `statusId` already changes with it.
+        // A nested group drawn outside its parent changes either its status-root placement or its pin tier.
+        // Those fields already detect that view change; ordinary reparenting reveals its destination at the writer.
     }
 
     private func groupPlace(_ groupId: UUID) -> GroupPlace? {
@@ -90,10 +90,10 @@ extension TabManager {
         guard let group = groups.first(where: { $0.id == groupId }) else { return nil }
         let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabs, groups: groups)?.workspaceGroups
         let isRoot = projection?.rootGroupIds.contains(groupId) ?? false
-        let outermost = WorkspaceGroupTree(groups: groups).outermost(of: groupId)
+        let pin = group.sidebarPin(in: Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) }), sectionsShown: projection != nil)
         return GroupPlace(
             statusId: isRoot ? projection?.statusIdByGroupId[groupId] : nil,
-            isPinned: groups.first { $0.id == outermost }?.isPinned ?? group.isPinned
+            isPinned: pin.isPinned
         )
     }
 
