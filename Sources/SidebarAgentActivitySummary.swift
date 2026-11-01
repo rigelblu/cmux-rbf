@@ -1,6 +1,16 @@
 import Foundation
 
 enum SidebarAgentActivitySummary {
+    static func visibleMonitoringAgentCount(
+        showsAgentActivity: Bool,
+        statesByPanelId: @autoclosure () -> [UUID: [String: AgentHibernationLifecycleState]]
+    ) -> Int {
+        guard showsAgentActivity else { return 0 }
+        return statesByPanelId().values.reduce(0) { count, states in
+            count + states.values.filter { $0 == .monitoring }.count
+        }
+    }
+
     static func visibleActiveCodingAgentCount(
         showsAgentActivity: Bool,
         statesByPanelId: @autoclosure () -> [UUID: [String: AgentHibernationLifecycleState]]

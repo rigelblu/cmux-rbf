@@ -21,6 +21,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let activeCodingAgentCount: Int
         let taskStatusInput: SidebarWorkspaceTaskStatusSnapshot
         let showsRaisedHand: Bool // (#cm-109.3)
+        let monitoringAgentCount: Int
     }
 
     var contextMenuImmediateFields: ContextMenuImmediateFields {
@@ -43,7 +44,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             checklistFirstUncheckedText: checklistFirstUncheckedText,
             activeCodingAgentCount: activeCodingAgentCount,
             taskStatusInput: taskStatusInput,
-            showsRaisedHand: showsRaisedHand // (#cm-109.3)
+            showsRaisedHand: showsRaisedHand, // (#cm-109.3)
+            monitoringAgentCount: monitoringAgentCount
         )
     }
 
@@ -94,7 +96,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             checklistTotalCount: snapshot.checklistTotalCount,
             checklistFirstUncheckedText: snapshot.checklistFirstUncheckedText,
             taskStatusInput: snapshot.taskStatusInput,
-            showsRaisedHand: snapshot.showsRaisedHand // (#cm-109.3)
+            showsRaisedHand: snapshot.showsRaisedHand, // (#cm-109.3)
+            monitoringAgentCount: snapshot.monitoringAgentCount
         )
     }
 }

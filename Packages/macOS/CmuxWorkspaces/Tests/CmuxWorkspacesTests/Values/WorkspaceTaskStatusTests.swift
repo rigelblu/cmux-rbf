@@ -3,6 +3,11 @@ import Testing
 @testable import CmuxWorkspaces
 
 @Suite struct WorkspaceTaskStatusTests {
+    @Test func monitoringAloneDoesNotInferWorkingWithoutAStatusList() {
+        let signals = WorkspaceTaskStatusSignals(anyAgentMonitoring: true)
+        #expect(WorkspaceTaskStatus.resolveInferred(from: signals, hasStatusList: false, decidingStatus: nil) == .todo)
+    }
+
     /// Raw values are a control-socket and session wire format; frozen.
     @Test func rawValuesAreFrozenWireValues() {
         #expect(WorkspaceTaskStatus.todo.rawValue == "todo")

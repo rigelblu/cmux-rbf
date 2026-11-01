@@ -15,6 +15,8 @@ public struct ControlWorkspaceTodoStatusSnapshot: Sendable, Equatable {
         public let anyAgentNeedsInput: Bool
         /// Whether any agent is running.
         public let anyAgentRunning: Bool
+        /// Whether any agent is watching background work after its turn ended.
+        public let anyAgentMonitoring: Bool
         /// Whether any sidebar pull request is open.
         public let anyOpenPullRequest: Bool
         /// Whether the workspace has any sidebar pull requests.
@@ -31,10 +33,12 @@ public struct ControlWorkspaceTodoStatusSnapshot: Sendable, Equatable {
             anyOpenPullRequest: Bool,
             hasPullRequests: Bool,
             allPullRequestsMergedOrClosed: Bool,
-            isGitDirty: Bool
+            isGitDirty: Bool,
+            anyAgentMonitoring: Bool = false
         ) {
             self.anyAgentNeedsInput = anyAgentNeedsInput
             self.anyAgentRunning = anyAgentRunning
+            self.anyAgentMonitoring = anyAgentMonitoring
             self.anyOpenPullRequest = anyOpenPullRequest
             self.hasPullRequests = hasPullRequests
             self.allPullRequestsMergedOrClosed = allPullRequestsMergedOrClosed

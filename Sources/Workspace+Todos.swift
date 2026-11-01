@@ -10,7 +10,7 @@ extension Workspace {
     // MARK: - Status signals
 
     /// Samples the live signals that drive task-status inference: agent
-    /// lifecycle states (needs-input / running) for panels that still exist,
+    /// lifecycle states (needs-input / running / monitoring) for panels that still exist,
     /// the sidebar pull-request rows, and git working-tree dirtiness.
     ///
     /// Takes the panel order **once** and hands it to both sidebar queries.
@@ -29,10 +29,12 @@ extension Workspace {
     func taskStatusSignals(orderedPanelIds: [UUID]) -> WorkspaceTaskStatusSignals {
         var anyAgentNeedsInput = false
         var anyAgentRunning = false
+        var anyAgentMonitoring = false
         for (panelId, states) in agentLifecycleStatesByPanelId where panels[panelId] != nil {
             for state in states.values {
                 if state == .needsInput { anyAgentNeedsInput = true }
                 if state == .running { anyAgentRunning = true }
+                if state == .monitoring { anyAgentMonitoring = true }
             }
         }
         let orderedPanelIds = orderedPanelIds ?? sidebarOrderedPanelIds()
@@ -45,7 +47,8 @@ extension Workspace {
             allPullRequestsMergedOrClosed: !pullRequests.isEmpty
                 && pullRequests.allSatisfy { $0.status != .open },
             isGitDirty: sidebarGitBranchesInDisplayOrder(orderedPanelIds: orderedPanelIds)
-                .contains { $0.isDirty }
+                .contains { $0.isDirty },
+            anyAgentMonitoring: anyAgentMonitoring
         )
     }
 

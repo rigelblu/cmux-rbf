@@ -82,6 +82,8 @@ struct SidebarWorkspaceSnapshotBuilder {
         var taskStatusInput = SidebarWorkspaceTaskStatusSnapshot()
         /// Whether the raised hand indicator should show. (#cm-109.3)
         var showsRaisedHand: Bool = false // (#cm-109.3)
+        /// How many agent states are watching background work after their turn ended. (#cm-128.3)
+        var monitoringAgentCount: Int = 0
 
         /// One menu decision for both renderers, their popovers, and tests. (#cm-110.13)
         func statusMenuModel(controlsEnabled: Bool) -> SidebarWorkspaceCompactStatusMenuModel? { // (#cm-110.13)

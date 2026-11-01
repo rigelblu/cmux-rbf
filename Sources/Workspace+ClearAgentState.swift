@@ -18,11 +18,11 @@ extension Workspace {
     }
 
     /// **The** enabled check for Clear Agent State, read by the menu item (both builders) and the palette entry: any agent
-    /// mark (needs you or running, from any writer) or agent pill on any of the workspace's panels. `unknown`, which a clear
+    /// mark (needs you, running or monitoring, from any writer) or agent pill on any of the workspace's panels. `unknown`, which a clear
     /// leaves, does not count, and neither does Dock-pane state.
     var hasClearableAgentState: Bool {
         for (panelId, states) in agentLifecycleStatesByPanelId where panels[panelId] != nil {
-            for (key, state) in states where Self.isAgentMarkLifecycleKey(key) && (state == .needsInput || state == .running) {
+            for (key, state) in states where Self.isAgentMarkLifecycleKey(key) && (state == .needsInput || state == .running || state == .monitoring) {
                 return true
             }
         }
@@ -48,7 +48,7 @@ extension Workspace {
                     // A slot with no pending decision behind it: nobody else will remove it.
                     clearAgentLifecycle(key: key, panelId: panelId)
                     droppedSlotKeysByPanel[panelId, default: []].append(key)
-                } else if state == .needsInput || state == .running {
+                } else if state == .needsInput || state == .running || state == .monitoring {
                     // `unknown`, never a removal: with no key left the pane would fall back to the CLI's record, which can be
                     // `idle` and hibernatable.
                     setAgentLifecycle(key: key, panelId: panelId, lifecycle: .unknown)

@@ -66,11 +66,12 @@ final class ClearAgentStateHarness {
 
     /// Sends one agent event for the workspace's pane through the center, as a hook would.
     func observe(_ kind: AgentJournalEventKind, sessionId: String = "session", source: String = "claude",
-                 request: String? = nil, phase: AgentLifecyclePhase? = nil, correlationKey: String? = nil) {
+                 request: String? = nil, phase: AgentLifecyclePhase? = nil, correlationKey: String? = nil,
+                 pending: Bool = false) {
         clock = max(clock + 1, Int64(Date().timeIntervalSince1970 * 1000))
         center.observe(AgentJournalEventDraft(kind: kind, occurredAtMs: clock, source: source,
             agentKey: source == "claude" ? "claude_code" : source, sessionId: sessionId,
-            workspaceId: workspace.id.uuidString, surfaceId: panel.uuidString, declaredPhase: phase,
+            workspaceId: workspace.id.uuidString, surfaceId: panel.uuidString, pendingWork: pending, declaredPhase: phase,
             attention: AgentAttentionContext(requestIdentity: request, notification: correlationKey.map {
                 AgentJournalNotification(title: "Agent", subtitle: "", body: "Answer", category: "needs-permission",
                     correlationKey: $0)
@@ -134,6 +135,46 @@ struct ClearAgentStateHarnessIsolationTests {
 @MainActor
 @Suite("Clear Agent State leaves panes unknown", .serialized)
 struct AgentClearHibernationTests {
+    @Test func aMonitoringOnlyPaneWithoutAPillEnablesClearAndStaysUnknownAfterALaterObservation() async throws {
+        try await ClearAgentStateHarness.run { harness in
+            harness.observe(.turnStarted)
+            harness.observe(.turnCompleted, pending: true)
+            await harness.settle()
+            #expect(harness.marks["claude_code"] == .monitoring)
+            #expect(rowSnapshot(harness.workspace).monitoringAgentCount == 1)
+            #expect(!harness.workspace.statusEntries.keys.contains(where: Workspace.isAgentStatusPillKey))
+            #expect(harness.workspace.hasClearableAgentState)
+            #expect(harness.tabManager.canClearAgentState(workspaceIds: [harness.workspace.id]))
+            #expect(harness.workspace.clearAgentState(journal: harness.center))
+            await harness.settle()
+            #expect(harness.marks["claude_code"] == .unknown)
+            harness.observe(.idleObserved, pending: true)
+            await harness.settle()
+            #expect(harness.marks["claude_code"] == .unknown)
+            harness.observe(.sessionStarted)
+            await harness.settle()
+            #expect(harness.marks["claude_code"] == .unknown, "the clear must reach the journal's own state")
+            #expect(harness.state(fallback: .idle) == .unknown)
+            #expect(!harness.state(fallback: .idle).allowsHibernation)
+            let snapshot = rowSnapshot(harness.workspace)
+            #expect(snapshot.activeCodingAgentCount == 0)
+            #expect(snapshot.monitoringAgentCount == 0)
+            #expect(!snapshot.showsRaisedHand)
+        }
+    }
+
+    @Test func aRestoredMonitoringKeyIsSetUnknownEvenWithoutAJournalSession() async throws {
+        try await ClearAgentStateHarness.run { harness in
+            harness.workspace.setAgentLifecycle(key: "claude_code", panelId: harness.panel, lifecycle: .monitoring)
+            harness.workspace.statusEntries["claude_code"] = SidebarStatusEntry(key: "claude_code", value: "Running")
+            #expect(harness.workspace.clearAgentState(journal: harness.center))
+            await harness.settle()
+            #expect(harness.marks["claude_code"] == .unknown)
+            #expect(harness.state(fallback: .idle) == .unknown)
+            #expect(harness.workspace.statusEntries["claude_code"] == nil)
+        }
+    }
+
     private func rowSnapshot(_ workspace: Workspace) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         let suite = "AgentClearHibernationTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

@@ -7,7 +7,7 @@
 /// - `needsInput` and `error` survive replay: the agent was blocked on the
 ///   user, and that fact stays true across an app restart (the stale-badge
 ///   bug class this design fixes).
-/// - `running` is downgraded out: a relaunch tore down local PTYs, so a
+/// - `running` and `monitoring` are downgraded out: a relaunch tore down local PTYs, so a
 ///   journal-running agent is usually dead; the next live event restores the
 ///   spinner honestly.
 /// - `idle` and `unknown` are dropped: painting them adds no user signal and
@@ -31,7 +31,7 @@ public struct AgentJournalReplayPolicy: Sendable {
                     phases[surfaceId, default: [:]][agentKey] = phase
                     newest[surfaceId, default: [:]][agentKey] =
                         snapshot.newestOccurredAtMs[surfaceId]?[agentKey] ?? 0
-                case .running, .idle, .unknown:
+                case .running, .monitoring, .idle, .unknown:
                     continue
                 }
             }

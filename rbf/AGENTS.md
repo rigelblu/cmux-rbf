@@ -183,6 +183,11 @@ A workspace group can sit inside another group. The model, the drop planner and 
 - **A second upstream test is changed on purpose:** `cmuxTests/WorkspaceGroupTests.swift`, around line 272, `staleGroupReferenceInsideGroupRunRendersAsRootRow`. The `effectiveMembership[staleMember.id]` lookup is a nested optional (`UUID??`); flatten it with `?? nil` before comparing to nil. A control on the exact pre-cm-110.4 parent failed the original assertion too. Keep the marked `(#cm-110.4)` correction; this changes no membership or rendering behaviour.
 - **`Packages/macOS/CmuxWorkspaces/Package.swift` gives `CmuxFoundation` to the test target only.** The tests plan a drop with the planner and commit the plan through the coordinator. The planner lives in `CmuxFoundation`, which depends on no other package, and the `CmuxWorkspaces` library does not import it. Keep the `.product` on the test target; moving it to the library would make the model depend on the planner
 
+### 🟣⋯ Agent monitoring (`#cm-128.3`): two upstream tests changed on purpose
+Both are in `Packages/macOS/CmuxAgentJournal/Tests/CmuxAgentJournalTests/AgentNotificationReconcilerTests.swift`, and `make test` doesn't run that package: run `swift test --package-path Packages/macOS/CmuxAgentJournal` after any upstream sync that touches the reconciler.
+- **`pendingStopDoesNotConsumeSettledCompletionOrApproval` is now `pendingStopRespectsItsSourceWithoutSwallowingSettledCompletionOrApproval`.** A Claude Stop with pending background work is now accepted, because the agent is watching a background job and the "finished" notification may go out. A Codex one is still delayed, because Codex's pending work is always a live child. Keep ours when upstream touches the test
+- **`delayedParentCompletionIsReleasedByLastChildWithoutTimer` runs for `codex` only.** A Claude Stop without pending work now proves its children settled, so Claude never enters that hold. The line is marked `cmux-rbf: … (#cm-128.3)`. Keep ours
+
 ### 🟣⋯ The gate that does exist is the manual suite plus dogfood
 - Every feature is shipped through these, not through a pipeline
 - In `rb-drive/projects/<PROJECT_NAME>/06_plan-execute/test-suite/`:
