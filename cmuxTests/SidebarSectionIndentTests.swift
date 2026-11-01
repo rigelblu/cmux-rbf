@@ -281,7 +281,7 @@ struct SidebarSectionIndentMountedTests {
         return matches
     }
 
-    private func drain(_ window: NSWindow, iterations: Int = 40) async {
+    func drain(_ window: NSWindow, iterations: Int = 40) async {
         for _ in 0..<iterations {
             window.contentView?.layoutSubtreeIfNeeded()
             _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.001))
@@ -290,7 +290,7 @@ struct SidebarSectionIndentMountedTests {
     }
 
     /// The real `ContentView` with the AppKit table, in a window tall enough to realize every row.
-    private func mount(_ manager: TabManager) async throws -> Mounted {
+    func mount(_ manager: TabManager) async throws -> Mounted {
         _ = NSApplication.shared
         let suite = "SidebarSectionIndentMountedTests.mounted"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -316,21 +316,21 @@ struct SidebarSectionIndentMountedTests {
         return Mounted(window: window, table: container.tableView, controller: controller, defaults: defaults, suite: suite)
     }
 
-    private func close(_ mounted: Mounted) {
+    func close(_ mounted: Mounted) {
         mounted.window.contentView = nil
         mounted.window.close()
         mounted.defaults.removePersistentDomain(forName: mounted.suite)
     }
 
     /// The depth the table's own cell for a workspace row or a group header holds.
-    private func depth(_ mounted: Mounted, workspace key: String, in world: World) throws -> Int {
+    func depth(_ mounted: Mounted, workspace key: String, in world: World) throws -> Int {
         let id = world.w(key).id
         let cell = try #require(descendants(of: SidebarWorkspaceRowTableCellView.self, in: mounted.table)
             .first { $0.currentModelForMeasurement?.workspaceId == id }, "row \(key) is drawn")
         return try #require(cell.currentModelForMeasurement).depth
     }
 
-    private func depth(_ mounted: Mounted, group id: UUID) throws -> Int {
+    func depth(_ mounted: Mounted, group id: UUID) throws -> Int {
         let cell = try #require(descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table)
             .first { $0.currentModelForTesting?.groupId == id }, "the group's header is drawn")
         return try #require(cell.currentModelForTesting).depth
@@ -423,7 +423,7 @@ struct SidebarSectionIndentMountedTests {
         }
     }
 
-    private func memberCell(_ mounted: Mounted, _ key: String, in world: World) throws -> SidebarWorkspaceRowTableCellView {
+    func memberCell(_ mounted: Mounted, _ key: String, in world: World) throws -> SidebarWorkspaceRowTableCellView {
         let id = world.w(key).id
         return try #require(descendants(of: SidebarWorkspaceRowTableCellView.self, in: mounted.table)
             .first { $0.currentModelForMeasurement?.workspaceId == id }, "row \(key) is drawn")
@@ -532,6 +532,55 @@ struct SidebarSectionIndentMountedTests {
             let flush = try await outcome(sectioned: false, dragged: "u", target: target, zone: zone, side: side)
             #expect(withSections.first == "performed=true")
             #expect(withSections == flush, "u dropped on the \(zone) of \(target), pointer on the \(side): \(withSections) vs \(flush)")
+        }
+    }
+}
+#endif
+
+#if DEBUG
+extension SidebarSectionIndentMountedTests {
+    @Test(arguments: [false, true], [false, true])
+    func aGroupedPinHasTheSameRenderedDepthAndIndentAsALoosePin(_ nested: Bool, _ colored: Bool) async throws {
+        try await gate {
+            let restore = try Status.installStatusList(); defer { restore() }
+            let world = try World(nested: nested, colored: false)
+            let key = nested ? "m1" : "r1"
+            world.manager.setPinned(world.w(key), pinned: true)
+            if colored {
+                world.w(key).customColor = "#112233"
+                world.w("p1").customColor = "#112233"
+            }
+            let mounted = try await mount(world.manager); defer { close(mounted) }
+            let grouped = try #require(try memberCell(mounted, key, in: world).currentModelForMeasurement)
+            let loose = try #require(try memberCell(mounted, "p1", in: world).currentModelForMeasurement)
+            #expect(grouped.depth == loose.depth)
+            #expect(grouped.indentPoints(width: 280) == loose.indentPoints(width: 280))
+        }
+    }
+}
+#endif
+
+#if DEBUG
+extension SidebarSectionIndentMountedTests {
+    @Test(arguments: [false, true])
+    func theMountedFoldedGroupBadgeLeavesOutItsPinAndThePinKeepsItsUnread(_ nested: Bool) async throws {
+        try await gate {
+            let restore = try Status.installStatusList(); defer { restore() }
+            let world = try World(nested: nested, colored: false)
+            world.manager.selectWorkspace(world.w("w"))
+            world.manager.setPinned(world.w("r1"), pinned: true)
+            world.manager.setWorkspaceGroupCollapsed(groupId: world.r, isCollapsed: true)
+            let unread = TerminalNotificationStore.shared.sidebarUnread
+            for (key, count) in [("r", 1), ("r1", 2)] {
+                unread.applyWorkspaceSummaryProjection(forWorkspaceId: world.w(key).id,
+                    summary: SidebarWorkspaceUnreadSummary(unreadCount: count, latestNotificationText: nil), totalUnreadCount: count)
+            }
+            defer { for key in ["r", "r1"] { unread.applyWorkspaceSummaryProjection(forWorkspaceId: world.w(key).id, summary: nil, totalUnreadCount: 0) } }
+            let mounted = try await mount(world.manager); defer { close(mounted) }
+            let header = try #require(descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table)
+                .first { $0.currentModelForTesting?.groupId == world.r })
+            #expect(header.currentModelForTesting?.anchorUnreadCount == 1)
+            #expect(try memberCell(mounted, "r1", in: world).currentModelForMeasurement?.unreadCount == 2)
         }
     }
 }

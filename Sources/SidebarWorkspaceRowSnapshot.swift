@@ -11,8 +11,7 @@ struct SidebarWorkspaceRowSnapshot: Equatable {
     let workspaceId: UUID
     let groupId: UUID?
     /// Whether this row sits under a generated color-section header (`#cm-56`).
-    /// Mutually exclusive with `groupId != nil` — a workspace inside a real
-    /// group is never projected into a color section.
+    /// A pin drawn separately from its group can also be in a color section while `groupId` keeps its model membership.
     let isColorSectionMember: Bool
     let index: Int
     let workspaceCount: Int

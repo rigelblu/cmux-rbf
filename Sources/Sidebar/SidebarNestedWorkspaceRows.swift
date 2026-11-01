@@ -41,17 +41,22 @@ enum SidebarNestedWorkspaceRows {
     /// nested, so a flat window carries no depth and its rows keep the one step a member already has.
     static func depthById(
         groupsById: [UUID: WorkspaceGroup],
-        effectiveMembership: [UUID: UUID?]
+        effectiveMembership: [UUID: UUID?],
+        sectionsShown: Bool = false
     ) -> [UUID: Int] {
         guard hasNestedGroup(groupsById) else { return [:] }
         let tree = WorkspaceGroupTree(groups: Array(groupsById.values))
         var result: [UUID: Int] = [:]
         result.reserveCapacity(effectiveMembership.count + groupsById.count)
-        for groupId in groupsById.keys {
-            result[groupId] = tree.depth(of: groupId)
+        var rootDepthByGroupId: [UUID: Int] = [:]
+        for group in groupsById.values {
+            let pin = group.sidebarPin(in: groupsById, sectionsShown: sectionsShown)
+            let rootDepth = pin.pinRootGroupId.map { tree.depth(of: $0) } ?? 0
+            rootDepthByGroupId[group.id] = rootDepth
+            result[group.id] = tree.depth(of: group.id) - rootDepth
         }
         for (workspaceId, groupId) in effectiveMembership {
-            if let groupId { result[workspaceId] = tree.depth(of: groupId) + 1 }
+            if let groupId { result[workspaceId] = tree.depth(of: groupId) - (rootDepthByGroupId[groupId] ?? 0) + 1 }
         }
         return result
     }

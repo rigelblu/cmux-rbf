@@ -700,11 +700,16 @@ class TabManager: ObservableObject {
         // from the very first insertion, matching the legacy @Published
         // observer timing.
         workspaces.attach(host: self)
-        // The model cannot know which nested groups the sidebar draws under a status; this is the sidebar's own answer,
+        // The model cannot know which nested groups the sidebar draws outside their parent; this is the sidebar's answer,
         // from the same projection (weak: the model is owned by this manager). (#cm-110.3)
-        workspaces.groupIdsShownUnderAStatus = { [weak self] in
+        workspaces.groupIdsShownOutsideParent = { [weak self] in
+            guard let self, self.workspaceGroups.contains(where: { $0.parentGroupId != nil && ($0.statusId != nil || $0.isPinned) }) else { return [] }
+            let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: self.tabs, groups: self.workspaceGroups)
+            return VerticalTabsSidebar.groupsShownOutsideTheirParent(groups: self.workspaceGroups, projection: projection)
+        }
+        workspaces.workspaceIdsShownInPinned = { [weak self] in
             guard let self else { return [] }
-            return VerticalTabsSidebar.groupsShownUnderAStatus(tabs: self.tabs, groups: self.workspaceGroups)
+            return VerticalTabsSidebar.workspaceIdsShownInPinned(tabs: self.tabs, groups: self.workspaceGroups)
         }
         workspaceReordering.attach(host: self)
         workspaceGrouping.attach(host: self)

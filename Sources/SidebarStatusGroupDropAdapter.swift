@@ -98,6 +98,23 @@ extension VerticalTabsSidebar {
         if let join = workspaceProjectedGroupJoin(point: point, targets: targets, snapshot: snapshot, // (#cm-110.8)
             draggedId: draggedId, sourceKind: sourceKind, token: token, // (#cm-110.8)
             controlsEnabled: controlsEnabled, hasUserStatusList: hasUserStatusList) { return join } // (#cm-110.8)
+        // A member drawn separately in Pinned has no independent saved order. Keep explicit group joins and status drops.
+        let groupsById = Dictionary(uniqueKeysWithValues: snapshot.workspaceGroups.map { ($0.id, $0) })
+        if case .unrelated = decision, controlsEnabled, hasUserStatusList, let workspace,
+           WorkspaceGroupWorkspaceItem(workspace).sidebarPin(in: groupsById, sectionsShown: true).isOutsideGroup {
+            let pins = layout.headerDropTargets(measured: targets).filter { $0.isPinned }
+            if let top = pins.map({ $0.frame.minY }).min(), let bottom = pins.map({ $0.frame.maxY }).max(),
+               point.y >= top, point.y <= bottom {
+                if let target = targets.first(where: { !$0.isGroupHeader && point.y >= $0.frame.minY && point.y <= $0.frame.maxY }),
+                   let destination = snapshot.tabs.first(where: { $0.id == target.workspaceId }),
+                   WorkspaceGroupWorkspaceItem(destination).sidebarPin(in: groupsById, sectionsShown: true).isOutsideGroup {
+                    return .refused
+                }
+                guard let plan = ordinary(point, targets, false) else { return .refused }
+                if case .reorder(_, _, let groupId) = plan.action, groupId != nil { return .plan(plan) }
+                return .refused
+            }
+        }
         let rootPoint = CGPoint(x: targets.map(\.frame.minX).min() ?? point.x, y: point.y)
         let lastMeasuredBottom = request.targets.filter { $0.frame.width > 0 && $0.frame.height > 0 }.map(\.frame.maxY).max()
         let belowLastArea = request.areaIsLast && request.targets.contains { $0.workspaceId == SidebarStatusHeaderIdentity.statusesAreaUUID } // (#cm-110.4) section provenance no longer uses the legacy area kind
