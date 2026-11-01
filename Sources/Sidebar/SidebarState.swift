@@ -61,8 +61,10 @@ final class SidebarState: ObservableObject {
     }
 
     @MainActor
-    func expandColorSection(containing workspace: Workspace) {
-        guard workspace.groupId == nil,
+    func expandColorSection(containing workspace: Workspace, workspaceGroups: [WorkspaceGroup] = [], sectionsShown: Bool = false) {
+        let pin = WorkspaceGroupWorkspaceItem(workspace).sidebarPin(
+            in: Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) }), sectionsShown: sectionsShown)
+        guard workspace.groupId == nil || pin.isOutsideGroup,
               let rawColor = workspace.customColor else { return }
         expandColorSection(hex: rawColor)
     }

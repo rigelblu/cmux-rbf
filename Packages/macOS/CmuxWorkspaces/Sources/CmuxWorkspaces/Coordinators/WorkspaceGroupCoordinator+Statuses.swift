@@ -44,7 +44,7 @@ extension WorkspaceGroupCoordinator {
     /// Writes a group the status writers changed, then brings a selection back out of a fold if the group stopped being drawn
     /// under its status (ruling (27), #cm-110.3). The shown set is taken before the write.
     private func write(_ group: WorkspaceGroup, at index: Int) {
-        let shownBefore = model.groupIdsShownUnderAStatus()
+        let shownBefore = model.groupIdsShownOutsideParent()
         if model.workspaceGroups[index] != group { model.workspaceGroups[index] = group }
         model.expandSelectionIfItsGroupLeftItsStatus(shownBefore: shownBefore)
     }

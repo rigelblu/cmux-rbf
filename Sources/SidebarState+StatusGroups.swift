@@ -39,7 +39,10 @@ extension SidebarState {
         }
         reconcileStatusGroupOrder(list: list)
         if let selectedWorkspace {
-            expandColorSection(containing: selectedWorkspace)
+            let place = statusSidePlace(containing: selectedWorkspace, list: list,
+                resolvedHexByStatusId: resolvedHexByStatusId, workspaceGroups: workspaceGroups)
+            expandColorSection(containing: selectedWorkspace, workspaceGroups: workspaceGroups,
+                sectionsShown: place != nil && WorkspaceTodoFeature.isEnabled)
             revealStatusGroup(containing: selectedWorkspace, list: list, resolvedHexByStatusId: resolvedHexByStatusId,
                               workspaceGroups: workspaceGroups, revealWorkspaces: revealWorkspaces)
         }
@@ -71,17 +74,19 @@ extension SidebarState {
         resolvedHexByStatusId: [String: String],
         workspaceGroups: [WorkspaceGroup]
     ) -> StatusSidePlace? {
+        let controlsEnabled = WorkspaceTodoFeature.isEnabled
+        let sectionsShown = WorkspaceStatusGroupProjection.showsSections(list: list, controlsEnabled: controlsEnabled)
         // A selected member is a one-row sample; the absent anchor is not evidence that its live group disappeared.
         let groupsById = Dictionary(uniqueKeysWithValues: workspaceGroups.map { ($0.id, $0) })
         let storedGroup = workspaceGroups.first { $0.liveAnchorWorkspaceId == workspace.id }?.id ?? workspace.groupId
         // Restore prepares selection before registering its context; retain the same raw-membership fallback as rendering.
         let groupId = workspaceGroups.isEmpty ? storedGroup : storedGroup.flatMap { groupsById[$0] == nil ? nil : $0 }
-        let tree = WorkspaceGroupTree(groups: workspaceGroups)
-        let root = groupId.flatMap { groupsById[tree.outermost(of: $0)] }
+        let placement = WorkspaceGroupWorkspaceItem(id: workspace.id, groupId: groupId, isPinned: workspace.isPinned)
+            .sidebarPin(in: groupsById, sectionsShown: sectionsShown)
         let item = VerticalTabsSidebar.statusGroupProjectionItem(workspace, list: list,
-            groupId: groupId, isPinned: root?.isPinned ?? workspace.isPinned)
+            groupId: groupId, isPinned: placement.isPinned)
         guard let projection = VerticalTabsSidebar.statusGroupProjection(items: [item],
-            list: list, colorHexes: resolvedHexByStatusId, controlsEnabled: true,
+            list: list, colorHexes: resolvedHexByStatusId, controlsEnabled: controlsEnabled,
             workspaceGroups: workspaceGroups) else { return nil }
         let statusId = projection.workspaceGroups?.statusIdByWorkspaceId[workspace.id]
             ?? projection.groups.first(where: { $0.memberWorkspaceIds.contains(workspace.id) })?.statusId

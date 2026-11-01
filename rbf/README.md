@@ -217,7 +217,7 @@ Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at 
 - Drop a workspace on a status group to set that status and its color. A pinned workspace stays pinned.
 - Drag a status group, or the **Statuses** header, to reorder; the order survives a relaunch.
 - Click a header to fold it; a folded header shows the unread count inside.
-- Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Statuses**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups.
+- Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Statuses**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups. A workspace row pinned inside an unpinned workspace group shows only under **Pinned**, while staying a member of its group. Unpin it to show it in its group again, first among the group's unpinned rows.
 - A whole workspace group, nested or not, takes a status and sits under it with everything inside. Drop its header on a status group, or set it from its Status menu or Group Color.
 - Drag a tab out of a workspace onto a status group to make a new workspace already on that status.
 - Since v0.34.2 a workspace on **None** shows a small dot in the status glyph's place and sits under **Workspaces**, never in a status group, whatever its color. Click the dot to pick a status.
@@ -227,9 +227,9 @@ Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at 
 Since v0.32.0, a workspace group can sit inside another group, to any depth, so one header can hold a whole area of work.
 
 - Right-click a group's header and choose **Move Group to**, then a group, or **Top Level** to take it back out. Dragging a header does not nest it yet.
-- Each depth indents its rows. Collapsing a group hides everything inside it, and its header shows the unread count of all of it.
+- Each depth indents its rows. Collapsing a group hides the rows drawn inside it, and its header sums their unread count. Rows drawn separately under **Pinned** stay visible and keep their own unread counts.
 - A group that still holds other groups keeps its header when its last own workspace closes. That header shows a dot in the group's colour where its icon was, and a click on its name collapses or expands it.
-- A pinned group inside a group sits among that group's pinned rows, not at the top of the sidebar.
+- With Workspace Todo Controls on and a status list in use, a pinned child group shows under **Pinned** with everything inside it, while staying its parent's child. Unpin it to show it inside its parent again. With no section headers, it sits among its parent's pinned rows.
 - The nesting, the row order, and each group's collapsed and pinned state come back after you quit and reopen.
 - From the CLI, `cmux workspace-group list --json` names the group that holds each group in `parent_group_id`.
 - Always on; no setting or migration. An older build opens the same saved file and shows the groups without the nesting.

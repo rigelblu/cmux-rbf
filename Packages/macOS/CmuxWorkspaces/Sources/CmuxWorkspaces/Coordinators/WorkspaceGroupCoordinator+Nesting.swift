@@ -249,14 +249,15 @@ extension WorkspaceGroupCoordinator {
             let anchorId = model.workspaceGroups[index].liveAnchorWorkspaceId
             // A group the sidebar draws under a status is not hidden by this fold, so it stays selected and keeps its
             // multi-selection (ruling (7), #cm-110.3). Its own fold, when it is the one folding, hides all of it.
-            let shown = model.groupIdsShownUnderAStatus()
+            let shown = model.groupIdsShownOutsideParent()
             var staysShown = Set<UUID>()
             for root in below where shown.contains(root) { staysShown.formUnion([root] + tree.descendants(of: root)) }
+            let pinnedRows = model.workspaceIdsShownInPinned()
             let hiddenIds = Set(
                 model.tabs
                     .filter { tab in
                         guard let tabGroup = tab.groupId else { return false }
-                        return inside.contains(tabGroup) && !staysShown.contains(tabGroup) && tab.id != anchorId
+                        return inside.contains(tabGroup) && !staysShown.contains(tabGroup) && !pinnedRows.contains(tab.id) && tab.id != anchorId
                     }
                     .map(\.id)
             )

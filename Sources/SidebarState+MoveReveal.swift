@@ -27,22 +27,17 @@ extension SidebarState {
             resolvedHexByStatusId: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:],
             workspaceGroups: tabManager.workspaceGroups
         )
+        let pin = WorkspaceGroupWorkspaceItem(workspace).sidebarPin(
+            in: Dictionary(uniqueKeysWithValues: tabManager.workspaceGroups.map { ($0.id, $0) }),
+            sectionsShown: place != nil && WorkspaceTodoFeature.isEnabled
+        )
         return SidebarMovePlace(
             statusId: place?.statusId,
-            isPinned: place?.isPinned ?? drawnPin(of: workspace, workspaceGroups: tabManager.workspaceGroups),
-            // The color group the row is drawn in: a row in a workspace group, or under a status group, is not in one.
-            colorHex: workspace.groupId == nil && place?.statusId == nil ? workspace.customColor.flatMap(WorkspaceColorHex.normalized) : nil,
+            isPinned: place?.isPinned ?? pin.isPinned,
+            // A separately drawn pin takes its own color group; rows held by a workspace/status group do not.
+            colorHex: (workspace.groupId == nil || pin.isOutsideGroup) && place?.statusId == nil ? workspace.customColor.flatMap(WorkspaceColorHex.normalized) : nil,
             groupId: workspace.groupId
         )
-    }
-
-    /// The pin a row is drawn under when there is no status projection (the built-in list): the outermost group's, as
-    /// `statusSidePlace` takes it, never the row's own pin while it sits in a group (#cm-110.14, fix round 2).
-    private func drawnPin(of workspace: Workspace, workspaceGroups: [WorkspaceGroup]) -> Bool {
-        let groupId = workspaceGroups.first { $0.liveAnchorWorkspaceId == workspace.id }?.id ?? workspace.groupId
-        guard let groupId, workspaceGroups.contains(where: { $0.id == groupId }) else { return workspace.isPinned }
-        let root = WorkspaceGroupTree(groups: workspaceGroups).outermost(of: groupId)
-        return workspaceGroups.first { $0.id == root }?.isPinned ?? workspace.isPinned
     }
 
     func revealMoved(_ workspace: Workspace, tabManager: TabManager, cause: MoveRevealCause, scrollsSelected: Bool) {
