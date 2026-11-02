@@ -612,3 +612,31 @@ extension SidebarGroupedPinTests {
         }
     }
 }
+
+extension SidebarGroupedPinTests {
+    /// Tom, 2026-11-02 (#cm-110.18): while the section headers show, a color group under `Pinned` whose color the
+    /// palette does not name takes the name of the first status in his list with that color, not `Custom (<hex>)`.
+    /// A palette name wins, and with the section headers off nothing changes.
+    @Test(arguments: ["statusName", "paletteName", "sectionsOff", "firstStatusWins", "firstStatusWinsReversed"])
+    func pinnedColorGroupTakesItsStatusNameOnlyWhenThePaletteHasNone(_ mode: String) throws {
+        let f = Fixture(nested: false)
+        let shown = mode == "sectionsOff" ? nil : sectionProjection(tabs: f.tabs, groups: f.groups)
+        if mode != "sectionsOff" { _ = try #require(shown) }
+        let pinnedId = UUID()
+        let sharedColor = mode.hasPrefix("firstStatusWins")
+        let projection = VerticalTabsSidebar.colorSectionProjection(
+            workspaces: [SidebarWorkspaceColorSectionWorkspaceSnapshot(id: pinnedId, groupId: nil, isPinned: true, customColor: "#5F42A6")],
+            collapsedHexes: [],
+            statusGroupProjection: shown,
+            colorHexes: ["parked": "#5F42A6", "snooze": sharedColor ? "#5f42a6" : "#4251A6"],
+            paletteEntries: mode == "paletteName" ? [WorkspaceColorPaletteEntry(name: "5: PARKED", hex: "#5F42A6")] : [],
+            statusTitles: mode == "firstStatusWinsReversed"
+                ? [(id: "snooze", title: "Snooze"), (id: "parked", title: "Parked")]
+                : [(id: "parked", title: "Parked"), (id: "snooze", title: "Snooze")]
+        )
+        let section = try #require(projection.sections.first { $0.memberWorkspaceIds.contains(pinnedId) })
+        let expected = ["statusName": "Parked", "paletteName": "5: PARKED", "sectionsOff": "Custom (#5F42A6)",
+                        "firstStatusWins": "Parked", "firstStatusWinsReversed": "Snooze"][mode]
+        #expect(section.title == expected)
+    }
+}
