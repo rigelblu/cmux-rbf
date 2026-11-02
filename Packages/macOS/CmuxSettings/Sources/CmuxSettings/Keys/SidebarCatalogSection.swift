@@ -15,6 +15,13 @@ public struct SidebarCatalogSection: SettingCatalogSection {
         vertical || explicit
     }
 
+    /// Optional names for the three sidebar sections; absent entries use localized titles.
+    public let sectionNames = DefaultsKey<[String: String]>(
+        id: "sidebar.sectionNames",
+        defaultValue: [:],
+        userDefaultsKey: "sidebar.sectionNames"
+    )
+
     public let hideAllDetails = DefaultsKey<Bool>(
         id: "sidebar.hideAllDetails",
         defaultValue: false,

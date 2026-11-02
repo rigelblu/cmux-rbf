@@ -13,6 +13,7 @@
 		C12800090000000000000001 /* CMUXCLI+ClaudeEditorMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800090000000000000002 /* CMUXCLI+ClaudeEditorMode.swift */; };
 		C12800080000000000000001 /* TerminalSurface+AgentInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800080000000000000002 /* TerminalSurface+AgentInput.swift */; };
 		C12800070000000000000001 /* KeypressWaitResolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800070000000000000002 /* KeypressWaitResolutionTests.swift */; };
+		C128020990000000000000001 /* SidebarSectionNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020990000000000000002 /* SidebarSectionNameTests.swift */; };
 		C128020310000000000000001 /* SidebarGroupedPinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020310000000000000002 /* SidebarGroupedPinTests.swift */; };
 		C12800060000000000000001 /* AgentPaneInputResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800060000000000000002 /* AgentPaneInputResolver.swift */; };
 		C12800050000000000000001 /* ClaudeStopHookPendingWorkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */; };
@@ -4252,6 +4253,7 @@
 		C12800090000000000000002 /* CMUXCLI+ClaudeEditorMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+ClaudeEditorMode.swift"; sourceTree = "<group>"; };
 		C12800080000000000000002 /* TerminalSurface+AgentInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalSurface+AgentInput.swift"; sourceTree = "<group>"; };
 		C12800070000000000000002 /* KeypressWaitResolutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeypressWaitResolutionTests.swift"; sourceTree = "<group>"; };
+		C128020990000000000000002 /* SidebarSectionNameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarSectionNameTests.swift"; sourceTree = "<group>"; };
 		C128020310000000000000002 /* SidebarGroupedPinTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarGroupedPinTests.swift"; sourceTree = "<group>"; };
 		C12800060000000000000002 /* AgentPaneInputResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentPaneInputResolver.swift"; sourceTree = "<group>"; };
 		C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeStopHookPendingWorkTests.swift"; sourceTree = "<group>"; };
@@ -12211,6 +12213,7 @@
 				C128000B0000000000000002 /* AgentJournalReplayLivenessTests.swift */,
 				C128000C0000000000000002 /* WorkspaceAgentPIDSweepJournalTests.swift */,
 				C12800070000000000000002 /* KeypressWaitResolutionTests.swift */,
+				C128020990000000000000002 /* SidebarSectionNameTests.swift */,
 				C128020310000000000000002 /* SidebarGroupedPinTests.swift */,
 				C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */,
 				C12800040000000000000002 /* ClaudeHookAttentionTestFixture.swift */,
@@ -16026,6 +16029,7 @@
 				C128000B0000000000000001 /* AgentJournalReplayLivenessTests.swift in Sources */,
 				C128000C0000000000000001 /* WorkspaceAgentPIDSweepJournalTests.swift in Sources */,
 				C12800070000000000000001 /* KeypressWaitResolutionTests.swift in Sources */,
+				C128020990000000000000001 /* SidebarSectionNameTests.swift in Sources */,
 				C128020310000000000000001 /* SidebarGroupedPinTests.swift in Sources */,
 				C12800050000000000000001 /* ClaudeStopHookPendingWorkTests.swift in Sources */,
 				C12800040000000000000001 /* ClaudeHookAttentionTestFixture.swift in Sources */,
