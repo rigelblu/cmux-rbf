@@ -255,7 +255,9 @@ def main() -> int:
         expected = {
             "kind": "agent.turn.completed", "source": "claude",
             "workspace_id": workspace_id, "surface_id": surface_id,
-            "title": "Claude Code", "subtitle": "Completed in fun", "body": "2",
+            # cmux-rbf: changed on purpose (#cm-128.4): source line names the
+            # kind; the subtitle names only the working folder.
+            "title": "Claude Code · Finished", "subtitle": "fun", "body": "2",
             "category": "turn-complete", "pending_work": False,
             "request_identity": None,
         }

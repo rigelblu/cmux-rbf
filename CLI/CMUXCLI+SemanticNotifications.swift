@@ -1,4 +1,5 @@
 import CmuxAgentJournal
+import CmuxNotifications
 import Foundation
 
 extension CMUXCLI {
@@ -7,7 +8,7 @@ extension CMUXCLI {
     func semanticNotificationCommand(
         source: String, agentKey: String, sessionId: String?,
         workspaceId: String, surfaceId: String, kind: AgentJournalEventKind,
-        rawObject: [String: Any]?, payload: String, pendingWork: Bool = false
+        rawObject: [String: Any]?, payload: String, pendingWork: Bool = false, cwd: String? = nil
     ) throws -> String {
         let fields = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
         guard fields.count >= 3 else { throw CLIError(message: String(localized: "cli.notification.invalidPayload", defaultValue: "Invalid notification payload")) }
@@ -18,13 +19,13 @@ extension CMUXCLI {
             category: category, correlationKey: meta.first { $0.hasPrefix("k=") }.map { String($0.dropFirst(2)) })
         return try semanticNotificationCommand(source: source, agentKey: agentKey, sessionId: sessionId,
             workspaceId: workspaceId, surfaceId: surfaceId, kind: kind, rawObject: rawObject,
-            notification: notification, pendingWork: pendingWork || meta.contains("p=1"), isSubagent: meta.contains("n=1"))
+            notification: notification, pendingWork: pendingWork || meta.contains("p=1"), isSubagent: meta.contains("n=1"), cwd: cwd)
     }
 
     func semanticNotificationCommand(
         source: String, agentKey: String, sessionId: String?, workspaceId: String, surfaceId: String,
         kind: AgentJournalEventKind, rawObject: [String: Any]?, notification: AgentJournalNotification,
-        pendingWork: Bool = false, isSubagent: Bool = false
+        pendingWork: Bool = false, isSubagent: Bool = false, cwd: String? = nil
     ) throws -> String {
         var context = Self.semanticAttentionContext(rawObject)
         var notification = notification
@@ -35,6 +36,19 @@ extension CMUXCLI {
         case .approvalRequested, .planReviewRequested: notification.category = "needs-permission"
         default: break
         }
+        let presentationKind: AgentNotificationPresentation.Kind?
+        switch kind {
+        case .turnCompleted: presentationKind = .finished
+        case .questionRequested, .planReviewRequested, .idleObserved: presentationKind = .answer
+        case .approvalRequested: presentationKind = .approval
+        case .errorReported: presentationKind = .error
+        default: presentationKind = nil
+        }
+        let presentation = AgentNotificationPresentation(agentTitle: notification.title,
+            kind: presentationKind, cwd: cwd ?? rawObject.flatMap { extractClaudeHookCWD(from: $0) })
+        notification.sourceTitle = notification.title
+        notification.title = presentation.title
+        notification.subtitle = presentation.subtitle
         context.notification = notification
         if context.requestIdentity == nil { context.requestIdentity = notification.correlationKey }
         let draft = AgentJournalEventDraft(kind: kind,

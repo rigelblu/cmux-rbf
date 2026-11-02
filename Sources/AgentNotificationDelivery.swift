@@ -34,7 +34,9 @@ struct AgentNotificationDelivery: Sendable {
         isSubagent: Bool? = nil,
         correlationKey: String? = nil,
         sessionId: String? = nil,
-        coalesces: Bool = false
+        coalesces: Bool = false,
+        sourceTitle: String? = nil,
+        isPromptTurn: Bool = false
     ) -> Bool {
         guard allows(category: category, pending: pending) else { return false }
         TerminalMutationBus.shared.enqueueNotification(
@@ -53,7 +55,9 @@ struct AgentNotificationDelivery: Sendable {
             ),
             soundContext: soundContext,
             correlationKey: correlationKey,
-            coalesces: coalesces
+            coalesces: coalesces,
+            unattendedNudgeTitle: category == .turnComplete && !pending && !isPromptTurn && idleEnabled
+                ? AgentNotificationPresentation(agentTitle: sourceTitle ?? title, kind: .unreadReminder, cwd: nil).title : nil
         )
         return true
     }

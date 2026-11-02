@@ -47,6 +47,7 @@ Notification behavior from Settings > Notifications.
 | `notifications.showInMenuBar` | boolean | `true` | Show the menu bar extra. |
 | `notifications.unreadPaneRing` | boolean | `true` | Highlight panes with unread notifications. |
 | `notifications.paneFlash` | boolean | `true` | Flash the focused pane when requested. |
+| `notifications.agentIdleReminder` | boolean | `true` | Notify when an agent is waiting for input, including Claude idle prompts and generic-agent waiting/attention alerts; suppress these while background work is pending. Also remind once when a finished turn stays unread for about 1 minute, except screen-detected prompt turns (Ollama). Skip the reminder for a turn that ended with pending background work, or while you are looking at that pane and present (screen awake and unlocked, input in the last 2 minutes). |
 | `notifications.sound` | `"default"` or `"Basso"` or `"Blow"` or `"Bottle"` or `"Frog"` or `"Funk"` or `"Glass"` or `"Hero"` or `"Morse"` or `"Ping"` or `"Pop"` or `"Purr"` or `"Sosumi"` or `"Submarine"` or `"Tink"` or `"custom_file"` or `"none"` | `"default"` | Notification sound preset. |
 | `notifications.customSoundFilePath` | string | `""` | Local path to the custom notification sound file. |
 | `notifications.command` | string | `""` | Optional shell command to run alongside notification delivery. |

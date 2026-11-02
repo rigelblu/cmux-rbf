@@ -4,6 +4,11 @@ public import Foundation
 public struct SidebarWorkspaceUnreadSummary: Equatable, Sendable {
     /// The workspace's displayed unread count.
     public var unreadCount: Int
+    /// Whether an owner has an unread mark independent of notification news.
+    public var markedUnread: Bool
+
+    /// The mark-inclusive count retained by unread actions and the iPhone.
+    public var unreadCountIncludingMarks: Int { unreadCount + (markedUnread ? 1 : 0) }
     /// The trimmed body or title of the latest notification, when present.
     public var latestNotificationText: String?
     /// The stable identity of the latest notification, when present.
@@ -19,9 +24,11 @@ public struct SidebarWorkspaceUnreadSummary: Equatable, Sendable {
         latestNotificationText: String?,
         latestNotificationId: UUID? = nil,
         latestNotificationCreatedAt: Date? = nil,
-        hasLatestNotification: Bool = false
+        hasLatestNotification: Bool = false,
+        markedUnread: Bool = false
     ) {
         self.unreadCount = unreadCount
+        self.markedUnread = markedUnread
         self.latestNotificationText = latestNotificationText
         self.latestNotificationId = latestNotificationId
         self.latestNotificationCreatedAt = latestNotificationCreatedAt
@@ -88,6 +95,22 @@ public struct SidebarUnreadSnapshot: Equatable, Sendable {
         summary(forWorkspaceId: id).unreadCount
     }
 
+    /// Returns whether this owner carries any mark independent of news.
+    public func hasUnreadMark(forWorkspaceId id: UUID) -> Bool {
+        summary(forWorkspaceId: id).markedUnread || hasManualUnread(forWorkspaceId: id)
+    }
+
+    /// Combines only the members a header's badge represents.
+    /// - Parameter ids: The header's own badge members, after projection.
+    /// - Returns: News count and mark state, without a latest-notification preview.
+    public func badgeSummary(forWorkspaceIds ids: [UUID]) -> SidebarWorkspaceUnreadSummary {
+        SidebarWorkspaceUnreadSummary(
+            unreadCount: ids.reduce(0) { $0 + unreadCount(forWorkspaceId: $1) },
+            latestNotificationText: nil,
+            markedUnread: ids.contains { hasUnreadMark(forWorkspaceId: $0) }
+        )
+    }
+
     /// Returns the workspace's latest notification text.
     public func latestNotificationText(forWorkspaceId id: UUID) -> String? {
         summary(forWorkspaceId: id).latestNotificationText
@@ -95,7 +118,7 @@ public struct SidebarUnreadSnapshot: Equatable, Sendable {
 
     /// Returns whether the workspace has any displayed unread state.
     public func workspaceIsUnread(forWorkspaceId id: UUID) -> Bool {
-        unreadCount(forWorkspaceId: id) > 0 || hasManualUnread(forWorkspaceId: id)
+        unreadCount(forWorkspaceId: id) > 0 || hasUnreadMark(forWorkspaceId: id)
     }
 
     /// Returns whether the workspace was explicitly marked unread.

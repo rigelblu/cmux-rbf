@@ -58,10 +58,10 @@ struct SidebarWorkspaceContextMenuTargetAggregate: Equatable {
             workspaceRowsById[$0]?.groupId != nil
         }
         canMarkRead = targetWorkspaceIds.contains {
-            (workspaceRowsById[$0]?.unreadCount ?? 0) > 0
+            (workspaceRowsById[$0]?.unreadCountIncludingMarks ?? 0) > 0
         }
         canMarkUnread = targetWorkspaceIds.contains {
-            (workspaceRowsById[$0]?.unreadCount ?? 0) == 0
+            (workspaceRowsById[$0]?.unreadCountIncludingMarks ?? 0) == 0
         }
         hasLatestNotification = notificationIndex.hasNotification(
             workspaceIds: targetWorkspaceIds

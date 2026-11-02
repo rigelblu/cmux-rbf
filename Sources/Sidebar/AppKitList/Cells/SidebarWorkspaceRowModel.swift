@@ -29,6 +29,7 @@ struct SidebarWorkspaceRowModel: Equatable {
     let canCloseWorkspace: Bool
     let accessibilityWorkspaceCount: Int
     var unreadCount: Int
+    var markedUnread: Bool = false
     var latestNotificationText: String?
     let showsAgentActivity: Bool
     let rowSpacing: CGFloat

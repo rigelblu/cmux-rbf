@@ -26,6 +26,7 @@ struct SidebarWorkspaceRowSnapshot: Equatable {
     let workspaceShortcutModifierSymbol: String
     let canCloseWorkspace: Bool
     let unreadCount: Int
+    var markedUnread: Bool = false
     let latestNotificationText: String?
     let showsAgentActivity: Bool
     let rowSpacing: CGFloat

@@ -6,6 +6,8 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
     let showsSpinner: Bool
     let showsBadge: Bool
     let unreadCount: Int
+    var markedUnread: Bool = false
+    var markColor: Color = .accentColor
     let side: CGFloat
     let spinnerSide: CGFloat
     /// The slot's width: both trailing marks and their gap, never less than the close button. (#cm-128.1)
@@ -37,12 +39,14 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
                 if showsBadge {
                     SidebarWorkspaceUnreadBadge(
                         unreadCount: unreadCount,
+                        markedUnread: markedUnread,
+                        markColor: markColor,
                         side: side,
                         font: badgeFont,
                         fillColor: badgeFillColor,
                         textColor: badgeTextColor
                     )
-                    .opacity(contentAlpha)
+                    .opacity(unreadCount == 0 && markedUnread ? 1 : contentAlpha)
                 }
             }
             .opacity(canCloseWorkspace && showsCloseButton ? 0 : 1)

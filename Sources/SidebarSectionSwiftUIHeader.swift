@@ -7,11 +7,12 @@ struct SidebarSectionSwiftUIHeader: View, Equatable {
     let identifier: String
     let isCollapsed: Bool
     var unreadCount: Int = 0
+    var markedUnread: Bool = false
     var onToggle: @MainActor () -> Void = {}
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.title == rhs.title && lhs.label == rhs.label && lhs.identifier == rhs.identifier
-            && lhs.isCollapsed == rhs.isCollapsed && lhs.unreadCount == rhs.unreadCount
+            && lhs.isCollapsed == rhs.isCollapsed && lhs.unreadCount == rhs.unreadCount && lhs.markedUnread == rhs.markedUnread
     }
 
     var body: some View {
@@ -27,8 +28,8 @@ struct SidebarSectionSwiftUIHeader: View, Equatable {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                if unreadCount > 0 {
-                    SidebarStatusUnreadBadge(count: unreadCount, fontScale: 1, globalFontMagnificationPercent: 100)
+                if unreadCount > 0 || markedUnread {
+                    SidebarStatusUnreadBadge(count: unreadCount, markedUnread: markedUnread, fontScale: 1, globalFontMagnificationPercent: 100)
                 }
                 Spacer(minLength: 0)
             }

@@ -62,7 +62,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         // the new multi-fingerprint store does not regress the eviction case.
         let notifications = notifyCommands(in: Array(context.state.snapshot().dropFirst(start)))
         XCTAssertEqual(notifications.count, 2, "Incidental completion cue should not send after a real completion, saw \(notifications)")
-        XCTAssertEqual(notifications.filter { $0.contains("Grok|Completed|") }.count, 1, notifications.joined(separator: "\n"))
+        // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+        XCTAssertEqual(notifications.filter { $0.contains("Grok · Finished|\(context.root.lastPathComponent)|") }.count, 1, notifications.joined(separator: "\n"))
     }
 
     func testGrokSessionStartRefireDoesNotRearmCompletionDedupe() throws {
