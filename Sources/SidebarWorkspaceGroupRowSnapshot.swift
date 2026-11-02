@@ -26,6 +26,7 @@ struct SidebarWorkspaceGroupRowSnapshot {
     let multiSelectionBackgroundStyle: SidebarWorkspaceRowBackgroundStyle
     let memberCount: Int
     let anchorUnreadCount: Int
+    var anchorMarkedUnread: Bool = false
     let canMarkRead: Bool
     let canMarkUnread: Bool
     let hasLatestNotifications: Bool

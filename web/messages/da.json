@@ -1233,7 +1233,7 @@
         },
         "notifications": {
           "suppressOnlyFocusedSurface": "Når dette er slået til, trækkes et notifikationsbanner kun automatisk tilbage, når dets surface er præcis den fokuserede surface. Et banner leveret til en ikke-fokuseret surface i det aktuelt synlige workspace bliver vist, indtil du fokuserer på den surface (eller klikker/afviser det), i stedet for at blive trukket tilbage, når workspacet bliver synligt. Fra bevarer den ældre tilbagetrækning baseret på workspace-synlighed.",
-          "agentIdleReminder": "Send en notifikation, når en agent har været inaktiv og venter på dit input (ca. 60 sekunder efter en tur slutter). Undertrykkes, mens baggrundsarbejde fra den seneste tur stadig kører, så en igangværende build eller overvågning ikke udløser en falsk vente-notifikation.",
+          "agentIdleReminder": "Giv besked, når en agent venter på dit input, og påmind én gang efter 1 min, hvis en afsluttet tur stadig er ulæst. Undertrykkes, mens baggrundsarbejde kører.",
           "soundOverrides": "Sparsomme tilsidesættelser af notifikationslyd pr. agent og alarmtype. Manglende felter bruger notifications.sound.",
           "soundOverride": "En tilsidesættelse af notifikationslyden. default bruger notifications.sound, none deaktiverer afspilning, og de øvrige værdier vælger en indbygget eller brugerdefineret lyd."
         },

@@ -363,6 +363,36 @@ struct SidebarWorkspaceRowVisualPalette {
             blue: (rgb.blueComponent * 255).rounded() / 255, alpha: 1)
     }
 
+    /// Keeps a mark at 3:1 over the row fill without changing its reserved slot.
+    func unreadMarkColor(sidebarStandIn: NSColor) -> NSColor {
+        if isActive { return agentActivityColor() }
+        let fill = contrastBackground(sidebarStandIn: sidebarStandIn)
+        let pixelFill = Self.eightBitActivityColor(fill)
+        let accent = cmuxAccentNSColor(for: colorScheme)
+        if cmuxContrastRatio(foreground: Self.eightBitActivityColor(accent), background: pixelFill) >= 3 {
+            return accent
+        }
+        let endpoint: NSColor = cmuxContrastRatio(foreground: .black, background: fill)
+            > cmuxContrastRatio(foreground: .white, background: fill) ? .black : .white
+        var lower: CGFloat = 0
+        var upper: CGFloat = 1
+        for _ in 0..<24 {
+            let fraction = (lower + upper) / 2
+            let candidate = accent.blended(withFraction: fraction, of: endpoint) ?? endpoint
+            if cmuxContrastRatio(foreground: candidate, background: fill) >= 3 {
+                upper = fraction
+            } else {
+                lower = fraction
+            }
+        }
+        while upper < 1 {
+            let candidate = accent.blended(withFraction: upper, of: endpoint) ?? endpoint
+            if cmuxContrastRatio(foreground: Self.eightBitActivityColor(candidate), background: pixelFill) >= 3 { break }
+            upper = min(1, upper + 1 / 255)
+        }
+        return accent.blended(withFraction: upper, of: endpoint) ?? endpoint
+    }
+
     private static func darkenedForWhiteText(_ identityColor: NSColor) -> NSColor {
         let opaqueIdentity = (identityColor.usingColorSpace(.sRGB) ?? identityColor)
             .withAlphaComponent(1)

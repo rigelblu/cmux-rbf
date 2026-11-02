@@ -52,6 +52,8 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
     public let customColor: String?
     /// The unread notification count for this workspace.
     public let unreadCount: Int
+    /// Whether this workspace has a mark independent of notification news.
+    public let markedUnread: Bool
     /// The latest notification's trimmed text, if any.
     public let latestNotificationText: String?
     /// The latest conversation message, if any.
@@ -87,6 +89,7 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
     ///   - currentDirectory: The current directory.
     ///   - customColor: The custom tab color hex, if any.
     ///   - unreadCount: The unread notification count.
+    ///   - markedUnread: Whether the workspace has an independent unread mark.
     ///   - latestNotificationText: The latest notification text, if any.
     ///   - latestConversationMessage: The latest conversation message.
     ///   - latestSubmittedMessage: The latest submitted message.
@@ -111,6 +114,7 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
         currentDirectory: String,
         customColor: String?,
         unreadCount: Int,
+        markedUnread: Bool = false,
         latestNotificationText: String?,
         latestConversationMessage: String?,
         latestSubmittedMessage: String?,
@@ -135,6 +139,7 @@ public struct ControlExtensionSidebarWorkspace: Sendable, Equatable {
         self.currentDirectory = currentDirectory
         self.customColor = customColor
         self.unreadCount = unreadCount
+        self.markedUnread = markedUnread
         self.latestNotificationText = latestNotificationText
         self.latestConversationMessage = latestConversationMessage
         self.latestSubmittedMessage = latestSubmittedMessage

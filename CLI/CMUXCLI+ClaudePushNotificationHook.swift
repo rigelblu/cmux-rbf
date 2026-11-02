@@ -82,7 +82,8 @@ extension CMUXCLI {
         let notification = AgentJournalNotification(title: title, subtitle: "", body: pushMessage, category: "other")
         _ = try sendV1Command(try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
             sessionId: sessionID, workspaceId: workspaceId, surfaceId: surfaceId,
-            kind: .messagePublished, rawObject: parsedInput.rawObject, notification: notification), client: client)
+            kind: .messagePublished, rawObject: parsedInput.rawObject, notification: notification,
+            cwd: parsedInput.cwd ?? mappedSession?.cwd), client: client)
         printClaudeHookAck()
     }
 

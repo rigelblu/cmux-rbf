@@ -62,7 +62,8 @@ struct CodexTerminalErrorNotificationTests {
         #expect(
             server.commands.contains { command in
                 command.contains(
-                    "notify_target \(workspaceID) \(surfaceID) Codex|Error|Selected model is at capacity. Please try a different model."
+                    // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                    "notify_target \(workspaceID) \(surfaceID) Codex · Stopped on an error|\(root.lastPathComponent)|Selected model is at capacity. Please try a different model."
                 )
             },
             "Expected the nested terminal error to notify, saw \(server.commands)"

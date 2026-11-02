@@ -36,11 +36,12 @@ struct SidebarWorkspaceSlotResolution: Equatable, Sendable {
         showsHand: Bool,
         showsSpinner: Bool,
         unreadCount: Int,
+        markedUnread: Bool = false,
         loadingSpinnerPosition: SidebarIndicatorPosition,
         notificationBadgePosition: SidebarIndicatorPosition,
         showsCloseButton: Bool = false
     ) -> SidebarWorkspaceSlotResolution {
-        let showsBadge = unreadCount > 0
+        let showsBadge = unreadCount > 0 || markedUnread
         let trailingBadge = showsBadge && notificationBadgePosition == .trailing
         let trailingSpinner = showsSpinner && loadingSpinnerPosition == .trailing
 
@@ -77,6 +78,9 @@ struct SidebarWorkspaceSlotResolution: Equatable, Sendable {
 
     /// The gap between a trailing badge and the spinner beside it, in points: the code's spinner spacing.
     static let trailingMarkGap: CGFloat = 6
+
+    /// Diameter of a manual mark inside the unchanged sixteen-point badge slot.
+    static func unreadMarkDiameter(fontScale: CGFloat) -> CGFloat { 6 * fontScale }
 
     /// Width the title reserves at the row's trailing edge: the trailing marks and their gap, or the close button's
     /// width when that is wider (it replaces the marks on hover, so it must fit in the same place).

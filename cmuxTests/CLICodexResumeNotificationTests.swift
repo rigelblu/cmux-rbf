@@ -108,7 +108,8 @@ struct CLICodexResumeNotificationTests {
         #expect(outcome.result.status == 0, Comment(rawValue: outcome.result.stderr))
         #expect(
             outcome.commands.contains {
-                $0.hasPrefix("notify_target_async \(workspaceID) \(surfaceID) Codex|")
+                // cmux-rbf: changed on purpose (#cm-128.4): resumed completion source line and folder.
+                $0.hasPrefix("notify_target_async \(workspaceID) \(surfaceID) Codex · Finished|\(root.lastPathComponent)|")
             },
             "A task_complete rollout event must recover notification delivery when Codex drops Stop"
         )

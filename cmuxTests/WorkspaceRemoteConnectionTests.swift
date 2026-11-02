@@ -4046,7 +4046,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "{}\n")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Error|Try again later.")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Try again later.")
             },
             "Expected typed Codex error notification, saw \(state.commands)"
         )
@@ -4124,7 +4125,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "{}\n")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Network error|Stream disconnected before completion.")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Stream disconnected before completion.")
             },
             "Expected discovered transcript failure notification, saw \(state.commands)"
         )
@@ -4513,7 +4515,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "{}\n")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Error|quota exceeded")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|quota exceeded")
             },
             "Expected explicit error field notification, saw \(state.commands)"
         )
@@ -4665,7 +4668,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "{}\n")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Error|Try again later.")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Try again later.")
             },
             "Expected payload error notification to beat healthy transcript, saw \(state.commands)"
         )
@@ -4739,7 +4743,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "{}\n")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Error|Codex ended before sending a final response")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Codex ended before sending a final response")
             },
             "Expected no-final-response notification, saw \(state.commands)"
         )
@@ -4940,6 +4945,7 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
             executablePath: cliPath,
             arguments: [
                 "hooks", "codex", "monitor",
+                "--cwd", root.path,
                 "--workspace",
                 workspaceId,
                 "--surface",
@@ -4961,7 +4967,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Error|Codex ended before sending a final response")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Codex ended before sending a final response")
             },
             "Expected monitor to send no-final-response notification, saw \(state.commands)"
         )
@@ -5030,6 +5037,7 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
                 "turn-monitor-stream-error",
                 "--transcript",
                 transcriptURL.path,
+                "--cwd", root.path,
             ],
             environment: environment,
             timeout: 5
@@ -5041,7 +5049,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Network error|Stream disconnected before completion.")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Stream disconnected before completion.")
             },
             "Expected monitor to send stream error notification before terminal completion, saw \(state.commands)"
         )
@@ -5113,6 +5122,7 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
             turnId,
             "--transcript",
             transcriptURL.path,
+            "--cwd", root.path,
         ]
         process.environment = environment
         process.standardInput = FileHandle.nullDevice
@@ -5140,7 +5150,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         )
         XCTAssertTrue(
             waitForSocketCommand(state: state, timeout: 5) { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Waiting|Which demo path should I use?")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Needs your answer|\(root.lastPathComponent)|Which demo path should I use?")
             },
             "Expected monitor to send Codex input notification, saw \(state.snapshot())"
         )
@@ -5203,6 +5214,7 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         process.executableURL = URL(fileURLWithPath: cliPath)
         process.arguments = [
             "hooks", "codex", "monitor",
+                "--cwd", root.path,
             "--workspace",
             workspaceId,
             "--surface",
@@ -5240,7 +5252,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         )
         XCTAssertTrue(
             waitForSocketCommand(state: state, timeout: 5) { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Waiting|What kind of demo plan should I create?")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Needs your answer|\(root.lastPathComponent)|What kind of demo plan should I create?")
             },
             "Expected monitor to send Codex input notification from response_item, saw \(state.snapshot())"
         )
@@ -5304,6 +5317,7 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
             executablePath: cliPath,
             arguments: [
                 "hooks", "codex", "monitor",
+                "--cwd", root.path,
                 "--workspace",
                 workspaceId,
                 "--surface",
@@ -5325,7 +5339,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Error|Codex ended before sending a final response")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Codex ended before sending a final response")
             },
             "Expected monitor to recover from stale transcript path, saw \(state.commands)"
         )
@@ -5385,6 +5400,7 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         process.executableURL = URL(fileURLWithPath: cliPath)
         process.arguments = [
             "hooks", "codex", "monitor",
+                "--cwd", root.path,
             "--workspace",
             workspaceId,
             "--surface",
@@ -5442,7 +5458,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(stdout, "")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target \(workspaceId) \(surfaceId) Codex|Network error|Stream disconnected before completion.")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|Stream disconnected before completion.")
             },
             "Expected monitor to ignore old unscoped terminal event and report scoped stream error, saw \(state.commands)"
         )

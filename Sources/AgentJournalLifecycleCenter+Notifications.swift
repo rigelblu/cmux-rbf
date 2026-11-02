@@ -101,7 +101,8 @@ extension AgentJournalLifecycleCenter {
             agentKind: draft.source, isSubagent: draft.isSubagent,
             correlationKey: notification.correlationKey ?? identity,
             sessionId: draft.sessionId,
-            coalesces: false
+            coalesces: false,
+            sourceTitle: notification.sourceTitle
         )
         if !delivered { notificationDiagnostic(draft, reason: "preference-filtered", identity: identity) }
     }

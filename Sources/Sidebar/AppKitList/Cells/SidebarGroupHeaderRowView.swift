@@ -236,7 +236,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         )
         nameField.textColor = nameTextColor(model, palette: headerPalette) // (#cm-106)
 
-        let showsBadge = model.anchorUnreadCount > 0
+        let showsBadge = model.anchorUnreadCount > 0 || model.anchorMarkedUnread
         unreadBadgeView.isHidden = !showsBadge
         if showsBadge {
             unreadBadgeFont = .systemFont(
@@ -245,6 +245,9 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             )
             unreadBadgeView.configure(
                 count: model.anchorUnreadCount,
+                markedUnread: model.anchorMarkedUnread,
+                markColor: headerPalette.unreadMarkColor(isActive: model.isAnchorActive, colorScheme: colorScheme, sidebarStandIn: model.contrastBackgroundHex.flatMap { NSColor(hex: $0) }, drawsBand: !(model.statusHeaderKind?.isSection ?? false)),
+                markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.fontScale),
                 fillColor: .controlAccentColor,
                 textColor: .white,
                 font: unreadBadgeFont
@@ -253,6 +256,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
                 String(localized: "workspaceGroup.unread.a11y", defaultValue: "%lld unread"),
                 model.anchorUnreadCount
             ))
+            if model.anchorUnreadCount == 0 { unreadBadgeView.setAccessibilityLabel(nil) }
         }
 
         plusButton.glyphImage = RenderableSystemSymbol.configuredAppKitImage(
@@ -539,12 +543,16 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
 
         var badgeSize = NSSize.zero
         if !unreadBadgeView.isHidden {
-            let textSize = NSString(string: "\(model.anchorUnreadCount)")
-                .size(withAttributes: [.font: unreadBadgeFont])
-            badgeSize = NSSize(
-                width: ceil(textSize.width) + metrics.unreadHorizontalPadding * 2,
-                height: ceil(textSize.height) + metrics.unreadVerticalPadding * 2
-            )
+            if model.anchorUnreadCount == 0 && model.anchorMarkedUnread {
+                badgeSize = NSSize(width: 16 * model.fontScale, height: 16 * model.fontScale)
+            } else {
+                let textSize = NSString(string: "\(model.anchorUnreadCount)")
+                    .size(withAttributes: [.font: unreadBadgeFont])
+                badgeSize = NSSize(
+                    width: ceil(textSize.width) + metrics.unreadHorizontalPadding * 2,
+                    height: ceil(textSize.height) + metrics.unreadVerticalPadding * 2
+                )
+            }
         }
 
         let nameAvailable = max(0, (plusButton.frame.minX - 4) - x
@@ -1100,7 +1108,7 @@ extension SidebarGroupHeaderTableCellView { // (#cm-110.1)
             ? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme) // (#cm-110.1)
             : nameTextColor(model, palette: headerPalette) // (#cm-110.1)
 
-        let showsBadge = model.anchorUnreadCount > 0 // (#cm-110.1)
+        let showsBadge = model.anchorUnreadCount > 0 || model.anchorMarkedUnread // (#cm-110.1)
         unreadBadgeView.isHidden = !showsBadge // (#cm-110.1)
         if showsBadge { // (#cm-110.1)
             unreadBadgeFont = .systemFont( // (#cm-110.1)
@@ -1108,7 +1116,10 @@ extension SidebarGroupHeaderTableCellView { // (#cm-110.1)
                 weight: .semibold // (#cm-110.1)
             ) // (#cm-110.1)
             unreadBadgeView.configure( // (#cm-110.1)
-                count: model.anchorUnreadCount, // (#cm-110.1)
+                count: model.anchorUnreadCount,
+                markedUnread: model.anchorMarkedUnread,
+                markColor: headerPalette.unreadMarkColor(isActive: model.isAnchorActive, colorScheme: colorScheme, sidebarStandIn: model.contrastBackgroundHex.flatMap { NSColor(hex: $0) }, drawsBand: !(model.statusHeaderKind?.isSection ?? false)),
+                markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.fontScale), // (#cm-110.1)
                 fillColor: .controlAccentColor, // (#cm-110.1)
                 textColor: .white, // (#cm-110.1)
                 font: unreadBadgeFont // (#cm-110.1)
