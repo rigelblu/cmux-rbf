@@ -2,6 +2,7 @@ import Foundation
 import CMUXAgentLaunch
 import CmuxAgentJournal
 import CmuxFoundation
+import CmuxNotifications
 import CmuxSettings
 import CmuxSimulator
 import CmuxSudoBroker
@@ -28190,7 +28191,7 @@ struct CMUXCLI {
                     _ = try? sendV1Command(try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                         sessionId: parsedInput.sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
                         kind: .turnCompleted, rawObject: parsedInput.rawObject, payload: payload,
-                        pendingWork: hasPendingBackgroundWork), client: client)
+                        pendingWork: hasPendingBackgroundWork, cwd: hookCwd), client: client)
                 }
                 printClaudeHookAck()
             } catch {
@@ -28657,7 +28658,7 @@ struct CMUXCLI {
                 _ = try sendV1Command(try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                     sessionId: parsedInput.sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
                     kind: journalKind, rawObject: parsedInput.rawObject, payload: payload,
-                    pendingWork: notifyPending), client: client)
+                    pendingWork: notifyPending, cwd: hookCwd), client: client)
             }
             printClaudeHookAck()
         case "post-tool-use":
@@ -28992,7 +28993,7 @@ struct CMUXCLI {
                         try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                             sessionId: sessionId, workspaceId: workspaceId, surfaceId: existingSurfaceId,
                             kind: toolName == "AskUserQuestion" ? .questionRequested : .planReviewRequested,
-                            rawObject: parsedInput.rawObject, payload: payload),
+                            rawObject: parsedInput.rawObject, payload: payload, cwd: hookCwd),
                         client: client
                     )
                 }
@@ -30945,6 +30946,7 @@ struct CMUXCLI {
             ?? ""
         let turnId = optionValue(commandArgs, name: "--turn")
         var transcriptPath = optionValue(commandArgs, name: "--transcript")
+        let cwd = optionValue(commandArgs, name: "--cwd")
         let leasePath = optionValue(commandArgs, name: "--lease")
 
         guard !workspaceId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -30983,6 +30985,7 @@ struct CMUXCLI {
                         userInput,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
+                        cwd: cwd,
                         client: client
                     )
                 }
@@ -30997,6 +31000,7 @@ struct CMUXCLI {
                         failure,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
+                        cwd: cwd,
                         client: client
                     )
                     return
@@ -31036,22 +31040,27 @@ struct CMUXCLI {
         _ userInput: CodexHookUserInputCandidate,
         workspaceId: String,
         surfaceId: String?,
+        cwd: String?,
         client: SocketClient
     ) {
-        let subtitle = String(localized: "agent.codex.input.subtitle.waiting", defaultValue: "Waiting")
         let body = userInput.question ?? String(
             localized: "agent.codex.input.body.needsInput",
             defaultValue: "Codex is asking a question"
         )
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         if let surfaceId, !surfaceId.isEmpty {
-            let payload = notificationPayload(
-                title: String(
+            let presentation = AgentNotificationPresentation(
+                agentTitle: String(
                     localized: "cli.codexMonitor.notification.title",
                     defaultValue: "Codex",
                     bundle: bundle
                 ),
-                subtitle: subtitle,
+                kind: .answer,
+                cwd: cwd
+            )
+            let payload = notificationPayload(
+                title: presentation.title,
+                subtitle: presentation.subtitle,
                 body: body,
                 meta: AgentHookNotifyCategory.needsPermission.metaSegment(
                     pending: false,
@@ -31071,18 +31080,24 @@ struct CMUXCLI {
         _ failure: CodexHookFailureCandidate,
         workspaceId: String,
         surfaceId: String?,
+        cwd: String?,
         client: SocketClient
     ) {
         let summary = summarizeCodexHookFailureCandidate(failure)
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         if let surfaceId, !surfaceId.isEmpty {
-            let payload = notificationPayload(
-                title: String(
+            let presentation = AgentNotificationPresentation(
+                agentTitle: String(
                     localized: "cli.codexMonitor.notification.title",
                     defaultValue: "Codex",
                     bundle: bundle
                 ),
-                subtitle: summary.subtitle,
+                kind: .error,
+                cwd: cwd
+            )
+            let payload = notificationPayload(
+                title: presentation.title,
+                subtitle: presentation.subtitle,
                 body: summary.body,
                 meta: AgentHookNotifyCategory.other.metaSegment(
                     pending: false,
@@ -35256,7 +35271,7 @@ export default CMUXSessionRestore;
                     let evidence = remaining?.toolUseId.map { ["tool_use_id": $0] }
                     if let command = try? semanticNotificationCommand(source: def.name, agentKey: def.statusKey,
                         sessionId: sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
-                        kind: .approvalRequested, rawObject: evidence, payload: pendingPayload) {
+                        kind: .approvalRequested, rawObject: evidence, payload: pendingPayload, cwd: hookCwd) {
                         sendCursorCriticalCommand(command)
                     }
                     return
@@ -36545,7 +36560,7 @@ export default CMUXSessionRestore;
                 let notifyCommand = try semanticNotificationCommand(source: def.name, agentKey: def.statusKey,
                     sessionId: sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
                     kind: stopNotificationStatus == .error ? .errorReported : .turnCompleted,
-                    rawObject: input.rawObject, payload: payload, pendingWork: hasActiveBackgroundWork)
+                    rawObject: input.rawObject, payload: payload, pendingWork: hasActiveBackgroundWork, cwd: hookCwd)
 #if DEBUG
                 agentHookDebugLog(
                     "agentHook.stop.notify agent=\(def.name) session=\(agentHookDebugShort(sessionId)) resumed=\(env["CMUX_AGENT_RESUME_LAUNCH"] == "1" ? 1 : 0) fallback=\(shouldPublishGrokStopFallbackNotification ? 1 : 0) workspace=\(agentHookDebugShort(workspaceId)) surface=\(agentHookDebugShort(surfaceId)) subtitleLen=\(subtitle.count) bodyLen=\(body.count)",
@@ -37158,7 +37173,7 @@ export default CMUXSessionRestore;
                 )
                 let notifyCommand = try semanticNotificationCommand(source: def.name, agentKey: def.statusKey,
                     sessionId: sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
-                    kind: notificationJournalKind, rawObject: input.rawObject, payload: payload)
+                    kind: notificationJournalKind, rawObject: input.rawObject, payload: payload, cwd: hookCwd)
 #if DEBUG
                 agentHookDebugLog(
                     "agentHook.notification.notify agent=\(def.name) session=\(agentHookDebugShort(sessionId)) workspace=\(agentHookDebugShort(workspaceId)) surface=\(agentHookDebugShort(surfaceId))",

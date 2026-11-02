@@ -2592,6 +2592,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 // not put an older unread preview back over a committed row.
                 if let currentModel = self.rows[rowIndex].appKitWorkspaceRowModel {
                     fresh.unreadCount = currentModel.unreadCount
+                    fresh.markedUnread = currentModel.markedUnread
                     fresh.latestNotificationText = currentModel.latestNotificationText
                 }
                 cell.applyRebuiltModel(fresh)

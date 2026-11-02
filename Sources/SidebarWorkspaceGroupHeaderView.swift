@@ -25,6 +25,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             lhs.multiSelectionBackgroundStyle == rhs.multiSelectionBackgroundStyle &&
             lhs.memberCount == rhs.memberCount &&
             lhs.anchorUnreadCount == rhs.anchorUnreadCount &&
+            lhs.anchorMarkedUnread == rhs.anchorMarkedUnread &&
             lhs.canMarkRead == rhs.canMarkRead &&
             lhs.canMarkUnread == rhs.canMarkUnread &&
             lhs.hasLatestNotifications == rhs.hasLatestNotifications &&
@@ -71,6 +72,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     let multiSelectionBackgroundStyle: SidebarWorkspaceRowBackgroundStyle
     let memberCount: Int
     let anchorUnreadCount: Int
+    var anchorMarkedUnread: Bool = false
     let canMarkRead: Bool
     let canMarkUnread: Bool
     let hasLatestNotifications: Bool
@@ -112,6 +114,8 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
 
     @State private var contextMenuVisible = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.sidebarContrastBackgroundHex) private var sidebarContrastBackgroundHex
+    @Environment(\.cmuxGlobalFontMagnificationPercent) private var globalFontMagnificationPercent
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
 #if DEBUG
@@ -287,17 +291,10 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     .foregroundStyle(nameColor) // (#cm-106)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                if anchorUnreadCount > 0 {
-                    Text("\(anchorUnreadCount)")
-                        .cmuxFont(size: metrics.unreadFontSize, weight: .semibold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, metrics.unreadHorizontalPadding)
-                        .padding(.vertical, metrics.unreadVerticalPadding)
-                        .background(Capsule().fill(Color.accentColor))
-                        .accessibilityLabel(Text(String.localizedStringWithFormat(
-                            String(localized: "workspaceGroup.unread.a11y", defaultValue: "%lld unread"),
-                            anchorUnreadCount
-                        )))
+                if anchorUnreadCount > 0 || anchorMarkedUnread {
+                    SidebarStatusUnreadBadge(count: anchorUnreadCount, markedUnread: anchorMarkedUnread,
+                        fontScale: fontScale, globalFontMagnificationPercent: globalFontMagnificationPercent,
+                        markColor: Color(nsColor: bandPalette.unreadMarkColor(isActive: isAnchorActive, colorScheme: colorScheme, sidebarStandIn: sidebarContrastBackgroundHex.flatMap { NSColor(hex: $0) })))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

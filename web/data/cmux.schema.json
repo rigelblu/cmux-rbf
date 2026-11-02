@@ -948,7 +948,7 @@
           "type": "boolean",
           "default": true,
           "descriptionKey": "schemaDescriptions.notifications.agentIdleReminder",
-          "description": "Notify when an agent has been idle waiting for your input (about 60s after a turn ends). Suppressed while background work from the last turn is still pending, so a running build or watcher does not trigger a false waiting alert."
+          "description": "Notify when an agent is waiting for input, and remind once after 1 min if a finished turn is still unread. Suppressed while background work is running."
         },
         "sound": {
           "type": "string",

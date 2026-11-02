@@ -29,6 +29,8 @@ struct SidebarWorkspaceRowInput {
     let workspaceShortcutModifierSymbol: String
     let canCloseWorkspace: Bool
     let unreadCount: Int
+    var markedUnread: Bool = false
+    var unreadCountIncludingMarks: Int { unreadCount + (markedUnread ? 1 : 0) }
     let latestNotificationText: String?
     let showsAgentActivity: Bool
     let rowSpacing: CGFloat
@@ -76,6 +78,7 @@ struct SidebarWorkspaceRowInput {
             workspaceShortcutModifierSymbol: workspaceShortcutModifierSymbol,
             canCloseWorkspace: canCloseWorkspace,
             unreadCount: unreadCount,
+            markedUnread: markedUnread,
             latestNotificationText: latestNotificationText,
             showsAgentActivity: showsAgentActivity,
             rowSpacing: rowSpacing,

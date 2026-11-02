@@ -384,6 +384,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
                 var fresh = model
                 fresh.anchorUnreadCount = collapsed
                     ? memberIds.reduce(0) { $0 + snapshot.unreadCount(forWorkspaceId: $1) } : 0
+                fresh.anchorMarkedUnread = collapsed && memberIds.contains { snapshot.hasUnreadMark(forWorkspaceId: $0) }
                 return fresh
             }
         )
@@ -431,6 +432,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             groupCount: renderContext.statusGroupProjection?.groups.count ?? 0,
             isCollapsed: folds.areaCollapsed,
             unreadCount: folds.areaCollapsed ? memberIds.reduce(0) { $0 + unreadSnapshot.unreadCount(forWorkspaceId: $1) } : 0,
+            markedUnread: folds.areaCollapsed && memberIds.contains { unreadSnapshot.hasUnreadMark(forWorkspaceId: $0) },
             onToggle: onToggle
         )
     }
@@ -462,7 +464,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             listWidth: listWidth, colorScheme: environment.colorScheme,
             fontScale: model.fontScale,
             globalFontMagnificationPercent: model.globalFontMagnificationPercent,
-            unreadCount: unreadCount, onToggle: onToggle
+            unreadCount: unreadCount, markedUnread: collapsed && memberIds.contains { unreadSnapshot.hasUnreadMark(forWorkspaceId: $0) }, onToggle: onToggle
         )
     }
 
@@ -532,7 +534,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             isBeingDragged: isBeingDragged,
             topDropIndicatorVisible: false,
             bottomDropIndicatorVisible: false,
-            colorSchemeIsDark: environment.colorScheme == .dark,
+            colorSchemeIsDark: environment.colorScheme == .dark, contrastBackgroundHex: environment.sidebarContrastBackgroundHex,
             depth: depth,
             hasOwnWorkspace: false,
             isFoldedOverSelection: false,

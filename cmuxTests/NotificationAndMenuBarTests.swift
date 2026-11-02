@@ -1971,15 +1971,18 @@ final class NotificationMenuSnapshotBuilderTests: XCTestCase {
         XCTAssertEqual(snapshot.recentNotifications.map(\.id), Array(notifications.prefix(3)).map(\.id))
     }
 
-    func testSnapshotCountsWorkspaceUnreadIndicatorsWithoutNotificationRecords() {
+    func testSnapshotKeepsMarkedWorkspaceActionsWithoutCountingMarksAsNews() {
         let snapshot = NotificationMenuSnapshotBuilder.make(
             notifications: [],
             workspaceUnreadIndicatorCount: 2
         )
 
-        XCTAssertEqual(snapshot.unreadCount, 2)
+        // cmux-rbf: changed on purpose (#cm-128.4): marks keep Clear All
+        // available, while every Mac number and unread hint counts news only.
+        XCTAssertEqual(snapshot.unreadCount, 0)
         XCTAssertTrue(snapshot.hasNotifications)
-        XCTAssertTrue(snapshot.hasUnreadNotifications)
+        XCTAssertFalse(snapshot.hasUnreadNotifications)
+        XCTAssertEqual(snapshot.stateHintTitle, "No unread notifications")
         XCTAssertTrue(snapshot.recentNotifications.isEmpty)
     }
 

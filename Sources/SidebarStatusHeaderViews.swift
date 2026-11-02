@@ -184,29 +184,32 @@ struct SidebarStatusesAreaSwiftUIHeader: View, Equatable {
     let groupCount: Int
     let isCollapsed: Bool
     var unreadCount: Int = 0
+    var markedUnread: Bool = false
     var onToggle: @MainActor () -> Void = {}
 
     private let title: String
     private let label: String
 
-    init(groupCount: Int, isCollapsed: Bool, unreadCount: Int = 0, onToggle: @escaping @MainActor () -> Void = {}) {
+    init(groupCount: Int, isCollapsed: Bool, unreadCount: Int = 0, markedUnread: Bool = false,
+         onToggle: @escaping @MainActor () -> Void = {}) {
         self.groupCount = groupCount
         self.isCollapsed = isCollapsed
         self.unreadCount = unreadCount
+        self.markedUnread = markedUnread
         self.onToggle = onToggle
         title = SidebarStatusHeaderText.statusesAreaTitle
         label = SidebarStatusHeaderText.statusesAreaLabel(groupCount: groupCount, isCollapsed: isCollapsed)
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.groupCount == rhs.groupCount && lhs.isCollapsed == rhs.isCollapsed && lhs.unreadCount == rhs.unreadCount
+        lhs.groupCount == rhs.groupCount && lhs.isCollapsed == rhs.isCollapsed && lhs.unreadCount == rhs.unreadCount && lhs.markedUnread == rhs.markedUnread
             && lhs.title == rhs.title && lhs.label == rhs.label
     }
 
     var body: some View {
         SidebarSectionSwiftUIHeader(title: title,
             label: label,
-            identifier: "sidebarStatusesArea", isCollapsed: isCollapsed, unreadCount: unreadCount, onToggle: onToggle)
+            identifier: "sidebarStatusesArea", isCollapsed: isCollapsed, unreadCount: unreadCount, markedUnread: markedUnread, onToggle: onToggle)
     }
 }
 
@@ -223,16 +226,18 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
     let fontScale: CGFloat
     let globalFontMagnificationPercent: Int
     var unreadCount: Int = 0
+    var markedUnread: Bool = false
     var onToggle: @MainActor () -> Void = {}
 
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.sidebarContrastBackgroundHex) private var sidebarContrastBackgroundHex
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.statusId == rhs.statusId && lhs.presentation == rhs.presentation && lhs.memberCount == rhs.memberCount
             && lhs.isCollapsed == rhs.isCollapsed && lhs.listWidth == rhs.listWidth && lhs.colorScheme == rhs.colorScheme
             && lhs.fontScale == rhs.fontScale
             && lhs.globalFontMagnificationPercent == rhs.globalFontMagnificationPercent
-            && lhs.unreadCount == rhs.unreadCount
+            && lhs.unreadCount == rhs.unreadCount && lhs.markedUnread == rhs.markedUnread
     }
 
     var body: some View {
@@ -246,9 +251,9 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
                 .font(.system(size: nameFontPointSize, weight: .semibold))
                 .foregroundStyle(Color(nsColor: palette.primaryTextColor))
                 .lineLimit(1)
-            if unreadCount > 0 {
-                SidebarStatusUnreadBadge(count: unreadCount, fontScale: fontScale,
-                                  globalFontMagnificationPercent: globalFontMagnificationPercent)
+            if unreadCount > 0 || markedUnread {
+                SidebarStatusUnreadBadge(count: unreadCount, markedUnread: markedUnread, fontScale: fontScale,
+                                  globalFontMagnificationPercent: globalFontMagnificationPercent, markColor: Color(nsColor: palette.unreadMarkColor(isActive: false, colorScheme: colorScheme, sidebarStandIn: sidebarContrastBackgroundHex.flatMap { NSColor(hex: $0) })))
             }
             Spacer(minLength: 0)
         }

@@ -450,6 +450,9 @@ struct FeedEventClassifier {
     /// — and never the tool input: commands can embed credentials, and
     /// notification banners reach lock screens, paired phones, and the
     /// recorded notification history.
+    // cmux-rbf: Feed permission banners now carry the tool command/target
+    // (Tom, 2026-11-01; #cm-128.4). This raw native-hook candidate keeps
+    // its existing tool-only payload.
     static func nativeApprovalPromptAttentionCommand(
         classification: FeedEventClassification,
         displayName: String,
