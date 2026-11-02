@@ -505,7 +505,8 @@ struct SidebarWorkspaceColorSectionProjection {
         paletteEntries: [WorkspaceColorPaletteEntry],
         collapsedHexes: Set<String>, // (#cm-110.1)
         excludedWorkspaceIds: Set<UUID> = [], // (#cm-110.1)
-        unpinnedExcludedHexes: Set<String> = [] // (#cm-110.1)
+        unpinnedExcludedHexes: Set<String> = [], // (#cm-110.1)
+        fallbackTitleByHex: [String: String] = [:] // (#cm-110.18) a status's name where the palette has none
     ) -> SidebarWorkspaceColorSectionProjection {
         var firstTitleByHex: [String: String] = [:]
         firstTitleByHex.reserveCapacity(paletteEntries.count)
@@ -544,6 +545,7 @@ struct SidebarWorkspaceColorSectionProjection {
             SidebarWorkspaceColorSection(
                 id: id,
                 title: firstTitleByHex[id.normalizedHex]
+                    ?? fallbackTitleByHex[id.normalizedHex] // (#cm-110.18)
                     ?? String(localized: "sidebar.colorSection.custom", defaultValue: "Custom (\(id.normalizedHex))"),
                 memberWorkspaceIds: membersByID[id] ?? [],
                 isCollapsed: normalizedCollapsed.contains(id.normalizedHex)
