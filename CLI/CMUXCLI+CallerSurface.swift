@@ -1,6 +1,6 @@
 import Foundation
 
-// cmux-rbf #cm-73.45: the terminal a `cmux figma` command ran in.
+// cmux-rbf #cm-73.45: the terminal a `cmux figma` or `agent-pane show` command ran in (#cm-126.3).
 
 extension CMUXCLI {
 
@@ -17,6 +17,7 @@ extension CMUXCLI {
     /// `strict` says whether a `CMUX_SURFACE_ID` that is no surface at all fails the command. It does where the
     /// command read that variable before the note existed (`open`; `goto` and `fit` without `--surface`), and
     /// not elsewhere (`goto --surface`, `fit --surface`): there the bad value is dropped and the command goes on.
+    /// `agent-pane show` also passes `strict: true`: its pane opens beside a terminal (#cm-126.3).
     func figmaCallerSurfaces(client: SocketClient, strict: Bool) throws -> [String] {
         let environment = ProcessInfo.processInfo.environment
         let home = environment["HOME"] ?? NSHomeDirectory()

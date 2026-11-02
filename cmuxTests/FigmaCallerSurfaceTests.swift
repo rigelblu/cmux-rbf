@@ -5,31 +5,32 @@ import Testing
 // cmux-rbf #cm-73.45: the real process check behind herdr-agent's note.
 
 /// Whether a note's pid is still herdr's attach client, against real processes.
-/// The attach client is a copy of `/bin/sleep` named `herdr-agent-attach`, as
+/// The attach client runs `/bin/sleep` with argv[0] `herdr-agent-attach`, as
 /// herdr runs its own binary under that name. The note folder is a scratch
 /// directory, never `~/.local/state`.
 @Suite("FigmaCallerSurface")
 struct FigmaCallerSurfaceTests {
 
-    /// A scratch folder holding the stand-in binary and notes, removed on `finish()`.
+    /// A scratch folder holding notes and retaining stand-ins until `finish()`.
     private final class Scratch {
         let folder: URL
-        let binary: URL
         private var children: [Process] = []
 
         init() throws {
             folder = FileManager.default.temporaryDirectory
                 .appendingPathComponent("cm-73.45-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            binary = folder.appendingPathComponent("herdr-agent-attach")
-            try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
         }
 
         /// Starts the stand-in, which sleeps `seconds`.
-        func startAttach(seconds: String = "60") throws -> Process {
+        func startAttach(seconds: String = "600") throws -> Process {
             let process = Process()
-            process.executableURL = binary
-            process.arguments = [seconds]
+            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            process.arguments = ["-fc", "exec -a herdr-agent-attach /bin/sleep \"$1\"", "herdr-attach-test", seconds]
+            process.environment = ["HOME": folder.path, "PATH": "/usr/bin:/bin"]
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
             try process.run()
             children.append(process)
             return process
@@ -40,6 +41,12 @@ struct FigmaCallerSurfaceTests {
             let path = folder.appendingPathComponent(name).path
             let line = "\(UUID().uuidString)\t\(UUID().uuidString)\t\(pid)\n"
             try line.write(toFile: path, atomically: true, encoding: .utf8)
+            return path
+        }
+
+        func writeLiveNote(pid: Int32) throws -> String {
+            let path = try writeNote(pid: pid)
+            try HerdrAttachNoteTestSupport(pid: pid, notePath: path).waitUntilLive()
             return path
         }
 
@@ -60,7 +67,7 @@ struct FigmaCallerSurfaceTests {
     func liveAttach() throws {
         try withScratch { scratch in
             let child = try scratch.startAttach()
-            let note = try scratch.writeNote(pid: child.processIdentifier)
+            let note = try scratch.writeLiveNote(pid: child.processIdentifier)
             #expect(HerdrAttachProcess.isLiveAttach(pid: child.processIdentifier, notePath: note))
         }
     }
@@ -90,7 +97,7 @@ struct FigmaCallerSurfaceTests {
     func reusedPid() throws {
         try withScratch { scratch in
             let child = try scratch.startAttach()
-            let note = try scratch.writeNote(pid: child.processIdentifier)
+            let note = try scratch.writeLiveNote(pid: child.processIdentifier)
             let started = try #require(HerdrAttachProcess.startTime(pid: child.processIdentifier))
             try FileManager.default.setAttributes(
                 [.modificationDate: started.addingTimeInterval(-60)],
@@ -119,6 +126,7 @@ struct FigmaCallerSurfaceTests {
             let path = scratch.folder.appendingPathComponent("sess.w1:p3").path
             try "\(surface.uuidString)\t\(UUID().uuidString)\t\(child.processIdentifier)\n"
                 .write(toFile: path, atomically: true, encoding: .utf8)
+            try HerdrAttachNoteTestSupport(pid: child.processIdentifier, notePath: path).waitUntilLive()
 
             let named = HerdrPaneNote.callers(
                 environment: ["HERDR_SESSION": "sess", "HERDR_PANE_ID": "w1:p3", "CMUX_SURFACE_ID": other.uuidString],

@@ -26,6 +26,7 @@ extension Workspace {
     @discardableResult
     func setFigmaPaneOwner(figmaPanelId: UUID, callerPanelId: UUID, via source: FigmaPaneOwnerSource) -> Bool {
         guard let figma = panels[figmaPanelId] as? BrowserPanel,
+              figma.ownedKind != .agentPane, // cmux-rbf #cm-126.3: an Agent Pane's owner never follows a Figma caller.
               FigmaTabMark.applies(
                   address: figma.currentURL ?? figma.webView.url,
                   showsAddressBar: figma.isOmnibarVisible,
