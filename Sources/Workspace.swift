@@ -861,7 +861,8 @@ extension Workspace {
                     diffViewerToken: diffViewerComponents?.token,
                     diffViewerRequestPath: diffViewerComponents?.requestPath,
                     figmaPages: browserPanel.figmaPagesSessionSnapshot(),
-                    ownerTerminalSurfaceId: browserPanel.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
+                    ownerTerminalSurfaceId: browserPanel.ownerTerminalSurfaceId, // cmux-rbf #cm-73.45
+                    ownedKind: browserPanel.ownedKind?.rawValue // cmux-rbf #cm-126.3
                 )
             } else if let deferredPanel = panel as? DeferredBrowserPanel {
                 // A deferred panel already owns the exact persisted browser DTO;
@@ -2348,7 +2349,14 @@ extension Workspace {
                 )
                 panels[restoredPanelId] = deferredPanel
                 guard let tabId = bonsplitController.createTab(
-                    title: snapshot.customTitle ?? snapshot.title ?? deferredPanel.displayTitle,
+                    // cmux-rbf #cm-126.3: a deferred Agent Pane has its caption before materialization.
+                    title: snapshot.customTitle ?? AgentPaneMark.title(
+                        isAgentPaneKind: AgentPaneMark.isAgentPaneKind(
+                            owner: snapshot.browser?.ownerTerminalSurfaceId,
+                            kind: snapshot.browser?.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
+                        ),
+                        own: snapshot.title ?? deferredPanel.displayTitle
+                    ),
                     hasCustomTitle: snapshot.customTitle != nil,
                     icon: deferredPanel.displayIcon,
                     // cmux-rbf `#cm-73.10`: the mark before the tab is shown.
@@ -2470,7 +2478,15 @@ extension Workspace {
     func applySessionPanelMetadata(_ snapshot: SessionPanelSnapshot, toPanelId panelId: UUID) {
         adoptPersistedStableSurfaceId(from: snapshot, panelId: panelId)
 
-        if let title = snapshot.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+        // cmux-rbf #cm-126.3: metadata must not overwrite the placeholder's owned caption.
+        let title = AgentPaneMark.title(
+            isAgentPaneKind: AgentPaneMark.isAgentPaneKind(
+                owner: snapshot.browser?.ownerTerminalSurfaceId,
+                kind: snapshot.browser?.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
+            ),
+            own: snapshot.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        )
+        if !title.isEmpty {
             panelTitles[panelId] = title
         }
 
@@ -3346,6 +3362,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     }()
     // cmux-rbf #cm-73.2a
     static var designFocusExternalOpen = DefaultBrowserOpenAction()
+    /// cmux-rbf #cm-126.3: latest page per owner, held only until Design Focus ends.
+    var heldAgentPaneUpdates: [UUID: URL] = [:]
 #if DEBUG
     /// XCTest seam: assign before `configureRemoteConnection` to script the
     /// session coordinator's subprocess results. Instance-scoped injection of
@@ -5200,10 +5218,14 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     /// writers and does not ask.
     // cmux-rbf `#cm-73.10`: Figma's mark on a Figma pane's tab.
     private func browserTabPicture(for browserPanel: BrowserPanel) -> Data? {
-        FigmaTabMark.picture(
-            own: browserPanel.faviconPNGData,
-            address: browserPanel.currentURL,
-            showsAddressBar: browserPanel.isOmnibarVisible
+        // cmux-rbf #cm-126.3: the stored kind takes precedence over the page's icon.
+        AgentPaneMark.picture(
+            isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
+            own: FigmaTabMark.picture(
+                own: browserPanel.faviconPNGData,
+                address: browserPanel.currentURL,
+                showsAddressBar: browserPanel.isOmnibarVisible
+            )
         )
     }
 
@@ -5215,10 +5237,17 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         guard let browser = record.browser else { return nil }
         let chrome = browser.chromeVisibility
             ?? BrowserChromeVisibility(omnibarVisible: browser.omnibarVisible ?? true)
-        return FigmaTabMark.picture(
-            own: nil,
-            address: browser.urlString.flatMap { URL(string: $0) },
-            showsAddressBar: chrome.isOmnibarVisible
+        // cmux-rbf #cm-126.3: placeholders carry the same owner and kind.
+        return AgentPaneMark.picture(
+            isAgentPaneKind: AgentPaneMark.isAgentPaneKind(
+                owner: browser.ownerTerminalSurfaceId,
+                kind: browser.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
+            ),
+            own: FigmaTabMark.picture(
+                own: nil,
+                address: browser.urlString.flatMap { URL(string: $0) },
+                showsAddressBar: chrome.isOmnibarVisible
+            )
         )
     }
 
@@ -5248,7 +5277,10 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             // cmux-rbf #cm-73.3: a showing-side URL change also updates an already-hovered row.
             self.bonsplitController.refreshPairFigmaPage()
             guard let existing = self.bonsplitController.tab(tabId) else { return }
-            let nextTitle = browserPanel.displayTitle
+            let nextTitle = AgentPaneMark.title(
+                isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
+                own: browserPanel.displayTitle
+            )
             if self.panelTitles[browserPanel.id] != nextTitle {
                 self.panelTitles[browserPanel.id] = nextTitle
             }
@@ -5257,10 +5289,14 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             // cmux-rbf `#cm-73.10`: without the mark here, this write replaces it with
             // nothing one turn after the tab is made. The published icon and address,
             // not the panel's: this closure runs a turn later.
-            let favicon = FigmaTabMark.picture(
-                own: ownFavicon,
-                address: address,
-                showsAddressBar: browserPanel.isOmnibarVisible
+            // cmux-rbf #cm-126.3: a page cannot replace the Agent Pane's mark.
+            let favicon = AgentPaneMark.picture(
+                isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
+                own: FigmaTabMark.picture(
+                    own: ownFavicon,
+                    address: address,
+                    showsAddressBar: browserPanel.isOmnibarVisible
+                )
             )
             let faviconUpdate: Data?? = existing.iconImageData == favicon ? nil : .some(favicon)
             let loadingUpdate: Bool? = existing.isLoading == isLoading ? nil : isLoading
@@ -6711,7 +6747,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
 
         for browserPanel in browserPanels {
             browserPanel.resetForWorkspaceContextChange(reason: reason)
-            let nextTitle = browserPanel.displayTitle
+            // cmux-rbf #cm-126.3: reset does not change the owned pane's identity.
+            let isAgentPaneKind = AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind)
+            let nextTitle = AgentPaneMark.title(isAgentPaneKind: isAgentPaneKind, own: browserPanel.displayTitle)
             _ = updatePanelTitle(panelId: browserPanel.id, title: nextTitle)
 
             guard let tabId = surfaceIdFromPanelId(browserPanel.id),
@@ -6719,7 +6757,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
                 continue
             }
 
-            let faviconUpdate: Data?? = existing.iconImageData == nil ? nil : .some(nil)
+            let favicon = AgentPaneMark.picture(isAgentPaneKind: isAgentPaneKind, own: nil) // cmux-rbf #cm-126.3
+            let faviconUpdate: Data?? = existing.iconImageData == favicon ? nil : .some(favicon)
             let loadingUpdate: Bool? = existing.isLoading ? false : nil
 
             guard faviconUpdate != nil || loadingUpdate != nil else {
@@ -9882,7 +9921,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         bypassRemoteProxy: Bool = false,
         initialDividerPosition: CGFloat? = nil,
         websiteDataStore: WKWebsiteDataStore? = nil,
-        designFocusAsker: DesignFocusRouting.Asker? = nil // cmux-rbf #cm-73.2a
+        designFocusAsker: DesignFocusRouting.Asker? = nil, // cmux-rbf #cm-73.2a
+        owner: BrowserPaneOwner? = nil // cmux-rbf #cm-126.3
     ) -> BrowserPanel? {
         // cmux-rbf #cm-73.2a
         var isMadeOutOfSight = false
@@ -9984,13 +10024,20 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             remoteWebsiteDataStoreIdentifier: isRemoteWorkspace && !bypassRemoteProxy ? id : nil,
             websiteDataStore: websiteDataStore
         )
+        // cmux-rbf #cm-126.3: ownership and kind precede the first tab picture and caption.
+        browserPanel.ownerTerminalSurfaceId = owner?.terminalStableID
+        browserPanel.ownedKind = owner?.kind
+        let initialTitle = AgentPaneMark.title(
+            isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
+            own: browserPanel.displayTitle
+        )
         configureBrowserPanel(browserPanel)
         panels[browserPanel.id] = browserPanel
-        panelTitles[browserPanel.id] = browserPanel.displayTitle
+        panelTitles[browserPanel.id] = initialTitle
 
         // Pre-generate the bonsplit tab ID so the mapping exists before the split lands.
         let newTab = Bonsplit.Tab(
-            title: browserPanel.displayTitle,
+            title: initialTitle,
             icon: browserPanel.displayIcon,
             // cmux-rbf `#cm-73.10`: the mark when the tab is made (a split).
             iconImageData: browserTabPicture(for: browserPanel),
@@ -11033,29 +11080,36 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     /// use the closest horizontal ancestor where the source is in the first (left) branch.
     func preferredRightSideTargetPane(fromPanelId panelId: UUID) -> PaneID? {
         guard let sourcePane = paneId(forPanelId: panelId) else { return nil }
-        return BrowserRightSidePaneResolver().preferredPane(
+        return agentPaneFreePane(BrowserRightSidePaneResolver().preferredPane( // cmux-rbf #cm-126.3
             from: sourcePane,
             in: bonsplitController
-        )
+        ))
     }
 
     /// Returns the top-right pane in the current split tree.
     /// When a workspace is already split, sidebar PR opens should reuse an existing pane
     /// instead of creating additional right splits.
     func topRightBrowserReusePane() -> PaneID? {
-        let paneIds = bonsplitController.allPaneIds
-        guard paneIds.count > 1 else { return nil }
-
-        let paneById = Dictionary(uniqueKeysWithValues: paneIds.map { ($0.id.uuidString, $0) })
+        guard bonsplitController.allPaneIds.count > 1 else { return nil }
         var paneBounds: [String: CGRect] = [:]
         browserCollectNormalizedPaneBounds(
             node: bonsplitController.treeSnapshot(),
             availableRect: CGRect(x: 0, y: 0, width: 1, height: 1),
             into: &paneBounds
         )
+        return topRightBrowserReusePane(normalizedPaneBounds: paneBounds)
+    }
+
+    /// Selects a reusable pane from measured bounds, including the unavailable-bounds fallback.
+    /// cmux-rbf #cm-126.3: keep Agent Panes out of reuse when bounds are unavailable.
+    func topRightBrowserReusePane(normalizedPaneBounds paneBounds: [String: CGRect]) -> PaneID? {
+        let paneIds = bonsplitController.allPaneIds
+        guard paneIds.count > 1 else { return nil }
+        let hasAgentPane = paneIds.contains { agentPaneFreePane($0) == nil } // cmux-rbf #cm-126.3
+        let paneById = Dictionary(uniqueKeysWithValues: paneIds.map { ($0.id.uuidString, $0) })
 
         guard !paneBounds.isEmpty else {
-            return paneIds.sorted { $0.id.uuidString < $1.id.uuidString }.first
+            return hasAgentPane ? nil : paneIds.sorted { $0.id.uuidString < $1.id.uuidString }.first // cmux-rbf #cm-126.3
         }
 
         let epsilon = 0.000_1
@@ -11074,12 +11128,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             }
 
         for candidate in sortedCandidates {
-            if let pane = paneById[candidate.key] {
+            if let pane = paneById[candidate.key], let pane = agentPaneFreePane(pane) { // cmux-rbf #cm-126.3
                 return pane
             }
         }
 
-        return paneIds.sorted { $0.id.uuidString < $1.id.uuidString }.first
+        return hasAgentPane ? nil : paneIds.sorted { $0.id.uuidString < $1.id.uuidString }.first // cmux-rbf #cm-126.3
     }
 
     private func browserCollectPaneNodes(node: ExternalTreeNode, into output: inout [ExternalPaneNode]) {
@@ -12390,6 +12444,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             reason: "workspace.exitDesignFocus",
             includeGeometry: true
         )
+        applyHeldAgentPaneUpdates(reason: reason) // cmux-rbf #cm-126.3: appQuit drops the held pages.
     }
 
     // cmux-rbf #cm-73.2a

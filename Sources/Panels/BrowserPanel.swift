@@ -1897,6 +1897,7 @@ final class BrowserPanel: Panel, ObservableObject {
     var keepsBoardLayoutOnFlip = false
     /// cmux-rbf #cm-73.45: the `stableSurfaceId` of the terminal that last opened or pointed this pane. Saved; never a runtime `id`.
     var ownerTerminalSurfaceId: UUID?
+    var ownedKind: BrowserOwnedKind? // cmux-rbf #cm-126.3: independent of the page's address.
 
     /// Popup windows owned by this panel (for lifecycle cleanup)
     private var popupControllers: [BrowserPopupWindowController] = []
@@ -4781,6 +4782,7 @@ final class BrowserPanel: Panel, ObservableObject {
 
         restoreFigmaPagesSessionSnapshot(snapshot.figmaPages, showingURL: restoredURL)
         ownerTerminalSurfaceId = snapshot.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
+        ownedKind = snapshot.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:)) // cmux-rbf #cm-126.3
 
         guard shouldRenderRestoredWebView, let restoredURL else {
             shouldRenderWebView = false
@@ -6949,6 +6951,7 @@ extension BrowserPanel: BrowserHiddenWebViewDiscardManagerDelegate {
 
     var hiddenWebViewDiscardKeepLoaded: Bool {
         keepLoaded || isFigmaPaneForHiddenUnload // cmux-rbf (#cm-73.14): a Figma pane is kept loaded while hidden, as Keep Page Loaded keeps a pane. Reject a revert of this hunk on upstream sync.
+            || AgentPaneMark.isAgentPaneKind(owner: ownerTerminalSurfaceId, kind: ownedKind) // cmux-rbf #cm-126.3
     }
 
     func hiddenWebViewDiscardManagerDidRequestDiscard(

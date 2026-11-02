@@ -8077,6 +8077,9 @@ struct CMUXCLI {
         case "figma":
             try runFigmaCommand(commandArgs: commandArgs, client: client, jsonOutput: jsonOutput, idFormat: idFormat)
 
+        case "agent-pane": // cmux-rbf #cm-126.3
+            try runAgentPaneCommand(commandArgs: commandArgs, client: client, jsonOutput: jsonOutput, idFormat: idFormat)
+
         // Browser commands
         case "browser":
             try runBrowserCommand(commandArgs: commandArgs, client: client, jsonOutput: jsonOutput, idFormat: idFormat)
@@ -8969,7 +8972,8 @@ struct CMUXCLI {
         return value
     }
 
-    private func isHandleRef(_ value: String) -> Bool {
+    // cmux-rbf #cm-126.3: shared with Agent Pane's explicit surface validation.
+    func isHandleRef(_ value: String) -> Bool {
         let pieces = value.split(separator: ":", omittingEmptySubsequences: false)
         guard pieces.count == 2 else { return false }
         let kind = String(pieces[0]).lowercased()
@@ -20455,6 +20459,8 @@ struct CMUXCLI {
         // cmux-rbf `#cm-73`: the help for `cmux figma`
         case "figma":
             return figmaUsage
+        case "agent-pane": // cmux-rbf #cm-126.3
+            return agentPaneUsage
         case "browser":
             return """
             Usage: cmux browser [--surface <id|ref|index> | <surface>] <subcommand> [args]
