@@ -173,7 +173,8 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         statusGroupProjection: WorkspaceStatusGroupProjection?,
         colorHexes: [String: String],
         paletteEntries: [WorkspaceColorPaletteEntry],
-        groups: [WorkspaceGroup] = []
+        groups: [WorkspaceGroup] = [],
+        statusTitles: [(id: String, title: String)] = []
     ) -> SidebarWorkspaceColorSectionProjection {
         let groupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
         let displayWorkspaces = workspaces.map { workspace in
@@ -182,12 +183,24 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             return SidebarWorkspaceColorSectionWorkspaceSnapshot(id: workspace.id,
                 groupId: pin.isOutsideGroup ? nil : workspace.groupId, isPinned: workspace.isPinned, customColor: workspace.customColor)
         }
+        // While the section headers show, a color the palette does not name takes the name of the first status in his
+        // list with that color, not `Custom (<hex>)` (Tom, 2026-11-02, #cm-110.18). Unpinned rows wearing a status's
+        // color sit under that status, so in practice this names color groups under `Pinned`.
+        var statusTitleByHex: [String: String] = [:]
+        if statusGroupProjection != nil {
+            for status in statusTitles {
+                guard let hex = colorHexes[status.id].flatMap(WorkspaceColorHex.normalized),
+                      statusTitleByHex[hex] == nil else { continue }
+                statusTitleByHex[hex] = status.title
+            }
+        }
         return SidebarWorkspaceColorSectionProjection.project(
             workspaces: displayWorkspaces,
             paletteEntries: paletteEntries,
             collapsedHexes: collapsedHexes,
             excludedWorkspaceIds: statusGroupProjection?.allMemberWorkspaceIds ?? [],
-            unpinnedExcludedHexes: statusColorHexesWithoutColorGroup(for: statusGroupProjection, colorHexes: colorHexes)
+            unpinnedExcludedHexes: statusColorHexesWithoutColorGroup(for: statusGroupProjection, colorHexes: colorHexes),
+            fallbackTitleByHex: statusTitleByHex
         )
     }
 
@@ -203,7 +216,8 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             statusGroupProjection: statusGroupProjection,
             colorHexes: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:],
             paletteEntries: WorkspaceTabColorSettings.labeledPaletteEntries(),
-            groups: groups
+            groups: groups,
+            statusTitles: AppDelegate.statusListInUse.entries.map { (id: $0.id, title: WorkspaceStatusPresentation.text($0.label)) }
         )
     }
 
