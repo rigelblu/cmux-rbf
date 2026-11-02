@@ -92,7 +92,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertTrue(
             approvalCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Needs your approval|\(context.root.lastPathComponent)|")
             },
             "Amp approval did not use agent notification delivery: \(approvalCommands)"
         )
@@ -124,7 +125,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertTrue(
             completionCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Finished|\(context.root.lastPathComponent)|")
                     && $0.contains("Completed Amp work")
             },
             "Amp completion did not use the generic turn-complete notification path: \(completionCommands)"
@@ -165,7 +167,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let idleErrorCommands = Array(context.state.snapshot().dropFirst(beforeIdleError))
         XCTAssertTrue(
             idleErrorCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Stopped on an error|\(context.root.lastPathComponent)|")
                     && $0.contains("The task reported an error")
             },
             "Amp idle-after-error did not use agent error notification delivery: \(idleErrorCommands)"

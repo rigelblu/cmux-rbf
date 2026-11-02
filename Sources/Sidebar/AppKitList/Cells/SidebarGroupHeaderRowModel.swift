@@ -31,6 +31,7 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     let multiSelectionBackgroundStyle: SidebarWorkspaceRowBackgroundStyle
     let memberCount: Int
     var anchorUnreadCount: Int
+    var anchorMarkedUnread: Bool = false
     var canMarkRead: Bool
     var canMarkUnread: Bool
     var hasLatestNotifications: Bool
@@ -50,6 +51,7 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     let bottomDropIndicatorVisible: Bool
     /// Resolved cmux scheme used by native group-header chrome.
     let colorSchemeIsDark: Bool
+    var contrastBackgroundHex: String? = nil
     /// Display depth, including the Statuses area and status header when projected. (#cm-106) (#cm-110.2)
     var depth: Int = 0
     /// Whether a workspace stands behind the group's name. When none does the header is never active, a dot in the

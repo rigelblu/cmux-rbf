@@ -1019,6 +1019,55 @@ extension FeedCoordinator {
 
 // MARK: - Native notification banner
 
+extension FeedCoordinator {
+    /// Presentation shared by Feed policy hooks and native banners.
+    static func notificationContent(for event: WorkstreamEvent) -> (title: String, subtitle: String, body: String)? {
+        let object = event.toolInputJSON.flatMap { $0.data(using: .utf8) }
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let kind: AgentNotificationPresentation.Kind
+        let body: String
+        switch event.hookEventName {
+        case .permissionRequest:
+            kind = .approval
+            // Read only target fields. Edit/Write contents and instructions
+            // never become a banner or phone-push preview.
+            let target = ["command", "cmd", "file_path", "filePath", "path", "url", "uri"]
+                .compactMap { object?[$0] as? String }
+                .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            if let tool = event.toolName, let target {
+                body = "\(tool) · \(target)"
+            } else {
+                body = event.toolName.map {
+                    String(localized: "feed.notification.permission.body", defaultValue: "\($0) needs approval")
+                } ?? String(localized: "feed.notification.decisionNeeded", defaultValue: "Decision needed")
+            }
+        case .exitPlanMode:
+            kind = .answer
+            body = (object?["plan"] as? String).flatMap {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0
+            } ?? String(localized: "feed.notification.exitPlan.body", defaultValue: "Review and approve the plan")
+        case .askUserQuestion:
+            kind = .answer
+            let prompts = WorkstreamQuestionPrompt.parse(toolInputJSON: event.toolInputJSON)
+                .map(\.prompt).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            body = prompts.isEmpty
+                ? String(localized: "feed.notification.question.body", defaultValue: "Agent is asking a question")
+                : prompts.joined(separator: " ")
+        default:
+            return nil
+        }
+        let source = event.source.lowercased()
+        let name = CmuxTaskManagerCodingAgentDefinition.builtIns.first {
+            $0.id == source || $0.launchKinds.contains(source)
+        }?.displayName ?? event.source.capitalized
+        let presentation = AgentNotificationPresentation(agentTitle: name, kind: kind, cwd: event.cwd)
+        let singleLine = body.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }.joined(separator: " ")
+        return (presentation.title, presentation.subtitle, FeedSocketEncoding.limitedText(singleLine, limit: 180).text)
+    }
+
+}
+
 private extension FeedCoordinator {
     /// Posts a UNUserNotificationCenter banner with inline action buttons
     /// for the given Feed event after optional notification policy hooks run.
@@ -1039,54 +1088,23 @@ private extension FeedCoordinator {
             )
             guard admission.disposition != .muted else { return }
 
+            guard let content = Self.notificationContent(for: event) else { return }
             let categoryId: String
-            let title: String
-            let body: String
             switch event.hookEventName {
-            case .permissionRequest:
-                categoryId = Self.permissionNotificationCategoryId(for: event)
-                title = String(
-                    localized: "feed.notification.permission.title",
-                    defaultValue: "\(event.source.capitalized) permission"
-                )
-                body = event.toolName.map {
-                    String(
-                        localized: "feed.notification.permission.body",
-                        defaultValue: "\($0) needs approval"
-                    )
-                } ?? String(
-                    localized: "feed.notification.decisionNeeded",
-                    defaultValue: "Decision needed"
-                )
-            case .exitPlanMode:
-                categoryId = "CMUXFeedExitPlan"
-                title = String(
-                    localized: "feed.notification.exitPlan.title",
-                    defaultValue: "\(event.source.capitalized) plan ready"
-                )
-                body = String(
-                    localized: "feed.notification.exitPlan.body",
-                    defaultValue: "Review and approve the plan"
-                )
+            case .permissionRequest: categoryId = Self.permissionNotificationCategoryId(for: event)
+            case .exitPlanMode: categoryId = "CMUXFeedExitPlan"
             case .askUserQuestion:
                 categoryId = Self.inlineQuestionOptions(for: event) == nil
-                    ? "CMUXFeedQuestion"
-                    : "CMUXFeedQuestion.\(requestId)"
-                title = String(
-                    localized: "feed.notification.question.title",
-                    defaultValue: "\(event.source.capitalized) question"
-                )
-                body = String(
-                    localized: "feed.notification.question.body",
-                    defaultValue: "Agent is asking a question"
-                )
-            default:
-                return
+                    ? "CMUXFeedQuestion" : "CMUXFeedQuestion.\(requestId)"
+            default: return
             }
+            let title = content.title
+            let body = content.body
 
             let policyContext = makeFeedNotificationPolicyContext(
                 event: event,
                 title: title,
+                subtitle: content.subtitle,
                 body: body
             )
             let deliverDefault: @MainActor () async -> Void = { [weak self] in
@@ -1095,7 +1113,7 @@ private extension FeedCoordinator {
                     event: event,
                     categoryId: categoryId,
                     title: title,
-                    subtitle: "",
+                    subtitle: content.subtitle,
                     body: body,
                     effects: policyContext.envelope.effects,
                     soundContext: policyContext.envelope.context.soundContext
@@ -1561,6 +1579,7 @@ private struct FeedNotificationPolicyContext {
 private func makeFeedNotificationPolicyContext(
     event: WorkstreamEvent,
     title: String,
+    subtitle: String,
     body: String
 ) -> FeedNotificationPolicyContext {
     let appDelegate = AppDelegate.shared
@@ -1601,7 +1620,7 @@ private func makeFeedNotificationPolicyContext(
                 workspaceId: event.workspaceId ?? event.sessionId,
                 surfaceId: nil,
                 title: title,
-                subtitle: "",
+                subtitle: subtitle,
                 body: body
             ),
             context: TerminalNotificationPolicyContext(
@@ -1669,7 +1688,7 @@ enum FeedSocketEncoding {
         }
     }
 
-    private static func limitedText(_ value: String, limit: Int) -> (text: String, truncated: Bool) {
+    fileprivate static func limitedText(_ value: String, limit: Int) -> (text: String, truncated: Bool) {
         guard value.count > limit else { return (value, false) }
         let end = value.index(value.startIndex, offsetBy: max(limit - 3, 0))
         return (String(value[..<end]) + "...", true)

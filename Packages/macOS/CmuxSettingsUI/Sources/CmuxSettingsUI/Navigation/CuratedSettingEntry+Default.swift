@@ -124,7 +124,7 @@ extension Array where Element == CuratedSettingEntry {
             .init(
                 section: .app,
                 id: "agent-idle-reminder",
-                title: String(localized: "settings.notifications.agentIdleReminder.title", defaultValue: "Agent Waiting for Input"),
+                title: String(localized: "settings.notifications.agentIdleReminder.title", defaultValue: "Agent Reminders"),
                 synonyms: "notifications.agentIdleReminder agent waiting input idle reminder nag notify claude"
             ),
             .init(section: .app, id: "notification-sound", title: String(localized: "settings.notifications.sound.title", defaultValue: "Notification Sound"), synonyms: "Notification Sound notifications.sound sound audio alert chime beep custom file wav mp3 caf aiff"),

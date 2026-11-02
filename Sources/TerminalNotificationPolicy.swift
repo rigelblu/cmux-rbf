@@ -262,6 +262,7 @@ struct TerminalNotificationPolicyRequest: Sendable {
     let agent: TerminalNotificationPolicyAgentContext?
     let soundContext: NotificationSoundOverrideContext?
     let origin: TerminalNotificationOrigin
+    let unattendedNudgeTitle: String?
     init(
         tabId: UUID,
         surfaceId: UUID?,
@@ -277,7 +278,8 @@ struct TerminalNotificationPolicyRequest: Sendable {
         isFocusedPanel: Bool,
         agent: TerminalNotificationPolicyAgentContext? = nil,
         soundContext: NotificationSoundOverrideContext? = nil,
-        origin: TerminalNotificationOrigin = .local
+        origin: TerminalNotificationOrigin = .local,
+        unattendedNudgeTitle: String? = nil
     ) {
         self.tabId = tabId
         self.surfaceId = surfaceId
@@ -294,6 +296,7 @@ struct TerminalNotificationPolicyRequest: Sendable {
         self.agent = agent
         self.soundContext = soundContext
         self.origin = origin
+        self.unattendedNudgeTitle = unattendedNudgeTitle
     }
 }
 struct TerminalNotificationPolicyFailure: Error, Sendable, Hashable {

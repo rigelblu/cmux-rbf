@@ -1233,7 +1233,7 @@
         },
         "notifications": {
           "suppressOnlyFocusedSurface": "啟用後，只有當通知橫幅的 Surface 正好是目前聚焦的 Surface 時，該橫幅才會自動撤回。對於目前可見 workspace 中未聚焦的 Surface 所投遞的橫幅，在你聚焦該 Surface（或點擊／關閉它）之前會持續顯示，而不會在 workspace 變為可見時被撤回。關閉則保留舊有的基於 workspace 可見性的撤回行為。",
-          "agentIdleReminder": "當代理程式閒置並等待你的輸入時（回合結束後約 60 秒）傳送通知。只要上一回合的背景工作仍在等待，就會抑制通知，避免正在執行的建置或監看程式觸發錯誤的等待提醒。",
+          "agentIdleReminder": "代理等待你的輸入時傳送通知；如果已完成的回合仍未讀，則在 1 分鐘後提醒一次。背景工作仍在執行時不提醒。",
           "soundOverrides": "依代理程式和提醒類型設定的稀疏通知聲音覆寫。缺少的儲存格會使用 notifications.sound。",
           "soundOverride": "通知聲音覆寫。default 使用 notifications.sound，none 停用播放，其餘值選擇內建或自訂聲音。"
         },

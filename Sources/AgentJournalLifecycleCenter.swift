@@ -280,6 +280,11 @@ final class AgentJournalLifecycleCenter: Sendable {
     /// check never opens it, so it is safe from any context.
     var isAvailable: Bool { lazyStore != nil }
 
+#if DEBUG
+    /// Inspect only from an off-main test worker: opening the journal can perform SQLite migration.
+    func journalStoreForTesting() -> AgentJournalStore? { lazyStore?.store() }
+#endif
+
     /// Full body of the `agent_journal_append` socket verb: decode, commit
     /// durably, enqueue reduction, and reply with the committed sequence.
     ///

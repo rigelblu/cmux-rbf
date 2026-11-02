@@ -7,6 +7,38 @@ import Testing
 @Suite("Sidebar unread snapshot")
 struct SidebarUnreadSnapshotTests {
     @Test
+    func foldedBadgeUsesOnlyItsOwnMembersNewsAndMarks() {
+        let mark = UUID(), news = UUID(), outside = UUID()
+        let snapshot = SidebarUnreadSnapshot(summaryByWorkspaceId: [
+            mark: .init(unreadCount: 0, latestNotificationText: nil, markedUnread: true),
+            news: .init(unreadCount: 2, latestNotificationText: nil),
+            outside: .init(unreadCount: 100, latestNotificationText: nil, markedUnread: true),
+        ])
+        let marksOnly = snapshot.badgeSummary(forWorkspaceIds: [mark])
+        #expect(marksOnly.unreadCount == 0)
+        #expect(marksOnly.markedUnread)
+        let mixed = snapshot.badgeSummary(forWorkspaceIds: [mark, news])
+        #expect(mixed.unreadCount == 2)
+        #expect(mixed.markedUnread)
+        let empty = snapshot.badgeSummary(forWorkspaceIds: [])
+        #expect(empty.unreadCount == 0)
+        #expect(!empty.markedUnread)
+    }
+
+    @Test
+    func marksKeepActionsUnreadWithoutAddingNews() {
+        let workspace = UUID()
+        let snapshot = SidebarUnreadSnapshot(summaryByWorkspaceId: [
+            workspace: SidebarWorkspaceUnreadSummary(unreadCount: 0, latestNotificationText: nil, markedUnread: true),
+        ])
+        #expect(snapshot.unreadCount(forWorkspaceId: workspace) == 0)
+        #expect(snapshot.summary(forWorkspaceId: workspace).unreadCountIncludingMarks == 1)
+        #expect(snapshot.workspaceIsUnread(forWorkspaceId: workspace))
+        #expect(snapshot.canMarkWorkspaceRead(forWorkspaceIds: [workspace]))
+        #expect(!snapshot.canMarkWorkspaceUnread(forWorkspaceIds: [workspace]))
+    }
+
+    @Test
     func queriesResolveMissingAndSurfaceState() {
         let workspaceID = UUID()
         let surfaceID = UUID()

@@ -23,6 +23,18 @@ import SwiftUI
 /// same hazard `accentStripOpacity` was pulled out of two files to close.
 /// Resolve here; do not re-inline a rung at a call site.
 struct SidebarGroupHeaderBandPalette: Equatable {
+    /// The same contrast rule as workspace marks, over this header's band.
+    func unreadMarkColor(isActive: Bool, colorScheme: ColorScheme, sidebarStandIn: NSColor? = nil,
+                         drawsBand: Bool = true) -> NSColor {
+        let fill = sidebarStandIn.map { base in
+            drawsBand ? cmuxCompositedNSColor(bandColor.withAlphaComponent(bandOpacity), over: base) : base
+        } ?? compositedBandColor
+        return SidebarWorkspaceRowVisualPalette(isActive: isActive, isMultiSelected: false,
+            isHovered: false, isEditing: false, customColorHex: nil, colorScheme: colorScheme,
+            selectionColorHex: fill.hexString(), notificationBadgeColorHex: nil,
+            attentionTaskStatus: nil).unreadMarkColor(sidebarStandIn: fill)
+    }
+
     /// The concrete appearance a renderer is drawing.
     ///
     /// Dynamic AppKit colours otherwise resolve against whichever appearance

@@ -544,8 +544,8 @@ struct NotificationDeliveryCoordinatorTests {
         #expect(terminal.opens.isEmpty)
     }
 
-    @Test("terminal default response opens stored notification using notificationId fallback")
-    func terminalDefaultOpensStoredNotification() {
+    @Test("terminal default response opens stored notification using notificationId fallback", arguments: [false, true])
+    func terminalDefaultOpensStoredNotification(_ isReminder: Bool) {
         let terminal = FakeTerminalNavigation()
         let tabId = UUID()
         let surfaceId = UUID()
@@ -555,7 +555,7 @@ struct NotificationDeliveryCoordinatorTests {
         coordinator.handle(NotificationDeliveryResponse(
             categoryIdentifier: "terminal.category",
             actionIdentifier: "terminal.show",
-            requestIdentifier: "not-a-uuid",
+            requestIdentifier: isReminder ? "\(notificationId.uuidString).reminder" : "not-a-uuid",
             userInfo: [
                 "tabId": tabId.uuidString,
                 "surfaceId": surfaceId.uuidString,

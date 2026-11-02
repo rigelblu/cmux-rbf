@@ -29,6 +29,8 @@ extension NSTextField {
 final class SidebarRowUnreadBadgeView: NSView {
     private var text: NSString = ""
     private var textAttributes: [NSAttributedString.Key: Any] = [:]
+    private var markColor: NSColor?
+    private var markDiameter: CGFloat = 6
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -39,10 +41,13 @@ final class SidebarRowUnreadBadgeView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(count: Int, fillColor: NSColor, textColor: NSColor, font: NSFont) {
+    func configure(count: Int, markedUnread: Bool = false, markColor: NSColor? = nil,
+                   markDiameter: CGFloat = 6, fillColor: NSColor, textColor: NSColor, font: NSFont) {
+        self.markColor = count == 0 && markedUnread ? (markColor ?? .controlAccentColor) : nil
+        self.markDiameter = markDiameter
         text = NSString(string: "\(count)")
         textAttributes = [.font: font, .foregroundColor: textColor]
-        layer?.backgroundColor = fillColor.cgColor
+        layer?.backgroundColor = (self.markColor == nil ? fillColor : .clear).cgColor
         needsDisplay = true
     }
 
@@ -53,6 +58,12 @@ final class SidebarRowUnreadBadgeView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        if let markColor {
+            markColor.setFill()
+            NSBezierPath(ovalIn: NSRect(x: bounds.midX - markDiameter / 2, y: bounds.midY - markDiameter / 2,
+                width: markDiameter, height: markDiameter)).fill()
+            return
+        }
         guard text.length > 0, let font = textAttributes[.font] as? NSFont else { return }
         let size = text.size(withAttributes: textAttributes)
         // Center on the digit's cap-height band, not the full line box, so

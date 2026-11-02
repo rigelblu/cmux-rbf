@@ -1285,7 +1285,7 @@ final class WorkspaceManualUnreadTests: XCTestCase {
         XCTAssertFalse(store.canMarkWorkspaceUnread(forTabIds: [workspace.id]))
     }
 
-    func testMarkPanelUnreadContributesToGlobalUnreadSurfaces() throws {
+    func testMarkPanelUnreadShowsMarkWithoutAddingGlobalNews() throws {
         let appDelegate = AppDelegate.shared ?? AppDelegate()
         let store = TerminalNotificationStore.shared
         let originalNotificationStore = appDelegate.notificationStore
@@ -1306,9 +1306,11 @@ final class WorkspaceManualUnreadTests: XCTestCase {
 
         workspace.markPanelUnread(panelId)
 
-        XCTAssertEqual(store.unreadCount, 1)
-        XCTAssertEqual(store.notificationMenuSnapshot.unreadCount, 1)
-        XCTAssertTrue(store.notificationMenuSnapshot.hasUnreadNotifications)
+        // cmux-rbf: changed on purpose (#cm-128.4): pane marks set the flag; every Mac number counts notification news only.
+        XCTAssertEqual(store.unreadCount, 0)
+        XCTAssertEqual(store.notificationMenuSnapshot.unreadCount, 0)
+        XCTAssertFalse(store.notificationMenuSnapshot.hasUnreadNotifications)
+        XCTAssertTrue(store.sidebarUnread.summary(forWorkspaceId: workspace.id).markedUnread)
 
         store.markRead(forTabId: workspace.id)
 

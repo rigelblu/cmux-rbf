@@ -312,7 +312,7 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         )
     }
 
-    private static func rowInput(
+    static func rowInput(
         workspaceId: UUID,
         groupId: UUID?,
         unreadCount: Int,

@@ -653,7 +653,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(stop.status, 0, stop.stderr)
         XCTAssertTrue(
             context.state.commands.contains { command in
-                command.contains("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|Error|Codex ended before sending a final response")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                command.contains("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Stopped on an error|\(context.root.lastPathComponent)|Codex ended before sending a final response")
             },
             "Expected Codex to parse the oversized final transcript line, saw \(context.state.commands)"
         )
@@ -2172,7 +2173,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
             "Parent Codex Stop should still refresh the resume binding, saw \(parentStopCommands)"
         )
         XCTAssertTrue(
-            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "Parent Codex Stop should still notify, saw \(parentStopCommands)"
         )
         XCTAssertTrue(
@@ -2422,7 +2424,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(parentStop.status, 0, parentStop.stderr)
         let parentStopCommands = Array(context.state.commands.dropFirst(parentStopStart))
         XCTAssertTrue(
-            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "The parent Stop must still notify after a legacy child Stop without a turn_id, saw \(parentStopCommands)"
         )
         XCTAssertTrue(
@@ -2497,7 +2500,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(parentStop.status, 0, parentStop.stderr)
         let parentStopCommands = Array(context.state.commands.dropFirst(parentStopStart))
         XCTAssertTrue(
-            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Gemini|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Gemini · Finished|\(context.root.lastPathComponent)|") },
             "The generic parent Stop must still notify after its nested child, saw \(parentStopCommands)"
         )
         XCTAssertTrue(
@@ -2602,7 +2606,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(parentStop.status, 0, parentStop.stderr)
         let parentStopCommands = Array(context.state.commands.dropFirst(parentStopStart))
         XCTAssertTrue(
-            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "The parent Stop must still notify after mixed anonymous depth, saw \(parentStopCommands)"
         )
         XCTAssertTrue(
@@ -2663,7 +2668,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(parentStop.status, 0, parentStop.stderr)
         let parentStopCommands = Array(context.state.commands.dropFirst(parentStopStart))
         XCTAssertTrue(
-            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "The parent Stop must still notify after a child Stop supplies a new turn_id, saw \(parentStopCommands)"
         )
         XCTAssertTrue(
@@ -2716,7 +2722,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         let stopCommands = Array(context.state.commands.dropFirst(stopStart))
 
         XCTAssertTrue(
-            stopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            stopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "A stale prompt depth from an interrupted prior turn must not suppress the current top-level completion notification, saw \(stopCommands)"
         )
         XCTAssertTrue(
@@ -2883,7 +2890,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(parentStop.status, 0, parentStop.stderr)
         let parentStopCommands = Array(context.state.commands.dropFirst(parentStopStart))
         XCTAssertTrue(
-            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "The parent Stop should still notify after terminal nested children, saw \(parentStopCommands)"
         )
     }
@@ -2947,7 +2955,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(currentStop.status, 0, currentStop.stderr)
         let currentStopCommands = Array(context.state.commands.dropFirst(currentStopStart))
         XCTAssertTrue(
-            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "A current Stop after a fully terminal interrupted stack must notify, saw \(currentStopCommands)"
         )
     }
@@ -3219,7 +3228,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(parentStop.status, 0, parentStop.stderr)
         let parentStopCommands = Array(context.state.commands.dropFirst(parentStopStart))
         XCTAssertTrue(
-            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            parentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "The depth-only parent Stop must notify after its child turn stops, saw \(parentStopCommands)"
         )
         XCTAssertTrue(
@@ -3446,7 +3456,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         let currentStopCommands = Array(context.state.commands.dropFirst(currentStopStart))
 
         XCTAssertTrue(
-            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "The current turn should still notify after a stale older Stop, saw \(currentStopCommands)"
         )
     }
@@ -3494,7 +3505,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(currentStop.status, 0, currentStop.stderr)
         let currentStopCommands = Array(context.state.commands.dropFirst(currentStopStart))
         XCTAssertTrue(
-            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "The current turn should notify before a late stale Stop arrives, saw \(currentStopCommands)"
         )
 
@@ -3613,7 +3625,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         let currentStopCommands = Array(context.state.commands.dropFirst(currentStopStart))
 
         XCTAssertTrue(
-            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            currentStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "A missed prompt-submit Stop must clear a fully terminal stored stack and notify, saw \(currentStopCommands)"
         )
         XCTAssertTrue(
@@ -3660,7 +3673,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         let unseenStopCommands = Array(context.state.commands.dropFirst(unseenStopStart))
 
         XCTAssertTrue(
-            unseenStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            unseenStopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Finished|\(context.root.lastPathComponent)|") },
             "A Stop with a missed prompt-submit must still notify at idle depth, saw \(unseenStopCommands)"
         )
         XCTAssertTrue(
@@ -3740,7 +3754,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
 
         let stopCommands = Array(context.state.commands.dropFirst(stopStart))
         XCTAssertTrue(
-            stopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+            stopCommands.contains { $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Codex · Stopped on an error|\(context.root.lastPathComponent)|") },
             "Stale completed-turn subagent relay should not suppress the parent completion notification, saw \(stopCommands)"
         )
     }

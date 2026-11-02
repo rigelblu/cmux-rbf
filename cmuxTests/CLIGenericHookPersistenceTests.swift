@@ -442,7 +442,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let stopCommands = Array(state.commands.dropFirst(stopCommandStart))
         XCTAssertTrue(
             stopCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity · Finished|\(root.lastPathComponent)|")
                     && $0.contains(stopMessage)
             },
             "Expected Antigravity stop to publish a turn-completion notification, saw \(stopCommands)"
@@ -499,7 +500,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let permissionCommands = Array(state.commands.dropFirst(permissionCommandStart))
         XCTAssertTrue(
             permissionCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity|Permission|\(permissionMessage)")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity · Needs your approval|\(root.lastPathComponent)|\(permissionMessage)")
             },
             "Expected Antigravity permission notifications to publish through cmux, saw \(permissionCommands)"
         )
@@ -521,7 +523,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let stopErrorCommands = Array(state.commands.dropFirst(stopErrorCommandStart))
         XCTAssertTrue(
             stopErrorCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity|Error|\(stopErrorMessage)")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity · Stopped on an error|\(root.lastPathComponent)|\(stopErrorMessage)")
             },
             "Expected Antigravity Stop errors to publish through cmux, saw \(stopErrorCommands)"
         )
@@ -624,7 +627,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let stopCommands = Array(state.commands.dropFirst(stopCommandStart))
         XCTAssertTrue(
             stopCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent · Finished|\(root.lastPathComponent)|")
                     && $0.contains("|\(assistantResponse)")
             },
             "Expected Hermes completion notification to use extra.assistant_response, saw \(stopCommands)"
@@ -646,7 +650,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let approvalCommands = Array(state.commands.dropFirst(approvalCommandStart))
         XCTAssertTrue(
             approvalCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent|Permission|recursive delete: rm -rf build")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent · Needs your approval|\(root.lastPathComponent)|recursive delete: rm -rf build")
             },
             "Expected Hermes approval notification to include description and command, saw \(approvalCommands)"
         )
@@ -788,7 +793,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let nextCompletionCommands = Array(state.commands.dropFirst(nextCompletionStart))
         XCTAssertEqual(
             nextCompletionCommands.filter {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent · Finished|\(root.lastPathComponent)|")
                     && $0.contains("|\(finalResponse)")
             }.count,
             1,
@@ -1134,7 +1140,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(
             approvalCommands.filter {
                 $0.contains(
-                    "notify_target_async \(workspaceId) \(surfaceId) Cursor|Permission|Approval needed"
+                    // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                    "notify_target_async \(workspaceId) \(surfaceId) Cursor · Needs your approval|\(root.lastPathComponent)|Approval needed"
                 )
             }.count,
             1,
@@ -1362,7 +1369,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertFalse(
             duplicateCompletionCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Cursor|Permission|Approval needed")
+                // cmux-rbf: changed on purpose (#cm-128.4): keep this negative source-line guard active.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Cursor · Needs your approval|\(root.lastPathComponent)|Approval needed")
             },
             "A retried Cursor shell hook must resolve as one approval, saw \(duplicateCompletionCommands)"
         )
@@ -2558,7 +2566,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let notificationCommands = Array(state.commands.dropFirst(notificationCommandStart))
         XCTAssertTrue(
             notificationCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Grok finished updating docs")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Grok finished updating docs")
             },
             "Expected Grok Notification to forward the payload message, saw \(notificationCommands)"
         )
@@ -2602,7 +2611,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let preAssistantGenericCommands = Array(state.commands.dropFirst(preAssistantGenericCommandStart))
         XCTAssertTrue(
             preAssistantGenericCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Task completed")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Task completed")
             },
             "Grok generic completion notifications should still fire before there is an assistant response, saw \(preAssistantGenericCommands)"
         )
@@ -2644,7 +2654,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let enrichedStopCommands = Array(state.commands.dropFirst(enrichedStopCommandStart))
         XCTAssertTrue(
             enrichedStopCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|")
                     && $0.contains(assistantMessage)
             },
             "Expected Grok Stop fallback to publish the cwd-scoped assistant response when Grok only emits internal Notification events, saw \(enrichedStopCommands)"
@@ -2690,7 +2701,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let oversizedStopCommands = Array(state.commands.dropFirst(oversizedStopCommandStart))
         XCTAssertTrue(
             oversizedStopCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|")
                     && $0.contains("Oversized Grok assistant response")
             },
             "Expected Grok Stop fallback to parse the oversized final chat-history line, saw \(oversizedStopCommands)"
@@ -2750,7 +2762,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let multibyteStopCommands = Array(state.commands.dropFirst(multibyteStopCommandStart))
         XCTAssertTrue(
             multibyteStopCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|")
                     && $0.contains(multibyteAssistantMessage)
             },
             "Expected Grok Stop fallback to skip the partial multibyte leading line, saw \(multibyteStopCommands)"
@@ -2788,7 +2801,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let sameCwdMissingCommands = Array(state.commands.dropFirst(sameCwdMissingCommandStart))
         XCTAssertTrue(
             sameCwdMissingCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Task completed")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Task completed")
             },
             "Grok completion without a matching session transcript should still fire a generic completion notification, saw \(sameCwdMissingCommands)"
         )
@@ -2832,7 +2846,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let envResolvedCommands = Array(state.commands.dropFirst(envResolvedCommandStart))
         XCTAssertTrue(
             envResolvedCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|\(envResolvedMessage)")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|\(envResolvedMessage)")
             },
             "Grok completion without a payload session id should use the resolved hook session id, saw \(envResolvedCommands)"
         )
@@ -2879,7 +2894,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let scopedMissCommands = Array(state.commands.dropFirst(scopedMissCommandStart))
         XCTAssertTrue(
             scopedMissCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Task completed")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(missingCwd.lastPathComponent)|Task completed")
             },
             "Grok completion without a cwd-scoped transcript should still fire a generic completion notification, saw \(scopedMissCommands)"
         )
@@ -2905,7 +2921,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let waitingCommands = Array(state.commands.dropFirst(waitingCommandStart))
         XCTAssertTrue(
             waitingCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Waiting|\(waitingMessage)")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Needs your answer|\(root.lastPathComponent)|\(waitingMessage)")
             },
             "Expected waiting notification to forward the payload message, saw \(waitingCommands)"
         )
@@ -2926,7 +2943,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let fallbackCommands = Array(state.commands.dropFirst(fallbackCommandStart))
         XCTAssertFalse(
             fallbackCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Waiting|\(waitingMessage)")
+                // cmux-rbf: changed on purpose (#cm-128.4): keep this negative source-line guard active.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Needs your answer|\(root.lastPathComponent)|\(waitingMessage)")
             },
             "Expected the saved-message fallback to dedupe the notification already delivered for that message, saw \(fallbackCommands)"
         )
@@ -2981,7 +2999,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             "Incomplete/undone waiting text should not be classified as a completion, saw \(incompleteWaitingCommands)"
         )
         XCTAssertFalse(
-            incompleteWaitingCommands.contains { $0.contains("Grok|Completed|") },
+            // cmux-rbf: changed on purpose (#cm-128.4): keep this negative source-line guard active.
+            incompleteWaitingCommands.contains { $0.contains("Grok · Finished|\(root.lastPathComponent)|") },
             "Incomplete/undone waiting text must not emit a completed notification, saw \(incompleteWaitingCommands)"
         )
 
@@ -3024,7 +3043,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let neutralFallbackCommands = Array(state.commands.dropFirst(neutralFallbackCommandStart))
         XCTAssertFalse(
             neutralFallbackCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Waiting|\(incompleteWaitingMessage)")
+                // cmux-rbf: changed on purpose (#cm-128.4): keep this negative source-line guard active.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Needs your answer|\(root.lastPathComponent)|\(incompleteWaitingMessage)")
             },
             "Expected the saved-message fallback to dedupe the notification already delivered for that message, saw \(neutralFallbackCommands)"
         )
@@ -3328,7 +3348,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             let stopCommands = Array(state.commands.dropFirst(stopCommandStart))
             XCTAssertTrue(
                 stopCommands.contains {
-                    $0.contains("notify_target_async \(workspaceId) \(thread.surfaceId) Grok|Completed in ")
+                    // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                    $0.contains("notify_target_async \(workspaceId) \(thread.surfaceId) Grok · Finished|\(root.lastPathComponent)|")
                         && $0.contains(thread.assistantMessage)
                 },
                 "Expected Grok Stop fallback to notify for thread \(thread.index), saw \(stopCommands)"
@@ -3553,7 +3574,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             let notificationCommands = Array(state.commands.dropFirst(commandStart))
             XCTAssertTrue(
                 notificationCommands.contains {
-                    $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Task completed")
+                    // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                    $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Task completed")
                 },
                 "Expected Grok completion notification for prompt \(index), saw \(notificationCommands)"
             )
@@ -3702,7 +3724,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             let notificationCommands = Array(state.commands.dropFirst(notificationCommandStart))
             XCTAssertTrue(
                 notificationCommands.contains {
-                    $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Task completed")
+                    // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                    $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Task completed")
                 },
                 "Expected Grok completion notification for chat message \(index), saw \(notificationCommands)"
             )
@@ -3871,7 +3894,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let completionCommands = Array(state.commands.dropFirst(completionCommandStart))
         XCTAssertTrue(
             completionCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(completingSurfaceId) Grok|Completed|Task completed")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(completingSurfaceId) Grok · Finished|\(root.lastPathComponent)|Task completed")
             },
             "Expected completing Grok session to notify its own surface, saw \(completionCommands)"
         )
