@@ -31,7 +31,8 @@ public protocol ControlCommandContext:
     ControlProjectContext,
     ControlDebugContext,
     ControlSidebarContext,
-    ControlBrowserPanelContext
+    ControlBrowserPanelContext,
+    ControlAgentPaneContext // cmux-rbf #cm-126.3
 {
     /// Revalidates relay provenance and live ownership immediately before an
     /// in-process command acts. Local requests without relay provenance pass.
