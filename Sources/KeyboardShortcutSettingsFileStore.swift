@@ -68,6 +68,8 @@ final class CmuxSettingsFileStore {
     private var isApplyingManagedSettings = false
     private var deferredManagedDefaultSideEffects = ManagedDefaultBatchSideEffects()
     private(set) var activeSourcePath: String?
+    /// Invalid setting paths reported during the latest reload.
+    private(set) var invalidSettingPaths: [String] = []
 
     init(
         primaryPath: String = CmuxSettingsFileStore.defaultPrimaryPath,
@@ -157,6 +159,7 @@ final class CmuxSettingsFileStore {
         applyLiveDefaultSideEffects: Bool,
         notificationSourceURL: URL? = nil
     ) -> Bool {
+        invalidSettingPaths.removeAll(keepingCapacity: true)
         let previousState = synchronized {
             (
                 shortcuts: shortcutsByAction,
@@ -625,6 +628,15 @@ final class CmuxSettingsFileStore {
         sourcePath: String,
         snapshot: inout ResolvedSettingsSnapshot
     ) {
+        if let raw = section["sectionNames"] {
+            let key = SidebarCatalogSection().sectionNames.userDefaultsKey
+            if let names = raw as? [String: Any] {
+                snapshot.managedUserDefaults[key] = .stringDictionary(SidebarSectionNames.normalized(names))
+            } else {
+                snapshot.managedUserDefaults[key] = .stringDictionary([:])
+                logInvalid("sidebar.sectionNames", sourcePath: sourcePath)
+            }
+        }
         for setting in SidebarSettingsFileMapping.booleanSettings {
             if let value = jsonBool(section[setting.jsonKey]) {
                 snapshot.managedUserDefaults[setting.defaultsKey] = .bool(value)
@@ -1924,6 +1936,7 @@ final class CmuxSettingsFileStore {
     }
 
     func logInvalid(_ path: String, sourcePath: String) {
+        invalidSettingPaths.append(path)
         cmuxSettingsFileStoreLogger.warning("ignoring invalid setting '\(path, privacy: .private(mask: .hash))' in \(sourcePath, privacy: .private(mask: .hash))")
     }
 

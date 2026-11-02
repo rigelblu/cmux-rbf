@@ -211,13 +211,14 @@ Since v0.33.0, a workspace's status can be one of your own, in your words and yo
 - No list, no change: cmux's own five statuses work as before.
 
 ## 🟠⋯ See your workspaces grouped by status
-Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at the bottom of the sidebar, one group per status.
+Since v0.34.0, workspaces on one of your statuses sit in a **Workblocks** area at the bottom of the sidebar, one group per status. It was called **Statuses** before section names became customizable.
 
 - It shows with a `workspaceStatuses` list in `~/.config/cmux/cmux.json` and **Settings → Beta Features → Workspace Todo Controls** on.
 - Drop a workspace on a status group to set that status and its color. A pinned workspace stays pinned.
-- Drag a status group, or the **Statuses** header, to reorder; the order survives a relaunch.
+- Drag a status group, or the **Workblocks** header, to reorder; the order survives a relaunch.
 - Click a header to fold it; a folded header shows the unread count inside.
-- Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Statuses**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups. A workspace row pinned inside an unpinned workspace group shows only under **Pinned**, while staying a member of its group. Unpin it to show it in its group again, first among the group's unpinned rows.
+- Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Workblocks**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups. A workspace row pinned inside an unpinned workspace group shows only under **Pinned**, while staying a member of its group. Unpin it to show it in its group again, first among the group's unpinned rows.
+- Rename any section with `sidebar.sectionNames` in `cmux.json`, for example `"sidebar": { "sectionNames": { "workspaces": "Loose", "statuses": "Board" } }`. The keys are `pinned`, `workspaces` and `statuses`; names update when you save. Omit a name, or leave it blank, to use its localized default.
 - A whole workspace group, nested or not, takes a status and sits under it with everything inside. Drop its header on a status group, or set it from its Status menu or Group Color.
 - Drag a tab out of a workspace onto a status group to make a new workspace already on that status.
 - Since v0.34.2 a workspace on **None** shows a small dot in the status glyph's place and sits under **Workspaces**, never in a status group, whatever its color. Click the dot to pick a status.
