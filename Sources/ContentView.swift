@@ -12355,6 +12355,7 @@ struct VerticalTabsSidebar: View, Equatable {
             NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
                 .receive(on: DispatchQueue.main)
         ) { _ in
+            // Section names also reload here; keep their invalidation if this observer is narrowed to palette keys. (#cm-110.19)
             workspaceColorPaletteRevision &+= 1
             tabManager.revealSelectionIfItsGroupLeftItsStatus() // (#cm-110.3) ruling (27): Workspace Todo Controls is a defaults setting
         }
