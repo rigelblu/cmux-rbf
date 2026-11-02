@@ -1694,6 +1694,8 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
     var figmaPages: SessionFigmaPagesSnapshot? = nil
     /// cmux-rbf #cm-73.45: the terminal (its `stableSurfaceId`) that last opened or pointed this Figma pane. Added only; decoded when present.
     var ownerTerminalSurfaceId: UUID? = nil
+    /// cmux-rbf #cm-126.3: a string so an unknown future kind does not fail session decoding.
+    var ownedKind: String? = nil
 
     init(
         urlString: String?,
@@ -1711,7 +1713,8 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         diffViewerToken: String? = nil,
         diffViewerRequestPath: String? = nil,
         figmaPages: SessionFigmaPagesSnapshot? = nil,
-        ownerTerminalSurfaceId: UUID? = nil
+        ownerTerminalSurfaceId: UUID? = nil,
+        ownedKind: String? = nil // cmux-rbf #cm-126.3
     ) {
         self.urlString = urlString
         self.profileID = profileID
@@ -1729,6 +1732,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         self.diffViewerRequestPath = diffViewerRequestPath
         self.figmaPages = figmaPages
         self.ownerTerminalSurfaceId = ownerTerminalSurfaceId
+        self.ownedKind = ownedKind // cmux-rbf #cm-126.3
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -1748,6 +1752,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         case diffViewerRequestPath
         case figmaPages
         case ownerTerminalSurfaceId
+        case ownedKind // cmux-rbf #cm-126.3
     }
 
     init(from decoder: Decoder) throws {
@@ -1768,6 +1773,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         diffViewerRequestPath = try container.decodeIfPresent(String.self, forKey: .diffViewerRequestPath)
         figmaPages = try? container.decodeIfPresent(SessionFigmaPagesSnapshot.self, forKey: .figmaPages)
         ownerTerminalSurfaceId = try? container.decodeIfPresent(UUID.self, forKey: .ownerTerminalSurfaceId)
+        ownedKind = try? container.decodeIfPresent(String.self, forKey: .ownedKind) // cmux-rbf #cm-126.3
     }
 }
 struct SessionMarkdownPanelSnapshot: Codable, Sendable {

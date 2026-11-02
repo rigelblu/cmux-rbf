@@ -177,10 +177,10 @@ enum BrowserSplitContainer {
     private func preferredRightSidePane(from sourcePane: PaneID) -> PaneID? {
         switch self {
         case .workspace(let workspace):
-            return BrowserRightSidePaneResolver().preferredPane(
+            return workspace.agentPaneFreePane(BrowserRightSidePaneResolver().preferredPane( // cmux-rbf #cm-126.3
                 from: sourcePane,
                 in: workspace.bonsplitController
-            )
+            ))
         case .dock(let dock):
             return BrowserRightSidePaneResolver().preferredPane(
                 from: sourcePane,

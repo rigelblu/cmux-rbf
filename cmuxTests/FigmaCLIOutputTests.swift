@@ -728,19 +728,31 @@ struct FigmaCLIOutputTests {
         try line.write(to: folder.appendingPathComponent("\(noteSession).\(notePane)"), atomically: true, encoding: .utf8)
     }
 
-    /// A stand-in for herdr's attach client: a copy of `/bin/sleep` named `herdr-agent-attach`.
+    private static func writeLiveNote(_ home: URL, surface: String, pid: Int32) throws {
+        try writeNote(home, surface: surface, pid: pid)
+        try HerdrAttachNoteTestSupport(
+            pid: pid, notePath: noteFolder(home).appendingPathComponent("\(noteSession).\(notePane)").path
+        ).waitUntilLive()
+    }
+
+    /// A retained wait process under herdr's attach name, terminated only at fixture teardown.
     private func withAttachProcess(_ body: (Process) throws -> Void) throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("cm-73.45-attach-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        let binary = folder.appendingPathComponent("herdr-agent-attach")
-        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: binary)
         let child = Process()
-        child.executableURL = binary
-        child.arguments = ["60"]
+        child.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        child.arguments = ["-fc", "exec -a herdr-agent-attach /bin/sleep \"$1\"", "herdr-attach-test", "600"]
+        child.environment = ["HOME": folder.path, "PATH": "/usr/bin:/bin"]
+        child.standardInput = FileHandle.nullDevice
+        child.standardOutput = FileHandle.nullDevice
+        child.standardError = FileHandle.nullDevice
         try child.run()
-        defer { child.terminate(); child.waitUntilExit() }
-        try body(child)
+        defer {
+            if child.isRunning { child.terminate() }
+            child.waitUntilExit()
+        }
+        try withExtendedLifetime(child) { try body(child) }
     }
 
     @Test("goto sends the caller it listed by as caller_surface_id")
@@ -855,7 +867,7 @@ struct FigmaCLIOutputTests {
             let run = try drive(
                 ["figma", "goto", "12-2"],
                 environment: Self.herdrEnvironment.merging(["CMUX_SURFACE_ID": Self.callerSurface]) { $1 },
-                prepareHome: { try Self.writeNote($0, surface: noted, pid: child.processIdentifier) },
+                prepareHome: { try Self.writeLiveNote($0, surface: noted, pid: child.processIdentifier) },
                 reply: Self.gotoReplyByAsk(byPane: [Self.figmaPane(8)], byWorkspace: [])
             )
             #expect(run.status == 0, "\(run.stderr)")
@@ -884,7 +896,7 @@ struct FigmaCLIOutputTests {
             let run = try drive(
                 ["figma", "goto", "12-2"],
                 environment: Self.herdrEnvironment.merging(["CMUX_SURFACE_ID": Self.callerSurface]) { $1 },
-                prepareHome: { try Self.writeNote($0, surface: noted, pid: child.processIdentifier) },
+                prepareHome: { try Self.writeLiveNote($0, surface: noted, pid: child.processIdentifier) },
                 reply: { method, surfaceID in
                     if method == "surface.list", surfaceID == noted {
                         return Self.failure("not_found", "Source surface not found")

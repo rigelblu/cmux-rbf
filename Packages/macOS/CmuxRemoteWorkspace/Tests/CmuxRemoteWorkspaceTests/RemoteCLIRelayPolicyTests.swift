@@ -60,6 +60,26 @@ struct RemoteCLIRelayPolicyTests {
         }
     }
 
+    // cmux-rbf #cm-126.3: the Agent Pane shows content in Tom's app, so neither method joins the allowlist.
+    @Test("agent_pane.show is denied through a remote relay, even for an owned surface")
+    func deniesAgentPaneShow() {
+        let line = Data("""
+        {"id":"r","method":"agent_pane.show","params":{"surface_id":"\(UUID().uuidString)","url":"https://example.org/"}}
+        """.utf8)
+        #expect(RemoteRelayCommandPolicy().evaluate(commandLine: line, workspaceAliases: [:], surfaceAliases: [:])
+            == .deny(reason: "method 'agent_pane.show' is not permitted through a remote relay"))
+    }
+
+    // cmux-rbf #cm-126.3
+    @Test("agent_pane.list is denied through a remote relay")
+    func deniesAgentPaneList() {
+        let line = Data("""
+        {"id":"r","method":"agent_pane.list","params":{"workspace_id":"\(UUID().uuidString)"}}
+        """.utf8)
+        #expect(RemoteRelayCommandPolicy().evaluate(commandLine: line, workspaceAliases: [:], surfaceAliases: [:])
+            == .deny(reason: "method 'agent_pane.list' is not permitted through a remote relay"))
+    }
+
     private func withServer(
         workspaceAliases: [UUID: UUID] = [:],
         surfaceAliases: [UUID: UUID] = [:],
