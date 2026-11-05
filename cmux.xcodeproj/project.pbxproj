@@ -1579,6 +1579,7 @@
 		80732A000000000000000004 /* DesignFocusPairTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000003 /* DesignFocusPairTests.swift */; };
 		80732A000000000000000006 /* DesignFocusRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000005 /* DesignFocusRoutingTests.swift */; };
 		80732A000000000000000008 /* DesignFocusShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000007 /* DesignFocusShortcutTests.swift */; };
+		C13700000000000000000002 /* RestartCommandTTYDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13700000000000000000001 /* RestartCommandTTYDeviceTests.swift */; };
 		80732A00000000000000000A /* DesignFocusWorkspaceRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80732A000000000000000009 /* DesignFocusWorkspaceRoutingTests.swift */; };
 		A5001F000000000000000001 /* DetachedFolderDragIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001F000000000000000002 /* DetachedFolderDragIcon.swift */; };
 		B05553C10000000000000001 /* DetachedFolderPathLookupCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05553C10000000000000002 /* DetachedFolderPathLookupCache.swift */; };
@@ -5660,6 +5661,7 @@
 		80732A000000000000000003 /* DesignFocusPairTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusPairTests.swift; sourceTree = "<group>"; };
 		80732A000000000000000005 /* DesignFocusRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusRoutingTests.swift; sourceTree = "<group>"; };
 		80732A000000000000000007 /* DesignFocusShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusShortcutTests.swift; sourceTree = "<group>"; };
+		C13700000000000000000001 /* RestartCommandTTYDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestartCommandTTYDeviceTests.swift; sourceTree = "<group>"; };
 		80732A000000000000000009 /* DesignFocusWorkspaceRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignFocusWorkspaceRoutingTests.swift; sourceTree = "<group>"; };
 		A5001F000000000000000002 /* DetachedFolderDragIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetachedFolderDragIcon.swift; sourceTree = "<group>"; };
 		B05553C10000000000000002 /* DetachedFolderPathLookupCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetachedFolderPathLookupCache.swift; sourceTree = "<group>"; };
@@ -11702,6 +11704,7 @@
 				80732A000000000000000003 /* DesignFocusPairTests.swift */,
 				80732A000000000000000005 /* DesignFocusRoutingTests.swift */,
 				80732A000000000000000007 /* DesignFocusShortcutTests.swift */,
+				C13700000000000000000001 /* RestartCommandTTYDeviceTests.swift */,
 				80732A000000000000000009 /* DesignFocusWorkspaceRoutingTests.swift */,
 				80732A00000000000000000B /* SplitDividerOverlayTests.swift */,
 				AC61257DCDCA431A908C55CC /* CLIChildEnvironmentTests.swift */,
@@ -16248,6 +16251,7 @@
 				80732A000000000000000004 /* DesignFocusPairTests.swift in Sources */,
 				80732A000000000000000006 /* DesignFocusRoutingTests.swift in Sources */,
 				80732A000000000000000008 /* DesignFocusShortcutTests.swift in Sources */,
+				C13700000000000000000002 /* RestartCommandTTYDeviceTests.swift in Sources */,
 				80732A00000000000000000A /* DesignFocusWorkspaceRoutingTests.swift in Sources */,
 				B0555303B0555303B0555303 /* DetachedFolderPathLookupCacheTests.swift in Sources */,
 				DE71CE000000000000000002 /* DeviceRegistryClientTests.swift in Sources */,
