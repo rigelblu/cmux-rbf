@@ -175,6 +175,14 @@ fi
 # shellcheck source=rbf/scripts/lib/rbf-metal.sh
 source "$SCRIPT_DIR/lib/rbf-metal.sh"
 
+# Same git landmine dev.sh handles (its Landmine 5), and the same reason this is a
+# lib: this path never passes through dev.sh. Applied here, before the plan prints
+# and before the --dry-run exit, so `make install-rbf-plan` shows the row the real
+# install builds with. See the lib header.
+# shellcheck source=rbf/scripts/lib/rbf-git-env.sh
+source "$SCRIPT_DIR/lib/rbf-git-env.sh"
+rbf_git_env_apply "$REPO_ROOT"
+
 RBF_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/rbf/VERSION" 2>/dev/null || true)"
 [[ -n "$RBF_VERSION" ]] || die "rbf/VERSION is empty or unreadable"
 if [[ -d "$REPO_ROOT/.jj" ]]; then
@@ -230,6 +238,7 @@ printf '  rbf version    %s (%s)\n' "$RBF_VERSION" "$GIT_COMMIT"
 printf '  source         %s (working copy)\n' "$REPO_ROOT"
 printf '  signing        %s\n'  "$CODESIGN_IDENTITY"
 printf '  zig            %s\n'  "$ZIG_STATUS"
+[[ -z "$RBF_GIT_ENV_NOTE" ]] || printf '  git env        %s\n'  "$RBF_GIT_ENV_NOTE"
 printf '  derived data   %s\n'  "$DERIVED_DATA"
 if [[ "$SWAP_MODE" == "detached" ]]; then
   printf '  swap           detached — this terminal is hosted by the app being replaced;\n'
