@@ -196,6 +196,12 @@ Every Mac number counts unread notifications only (Tom, 2026-11-01). A pane's Ma
 - **`tests/test_claude_hook_stop_last_assistant.py:258`:** the Claude Stop notification expects `Claude Code · Finished` with the folder subtitle. Keep the marked `cmux-rbf: changed on purpose (#cm-128.4)` expectation on sync
 - **Old-format positive pins kept inside methods already failing on `ywtpnsmv`:** `cmuxTests/CampfireHookNotificationTests.swift:43`; `cmuxTests/CLICodexResumeNotificationTests.swift:36` and `:73` (assertions; their old prefixes are at `:38` and `:75`); `cmuxTests/CLIGenericHookPersistenceTests.swift:549`, `:754`, `:1229`, `:1398`, `:2997` and `:3465`; `cmuxTests/CLIAmpLifecycleIntegrationTests.swift:210`; `cmuxTests/CLINotifyProcessIntegrationRegressionTests.swift:2792` and `:3565`; and `cmuxTests/WorkspaceRemoteConnectionTests.swift:3975`. These pins are deferred, rather than proved by the `.4` runs: update these to the `.4` source line when the base failure is fixed
 
+### 🟣⋯ Every quit's save carries restart context (`#cm-137.2`): check it after a sync
+A quit with owned cleanup defers to a fresh save in `deferTerminateForOwnedCleanupAndFreshSnapshot` (`Sources/AppDelegate.swift`). That save must scan with `.pendingTermination` context, or no app relaunches after the quit.
+- **How it broke once:** the `cm-97` sync (2026-10-04) brought upstream's sudo broker into that function's `hasOwnedRuntimeCleanup`. From then on every quit took the deferred save, and that save had never carried context. Nothing conflicted and no test failed
+- **After every upstream sync:** run `rg -n "#cm-137.2" Sources cmuxTests` and check each line survived. Then read any new term in `hasOwnedRuntimeCleanup`, and any new save on the quit path
+- **Where upstream has moved it:** the phase enum and `terminateCleanupDeadlineDisposition` now live in upstream's `Sources/App/AppDelegate+AgentQuitTermination.swift`. Upstream sets `.agentTermination` where the fork sets `.finalDrain`, and the function maps both to `.terminateWithSavedSnapshot`. The watchdogs differ on purpose: upstream's arms the hard watchdog and waits for the cleanup there, while the fork's quits at once and only skips the cached re-save, so a quit takes no longer than before
+
 ### 🟣⋯ The gate that does exist is the manual suite plus dogfood
 - Every feature is shipped through these, not through a pipeline
 - In `rb-drive/projects/<PROJECT_NAME>/06_plan-execute/test-suite/`:
