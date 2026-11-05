@@ -1267,7 +1267,8 @@
         },
         "figma": {
           "description": "Ajustes de Figma.",
-          "defaultFolder": "Enlace a la carpeta de Figma donde deben ir los diseños nuevos que crea tu agente. Usa el enlace de la barra de direcciones de Figma en la página de la carpeta. Los agentes lo leen con \"cmux figma folder\"."
+          "defaultFolder": "Enlace a la carpeta de Figma donde van los diseños nuevos cuando figma.folders no tiene una entrada para su directorio. Usa el enlace de la barra de direcciones de Figma en la página de la carpeta. Los agentes lo leen con \"cmux figma folder\".",
+          "folders": "Carpetas de Figma por directorio: cada clave es un directorio y cada valor es el enlace a la carpeta de Figma donde deben ir los diseños nuevos creados en ese directorio o dentro de él. Gana el directorio coincidente más cercano; en los demás casos se aplica figma.defaultFolder. Los agentes lo leen con \"cmux figma folder\"."
         },
         "reply": {
           "description": "Panel de respuestas",

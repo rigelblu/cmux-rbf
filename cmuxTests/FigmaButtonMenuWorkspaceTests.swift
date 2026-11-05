@@ -27,7 +27,7 @@ import Testing
         for path in ["design/D/Design", "file/F/Legacy", "board/B/Board", "slides/S/Slides"] {
             w.figmaFiles.show(URL(string: "https://www.figma.com/\(path)")!)
         }
-        let menu = w.figmaButtonMenu(inPane: pane, folder: folder)
+        let menu = w.figmaButtonMenu(inPane: pane, choice: .defaultOnly(folder))
         var data: [String: Data] = [:]
         for title in ["Design", "Legacy", "Board", "Slides", "New Design File", "New FigJam Board", "New Slide Deck"] {
             let item = try #require(menu.items.first { $0.title == title })
@@ -68,7 +68,7 @@ import Testing
         #expect(FigmaKindIcon.kind(for: URL(string: "https://www.figma.com/files/recent")!) == nil)
         let w = Workspace(); defer { w.teardownAllPanels() }
         let pane = try #require(w.bonsplitController.allPaneIds.first)
-        let menu = w.figmaButtonMenu(inPane: pane, folder: "invalid")
+        let menu = w.figmaButtonMenu(inPane: pane, choice: .defaultOnly("invalid"))
         for title in ["Choose Figma Folder…", "Recents…", "Enter Design Focus"] {
             let item = try #require(menu.items.first { $0.title == title })
             #expect(item.image == nil)
@@ -91,7 +91,7 @@ import Testing
         w.focusPanel(terminal)
         let beforeFirst = w.bonsplitController.tabs(inPane: first).count
         let beforeClicked = w.bonsplitController.tabs(inPane: clicked).count
-        let menu = w.figmaButtonMenu(inPane: clicked, folder: folder)
+        let menu = w.figmaButtonMenu(inPane: clicked, choice: .defaultOnly(folder))
         try select("Recents…", in: menu)
         #expect(w.bonsplitController.tabs(inPane: clicked).count == beforeClicked + 1)
         #expect(w.bonsplitController.tabs(inPane: first).count == beforeFirst)
@@ -162,7 +162,7 @@ import Testing
         let w = Workspace(); defer { w.teardownAllPanels() }
         let pane = try #require(w.bonsplitController.allPaneIds.first)
         var destination: SettingsNavigationDestination?
-        let menu = w.figmaButtonMenu(inPane: pane, folder: "invalid", showSettings: { target, anchor, highlight in
+        let menu = w.figmaButtonMenu(inPane: pane, choice: .defaultOnly("invalid"), showSettings: { target, anchor, highlight in
             destination = SettingsNavigationDestination(target: target, anchorID: anchor, shouldHighlight: highlight)
         })
         try select("Choose Figma Folder…", in: menu)
@@ -244,18 +244,18 @@ import Testing
         }
         var sent: [[TextBoxSubmit.DispatchEvent]] = [], logs: [String] = []
         func menu() -> NSMenu {
-            w.figmaButtonMenu(inPane: pane, folder: folder, agentRegistry: registry, skillHome: home, deliverHandOff: { id, events in
+            w.figmaButtonMenu(inPane: pane, choice: .defaultOnly(folder), agentRegistry: registry, skillHome: home, deliverHandOff: { id, events in
                 #expect(id == panel); sent.append(events)
             }, logHandOffRefusal: { logs.append($0) })
         }
         var m = menu()
-        for title in ["Put Design into Figma", "New Design in Figma"] {
+        for title in ["Put Design into Figma", "Ask Agent to Design in Figma"] {
             let item = try #require(m.items.first { $0.title == title })
             #expect(!item.isEnabled)
             #expect(item.toolTip == "Available when your agent is waiting for you")
         }
         fire(.sessionStart); m = menu()
-        for title in ["Put Design into Figma", "New Design in Figma"] {
+        for title in ["Put Design into Figma", "Ask Agent to Design in Figma"] {
             let item = try #require(m.items.first { $0.title == title })
             #expect(item.isEnabled); #expect(item.toolTip == nil)
         }
@@ -265,7 +265,7 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: home.appendingPathComponent(".claude/skills/design-in-figma-pane/SKILL.md").path))
         fire(.stop); m = menu()
         try select("Put Design into Figma", in: m)
-        try select("New Design in Figma", in: m)
+        try select("Ask Agent to Design in Figma", in: m)
         #expect(sent == [FigmaDesignHandOff.dispatchEvents(for: .put, kind: .claude), FigmaDesignHandOff.dispatchEvents(for: .new, kind: .claude)])
         #expect(try String(contentsOf: home.appendingPathComponent(".claude/skills/design-in-figma-pane/SKILL.md"), encoding: .utf8) == FigmaDesignSkill.document())
         #expect(w.focusedPanelId == panel)

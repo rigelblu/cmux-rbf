@@ -34,6 +34,7 @@ struct FigmaFolderCLITests {
     private static let notSetOutput = """
     No default Figma folder. New designs go to your Figma Drafts.
     Set one:  cmux figma folder set <folder-url>
+    Or for this directory only:  cmux figma folder set <folder-url> --dir .
 
     """
     private static let setOutput = """
@@ -46,6 +47,7 @@ struct FigmaFolderCLITests {
     projectId  \(folder)
     planKey    team::\(team)
     url        \(good)
+    directory  default
 
     """
     private static let clearedOutput = "Default Figma folder cleared. New designs go to your Figma Drafts.\n"
@@ -187,7 +189,13 @@ struct FigmaFolderCLITests {
 
     /// Runs `cmux <arguments>` in `home`. `socket` listens on the path the child is told;
     /// without it the path is set and nothing listens.
-    private func run(_ arguments: [String], in home: Home, socket: StandInSocket? = nil) throws -> Run {
+    private func run(
+        _ arguments: [String],
+        in home: Home,
+        directory: String? = nil,
+        pwd: String? = nil,
+        socket: StandInSocket? = nil
+    ) throws -> Run {
         let process = Process()
         let stdout = Pipe()
         let stderr = Pipe()
@@ -203,8 +211,9 @@ struct FigmaFolderCLITests {
             "CMUX_CLI_SENTRY_DISABLED": "1"
         ]
         environment["CFFIXED_USER_HOME"] = home.root.path
+        if let pwd { environment["PWD"] = pwd }
         process.environment = environment
-        process.currentDirectoryURL = home.root
+        process.currentDirectoryURL = directory.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? home.root
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = stdout
         process.standardError = stderr
@@ -295,8 +304,9 @@ struct FigmaFolderCLITests {
             let asJSON = try run(["figma", "folder", "--json"], in: home)
             #expect(asJSON.status == 0, "\(asJSON.stderr)")
             let object = json(asJSON.stdout)
-            #expect(object?.count == 1, "\(asJSON.stdout)")
+            #expect(object?.count == 2, "\(asJSON.stdout)")
             #expect(object?["default_folder"] is NSNull, "\(asJSON.stdout)")
+            #expect(object?["folder"] is NSNull, "\(asJSON.stdout)")
 
             #expect(home.bytes == before, "a read changed the file")
             #expect(home.modified == stamp, "a read rewrote the file")
@@ -411,8 +421,17 @@ struct FigmaFolderCLITests {
             #expect(read.stdout == Self.readOutput, "\(read.stdout.debugDescription)")
             #expect(read.stderr.isEmpty, "\(read.stderr)")
 
+            let readDocument: [String: Any] = [
+                "default_folder": document["default_folder"] as Any,
+                "folder": [
+                    "project_id": Self.folder,
+                    "plan_key": "team::\(Self.team)",
+                    "url": Self.good,
+                    "directory": NSNull()
+                ]
+            ]
             let readJSON = try run(["figma", "folder", "--json"], in: home)
-            #expect(NSDictionary(dictionary: json(readJSON.stdout) ?? [:]).isEqual(to: document), "\(readJSON.stdout)")
+            #expect(NSDictionary(dictionary: json(readJSON.stdout) ?? [:]).isEqual(to: readDocument), "\(readJSON.stdout)")
 
             let clearJSON = try run(["figma", "folder", "clear", "--json"], in: home)
             #expect(clearJSON.status == 0, "\(clearJSON.stderr)")
@@ -488,7 +507,7 @@ struct FigmaFolderCLITests {
             try home.seed(Self.base)
             let before = home.bytes
             let result = try run(["figma", "folder", word], in: home)
-            fails(result, with: "unknown cmux figma folder subcommand '\(word)' (expected set, clear)")
+            fails(result, with: "unknown cmux figma folder subcommand '\(word)' (expected set, clear, list)")
             #expect(home.bytes == before)
         }
     }
@@ -613,7 +632,7 @@ struct FigmaFolderCLITests {
             try home.seed(#"{"figma": {"defaultFolder": "https://www.figma.com/files/team/1/folder/2?fuid=9"}}"#)
             let read = try run(["figma", "folder"], in: home)
             #expect(read.status == 0, "\(read.stderr)")
-            #expect(read.stdout == "projectId  2\nplanKey    team::1\nurl        https://www.figma.com/files/team/1/folder/2\n",
+            #expect(read.stdout == "projectId  2\nplanKey    team::1\nurl        https://www.figma.com/files/team/1/folder/2\ndirectory  default\n",
                     "\(read.stdout.debugDescription)")
             let asJSON = try run(["figma", "folder", "--json"], in: home)
             let found = json(asJSON.stdout)?["default_folder"] as? [String: Any]
@@ -882,18 +901,27 @@ struct FigmaFolderCLITests {
 
     // MARK: - The help and the parser (no binary)
 
+    /// State 14 of `15_design-experience.md`, Interaction `#16`: the `folder` lines of `cmux figma --help`.
+    private static let folderHelpLines = [
+        "  folder            Print the Figma folder for this directory as projectId,",
+        "                    planKey, url and directory: the folder set for the nearest",
+        "                    directory that holds this one, else the default.",
+        "                    Pass projectId and planKey to Figma's create_new_file.",
+        "                    Works with no app running.",
+        "  folder set <folder-url> [--dir <path>]",
+        "                    Set the default, or with --dir the folder for that",
+        "                    directory and every directory inside it. Use the link from",
+        "                    Figma's address bar on the folder's page. Put the link in",
+        "                    quotes: the shell reads the ? in it.",
+        "  folder clear [--dir <path>]",
+        "                    Remove the default, or with --dir that directory's folder.",
+        "  folder list       Print every directory's folder, then the default."
+    ]
+
     @Test("the help lists the three folder forms in the lines the brief gives")
     func helpListsTheFolderForms() {
         let lines = FigmaUsage.text.components(separatedBy: "\n")
-        let expected = [
-            "  folder            Print the default Figma folder as projectId, planKey and url.",
-            "                    Pass projectId and planKey to Figma's create_new_file.",
-            "                    Works with no app running.",
-            "  folder set <folder-url>",
-            "                    Set it. Use the link from Figma's address bar on the folder's page.",
-            "                    Put the link in quotes: the shell reads the ? in it.",
-            "  folder clear      Remove it. New designs then go to your Figma Drafts."
-        ]
+        let expected = Self.folderHelpLines
         for line in expected { #expect(lines.contains(line), "missing help line: \(line)") }
         let start = lines.firstIndex(of: expected[0])
         #expect(start != nil)
@@ -908,15 +936,7 @@ struct FigmaFolderCLITests {
             let result = try run(["figma", "--help"], in: home)
             #expect(result.status == 0, "\(result.stderr)")
             let lines = result.stdout.components(separatedBy: "\n")
-            let expected = [
-                "  folder            Print the default Figma folder as projectId, planKey and url.",
-                "                    Pass projectId and planKey to Figma's create_new_file.",
-                "                    Works with no app running.",
-                "  folder set <folder-url>",
-                "                    Set it. Use the link from Figma's address bar on the folder's page.",
-                "                    Put the link in quotes: the shell reads the ? in it.",
-                "  folder clear      Remove it. New designs then go to your Figma Drafts."
-            ]
+            let expected = Self.folderHelpLines
             let start = try #require(lines.firstIndex(of: expected[0]), "\(result.stdout)")
             #expect(Array(lines[start..<min(start + expected.count, lines.count)]) == expected)
             #expect(result.stdout.hasPrefix("cmux figma\n\nUsage: cmux figma <open|goto|fit|folder> [args]\n"))
@@ -935,9 +955,9 @@ struct FigmaFolderCLITests {
 
     @Test("the folder parser refuses by name", arguments: [
         (["--bogus"], "cmux figma folder does not support --bogus"),
-        (["bogus"], "unknown cmux figma folder subcommand 'bogus' (expected set, clear)"),
+        (["bogus"], "unknown cmux figma folder subcommand 'bogus' (expected set, clear, list)"),
         (["https://www.figma.com/files/team/1/folder/2"],
-         "unknown cmux figma folder subcommand 'https://www.figma.com/files/team/1/folder/2' (expected set, clear)"),
+         "unknown cmux figma folder subcommand 'https://www.figma.com/files/team/1/folder/2' (expected set, clear, list)"),
         (["set"], "cmux figma folder set requires a Figma folder URL"),
         (["set", ""], "cmux figma folder set requires a Figma folder URL"),
         (["set", "   "], "cmux figma folder set requires a Figma folder URL"),
@@ -949,6 +969,617 @@ struct FigmaFolderCLITests {
     func parserRefuses(args: [String], message: String) {
         #expect(throws: FigmaFolderArguments.Failure(message: message)) {
             _ = try FigmaFolderArguments.parse(args)
+        }
+    }
+}
+
+// MARK: - A folder per directory (cm-73.42, Scenario 372)
+
+/// `cmux figma folder` for a directory: the fourteen states of `15_design-experience.md`,
+/// Interaction `#16`, through the real binary in a throwaway home. The throwaway home holds
+/// the directories the states run in; its path is resolved first (`/var` is a link to
+/// `/private/var`), because the `directory` line prints the resolved path.
+extension FigmaFolderCLITests {
+
+    private static let xTeam = "764866853003674551"
+    private static let xFolder = "1029384756"
+    private static let linkX = "https://www.figma.com/files/team/\(xTeam)/folder/\(xFolder)"
+    private static let linkXWithQuery = "\(linkX)?fuid=764866775710094844"
+    private static let linkY = "https://www.figma.com/files/team/1/folder/2"
+
+    /// The directories the states run in, all under the throwaway home, all resolved.
+    private struct Stage {
+        let root: String
+        var a: String { root + "/a" }
+        var aInner: String { root + "/a/inner" }
+        var b: String { root + "/b" }
+        var bInner: String { root + "/b/inner" }
+        var lnA: String { root + "/ln-a" }
+        var plain: String { root + "/plain" }
+
+        init(home: FigmaFolderCLITests.Home) throws {
+            var buffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
+            guard realpath(home.root.path, &buffer) != nil else { throw POSIXError(.ENOENT) }
+            root = String(cString: buffer)
+            let fileManager = FileManager.default
+            for path in [aInner, bInner, plain] {
+                try fileManager.createDirectory(atPath: path, withIntermediateDirectories: true)
+            }
+            try fileManager.createSymbolicLink(atPath: lnA, withDestinationPath: a)
+            try fileManager.createSymbolicLink(atPath: a + "/out", withDestinationPath: "../b")
+        }
+    }
+
+    private func staged<T>(_ body: (Home, Stage) throws -> T) throws -> T {
+        try withGuardedHome { home in try body(home, try Stage(home: home)) }
+    }
+
+    /// Writes `cmux.json` holding the default and the folders given.
+    private func seedFolders(_ home: Home, default defaultLink: String? = nil, folders: Any? = nil, extra: String = "") throws {
+        var figma: [String: Any] = [:]
+        if let defaultLink { figma["defaultFolder"] = defaultLink }
+        if let folders { figma["folders"] = folders }
+        var root: [String: Any] = ["zz_keep": ["b": 2, "a": 1]]
+        if !figma.isEmpty { root["figma"] = figma }
+        let data = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        try home.seed(String(decoding: data, as: UTF8.self) + extra)
+    }
+
+    private func readText(_ link: String = linkX, projectId: String = xFolder, team: String = xTeam, directory: String) -> String {
+        "projectId  \(projectId)\nplanKey    team::\(team)\nurl        \(link)\ndirectory  \(directory)\n"
+    }
+
+    private func unchanged(_ home: Home, _ before: Data?, _ stamp: Date?, sourceLocation: SourceLocation = #_sourceLocation) {
+        #expect(home.bytes == before, "the file's bytes changed", sourceLocation: sourceLocation)
+        #expect(home.modified == stamp, "the file was rewritten", sourceLocation: sourceLocation)
+    }
+
+    // MARK: States 1 to 3: the read
+
+    @Test("state 1: a directory's entry answers, and the directory line names its key")
+    func state1EntryAnswers() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.a: Self.linkX])
+            let read = try run(["figma", "folder"], in: home, directory: stage.aInner)
+            #expect(read.status == 0, "\(read.stderr)")
+            #expect(read.stdout == readText(directory: stage.a), "\(read.stdout.debugDescription)")
+            #expect(read.stderr.isEmpty, "\(read.stderr)")
+        }
+    }
+
+    @Test("state 2: with no entry the default answers, and the directory line says default")
+    func state2DefaultAnswers() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.a: Self.linkX])
+            let read = try run(["figma", "folder"], in: home, directory: stage.bInner)
+            #expect(read.status == 0, "\(read.stderr)")
+            #expect(read.stdout == readText(Self.good, projectId: Self.folder, team: Self.team, directory: "default"),
+                    "\(read.stdout.debugDescription)")
+        }
+    }
+
+    @Test("state 3: nothing answers, so three lines and exit 0")
+    func state3NothingAnswers() throws {
+        try staged { home, stage in
+            try seedFolders(home)
+            let read = try run(["figma", "folder"], in: home, directory: stage.aInner)
+            #expect(read.status == 0, "\(read.stderr)")
+            #expect(read.stdout == Self.notSetOutput, "\(read.stdout.debugDescription)")
+            #expect(read.stderr.isEmpty)
+        }
+    }
+
+    // MARK: States 4 to 6: set --dir and clear --dir
+
+    @Test("state 4: set --dir binds the resolved directory, prints the lines, and keeps every other key and the mode")
+    func state4SetDir() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good)
+            let set = try run(["figma", "folder", "set", Self.linkXWithQuery, "--dir", ".."], in: home, directory: stage.aInner)
+            #expect(set.status == 0, "\(set.stderr)")
+            #expect(set.stdout == """
+            Figma folder set for this directory and every directory inside it.
+              directory  \(stage.a)
+              projectId  \(Self.xFolder)
+              planKey    team::\(Self.xTeam)
+
+            """, "\(set.stdout.debugDescription)")
+            #expect(set.stderr.isEmpty)
+            let root = try #require(home.object)
+            let figma = try #require(root["figma"] as? [String: Any])
+            #expect(figma["folders"] as? [String: String] == [stage.a: Self.linkX], "\(figma)")
+            #expect(figma["defaultFolder"] as? String == Self.good)
+            #expect(root["zz_keep"] as? [String: Int] == ["a": 1, "b": 2])
+            #expect(home.mode == 0o600, "mode \(String(describing: home.mode))")
+        }
+    }
+
+    @Test("state 4: --dir before the link, and a path through a symlink, write the same resolved key")
+    func state4SetDirSpellings() throws {
+        try staged { home, stage in
+            try seedFolders(home)
+            let first = try run(["figma", "folder", "set", "--dir", stage.lnA, Self.linkX], in: home)
+            #expect(first.status == 0, "\(first.stderr)")
+            #expect(first.stdout.contains("  directory  \(stage.a)\n"), "\(first.stdout.debugDescription)")
+            let figma = try #require(home.object?["figma"] as? [String: Any])
+            #expect(figma["folders"] as? [String: String] == [stage.a: Self.linkX])
+        }
+    }
+
+    @Test("state 4: set --dir replaces a hand-written symlink key so one directory has one entry")
+    func state4SetReplacesOtherSpelling() throws {
+        try staged { home, stage in
+            try seedFolders(home, folders: [stage.lnA: Self.linkY, stage.b: Self.linkY])
+            let set = try run(["figma", "folder", "set", Self.linkX, "--dir", stage.a], in: home)
+            #expect(set.status == 0, "\(set.stderr)")
+            let folders = try #require((home.object?["figma"] as? [String: Any])?["folders"] as? [String: String])
+            #expect(folders == [stage.a: Self.linkX, stage.b: Self.linkY], "\(folders)")
+        }
+    }
+
+    private static func bannedMessage(_ path: String) -> String {
+        "cmux doesn't set a Figma folder for \(path).\n       Set it for a directory inside it."
+    }
+
+    @Test("set --dir refuses /, /Volumes and /Users: exit 1, the path, nothing written", arguments: ["/", "/Volumes", "/Users"])
+    func setDirRefusesABannedDirectory(path: String) throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.a: Self.linkX])
+            let before = home.bytes
+            let stamp = home.modified
+            fails(try run(["figma", "folder", "set", Self.linkX, "--dir", path], in: home), with: Self.bannedMessage(path))
+            fails(try run(["figma", "folder", "set", "--json", Self.linkX, "--dir", path], in: home), with: Self.bannedMessage(path))
+            unchanged(home, before, stamp)
+        }
+    }
+
+    @Test("set --dir checks the resolved key: a symlink to /Volumes is refused, naming /Volumes")
+    func setDirRefusesASymlinkToABannedDirectory() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good)
+            try FileManager.default.createSymbolicLink(atPath: stage.root + "/ln-volumes", withDestinationPath: "/Volumes")
+            let before = home.bytes
+            let stamp = home.modified
+            fails(try run(["figma", "folder", "set", Self.linkX, "--dir", stage.root + "/ln-volumes"], in: home),
+                  with: Self.bannedMessage("/Volumes"))
+            unchanged(home, before, stamp)
+        }
+    }
+
+    @Test("clear --dir still removes a hand-written entry for /, /Volumes or /Users", arguments: ["/", "/Volumes", "/Users"])
+    func clearDirStillWorksOnABannedDirectory(path: String) throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [path: Self.linkX, stage.a: Self.linkY])
+            let clear = try run(["figma", "folder", "clear", "--dir", path], in: home)
+            #expect(clear.status == 0, "\(clear.stderr)")
+            let folders = try #require((home.object?["figma"] as? [String: Any])?["folders"] as? [String: String])
+            #expect(folders == [stage.a: Self.linkY], "\(folders)")
+        }
+    }
+
+    @Test("state 5: clear --dir removes that entry only and says the default now answers")
+    func state5ClearDefault() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.a: Self.linkX, stage.b: Self.linkY])
+            let clear = try run(["figma", "folder", "clear", "--dir", ".."], in: home, directory: stage.aInner)
+            #expect(clear.status == 0, "\(clear.stderr)")
+            #expect(clear.stdout == """
+            Figma folder cleared.
+              directory  \(stage.a)
+            New designs there now go to the default Figma folder.
+
+            """, "\(clear.stdout.debugDescription)")
+            let folders = try #require((home.object?["figma"] as? [String: Any])?["folders"] as? [String: String])
+            #expect(folders == [stage.b: Self.linkY], "\(folders)")
+        }
+    }
+
+    @Test("state 5: clear --dir says a parent's entry answers there now")
+    func state5ClearParentAnswers() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.root: Self.linkY, stage.a: Self.linkX])
+            let clear = try run(["figma", "folder", "clear", "--dir", "."], in: home, directory: stage.aInner + "/..")
+            #expect(clear.status == 0, "\(clear.stderr)")
+            #expect(clear.stdout.hasSuffix("New designs there now go to the folder set for \(stage.root).\n"), "\(clear.stdout.debugDescription)")
+        }
+    }
+
+    @Test("state 5: clear --dir with no default and no parent says Drafts, and the last key removes figma.folders")
+    func state5ClearToDrafts() throws {
+        try staged { home, stage in
+            try seedFolders(home, folders: [stage.a: Self.linkX])
+            let clear = try run(["figma", "folder", "clear", "--dir", stage.a], in: home)
+            #expect(clear.status == 0, "\(clear.stderr)")
+            #expect(clear.stdout.hasSuffix("New designs there now go to your Figma Drafts.\n"), "\(clear.stdout.debugDescription)")
+            let root = try #require(home.object)
+            #expect(root["figma"] == nil, "\(root)")
+            #expect(root["zz_keep"] as? [String: Int] == ["a": 1, "b": 2])
+        }
+    }
+
+    @Test("state 5: clear --dir says the default now fails when a broken default is what answers")
+    func state5ClearToABrokenDefault() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.noTeamLink, folders: [stage.a: Self.linkX])
+            let clear = try run(["figma", "folder", "clear", "--dir", stage.a], in: home)
+            #expect(clear.status == 0, "\(clear.stderr)")
+            #expect(clear.stdout == """
+            Figma folder cleared.
+              directory  \(stage.a)
+            New designs there now fail: the default Figma folder can't be used.
+            See why:  cmux figma folder list
+
+            """, "\(clear.stdout.debugDescription)")
+        }
+    }
+
+    @Test("state 5: clear --dir names the parent when a broken parent entry is what answers",
+          arguments: ["\"\(noTeamLink)\"", "7"])
+    func state5ClearToABrokenParent(value: String) throws {
+        try staged { home, stage in
+            try home.seed(#"{"figma": {"defaultFolder": "\#(Self.good)", "folders": {"\#(stage.root)": \#(value), "\#(stage.a)": "\#(Self.linkX)"}}}"#)
+            let clear = try run(["figma", "folder", "clear", "--dir", stage.a], in: home)
+            #expect(clear.status == 0, "\(clear.stderr)")
+            #expect(clear.stdout == """
+            Figma folder cleared.
+              directory  \(stage.a)
+            New designs there now fail: the folder set for \(stage.root) can't be used.
+            See why:  cmux figma folder list
+
+            """, "\(clear.stdout.debugDescription)")
+            let list = try run(["figma", "folder", "list"], in: home)
+            #expect(list.stdout.hasPrefix("\(stage.root)\n  error: "), "\(list.stdout.debugDescription)")
+        }
+    }
+
+    @Test("state 6: clear --dir with no entry there writes nothing")
+    func state6ClearNothing() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.b: Self.linkY])
+            let before = home.bytes
+            let stamp = home.modified
+            let clear = try run(["figma", "folder", "clear", "--dir", "."], in: home, directory: stage.aInner)
+            #expect(clear.status == 0, "\(clear.stderr)")
+            #expect(clear.stdout == """
+            No Figma folder was set for this directory. Nothing changed.
+              directory  \(stage.aInner)
+
+            """, "\(clear.stdout.debugDescription)")
+            unchanged(home, before, stamp)
+        }
+    }
+
+    // MARK: State 7 and 8: what answers cannot be used
+
+    private struct BrokenEntry: Sendable, CustomTestStringConvertible {
+        let name: String
+        let value: String
+        let reason: String
+        var testDescription: String { name }
+    }
+
+    private static let brokenEntries = [
+        BrokenEntry(name: "no team", value: #""\#(noTeamLink)""#, reason: "this Figma folder URL has no team in it."),
+        BrokenEntry(name: "design link", value: #""\#(designLink)""#, reason: "not a Figma folder URL."),
+        BrokenEntry(name: "not text", value: "7", reason: "it is not text."),
+        BrokenEntry(name: "null", value: "null", reason: "it is not text.")
+    ]
+
+    @Test("state 7: the entry that answers cannot be used: exit 1, the reason, the key, the fix, and nothing skipped",
+          arguments: brokenEntries)
+    private func state7BrokenEntry(_ entry: BrokenEntry) throws {
+        try staged { home, stage in
+            // A usable parent and a usable default sit behind the broken entry and must not be used.
+            try home.seed(#"{"figma": {"defaultFolder": "\#(Self.good)", "folders": {"\#(stage.root)": "\#(Self.linkY)", "\#(stage.a)": \#(entry.value)}}}"#)
+            let before = home.bytes
+            let stamp = home.modified
+            for arguments in [["figma", "folder"], ["figma", "folder", "--json"]] {
+                let read = try run(arguments, in: home, directory: stage.aInner)
+                fails(read, with: """
+                this directory's Figma folder in cmux.json is not a URL cmux can use:
+                       \(entry.reason)
+                       Set for:  \(stage.a)
+                       Fix it:   cmux figma folder set <folder-url> --dir \(stage.a)
+                """)
+            }
+            unchanged(home, before, stamp)
+        }
+    }
+
+    @Test("state 8: figma.folders that is not an object: exit 1 and the fix", arguments: ["5", #""text""#, "[1]", "true"])
+    func state8FoldersNotObject(value: String) throws {
+        try staged { home, stage in
+            try home.seed(#"{"figma": {"defaultFolder": "\#(Self.good)", "folders": \#(value)}}"#)
+            let before = home.bytes
+            let stamp = home.modified
+            let read = try run(["figma", "folder"], in: home, directory: stage.aInner)
+            fails(read, with: """
+            figma.folders in cmux.json is not an object.
+                   Fix it:  cmux figma folder set <folder-url> --dir <directory>
+            """)
+            unchanged(home, before, stamp)
+        }
+    }
+
+    @Test("state 8: set --dir writes over a figma.folders that is not an object")
+    func state8SetOverNonObject() throws {
+        try staged { home, stage in
+            try home.seed(#"{"figma": {"defaultFolder": "\#(Self.good)", "folders": 5}}"#)
+            let set = try run(["figma", "folder", "set", Self.linkX, "--dir", stage.a], in: home)
+            #expect(set.status == 0, "\(set.stderr)")
+            let figma = try #require(home.object?["figma"] as? [String: Any])
+            #expect(figma["folders"] as? [String: String] == [stage.a: Self.linkX])
+        }
+    }
+
+    // MARK: States 9 and 10: list
+
+    @Test("state 9: list prints every entry sorted, a bad one as its error, then the default")
+    func state9List() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.b: Self.linkX, stage.a: Self.noTeamLink, stage.plain: 7] as [String: Any])
+            let list = try run(["figma", "folder", "list"], in: home, directory: stage.aInner)
+            #expect(list.status == 0, "\(list.stderr)")
+            #expect(list.stdout == """
+            \(stage.a)
+              error: this Figma folder URL has no team in it.
+            \(stage.b)
+              \(Self.linkX)
+            \(stage.plain)
+              error: it is not text.
+            default
+              \(Self.good)
+
+            """, "\(list.stdout.debugDescription)")
+        }
+    }
+
+    @Test("state 9: list under default shows not set, or the default's error")
+    func state9ListDefaultLines() throws {
+        try staged { home, stage in
+            try seedFolders(home, folders: [stage.a: Self.linkX])
+            let notSet = try run(["figma", "folder", "list"], in: home)
+            #expect(notSet.stdout == "\(stage.a)\n  \(Self.linkX)\ndefault\n  not set\n", "\(notSet.stdout.debugDescription)")
+            try seedFolders(home, default: Self.noTeamLink, folders: [stage.a: Self.linkX])
+            let broken = try run(["figma", "folder", "list"], in: home)
+            #expect(broken.status == 0, "\(broken.stderr)")
+            #expect(broken.stdout == "\(stage.a)\n  \(Self.linkX)\ndefault\n  error: this Figma folder URL has no team in it.\n",
+                    "\(broken.stdout.debugDescription)")
+        }
+    }
+
+    private static let notAFullPath = "this is not a full path, so it matches no directory."
+
+    @Test("list marks a key that is not a full path as matching nothing, plain and --json", arguments: ["relative/x", "$HOME/x", "~other/x", "./x"])
+    func listMarksAKeyThatCanNeverMatch(key: String) throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [key: Self.linkX, stage.a: Self.linkX] as [String: Any])
+            let list = try run(["figma", "folder", "list"], in: home)
+            #expect(list.status == 0, "\(list.stderr)")
+            let lines = list.stdout.components(separatedBy: "\n")
+            let at = try #require(lines.firstIndex(of: key), "\(list.stdout.debugDescription)")
+            #expect(lines[at + 1] == "  error: \(Self.notAFullPath)", "\(list.stdout.debugDescription)")
+            #expect(list.stdout.contains("\(stage.a)\n  \(Self.linkX)\n"), "a full path still lists its link")
+
+            let asJSON = try run(["figma", "folder", "list", "--json"], in: home)
+            #expect(asJSON.status == 0, "\(asJSON.stderr)")
+            let folders = try #require(json(asJSON.stdout)?["folders"] as? [[String: Any]])
+            let row = try #require(folders.first { $0["directory"] as? String == key })
+            #expect(NSDictionary(dictionary: row).isEqual(to: ["directory": key, "error": Self.notAFullPath]), "\(row)")
+        }
+    }
+
+    @Test("list does not mark ~ or ~/x or an absolute key as not a full path")
+    func listKeepsFullPathKeys() throws {
+        try staged { home, stage in
+            try seedFolders(home, folders: ["~": Self.linkX, "~/proj": Self.linkX, stage.a: Self.linkX] as [String: Any])
+            let list = try run(["figma", "folder", "list"], in: home)
+            #expect(!list.stdout.contains(Self.notAFullPath), "\(list.stdout.debugDescription)")
+        }
+    }
+
+    @Test("state 10: list with nothing set")
+    func state10ListNothing() throws {
+        try staged { home, stage in
+            try seedFolders(home)
+            let list = try run(["figma", "folder", "list"], in: home)
+            #expect(list.status == 0, "\(list.stderr)")
+            #expect(list.stdout == """
+            No Figma folders set. New designs go to your Figma Drafts.
+            Set one:  cmux figma folder set <folder-url>
+            Or for this directory only:  cmux figma folder set <folder-url> --dir .
+
+            """, "\(list.stdout.debugDescription)")
+        }
+    }
+
+    // MARK: States 11 to 13: refusals leave the file alone
+
+    @Test("state 11: --dir names no existing directory: exit 1, the absolute path, nothing written")
+    func state11NotADirectory() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good)
+            let before = home.bytes
+            let stamp = home.modified
+            let set = try run(["figma", "folder", "set", Self.linkX, "--dir", "./nope"], in: home, directory: stage.aInner)
+            fails(set, with: "not a directory: \(stage.aInner)/nope")
+            let clear = try run(["figma", "folder", "clear", "--dir", "./nope"], in: home, directory: stage.aInner)
+            fails(clear, with: "not a directory: \(stage.aInner)/nope")
+            // A file is not a directory either.
+            try Data("x".utf8).write(to: URL(fileURLWithPath: stage.root + "/afile"))
+            let file = try run(["figma", "folder", "set", Self.linkX, "--dir", stage.root + "/afile"], in: home)
+            fails(file, with: "not a directory: \(stage.root)/afile")
+            unchanged(home, before, stamp)
+        }
+    }
+
+    @Test("state 12: --dir with no path: exit 1")
+    func state12DirNeedsAPath() throws {
+        try staged { home, stage in
+            try seedFolders(home)
+            let before = home.bytes
+            for arguments in [["set", Self.linkX, "--dir"], ["clear", "--dir"]] {
+                let result = try run(["figma", "folder"] + arguments, in: home)
+                fails(result, with: "--dir requires a directory")
+            }
+            unchanged(home, before, home.modified)
+        }
+    }
+
+    @Test("state 13: an unknown word names set, clear and list")
+    func state13UnknownWord() throws {
+        try staged { home, stage in
+            try seedFolders(home)
+            let result = try run(["figma", "folder", "bogus"], in: home)
+            fails(result, with: "unknown cmux figma folder subcommand 'bogus' (expected set, clear, list)")
+        }
+    }
+
+    @Test("--dir on the read or on list, and an extra word on list, are refused by name")
+    func dirRefusals() throws {
+        try staged { home, stage in
+            try seedFolders(home)
+            fails(try run(["figma", "folder", "--dir", "."], in: home), with: "cmux figma folder does not support --dir")
+            fails(try run(["figma", "folder", "list", "--dir", "."], in: home), with: "cmux figma folder list does not support --dir")
+            fails(try run(["figma", "folder", "list", "extra"], in: home), with: "cmux figma folder list does not take an extra argument: extra")
+        }
+    }
+
+    // MARK: --json
+
+    @Test("--json: the read, set --dir, clear --dir and list print the documents Interaction #16 gives")
+    func jsonDocuments() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good)
+            let set = try run(["figma", "folder", "set", Self.linkX, "--dir", stage.a, "--json"], in: home)
+            #expect(set.status == 0, "\(set.stderr)")
+            let setDocument: [String: Any] = [
+                "folder": ["project_id": Self.xFolder, "plan_key": "team::\(Self.xTeam)", "url": Self.linkX, "directory": stage.a]
+            ]
+            #expect(NSDictionary(dictionary: json(set.stdout) ?? [:]).isEqual(to: setDocument), "\(set.stdout)")
+
+            let read = try run(["figma", "folder", "--json"], in: home, directory: stage.aInner)
+            let readDocument: [String: Any] = [
+                "default_folder": ["project_id": Self.folder, "plan_key": "team::\(Self.team)", "url": Self.good],
+                "folder": ["project_id": Self.xFolder, "plan_key": "team::\(Self.xTeam)", "url": Self.linkX, "directory": stage.a]
+            ]
+            #expect(NSDictionary(dictionary: json(read.stdout) ?? [:]).isEqual(to: readDocument), "\(read.stdout)")
+
+            let list = try run(["figma", "folder", "list", "--json"], in: home)
+            let listDocument: [String: Any] = [
+                "folders": [["directory": stage.a, "project_id": Self.xFolder, "plan_key": "team::\(Self.xTeam)", "url": Self.linkX]],
+                "default_folder": ["project_id": Self.folder, "plan_key": "team::\(Self.team)", "url": Self.good]
+            ]
+            #expect(NSDictionary(dictionary: json(list.stdout) ?? [:]).isEqual(to: listDocument), "\(list.stdout)")
+
+            let clear = try run(["figma", "folder", "clear", "--dir", stage.a, "--json"], in: home)
+            let clearDocument: [String: Any] = ["folder": NSNull(), "directory": stage.a]
+            #expect(NSDictionary(dictionary: json(clear.stdout) ?? [:]).isEqual(to: clearDocument), "\(clear.stdout)")
+        }
+    }
+
+    @Test("--json: the default answers with directory null; an entry answers even when the default is broken")
+    func jsonDefaultAndBrokenDefault() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good)
+            let defaultAnswers = try run(["figma", "folder", "--json"], in: home, directory: stage.bInner)
+            let folder = json(defaultAnswers.stdout)?["folder"] as? [String: Any]
+            #expect(folder?["directory"] is NSNull, "\(defaultAnswers.stdout)")
+            #expect(folder?["project_id"] as? String == Self.folder)
+
+            try seedFolders(home, default: Self.noTeamLink, folders: [stage.a: Self.linkX])
+            let entryAnswers = try run(["figma", "folder", "--json"], in: home, directory: stage.aInner)
+            #expect(entryAnswers.status == 0, "\(entryAnswers.stderr)")
+            let document = json(entryAnswers.stdout)
+            #expect((document?["default_folder"] as? [String: Any])?["error"] as? String == "this Figma folder URL has no team in it.",
+                    "\(entryAnswers.stdout)")
+            #expect((document?["folder"] as? [String: Any])?["directory"] as? String == stage.a)
+
+            let defaultBroken = try run(["figma", "folder", "--json"], in: home, directory: stage.bInner)
+            #expect(defaultBroken.status == 1)
+            #expect(defaultBroken.stdout.isEmpty, "\(defaultBroken.stdout)")
+        }
+    }
+
+    @Test("--json: list with nothing set, and a read that nothing answers")
+    func jsonNothingSet() throws {
+        try staged { home, stage in
+            try seedFolders(home)
+            let list = try run(["figma", "folder", "list", "--json"], in: home)
+            let document = json(list.stdout)
+            #expect((document?["folders"] as? [Any])?.isEmpty == true, "\(list.stdout)")
+            #expect(document?["default_folder"] is NSNull, "\(list.stdout)")
+        }
+    }
+
+    // MARK: Symlinks, $PWD and /tmp
+
+    @Test("a read from inside a symlink answers the target's entry, naming the resolved path")
+    func readThroughSymlink() throws {
+        try staged { home, stage in
+            try seedFolders(home, folders: [stage.a: Self.linkX])
+            let read = try run(["figma", "folder"], in: home, directory: stage.lnA + "/inner")
+            #expect(read.stdout == readText(directory: stage.a), "\(read.stdout.debugDescription)")
+        }
+    }
+
+    @Test("the shell form: with $PWD through a symlink the entry answers; without it, or with a $PWD that resolves elsewhere, the default does")
+    func shellForm() throws {
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good, folders: [stage.a: Self.linkX])
+            let through = stage.a + "/out/inner"
+            let withPwd = try run(["figma", "folder"], in: home, directory: through, pwd: through)
+            #expect(withPwd.stdout == readText(directory: stage.a), "\(withPwd.stdout.debugDescription)")
+            for pwd in [nil, stage.plain, "relative", stage.root + "/gone"] as [String?] {
+                let read = try run(["figma", "folder"], in: home, directory: through, pwd: pwd)
+                #expect(read.stdout.hasSuffix("directory  default\n"), "pwd \(String(describing: pwd)): \(read.stdout.debugDescription)")
+            }
+        }
+    }
+
+    @Test("a directory under /tmp is keyed /private/tmp/..., and the directory line prints that key byte for byte")
+    func tmpDirectoryKeyEqualsPrintedDirectory() throws {
+        let name = "cm-73.42-cli-\(UUID().uuidString.prefix(8))"
+        let spelled = "/tmp/\(name)"
+        try FileManager.default.createDirectory(atPath: spelled + "/inner", withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: spelled) }
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good)
+            let set = try run(["figma", "folder", "set", Self.linkX, "--dir", spelled], in: home)
+            #expect(set.status == 0, "\(set.stderr)")
+            #expect(set.stdout.contains("  directory  /private/tmp/\(name)\n"), "\(set.stdout.debugDescription)")
+            let stored = try #require((home.object?["figma"] as? [String: Any])?["folders"] as? [String: String])
+            #expect(Array(stored.keys) == ["/private/tmp/\(name)"], "\(stored)")
+
+            // The shell form is /tmp/..., the resolved form is /private/tmp/...: both read the stored key.
+            for pwd in [nil, spelled + "/inner"] as [String?] {
+                let read = try run(["figma", "folder"], in: home, directory: spelled + "/inner", pwd: pwd)
+                #expect(read.stdout.hasSuffix("directory  \(try #require(stored.keys.first))\n"), "pwd \(String(describing: pwd)): \(read.stdout.debugDescription)")
+            }
+            let list = try run(["figma", "folder", "list"], in: home)
+            #expect(list.stdout.hasPrefix("\(try #require(stored.keys.first))\n"), "\(list.stdout.debugDescription)")
+            let clear = try run(["figma", "folder", "clear", "--dir", spelled], in: home)
+            #expect(clear.status == 0, "\(clear.stderr)")
+            #expect(home.object?["figma"] as? [String: Any] != nil)
+            #expect(((home.object?["figma"] as? [String: Any])?["folders"]) == nil)
+        }
+    }
+
+    @Test("the three folder forms for a directory open no socket")
+    func perDirectoryFormsOpenNoSocket() throws {
+        let socketPath = "/tmp/cmux-figfld-\(UUID().uuidString.prefix(8)).sock"
+        let standIn = try StandInSocket(path: socketPath)
+        defer { standIn.stop() }
+        try staged { home, stage in
+            try seedFolders(home, default: Self.good)
+            for command in [
+                ["figma", "folder", "set", Self.linkX, "--dir", stage.a], ["figma", "folder", "list"],
+                ["figma", "folder"], ["figma", "folder", "clear", "--dir", stage.a]
+            ] {
+                let result = try run(command, in: home, directory: stage.aInner, socket: standIn)
+                #expect(result.status == 0, "\(command): \(result.stderr)")
+                #expect(result.socketTraffic == 0, "\(command) reached the socket")
+            }
         }
     }
 }

@@ -1754,8 +1754,10 @@
 		807390000000000000000006 /* FigmaButtonIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000005 /* FigmaButtonIcon.swift */; };
 		807316000000000000001702 /* FigmaButtonMenuItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000001701 /* FigmaButtonMenuItem.swift */; };
 		807316000000000000000202 /* FigmaButtonMenuModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000201 /* FigmaButtonMenuModel.swift */; };
+		807342000000000000000102 /* FigmaFolderDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807342000000000000000101 /* FigmaFolderDialog.swift */; };
 		807316000000000000000502 /* FigmaButtonMenuModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000501 /* FigmaButtonMenuModelTests.swift */; };
 		807316000000000000001602 /* FigmaButtonMenuWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000001601 /* FigmaButtonMenuWorkspaceTests.swift */; };
+		807342000000000000000202 /* FigmaFolderMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807342000000000000000201 /* FigmaFolderMenuTests.swift */; };
 		807300000000000000000031 /* FigmaClickRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000030 /* FigmaClickRoute.swift */; };
 		807300000000000000000032 /* FigmaClickRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000030 /* FigmaClickRoute.swift */; };
 		807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807300000000000000000033 /* FigmaClickRouteTests.swift */; };
@@ -5903,8 +5905,10 @@
 		807390000000000000000005 /* FigmaButtonIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaButtonIcon.swift; sourceTree = "<group>"; };
 		807316000000000000001701 /* FigmaButtonMenuItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaButtonMenuItem.swift; sourceTree = "<group>"; };
 		807316000000000000000201 /* FigmaButtonMenuModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaButtonMenuModel.swift; sourceTree = "<group>"; };
+		807342000000000000000101 /* FigmaFolderDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaFolderDialog.swift; sourceTree = "<group>"; };
 		807316000000000000000501 /* FigmaButtonMenuModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaButtonMenuModelTests.swift; sourceTree = "<group>"; };
 		807316000000000000001601 /* FigmaButtonMenuWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FigmaButtonMenuWorkspaceTests.swift"; sourceTree = "<group>"; };
+		807342000000000000000201 /* FigmaFolderMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FigmaFolderMenuTests.swift"; sourceTree = "<group>"; };
 		807300000000000000000030 /* FigmaClickRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickRoute.swift; sourceTree = "<group>"; };
 		807300000000000000000033 /* FigmaClickRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickRouteTests.swift; sourceTree = "<group>"; };
 		807300000000000000000038 /* FigmaClickWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaClickWorkspaceTests.swift; sourceTree = "<group>"; };
@@ -10426,6 +10430,7 @@
 				807316000000000000000001 /* FigmaFileList.swift */,
 				807316000000000000000101 /* FigmaNewFileLink.swift */,
 				807316000000000000000201 /* FigmaButtonMenuModel.swift */,
+				807342000000000000000101 /* FigmaFolderDialog.swift */,
 				807317000000000000000301 /* FigmaDesignSkill.swift */,
 				807317000000000000000201 /* FigmaDesignHandOff.swift */,
 				807312000000000000000201 /* Workspace+FigmaBoardLayout.swift */,
@@ -11862,6 +11867,7 @@
 				807316000000000000000D01 /* FigmaFileListPersistenceTests.swift */,
 				807316000000000000001501 /* FigmaFileSubscriptionWorkspaceTests.swift */,
 				807316000000000000001601 /* FigmaButtonMenuWorkspaceTests.swift */,
+				807342000000000000000201 /* FigmaFolderMenuTests.swift */,
 				807315000000000000000001 /* FigmaTabToRightWorkspaceTests.swift */,
 				80739000000000000000000B /* FigmaHeaderButtonWorkspaceTests.swift */,
 				807390000000000000000009 /* FigmaHeaderButtonTests.swift */,
@@ -14150,6 +14156,7 @@
 				807390000000000000000006 /* FigmaButtonIcon.swift in Sources */,
 				807316000000000000001702 /* FigmaButtonMenuItem.swift in Sources */,
 				807316000000000000000202 /* FigmaButtonMenuModel.swift in Sources */,
+				807342000000000000000102 /* FigmaFolderDialog.swift in Sources */,
 				807300000000000000000031 /* FigmaClickRoute.swift in Sources */,
 				807317000000000000000202 /* FigmaDesignHandOff.swift in Sources */,
 				807317000000000000000302 /* FigmaDesignSkill.swift in Sources */,
@@ -16536,6 +16543,7 @@
 				807312000000000000000902 /* FigmaBoardLayoutWorkspaceTests.swift in Sources */,
 				807316000000000000000502 /* FigmaButtonMenuModelTests.swift in Sources */,
 				807316000000000000001602 /* FigmaButtonMenuWorkspaceTests.swift in Sources */,
+				807342000000000000000202 /* FigmaFolderMenuTests.swift in Sources */,
 				807300000000000000000032 /* FigmaClickRoute.swift in Sources */,
 				807300000000000000000034 /* FigmaClickRouteTests.swift in Sources */,
 				807300000000000000000039 /* FigmaClickWorkspaceTests.swift in Sources */,
