@@ -1267,7 +1267,8 @@
         },
         "figma": {
           "description": "Figma-innstillinger.",
-          "defaultFolder": "Lenke til Figma-mappen der nye design som agenten din oppretter, skal havne. Bruk lenken fra Figmas adressefelt på mappens side. Agenter leser den med \"cmux figma folder\"."
+          "defaultFolder": "Lenke til Figma-mappen der nye design havner når figma.folders ikke har en oppføring for katalogen deres. Bruk lenken fra Figmas adressefelt på mappens side. Agenter leser den med \"cmux figma folder\".",
+          "folders": "Figma-mapper for kataloger: hver nøkkel er en katalog, og hver verdi er lenken til Figma-mappen der nye design laget i den katalogen, eller inni den, skal havne. Den nærmeste samsvarende katalogen vinner; ellers gjelder figma.defaultFolder. Agenter leser den med \"cmux figma folder\"."
         },
         "reply": {
           "description": "Svarpanel",

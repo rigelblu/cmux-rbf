@@ -268,7 +268,7 @@ extension SettingsWindowSharedStateSuites {
                 let pane = try #require(workspace.bonsplitController.allPaneIds.first)
                 let recorder = SettingsNavigationRecorder()
                 defer { recorder.stopObserving() }
-                let menu = workspace.figmaButtonMenu(inPane: pane, folder: "invalid", showSettings: { target, anchor, highlight in
+                let menu = workspace.figmaButtonMenu(inPane: pane, choice: .defaultOnly("invalid"), showSettings: { target, anchor, highlight in
                     presenter.show(navigationTarget: target, anchorID: anchor, highlight: highlight)
                 })
                 let index = try #require(menu.items.firstIndex { $0.title == "Choose Figma Folder…" })

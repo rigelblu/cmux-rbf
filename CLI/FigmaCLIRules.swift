@@ -139,7 +139,7 @@ enum FigmaArguments {
     }
 }
 
-/// What follows `cmux figma folder`: the read, `set <folder-url>` or `clear`,
+/// What follows `cmux figma folder`: the read, `set <folder-url>`, `clear` or `list`,
 /// split out so a test can hold the refusals with no socket and no file.
 ///
 /// **A form refuses what it does not take**, in the words `open` and `goto`
@@ -150,13 +150,53 @@ enum FigmaFolderArguments {
 
     enum Action: Equatable {
         case read
-        /// The text after `set`, as typed. It is checked by `FigmaFolderLink`.
+        /// The text after `set`, as typed. It is checked by `FigmaFolderLink`. Sets the default.
         case set(String)
+        /// Removes the default.
         case clear
+        /// `set <folder-url> --dir <path>`: the folder for one directory and everything inside it.
+        case setIn(String, directory: String)
+        /// `clear --dir <path>`: that directory's own entry.
+        case clearIn(directory: String)
+        /// Every directory's folder, then the default.
+        case list
     }
 
     struct Failure: Error, Equatable {
         let message: String
+    }
+
+    static let dirRequired = "--dir requires a directory"
+
+    /// Splits `args` into the one word a form takes and its `--dir` value.
+    /// `acceptsDir` is false for `list`, which refuses `--dir` by name.
+    private static func words(
+        _ args: [String],
+        form: String,
+        acceptsDir: Bool
+    ) throws -> (word: String?, directory: String?) {
+        var word: String?
+        var directory: String?
+        var index = 0
+        while index < args.count {
+            let arg = args[index]
+            if acceptsDir, arg == "--dir" {
+                guard directory == nil else { throw Failure(message: "\(form) accepts --dir only once") }
+                guard index + 1 < args.count,
+                      !args[index + 1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else { throw Failure(message: dirRequired) }
+                directory = args[index + 1]
+                index += 2
+                continue
+            }
+            if arg.hasPrefix("--") { throw Failure(message: "\(form) does not support \(arg)") }
+            guard word == nil else {
+                throw Failure(message: "\(form) does not take an extra argument: \(arg)")
+            }
+            word = arg
+            index += 1
+        }
+        return (word, directory)
     }
 
     static func parse(_ args: [String]) throws -> Action {
@@ -168,28 +208,30 @@ enum FigmaFolderArguments {
         switch first.lowercased() {
         case "set":
             let form = "cmux figma folder set"
-            var word: String?
-            for arg in rest {
-                if arg.hasPrefix("--") { throw Failure(message: "\(form) does not support \(arg)") }
-                guard word == nil else {
-                    throw Failure(message: "\(form) does not take an extra argument: \(arg)")
-                }
-                word = arg
-            }
-            guard let word, !word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            let parsed = try words(rest, form: form, acceptsDir: true)
+            guard let word = parsed.word, !word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw Failure(message: "\(form) requires a Figma folder URL")
             }
+            if let directory = parsed.directory { return .setIn(word, directory: directory) }
             return .set(word)
         case "clear":
             let form = "cmux figma folder clear"
-            for arg in rest {
-                if arg.hasPrefix("--") { throw Failure(message: "\(form) does not support \(arg)") }
-                throw Failure(message: "\(form) does not take an extra argument: \(arg)")
+            let parsed = try words(rest, form: form, acceptsDir: true)
+            if let extra = parsed.word {
+                throw Failure(message: "\(form) does not take an extra argument: \(extra)")
             }
+            if let directory = parsed.directory { return .clearIn(directory: directory) }
             return .clear
+        case "list":
+            let form = "cmux figma folder list"
+            let parsed = try words(rest, form: form, acceptsDir: false)
+            if let extra = parsed.word {
+                throw Failure(message: "\(form) does not take an extra argument: \(extra)")
+            }
+            return .list
         default:
             throw Failure(
-                message: "unknown cmux figma folder subcommand '\(first)' (expected set, clear)"
+                message: "unknown cmux figma folder subcommand '\(first)' (expected set, clear, list)"
             )
         }
     }
@@ -202,19 +244,105 @@ enum FigmaFolderText {
     static let notSet = """
     No default Figma folder. New designs go to your Figma Drafts.
     Set one:  cmux figma folder set <folder-url>
+    Or for this directory only:  cmux figma folder set <folder-url> --dir .
     """
 
     static let cleared = "Default Figma folder cleared. New designs go to your Figma Drafts."
 
     static let fixIt = "Fix it:  cmux figma folder set <folder-url>"
 
-    /// `cmux figma folder` with a folder set. The names are the ones
-    /// `create_new_file` takes; the value starts in column 12.
-    static func read(projectId: String, planKey: String, url: String) -> String {
+    /// `cmux figma folder` with a folder that answers. The names are the ones
+    /// `create_new_file` takes; the value starts in column 12. `directory` is the key
+    /// that answered, or `default`.
+    static func read(projectId: String, planKey: String, url: String, directory: String) -> String {
         """
         projectId  \(projectId)
         planKey    \(planKey)
         url        \(url)
+        directory  \(directory)
+        """
+    }
+
+    /// `set --dir`: the directory is the resolved path that was written as the key.
+    static func setDirectory(directory: String, projectId: String, planKey: String) -> String {
+        """
+        Figma folder set for this directory and every directory inside it.
+          directory  \(directory)
+          projectId  \(projectId)
+          planKey    \(planKey)
+        """
+    }
+
+    /// What new designs in a directory go to once its own entry is gone.
+    enum Now: Equatable {
+        case defaultFolder
+        case folderSetFor(String)
+        case drafts
+        /// The default answers and cannot be used.
+        case defaultUnusable
+        /// A parent's entry answers and cannot be used.
+        case folderUnusable(String)
+    }
+
+    /// `clear --dir` that removed an entry.
+    static func clearedDirectory(directory: String, now: Now) -> String {
+        let last: String
+        switch now {
+        case .defaultFolder: last = "New designs there now go to the default Figma folder."
+        case .folderSetFor(let path): last = "New designs there now go to the folder set for \(path)."
+        case .drafts: last = "New designs there now go to your Figma Drafts."
+        case .defaultUnusable:
+            last = "New designs there now fail: the default Figma folder can't be used.\nSee why:  cmux figma folder list"
+        case .folderUnusable(let path):
+            last = "New designs there now fail: the folder set for \(path) can't be used.\nSee why:  cmux figma folder list"
+        }
+        return """
+        Figma folder cleared.
+          directory  \(directory)
+        \(last)
+        """
+    }
+
+    /// `clear --dir` with no entry of its own there.
+    static func notClearedDirectory(directory: String) -> String {
+        """
+        No Figma folder was set for this directory. Nothing changed.
+          directory  \(directory)
+        """
+    }
+
+    /// `list`, for a key that cannot match any directory.
+    static let keyNotAFullPath = "this is not a full path, so it matches no directory."
+
+    /// `set --dir` for a directory no folder is set for.
+    static func cannotSetFor(_ path: String) -> String {
+        """
+        cmux doesn't set a Figma folder for \(path).
+               Set it for a directory inside it.
+        """
+    }
+
+    static func notADirectory(_ path: String) -> String { "not a directory: \(path)" }
+
+    static let foldersNotObject = """
+    figma.folders in cmux.json is not an object.
+           Fix it:  cmux figma folder set <folder-url> --dir <directory>
+    """
+
+    /// `list` with no entry and no default.
+    static let noFolders = """
+    No Figma folders set. New designs go to your Figma Drafts.
+    Set one:  cmux figma folder set <folder-url>
+    Or for this directory only:  cmux figma folder set <folder-url> --dir .
+    """
+
+    /// `cmux figma folder` when the entry that answers cannot be used. `key` is the key as written, `~` expanded.
+    static func unusableEntry(reason: String, key: String) -> String {
+        """
+        this directory's Figma folder in cmux.json is not a URL cmux can use:
+               \(reason)
+               Set for:  \(key)
+               Fix it:   cmux figma folder set <folder-url> --dir \(key)
         """
     }
 
@@ -297,13 +425,19 @@ enum FigmaUsage {
                         It moves nothing on Figma's Log in page.
                         It sends no key to a pane that is not showing, or while a text field in the pane has focus.
                         Counts the same pane goto does. --surface <handle> picks one.
-      folder            Print the default Figma folder as projectId, planKey and url.
+      folder            Print the Figma folder for this directory as projectId,
+                        planKey, url and directory: the folder set for the nearest
+                        directory that holds this one, else the default.
                         Pass projectId and planKey to Figma's create_new_file.
                         Works with no app running.
-      folder set <folder-url>
-                        Set it. Use the link from Figma's address bar on the folder's page.
-                        Put the link in quotes: the shell reads the ? in it.
-      folder clear      Remove it. New designs then go to your Figma Drafts.
+      folder set <folder-url> [--dir <path>]
+                        Set the default, or with --dir the folder for that
+                        directory and every directory inside it. Use the link from
+                        Figma's address bar on the folder's page. Put the link in
+                        quotes: the shell reads the ? in it.
+      folder clear [--dir <path>]
+                        Remove the default, or with --dir that directory's folder.
+      folder list       Print every directory's folder, then the default.
 
     Move the view with goto. Do not use cmux browser click or type commands on a Figma pane:
     in the editor they can change the file.

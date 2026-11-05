@@ -1267,7 +1267,8 @@
         },
         "figma": {
           "description": "Réglages Figma.",
-          "defaultFolder": "Lien vers le dossier Figma où doivent aller les nouveaux designs créés par votre agent. Utilisez le lien de la barre d'adresse de Figma sur la page du dossier. Les agents le lisent avec \"cmux figma folder\"."
+          "defaultFolder": "Lien vers le dossier Figma où vont les nouveaux designs quand figma.folders n'a pas d'entrée pour leur répertoire. Utilisez le lien de la barre d'adresse de Figma sur la page du dossier. Les agents le lisent avec \"cmux figma folder\".",
+          "folders": "Dossiers Figma par répertoire : chaque clé est un répertoire et chaque valeur le lien du dossier Figma où doivent aller les nouveaux designs créés dans ce répertoire ou à l'intérieur. Le répertoire correspondant le plus proche l'emporte ; ailleurs, figma.defaultFolder s'applique. Les agents le lisent avec \"cmux figma folder\"."
         },
         "reply": {
           "description": "Panneau de réponses",
