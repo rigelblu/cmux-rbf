@@ -277,4 +277,24 @@ struct FigmaLoadBarSignalTests {
         state.inPlaceNonEditorOpened()
         #expect(state.editorWait == .failed, "inPlaceNonEditorOpened must not clear failed state")
     }
+
+    // cmux-rbf #cm-73.40 (13_known-unknowns.md, "does cm-73.11's loading line see a simulated load as a load?"; scope check 1
+    // item 6): cmux loads its preview with `loadSimulatedRequest`. The line starts at `figmaLoadBar.begin`, called from the
+    // delegate's start of a provisional navigation, and `generation` counts each start.
+    @Test("The loading line starts, once, for cmux's simulated load of the preview page, and ends with it")
+    func simulatedPreviewLoadStartsTheLine() async throws {
+        let panel = BrowserPanel(workspaceId: UUID(), chromeVisibility: .hidden, websiteDataStore: .nonPersistent())
+        defer { panel.close() }
+        let page = FigmaPaneURL.previewPageURL.appending(queryItems: [URLQueryItem(name: "embed", value: "https://embed.figma.com/design/KEY/a?node-id=1-2")])
+        let before = panel.figmaLoadBar.generation
+        panel.navigate(to: page)
+        let committed = await eventually {
+            let href = (try? await panel.webView.evaluateJavaScript("document.title === 'Figma' ? location.href : ''") as? String) ?? ""
+            return URL(string: href) == page && !panel.webView.isLoading
+        }
+        try #require(committed, "fixture: cmux's page did not load at \(page)")
+        #expect(panel.figmaLoadBar.generation == before + 1, "the line started \(panel.figmaLoadBar.generation - before) times for one simulated load")
+        #expect(panel.figmaLoadBar.loadTarget == nil, "the finished load left the target \(String(describing: panel.figmaLoadBar.loadTarget))")
+        #expect(panel.figmaLoadBar.editorWait == .notWaiting, "the preview is not the editor, so nothing waits: \(panel.figmaLoadBar.editorWait)")
+    }
 }

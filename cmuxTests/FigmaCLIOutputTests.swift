@@ -333,7 +333,7 @@ struct FigmaCLIOutputTests {
         #expect(run.opens.count == 1)
         #expect(params["show_omnibar"] as? Bool == false)
         let address = try #require(params["url"] as? String)
-        #expect(address.hasPrefix("cmux-figma://cmux/figma-embed.html?embed="), "\(address)") // cmux-rbf #cm-73.39
+        #expect(address.hasPrefix(FigmaPaneURL.previewPageURL.absoluteString + "?embed="), "\(address)") // cmux-rbf #cm-73.40
         #expect(address.contains("figma-embed.html?embed="), "\(address)")
         let embedded = URLComponents(string: address)?.queryItems?.first { $0.name == "embed" }?.value ?? ""
         #expect(embedded.hasPrefix("https://embed.figma.com/design/KEY/slug?"), "\(embedded)")

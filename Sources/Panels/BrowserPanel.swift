@@ -1005,12 +1005,18 @@ func browserLoadRequest(
             return nil
         }
         if let cmuxWebView = webView as? CmuxWebView,
-           BrowserURLAllowlistPolicy.trustedInternalSchemes.contains(url.scheme?.lowercased() ?? "") {
+           (BrowserURLAllowlistPolicy.trustedInternalSchemes.contains(url.scheme?.lowercased() ?? "")
+            || FigmaPaneURL.isWrapperPage(url, wrapper: FigmaPreviewPageGuard.pageAddress(for: webView))) {
             cmuxWebView.markTrustedInternalNavigation(url)
         }
     }
     webView.applyBrowserUserAgentPolicy(for: url)
     let nudgeReason = "navigationStart:\(url.scheme?.lowercased() ?? "none")"
+    // cmux-rbf #cm-73.40: Figma preview page loaded via loadSimulatedRequest at https://www.figma.com/cmux-preview/figma-embed.html
+    if trustedInternalNavigation, FigmaPaneURL.isSamePage(url, FigmaPreviewPageGuard.pageAddress(for: webView)) {
+        webView.browserPortalMarkFirstSizedRevealNudgeIfNavigationStartsWithoutPresentation(reason: nudgeReason)
+        return webView.loadSimulatedRequest(request, responseHTML: FigmaWrapperPage.html)
+    }
     if url.isFileURL {
         guard let readAccessURL = browserReadAccessURL(forLocalFileURL: url) else { return nil }
         webView.browserPortalMarkFirstSizedRevealNudgeIfNavigationStartsWithoutPresentation(reason: nudgeReason)
@@ -2028,7 +2034,7 @@ final class BrowserPanel: Panel, ObservableObject {
     private var retainedFigmaPage: RetainedFigmaPage?
     // Memory pressure releases the document, but the next switch still knows its address.
     private var discardedFigmaPageAddress: URL?
-    var figmaPageWrapper = FigmaPaneURL.previewPageURL // cmux-rbf #cm-73.39: the served page, not the legacy file
+    var figmaPageWrapper = FigmaPaneURL.previewPageURL // cmux-rbf #cm-73.40: cmux's page loaded from its own bytes at the https address, not the legacy file
     var retainedFigmaPageAddress: URL? { retainedFigmaPage?.address ?? discardedFigmaPageAddress }
     // cmux-rbf (#cm-73.32): Play state for this panel (reset to still on every exchange), and whether a goto --play is waiting for load. Reject a revert of this hunk on upstream sync.
     // cmux-rbf (#cm-73.37): the served page owns motion; native surfaces mirror its reports.
@@ -4535,7 +4541,10 @@ final class BrowserPanel: Panel, ObservableObject {
 
         let previousWebView = webView
         let wasRenderable = shouldRenderWebView
-        let restoreURL = restorableDisplayURLForCurrentErrorPage(liveURL: previousWebView.url)
+        // cmux-rbf #cm-73.40 (round 5; code review 4 R2): a page address in `webView.url` is replaced by the history
+        // entry's address, or by `currentURL` when there is no entry, so a site's refused redirect to the page address is
+        // not restored as cmux's page. Any other live address is unchanged.
+        let restoreURL = restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: previousWebView))
         let restoreURLString = restoreURL?.absoluteString
         let shouldRestoreURL = wasRenderable && restoreURLString != nil && restoreURLString != blankURLString
         let history = sessionNavigationHistorySnapshot()
@@ -4639,7 +4648,7 @@ final class BrowserPanel: Panel, ObservableObject {
     }
 
     private func resolvedLiveSessionHistoryURL() -> URL? {
-        if let displayURL = restorableDisplayURLForCurrentErrorPage(liveURL: webView.url),
+        if let displayURL = restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: webView)), // cmux-rbf #cm-73.40: reject a revert on upstream sync
            Self.serializableSessionHistoryURLString(displayURL) != nil {
             return displayURL
         }
@@ -4864,7 +4873,8 @@ final class BrowserPanel: Panel, ObservableObject {
     func publishObservedDocumentURL(_ observedURL: URL?) {
         // cmux-rbf #cm-73.3: WebKit may clear its URL while the requested Preview is still loading. Keep that pending address available to the shared switch. Reject a revert of this hunk on upstream sync.
         // cmux-rbf #cm-73.39: the served page is not a local file, so its pending load is the attempted one.
-        let pendingServedPage = navigationDelegate?.lastAttemptedURL.flatMap { FigmaPreviewPageGuard.isPreviewScheme($0) ? $0 : nil }
+        // cmux-rbf #cm-73.40: preview page is recognized via isWrapperPage.
+        let pendingServedPage = navigationDelegate?.lastAttemptedURL.flatMap { FigmaPaneURL.isWrapperPage($0) ? $0 : nil }
         if observedURL == nil,
            let pending = currentURL,
            pending == pendingTrustedLocalFileURL || pending == pendingServedPage,
@@ -5787,7 +5797,8 @@ final class BrowserPanel: Panel, ObservableObject {
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> Bool {
         let node = node.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !node.isEmpty, let address = currentURL ?? webView.url,
+        // cmux-rbf #cm-73.40 (code review 5, C1): never a page address taken from `webView.url` (`figmaCheckedLiveURL(of:)`).
+        guard !node.isEmpty, let address = currentURL ?? figmaCheckedLiveURL(of: webView),
               let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper)
         else { return false }
         let shouldMarkMotion = motion || play || (purpose == .fit && FigmaPaneURL.hasMotionMark(inWrapper: address, wrapper: wrapper))
@@ -6563,6 +6574,14 @@ final class BrowserPanel: Panel, ObservableObject {
         let trustedInternalNavigation = BrowserURLAllowlistPolicy
             .trustedInternalSchemes
             .contains(originalURL.scheme?.lowercased() ?? "")
+            // cmux-rbf #cm-73.40: cmux's page is trusted by its address here, as a trusted scheme is (code review 1, C1: kept on
+            // purpose). A new pane's `initialRequest` and the `request:` overloads carry no flag of their own, so deriving trust at
+            // the caller would refuse every new Figma pane. It is safe because every route that can hand this an address a page
+            // chose decides first: `refusesPageRoute` at `requestNavigation`, `createWebViewWith`, `openLinkInNewTab` and the popup;
+            // and `decidePolicy`'s verdict, which refuses a page's own move there and lets WebKit's Reload, Back or Forward and the
+            // commit repair go on only on a history entry that started at the page, so a site's reload or Back that its server
+            // redirects to the address is refused too (code review 2, R4).
+            || FigmaPaneURL.isWrapperPage(originalURL, wrapper: FigmaPreviewPageGuard.pageAddress(for: webView))
         if trustedInternalNavigation, originalURL.isFileURL {
             beginTrustedLocalFileNavigation(originalURL)
         } else {
@@ -7361,7 +7380,7 @@ extension BrowserPanel {
 
     var currentURLForTabDuplication: URL? {
         resolvedCurrentSessionHistoryURL()
-            ?? Self.remoteProxyDisplayURL(for: webView.url)
+            ?? Self.remoteProxyDisplayURL(for: figmaCheckedLiveURL(of: webView)) // cmux-rbf #cm-73.40: reject a revert on upstream sync
             ?? currentURL
     }
 
@@ -7370,7 +7389,7 @@ extension BrowserPanel {
     }
 
     func automationReloadTargetURL() -> URL? {
-        restorableDisplayURLForCurrentErrorPage(liveURL: webView.url)
+        restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: webView)) // cmux-rbf #cm-73.40: reject a revert on upstream sync
             ?? Self.remoteProxyDisplayURL(for: navigationDelegate?.lastAttemptedURL)
             ?? navigationDelegate?.lastAttemptedURL
             ?? resolvedCurrentSessionHistoryURL()
@@ -7410,11 +7429,51 @@ extension BrowserPanel {
         return false
     }
 
+    /// cmux-rbf #cm-73.40 (code review 3, C1; code review 4, R2): a web view's address, never a page address taken from
+    /// `webView.url`. While WebKit decides a navigation, `webView.url` already reads its target: a site whose server
+    /// redirects a load, a reload or a Back to the page address puts that address there for a few milliseconds, though
+    /// the guard refuses it and the document and history entry stay what they were. So when `webView.url` is a page
+    /// address this returns the current history entry's address, which may itself be a preview the pane was on, or nil
+    /// when the web view has no entry yet, and every caller then falls back to `currentURL`. Any other `webView.url` is
+    /// returned unchanged, so other panes read as before. The cost: during cmux's own load of a preview, from a site or
+    /// from another preview, readers see the entry being left until the load commits. Not the entry's `initialURL`: a
+    /// `www.figma.com` page that moved its own entry to the page address keeps an editor start there, and its
+    /// `currentItem.url` moves with the History API, so cmux's Reload still works on it.
+    /// The one place this rule is applied. Callers, each of which would otherwise load or save the site's address:
+    /// `reload()` and `hardReload()` (through `figmaPreviewReloadTargetURL()`), `switchToProfile(_:)`,
+    /// `resolvedCurrentSessionHistoryURL()` and `currentURLForTabDuplication` (Duplicate Tab), `resolvedLiveSessionHistoryURL()`
+    /// (saved Back/Forward), `preferredURLStringForOmnibar()` (the profile switch's restored-history current),
+    /// `automationReloadTargetURL()` (CLI reload) and `preferredURLStringForSessionSnapshot()` (the saved address).
+    /// Also, behind `currentURL`: `gotoFigmaNode(_:)` and `TerminalController.v2BrowserGetURL` (`browser.url.get`). Those
+    /// two read `currentURL` first, and in a redirect to the page address `currentURL` already holds the site (measured
+    /// six times in `FigmaPaneBackTests.blankPaneFirstNavigationWindowGotoAndGetURL`), so on this WebKit their fallback
+    /// here is not reached; it keeps one rule for every reader, with no red proof of its own.
+    func figmaCheckedLiveURL(of view: WKWebView) -> URL? {
+        guard let live = view.url else { return nil }
+        guard FigmaPaneURL.isWrapperPage(live, wrapper: FigmaPreviewPageGuard.pageAddress(for: view)) else { return live }
+        return view.backForwardList.currentItem?.url
+    }
+
+    /// cmux-rbf #cm-73.40: the preview address cmux's Reload loads again, or nil when the pane is not on the preview:
+    /// the web view's address as `figmaCheckedLiveURL(of:)` reads it (never a page address from `webView.url`), or
+    /// `currentURL` when that gives none.
+    private func figmaPreviewReloadTargetURL() -> URL? {
+        guard let targetURL = figmaCheckedLiveURL(of: webView) ?? currentURL,
+              FigmaPaneURL.isWrapperPage(targetURL, wrapper: FigmaPreviewPageGuard.pageAddress(for: webView)) else { return nil }
+        return targetURL
+    }
+
     /// Reload the current page
     @discardableResult
     func reload() -> WKNavigation? {
         if prepareForReload(reason: "reload", mode: .soft) {
             return nil
+        }
+        // cmux-rbf #cm-73.40: cmux's Reload of the preview page goes through the funnel. Its target never takes a page
+        // address from `webView.url`, which already holds a refused redirect's target while WebKit decides it; it takes
+        // the history entry's, or `currentURL` (`figmaCheckedLiveURL(of:)`; code review 3 C1, code review 4 R2).
+        if let targetURL = figmaPreviewReloadTargetURL() {
+            return navigate(to: targetURL)
         }
         markTrustedInternalNavigationIfNeeded(for: webView.url ?? currentURL)
         return webView.reload()
@@ -7423,6 +7482,11 @@ extension BrowserPanel {
     /// Reload the current page, bypassing WebKit's cache.
     func hardReload() {
         if prepareForReload(reason: "hardReload", mode: .hard) {
+            return
+        }
+        // cmux-rbf #cm-73.40: cmux's Reload of the preview page goes through the funnel (code review 3, C1).
+        if let targetURL = figmaPreviewReloadTargetURL() {
+            navigate(to: targetURL)
             return
         }
         markTrustedInternalNavigationIfNeeded(for: webView.url ?? currentURL)
@@ -8942,9 +9006,11 @@ extension BrowserPanel {
     }
 
     /// Returns the most reliable URL string for omnibar-related matching and UI decisions.
-    /// `currentURL` can lag behind navigation changes, so prefer the live WKWebView URL.
+    /// `currentURL` can lag behind navigation changes, so prefer the live WKWebView URL, read through
+    /// `figmaCheckedLiveURL(of:)`: when the web view shows cmux's Figma page address, that is the history entry's address
+    /// (or nil, falling back to `currentURL`), never a page address a site's redirect produced (cmux-rbf #cm-73.40).
     func preferredURLStringForOmnibar() -> String? {
-        if let webViewURL = restorableDisplayURLForCurrentErrorPage(liveURL: webView.url)?.absoluteString
+        if let webViewURL = restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: webView))?.absoluteString // cmux-rbf #cm-73.40: reject a revert on upstream sync
             .trimmingCharacters(in: .whitespacesAndNewlines),
            !webViewURL.isEmpty,
            webViewURL != blankURLString {
@@ -8963,8 +9029,13 @@ extension BrowserPanel {
 
     func currentDefaultBrowserURL() -> URL? {
         guard let rawURL = preferredURLStringForOmnibar(),
-              let url = URL(string: rawURL),
-              let scheme = url.scheme?.lowercased(),
+              let url = URL(string: rawURL) else { return nil }
+        // cmux-rbf #cm-73.40: cmux's Figma page is no page for a browser (Figma answers it with a 404); hand over Figma's own link, as the Figma button's menu does. Reject a revert on upstream sync.
+        let figmaPage = FigmaPreviewPageGuard.pageAddress(for: webView)
+        if FigmaPaneURL.isWrapperPage(url, wrapper: figmaPage) {
+            return FigmaPaneURL.browserLink(fromPaneURL: url, wrapper: figmaPage)
+        }
+        guard let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
               BrowserInsecureHTTPSettings.normalizeHost(url.host ?? "") != nil,
               !browserIsTemporaryHistoryURL(url) else {
@@ -8993,7 +9064,7 @@ extension BrowserPanel {
     }
 
     func resolvedCurrentSessionHistoryURL() -> URL? {
-        if let displayURL = restorableDisplayURLForCurrentErrorPage(liveURL: webView.url),
+        if let displayURL = restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: webView)), // cmux-rbf #cm-73.40: reject a revert on upstream sync
            Self.serializableSessionHistoryURLString(displayURL) != nil {
             return displayURL
         }
