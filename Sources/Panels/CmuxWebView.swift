@@ -13,6 +13,14 @@ final class CmuxWebView: CmuxUndoableWebView {
     var browserViewportModel: BrowserViewportModel?
     var onBrowserViewportHierarchyChanged: (() -> Void)?
 
+    /// cmux-rbf #cm-73.40: the address this web view treats as cmux's Figma preview page, in place of
+    /// `FigmaPaneURL.previewPageURL`. Nil in production, always; only tests set it. A test needs WebKit to ask a server
+    /// for the page on a Back or Forward, as it asks Figma's, and a local server can't answer for the `https` address,
+    /// so the test serves a stand-in at `http://127.0.0.1:<port>/cmux-preview/figma-embed.html` and names it here.
+    /// Per web view, not global, because the test host runs suites side by side. Read only through
+    /// `FigmaPreviewPageGuard.pageAddress(for:)`.
+    var figmaPreviewPageAddressForTesting: URL?
+
     /// One-shot app-owned internal navigations (file/data/blob/etc.) that
     /// must pass the browser URL policy's trusted-load seam. Page callbacks
     /// never add to this set.

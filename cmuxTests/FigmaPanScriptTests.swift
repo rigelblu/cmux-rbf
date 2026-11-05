@@ -10,7 +10,8 @@ import Testing
 
 @Suite("FigmaPanScripts")
 struct FigmaPanScriptTests {
-    private func frame(path: String = "/design/KEY/slug", editor: Bool = false, drawn: Bool = true) throws -> JSContext {
+    // cmux-rbf #cm-73.40: the preview's top is https://www.figma.com/cmux-preview/…, Figma's own editor's is /design/…; `topPath` picks which.
+    private func frame(path: String = "/design/KEY/slug", editor: Bool = false, drawn: Bool = true, topPath: String = "/cmux-preview/figma-embed.html") throws -> JSContext {
         let c = try #require(JSContext())
         c.evaluateScript(FigmaMotionTests.browser)
         c.evaluateScript("""
@@ -19,7 +20,7 @@ struct FigmaPanScriptTests {
         window.parent={postMessage:function(m,t){posted.push(m); targets.push(t)}}; targets=[];
         window.postMessage=window.parent.postMessage;
         location.hostname='www.figma.com'; location.pathname='\(path)';
-        location.ancestorOrigins=['cmux-figma://cmux']; location.href='https://www.figma.com\(path)?node-id=12-2';
+        location.ancestorOrigins=['https://www.figma.com']; window.top={location:{pathname:'\(topPath)'}}; location.href='https://www.figma.com\(path)?node-id=12-2';
         operations=[]; location.replace=function(s){operations.push('replace'); replaced=s};
         time=0; performance={now:function(){return time},timeOrigin:1000}; Date.now=function(){return time+1000};
         raf=[]; canvas=false; requestAnimationFrame=function(f){raf.push(f)}; document.querySelector=function(){return canvas?target:null};
@@ -200,6 +201,16 @@ struct FigmaPanScriptTests {
         #expect(try check(editor, "!listeners.wheel && posted.length===0"))
     }
 
+    // cmux-rbf #cm-73.40: Figma's own editor is on https://www.figma.com too, so only its page path tells it from the preview.
+    @Test func aFrameUnderFigmasOwnEditorGetsNothingFromThePanScript() throws {
+        for top in ["/design/KEY/slug", "/file/KEY/slug", "/proto/KEY/slug"] {
+            let c = try frame(topPath: top)
+            #expect(try check(c, "!listeners.wheel && !listeners.message && posted.length===0 && !wheel({deltaY:10}).defaultPrevented"), "top \(top)")
+        }
+        let preview = try frame()
+        #expect(try check(preview, "!!listeners.wheel && !!listeners.message"), "control: under cmux's preview the script is set up")
+    }
+
     @Test func pagehideEndsAnOpenDragAndClearsItsTimer() throws {
         let c = try frame()
         #expect(try check(c, "wheel({deltaY:10});listeners.pagehide();operations.join(',')==='pointerdown,mousedown,pointermove,mousemove,pointerup,mouseup' && eventAt(4).clientY===190"))
@@ -209,7 +220,7 @@ struct FigmaPanScriptTests {
     @Test func stillAndPlayerCommandsEndTheDragBeforeReplacingThePage() throws {
         for kind in ["still", "player"] {
             let c = try frame()
-            #expect(try check(c, "wheel({deltaY:10});listeners.message({source:window.parent,origin:'cmux-figma://cmux',data:{cmuxClockCommand:true,kind:'\(kind)'}});operations.join(',')==='pointerdown,mousedown,pointermove,mousemove,pointerup,mouseup,replace'"))
+            #expect(try check(c, "wheel({deltaY:10});listeners.message({source:window.parent,origin:'https://www.figma.com',data:{cmuxClockCommand:true,kind:'\(kind)'}});operations.join(',')==='pointerdown,mousedown,pointermove,mousemove,pointerup,mouseup,replace'"))
             #expect(try check(c, "advance(200);events.length===6"))
         }
     }
@@ -217,7 +228,7 @@ struct FigmaPanScriptTests {
     @Test func reportsUseTheirOwnTagAndCarryTheAxisDeltasAndStepCount() throws {
         let c = try frame()
         #expect(try check(c, "wheel({deltaX:10,deltaY:80,shiftKey:true});wheel({deltaY:5,shiftKey:true});advance(150);posted.length===2 && posted.every(function(r){return r.cmuxPanReport===true && !('cmuxClockReport' in r)})"))
-        #expect(try check(c, "reportAt(0).phase==='start' && reportAt(0).axis==='down' && reportAt(0).dx===0 && reportAt(0).dy===80 && reportAt(1).phase==='end' && reportAt(1).steps===2 && targets.every(function(t){return t==='cmux-figma://cmux'})"))
+        #expect(try check(c, "reportAt(0).phase==='start' && reportAt(0).axis==='down' && reportAt(0).dx===0 && reportAt(0).dy===80 && reportAt(1).phase==='end' && reportAt(1).steps===2 && targets.every(function(t){return t==='https://www.figma.com'})"))
     }
 
     @MainActor @Test func pageRelaysPanWithoutChangingItsFitReportAndRejectsForeignSenders() throws {
@@ -383,7 +394,7 @@ struct FigmaPanScriptTests {
     @Test func mouseReportsItsAxisAndCountsOnlyPointermoveCopies() throws {
         for (dx, dy, axis) in [(10, 2, "across"), (2, 10, "down")] {
             let c = try frame()
-            #expect(try check(c, "input('pointerdown');input('pointermove',{clientX:300+\(dx),clientY:200+\(dy)});input('mousemove',{clientX:300+\(dx),clientY:200+\(dy)});input('pointerup');input('mouseup');posted.length===2 && posted.every(function(r){return r.cmuxPanReport===true && !r.cmuxClockReport}) && reportAt(0).axis==='mouse-\(axis)' && reportAt(1).phase==='end' && reportAt(1).steps===1 && targets.every(function(t){return t==='cmux-figma://cmux'})"))
+            #expect(try check(c, "input('pointerdown');input('pointermove',{clientX:300+\(dx),clientY:200+\(dy)});input('mousemove',{clientX:300+\(dx),clientY:200+\(dy)});input('pointerup');input('mouseup');posted.length===2 && posted.every(function(r){return r.cmuxPanReport===true && !r.cmuxClockReport}) && reportAt(0).axis==='mouse-\(axis)' && reportAt(1).phase==='end' && reportAt(1).steps===1 && targets.every(function(t){return t==='https://www.figma.com'})"))
         }
     }
 

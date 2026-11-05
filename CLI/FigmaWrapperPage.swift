@@ -13,8 +13,9 @@ import Foundation
 /// the pane's URL is the file binding, so everything `goto` and a restart need
 /// has to be *in* that URL. Making the page static and the URL carry the
 /// payload gets both — one page, no per-pane temp files to clean up, and a
-/// binding that survives a restart. Since `cm-73.39` the app serves it from
-/// memory under `cmux-figma://cmux/figma-embed.html`; nothing writes it to disk.
+/// binding that survives a restart. Since `cm-73.40` the app loads these bytes with
+/// `loadSimulatedRequest` at `https://www.figma.com/cmux-preview/figma-embed.html` (`cm-73.39` served them under
+/// `cmux-figma://cmux/figma-embed.html`, a handler the app still keeps for old addresses); nothing writes it to disk.
 enum FigmaWrapperPage {
 
     /// The two decisions the page makes about the address it frames, as plain

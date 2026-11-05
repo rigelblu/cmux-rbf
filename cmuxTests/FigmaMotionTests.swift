@@ -229,12 +229,34 @@ struct FigmaMotionTests {
         }
     }
 
+    // cmux-rbf #cm-73.40: clock script checks top.location.pathname starts with /cmux-preview/
+    @Test func clockScriptRunsWhenTopIsCmuxPreviewAndExitsWhenTopIsFigmaEditor() throws {
+        // When top is Figma's editor (/design/KEY/slug):
+        let cEditor = try #require(JSContext())
+        cEditor.evaluateScript(Self.browser)
+        cEditor.evaluateScript("window.top = { location: { pathname: '/design/KEY/slug' } };")
+        cEditor.evaluateScript("window.name='cmux-freeze'; window.parent={postMessage:function(m){posted.push(m)}}; location.hostname='www.figma.com'; location.pathname='/proto/KEY/slug'; location.ancestorOrigins=['https://www.figma.com']; perfTime=20; wallTime=10000; performance={now:function(){return perfTime}}; Date.now=function(){return wallTime}; raf=[]; requestAnimationFrame=function(f){raf.push(f)};")
+        cEditor.evaluateScript(FigmaMotion.clockScript)
+        #expect(text(cEditor, "posted.length") == "0", "editor must not get clock report")
+        cEditor.evaluateScript("perfTime+=5")
+        #expect(text(cEditor, "performance.now()") == "25", "editor keeps real clock")
+
+        // When top is cmux's preview (/cmux-preview/figma-embed.html):
+        let cPreview = try #require(JSContext())
+        cPreview.evaluateScript(Self.browser)
+        cPreview.evaluateScript("window.top = { location: { pathname: '/cmux-preview/figma-embed.html' } };")
+        cPreview.evaluateScript("window.name='cmux-freeze'; window.parent={postMessage:function(m){posted.push(m)}}; location.hostname='www.figma.com'; location.pathname='/proto/KEY/slug'; location.ancestorOrigins=['https://www.figma.com']; perfTime=20; wallTime=10000; performance={now:function(){return perfTime}}; Date.now=function(){return wallTime}; raf=[]; requestAnimationFrame=function(f){raf.push(f)};")
+        cPreview.evaluateScript(FigmaMotion.clockScript)
+        cPreview.evaluateScript("perfTime+=5")
+        #expect(text(cPreview, "performance.now()") == "20", "preview holds frozen clock")
+    }
+
     // cmux-rbf (#cm-73.44): internal so FigmaRefitScriptTests runs in the same harness; reports now carry the real `origin`.
     static let browser = #"""
-    window=this; window.frames=[]; elements={}; listeners={}; sent=[]; posted=[];
+    window=this; window.frames=[]; window.top={location:{pathname:'/cmux-preview/figma-embed.html'}}; elements={}; listeners={}; sent=[]; posted=[];
     window.addEventListener=function(n,f){listeners[n]=f};
     window.webkit={messageHandlers:{cmuxFigmaMotion:{postMessage:function(m){posted.push(m)}}}};
-    location={pathname:'/figma-embed.html',hash:'',search:'?embed='+encodeURIComponent('https://embed.figma.com/design/KEY/slug?node-id=12-2')};
+    location={pathname:'/cmux-preview/figma-embed.html',hash:'',search:'?embed='+encodeURIComponent('https://embed.figma.com/design/KEY/slug?node-id=12-2')};
     URLSearchParams=function(s){var p={}; s.replace(/^\?/,'').split('&').filter(Boolean).forEach(function(v){var a=v.indexOf('='); p[decodeURIComponent(v.slice(0,a))]=decodeURIComponent(v.slice(a+1).replace(/\+/g,' '))});this.get=function(k){return p[k]||null};this.set=function(k,v){p[k]=String(v)};this.toString=function(){return Object.keys(p).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(p[k])}).join('&')}};
     frame={src:'https://embed.figma.com/proto/KEY/slug?node-id=12-2',contentWindow:{postMessage:function(m){sent.push(m)}}};
     function element(){var e={style:{},appendChild:function(){},setAttribute:function(k,v){this[k]=v}};return e;}

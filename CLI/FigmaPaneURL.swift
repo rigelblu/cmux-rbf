@@ -57,15 +57,17 @@ enum FigmaPaneURL {
 
     // MARK: - Where the wrapper lives
 
-    /// The read view's page (`cm-73.39`): served from memory by
-    /// `FigmaPreviewPageSchemeHandler`, under a scheme cmux owns. Under the old
-    /// `file://` page, macOS 27.2's WebKit gave Figma's frame no cookies after a
-    /// granted storage-access request, so a file that needs sign-in looped on
-    /// Log in. The host is what WebKit's storage-access prompt names.
+    /// The read view's page (`cm-73.40`): loaded via loadSimulatedRequest at an
+    /// `https://www.figma.com/cmux-preview/figma-embed.html` address so Figma's frame
+    /// is first-party and receives cookies without a storage-access grant.
+    /// Split from `previewPageScheme` so WebKit's scheme registration is untouched.
     static let previewPageScheme = "cmux-figma"
     static let previewPageHost = "cmux"
     static let previewPagePath = "/figma-embed.html"
-    static let previewPageURL = URL(string: "\(previewPageScheme)://\(previewPageHost)\(previewPagePath)")!
+    static let legacyServedPageURL = URL(string: "\(previewPageScheme)://\(previewPageHost)\(previewPagePath)")!
+    // One of three copies of this address: also the `/cmux-preview/` check in Sources/FigmaMotion.swift (`clockScript`) and
+    // `isFigmaPreviewPageURL` in CmuxSettings' BrowserURLAllowlistPolicy, which cannot import this target. Change all three.
+    static let previewPageURL = URL(string: "https://www.figma.com/cmux-preview/figma-embed.html")!
 
     /// The legacy page: the file older builds wrote in Application Support.
     ///
@@ -180,11 +182,22 @@ enum FigmaPaneURL {
         return isFigmaDocumentURL(embedded) ? canonicalized(embedded) : nil
     }
 
+    /// Figma's own link for what a pane shows, for a system browser: the document's `https://www.figma.com/…`
+    /// address with the pane's node, never cmux's page address, which Figma's server answers with a 404 (`cm-73.40`).
+    static func browserLink(fromPaneURL paneURL: URL, wrapper: URL = previewPageURL) -> URL? {
+        guard let document = documentURL(fromPaneURL: paneURL, wrapper: wrapper) else { return nil }
+        guard let node = node(fromPaneURL: paneURL, wrapper: wrapper),
+              var components = URLComponents(url: document, resolvingAgainstBaseURL: false) else { return document }
+        components.queryItems = [URLQueryItem(name: "node-id", value: node)]
+        return components.url ?? document
+    }
+
     /// Whether an address is cmux's own page: the page passed in, matched by
-    /// scheme, host and path whatever the query, or the legacy Application
+    /// scheme, host and path whatever the query, or the legacy served page
+    /// (`cmux-figma://cmux/figma-embed.html`), or the legacy Application
     /// Support file, which an address an older build saved still names.
     static func isWrapperPage(_ paneURL: URL, wrapper: URL = previewPageURL) -> Bool {
-        isSamePage(paneURL, wrapper) || isSamePage(paneURL, wrapperFileURL())
+        isSamePage(paneURL, wrapper) || isSamePage(paneURL, legacyServedPageURL) || isSamePage(paneURL, wrapperFileURL())
     }
 
     /// One page check, shared with `FigmaPreviewPageSchemeHandler`: a file page by its path; any
@@ -201,14 +214,17 @@ enum FigmaPaneURL {
             && address.path == page.path
     }
 
-    /// An address on the legacy file page, moved to ``previewPageURL`` with the
+    /// An address on either legacy page (the Application Support file or the
+    /// `cmux-figma:` served page), moved to ``previewPageURL`` with the
     /// same query; any other address as given.
     ///
     /// Applied where an address comes in — a restored pane, `navigate(to:)` before
     /// its policy check, and the panel's load funnel — so restored history and
     /// WebKit agree on one address.
     static func upgradingLegacyPage(_ address: URL) -> URL {
-        guard address.isFileURL, isSamePage(address, wrapperFileURL()),
+        let isLegacyFile = address.isFileURL && isSamePage(address, wrapperFileURL())
+        let isLegacyServed = isSamePage(address, legacyServedPageURL)
+        guard isLegacyFile || isLegacyServed,
               let legacy = URLComponents(url: address, resolvingAgainstBaseURL: false),
               var upgraded = URLComponents(url: previewPageURL, resolvingAgainstBaseURL: false)
         else { return address }
