@@ -1268,7 +1268,8 @@
         },
         "figma": {
           "description": "Ustawienia Figmy.",
-          "defaultFolder": "Link do folderu Figmy, w którym mają lądować nowe projekty tworzone przez agenta. Użyj linku z paska adresu Figmy na stronie folderu. Agenci odczytują go poleceniem \"cmux figma folder\"."
+          "defaultFolder": "Link do folderu Figmy, w którym lądują nowe projekty, gdy figma.folders nie ma wpisu dla ich katalogu. Użyj linku z paska adresu Figmy na stronie folderu. Agenci odczytują go poleceniem \"cmux figma folder\".",
+          "folders": "Foldery Figmy dla katalogów: każdy klucz to katalog, a każda wartość to link do folderu Figmy, w którym mają lądować nowe projekty tworzone w tym katalogu lub w nim. Wygrywa najbliższy pasujący katalog; w pozostałych przypadkach obowiązuje figma.defaultFolder. Agenci odczytują go poleceniem \"cmux figma folder\"."
         },
         "reply": {
           "description": "Panel odpowiedzi",

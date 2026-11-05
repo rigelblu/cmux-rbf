@@ -167,11 +167,12 @@ Reply panel settings — the right sidebar's Reply mode. Top-level rather than u
 
 ## figma
 
-Figma settings — the folder new designs an agent creates should go to. Top-level, like `reply`. Settings > Automation > Figma Default Folder edits it, and `cmux figma folder` reads and writes it with no app running.
+Figma settings — the default folder new designs go to, and a folder per directory. Top-level, like `reply`. Settings > Automation > Figma Default Folder edits the default. The Figma button's menu and `cmux figma folder set --dir` set a directory's; the command needs no app running.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `figma.defaultFolder` | string | `""` | Link to the Figma folder where new designs your agent creates should go. Use the link from Figma's address bar on the folder's page. Agents read it with "cmux figma folder". |
+| `figma.defaultFolder` | string | `""` | Link to the Figma folder where new designs go when figma.folders has no entry for their directory. Use the link from Figma's address bar on the folder's page. Agents read it with "cmux figma folder". |
+| `figma.folders` | object | `{}` | Figma folders for directories: each key is a directory, each value the link to the Figma folder where new designs made in that directory, or inside it, should go. The nearest matching directory wins; elsewhere figma.defaultFolder applies. Agents read it with "cmux figma folder". A single entry cannot be set by dotted path, because a directory path holds dots: set the whole object, or use `cmux figma folder set <folder-url> --dir <path>`. |
 
 ## shortcuts
 

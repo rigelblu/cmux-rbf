@@ -73,19 +73,23 @@ extension CMUXCLI {
 
     // MARK: - folder
 
-    /// `cmux figma folder`, `folder set <folder-url>` and `folder clear`.
+    /// `cmux figma folder`, `folder set <folder-url> [--dir <path>]`, `folder clear [--dir <path>]`
+    /// and `folder list`.
     ///
-    /// **No socket and no app.** The folder is one string in `cmux.json`, so
+    /// **No socket and no app.** The folders are strings in `cmux.json`, so
     /// these read and write the file from this process, as
     /// `cmux window default-display` does, and `run()` dispatches them before it
     /// resolves a socket. `open` and `goto` still need the app.
     ///
-    /// **An agent never reads a broken setting as "not set".** The read goes
-    /// through ``JSONConfigStore/strictRoot()``, which says why a file could not
-    /// be read, and a stored value that is not text, or a link that no longer
-    /// passes, is exit 1 with the fix named. `set` writes over a broken value at
-    /// the key, which is what the `Fix it:` line promises, and stops on a file
-    /// that is not valid JSON, because the strict read runs before any write.
+    /// **Which folder answers is `FigmaFolderChoice`,** the rule the Figma button's menu runs
+    /// too, asked about this process's working directory. **An agent never reads a broken
+    /// setting as "not set".** The read goes through ``JSONConfigStore/strictRoot()``,
+    /// which says why a file could not be read, and a stored value that is not text, or a
+    /// link that no longer passes, is exit 1 with the fix named, whether it is the entry for
+    /// this directory or the default. `set` writes over a broken value at the key, which is
+    /// what the `Fix it:` line promises, and stops on a file that is not valid JSON, because
+    /// the strict read runs before any write. `set --dir` and `clear --dir` write through
+    /// `FigmaFolders.plan`, the plan the menu's Set and Remove use.
     func runFigmaFolderCommand(commandArgs: [String], jsonOutput: Bool) async throws {
         let action: FigmaFolderArguments.Action
         do {
@@ -107,32 +111,89 @@ extension CMUXCLI {
             throw CLIError(message: "could not read \(path): \(reason)")
         }
 
+        func linkObject(_ link: FigmaFolderLink) -> [String: Any] {
+            ["project_id": link.projectId, "plan_key": link.planKey, "url": link.url]
+        }
+
         func folderJSON(_ link: FigmaFolderLink?) -> String {
             guard let link else { return jsonString(["default_folder": NSNull()]) }
-            return jsonString([
-                "default_folder": [
-                    "project_id": link.projectId,
-                    "plan_key": link.planKey,
-                    "url": link.url
-                ]
-            ])
+            return jsonString(["default_folder": linkObject(link)])
         }
 
         let folder = FigmaDefaultFolder(root: root)
+        let home = FigmaFolderPath.homeDirectory
+
+        /// The default as `list` and `--json` show it: its object, `null` for not set, or an error.
+        func defaultJSON() -> Any {
+            switch folder.state {
+            case .notSet: return NSNull()
+            case .set(let link): return linkObject(link)
+            case .refused(let refusal): return ["error": FigmaFolderText.reason(refusal)]
+            case .notText: return ["error": "it is not text."]
+            }
+        }
+
+        func foldersEntries() throws -> FigmaFolderEntries {
+            switch FigmaFolderChoice.strictEntries(root: root) {
+            case .success(let entries): return entries
+            case .failure: throw CLIError(message: FigmaFolderText.foldersNotObject)
+            }
+        }
+
+        /// The directory `--dir` names, made absolute from the shell form of the working
+        /// directory and required to exist. Its resolved form is the key both writers use.
+        func directoryForms(_ argument: String) throws -> FigmaFolderPath.Forms {
+            let working = FigmaFolderPath.cliForms(
+                pwd: ProcessInfo.processInfo.environment["PWD"],
+                cwd: FileManager.default.currentDirectoryPath
+            )
+            let shell = FigmaFolderPath.shellForm(argument, relativeTo: working.shell, home: home)
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: shell, isDirectory: &isDirectory), isDirectory.boolValue else {
+                throw CLIError(message: FigmaFolderText.notADirectory(shell))
+            }
+            return FigmaFolderPath.Forms(shell: shell, resolved: FigmaFolderPath.resolvedForm(shell))
+        }
 
         switch action {
         case .read:
-            switch folder.state {
-            case .notSet:
-                print(jsonOutput ? folderJSON(nil) : FigmaFolderText.notSet)
-            case .set(let link):
+            let working = FigmaFolderPath.cliForms(
+                pwd: ProcessInfo.processInfo.environment["PWD"],
+                cwd: FileManager.default.currentDirectoryPath
+            )
+            let choice: FigmaFolderChoice
+            switch FigmaFolderChoice.strict(root: root, forms: working, home: home) {
+            case .success(let answered): choice = answered
+            case .failure: throw CLIError(message: FigmaFolderText.foldersNotObject)
+            }
+            switch choice {
+            case .none:
                 print(jsonOutput
-                    ? folderJSON(link)
-                    : FigmaFolderText.read(projectId: link.projectId, planKey: link.planKey, url: link.url))
-            case .refused(let refusal):
-                throw CLIError(message: FigmaFolderText.unusable(reason: FigmaFolderText.reason(refusal)))
-            case .notText:
-                throw CLIError(message: FigmaFolderText.unusable(reason: "it is not text."))
+                    ? jsonString(["default_folder": NSNull(), "folder": NSNull()])
+                    : FigmaFolderText.notSet)
+            case .folder(let link, let source):
+                var directory: Any = NSNull()
+                var directoryText = "default"
+                if case .directory(let found) = source {
+                    directory = found
+                    directoryText = found
+                }
+                if jsonOutput {
+                    var answered = linkObject(link)
+                    answered["directory"] = directory
+                    print(jsonString(["default_folder": defaultJSON(), "folder": answered]))
+                } else {
+                    print(FigmaFolderText.read(
+                        projectId: link.projectId,
+                        planKey: link.planKey,
+                        url: link.url,
+                        directory: directoryText
+                    ))
+                }
+            case .refused(let refusal, let source):
+                throw CLIError(message: unusable(FigmaFolderText.reason(refusal), source))
+            case .notText(let source):
+                throw CLIError(message: unusable("it is not text.", source))
             }
 
         case .set(let raw):
@@ -173,6 +234,119 @@ extension CMUXCLI {
                 throw CLIError(message: "could not save to \(path): \(error.localizedDescription)")
             }
             print(jsonOutput ? folderJSON(nil) : FigmaFolderText.cleared)
+
+        case .setIn(let raw, let argument):
+            let link: FigmaFolderLink
+            switch FigmaFolderLink.check(raw) {
+            case .success(let checked): link = checked
+            case .failure(let refusal): throw CLIError(message: FigmaFolderText.refusedSet(refusal))
+            }
+            let forms = try directoryForms(argument)
+            // The resolved key is checked, so a symlink to `/Volumes` is refused too.
+            if FigmaFolderPath.isNeverSet(resolved: forms.resolved) {
+                throw CLIError(message: FigmaFolderText.cannotSetFor(forms.resolved))
+            }
+            // A `figma.folders` that is not an object is written over, as the default's set does.
+            let entries = (try? FigmaFolderChoice.strictEntries(root: root).get()) ?? .empty
+            let plan = FigmaFolders.plan(.set(link), directory: forms.resolved, entries: entries, home: home)
+            do {
+                try await FigmaFolders.apply(plan, to: store)
+            } catch {
+                throw CLIError(message: "could not save to \(path): \(error.localizedDescription)")
+            }
+            if jsonOutput {
+                var answered = linkObject(link)
+                answered["directory"] = forms.resolved
+                print(jsonString(["folder": answered]))
+            } else {
+                print(FigmaFolderText.setDirectory(
+                    directory: forms.resolved,
+                    projectId: link.projectId,
+                    planKey: link.planKey
+                ))
+            }
+
+        case .clearIn(let argument):
+            let forms = try directoryForms(argument)
+            let entries = (try? FigmaFolderChoice.strictEntries(root: root).get()) ?? .empty
+            let plan = FigmaFolders.plan(.clear, directory: forms.resolved, entries: entries, home: home)
+            do {
+                try await FigmaFolders.apply(plan, to: store)
+            } catch {
+                throw CLIError(message: "could not save to \(path): \(error.localizedDescription)")
+            }
+            if jsonOutput {
+                print(jsonString(["folder": NSNull(), "directory": forms.resolved]))
+            } else if plan == .nothing {
+                print(FigmaFolderText.notClearedDirectory(directory: forms.resolved))
+            } else {
+                let after = FigmaFolders.entries(after: plan, from: entries)
+                let now: FigmaFolderText.Now
+                switch FigmaFolderChoice.answer(forms: forms, entries: after, defaultState: folder.state, home: home) {
+                case .folder(_, from: .default): now = .defaultFolder
+                case .folder(_, from: .directory(let found)): now = .folderSetFor(found)
+                case .none: now = .drafts
+                case .refused(_, from: .default), .notText(from: .default): now = .defaultUnusable
+                case .refused(_, from: .directory(let found)), .notText(from: .directory(let found)):
+                    now = .folderUnusable(found)
+                }
+                print(FigmaFolderText.clearedDirectory(directory: forms.resolved, now: now))
+            }
+
+        case .list:
+            let entries = try foldersEntries()
+            var rows: [(directory: String, link: FigmaFolderLink?, error: String?)] = []
+            for (directory, entry) in entries.entries.sorted(by: { $0.key < $1.key }) {
+                // A key that is not a full path matches no directory, so it never works: say so.
+                guard FigmaFolderPath.keyForms(directory, home: home) != nil else {
+                    rows.append((directory, nil, FigmaFolderText.keyNotAFullPath))
+                    continue
+                }
+                switch entry {
+                case .link(let text):
+                    switch FigmaFolderLink.check(text) {
+                    case .success(let link): rows.append((directory, link, nil))
+                    case .failure(let refusal): rows.append((directory, nil, FigmaFolderText.reason(refusal)))
+                    }
+                case .notText:
+                    rows.append((directory, nil, "it is not text."))
+                }
+            }
+            if jsonOutput {
+                let listed: [[String: Any]] = rows.map { row in
+                    if let link = row.link {
+                        var object = linkObject(link)
+                        object["directory"] = row.directory
+                        return object
+                    }
+                    return ["directory": row.directory, "error": row.error ?? ""]
+                }
+                print(jsonString(["folders": listed, "default_folder": defaultJSON()]))
+            } else if rows.isEmpty, case .notSet = folder.state {
+                print(FigmaFolderText.noFolders)
+            } else {
+                var lines: [String] = []
+                for row in rows {
+                    lines.append(row.directory)
+                    lines.append("  " + (row.link?.url ?? "error: \(row.error ?? "")"))
+                }
+                lines.append("default")
+                switch folder.state {
+                case .notSet: lines.append("  not set")
+                case .set(let link): lines.append("  " + link.url)
+                case .refused(let refusal): lines.append("  error: " + FigmaFolderText.reason(refusal))
+                case .notText: lines.append("  error: it is not text.")
+                }
+                print(lines.joined(separator: "\n"))
+            }
+        }
+    }
+
+    /// The error for a broken answer: the entry's, or the default's in the words `cm-73.6` gave it.
+    private func unusable(_ reason: String, _ source: FigmaFolderChoice.Source) -> String {
+        switch source {
+        case .default: return FigmaFolderText.unusable(reason: reason)
+        case .directory(let key): return FigmaFolderText.unusableEntry(reason: reason, key: key)
         }
     }
 

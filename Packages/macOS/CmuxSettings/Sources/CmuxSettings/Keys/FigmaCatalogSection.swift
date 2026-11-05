@@ -14,6 +14,16 @@ public struct FigmaCatalogSection: SettingCatalogSection {
         defaultValue: ""
     )
 
+    /// The Figma folder for each directory: an object mapping an absolute
+    /// directory path to a folder link. The nearest directory that contains
+    /// the one asked about answers; ``defaultFolder`` answers where none does.
+    /// Kept raw by ``FigmaFolderEntries``, so one value that is not text never
+    /// hides the others.
+    public let folders = JSONKey<FigmaFolderEntries>(
+        id: "figma.folders",
+        defaultValue: .empty
+    )
+
     /// Creates the section with the shipped default (not set).
     public init() {}
 }

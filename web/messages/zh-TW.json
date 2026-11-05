@@ -1267,7 +1267,8 @@
         },
         "figma": {
           "description": "Figma 設定。",
-          "defaultFolder": "代理程式建立的新設計應儲存到的 Figma 資料夾連結。請使用資料夾頁面上 Figma 網址列中的連結。代理程式透過 \"cmux figma folder\" 讀取此值。"
+          "defaultFolder": "當 figma.folders 中沒有其目錄的項目時，新設計應儲存到的 Figma 資料夾連結。請使用資料夾頁面上 Figma 網址列中的連結。代理程式透過 \"cmux figma folder\" 讀取。",
+          "folders": "依目錄設定的 Figma 資料夾：每個鍵是一個目錄，每個值是在該目錄或其內建立的新設計應儲存到的 Figma 資料夾連結。最近的相符目錄優先；其他情況使用 figma.defaultFolder。代理程式透過 \"cmux figma folder\" 讀取。"
         },
         "reply": {
           "description": "回覆面板",
