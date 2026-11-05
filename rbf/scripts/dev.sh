@@ -46,9 +46,9 @@ tcc_preseed() {
 # ~6GB DerivedData directory. So walk back to the nearest bookmark instead —
 # see the revset below, and why it is written out rather than aliased.
 #
-# git worktrees (used for isolated builds, since jj workspaces cannot build this
-# repo) do have a real branch, so the git path still matters. Detached-and-no-jj
-# falls back to the sha, which at least keeps two detached checkouts apart.
+# jj workspaces build here too (Landmine 5 below); git worktrees have a real
+# branch, so the git path still matters there. Detached-and-no-jj falls back to
+# the sha, which at least keeps two detached checkouts apart.
 slugify() { printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//'; }
 
 derive_build_id() {
@@ -131,12 +131,21 @@ ensure_zig() { rbf_ensure_zig; }
 # shellcheck source=rbf/scripts/lib/rbf-metal.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-metal.sh"
 
+# --- Landmine 5: git refuses a workspace's symlinked ghostty ------------------
+# In a jj workspace `ghostty` is a symlink where git's index records a submodule,
+# so `git status` exits 128 and Go's VCS stamping fails the "Build wireguard-go"
+# phase. Same lib-not-here reasoning. This only defines the function; the call is
+# in the build|run|test pre-case below, so `build-id` (stdout is the id alone),
+# `help` and every command that doesn't build stay untouched. See the lib header.
+# shellcheck source=rbf/scripts/lib/rbf-git-env.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-git-env.sh"
+
 # Running-app checks match the executable, never argv. See the lib header.
 # shellcheck source=rbf/scripts/lib/rbf-procs.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-procs.sh"
 
-# The parent tree's recorded submodule pointer must also be readable from linked
-# JJ workspaces, which deliberately have no `.git` directory.
+# The parent tree's recorded submodule pointer must be readable from jj workspaces
+# of both shapes: most carry a `.git` gitfile, some carry no `.git` at all.
 # shellcheck source=scripts/lib/recorded-gitlink.sh
 . "$REPO_ROOT/scripts/lib/recorded-gitlink.sh"
 
@@ -193,7 +202,11 @@ check_submodule_sync() {
 cmd="${1:-run}"
 [[ $# -gt 0 ]] && shift || true
 case "$cmd" in
-  build|run|test) rbf_configure_dev_signing || exit 1 ;;
+  build|run|test)
+    # First, so the export reaches ensure_ghosttykit, reload.sh and xcodebuild.
+    rbf_git_env_apply "$REPO_ROOT"
+    rbf_configure_dev_signing || exit 1
+    ;;
 esac
 
 
@@ -203,6 +216,7 @@ case "$cmd" in
     ;;
   build)
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
+    [[ -z "$RBF_GIT_ENV_NOTE" ]] || echo "==> git $RBF_GIT_ENV_NOTE"
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
@@ -219,6 +233,7 @@ case "$cmd" in
     ;;
   run)
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
+    [[ -z "$RBF_GIT_ENV_NOTE" ]] || echo "==> git $RBF_GIT_ENV_NOTE"
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
@@ -231,6 +246,7 @@ case "$cmd" in
     exit "$status"
     ;;
   test)
+    [[ -z "$RBF_GIT_ENV_NOTE" ]] || echo "==> git $RBF_GIT_ENV_NOTE"
     # The `cmux` scheme compiles no unit tests and still prints TEST BUILD
     # SUCCEEDED, so this pins `cmux-unit` — see rbf/AGENTS.md. There is no CI
     # behind this; running it here is the only gate.
