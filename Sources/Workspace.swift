@@ -106,6 +106,19 @@ private struct SessionPaneRestoreEntry {
 }
 
 extension Workspace {
+    /// The TTY a restart-command scan may read for one pane: only evidence from this launch.
+    ///
+    /// The live Ghostty PTY comes first, then a TTY the pane's own shell reported since launch.
+    /// Never the name restore loaded from the previous launch (`restorePersistedSurfaceTTYName`):
+    /// TTY numbers are handed out again at every launch, so for a pane whose terminal hasn't
+    /// started, that name points at whatever another pane now runs there (#cm-137.1).
+    nonisolated static func restartCommandTTYDevice(
+        liveDevice: Int64?,
+        currentRuntimeReportedDevice: Int64?
+    ) -> Int64? {
+        liveDevice ?? currentRuntimeReportedDevice
+    }
+
     /// App-owned local panel-to-tty map used by one detached process observation scan.
     func restartCommandPanelTTYDevices() -> [RestartCommandPanelKey: Int64] {
         guard !isRemoteWorkspace else { return [:] }
@@ -125,8 +138,13 @@ extension Workspace {
                     ?? terminal.requestedWorkingDirectory,
                   !workingDirectory.isEmpty,
                   directoryExists(workingDirectory),
-                  let ttyName = surfaceTTYNames[panelID],
-                  let device = CmuxTopProcessSnapshot.deviceIdentifier(forTTYName: ttyName) else {
+                  let device = Self.restartCommandTTYDevice(
+                      liveDevice: terminal.surface.controllingTTYDeviceIdentifier,
+                      currentRuntimeReportedDevice: hasCurrentRuntimeReportedTTY(
+                          panelId: panelID,
+                          terminal: terminal
+                      ) ? surfaceTTYDevices[panelID] : nil
+                  ) else {
                 continue
             }
             result[RestartCommandPanelKey(workspaceID: id, panelID: panelID)] = device
