@@ -159,6 +159,7 @@ extension CmuxSettingsFileStore {
         "reply.maxMessagesBack",
         "reply.labels",
         "figma.defaultFolder",
+        "figma.folders",
         "shortcuts.bindings",
     ]
 }

@@ -1267,7 +1267,8 @@
         },
         "figma": {
           "description": "Impostazioni di Figma.",
-          "defaultFolder": "Link alla cartella di Figma in cui devono andare i nuovi design creati dal tuo agente. Usa il link dalla barra degli indirizzi di Figma nella pagina della cartella. Gli agenti lo leggono con \"cmux figma folder\"."
+          "defaultFolder": "Link alla cartella Figma in cui vanno i nuovi design quando figma.folders non ha una voce per la loro directory. Usa il link dalla barra degli indirizzi di Figma nella pagina della cartella. Gli agenti lo leggono con \"cmux figma folder\".",
+          "folders": "Cartelle Figma per directory: ogni chiave è una directory e ogni valore è il link alla cartella Figma in cui devono andare i nuovi design creati in quella directory o al suo interno. Vince la directory corrispondente più vicina; altrove vale figma.defaultFolder. Gli agenti lo leggono con \"cmux figma folder\"."
         },
         "reply": {
           "description": "Pannello risposte",

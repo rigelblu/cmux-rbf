@@ -2427,7 +2427,8 @@
         },
         "figma": {
           "description": "Figma の設定です。",
-          "defaultFolder": "エージェントが作成する新しいデザインの保存先にする Figma フォルダへのリンクです。フォルダのページで Figma のアドレスバーに表示されるリンクを使用してください。エージェントは \"cmux figma folder\" で読み取ります。"
+          "defaultFolder": "figma.folders にそのディレクトリのエントリがないときに、新しいデザインの保存先にする Figma フォルダへのリンクです。フォルダのページで Figma のアドレスバーに表示されるリンクを使用してください。エージェントは \"cmux figma folder\" で読み取ります。",
+          "folders": "ディレクトリごとの Figma フォルダです。各キーはディレクトリ、各値はそのディレクトリまたはその中で作成した新しいデザインの保存先にする Figma フォルダへのリンクです。最も近い一致するディレクトリが優先され、それ以外では figma.defaultFolder が使われます。エージェントは \"cmux figma folder\" で読み取ります。"
         },
         "reply": {
           "description": "返信パネル",
