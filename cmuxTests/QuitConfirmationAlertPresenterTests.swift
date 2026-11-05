@@ -32,6 +32,24 @@ struct QuitConfirmationAlertPresenterTests {
         )
     }
 
+    // cmux-rbf #cm-137.2: a deadline during the cloud drain must keep the fresh save,
+    // which carries restart-command context, instead of re-saving from cached indexes.
+    @Test
+    func finalDrainDeadlineTerminatesWithoutReplacingTheFreshSave() {
+        #expect(
+            AppDelegate.terminateCleanupDeadlineDisposition(
+                phase: .finalDrain,
+                hasOwnedRuntimeCleanup: true
+            ) == .terminateWithSavedSnapshot
+        )
+        #expect(
+            AppDelegate.terminateCleanupDeadlineDisposition(
+                phase: .finalDrain,
+                hasOwnedRuntimeCleanup: false
+            ) == .terminateWithSavedSnapshot
+        )
+    }
+
     @Test
     func pendingTerminateReplyWaitsForOwnedCleanupOrTerminateOwnedConfirmation() {
         #expect(

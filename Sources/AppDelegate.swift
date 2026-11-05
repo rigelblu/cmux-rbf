@@ -1277,9 +1277,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     enum TerminateCleanupPhase: Equatable, Sendable {
         case ownedRuntimeCleanup
         case freshSnapshot
+        // cmux-rbf #cm-137.2: the fresh save is written; only the flush and the cloud
+        // drain are left. Upstream's `.agentTermination` sits at this point.
+        case finalDrain
     }
     enum TerminateCleanupDeadlineDisposition: Equatable, Sendable {
         case persistCachedSnapshotAndTerminate
+        // cmux-rbf #cm-137.2: upstream's name, so a sync merges this case.
+        case terminateWithSavedSnapshot
         case cancelTerminationAfterRuntimeCleanupFailure
     }
     private var terminateCleanupPhase: TerminateCleanupPhase?
@@ -2260,22 +2265,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     return
                 }
                 self.terminateCleanupPhase = .freshSnapshot
-                let ttyDeviceBindings = self.currentSurfaceTTYDeviceBindings()
-                let resumeIndexes = await ProcessDetectedResumeIndexes.loadFresh(
-                    ttyDeviceBindings: ttyDeviceBindings
-                )
+                // cmux-rbf #cm-137.2: scan with restart-command context, as the power-off save
+                // does, so apps still running at the quit relaunch next launch.
+                let scanStartedAt = ProcessInfo.processInfo.systemUptime
+                let fresh = await self.loadFreshTerminationResumeIndexes()
+                let scanMs = Int((ProcessInfo.processInfo.systemUptime - scanStartedAt) * 1000)
                 guard !Task.isCancelled else { return }
                 self.mainWindowLifecycleCoordinator
                     .cancelAllWindowlessRouteFreezeTasks()
                 // cmux-rbf #cm-73.2a
                 self.exitDesignFocusForAppQuit()
-                _ = self.saveSessionSnapshot(
+                let savedForQuit = self.saveSessionSnapshot(
                     includeScrollback: true,
                     removeWhenEmpty: false,
-                    restorableAgentIndex: resumeIndexes.restorableAgentIndex,
-                    surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex
+                    restorableAgentIndex: fresh.indexes.restorableAgentIndex,
+                    surfaceResumeBindingIndex: fresh.indexes.surfaceResumeBindingIndex,
+                    restartCommandCaptureContext: fresh.restartCommandCaptureContext
+                )
+                // cmux-rbf #cm-137.2
+                StartupBreadcrumbLog.append(
+                    "appDelegate.shouldTerminate.freshSnapshot",
+                    fields: [
+                        "saved": savedForQuit ? "1" : "0",
+                        "restartContext": fresh.restartCommandCaptureContext == nil ? "0" : "1",
+                        "scanMs": String(scanMs),
+                    ]
                 )
                 ClosedItemHistoryStore.shared.flushPendingSaves()
+                // cmux-rbf #cm-137.2: a deadline from here on must not re-save over this one.
+                self.terminateCleanupPhase = .finalDrain
                 await CloudNotificationSyncHub.shared.persistenceStore.drain()
                 self.terminationWatchdog.arm()
                 self.replyToTerminateOnce(true)
@@ -2308,11 +2326,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     hasOwnedRuntimeCleanup: hasOwnedRuntimeCleanup
                 )
                 guard disposition == .cancelTerminationAfterRuntimeCleanupFailure else {
-                    _ = self.saveSessionSnapshotUsingCachedProcessDetectedIndexes(
-                        includeScrollback: true,
-                        removeWhenEmpty: false
+                    // cmux-rbf #cm-137.2: the cached save carries no restart-command context,
+                    // so after it nothing relaunches unless a later power-off save (a Mac
+                    // restart) replaces it. In `.finalDrain` the fresh save stands. The log
+                    // line says which happened.
+                    let persistsCachedSnapshot = disposition == .persistCachedSnapshotAndTerminate
+                    StartupBreadcrumbLog.append(
+                        "appDelegate.shouldTerminate.freshSnapshotDeadline",
+                        fields: [
+                            "phase": self.terminateCleanupPhase.map { String(describing: $0) } ?? "none",
+                            "cachedSave": persistsCachedSnapshot ? "1" : "0",
+                        ]
                     )
-                    ClosedItemHistoryStore.shared.flushPendingSaves()
+                    if persistsCachedSnapshot {
+                        _ = self.saveSessionSnapshotUsingCachedProcessDetectedIndexes(
+                            includeScrollback: true,
+                            removeWhenEmpty: false
+                        )
+                        ClosedItemHistoryStore.shared.flushPendingSaves()
+                    }
                     self.terminationWatchdog.arm()
                     self.replyToTerminateOnce(true)
                     return
@@ -2335,6 +2367,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         phase: TerminateCleanupPhase?,
         hasOwnedRuntimeCleanup: Bool
     ) -> TerminateCleanupDeadlineDisposition {
+        // cmux-rbf #cm-137.2
+        if phase == .finalDrain { return .terminateWithSavedSnapshot }
         if phase == .freshSnapshot || !hasOwnedRuntimeCleanup {
             return .persistCachedSnapshotAndTerminate
         }
@@ -4895,21 +4929,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 self.isTerminatingApp = true
                 // cmux-rbf #cm-73.2a
                 self.exitDesignFocusForAppQuit()
-                let ttyDeviceBindings = self.currentSurfaceTTYDeviceBindings()
-                let restartCommandCaptureContext = self.restartCommandCoordinator.captureContext(
-                    kind: .pendingTermination
-                )
-                let resumeIndexes = await ProcessDetectedResumeIndexes.loadFresh(
-                    ttyDeviceBindings: ttyDeviceBindings,
-                    restartCommandPanelTTYDevices: self.restartCommandPanelTTYDevices(),
-                    restartCommandCaptureContext: restartCommandCaptureContext
-                )
+                // cmux-rbf #cm-137.2: the same scan the quit's fresh save makes.
+                let fresh = await self.loadFreshTerminationResumeIndexes()
                 _ = self.saveSessionSnapshot(
                     includeScrollback: true,
                     removeWhenEmpty: false,
-                    restorableAgentIndex: resumeIndexes.restorableAgentIndex,
-                    surfaceResumeBindingIndex: resumeIndexes.surfaceResumeBindingIndex,
-                    restartCommandCaptureContext: restartCommandCaptureContext
+                    restorableAgentIndex: fresh.indexes.restorableAgentIndex,
+                    surfaceResumeBindingIndex: fresh.indexes.surfaceResumeBindingIndex,
+                    restartCommandCaptureContext: fresh.restartCommandCaptureContext
                 )
                 ClosedItemHistoryStore.shared.flushPendingSaves()
             }
@@ -5694,6 +5721,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
         return result
+    }
+
+    // cmux-rbf #cm-137.2
+    /// Scans fresh, with `.pendingTermination` restart-command context, for a save that ends
+    /// this launch: a quit or a power-off. The caller saves with the returned context, so the
+    /// next launch relaunches the approved apps still running in their panes now.
+    private func loadFreshTerminationResumeIndexes() async -> (
+        indexes: ProcessDetectedResumeIndexes,
+        restartCommandCaptureContext: RestartCommandCaptureContext?
+    ) {
+        let ttyDeviceBindings = currentSurfaceTTYDeviceBindings()
+        let restartCommandCaptureContext = restartCommandCoordinator.captureContext(
+            kind: .pendingTermination
+        )
+        let indexes = await ProcessDetectedResumeIndexes.loadFresh(
+            ttyDeviceBindings: ttyDeviceBindings,
+            restartCommandPanelTTYDevices: restartCommandPanelTTYDevices(),
+            restartCommandCaptureContext: restartCommandCaptureContext
+        )
+        return (indexes, restartCommandCaptureContext)
     }
 
     private func buildSessionSnapshot(
