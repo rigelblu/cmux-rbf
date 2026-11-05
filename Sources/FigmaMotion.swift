@@ -49,20 +49,21 @@ enum FigmaMotion {
     static let clockScript = FigmaPlayScript.script + FigmaPlayScript.stillAddressScript + fitKeyScript + nodeScript + #"""
     (function () {
       if (window === window.parent || !/(^|\.)figma\.com$/i.test(location.hostname)) return;
-      // cmux-rbf (#cm-73.44): this script is for cmux's preview only. When the top page is Figma's own (the pane shows the
-      // editor), its frames get nothing from it: Figma keeps its ⇧1, and no report goes to a page that ignores it.
-      var topOrigin = location.ancestorOrigins && location.ancestorOrigins.length
-        ? location.ancestorOrigins[location.ancestorOrigins.length - 1] : '';
-      if (/^https:\/\/([^\/]+\.)?figma\.com$/i.test(topOrigin)) return;
+      // cmux-rbf (#cm-73.40): under .40 the preview's top is https://www.figma.com too, so check
+      // pathname starts with /cmux-preview/. When top is Figma's own (editor), its frames get nothing.
+      // One of three copies of the page's address: also CLI/FigmaPaneURL.swift and CmuxSettings' BrowserURLAllowlistPolicy.
+      // Under another site's page (a plain browser pane on a site that embeds Figma) reading the top's path throws SecurityError.
+      var topPath = '';
+      try { topPath = (window.top && window.top.location && window.top.location.pathname) || ''; } catch (e) {}
+      if (topPath.indexOf('/cmux-preview/') !== 0) return;
       var player = location.pathname.indexOf('/proto/') === 0;
       // cmux-rbf (#cm-73.46, #cm-73.44): which document this is. A back-forward restore keeps it; a re-fit's redraw is a new one.
       var doc = performance.timeOrigin;
       // cmux-rbf (#cm-73.46): a still board reports drawn too, so a re-fit knows when Figma has painted.
       var board = /^\/(design|file)\//.test(location.pathname);
-      // cmux-rbf (#cm-73.44): cmux's page is the only window this frame takes commands from. The origin
-      // is checked too when WebKit gives one for the custom scheme; if it doesn't, the source check stands alone.
+      // cmux-rbf (#cm-73.44, #cm-73.40): cmux's page is the only window this frame takes commands from.
       var parentOrigin = (location.ancestorOrigins && location.ancestorOrigins[0]) || '';
-      var up = parentOrigin === 'cmux-figma://cmux' ? parentOrigin : '*';
+      var up = parentOrigin === 'https://www.figma.com' ? parentOrigin : '*';
       var drawn = false;
       var frozen = player && window.name === 'cmux-freeze';
       var perf = performance.now.bind(performance), date = Date.now.bind(Date);
@@ -226,7 +227,7 @@ enum FigmaMotion {
           return;
         }
         if (e.source !== window.parent) return;
-        if (parentOrigin === 'cmux-figma://cmux' && e.origin && e.origin !== 'null' && e.origin !== parentOrigin) return;
+        if (parentOrigin === 'https://www.figma.com' && e.origin && e.origin !== 'null' && e.origin !== parentOrigin) return;
         var data = e.data || {};
         if (!data.cmuxClockCommand) return;
         if (data.kind === 'still' || data.kind === 'player') {

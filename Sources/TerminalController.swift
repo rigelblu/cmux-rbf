@@ -9747,8 +9747,9 @@ class TerminalController {
             }
             // A never-navigated surface reports about:blank (matching JS location.href)
             // instead of an empty string, so agents can tell "blank page" from "no data".
+            // cmux-rbf #cm-73.40 (code review 5, C1): never a page address taken from `webView.url`.
             let urlString = browserPanel.currentURL?.absoluteString
-                ?? browserPanel.webView.url?.absoluteString
+                ?? browserPanel.figmaCheckedLiveURL(of: browserPanel.webView)?.absoluteString
                 ?? "about:blank"
             return .ok([
                 "workspace_id": workspaceId.uuidString,

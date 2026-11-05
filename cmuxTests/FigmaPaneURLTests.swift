@@ -311,6 +311,74 @@ struct FigmaPaneURLTests {
         #expect(!url.path.contains(".app/Contents"))
     }
 
+    // MARK: - cm-73.40: Address and upgrade
+
+    @Test("previewPageURL is the https figma.com address")
+    func previewPageURLIsHttpsFigmaCom() {
+        #expect(FigmaPaneURL.previewPageURL.absoluteString == "https://www.figma.com/cmux-preview/figma-embed.html")
+    }
+
+    @Test("isWrapperPage matches previewPageURL, legacyServedPageURL, and wrapperFileURL")
+    func isWrapperPageMatchesAllThreeAddresses() {
+        let https = URL(string: "https://www.figma.com/cmux-preview/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY")!
+        let served = URL(string: "cmux-figma://cmux/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY")!
+        let file = FigmaPaneURL.wrapperFileURL().appending(queryItems: [URLQueryItem(name: "embed", value: "https://embed.figma.com/design/KEY")])
+        let otherFigma = URL(string: "https://www.figma.com/design/KEY/slug")!
+
+        #expect(FigmaPaneURL.isWrapperPage(https))
+        #expect(FigmaPaneURL.isWrapperPage(served))
+        #expect(FigmaPaneURL.isWrapperPage(file))
+        #expect(!FigmaPaneURL.isWrapperPage(otherFigma))
+    }
+
+    @Test("upgradingLegacyPage upgrades both file:// and cmux-figma:// to previewPageURL")
+    func upgradingLegacyPageUpgradesBothOlderAddresses() {
+        let served = URL(string: "cmux-figma://cmux/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY&motion=1")!
+        let file = FigmaPaneURL.wrapperFileURL().appending(queryItems: [
+            URLQueryItem(name: "embed", value: "https://embed.figma.com/design/KEY"),
+            URLQueryItem(name: "motion", value: "1")
+        ])
+        let alreadyUpgraded = URL(string: "https://www.figma.com/cmux-preview/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY")!
+        let plainWeb = URL(string: "https://example.com/page")!
+
+        let upgradedFromServed = FigmaPaneURL.upgradingLegacyPage(served)
+        #expect(upgradedFromServed.absoluteString == "https://www.figma.com/cmux-preview/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY&motion=1")
+
+        let upgradedFromFile = FigmaPaneURL.upgradingLegacyPage(file)
+        #expect(upgradedFromFile.scheme == "https")
+        #expect(upgradedFromFile.host == "www.figma.com")
+        #expect(upgradedFromFile.path == "/cmux-preview/figma-embed.html")
+        #expect(query(upgradedFromFile, "embed") == "https://embed.figma.com/design/KEY")
+        #expect(query(upgradedFromFile, "motion") == "1")
+
+        #expect(FigmaPaneURL.upgradingLegacyPage(alreadyUpgraded) == alreadyUpgraded)
+        #expect(FigmaPaneURL.upgradingLegacyPage(plainWeb) == plainWeb)
+    }
+
+    // cmux-rbf #cm-73.40 (Scenario 406, scope check 1 item 5): every reader gives one answer for the three addresses.
+    @Test("documentURL, fileKey, node and hasMotionMark read the same from the https, cmux-figma:// and file:// addresses")
+    func readersAgreeAcrossTheThreeAddresses() throws {
+        let embedded = "https://embed.figma.com/design/MVdKSLWiPvKNyWab361uJ2/slug?embed-host=cmux&node-id=172-310"
+        let marked = [URLQueryItem(name: "embed", value: embedded), URLQueryItem(name: "motion", value: "1")]
+        let plain = [URLQueryItem(name: "embed", value: embedded)]
+        let pages = [FigmaPaneURL.previewPageURL, FigmaPaneURL.legacyServedPageURL, FigmaPaneURL.wrapperFileURL()]
+        let expectedDocument = try #require(FigmaPaneURL.documentURL(fromPaneURL: pages[0].appending(queryItems: marked)))
+        try #require(expectedDocument.absoluteString.hasPrefix("https://www.figma.com/design/MVdKSLWiPvKNyWab361uJ2"), "fixture: \(expectedDocument)")
+        for page in pages {
+            let address = page.appending(queryItems: marked)
+            #expect(FigmaPaneURL.documentURL(fromPaneURL: address) == expectedDocument, "\(address)")
+            #expect(FigmaPaneURL.fileKey(fromPaneURL: address) == "MVdKSLWiPvKNyWab361uJ2", "\(address)")
+            #expect(FigmaPaneURL.node(fromPaneURL: address) == "172-310", "\(address)")
+            #expect(FigmaPaneURL.hasMotionMark(inWrapper: address), "\(address)")
+            #expect(!FigmaPaneURL.hasMotionMark(inWrapper: page.appending(queryItems: plain)), "\(page)")
+        }
+        // Control: the same query on a www.figma.com address on another path is not cmux's page, so nothing reads it.
+        let otherPath = URL(string: "https://www.figma.com/other/figma-embed.html")!.appending(queryItems: marked)
+        #expect(FigmaPaneURL.fileKey(fromPaneURL: otherPath) == nil)
+        #expect(FigmaPaneURL.node(fromPaneURL: otherPath) == nil)
+        #expect(!FigmaPaneURL.hasMotionMark(inWrapper: otherPath))
+    }
+
     // MARK: -
 
     private func query(_ url: URL, _ name: String) -> String? {

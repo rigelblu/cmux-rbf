@@ -12,20 +12,22 @@ import Testing
 @Suite("FigmaRefitScripts")
 struct FigmaRefitScriptTests {
     private static let figma = "https://www.figma.com"
-    private static let cmuxOrigin = "cmux-figma://cmux"
+    // cmux-rbf #cm-73.40: the preview is a page on https://www.figma.com now; Figma's editor is too, told apart by its path.
+    private static let cmuxOrigin = "https://www.figma.com"
 
     // MARK: Harness
 
     /// Figma's frame: `clockScript` on a still board, with a parent (cmux's page) and no child frames.
     private func frame(
-        path: String = "/design/KEY/slug", ancestorOrigin: String? = nil, ancestors chain: [String]? = nil
+        path: String = "/design/KEY/slug", ancestorOrigin: String? = nil, ancestors chain: [String]? = nil,
+        topPath: String = "/cmux-preview/figma-embed.html", topIsAnotherOrigin: Bool = false
     ) throws -> JSContext {
         let c = try #require(JSContext()); c.evaluateScript(FigmaMotionTests.browser)
         let ancestors = chain.map { "[" + $0.map { "'\($0)'" }.joined(separator: ",") + "]" }
             ?? ancestorOrigin.map { "['\($0)']" } ?? "undefined"
         c.evaluateScript("""
         window.name=''; window.parent={postMessage:function(m,t){posted.push(m); targets.push(t)}}; targets=[];
-        location.hostname='www.figma.com'; location.pathname='\(path)'; location.ancestorOrigins=\(ancestors);
+        location.hostname='www.figma.com'; location.pathname='\(path)'; location.ancestorOrigins=\(ancestors); window.top=\(topIsAnotherOrigin ? "{location:{get pathname(){throw new Error('SecurityError')}}}" : "{location:{pathname:'\(topPath)'}}");
         location.href='https://www.figma.com\(path)?node-id=12-2&embed-host=cmux&footer=false&theme=dark&page-selector=0';
         location.replace=function(s){replaced=s}; perfTime=20; wallTime=10000; performance={now:function(){return perfTime},timeOrigin:1793474311079.5};
         Date.now=function(){return wallTime}; canvas=false; raf=[]; requestAnimationFrame=function(f){raf.push(f)};
@@ -158,7 +160,7 @@ struct FigmaRefitScriptTests {
     // MARK: The editor's frames get nothing from the script (item 5b)
 
     @Test func aNestedFrameUnderFigmasEditorSetsUpNothingAndLeavesShiftOneToFigma() throws {
-        let editor = try frame(ancestors: ["https://www.figma.com"])
+        let editor = try frame(ancestors: ["https://www.figma.com"], topPath: "/design/KEY/slug")
         #expect(text(editor, "typeof listeners.keydown") == "undefined", "no key listener in the editor's frames")
         #expect(text(editor, "typeof listeners.message") == "undefined", "no message listener either")
         key(editor)
@@ -170,12 +172,33 @@ struct FigmaRefitScriptTests {
         let child = try frame(ancestors: ["https://www.figma.com", Self.cmuxOrigin])
         key(child)
         #expect(fitPosts(child) == 1 && bool(child, "prevented"), "the preview's child frame still asks for the fit")
-        let customScheme = try frame(ancestors: ["null"])
-        key(customScheme)
-        #expect(fitPosts(customScheme) == 1, "a top whose origin WebKit reads as null is not Figma's editor")
         let unknown = try frame()
         key(unknown)
-        #expect(fitPosts(unknown) == 1, "no ancestorOrigins at all behaves as before")
+        #expect(fitPosts(unknown) == 1, "no ancestorOrigins at all, under cmux's page, still asks for the fit")
+    }
+
+    // cmux-rbf #cm-73.40 (code review 1, R3): the top's path decides, not its origin or the nearest parent. These two used to
+    // ask whether WebKit reads the top's origin as null; the script no longer reads it, so they ask the .40 question.
+    @Test func aFrameWhoseOriginChainIsUnreadableIsStillToldApartByTheTopsPath() throws {
+        let editorNullOrigin = try frame(ancestors: ["null"], topPath: "/design/KEY/slug")
+        key(editorNullOrigin)
+        #expect(fitPosts(editorNullOrigin) == 0, "a null ancestor origin under Figma's editor is not cmux's page")
+        let editorNoOrigins = try frame(topPath: "/design/KEY/slug")
+        key(editorNoOrigins)
+        #expect(fitPosts(editorNoOrigins) == 0, "no ancestorOrigins under Figma's editor is not cmux's page")
+        // Controls: the same two chains under cmux's page do ask.
+        let previewNullOrigin = try frame(ancestors: ["null"])
+        key(previewNullOrigin)
+        #expect(fitPosts(previewNullOrigin) == 1, "a null ancestor origin under cmux's page asks for the fit")
+    }
+
+    // cmux-rbf #cm-73.40 (code review 1, C2): a Figma frame under another site's page (a plain browser pane on a site that
+    // embeds Figma) cannot read that top's path; reading it throws SecurityError. The script stops there, without a throw.
+    @Test func aFrameUnderAnotherOriginsTopSetsUpNothingAndDoesNotThrow() throws {
+        let embedded = try frame(topIsAnotherOrigin: true)
+        #expect(text(embedded, "typeof listeners.keydown") == "undefined", "no key listener under another site's page")
+        key(embedded)
+        #expect(fitPosts(embedded) == 0, "no fit request under another site's page")
     }
 
     @Test func otherKeysAndModifiedKeysAreFigmasOwn() throws {
@@ -294,7 +317,7 @@ struct FigmaRefitScriptTests {
         #expect(text(c, "historyPushes") == "0")
         #expect(bool(c, "answer && answer.report === null && frame === oldFrame"))
         let search = try #require(text(c, "location.search"))
-        let url = try #require(URLComponents(string: "cmux-figma://cmux/figma-embed.html" + search))
+        let url = try #require(URLComponents(string: FigmaPaneURL.previewPageURL.absoluteString + search))
         let q = Dictionary(uniqueKeysWithValues: (url.queryItems ?? []).map { ($0.name, $0.value ?? "") })
         #expect(q["outer"] == "kept")
         let embeddedAddress = try #require(q["embed"])

@@ -215,7 +215,7 @@ import Testing
         let added = try #require(w.panels.values.compactMap { $0 as? BrowserPanel }.first { !beforePanels.contains($0.id) })
         let address = try #require(panelAddress(added).flatMap(URL.init(string:)))
         #expect(FigmaPaneURL.isWrapperPage(address, wrapper: FigmaPaneURL.previewPageURL), "\(address)")
-        #expect(address.scheme == FigmaPaneURL.previewPageScheme, "\(address)")
+        #expect(address.absoluteString.hasPrefix("https://www.figma.com/cmux-preview/figma-embed.html"), "\(address)")
         #expect(FigmaPaneURL.node(fromPaneURL: address) == "8-7", "\(address)")
     }
 
