@@ -180,4 +180,50 @@ struct FigmaHiddenUnloadTests {
         #expect(panel.discardHiddenWebViewForSystemMemoryPressure())
         #expect(panel.webViewInstanceID != originalInstanceID)
     }
+
+    // MARK: - cm-73.40, Scenario 402's memory-pressure leg
+
+    /// The committed document's address when it is cmux's page (titled Figma, as only cmux's own bytes are), else "".
+    private func cmuxPageAddress(_ panel: BrowserPanel, seconds: Double = 10) async -> String {
+        let deadline = Date().addingTimeInterval(seconds)
+        var href = ""
+        while Date() < deadline {
+            href = (try? await panel.webView.evaluateJavaScript("document.title === 'Figma' ? location.href : ''") as? String) ?? ""
+            if !href.isEmpty, !panel.webView.isLoading { return href }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return href
+    }
+
+    // cmux-rbf #cm-73.40 (Scenario 402, scope check 1 item 4): a preview discarded for memory pressure comes back on the page
+    // address through the funnel's simulated load. Figma's server would answer the address with its own 404 (or nothing,
+    // offline), so a document titled Figma at the page address is cmux's own bytes.
+    @Test("A preview pane discarded for memory pressure comes back on the page address, as cmux's own page")
+    func previewDiscardedForMemoryPressureComesBackThroughTheFunnel() async throws {
+        let panel = BrowserPanel(workspaceId: UUID(), chromeVisibility: .hidden, websiteDataStore: .nonPersistent())
+        defer { panel.close() }
+        let page = Self.figmaReadViewURL
+        panel.navigate(to: page)
+        let first = await cmuxPageAddress(panel)
+        try #require(URL(string: first).map { FigmaPaneURL.isSamePage($0, FigmaPaneURL.previewPageURL) } == true, "fixture: the first load committed \(first)")
+        // A loading pane is never discarded, and Figma's embedded frame loads from the network after cmux's page commits.
+        let settleBy = Date().addingTimeInterval(20)
+        while (panel.webView.isLoading || panel.isLoading), Date() < settleBy { try await Task.sleep(nanoseconds: 50_000_000) }
+
+        let originalInstanceID = panel.webViewInstanceID
+        panel.noteWebViewVisibility(
+            false,
+            reason: "test.hide",
+            now: Date().addingTimeInterval(-(BrowserHiddenWebViewDiscardPolicy.hiddenDelay + 1))
+        )
+        let blockers = panel.hiddenWebViewDiscardManager.blockers(for: panel.hiddenWebViewDiscardSnapshot, allowingRecoverableWebContentTermination: true)
+        try #require(panel.discardHiddenWebViewForSystemMemoryPressure(), "fixture: the preview was not discarded; blockers \(blockers), web view loading \(panel.webView.isLoading), pane loading \(panel.isLoading)")
+        try #require(panel.webViewInstanceID != originalInstanceID, "fixture: the web view was not replaced")
+
+        #expect(panel.restoreDiscardedWebViewIfNeeded(reason: "test.reveal"), "the discarded preview did not restore")
+        let restored = await cmuxPageAddress(panel)
+        #expect(URL(string: restored) == page, "the restore committed \(restored.isEmpty ? "no cmux page" : restored); web view at \(String(describing: panel.webView.url))")
+        #expect(panel.currentURL == page, "the pane's address is \(String(describing: panel.currentURL))")
+        #expect(FigmaPreviewPageSchemeHandler.shared.requestCount(in: panel.webView) == 0, "the older scheme's handler was asked")
+    }
 }

@@ -177,7 +177,7 @@ struct FigmaClickWorkspaceTests {
 
             let moved = try #require(f.loading(pane))
             #expect(moved == (try f.address("\(key)/old-name", node: "12-2")))
-            #expect(moved.hasPrefix("cmux-figma://cmux/figma-embed.html?")) // cmux-rbf #cm-73.39
+            #expect(moved.hasPrefix(FigmaPaneURL.previewPageURL.absoluteString + "?")) // cmux-rbf #cm-73.40
             #expect(f.workspace.focusedPanelId == pane.id)
             #expect(f.panelCount == panels)
             #expect(f.tabCount == tabs)
