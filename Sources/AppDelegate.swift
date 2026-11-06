@@ -736,17 +736,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             openRouting: notificationNavSeams,
             clickRouting: notificationClickPerformer,
             focusedResolving: notificationNavSeams,
-            // Route the focused-mark jump through `AppDelegate.jumpToLatestUnread`
+            // Route the focused-mark jump through `AppDelegate.jumpToOldestUnread`
             // so its `#if DEBUG` `jumpUnreadInvoked` recorder and nil-store guard
             // still fire exactly as before; map the resolved notification back to
-            // its id for the package boundary.
-            focusedJump: {
-                [unowned self] excludedNotificationId, excludedWorkspaceId, excludedWindowDockTarget in
-                self.jumpToLatestUnread(
-                    excludingNotificationId: excludedNotificationId,
-                    excludingWorkspaceId: excludedWorkspaceId,
-                    excludingWindowDockTarget: excludedWindowDockTarget
-                )?.id
+            // its id for the package boundary. (cm-128.11) Summary-aware, like the other ways in.
+            focusedJump: { [unowned self] excludedPane in
+                self.jumpToOldestUnread(excludingPane: excludedPane)?.id
             }
         )
     /// OS notification delivery/response coordination, extracted into
@@ -1240,7 +1235,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Separate Mac-only presentation persistence and projection. This store
     /// is intentionally absent from terminal delivery, Dock/workspace badges,
     /// mobile sync, desktop hooks, and terminal notification history.
-    let restartCommandSummaryStore = RestartCommandRestoreSummaryStore.shared
+    // (cm-128.11) `var` so a test can swap in a store backed by a temporary file.
+    var restartCommandSummaryStore = RestartCommandRestoreSummaryStore.shared
     /// Accessibility window-hierarchy cache (CmuxWindowing); composition-root
     /// owned. The `NSApplication` AX swizzle forwards to it behind
     /// ``AccessibilityWindowCaching``.
@@ -11067,7 +11063,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 _ = self?.openTerminalNotification(notification)
             },
             onJumpToLatestUnread: { [weak self] in
-                _ = self?.jumpToLatestMacNotificationUnread()
+                _ = self?.jumpToOldestUnread() // (cm-128.11)
             },
             onOpenTaskManager: {
                 TaskManagerWindowController.shared.show()
@@ -14460,11 +14456,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// (`notificationStore`, the env-gated test sink). The coordinator returns
     /// the opened notification's id, which we re-resolve to the current store
     /// snapshot exactly as the legacy body did.
+    ///
+    /// (cm-128.11) The one function behind all eight ways in, ⌘⌃U's follow-on jump included: the pane
+    /// unread longest opens first, and a restart summary takes its place in the queue by its own time.
+    /// It returns the opened notification, or nil when nothing opened or a summary or a mark did.
+    /// `excludedPane` is the pane ⌘⌃U just sent back; nil for the eight ways in.
     @discardableResult
-    func jumpToLatestUnread(
-        excludingNotificationId excludedNotificationId: UUID? = nil,
-        excludingWorkspaceId excludedWorkspaceId: UUID? = nil,
-        excludingWindowDockTarget excludedWindowDockTarget: WindowDockUnreadTarget? = nil
+    func jumpToOldestUnread(
+        excludingPane excludedPane: UnreadQueueTarget? = nil
     ) -> TerminalNotification? {
         guard let notificationStore else { return nil }
 #if DEBUG
@@ -14475,29 +14474,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ])
         }
 #endif
-        guard let openedId = notificationNavigation.jumpToLatestUnread(
-            excludingNotificationId: excludedNotificationId,
-            excludingWorkspaceId: excludedWorkspaceId,
-            excludingWindowDockTarget: excludedWindowDockTarget
+        guard let openedId = notificationNavigation.jumpToOldestUnread(
+            excludingPane: excludedPane,
+            openRestartSummary: { [weak self] before in
+                self?.openOldestUnreadRestartSummary(notOlderThan: before) ?? false
+            }
         ) else {
             return nil
         }
         return notificationStore.notifications.first(where: { $0.id == openedId })
     }
 
-    /// Routes the two-kind Mac feed without widening the terminal/mobile
-    /// notification coordinator. A restart summary opens the full Mac
-    /// Notifications page and requests focus for that app-scoped row; terminal
-    /// items retain their existing workspace-navigation path.
-    @discardableResult
-    func jumpToLatestMacNotificationUnread() -> Bool {
-        let newestSummary = restartCommandSummaryStore.summaries.first(where: { !$0.isRead })
-        let newestTerminal = notificationStore?.notifications.first(where: { !$0.isRead })
-        if let newestSummary,
-           newestTerminal.map({ newestSummary.createdAt >= $0.createdAt }) ?? true {
-            return focusRestartCommandSummary(newestSummary)
-        }
-        return jumpToLatestUnread() != nil
+    /// Opens the oldest unread restart summary when it is at least as old as `before`, the next
+    /// stop's place in the queue (nil: no stop is left, so any unread summary is next). A restart
+    /// summary opens the full Mac Notifications page and requests focus for that app-scoped row.
+    /// (cm-128.11) It takes its place by its own time; it used to be weighed only against the newest.
+    private func openOldestUnreadRestartSummary(notOlderThan before: Date?) -> Bool {
+        guard let oldest = restartCommandSummaryStore.summaries
+            .filter({ !$0.isRead })
+            .min(by: { $0.createdAt < $1.createdAt }) else { return false }
+        if let before, oldest.createdAt > before { return false }
+        return focusRestartCommandSummary(oldest)
     }
 
     func markAllMacNotificationsRead() {
@@ -14542,7 +14539,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     /// Forwards to `notificationNavigation`. The marker returns the opened
     /// notification id, which we re-resolve to the current store snapshot
-    /// exactly as the legacy body did via `jumpToLatestUnread`.
+    /// exactly as the legacy body did via `jumpToOldestUnread`.
     @discardableResult
     func markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread(
         preferredWindow: NSWindow? = nil
@@ -15786,7 +15783,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 writeJumpUnreadTestData(["jumpUnreadShortcutHandled": "1"])
             }
 #endif
-            _ = jumpToLatestMacNotificationUnread()
+            _ = jumpToOldestUnread() // (cm-128.11)
             return true
         }
 

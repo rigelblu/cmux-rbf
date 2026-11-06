@@ -341,7 +341,7 @@ export function buildLlmsText(origin: string): string {
     "- Native macOS app: written in Swift and AppKit with no Electron, built on libghostty (the Ghostty engine) for GPU-accelerated rendering.",
     "- Agent-first: run many AI coding agents in parallel, each in its own workspace, instead of juggling one terminal.",
     "- Notification rings: a pane lights up the moment an agent needs your attention, so you are not babysitting prompts.",
-    "- Keyboard-first attention: shortcuts such as jump to latest unread move directly to the agent that needs a decision.",
+    "- Keyboard-first attention: shortcuts such as jump to oldest unread move directly to the agent that has waited longest.",
     "- Workspace organization: a vertical sidebar groups work by workspace, each showing its git branch, working directory, ports, and the latest line of agent output.",
     "- Vertical tabs: tabs live in the sidebar instead of a cramped top bar, scaling to dozens of concurrent sessions.",
     "- Performance under load: native Swift/AppKit plus libghostty keeps the UI lightweight while many agents, dev servers, and browser panes are running.",

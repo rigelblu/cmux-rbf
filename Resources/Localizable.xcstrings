@@ -83365,55 +83365,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usage: cmux jump-to-unread\n\nFocus the latest unread notification, matching the Notifications page action.\n\nFlags:\n  --json                Print JSON\n  --id-format <mode>    refs, uuids, or both"
+            "value": "Usage: cmux jump-to-unread\n\nFocus the unread pane that has waited longest, matching the Notifications page action.\n\nFlags:\n  --json                Print JSON\n  --id-format <mode>    refs, uuids, or both"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usage: cmux jump-to-unread\n\n通知ページの操作と同じく、最新の未読通知へフォーカスします。\n\nFlags:\n  --json                JSON を出力\n  --id-format <mode>    refs、uuids、both のいずれか"
+            "value": "Usage: cmux jump-to-unread\n\n通知ページの操作と同じく、最も長く待っている未読のペインへフォーカスします。\n\nFlags:\n  --json                JSON を出力\n  --id-format <mode>    refs、uuids、both のいずれか"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法：cmux jump-to-unread\n\n聚焦最新的未读通知，与通知页面上的操作一致。\n\n标志:\n  --json                输出 JSON\n  --id-format <mode>    refs、uuids 或 both"
+            "value": "用法： cmux jump-to-unread\n\n聚焦等待时间最长的未读窗格，与通知页面上的操作一致。\n\n标志:\n  --json                输出 JSON\n  --id-format <mode>    refs、uuids 或 both"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verwendung: cmux jump-to-unread\n\nFokussiert die neueste ungelesene Benachrichtigung, entsprechend der Aktion auf der Benachrichtigungsseite.\n\nFlags:\n  --json                JSON ausgeben\n  --id-format <mode>    refs, uuids oder beides"
+            "value": "Verwendung: cmux jump-to-unread\n\nFokussiert den ungelesenen Bereich, der am längsten wartet, entsprechend der Aktion auf der Benachrichtigungsseite.\n\nFlags:\n  --json                JSON ausgeben\n  --id-format <mode>    refs, uuids oder beides"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utilisation : cmux jump-to-unread\n\nCible la dernière notification non lue, correspondant à l'action de la page Notifications.\n\nOptions :\n  --json                Affiche le JSON\n  --id-format <mode>    refs, uuids ou both"
+            "value": "Utilisation : cmux jump-to-unread\n\nCible le volet non lu qui attend depuis le plus longtemps, correspondant à l'action de la page Notifications.\n\nOptions :\n  --json                Affiche le JSON\n  --id-format <mode>    refs, uuids ou both"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الاستخدام: cmux jump-to-unread\n\nالتركيز على أحدث إشعار غير مقروء، بمطابقة إجراء صفحة الإشعارات.\n\nالخيارات:\n  --json                طباعة بتنسيق JSON\n  --id-format <mode>    refs، أو uuids، أو كلاهما"
+            "value": "الاستخدام: cmux jump-to-unread\n\nالتركيز على اللوح غير المقروء الذي ينتظر منذ أطول وقت، بمطابقة إجراء صفحة الإشعارات.\n\nالخيارات:\n  --json                طباعة بتنسيق JSON\n  --id-format <mode>    refs، أو uuids، أو كلاهما"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uso: cmux jump-to-unread\n\nEnfoca la última notificación no leída, coincidiendo con la acción de la página de Notificaciones.\n\nOpciones:\n  --json                Muestra JSON\n  --id-format <mode>    refs, uuids o ambos"
+            "value": "Uso: cmux jump-to-unread\n\nEnfoca el panel no leído que lleva más tiempo esperando, coincidiendo con la acción de la página de Notificaciones.\n\nOpciones:\n  --json                Muestra JSON\n  --id-format <mode>    refs, uuids o ambos"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法：cmux jump-to-unread\n\n聚焦最新一則未讀通知，與「通知」頁面的操作相符。\n\n旗標：\n  --json                列印 JSON\n  --id-format <mode>    refs、uuids 或兩者皆是"
+            "value": "用法： cmux jump-to-unread\n\n聚焦等待最久的未讀窗格，與「通知」頁面的操作相符。\n\n旗標：\n  --json                列印 JSON\n  --id-format <mode>    refs、uuids 或兩者皆是"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사용법: cmux jump-to-unread\n\n알림 페이지의 동작 방식과 동일하게 가장 최근 읽지 않은 알림에 포커스를 둡니다.\n\n플래그:\n  --json                JSON 출력\n  --id-format <mode>    refs, uuids 또는 둘 다"
+            "value": "사용법: cmux jump-to-unread\n\n알림 페이지의 동작 방식과 동일하게 가장 오래 기다린 읽지 않은 패널에 포커스를 둡니다.\n\n플래그:\n  --json                JSON 출력\n  --id-format <mode>    refs, uuids 또는 둘 다"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upotreba: cmux jump-to-unread\n\nFokusira nepročitani panel koji najduže čeka, kao radnja na stranici obavještenja.\n\nZastavice:\n  --json                Ispiši JSON\n  --id-format <mode>    refs, uuids ili oba"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brug: cmux jump-to-unread\n\nFokuserer på det ulæste panel, der har ventet længst, ligesom handlingen på siden Notifikationer.\n\nFlag:\n  --json                Udskriv JSON\n  --id-format <mode>    refs, uuids eller begge"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uso: cmux jump-to-unread\n\nPorta il focus sul pannello non letto che attende da più tempo, come l'azione della pagina Notifiche.\n\nOpzioni:\n  --json                Stampa il JSON\n  --id-format <mode>    refs, uuids o entrambi"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ការប្រើប្រាស់៖ cmux jump-to-unread\n\nផ្តោតលើផ្ទាំងដែលមិនទាន់អានដែលរង់ចាំយូរបំផុត ដូចសកម្មភាពនៅទំព័រការជូនដំណឹង។\n\nទង់៖\n  --json                បោះពុម្ព JSON\n  --id-format <mode>    refs, uuids ឬទាំងពីរ"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk: cmux jump-to-unread\n\nFokuserer på det uleste panelet som har ventet lengst, som handlingen på varslingssiden.\n\nFlagg:\n  --json                Skriv ut JSON\n  --id-format <mode>    refs, uuids eller begge"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Użycie: cmux jump-to-unread\n\nPrzenosi fokus na nieprzeczytany panel, który czeka najdłużej, tak jak akcja na stronie powiadomień.\n\nFlagi:\n  --json                Wypisz JSON\n  --id-format <mode>    refs, uuids lub oba"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uso: cmux jump-to-unread\n\nFoca o painel não lido que espera há mais tempo, como a ação da página de Notificações.\n\nOpções:\n  --json                Imprime JSON\n  --id-format <mode>    refs, uuids ou ambos"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Использование: cmux jump-to-unread\n\nФокусирует непрочитанную панель, которая ждёт дольше всех, как действие на странице уведомлений.\n\nФлаги:\n  --json                Вывести JSON\n  --id-format <mode>    refs, uuids или оба"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "การใช้งาน: cmux jump-to-unread\n\nโฟกัสบานหน้าต่างที่ยังไม่ได้อ่านซึ่งรอมานานที่สุด ตรงกับการทำงานบนหน้าการแจ้งเตือน\n\nแฟล็ก:\n  --json                พิมพ์ JSON\n  --id-format <mode>    refs, uuids หรือทั้งสองอย่าง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanım: cmux jump-to-unread\n\nBildirimler sayfasındaki eylemle aynı şekilde, en uzun süredir bekleyen okunmamış bölmeye odaklanır.\n\nBayraklar:\n  --json                JSON yazdır\n  --id-format <mode>    refs, uuids veya ikisi"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Використання: cmux jump-to-unread\n\nФокусує непрочитану панель, яка чекає найдовше, як дія на сторінці сповіщень.\n\nПрапорці:\n  --json                Вивести JSON\n  --id-format <mode>    refs, uuids або обидва"
           }
         }
       }
@@ -146738,115 +146804,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الانتقال إلى أحدث غير مقروء"
+            "value": "الانتقال إلى أقدم غير مقروء"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Skoči na najnovije nepročitano"
+            "value": "Skoči na najstarije nepročitano"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til seneste ulæste"
+            "value": "Gå til ældste ulæste"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zur letzten ungelesenen springen"
+            "value": "Zur ältesten ungelesenen springen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jump to Latest Unread"
+            "value": "Jump to Oldest Unread"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir a la última no leída"
+            "value": "Ir a la no leída más antigua"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aller au dernier message non lu"
+            "value": "Aller au plus ancien non lu"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vai all'ultimo non letto"
+            "value": "Vai al non letto più vecchio"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新の未読にジャンプ"
+            "value": "最古の未読にジャンプ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 읽지 않은 항목으로 이동"
+            "value": "가장 오래된 읽지 않은 항목으로 이동"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til siste uleste"
+            "value": "Gå til eldste uleste"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Przejdź do najnowszego nieprzeczytanego"
+            "value": "Przejdź do najstarszego nieprzeczytanego"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir para Última Não Lida"
+            "value": "Ir para a Não Lida Mais Antiga"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти к последнему непрочитанному"
+            "value": "Перейти к самому старому непрочитанному"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ข้ามไปยังรายการยังไม่อ่านล่าสุด"
+            "value": "ข้ามไปยังรายการยังไม่อ่านเก่าที่สุด"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Son Okunmamışa Atla"
+            "value": "En Eski Okunmamışa Atla"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти до останнього непрочитаного"
+            "value": "Перейти до найстарішого непрочитаного"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳转到最新未读"
+            "value": "跳转到最旧未读"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳至最新未讀"
+            "value": "跳至最舊未讀"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លោតទៅមិនទាន់អានចាស់បំផុត"
           }
         }
       }
@@ -147034,55 +147106,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mark as Oldest Unread and Jump to Next Latest Unread"
+            "value": "Send to Back of Unread Queue and Jump to Next"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最古の未読としてマークして次の最新未読にジャンプ"
+            "value": "未読キューの最後に送って次にジャンプ"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "标记为最早未读并跳转到下一条最新未读"
+            "value": "移到未读队列末尾并跳转到下一条"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Als älteste ungelesene markieren und zur nächsten aktuellen ungelesenen springen"
+            "value": "Ans Ende der ungelesenen Warteschlange schicken und zur nächsten springen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marquer comme le plus ancien non lu et aller au non lu suivant"
+            "value": "Envoyer au bout de la file des non lus et aller au suivant"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تمييز كأقدم غير مقروء والانتقال إلى غير المقروء الأحدث التالي"
+            "value": "إرسال إلى آخر قائمة غير المقروء والانتقال إلى التالي"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marcar como no leído más antiguo e ir al siguiente no leído más reciente"
+            "value": "Enviar al final de la cola de no leídos e ir al siguiente"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "標記為最早未讀並跳至下一個最新未讀"
+            "value": "移到未讀佇列末尾並跳至下一個"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "가장 오래된 읽지 않은 상태로 표시하고 다음 읽지 않은 항목으로 이동"
+            "value": "읽지 않음 대기열의 맨 뒤로 보내고 다음으로 이동"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pošalji na kraj reda nepročitanih i skoči na sljedeće"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send bagerst i køen af ulæste og gå til næste"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manda in fondo alla coda dei non letti e vai al successivo"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ផ្ញើទៅខាងក្រោយជួរមិនទាន់អាន ហើយលោតទៅបន្ទាប់"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send bakerst i køen av uleste og gå til neste"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odeślij na koniec kolejki nieprzeczytanych i przejdź do następnego"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar para o Fim da Fila de Não Lidas e Ir para a Próxima"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отправить в конец очереди непрочитанных и перейти к следующему"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ส่งไปท้ายคิวที่ยังไม่อ่านและข้ามไปรายการถัดไป"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Okunmamış Kuyruğunun Sonuna Gönder ve Sonrakine Atla"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відправити в кінець черги непрочитаних і перейти до наступного"
           }
         }
       }
@@ -260715,115 +260853,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الانتقال إلى أحدث غير مقروء"
+            "value": "الانتقال إلى أقدم غير مقروء"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Skoči na najnovije nepročitano"
+            "value": "Skoči na najstarije nepročitano"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til seneste ulæste"
+            "value": "Gå til ældste ulæste"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zur letzten ungelesenen springen"
+            "value": "Zur ältesten ungelesenen springen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jump to Latest Unread"
+            "value": "Jump to Oldest Unread"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir a la última no leída"
+            "value": "Ir a la no leída más antigua"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aller au dernier message non lu"
+            "value": "Aller au plus ancien non lu"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vai all'ultimo non letto"
+            "value": "Vai al non letto più vecchio"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新の未読にジャンプ"
+            "value": "最古の未読にジャンプ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 읽지 않은 항목으로 이동"
+            "value": "가장 오래된 읽지 않은 항목으로 이동"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til siste uleste"
+            "value": "Gå til eldste uleste"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Przejdź do najnowszego nieprzeczytanego"
+            "value": "Przejdź do najstarszego nieprzeczytanego"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir para Última Não Lida"
+            "value": "Ir para a Não Lida Mais Antiga"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти к последнему непрочитанному"
+            "value": "Перейти к самому старому непрочитанному"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ข้ามไปยังรายการยังไม่อ่านล่าสุด"
+            "value": "ข้ามไปยังรายการยังไม่อ่านเก่าที่สุด"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Son Okunmamışa Atla"
+            "value": "En Eski Okunmamışa Atla"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти до останнього непрочитаного"
+            "value": "Перейти до найстарішого непрочитаного"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳转到最新未读"
+            "value": "跳转到最旧未读"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳至最新未讀"
+            "value": "跳至最舊未讀"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លោតទៅមិនទាន់អានចាស់បំផុត"
           }
         }
       }
@@ -265020,115 +265164,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الانتقال إلى أحدث غير مقروء"
+            "value": "الانتقال إلى أقدم غير مقروء"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Skoči na najnovije nepročitano"
+            "value": "Skoči na najstarije nepročitano"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til seneste ulæste"
+            "value": "Gå til ældste ulæste"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zur letzten ungelesenen springen"
+            "value": "Zur ältesten ungelesenen springen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jump to Latest Unread"
+            "value": "Jump to Oldest Unread"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir a la última no leída"
+            "value": "Ir a la no leída más antigua"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aller au dernier message non lu"
+            "value": "Aller au plus ancien non lu"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vai all'ultimo non letto"
+            "value": "Vai al non letto più vecchio"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新の未読にジャンプ"
+            "value": "最古の未読にジャンプ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 읽지 않은 항목으로 이동"
+            "value": "가장 오래된 읽지 않은 항목으로 이동"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til siste uleste"
+            "value": "Gå til eldste uleste"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Przejdź do najnowszego nieprzeczytanego"
+            "value": "Przejdź do najstarszego nieprzeczytanego"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir para Última Não Lida"
+            "value": "Ir para a Não Lida Mais Antiga"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти к последнему непрочитанному"
+            "value": "Перейти к самому старому непрочитанному"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ข้ามไปยังรายการยังไม่อ่านล่าสุด"
+            "value": "ข้ามไปยังรายการยังไม่อ่านเก่าที่สุด"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Son Okunmamışa Atla"
+            "value": "En Eski Okunmamışa Atla"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти до останнього непрочитаного"
+            "value": "Перейти до найстарішого непрочитаного"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳转到最新未读"
+            "value": "跳转到最旧未读"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳至最新未讀"
+            "value": "跳至最舊未讀"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លោតទៅមិនទាន់អានចាស់បំផុត"
           }
         }
       }
@@ -275578,61 +275728,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jump to Latest"
+            "value": "Oldest Unread"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新へジャンプ"
+            "value": "最古の未読"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신으로 이동"
+            "value": "가장 오래된 읽지 않음"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти до останнього"
+            "value": "Найстаріше непрочитане"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳转到最新"
+            "value": "最旧未读"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zum Neuesten springen"
+            "value": "Älteste ungelesene"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aller au plus récent"
+            "value": "Plus ancien non lu"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الانتقال إلى الأحدث"
+            "value": "أقدم غير مقروء"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir al más reciente"
+            "value": "Más antigua sin leer"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳至最新"
+            "value": "最舊未讀"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Najstarije nepročitano"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ældste ulæste"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Più vecchio non letto"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "មិនទាន់អានចាស់បំផុត"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eldste uleste"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Najstarsze nieprzeczytane"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mais antiga não lida"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Старейшее непрочитанное"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ยังไม่อ่านเก่าที่สุด"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En eski okunmamış"
           }
         }
       }
@@ -275643,115 +275853,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الانتقال إلى أحدث غير مقروء"
+            "value": "الانتقال إلى أقدم غير مقروء"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Skoči na najnovije nepročitano"
+            "value": "Skoči na najstarije nepročitano"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til seneste ulæste"
+            "value": "Gå til ældste ulæste"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zur letzten ungelesenen springen"
+            "value": "Zur ältesten ungelesenen springen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jump to Latest Unread"
+            "value": "Jump to Oldest Unread"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir a la última no leída"
+            "value": "Ir a la no leída más antigua"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aller au dernier message non lu"
+            "value": "Aller au plus ancien non lu"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vai all'ultimo non letto"
+            "value": "Vai al non letto più vecchio"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新の未読にジャンプ"
+            "value": "最古の未読にジャンプ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 읽지 않은 항목으로 이동"
+            "value": "가장 오래된 읽지 않은 항목으로 이동"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til siste uleste"
+            "value": "Gå til eldste uleste"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Przejdź do najnowszego nieprzeczytanego"
+            "value": "Przejdź do najstarszego nieprzeczytanego"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir para Última Não Lida"
+            "value": "Ir para a Não Lida Mais Antiga"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти к последнему непрочитанному"
+            "value": "Перейти к самому старому непрочитанному"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ข้ามไปยังรายการยังไม่อ่านล่าสุด"
+            "value": "ข้ามไปยังรายการยังไม่อ่านเก่าที่สุด"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Son Okunmamışa Atla"
+            "value": "En Eski Okunmamışa Atla"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти до останнього непрочитаного"
+            "value": "Перейти до найстарішого непрочитаного"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳转到最新未读"
+            "value": "跳转到最旧未读"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳至最新未讀"
+            "value": "跳至最舊未讀"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លោតទៅមិនទាន់អានចាស់បំផុត"
           }
         }
       }
@@ -394944,115 +395160,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الانتقال إلى أحدث غير مقروء"
+            "value": "الانتقال إلى أقدم غير مقروء"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Skoči na najnovije nepročitano"
+            "value": "Skoči na najstarije nepročitano"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til seneste ulæste"
+            "value": "Gå til ældste ulæste"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zur letzten ungelesenen springen"
+            "value": "Zur ältesten ungelesenen springen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jump to Latest Unread"
+            "value": "Jump to Oldest Unread"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir a la última no leída"
+            "value": "Ir a la no leída más antigua"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aller au dernier message non lu"
+            "value": "Aller au plus ancien non lu"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vai all'ultimo non letto"
+            "value": "Vai al non letto più vecchio"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新の未読にジャンプ"
+            "value": "最古の未読にジャンプ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 읽지 않은 항목으로 이동"
+            "value": "가장 오래된 읽지 않은 항목으로 이동"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til siste uleste"
+            "value": "Gå til eldste uleste"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Przejdź do najnowszego nieprzeczytanego"
+            "value": "Przejdź do najstarszego nieprzeczytanego"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir para Última Não Lida"
+            "value": "Ir para a Não Lida Mais Antiga"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти к последнему непрочитанному"
+            "value": "Перейти к самому старому непрочитанному"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ข้ามไปยังรายการยังไม่อ่านล่าสุด"
+            "value": "ข้ามไปยังรายการยังไม่อ่านเก่าที่สุด"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Son Okunmamışa Atla"
+            "value": "En Eski Okunmamışa Atla"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти до останнього непрочитаного"
+            "value": "Перейти до найстарішого непрочитаного"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳转到最新未读"
+            "value": "跳转到最旧未读"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳至最新未讀"
+            "value": "跳至最舊未讀"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លោតទៅមិនទាន់អានចាស់បំផុត"
           }
         }
       }
@@ -396432,55 +396654,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mark as Oldest Unread and Jump to Next Latest Unread"
+            "value": "Send to Back of Unread Queue and Jump to Next"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最古の未読としてマークして次の最新未読にジャンプ"
+            "value": "未読キューの最後に送って次にジャンプ"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "标记为最早未读并跳转到下一条最新未读"
+            "value": "移到未读队列末尾并跳转到下一条"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Als älteste ungelesene markieren und zur nächsten aktuellen ungelesenen springen"
+            "value": "Ans Ende der ungelesenen Warteschlange schicken und zur nächsten springen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marquer comme le plus ancien non lu et aller au non lu suivant"
+            "value": "Envoyer au bout de la file des non lus et aller au suivant"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تمييز كأقدم غير مقروء والانتقال إلى غير المقروء الأحدث التالي"
+            "value": "إرسال إلى آخر قائمة غير المقروء والانتقال إلى التالي"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marcar como no leído más antiguo e ir al siguiente no leído más reciente"
+            "value": "Enviar al final de la cola de no leídos e ir al siguiente"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "標記為最早未讀並跳至下一個最新未讀"
+            "value": "移到未讀佇列末尾並跳至下一個"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "가장 오래된 읽지 않은 상태로 표시하고 다음 읽지 않은 항목으로 이동"
+            "value": "읽지 않음 대기열의 맨 뒤로 보내고 다음으로 이동"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pošalji na kraj reda nepročitanih i skoči na sljedeće"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send bagerst i køen af ulæste og gå til næste"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manda in fondo alla coda dei non letti e vai al successivo"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ផ្ញើទៅខាងក្រោយជួរមិនទាន់អាន ហើយលោតទៅបន្ទាប់"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send bakerst i køen av uleste og gå til neste"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odeślij na koniec kolejki nieprzeczytanych i przejdź do następnego"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar para o Fim da Fila de Não Lidas e Ir para a Próxima"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отправить в конец очереди непрочитанных и перейти к следующему"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ส่งไปท้ายคิวที่ยังไม่อ่านและข้ามไปรายการถัดไป"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Okunmamış Kuyruğunun Sonuna Gönder ve Sonrakine Atla"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відправити в кінець черги непрочитаних і перейти до наступного"
           }
         }
       }
@@ -458152,115 +458440,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الانتقال إلى أحدث غير مقروء"
+            "value": "الانتقال إلى أقدم غير مقروء"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Skoči na najnovije nepročitano"
+            "value": "Skoči na najstarije nepročitano"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til seneste ulæste"
+            "value": "Gå til ældste ulæste"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zur letzten ungelesenen springen"
+            "value": "Zur ältesten ungelesenen springen"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jump to Latest Unread"
+            "value": "Jump to Oldest Unread"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir a la última no leída"
+            "value": "Ir a la no leída más antigua"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aller au dernier message non lu"
+            "value": "Aller au plus ancien non lu"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vai all'ultimo non letto"
+            "value": "Vai al non letto più vecchio"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新の未読にジャンプ"
+            "value": "最古の未読にジャンプ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 읽지 않은 항목으로 이동"
+            "value": "가장 오래된 읽지 않은 항목으로 이동"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gå til siste uleste"
+            "value": "Gå til eldste uleste"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Przejdź do najnowszego nieprzeczytanego"
+            "value": "Przejdź do najstarszego nieprzeczytanego"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ir para Última Não Lida"
+            "value": "Ir para a Não Lida Mais Antiga"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти к последнему непрочитанному"
+            "value": "Перейти к самому старому непрочитанному"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ข้ามไปยังรายการยังไม่อ่านล่าสุด"
+            "value": "ข้ามไปยังรายการยังไม่อ่านเก่าที่สุด"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Son Okunmamışa Atla"
+            "value": "En Eski Okunmamışa Atla"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перейти до останнього непрочитаного"
+            "value": "Перейти до найстарішого непрочитаного"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳转到最新未读"
+            "value": "跳转到最旧未读"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "跳至最新未讀"
+            "value": "跳至最舊未讀"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "លោតទៅមិនទាន់អានចាស់បំផុត"
           }
         }
       }

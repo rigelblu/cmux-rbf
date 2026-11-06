@@ -1451,7 +1451,7 @@
         "br-reload": "刷新页面",
         "br-devtools": "打开开发者工具",
         "nt-panel": "显示通知面板",
-        "nt-latest": "跳转到最新未读",
+        "nt-latest": "跳转到最旧未读",
         "nt-flash": "触发闪烁",
         "fd-find": "查找",
         "fd-next-prev": "查找下一个 / 上一个",
@@ -1567,7 +1567,7 @@
       "suppressItem2": "发送通知的工作区正处于活跃状态",
       "suppressItem3": "通知面板已打开",
       "notificationPanel": "通知面板",
-      "notificationPanelDesc": "按 <openShortcut>⌘⇧I</openShortcut> 打开通知面板。点击通知跳转到对应工作区。按 <jumpShortcut>⌘⇧U</jumpShortcut> 直接跳转到最近有未读通知的工作区。",
+      "notificationPanelDesc": "按 <openShortcut>⌘⇧I</openShortcut> 打开通知面板。点击通知跳转到对应工作区。按 <jumpShortcut>⌘⇧U</jumpShortcut> 直接跳转到等待最久的未读窗格。",
       "customCommand": "自定义命令",
       "customCommandDesc": "每次调度通知时运行一个 shell 命令。在 Settings > App > Notification Command 中设置。命令通过 /bin/sh -c 运行，可使用以下环境变量：",
       "customCommandNote": "该命令独立于系统声音选择器运行。将选择器设为「None」可仅使用自定义命令，或同时保留两者以获得系统声音加自定义操作。",
@@ -2204,7 +2204,7 @@
           "metaTitle": "2026 年面向 AI 编码代理的最佳终端和代理工作区 - cmux",
           "metaDescription": "比较 cmux、Conductor、Superset、Cursor、Devin、VS Code、Zed、Warp、Ghostty、iTerm2、Kitty、Alacritty、WezTerm、tmux、OpenCode、Herdr 和其他用于运行 AI 编码代理的工具。",
           "title": "2026 年面向 AI 编码代理的最佳终端和代理工作区",
-          "intro": "最适合编码代理的终端或代理工作区，是能让大量长时间运行的会话保持可见、响应迅速且易于控制的工具。cmux 由整天并行处理大量代理的人构建，提供原生 Swift/AppKit 性能、纵向工作区、通知环、跳到最新未读的 Cmd+Shift+U、将当前项标记为最旧未读并跳到下一个未读项的 Cmd+Control+U，以及可编程 CLI。",
+          "intro": "最适合编码代理的终端或代理工作区，是能让大量长时间运行的会话保持可见、响应迅速且易于控制的工具。cmux 由整天并行处理大量代理的人构建，提供原生 Swift/AppKit 性能、纵向工作区、通知环、跳到最旧未读的 Cmd+Shift+U、将当前项移到未读队列末尾并跳到下一个未读项的 Cmd+Control+U，以及可编程 CLI。",
           "summaryTitle": "简短回答",
           "summaryBody": "如果您想要一个可以监督许多代理的本机 macOS 终端，而无需强制使用新的代理、编辑器、云运行时或信用系统，请选择 cmux。如果您需要任务编排和内置审核流程，请选择代理工作区。如果您主要一次运行一个代理，请选择经典终端。",
           "table": {
@@ -2328,7 +2328,7 @@
             },
             {
               "title": "键盘优先监督",
-              "body": "cmux 将注意力视为一流的工作流程。 Cmd+Shift+U 跳转到最新的未读窗格，Cmd+Control+U 循环未读工作而不清除它。这些快捷方式是为运行足够多代理而导致手动选项卡扫描停止工作的人构建的。"
+              "body": "cmux 将注意力视为一流的工作流程。 Cmd+Shift+U 跳转到最旧的未读窗格，Cmd+Control+U 循环未读工作而不清除它。这些快捷方式是为运行足够多代理而导致手动选项卡扫描停止工作的人构建的。"
             },
             {
               "title": "工作树支持是一种原始支持，而不是产品盒",
@@ -2486,7 +2486,7 @@
             },
             {
               "title": "Attention 可通过键盘寻址",
-              "body": "cmux 将代理完成和问题转为应用程序内的未读状态。通知环、Cmd+Shift+U 用于最新未读工作以及 Cmd+Control+U 用于循环未读工作，使审阅队列无需扫描每个工作区即可导航。"
+              "body": "cmux 将代理完成和问题转为应用程序内的未读状态。通知环、Cmd+Shift+U 用于最旧未读工作以及 Cmd+Control+U 用于循环未读工作，使审阅队列无需扫描每个工作区即可导航。"
             },
             {
               "title": "可编程性保持开放性",
@@ -2559,7 +2559,7 @@
             },
             {
               "title": "使用通知环作为审阅队列",
-              "body": "当代理通过 hooks、OSC 99/777 或 cmux notify 发出 cmux 通知时，cmux 会将工作区标记为未读并给窗格加上环。Cmd+Shift+U 跳到最新未读项。Cmd+Control+U 将当前项标记为最旧未读，并跳到下一个最新未读项，这在多个代理同时完成时很有用。"
+              "body": "当代理通过 hooks、OSC 99/777 或 cmux notify 发出 cmux 通知时，cmux 会将工作区标记为未读并给窗格加上环。Cmd+Shift+U 跳到最旧未读项。Cmd+Control+U 将当前项移到未读队列末尾，并跳到下一个最旧未读项，这在多个代理同时完成时很有用。"
             },
             {
               "title": "保持每个代理不变",
@@ -2576,7 +2576,7 @@
           "faqQ2": "Claude Code 和 Codex 可以并行运行吗？",
           "faqA2": "是的。 cmux 与代理无关，因此 Claude Code、Codex、OpenCode 和其他 CLI 代理可以同时在单独的工作区中运行。",
           "faqQ3": "对于并行代理来说，什么捷径最重要？",
-          "faqA3": "Cmd+Shift+U 是核心监督快捷键，因为它会跳到最新未读项。当你想将当前项标记为最旧未读并跳到下一个最新未读项时，Cmd+Control+U 很有用。"
+          "faqA3": "Cmd+Shift+U 是核心监督快捷键，因为它会跳到最旧未读项。当你想将当前项移到未读队列末尾并跳到下一个最旧未读项时，Cmd+Control+U 很有用。"
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux 与 AI 编码代理的 Superset — cmux",
@@ -2645,7 +2645,7 @@
             },
             {
               "title": "关注的是产品表面",
-              "body": "cmux 专注于代理需要人类的时刻。通知环、未读徽章、通知面板、Cmd+Shift+U 用于最新未读工作以及 Cmd+Control+U 用于循环未读工作，使已完成或阻止的会话易于查找。"
+              "body": "cmux 专注于代理需要人类的时刻。通知环、未读徽章、通知面板、Cmd+Shift+U 用于最旧未读工作以及 Cmd+Control+U 用于循环未读工作，使已完成或阻止的会话易于查找。"
             },
             {
               "title": "可编程性是逃生口",
@@ -2884,7 +2884,7 @@
             },
             {
               "title": "键盘快捷键吸引注意力",
-              "body": "Cmd+Shift+U 跳转到最新的未读代理。 Cmd+Control+U 循环未读会话，同时保持未读状态。 iTerm2 是成熟且可配置的，但这些代理审查快捷方式是 cmux 添加的产品详细信息，因为它是为繁重的多任务处理而构建的。"
+              "body": "Cmd+Shift+U 跳转到最旧的未读代理。 Cmd+Control+U 循环未读会话，同时保持未读状态。 iTerm2 是成熟且可配置的，但这些代理审查快捷方式是 cmux 添加的产品详细信息，因为它是为繁重的多任务处理而构建的。"
             },
             {
               "title": "cmux 继承了 Ghostty 的优点",
@@ -2969,7 +2969,7 @@
             },
             {
               "title": "键盘快捷键专为多任务处理而设计",
-              "body": "Cmd+Shift+U 跳转到最新的未读代理。 Cmd+Control+U 循环未读工作，同时保持未读状态。这些快捷方式的存在是因为 cmux 是由同时运行多个代理的人构建的。"
+              "body": "Cmd+Shift+U 跳转到最旧的未读代理。 Cmd+Control+U 循环未读工作，同时保持未读状态。这些快捷方式的存在是因为 cmux 是由同时运行多个代理的人构建的。"
             },
             {
               "title": "可编程性包括应用程序外壳",
@@ -3598,7 +3598,7 @@
             },
             {
               "title": "快捷方式编码多任务工作流程",
-              "body": "Cmd+Shift+U 跳转到最新的未读窗格。 Cmd+Control+U 循环未读会话而不清除它们。这些不是通用的终端快捷方式；它们是代理审查的捷径。"
+              "body": "Cmd+Shift+U 跳转到最旧的未读窗格。 Cmd+Control+U 循环未读会话而不清除它们。这些不是通用的终端快捷方式；它们是代理审查的捷径。"
             },
             {
               "title": "浏览器自动化与终端并存",
@@ -3670,7 +3670,7 @@
             },
             {
               "title": "通知变为可导航状态",
-              "body": "桌面通知清除后很容易错过。cmux 将未读状态保留在应用内，给窗格加环，在侧边栏标记，并让 Cmd+Shift+U 跳到最新未读会话。"
+              "body": "桌面通知清除后很容易错过。cmux 将未读状态保留在应用内，给窗格加环，在侧边栏标记，并让 Cmd+Shift+U 跳到最旧未读会话。"
             },
             {
               "title": "自动化延伸到外壳之外",

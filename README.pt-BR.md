@@ -42,7 +42,7 @@ Os painéis recebem um anel azul e as abas acendem quando agentes de programaç�
 <tr>
 <td width="40%" valign="middle">
 <h3>Painel de notificações</h3>
-Veja todas as notificações pendentes em um só lugar, vá direto para a mais recente não lida
+Veja todas as notificações pendentes em um só lugar, vá direto para o painel não lido que espera há mais tempo
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Badge de notificação na barra lateral" width="100%" />
@@ -126,7 +126,7 @@ Eu executo muitas sessões de Claude Code e Codex em paralelo. Eu estava usando 
 
 Eu tentei alguns orquestradores de código, mas a maioria era apps Electron/Tauri e o desempenho me incomodava. Eu também prefiro o terminal, já que orquestradores GUI te prendem no fluxo de trabalho deles. Então eu construí o cmux como um app nativo macOS em Swift/AppKit. Ele usa o libghostty para renderização do terminal e lê sua configuração existente do Ghostty para temas, fontes e cores.
 
-As principais adições são a barra lateral e o sistema de notificações. A barra lateral tem abas verticais que mostram o branch do git, status/número do PR vinculado, diretório de trabalho, portas em escuta e o texto da última notificação para cada workspace. O sistema de notificações captura sequências do terminal (OSC 9/99/777) e tem uma CLI (`cmux notify`) que você pode conectar aos hooks de agentes para Claude Code, OpenCode, etc. Quando um agente está esperando, seu painel recebe um anel azul e a aba acende na barra lateral, para que eu possa ver qual precisa de mim entre divisões e abas. Cmd+Shift+U pula para o mais recente não lido.
+As principais adições são a barra lateral e o sistema de notificações. A barra lateral tem abas verticais que mostram o branch do git, status/número do PR vinculado, diretório de trabalho, portas em escuta e o texto da última notificação para cada workspace. O sistema de notificações captura sequências do terminal (OSC 9/99/777) e tem uma CLI (`cmux notify`) que você pode conectar aos hooks de agentes para Claude Code, OpenCode, etc. Quando um agente está esperando, seu painel recebe um anel azul e a aba acende na barra lateral, para que eu possa ver qual precisa de mim entre divisões e abas. Cmd+Shift+U pula para o painel não lido que espera há mais tempo.
 
 O navegador integrado tem uma API programável portada do [agent-browser](https://github.com/vercel-labs/agent-browser). Agentes podem capturar a árvore de acessibilidade, obter referências de elementos, clicar, preencher formulários e executar JS. Você pode dividir um painel de navegador ao lado do seu terminal e fazer o Claude Code interagir diretamente com seu servidor de desenvolvimento.
 
@@ -206,9 +206,9 @@ Os atalhos de navegação da paleta de comandos, incluindo ⌃ P, também são p
 | Atalho | Ação |
 |----------|--------|
 | ⌘ I | Mostrar painel de notificações |
-| ⌘ ⇧ U | Ir para última não lida |
+| ⌘ ⇧ U | Ir para o painel não lido que espera há mais tempo |
 | ⌥ ⌘ U | Alternar estado de não lida do item atual |
-| ⌃ ⌘ U | Marcar item atual como não lido mais antigo e ir para a próxima não lida mais recente |
+| ⌃ ⌘ U | Enviar o item atual para o fim da fila de não lidos e ir para o próximo |
 
 ### Busca
 

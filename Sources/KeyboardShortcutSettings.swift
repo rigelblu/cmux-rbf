@@ -280,10 +280,10 @@ enum KeyboardShortcutSettings {
             case .commandPalettePrevious: return String(localized: "shortcut.commandPalettePrevious.label", defaultValue: "Command Palette: Previous")
             case .sendFeedback: return String(localized: "sidebar.help.sendFeedback", defaultValue: "Send Feedback")
             case .showNotifications: return String(localized: "shortcut.showNotifications.label", defaultValue: "Show Notifications")
-            case .jumpToUnread: return String(localized: "shortcut.jumpToUnread.label", defaultValue: "Jump to Latest Unread")
+            case .jumpToUnread: return String(localized: "shortcut.jumpToUnread.label", defaultValue: "Jump to Oldest Unread") // (cm-128.11)
             case .toggleUnread: return String(localized: "shortcut.toggleUnread.label", defaultValue: "Toggle Unread")
             case .markOldestUnreadAndJumpNext:
-                return String(localized: "shortcut.markOldestUnreadAndJumpNext.label", defaultValue: "Mark as Oldest Unread and Jump to Next Latest Unread")
+                return String(localized: "shortcut.markOldestUnreadAndJumpNext.label", defaultValue: "Send to Back of Unread Queue and Jump to Next") // (cm-128.11)
             case .markAllNotificationsRead:
                 return String(localized: "shortcut.markAllNotificationsRead.label", defaultValue: "Mark All Notifications Read")
             case .clearAllNotifications:

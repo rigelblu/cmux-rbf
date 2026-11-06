@@ -23,4 +23,15 @@ public protocol UnreadWorkspaceTargeting: AnyObject {
 
     /// Clears the workspace's unread state after a jump opened `panelId`.
     func clearUnreadAfterJump(workspaceId: UUID, panelId: UUID?)
+
+    /// The pane he's on: the focused pane of the key window with cmux frontmost, or `nil` when cmux
+    /// isn't frontmost or nothing is focused (`cm-128.11`). The unread walk reads such a pane and passes
+    /// it by; the coordinator compares it with a stop through ``owningPanelId(workspaceId:surfaceId:)``.
+    func frontmostFocusedPane() -> UnreadQueueTarget?
+
+    /// The workspace panel that owns `surfaceId` (`cm-128.11`). It is `surfaceId` itself for an ordinary
+    /// pane; a remote tmux pane inside a container panel maps to that container. A surface this doesn't
+    /// know maps to itself. The walk maps one side at a time through this, never both, since two panes in
+    /// one container are two panes.
+    func owningPanelId(workspaceId: UUID, surfaceId: UUID) -> UUID
 }

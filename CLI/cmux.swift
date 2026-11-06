@@ -20192,11 +20192,11 @@ struct CMUXCLI {
               --json                Print JSON
               --id-format <mode>    refs, uuids, or both
             """)
-        case "jump-to-unread":
+        case "jump-to-unread": // (cm-128.11) the sentence below changed with the order
             return String(localized: "cli.help.jumpToUnread", defaultValue: """
             Usage: cmux jump-to-unread
 
-            Focus the latest unread notification, matching the Notifications page action.
+            Focus the unread pane that has waited longest, matching the Notifications page action.
 
             Flags:
               --json                Print JSON
@@ -41266,7 +41266,7 @@ export default CMUXSessionRestore;
           \(bold)\u{2318}\u{21E7}P\(reset)\(subdued)                 Command palette\(reset)
           \(bold)\u{2318}\u{21E7}R\(reset)\(subdued)                 Rename workspace\(reset)
           \(bold)\u{2318}\u{21E7}L\(reset)\(subdued)                 New browser\(reset)
-          \(bold)\u{2318}\u{21E7}U\(reset)\(subdued)                 Jump to latest unread\(reset)
+          \(bold)\u{2318}\u{21E7}U\(reset)\(subdued)                 Jump to oldest unread\(reset)
           \(bold)\u{2325}\u{2318}U\(reset)\(subdued)                 Toggle unread\(reset)
         """
 

@@ -595,8 +595,8 @@ struct cmuxApp: App {
                     showNotificationsPopover()
                 }
 
-                splitCommandButton(title: String(localized: "menu.notifications.jumpToUnread", defaultValue: "Jump to Latest Unread"), shortcut: menuShortcut(for: .jumpToUnread)) {
-                    _ = appDelegate.jumpToLatestMacNotificationUnread()
+                splitCommandButton(title: String(localized: "menu.notifications.jumpToUnread", defaultValue: "Jump to Oldest Unread"), shortcut: menuShortcut(for: .jumpToUnread)) {
+                    _ = appDelegate.jumpToOldestUnread() // (cm-128.11)
                 }
                 .disabled(!snapshot.hasUnreadNotifications)
 
@@ -1279,8 +1279,8 @@ struct cmuxApp: App {
 
             Divider()
 
-            splitCommandButton(title: String(localized: "menu.view.jumpToUnread", defaultValue: "Jump to Latest Unread"), shortcut: menuShortcut(for: .jumpToUnread)) {
-                AppDelegate.shared?.jumpToLatestUnread()
+            splitCommandButton(title: String(localized: "menu.view.jumpToUnread", defaultValue: "Jump to Oldest Unread"), shortcut: menuShortcut(for: .jumpToUnread)) {
+                AppDelegate.shared?.jumpToOldestUnread() // (cm-128.11)
             }
 
             splitCommandButton(title: String(localized: "menu.view.showNotifications", defaultValue: "Show Notifications"), shortcut: menuShortcut(for: .showNotifications)) {

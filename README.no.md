@@ -42,7 +42,7 @@ Paneler får en blå ring og faner lyser opp når kodeagenter trenger oppmerksom
 <tr>
 <td width="40%" valign="middle">
 <h3>Varselpanel</h3>
-Se alle ventende varsler på ett sted, hopp til det nyeste uleste
+Se alle ventende varsler på ett sted, hopp til det uleste panelet som har ventet lengst
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Varselmerke i sidefeltet" width="100%" />
@@ -126,7 +126,7 @@ Jeg kjører mange Claude Code- og Codex-sesjoner parallelt. Jeg brukte Ghostty m
 
 Jeg prøvde noen kodeorkestratorer, men de fleste var Electron/Tauri-apper og ytelsen irriterte meg. Jeg foretrekker også terminalen siden GUI-orkestratorer låser deg inn i arbeidsflyten deres. Så jeg bygde cmux som en nativ macOS-app i Swift/AppKit. Den bruker libghostty for terminalgjengivelse og leser din eksisterende Ghostty-konfigurasjon for temaer, skrifttyper og farger.
 
-Hovedtilleggene er sidefeltet og varselsystemet. Sidefeltet har vertikale faner som viser git-gren, tilknyttet PR-status/nummer, arbeidsmappe, lyttende porter og siste varselstekst for hvert arbeidsområde. Varselsystemet fanger opp terminalsekvenser (OSC 9/99/777) og har en CLI (`cmux notify`) du kan koble til agentkroker for Claude Code, OpenCode osv. Når en agent venter, får panelet en blå ring og fanen lyser opp i sidefeltet, så jeg kan se hvilken som trenger meg på tvers av delinger og faner. Cmd+Shift+U hopper til det nyeste uleste.
+Hovedtilleggene er sidefeltet og varselsystemet. Sidefeltet har vertikale faner som viser git-gren, tilknyttet PR-status/nummer, arbeidsmappe, lyttende porter og siste varselstekst for hvert arbeidsområde. Varselsystemet fanger opp terminalsekvenser (OSC 9/99/777) og har en CLI (`cmux notify`) du kan koble til agentkroker for Claude Code, OpenCode osv. Når en agent venter, får panelet en blå ring og fanen lyser opp i sidefeltet, så jeg kan se hvilken som trenger meg på tvers av delinger og faner. Cmd+Shift+U hopper til det uleste panelet som har ventet lengst.
 
 Den innebygde nettleseren har et skriptbart API portet fra [agent-browser](https://github.com/vercel-labs/agent-browser). Agenter kan ta overblikk over tilgjengelighetstreet, hente elementreferanser, klikke, fylle ut skjemaer og kjøre JS. Du kan dele et nettleserpanel ved siden av terminalen og la Claude Code samhandle med utviklingsserveren din direkte.
 
@@ -206,9 +206,9 @@ Snarveier for navigasjon i kommandopaletten, inkludert ⌃ P, kan også tilpasse
 | Snarvei | Handling |
 |----------|--------|
 | ⌘ I | Vis varselpanel |
-| ⌘ ⇧ U | Hopp til nyeste uleste |
+| ⌘ ⇧ U | Hopp til det uleste panelet som har ventet lengst |
 | ⌥ ⌘ U | Veksle ulest-status for gjeldende element |
-| ⌃ ⌘ U | Merk gjeldende element som eldste uleste og hopp til neste nyeste uleste |
+| ⌃ ⌘ U | Send gjeldende element bakerst i køen av uleste og hopp til neste |
 
 ### Søk
 
