@@ -1450,7 +1450,7 @@
         "br-reload": "Genindlæs side",
         "br-devtools": "Åbn udviklerværktøjer",
         "nt-panel": "Vis notifikationspanel",
-        "nt-latest": "Spring til seneste ulæste",
+        "nt-latest": "Spring til ældste ulæste",
         "nt-flash": "Udløs flash",
         "fd-find": "Find",
         "fd-next-prev": "Find næste / forrige",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "Det specifikke workspace der sender notifikationen er aktivt",
       "suppressItem3": "Notifikationspanelet er åbent",
       "notificationPanel": "Notifikationspanel",
-      "notificationPanelDesc": "Tryk <openShortcut>⌘⇧I</openShortcut> for at åbne notifikationspanelet. Klik på en notifikation for at springe til det workspace. Tryk <jumpShortcut>⌘⇧U</jumpShortcut> for at springe direkte til workspace med den seneste ulæste notifikation.",
+      "notificationPanelDesc": "Tryk <openShortcut>⌘⇧I</openShortcut> for at åbne notifikationspanelet. Klik på en notifikation for at springe til det workspace. Tryk <jumpShortcut>⌘⇧U</jumpShortcut> for at springe til det ulæste panel, der har ventet længst.",
       "customCommand": "Brugerdefineret kommando",
       "customCommandDesc": "Kør en shell-kommando hver gang en notifikation planlægges. Indstil det i Indstillinger > App > Notifikationskommando. Kommandoen kører via /bin/sh -c med disse miljøvariabler:",
       "customCommandNote": "Kommandoen kører uafhængigt af systemlydvælgeren. Sæt vælgeren til \"Ingen\" for kun at bruge den brugerdefinerede kommando, eller behold begge for en systemlyd plus en brugerdefineret handling.",
@@ -2201,7 +2201,7 @@
           "metaTitle": "Bedste terminaler og agentarbejdsområder til AI-kodeagenter i 2026 - cmux",
           "metaDescription": "Sammenlign cmux, Superset, Warp, Ghostty, iTerm2, tmux og andre terminaler til at køre AI-kodningsagenter.",
           "title": "Bedste terminaler og agentarbejdsområder til AI-kodeagenter i 2026",
-          "intro": "Den bedste terminal eller det bedste agentarbejdsområde til kodeagenter er det, der holder mange langvarige sessioner synlige, responsive og lette at styre. cmux er bygget af folk, der multitasker gennem mange agenter hele dagen: native Swift/AppKit-ydelse, vertikale arbejdsområder, notifikationsringe, Cmd+Shift+U til seneste ulæste, Cmd+Control+U til at markere det aktuelle element som ældst ulæst og hoppe til det næste ulæste element samt en programmerbar CLI.",
+          "intro": "Den bedste terminal eller det bedste agentarbejdsområde til kodeagenter er det, der holder mange langvarige sessioner synlige, responsive og lette at styre. cmux er bygget af folk, der multitasker gennem mange agenter hele dagen: native Swift/AppKit-ydelse, vertikale arbejdsområder, notifikationsringe, Cmd+Shift+U til ældste ulæste, Cmd+Control+U til at sende det aktuelle element bagerst i køen af ulæste og hoppe til det næste ulæste element samt en programmerbar CLI.",
           "summaryTitle": "Kort svar",
           "summaryBody": "Vælg cmux, hvis du vil have en native macOS-terminal, der kan overvåge mange agenter uden at tvinge en ny agent, editor, cloud-runtime eller kreditsystem ned over dig. Vælg et agent-workspace, hvis du vil have opgaveorkestrering og indbyggede review-flows. Vælg en klassisk terminal, hvis du mest kører én agent ad gangen.",
           "table": {
@@ -2325,7 +2325,7 @@
             },
             {
               "title": "Tastaturførst overvågning",
-              "body": "cmux behandler opmærksomhed som et centralt workflow. Genveje som hop til seneste ulæste fører dig direkte til panelet, der kræver en beslutning, i stedet for at gennemgå hver fane eller vente på, at skrivebordsnotifikationer giver mening."
+              "body": "cmux behandler opmærksomhed som et centralt workflow. Genveje som hop til ældste ulæste fører dig direkte til panelet, der kræver en beslutning, i stedet for at gennemgå hver fane eller vente på, at skrivebordsnotifikationer giver mening."
             },
             {
               "title": "Worktree-understøttelse er en primitiv, ikke en produktboks",
@@ -2394,7 +2394,7 @@
             },
             {
               "title": "Brug notifikationsringe som review-kø",
-              "body": "Når en agent udsender en cmux-notifikation via hooks, OSC 99/777 eller cmux notify, markerer cmux arbejdsområdet som ulæst og ringer panelet. Cmd+Shift+U hopper til det seneste ulæste element. Cmd+Control+U markerer det aktuelle element som ældst ulæst og hopper til det næste seneste ulæste element, hvilket er nyttigt, når flere agenter bliver færdige samtidig."
+              "body": "Når en agent udsender en cmux-notifikation via hooks, OSC 99/777 eller cmux notify, markerer cmux arbejdsområdet som ulæst og ringer panelet. Cmd+Shift+U hopper til det ældste ulæste element. Cmd+Control+U sender det aktuelle element bagerst i køen af ulæste og hopper til det næste ældste ulæste element, hvilket er nyttigt, når flere agenter bliver færdige samtidig."
             },
             {
               "title": "Hold Claude Code uændret",
@@ -2411,7 +2411,7 @@
           "faqQ2": "Kan Claude Code og Codex køre ved siden af hinanden?",
           "faqA2": "Ja. cmux er agentagnostisk, så Claude Code, Codex, OpenCode og andre CLI-agenter kan køre i separate workspaces samtidig.",
           "faqQ3": "Hvilken genvej betyder mest for parallelle agenter?",
-          "faqA3": "Cmd+Shift+U er den centrale overvågningsgenvej, fordi den hopper til det seneste ulæste element. Cmd+Control+U er nyttig, når du vil markere det aktuelle element som ældst ulæst og hoppe til det næste seneste ulæste element."
+          "faqA3": "Cmd+Shift+U er den centrale overvågningsgenvej, fordi den hopper til det ældste ulæste element. Cmd+Control+U er nyttig, når du vil sende det aktuelle element bagerst i køen af ulæste og hoppe til det næste ældste ulæste element."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset til AI-kodningsagenter: cmux",
@@ -2480,7 +2480,7 @@
             },
             {
               "title": "Opmærksomhed er en produktflade",
-              "body": "cmux fokuserer på øjeblikket, hvor en agent har brug for et menneske. Notifikationsringe, ulæste badges, et notifikationspanel og hop til seneste ulæste gør færdige eller blokerede sessioner nemme at finde."
+              "body": "cmux fokuserer på øjeblikket, hvor en agent har brug for et menneske. Notifikationsringe, ulæste badges, et notifikationspanel og hop til ældste ulæste gør færdige eller blokerede sessioner nemme at finde."
             },
             {
               "title": "Programmerbarhed er nødudgangen",
@@ -2715,7 +2715,7 @@
             },
             {
               "title": "Notifikationer bliver navigerbar tilstand",
-              "body": "Desktopnotifikationer er lette at overse, når de forsvinder. cmux holder ulæst tilstand inde i appen, ringer panelet, markerer sidebaren og lader Cmd+Shift+U hoppe til den seneste ulæste session."
+              "body": "Desktopnotifikationer er lette at overse, når de forsvinder. cmux holder ulæst tilstand inde i appen, ringer panelet, markerer sidebaren og lader Cmd+Shift+U hoppe til den ældste ulæste session."
             },
             {
               "title": "Automatisering rækker uden for shellen",
@@ -2873,7 +2873,7 @@
             },
             {
               "title": "Notifikationer bliver tilstand",
-              "body": "cmux forvandler agentudførelse og spørgsmål til ulæst tilstand i appen. Meddelelsesringe, Cmd+Shift+U for seneste ulæste, og Cmd+Control+U til cykling af ulæst arbejde gør gennemgangskøen navigerbar uden at scanne alle arbejdsområder."
+              "body": "cmux forvandler agentudførelse og spørgsmål til ulæst tilstand i appen. Meddelelsesringe, Cmd+Shift+U for ældste ulæste, og Cmd+Control+U til cykling af ulæst arbejde gør gennemgangskøen navigerbar uden at scanne alle arbejdsområder."
             },
             {
               "title": "Workflowet er programmerbart",
@@ -3035,7 +3035,7 @@
             },
             {
               "title": "Notifikationer bliver tilstand",
-              "body": "Cmd+Shift+U hopper til den seneste ulæste agent. Cmd+Control+U skifter ulæste sessioner, mens de forbliver ulæste. iTerm2 er moden og konfigurerbar, men disse genveje til agentgennemgang er den slags produktdetaljer, cmux tilføjer, fordi den er bygget til tung multitasking."
+              "body": "Cmd+Shift+U hopper til den ældste ulæste agent. Cmd+Control+U skifter ulæste sessioner, mens de forbliver ulæste. iTerm2 er moden og konfigurerbar, men disse genveje til agentgennemgang er den slags produktdetaljer, cmux tilføjer, fordi den er bygget til tung multitasking."
             },
             {
               "title": "Workflowet er programmerbart",
@@ -3120,7 +3120,7 @@
             },
             {
               "title": "Workflowet er programmerbart",
-              "body": "Cmd+Shift+U hopper til den seneste ulæste agent. Cmd+Control+U skifter ulæst arbejde, mens det bevarer det ulæst. Disse genveje eksisterer, fordi cmux er bygget af folk, der kører mange agenter på én gang."
+              "body": "Cmd+Shift+U hopper til den ældste ulæste agent. Cmd+Control+U skifter ulæst arbejde, mens det bevarer det ulæst. Disse genveje eksisterer, fordi cmux er bygget af folk, der kører mange agenter på én gang."
             },
             {
               "title": "Programmerbarhed inkluderer app-skallen",
@@ -3667,7 +3667,7 @@
             },
             {
               "title": "Workflowet er programmerbart",
-              "body": "Cmd+Shift+U hopper til den seneste ulæste rude. Cmd+Control+U skifter ulæste sessioner uden at rydde dem. Det er ikke generiske terminalgenveje; de er genveje til agentanmeldelse."
+              "body": "Cmd+Shift+U hopper til den ældste ulæste rude. Cmd+Control+U skifter ulæste sessioner uden at rydde dem. Det er ikke generiske terminalgenveje; de er genveje til agentanmeldelse."
             },
             {
               "title": "Browserautomatisering lever ved siden af terminaler",

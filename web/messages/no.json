@@ -1450,7 +1450,7 @@
         "br-reload": "Last inn side på nytt",
         "br-devtools": "Åpne utviklerverktøy",
         "nt-panel": "Vis varselpanel",
-        "nt-latest": "Hopp til siste uleste",
+        "nt-latest": "Hopp til eldste uleste",
         "nt-flash": "Utløs blink",
         "fd-find": "Finn",
         "fd-next-prev": "Finn neste / forrige",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "Det spesifikke arbeidsområdet som sender varselet er aktivt",
       "suppressItem3": "Varselpanelet er åpent",
       "notificationPanel": "Varselpanel",
-      "notificationPanelDesc": "Trykk <openShortcut>⌘⇧I</openShortcut> for å åpne varselpanelet. Klikk et varsel for å hoppe til det arbeidsområdet. Trykk <jumpShortcut>⌘⇧U</jumpShortcut> for å hoppe direkte til arbeidsområdet med det nyeste uleste varselet.",
+      "notificationPanelDesc": "Trykk <openShortcut>⌘⇧I</openShortcut> for å åpne varselpanelet. Klikk et varsel for å hoppe til det arbeidsområdet. Trykk <jumpShortcut>⌘⇧U</jumpShortcut> for å hoppe til det uleste panelet som har ventet lengst.",
       "customCommand": "Egendefinert kommando",
       "customCommandDesc": "Kjør en shell-kommando hver gang et varsel planlegges. Sett den i Innstillinger > App > Varselkommando. Kommandoen kjøres via /bin/sh -c med disse miljøvariablene:",
       "customCommandNote": "Kommandoen kjøres uavhengig av systemlydvelgeren. Sett velgeren til \"Ingen\" for å kun bruke den egendefinerte kommandoen, eller behold begge for en systemlyd pluss en egendefinert handling.",
@@ -2342,7 +2342,7 @@
           "metaTitle": "Beste terminaler og agentarbeidsområder for AI-kodingsagenter i 2026 - cmux",
           "metaDescription": "Sammenlign cmux, Superset, Warp, Ghostty, iTerm2, tmux og andre terminaler for å kjøre AI-kodingsagenter.",
           "title": "Beste terminaler og agentarbeidsområder for AI-kodingsagenter i 2026",
-          "intro": "Det beste terminal- eller agentarbeidsområdet for koding av agenter er det som holder mange langvarige økter synlige, responsive og enkle å kontrollere. cmux er bygget av folk som multitasker gjennom mange agenter hele dagen: opprinnelig Swift/AppKit-ytelse, vertikale arbeidsområder, varslingsringer, Cmd+Shift+U for siste uleste, Cmd+Control+U for å markere gjeldende element som eldste uleste og hoppe til neste uleste element, og en programmerbar CLI.",
+          "intro": "Det beste terminal- eller agentarbeidsområdet for koding av agenter er det som holder mange langvarige økter synlige, responsive og enkle å kontrollere. cmux er bygget av folk som multitasker gjennom mange agenter hele dagen: opprinnelig Swift/AppKit-ytelse, vertikale arbeidsområder, varslingsringer, Cmd+Shift+U for eldste uleste, Cmd+Control+U for å sende gjeldende element bakerst i køen av uleste og hoppe til neste uleste element, og en programmerbar CLI.",
           "summaryTitle": "Kort svar",
           "summaryBody": "Velg cmux hvis du vil ha en native macOS-terminal som kan overvåke mange agenter uten å tvinge inn en ny agent, editor, sky-runtime eller kredittsystem. Velg et agentarbeidsområde hvis du vil ha oppgaveorkestrering og innebygde review-flyter. Velg en klassisk terminal hvis du stort sett kjører én agent om gangen.",
           "table": {
@@ -2466,7 +2466,7 @@
             },
             {
               "title": "Tastaturførst overvåking",
-              "body": "cmux behandler oppmerksomhet som en del av workflowen. Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U blar gjennom unread arbeid uten å tømme det. Snarveiene er laget for folk som kjører nok agenter til at manuell tab-skanning slutter å fungere."
+              "body": "cmux behandler oppmerksomhet som en del av workflowen. Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U blar gjennom unread arbeid uten å tømme det. Snarveiene er laget for folk som kjører nok agenter til at manuell tab-skanning slutter å fungere."
             },
             {
               "title": "Worktree-støtte er et primitiv, ikke en produktboks",
@@ -2517,7 +2517,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "Visuelle bjelle, bjellekommandoer og eksterne varslingsskript"
               ],
               [
@@ -2539,7 +2539,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -2598,7 +2598,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "For det meste manuelt eller bundet til produktet"
               ],
               [
@@ -2620,7 +2620,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -2697,7 +2697,7 @@
             },
             {
               "title": "Bruk varslingsringer som review-kø",
-              "body": "Når en agent sender ut en cmux-varsling gjennom kroker, OSC 99/777- eller cmux-varsler, merker cmux arbeidsområdet som ulest og ringer til ruten. Cmd+Shift+U hopper til det siste uleste elementet. Cmd+Control+U merker gjeldende element som eldste uleste og hopper til neste siste uleste, noe som er nyttig når flere agenter fullfører samtidig."
+              "body": "Når en agent sender ut en cmux-varsling gjennom kroker, OSC 99/777- eller cmux-varsler, merker cmux arbeidsområdet som ulest og ringer til ruten. Cmd+Shift+U hopper til det eldste uleste elementet. Cmd+Control+U sender gjeldende element bakerst i køen av uleste og hopper til neste eldste uleste, noe som er nyttig når flere agenter fullfører samtidig."
             },
             {
               "title": "Hold Claude Code uendret",
@@ -2714,7 +2714,7 @@
           "faqQ2": "Kan Claude Code og Codex kjøre ved siden av hverandre?",
           "faqA2": "Ja. cmux er agentagnostisk, så Claude Code, Codex, OpenCode og andre CLI-agenter kan kjøre i separate arbeidsområder samtidig.",
           "faqQ3": "Hvilken hurtigtast betyr mest for parallelle agenter?",
-          "faqA3": "Cmd+Shift+U er kjernetilsynssnarveien fordi den hopper til det siste uleste elementet. Cmd+Control+U er nyttig når du vil markere gjeldende element som eldste uleste og hoppe til neste siste uleste element."
+          "faqA3": "Cmd+Shift+U er kjernetilsynssnarveien fordi den hopper til det eldste uleste elementet. Cmd+Control+U er nyttig når du vil sende gjeldende element bakerst i køen av uleste og hoppe til neste eldste uleste element."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset for AI-kodingsagenter - cmux",
@@ -2783,7 +2783,7 @@
             },
             {
               "title": "Oppmerksomhet er en produktflate",
-              "body": "cmux fokuserer på øyeblikket når en agent trenger et menneske. Notification rings, unread-merker, et varslingspanel, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid gjør ferdige eller blokkerte økter enkle å finne."
+              "body": "cmux fokuserer på øyeblikket når en agent trenger et menneske. Notification rings, unread-merker, et varslingspanel, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid gjør ferdige eller blokkerte økter enkle å finne."
             },
             {
               "title": "Programmerbarhet er utveien",
@@ -2915,7 +2915,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "Devin Cloud, Devin Local, Devin CLI og ACP-kompatible agenter"
               ],
               [
@@ -2996,7 +2996,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "OSC-varsler, merker og varsler, utløservarsler og øktsøk"
               ],
               [
@@ -3077,7 +3077,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "OSC 99 skrivebordsvarsler og kattungevarsler, med tilpasset skripting for uleste arbeidsflyter"
               ],
               [
@@ -3099,7 +3099,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -3158,7 +3158,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "For det meste manuelt eller bundet til produktet"
               ],
               [
@@ -3185,7 +3185,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -3235,7 +3235,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "For det meste manuelt eller bundet til produktet"
               ],
               [
@@ -3257,7 +3257,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -3312,7 +3312,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "For det meste manuelt eller bundet til produktet"
               ],
               [
@@ -3334,7 +3334,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -3393,7 +3393,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "For det meste manuelt eller bundet til produktet"
               ],
               [
@@ -3470,7 +3470,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "Devin, Cascade og ACP-kompatible agenter inne i Devin Desktop"
               ],
               [
@@ -3492,7 +3492,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -3547,7 +3547,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "Innebygd terminalemulator som bruker Alacritty som backend"
               ],
               [
@@ -3569,7 +3569,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -3706,7 +3706,7 @@
               ],
               [
                 "Oppmerksomhetsmodell",
-                "Notification rings, Cmd+Shift+U for nyeste unread og Cmd+Control+U for å bla gjennom unread arbeid",
+                "Notification rings, Cmd+Shift+U for eldste unread og Cmd+Control+U for å bla gjennom unread arbeid",
                 "For det meste manuelt eller bundet til produktet"
               ],
               [
@@ -3728,7 +3728,7 @@
             },
             {
               "title": "Snarveiene er en del av oppmerksomhetsmodellen",
-              "body": "Cmd+Shift+U hopper til nyeste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
+              "body": "Cmd+Shift+U hopper til eldste unread pane, og Cmd+Control+U går gjennom unread arbeid uten å tømme tilstanden. Det gjør ferdige eller blokkerte agenter til en review-kø."
             },
             {
               "title": "Workflowen forblir programmerbar",
@@ -3808,7 +3808,7 @@
             },
             {
               "title": "Varsler blir navigerbar tilstand",
-              "body": "Skrivebordsvarsler er enkle å gå glipp av når de forsvinner. cmux beholder ulest tilstand inne i appen, ringer ruten, markerer sidefeltet og lar Cmd+Shift+U hoppe til den siste uleste økten."
+              "body": "Skrivebordsvarsler er enkle å gå glipp av når de forsvinner. cmux beholder ulest tilstand inne i appen, ringer ruten, markerer sidefeltet og lar Cmd+Shift+U hoppe til den eldste uleste økten."
             },
             {
               "title": "Automatisering når utenfor shell",

@@ -1450,7 +1450,7 @@
         "br-reload": "إعادة تحميل الصفحة",
         "br-devtools": "فتح أدوات المطور",
         "nt-panel": "عرض لوحة الإشعارات",
-        "nt-latest": "الانتقال إلى أحدث غير مقروء",
+        "nt-latest": "الانتقال إلى أقدم غير مقروء",
         "nt-flash": "تشغيل الوميض",
         "fd-find": "بحث",
         "fd-next-prev": "بحث التالي / السابق",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "مساحة العمل المحددة التي ترسل الإشعار نشطة",
       "suppressItem3": "لوحة الإشعارات مفتوحة",
       "notificationPanel": "لوحة الإشعارات",
-      "notificationPanelDesc": "اضغط <openShortcut>⌘⇧I</openShortcut> لفتح لوحة الإشعارات. انقر على إشعار للانتقال إلى مساحة العمل تلك. اضغط <jumpShortcut>⌘⇧U</jumpShortcut> للانتقال مباشرة إلى مساحة العمل التي تحتوي على أحدث إشعار غير مقروء.",
+      "notificationPanelDesc": "اضغط <openShortcut>⌘⇧I</openShortcut> لفتح لوحة الإشعارات. انقر على إشعار للانتقال إلى مساحة العمل تلك. اضغط <jumpShortcut>⌘⇧U</jumpShortcut> للانتقال إلى اللوح غير المقروء الذي ينتظر منذ أطول وقت.",
       "customCommand": "أمر مخصص",
       "customCommandDesc": "تشغيل أمر shell في كل مرة يُجدول فيها إشعار. عيّنه في الإعدادات > التطبيق > أمر الإشعار. يُشغل الأمر عبر /bin/sh -c مع متغيرات البيئة هذه:",
       "customCommandNote": "يعمل الأمر بشكل مستقل عن منتقي صوت النظام. عيّن المنتقي إلى \"لا شيء\" لاستخدام الأمر المخصص فقط، أو احتفظ بكليهما لصوت نظام مع إجراء مخصص.",
@@ -2342,7 +2342,7 @@
           "metaTitle": "أفضل الطرفيات ومساحات عمل الوكلاء لوكلاء برمجة الذكاء الاصطناعي في 2026 - cmux",
           "metaDescription": "قارن cmux وSuperset وWarp وGhostty وiTerm2 وtmux وطرفيات أخرى لتشغيل وكلاء برمجة الذكاء الاصطناعي.",
           "title": "أفضل الطرفيات ومساحات عمل الوكلاء لوكلاء برمجة الذكاء الاصطناعي في 2026",
-          "intro": "أفضل طرفية أو مساحة عمل للوكلاء من أجل وكلاء البرمجة هي التي تبقي الجلسات الطويلة الكثيرة مرئية وسريعة الاستجابة وسهلة التحكم. بُني cmux بواسطة أشخاص يعملون عبر وكلاء كثيرين طوال اليوم: أداء Swift/AppKit أصلي، ومساحات عمل عمودية، وحلقات إشعارات، وCmd+Shift+U لأحدث عنصر غير مقروء، وCmd+Control+U لوضع العنصر الحالي كأقدم عنصر غير مقروء والانتقال إلى العنصر غير المقروء التالي، وCLI قابل للبرمجة.",
+          "intro": "أفضل طرفية أو مساحة عمل للوكلاء من أجل وكلاء البرمجة هي التي تبقي الجلسات الطويلة الكثيرة مرئية وسريعة الاستجابة وسهلة التحكم. بُني cmux بواسطة أشخاص يعملون عبر وكلاء كثيرين طوال اليوم: أداء Swift/AppKit أصلي، ومساحات عمل عمودية، وحلقات إشعارات، وCmd+Shift+U لأقدم عنصر غير مقروء، وCmd+Control+U لإرسال العنصر الحالي إلى آخر قائمة غير المقروء والانتقال إلى العنصر غير المقروء التالي، وCLI قابل للبرمجة.",
           "summaryTitle": "الإجابة المختصرة",
           "summaryBody": "اختر cmux إذا أردت طرفية macOS أصلية يمكنها الإشراف على وكلاء كثيرين دون فرض وكيل جديد أو محرر أو runtime سحابي أو نظام أرصدة. اختر مساحة عمل وكلاء إذا أردت تنسيق المهام وتدفقات مراجعة مدمجة. اختر طرفية كلاسيكية إذا كنت تشغل غالبًا وكيلًا واحدًا في كل مرة.",
           "table": {
@@ -2466,7 +2466,7 @@
             },
             {
               "title": "إشراف يبدأ من لوحة المفاتيح",
-              "body": "يتعامل cmux مع الانتباه كجزء أساسي من workflow. ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسحه. صممت هذه الاختصارات لمن يشغلون وكلاء كثيرين بحيث لا يعود فحص التبويبات يدويا مجديا."
+              "body": "يتعامل cmux مع الانتباه كجزء أساسي من workflow. ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسحه. صممت هذه الاختصارات لمن يشغلون وكلاء كثيرين بحيث لا يعود فحص التبويبات يدويا مجديا."
             },
             {
               "title": "دعم worktree بدائية، لا خانة منتج",
@@ -2517,7 +2517,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "جرس مرئي، وأمر الجرس، وسكربتات إشعارات خارجية"
               ],
               [
@@ -2539,7 +2539,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -2598,7 +2598,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "غالبا يدوي أو مرتبط بالمنتج"
               ],
               [
@@ -2620,7 +2620,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -2697,7 +2697,7 @@
             },
             {
               "title": "استخدم حلقات الإشعارات كطابور مراجعة",
-              "body": "عندما يصدر وكيل إشعار cmux عبر hooks أو OSC 99/777 أو cmux notify، يعلّم cmux مساحة العمل كغير مقروءة ويرن pane. ينتقل Cmd+Shift+U إلى أحدث عنصر غير مقروء. يضع Cmd+Control+U العنصر الحالي كأقدم غير مقروء وينتقل إلى أحدث عنصر غير مقروء تال، وهذا مفيد عندما تنتهي عدة وكلاء في وقت واحد."
+              "body": "عندما يصدر وكيل إشعار cmux عبر hooks أو OSC 99/777 أو cmux notify، يعلّم cmux مساحة العمل كغير مقروءة ويرن pane. ينتقل Cmd+Shift+U إلى أقدم عنصر غير مقروء. يرسل Cmd+Control+U العنصر الحالي إلى آخر قائمة غير المقروء وينتقل إلى أقدم عنصر غير مقروء تال، وهذا مفيد عندما تنتهي عدة وكلاء في وقت واحد."
             },
             {
               "title": "أبق Claude Code كما هو",
@@ -2714,7 +2714,7 @@
           "faqQ2": "هل يمكن تشغيل Claude Code وCodex جنبًا إلى جنب؟",
           "faqA2": "نعم. cmux محايد تجاه الوكيل، لذلك يمكن تشغيل Claude Code وCodex وOpenCode ووكلاء CLI آخرين في مساحات عمل منفصلة في الوقت نفسه.",
           "faqQ3": "ما أهم اختصار للوكلاء المتوازيين؟",
-          "faqA3": "Cmd+Shift+U هو اختصار الإشراف الأساسي لأنه ينتقل إلى أحدث عنصر غير مقروء. يكون Cmd+Control+U مفيدا عندما تريد وضع العنصر الحالي كأقدم غير مقروء والانتقال إلى أحدث عنصر غير مقروء تال."
+          "faqA3": "Cmd+Shift+U هو اختصار الإشراف الأساسي لأنه ينتقل إلى أقدم عنصر غير مقروء. يكون Cmd+Control+U مفيدا عندما تريد إرسال العنصر الحالي إلى آخر قائمة غير المقروء والانتقال إلى أقدم عنصر غير مقروء تال."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux مقابل Superset لوكلاء برمجة الذكاء الاصطناعي - cmux",
@@ -2783,7 +2783,7 @@
             },
             {
               "title": "الانتباه سطح منتج",
-              "body": "يركز cmux على اللحظة التي يحتاج فيها الوكيل إلى إنسان. تجعل notification rings و unread badges ولوحة الإشعارات و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work العثور على الجلسات المنتهية أو العالقة سهلا."
+              "body": "يركز cmux على اللحظة التي يحتاج فيها الوكيل إلى إنسان. تجعل notification rings و unread badges ولوحة الإشعارات و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work العثور على الجلسات المنتهية أو العالقة سهلا."
             },
             {
               "title": "القابلية للبرمجة مخرج مرن",
@@ -2996,7 +2996,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "إشعارات OSC وعلامات وتنبيهات وإشعارات triggers وبحث الجلسات"
               ],
               [
@@ -3077,7 +3077,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "إشعارات سطح مكتب OSC 99 وkitten notify، مع سكربة مخصصة لتدفقات غير المقروء"
               ],
               [
@@ -3099,7 +3099,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -3163,7 +3163,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "غالبا يدوي أو مرتبط بالمنتج"
               ],
               [
@@ -3185,7 +3185,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -3235,7 +3235,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "غالبا يدوي أو مرتبط بالمنتج"
               ],
               [
@@ -3257,7 +3257,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -3312,7 +3312,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "غالبا يدوي أو مرتبط بالمنتج"
               ],
               [
@@ -3334,7 +3334,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -3393,7 +3393,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "غالبا يدوي أو مرتبط بالمنتج"
               ],
               [
@@ -3470,7 +3470,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "Devin وCascade ووكلاء متوافقون مع ACP داخل Devin Desktop"
               ],
               [
@@ -3492,7 +3492,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -3547,7 +3547,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "محاكي طرفية مدمج يستخدم Alacritty كخلفيته"
               ],
               [
@@ -3569,7 +3569,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -3706,7 +3706,7 @@
               ],
               [
                 "نموذج الانتباه",
-                "notification rings و Cmd+Shift+U لأحدث unread و Cmd+Control+U للتنقل بين unread work",
+                "notification rings و Cmd+Shift+U لأقدم unread و Cmd+Control+U للتنقل بين unread work",
                 "غالبا يدوي أو مرتبط بالمنتج"
               ],
               [
@@ -3728,7 +3728,7 @@
             },
             {
               "title": "الاختصارات جزء من نموذج الانتباه",
-              "body": "ينتقل Cmd+Shift+U إلى أحدث pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
+              "body": "ينتقل Cmd+Shift+U إلى أقدم pane غير مقروء، ويتنقل Cmd+Control+U بين unread work من دون مسح الحالة. هكذا تصبح الوكلاء المنتهية أو المحجوبة قائمة review."
             },
             {
               "title": "workflow يبقى قابلا للبرمجة",
@@ -3808,7 +3808,7 @@
             },
             {
               "title": "تصبح الإشعارات حالة قابلة للتنقل",
-              "body": "من السهل تفويت إشعارات سطح المكتب بعد زوالها. يبقي cmux حالة غير المقروء داخل التطبيق، ويرن pane، ويعلّم الشريط الجانبي، ويجعل Cmd+Shift+U ينتقل إلى أحدث جلسة غير مقروءة."
+              "body": "من السهل تفويت إشعارات سطح المكتب بعد زوالها. يبقي cmux حالة غير المقروء داخل التطبيق، ويرن pane، ويعلّم الشريط الجانبي، ويجعل Cmd+Shift+U ينتقل إلى أقدم جلسة غير مقروءة."
             },
             {
               "title": "تتجاوز الأتمتة حدود shell",

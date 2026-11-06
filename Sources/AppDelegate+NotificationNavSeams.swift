@@ -101,6 +101,14 @@ final class NotificationNavSeamAdapter:
         owner?.clearUnreadAfterJump(workspaceId: workspaceId, panelId: panelId)
     }
 
+    func frontmostFocusedPane() -> UnreadQueueTarget? {
+        owner?.frontmostFocusedPane() ?? nil
+    }
+
+    func owningPanelId(workspaceId: UUID, surfaceId: UUID) -> UUID {
+        owner?.owningPanelId(workspaceId: workspaceId, surfaceId: surfaceId) ?? surfaceId
+    }
+
     // MARK: NotificationOpenRouting
 
     func openRouted(
@@ -211,12 +219,6 @@ final class NotificationNavSeamAdapter:
         owner?.clearWindowDockSurfaceUnread(target)
     }
 
-    func markLatestWindowDockNotificationAsOldestUnread(
-        _ target: WindowDockUnreadTarget
-    ) -> UUID? {
-        owner?.markLatestWindowDockNotificationAsOldestUnread(target)
-    }
-
     func focusedPanel(forTabId tabId: UUID, surfaceId: UUID?) -> FocusedPanel? {
         owner?.focusedPanel(forTabId: tabId, surfaceId: surfaceId) ?? nil
     }
@@ -273,8 +275,9 @@ final class NotificationNavSeamAdapter:
         owner?.markPanelUnread(panel)
     }
 
-    func markLatestNotificationAsOldestUnread(forTabId tabId: UUID, surfaceId: UUID?) -> UUID? {
-        owner?.markLatestNotificationAsOldestUnread(forTabId: tabId, surfaceId: surfaceId) ?? nil
+    // (cm-128.11) Replaces upstream's `markLatestNotificationAsOldestUnread` adapter.
+    func sendToBack(_ target: UnreadQueueTarget) -> Bool {
+        owner?.sendToBack(target) ?? false
     }
 }
 
@@ -405,6 +408,20 @@ extension AppDelegate {
 
     func clearUnreadAfterJump(workspaceId: UUID, panelId: UUID?) {
         unreadJumpWorkspace(forTabId: workspaceId)?.clearUnreadAfterJump(panelId: panelId)
+    }
+
+    /// The pane he's on: cmux is frontmost and this is the focused pane of the key window (cm-128.11,
+    /// Tom grill Q77, Q97), or `nil`. The walk compares it with a stop after mapping both sides through
+    /// `owningPanelId` (cm-128.11).
+    func frontmostFocusedPane() -> UnreadQueueTarget? {
+        guard AppFocusState.isAppFocused() else { return nil }
+        return focusedTarget(preferredWindowToken: nil)
+    }
+
+    /// The workspace panel that owns `surfaceId` (cm-128.11): a remote tmux pane's container panel,
+    /// else the panel itself; an unknown surface maps to itself.
+    func owningPanelId(workspaceId: UUID, surfaceId: UUID) -> UUID {
+        unreadJumpWorkspace(forTabId: workspaceId)?.surfaceOwnershipTarget(for: surfaceId)?.containerPanelID ?? surfaceId
     }
 
     // MARK: NotificationOpenRouting helpers

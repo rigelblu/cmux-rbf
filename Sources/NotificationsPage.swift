@@ -263,28 +263,28 @@ struct NotificationsPage: View {
     private var jumpToUnreadButton: some View {
         if let key = jumpToUnreadShortcut.keyEquivalent {
             Button(action: {
-                _ = AppDelegate.shared?.jumpToLatestMacNotificationUnread()
+                _ = AppDelegate.shared?.jumpToOldestUnread() // (cm-128.11)
             }) {
                 HStack(spacing: 6) {
-                    Text(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Latest Unread"))
+                    Text(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Oldest Unread"))
                     ShortcutAnnotation(text: jumpToUnreadShortcut.displayString)
                 }
             }
             .buttonStyle(.bordered)
             .keyboardShortcut(key, modifiers: jumpToUnreadShortcut.eventModifiers)
-            .safeHelp(KeyboardShortcutSettings.Action.jumpToUnread.tooltip(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Latest Unread")))
+            .safeHelp(KeyboardShortcutSettings.Action.jumpToUnread.tooltip(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Oldest Unread")))
             .disabled(!hasUnreadNotifications)
         } else {
             Button(action: {
-                _ = AppDelegate.shared?.jumpToLatestMacNotificationUnread()
+                _ = AppDelegate.shared?.jumpToOldestUnread() // (cm-128.11)
             }) {
                 HStack(spacing: 6) {
-                    Text(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Latest Unread"))
+                    Text(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Oldest Unread"))
                     ShortcutAnnotation(text: jumpToUnreadShortcut.displayString)
                 }
             }
             .buttonStyle(.bordered)
-            .safeHelp(KeyboardShortcutSettings.Action.jumpToUnread.tooltip(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Latest Unread")))
+            .safeHelp(KeyboardShortcutSettings.Action.jumpToUnread.tooltip(String(localized: "notifications.jumpToLatestUnread", defaultValue: "Jump to Oldest Unread")))
             .disabled(!hasUnreadNotifications)
         }
     }

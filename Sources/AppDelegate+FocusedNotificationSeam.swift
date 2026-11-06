@@ -33,15 +33,6 @@ extension AppDelegate {
         )
     }
 
-    func markLatestWindowDockNotificationAsOldestUnread(
-        _ target: WindowDockUnreadTarget
-    ) -> UUID? {
-        notificationStore?.markLatestWindowDockNotificationAsOldestUnread(
-            windowId: target.windowId,
-            surfaceId: target.surfaceId
-        )
-    }
-
     func focusedPanel(forTabId tabId: UUID, surfaceId: UUID?) -> FocusedPanel? {
         guard let surfaceId,
               let workspace = workspaceFor(tabId: tabId) else {
@@ -112,7 +103,8 @@ extension AppDelegate {
         workspaceFor(tabId: panel.tabId)?.markPanelUnread(panel.panelId)
     }
 
-    func markLatestNotificationAsOldestUnread(forTabId tabId: UUID, surfaceId: UUID?) -> UUID? {
-        notificationStore?.markLatestNotificationAsOldestUnread(forTabId: tabId, surfaceId: surfaceId)
+    /// (cm-128.11) Send to Back: the store's one function over one explicit target.
+    func sendToBack(_ target: UnreadQueueTarget) -> Bool {
+        notificationStore?.sendToBack(target) ?? false
     }
 }
