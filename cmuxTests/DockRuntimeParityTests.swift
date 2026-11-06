@@ -322,7 +322,7 @@ struct DockRuntimeParityTests {
                 surfaceId: panel.id
             ))
 
-            _ = appDelegate.jumpToLatestUnread()
+            _ = appDelegate.jumpToOldestUnread()
 
             #expect(!window.isVisible)
             #expect(notificationStore.hasManualUnread(
@@ -915,7 +915,7 @@ struct DockRuntimeParityTests {
                 surfaceId: unreadPanel.id
             )
 
-            _ = appDelegate.jumpToLatestUnread()
+            _ = appDelegate.jumpToOldestUnread()
 
             #expect(dock.focusedPanelId == unreadPanel.id)
             #expect(notificationStore.hasManualUnread(
@@ -925,8 +925,10 @@ struct DockRuntimeParityTests {
         }
     }
 
-    @Test("Jump to unread opens the most recently marked window Dock pane")
-    func jumpToUnreadPrefersMostRecentlyMarkedWindowDockPane() async throws {
+    // (cm-128.11) Changed on purpose, Tom grill Q94: Dock marks are taken oldest first, so the jump opens the
+    // pane marked first. It used to open the most recently marked one.
+    @Test("Jump to unread opens the longest-marked window Dock pane")
+    func jumpToUnreadPrefersLongestMarkedWindowDockPane() async throws {
         try await withAppContext { appDelegate, _, _, windowID in
             let notificationStore = TerminalNotificationStore.shared
             let previousNotificationStore = appDelegate.notificationStore
@@ -958,14 +960,14 @@ struct DockRuntimeParityTests {
                 surfaceId: newerPanel.id
             )
 
-            _ = appDelegate.jumpToLatestUnread()
+            _ = appDelegate.jumpToOldestUnread()
 
-            #expect(dock.focusedPanelId == newerPanel.id)
-            #expect(notificationStore.hasManualUnread(
+            #expect(dock.focusedPanelId == olderPanel.id)
+            #expect(!notificationStore.hasManualUnread(
                 forTabId: windowID,
                 surfaceId: olderPanel.id
             ))
-            #expect(!notificationStore.hasManualUnread(
+            #expect(notificationStore.hasManualUnread(
                 forTabId: windowID,
                 surfaceId: newerPanel.id
             ))
@@ -998,7 +1000,7 @@ struct DockRuntimeParityTests {
             let workspacePanelID = try #require(workspace.focusedPanelId)
             workspace.markPanelUnread(workspacePanelID)
 
-            _ = appDelegate.jumpToLatestUnread()
+            _ = appDelegate.jumpToOldestUnread()
 
             #expect(manager.selectedTabId == workspace.id)
             #expect(workspace.manualUnreadPanelIds.isEmpty)
@@ -1230,11 +1232,10 @@ struct DockRuntimeParityTests {
             }
             defer { observation.cancel() }
 
-            #expect(
-                notificationStore.markLatestWindowDockNotificationAsOldestUnread(
-                    windowId: windowID,
-                    surfaceId: panel.id
-                ) == notificationID
+            #expect(  // (cm-128.11) Send to Back replaces the old mark-latest function
+                notificationStore.sendToBack(
+                    .windowDock(WindowDockUnreadTarget(windowId: windowID, surfaceId: panel.id))
+                )
             )
 
             #expect(observer.publicationCount == 1)

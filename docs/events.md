@@ -317,7 +317,7 @@ Notifications:
 | `notification.dismiss_requested` | Socket command asked cmux to remove one notification or already-read notifications. |
 | `notification.mark_read_requested` | Socket command asked cmux to mark notifications read. |
 | `notification.open_requested` | Socket command asked cmux to open a notification by id. |
-| `notification.jump_to_unread_requested` | Socket command asked cmux to jump to the latest unread notification. |
+| `notification.jump_to_unread_requested` | Socket command asked cmux to jump to the unread pane that has waited longest. |
 | `notification.created` | Notification store created a notification. |
 | `notification.read` | Notification was marked read. |
 | `notification.removed` | One notification was removed. |

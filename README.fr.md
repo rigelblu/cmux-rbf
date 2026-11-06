@@ -42,7 +42,7 @@ Les panneaux reçoivent un anneau bleu et les onglets s'illuminent lorsque les a
 <tr>
 <td width="40%" valign="middle">
 <h3>Panneau de notifications</h3>
-Consultez toutes les notifications en attente au même endroit, accédez directement à la plus récente non lue
+Consultez toutes les notifications en attente au même endroit, accédez directement au volet non lu qui attend depuis le plus longtemps
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Badge de notification dans la barre latérale" width="100%" />
@@ -126,7 +126,7 @@ J'exécute beaucoup de sessions Claude Code et Codex en parallèle. J'utilisais 
 
 J'ai essayé quelques orchestrateurs de programmation, mais la plupart étaient des applications Electron/Tauri et les performances me dérangeaient. Je préfère aussi simplement le terminal, car les orchestrateurs à interface graphique vous enferment dans leur flux de travail. J'ai donc construit cmux comme une application macOS native en Swift/AppKit. Elle utilise libghostty pour le rendu du terminal et lit votre configuration Ghostty existante pour les thèmes, polices et couleurs.
 
-Les principaux ajouts sont la barre latérale et le système de notifications. La barre latérale comporte des onglets verticaux qui affichent la branche git, le statut/numéro de PR lié, le répertoire de travail, les ports en écoute et le texte de la dernière notification pour chaque espace de travail. Le système de notifications capte les séquences de terminal (OSC 9/99/777) et dispose d'un CLI (`cmux notify`) que vous pouvez brancher aux hooks d'agents pour Claude Code, OpenCode, etc. Quand un agent est en attente, son panneau reçoit un anneau bleu et l'onglet s'illumine dans la barre latérale, pour que je puisse identifier lequel a besoin de moi parmi les divisions et les onglets. ⌘⇧U permet de sauter à la notification non lue la plus récente.
+Les principaux ajouts sont la barre latérale et le système de notifications. La barre latérale comporte des onglets verticaux qui affichent la branche git, le statut/numéro de PR lié, le répertoire de travail, les ports en écoute et le texte de la dernière notification pour chaque espace de travail. Le système de notifications capte les séquences de terminal (OSC 9/99/777) et dispose d'un CLI (`cmux notify`) que vous pouvez brancher aux hooks d'agents pour Claude Code, OpenCode, etc. Quand un agent est en attente, son panneau reçoit un anneau bleu et l'onglet s'illumine dans la barre latérale, pour que je puisse identifier lequel a besoin de moi parmi les divisions et les onglets. ⌘⇧U permet de sauter au volet non lu qui attend depuis le plus longtemps.
 
 Le navigateur intégré dispose d'une API scriptable portée depuis [agent-browser](https://github.com/vercel-labs/agent-browser). Les agents peuvent capturer l'arbre d'accessibilité, obtenir des références d'éléments, cliquer, remplir des formulaires et exécuter du JS. Vous pouvez diviser un panneau navigateur à côté de votre terminal et laisser Claude Code interagir directement avec votre serveur de développement.
 
@@ -206,9 +206,9 @@ Les raccourcis de navigation de la palette de commandes, y compris ⌃ P, sont �
 | Raccourci | Action |
 |----------|--------|
 | ⌘ I | Afficher le panneau de notifications |
-| ⌘ ⇧ U | Aller à la dernière non lue |
+| ⌘ ⇧ U | Aller au volet non lu qui attend depuis le plus longtemps |
 | ⌥ ⌘ U | Basculer l'état non lu de l'élément actuel |
-| ⌃ ⌘ U | Marquer l'élément actuel comme la plus ancienne non lue et passer à la suivante plus récente non lue |
+| ⌃ ⌘ U | Envoyer l'élément actuel à la fin de la file des non lus et passer au suivant |
 
 ### Recherche
 

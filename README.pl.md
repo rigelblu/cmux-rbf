@@ -42,7 +42,7 @@ Panele otrzymują niebieski pierścień, a karty podświetlają się, gdy agenci
 <tr>
 <td width="40%" valign="middle">
 <h3>Panel powiadomień</h3>
-Zobacz wszystkie oczekujące powiadomienia w jednym miejscu, przeskocz do najnowszego nieprzeczytanego
+Zobacz wszystkie oczekujące powiadomienia w jednym miejscu, przeskocz do nieprzeczytanego panelu, który czeka najdłużej
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Znacznik powiadomień w pasku bocznym" width="100%" />
@@ -126,7 +126,7 @@ Uruchamiam wiele sesji Claude Code i Codex równolegle. Używałem Ghostty z mas
 
 Wypróbowałem kilka orkiestratorów kodowania, ale większość z nich to aplikacje Electron/Tauri, a ich wydajność mi przeszkadzała. Po prostu wolę też terminal, ponieważ orkiestratory GUI zamykają cię w swoim przepływie pracy. Dlatego zbudowałem cmux jako natywną aplikację macOS w Swift/AppKit. Używa libghostty do renderowania terminala i odczytuje istniejącą konfigurację Ghostty dla motywów, czcionek i kolorów.
 
-Główne dodatki to pasek boczny i system powiadomień. Pasek boczny ma pionowe karty pokazujące gałąź git, status/numer powiązanego PR, katalog roboczy, nasłuchujące porty i tekst ostatniego powiadomienia dla każdej przestrzeni roboczej. System powiadomień przechwytuje sekwencje terminala (OSC 9/99/777) i ma CLI (`cmux notify`), który można podpiąć do hooków agentów dla Claude Code, OpenCode itp. Gdy agent czeka, jego panel otrzymuje niebieski pierścień, a karta podświetla się w pasku bocznym, więc mogę powiedzieć, który mnie potrzebuje, niezależnie od podziałów i kart. Cmd+Shift+U przeskakuje do najnowszego nieprzeczytanego.
+Główne dodatki to pasek boczny i system powiadomień. Pasek boczny ma pionowe karty pokazujące gałąź git, status/numer powiązanego PR, katalog roboczy, nasłuchujące porty i tekst ostatniego powiadomienia dla każdej przestrzeni roboczej. System powiadomień przechwytuje sekwencje terminala (OSC 9/99/777) i ma CLI (`cmux notify`), który można podpiąć do hooków agentów dla Claude Code, OpenCode itp. Gdy agent czeka, jego panel otrzymuje niebieski pierścień, a karta podświetla się w pasku bocznym, więc mogę powiedzieć, który mnie potrzebuje, niezależnie od podziałów i kart. Cmd+Shift+U przeskakuje do nieprzeczytanego panelu, który czeka najdłużej.
 
 Wbudowana przeglądarka ma skryptowalny API przeniesiony z [agent-browser](https://github.com/vercel-labs/agent-browser). Agenci mogą wykonać migawkę drzewa dostępności, uzyskać referencje elementów, klikać, wypełniać formularze i ewaluować JS. Możesz podzielić panel przeglądarki obok terminala i pozwolić Claude Code bezpośrednio komunikować się z Twoim serwerem deweloperskim.
 
@@ -206,9 +206,9 @@ Skróty nawigacji w palecie poleceń, w tym ⌃ P, również można dostosować 
 | Skrót | Akcja |
 |----------|--------|
 | ⌘ I | Pokaż panel powiadomień |
-| ⌘ ⇧ U | Przejdź do najnowszego nieprzeczytanego |
+| ⌘ ⇧ U | Przejdź do nieprzeczytanego panelu, który czeka najdłużej |
 | ⌥ ⌘ U | Przełącz stan przeczytania bieżącego elementu |
-| ⌃ ⌘ U | Oznacz bieżący element jako najstarszy nieprzeczytany i przejdź do następnego najnowszego nieprzeczytanego |
+| ⌃ ⌘ U | Wyślij bieżący element na koniec kolejki nieprzeczytanych i przejdź do następnego |
 
 ### Szukaj
 

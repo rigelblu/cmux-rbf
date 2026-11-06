@@ -1451,7 +1451,7 @@
         "br-reload": "Odśwież stronę",
         "br-devtools": "Otwórz narzędzia deweloperskie",
         "nt-panel": "Pokaż panel powiadomień",
-        "nt-latest": "Przejdź do najnowszego nieprzeczytanego",
+        "nt-latest": "Przejdź do najstarszego nieprzeczytanego",
         "nt-flash": "Wyzwól błysk",
         "fd-find": "Znajdź",
         "fd-next-prev": "Znajdź następny / poprzedni",
@@ -1567,7 +1567,7 @@
       "suppressItem2": "Konkretny workspace wysyłający powiadomienie jest aktywny",
       "suppressItem3": "Panel powiadomień jest otwarty",
       "notificationPanel": "Panel powiadomień",
-      "notificationPanelDesc": "Naciśnij <openShortcut>⌘⇧I</openShortcut> aby otworzyć panel powiadomień. Kliknij powiadomienie aby przejść do tego workspace'a. Naciśnij <jumpShortcut>⌘⇧U</jumpShortcut> aby przejść bezpośrednio do workspace'a z najnowszym nieprzeczytanym powiadomieniem.",
+      "notificationPanelDesc": "Naciśnij <openShortcut>⌘⇧I</openShortcut> aby otworzyć panel powiadomień. Kliknij powiadomienie aby przejść do tego workspace'a. Naciśnij <jumpShortcut>⌘⇧U</jumpShortcut> aby przejść do nieprzeczytanego panelu, który czeka najdłużej.",
       "customCommand": "Niestandardowe polecenie",
       "customCommandDesc": "Uruchom polecenie powłoki za każdym razem gdy powiadomienie jest zaplanowane. Ustaw to w Ustawieniach > Aplikacja > Polecenie powiadomienia. Polecenie uruchamia się przez /bin/sh -c z tymi zmiennymi środowiskowymi:",
       "customCommandNote": "Polecenie działa niezależnie od wybieraka dźwięku systemowego. Ustaw wybierak na \"Brak\" aby używać tylko niestandardowego polecenia, lub zachowaj oba dla dźwięku systemowego plus niestandardowa akcja.",
@@ -2204,7 +2204,7 @@
           "metaTitle": "Najlepsze terminale i obszary robocze agentów dla agentów kodujących AI w 2026 - cmux",
           "metaDescription": "Porównaj cmux, Superset, Warp, Ghostty, iTerm2, tmux i inne terminale do uruchamiania agentów kodujących AI.",
           "title": "Najlepsze terminale i obszary robocze agentów dla agentów kodujących AI w 2026",
-          "intro": "Najlepszy terminal lub obszar roboczy dla agentów kodujących to taki, który utrzymuje wiele długotrwałych sesji widocznymi, responsywnymi i łatwymi do kontrolowania. cmux tworzą osoby, które przez cały dzień pracują równolegle z wieloma agentami: natywna wydajność Swift/AppKit, pionowe obszary robocze, pierścienie powiadomień, Cmd+Shift+U dla najnowszego nieprzeczytanego elementu, Cmd+Control+U, aby oznaczyć bieżący element jako najstarszy nieprzeczytany i przejść do następnego nieprzeczytanego elementu, oraz programowalne CLI.",
+          "intro": "Najlepszy terminal lub obszar roboczy dla agentów kodujących to taki, który utrzymuje wiele długotrwałych sesji widocznymi, responsywnymi i łatwymi do kontrolowania. cmux tworzą osoby, które przez cały dzień pracują równolegle z wieloma agentami: natywna wydajność Swift/AppKit, pionowe obszary robocze, pierścienie powiadomień, Cmd+Shift+U dla najstarszego nieprzeczytanego elementu, Cmd+Control+U, aby odesłać bieżący element na koniec kolejki nieprzeczytanych i przejść do następnego nieprzeczytanego elementu, oraz programowalne CLI.",
           "summaryTitle": "Krótka odpowiedź",
           "summaryBody": "Wybierz cmux, jeśli chcesz natywnego terminala macOS, który potrafi nadzorować wielu agentów bez narzucania nowego agenta, edytora, runtime’u w chmurze lub systemu kredytów. Wybierz workspace agentów, jeśli chcesz orkiestracji zadań i wbudowanych przepływów review. Wybierz klasyczny terminal, jeśli zwykle uruchamiasz jednego agenta naraz.",
           "table": {
@@ -2328,7 +2328,7 @@
             },
             {
               "title": "Nadzór nastawiony na klawiaturę",
-              "body": "cmux traktuje uwagę jako pierwszorzędny element workflow. Skróty takie jak skok do ostatniego nieprzeczytanego przenoszą prosto do panelu wymagającego decyzji, zamiast zmuszać do skanowania każdej karty lub czekania, aż powiadomienia systemowe nabiorą sensu."
+              "body": "cmux traktuje uwagę jako pierwszorzędny element workflow. Skróty takie jak skok do najstarszego nieprzeczytanego przenoszą prosto do panelu wymagającego decyzji, zamiast zmuszać do skanowania każdej karty lub czekania, aż powiadomienia systemowe nabiorą sensu."
             },
             {
               "title": "Obsługa worktree to prymityw, nie pudełkowa funkcja produktu",
@@ -2397,7 +2397,7 @@
             },
             {
               "title": "Używaj pierścieni powiadomień jako kolejki review",
-              "body": "Gdy agent emituje powiadomienie cmux przez hooki, OSC 99/777 lub cmux notify, cmux oznacza obszar roboczy jako nieprzeczytany i podświetla pierścień panelu. Cmd+Shift+U przechodzi do najnowszego nieprzeczytanego elementu. Cmd+Control+U oznacza bieżący element jako najstarszy nieprzeczytany i przechodzi do kolejnego najnowszego nieprzeczytanego elementu, co jest przydatne, gdy kilka agentów kończy jednocześnie."
+              "body": "Gdy agent emituje powiadomienie cmux przez hooki, OSC 99/777 lub cmux notify, cmux oznacza obszar roboczy jako nieprzeczytany i podświetla pierścień panelu. Cmd+Shift+U przechodzi do najstarszego nieprzeczytanego elementu. Cmd+Control+U odsyła bieżący element na koniec kolejki nieprzeczytanych i przechodzi do kolejnego najstarszego nieprzeczytanego elementu, co jest przydatne, gdy kilka agentów kończy jednocześnie."
             },
             {
               "title": "Zostaw Claude Code bez zmian",
@@ -2414,7 +2414,7 @@
           "faqQ2": "Czy Claude Code i Codex mogą działać obok siebie?",
           "faqA2": "Tak. cmux jest niezależny od agenta, więc Claude Code, Codex, OpenCode i inni agenci CLI mogą działać jednocześnie w osobnych workspace’ach.",
           "faqQ3": "Który skrót jest najważniejszy dla równoległych agentów?",
-          "faqA3": "Cmd+Shift+U to główny skrót nadzoru, bo przechodzi do najnowszego nieprzeczytanego elementu. Cmd+Control+U jest przydatny, gdy chcesz oznaczyć bieżący element jako najstarszy nieprzeczytany i przejść do kolejnego najnowszego nieprzeczytanego elementu."
+          "faqA3": "Cmd+Shift+U to główny skrót nadzoru, bo przechodzi do najstarszego nieprzeczytanego elementu. Cmd+Control+U jest przydatny, gdy chcesz odesłać bieżący element na koniec kolejki nieprzeczytanych i przejść do kolejnego najstarszego nieprzeczytanego elementu."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset dla agentów kodujących AI: cmux",
@@ -2483,7 +2483,7 @@
             },
             {
               "title": "Uwaga jest powierzchnią produktu",
-              "body": "cmux skupia się na momencie, gdy agent potrzebuje człowieka. Pierścienie powiadomień, plakietki nieprzeczytanych, panel powiadomień i skok do ostatniego nieprzeczytanego ułatwiają znalezienie sesji zakończonych lub zablokowanych."
+              "body": "cmux skupia się na momencie, gdy agent potrzebuje człowieka. Pierścienie powiadomień, plakietki nieprzeczytanych, panel powiadomień i skok do najstarszego nieprzeczytanego ułatwiają znalezienie sesji zakończonych lub zablokowanych."
             },
             {
               "title": "Programowalność jest wyjściem awaryjnym",
@@ -2718,7 +2718,7 @@
             },
             {
               "title": "Powiadomienia stają się nawigowalnym stanem",
-              "body": "Powiadomienia desktopowe łatwo przeoczyć, gdy znikną. cmux utrzymuje stan nieprzeczytania w aplikacji, podświetla pierścień panelu, oznacza pasek boczny i pozwala Cmd+Shift+U przejść do najnowszej nieprzeczytanej sesji."
+              "body": "Powiadomienia desktopowe łatwo przeoczyć, gdy znikną. cmux utrzymuje stan nieprzeczytania w aplikacji, podświetla pierścień panelu, oznacza pasek boczny i pozwala Cmd+Shift+U przejść do najstarszej nieprzeczytanej sesji."
             },
             {
               "title": "Automatyzacja wychodzi poza shell",

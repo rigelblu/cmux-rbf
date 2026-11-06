@@ -1450,7 +1450,7 @@
         "br-reload": "Ricarica pagina",
         "br-devtools": "Apri strumenti di sviluppo",
         "nt-panel": "Mostra pannello notifiche",
-        "nt-latest": "Vai alla più recente non letta",
+        "nt-latest": "Vai alla più vecchia non letta",
         "nt-flash": "Attiva flash",
         "fd-find": "Trova",
         "fd-next-prev": "Risultato successivo / precedente",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "Il workspace specifico che invia la notifica è attivo",
       "suppressItem3": "Il pannello notifiche è aperto",
       "notificationPanel": "Pannello notifiche",
-      "notificationPanelDesc": "Premi <openShortcut>⌘⇧I</openShortcut> per aprire il pannello notifiche. Clicca su una notifica per andare a quel workspace. Premi <jumpShortcut>⌘⇧U</jumpShortcut> per andare direttamente al workspace con la notifica non letta più recente.",
+      "notificationPanelDesc": "Premi <openShortcut>⌘⇧I</openShortcut> per aprire il pannello notifiche. Clicca su una notifica per andare a quel workspace. Premi <jumpShortcut>⌘⇧U</jumpShortcut> per andare al pannello non letto che attende da più tempo.",
       "customCommand": "Comando personalizzato",
       "customCommandDesc": "Esegui un comando shell ogni volta che una notifica è pianificata. Impostalo in Impostazioni > App > Comando di notifica. Il comando viene eseguito tramite /bin/sh -c con queste variabili d'ambiente:",
       "customCommandNote": "Il comando viene eseguito indipendentemente dal selettore di suoni di sistema. Imposta il selettore su \"Nessuno\" per usare solo il comando personalizzato, o mantieni entrambi per un suono di sistema più un'azione personalizzata.",
@@ -2204,7 +2204,7 @@
           "metaTitle": "Migliori terminali e workspace per agenti di coding IA nel 2026 - cmux",
           "metaDescription": "Confronta cmux, Superset, Warp, Ghostty, iTerm2, tmux e altri terminali per eseguire agenti di programmazione IA.",
           "title": "Migliori terminali e workspace per agenti di coding IA nel 2026",
-          "intro": "Il miglior terminale o workspace per agenti di coding è quello che mantiene molte sessioni lunghe visibili, reattive e facili da controllare. cmux è costruito da persone che lavorano tutto il giorno con molti agenti: prestazioni native Swift/AppKit, workspace verticali, anelli di notifica, Cmd+Shift+U per l’elemento non letto più recente, Cmd+Control+U per segnare l’elemento corrente come il non letto più vecchio e passare al prossimo elemento non letto, e una CLI programmabile.",
+          "intro": "Il miglior terminale o workspace per agenti di coding è quello che mantiene molte sessioni lunghe visibili, reattive e facili da controllare. cmux è costruito da persone che lavorano tutto il giorno con molti agenti: prestazioni native Swift/AppKit, workspace verticali, anelli di notifica, Cmd+Shift+U per l’elemento non letto più vecchio, Cmd+Control+U per mandare l’elemento corrente in fondo alla coda dei non letti e passare al prossimo elemento non letto, e una CLI programmabile.",
           "summaryTitle": "Risposta breve",
           "summaryBody": "Scegli cmux se vuoi un terminale macOS nativo che possa supervisionare molti agenti senza imporre un nuovo agente, editor, runtime cloud o sistema di crediti. Scegli un workspace per agenti se vuoi orchestrazione delle attività e flussi di review integrati. Scegli un terminale classico se esegui soprattutto un agente alla volta.",
           "table": {
@@ -2328,7 +2328,7 @@
             },
             {
               "title": "Supervisione da tastiera",
-              "body": "cmux tratta l’attenzione come un flusso di primo livello. Scorciatoie come vai all’ultimo non letto portano direttamente al pannello che richiede una decisione, invece di passare in rassegna ogni tab o aspettare che le notifiche desktop abbiano senso."
+              "body": "cmux tratta l’attenzione come un flusso di primo livello. Scorciatoie come vai al non letto più vecchio portano direttamente al pannello che richiede una decisione, invece di passare in rassegna ogni tab o aspettare che le notifiche desktop abbiano senso."
             },
             {
               "title": "Il supporto worktree è una primitiva, non una casella di prodotto",
@@ -2397,7 +2397,7 @@
             },
             {
               "title": "Usa gli anelli di notifica come coda di review",
-              "body": "Quando un agente emette una notifica cmux tramite hook, OSC 99/777 o cmux notify, cmux marca il workspace come non letto e fa suonare l’anello del pannello. Cmd+Shift+U passa all’elemento non letto più recente. Cmd+Control+U marca l’elemento corrente come il non letto più vecchio e passa al prossimo elemento non letto più recente, utile quando più agenti finiscono insieme."
+              "body": "Quando un agente emette una notifica cmux tramite hook, OSC 99/777 o cmux notify, cmux marca il workspace come non letto e fa suonare l’anello del pannello. Cmd+Shift+U passa all’elemento non letto più vecchio. Cmd+Control+U manda l’elemento corrente in fondo alla coda dei non letti e passa al prossimo elemento non letto più vecchio, utile quando più agenti finiscono insieme."
             },
             {
               "title": "Mantieni Claude Code invariato",
@@ -2414,7 +2414,7 @@
           "faqQ2": "Claude Code e Codex possono girare uno accanto all’altro?",
           "faqA2": "Sì. cmux è agnostico rispetto agli agenti, quindi Claude Code, Codex, OpenCode e altri agenti CLI possono girare contemporaneamente in workspace separati.",
           "faqQ3": "Quale scorciatoia conta di più per agenti paralleli?",
-          "faqA3": "Cmd+Shift+U è la scorciatoia centrale di supervisione perché salta all’elemento non letto più recente. Cmd+Control+U è utile quando vuoi segnare l’elemento corrente come il non letto più vecchio e passare al prossimo elemento non letto più recente."
+          "faqA3": "Cmd+Shift+U è la scorciatoia centrale di supervisione perché salta all’elemento non letto più vecchio. Cmd+Control+U è utile quando vuoi mandare l’elemento corrente in fondo alla coda dei non letti e passare al prossimo elemento non letto più vecchio."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset per agenti di programmazione IA: cmux",
@@ -2483,7 +2483,7 @@
             },
             {
               "title": "L’attenzione è una superficie di prodotto",
-              "body": "cmux si concentra sul momento in cui un agente ha bisogno di una persona. Anelli di notifica, badge non letti, pannello notifiche e vai all’ultimo non letto rendono facili da trovare le sessioni finite o bloccate."
+              "body": "cmux si concentra sul momento in cui un agente ha bisogno di una persona. Anelli di notifica, badge non letti, pannello notifiche e vai al non letto più vecchio rendono facili da trovare le sessioni finite o bloccate."
             },
             {
               "title": "La programmabilità è la via di fuga",
@@ -2718,7 +2718,7 @@
             },
             {
               "title": "Le notifiche diventano stato navigabile",
-              "body": "Le notifiche desktop sono facili da perdere dopo che scompaiono. cmux mantiene lo stato non letto dentro l’app, fa suonare l’anello del pannello, marca la barra laterale e permette a Cmd+Shift+U di saltare alla sessione non letta più recente."
+              "body": "Le notifiche desktop sono facili da perdere dopo che scompaiono. cmux mantiene lo stato non letto dentro l’app, fa suonare l’anello del pannello, marca la barra laterale e permette a Cmd+Shift+U di saltare alla sessione non letta più vecchia."
             },
             {
               "title": "L’automazione arriva oltre la shell",
@@ -2876,7 +2876,7 @@
             },
             {
               "title": "Le notifiche diventano stato",
-              "body": "cmux trasforma il completamento e le domande dell'agente in uno stato non letto all'interno dell'app. Gli squilli di notifica, Cmd+Shift+U per gli ultimi non letti e Cmd+Control+U per scorrere il lavoro non letto rendono navigabile la coda di revisione senza scansionare ogni area di lavoro."
+              "body": "cmux trasforma il completamento e le domande dell'agente in uno stato non letto all'interno dell'app. Gli squilli di notifica, Cmd+Shift+U per i non letti più vecchi e Cmd+Control+U per scorrere il lavoro non letto rendono navigabile la coda di revisione senza scansionare ogni area di lavoro."
             },
             {
               "title": "Il workflow è programmabile",
@@ -3038,7 +3038,7 @@
             },
             {
               "title": "Le notifiche diventano stato",
-              "body": "Cmd+Shift+U passa all'ultimo agente non letto. Cmd+Control+U scorre le sessioni non lette mantenendole non lette. iTerm2 è maturo e configurabile, ma queste scorciatoie per la revisione dell'agente sono il tipo di dettaglio del prodotto che cmux aggiunge perché è progettato per il multitasking pesante."
+              "body": "Cmd+Shift+U passa all'agente non letto più vecchio. Cmd+Control+U scorre le sessioni non lette mantenendole non lette. iTerm2 è maturo e configurabile, ma queste scorciatoie per la revisione dell'agente sono il tipo di dettaglio del prodotto che cmux aggiunge perché è progettato per il multitasking pesante."
             },
             {
               "title": "Il workflow è programmabile",
@@ -3123,7 +3123,7 @@
             },
             {
               "title": "Il workflow è programmabile",
-              "body": "Cmd+Shift+U passa all'ultimo agente non letto. Cmd+Control+U scorre il lavoro non letto mantenendolo non letto. Queste scorciatoie esistono perché cmux è creato da persone che eseguono più agenti contemporaneamente."
+              "body": "Cmd+Shift+U passa all'agente non letto più vecchio. Cmd+Control+U scorre il lavoro non letto mantenendolo non letto. Queste scorciatoie esistono perché cmux è creato da persone che eseguono più agenti contemporaneamente."
             },
             {
               "title": "La programmabilità include la shell dell’app",
@@ -3670,7 +3670,7 @@
             },
             {
               "title": "Il workflow è programmabile",
-              "body": "Cmd+Shift+U passa all'ultimo riquadro non letto. Cmd+Control+U scorre le sessioni non lette senza cancellarle. Queste non sono scorciatoie da terminale generiche; sono scorciatoie per la revisione dell'agente."
+              "body": "Cmd+Shift+U passa al riquadro non letto più vecchio. Cmd+Control+U scorre le sessioni non lette senza cancellarle. Queste non sono scorciatoie da terminale generiche; sono scorciatoie per la revisione dell'agente."
             },
             {
               "title": "L’automazione del browser vive accanto ai terminali",

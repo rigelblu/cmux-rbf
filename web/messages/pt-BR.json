@@ -1450,7 +1450,7 @@
         "br-reload": "Recarregar página",
         "br-devtools": "Abrir Ferramentas de Desenvolvedor",
         "nt-panel": "Mostrar painel de notificações",
-        "nt-latest": "Ir para última não lida",
+        "nt-latest": "Ir para a mais antiga não lida",
         "nt-flash": "Disparar flash",
         "fd-find": "Buscar",
         "fd-next-prev": "Buscar próximo / anterior",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "O workspace específico enviando a notificação está ativo",
       "suppressItem3": "O painel de notificações está aberto",
       "notificationPanel": "Painel de notificações",
-      "notificationPanelDesc": "Pressione <openShortcut>⌘⇧I</openShortcut> para abrir o painel de notificações. Clique em uma notificação para ir ao workspace. Pressione <jumpShortcut>⌘⇧U</jumpShortcut> para ir diretamente ao workspace com a notificação não lida mais recente.",
+      "notificationPanelDesc": "Pressione <openShortcut>⌘⇧I</openShortcut> para abrir o painel de notificações. Clique em uma notificação para ir ao workspace. Pressione <jumpShortcut>⌘⇧U</jumpShortcut> para ir ao painel não lido que espera há mais tempo.",
       "customCommand": "Comando personalizado",
       "customCommandDesc": "Execute um comando shell toda vez que uma notificação for agendada. Defina em Configurações > App > Comando de Notificação. O comando é executado via /bin/sh -c com estas variáveis de ambiente:",
       "customCommandNote": "O comando é executado independentemente do seletor de som do sistema. Defina o seletor como \"Nenhum\" para usar apenas o comando personalizado, ou mantenha ambos para um som do sistema mais uma ação personalizada.",
@@ -2345,7 +2345,7 @@
           "metaTitle": "Melhores terminais e espaços de trabalho para agentes de codificação de IA em 2026 – cmux",
           "metaDescription": "Compare cmux, Superset, Warp, Ghostty, iTerm2, tmux e outros terminais para rodar agentes de programação com IA.",
           "title": "Melhores terminais e espaços de trabalho para agentes de codificação de IA em 2026",
-          "intro": "O melhor terminal ou espaço de trabalho para agentes de codificação é aquele que mantém muitas sessões de longa duração visíveis, responsivas e fáceis de controlar. O cmux foi desenvolvido por pessoas que realizam multitarefas por meio de vários agentes o dia todo: desempenho nativo do Swift/AppKit, espaços de trabalho verticais, anéis de notificação, Cmd+Shift+U para o último não lido, Cmd+Control+U para marcar o item atual como o mais antigo como não lido e pular para o próximo item não lido e um CLI programável.",
+          "intro": "O melhor terminal ou espaço de trabalho para agentes de codificação é aquele que mantém muitas sessões de longa duração visíveis, responsivas e fáceis de controlar. O cmux foi desenvolvido por pessoas que realizam multitarefas por meio de vários agentes o dia todo: desempenho nativo do Swift/AppKit, espaços de trabalho verticais, anéis de notificação, Cmd+Shift+U para o não lido mais antigo, Cmd+Control+U para enviar o item atual para o fim da fila de não lidos e pular para o próximo item não lido e um CLI programável.",
           "summaryTitle": "Resposta curta",
           "summaryBody": "Escolha o cmux se você quer um terminal nativo para macOS que consegue supervisionar muitos agentes sem impor um novo agente, editor, runtime em nuvem ou sistema de créditos. Escolha um workspace de agentes se você quer orquestração de tarefas e fluxos de revisão integrados. Escolha um terminal clássico se você costuma rodar um agente por vez.",
           "table": {
@@ -2469,7 +2469,7 @@
             },
             {
               "title": "Supervisão orientada pelo teclado",
-              "body": "O cmux trata atenção como parte central do workflow. Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Esses atalhos existem para quem roda agentes suficientes para que varrer abas manualmente pare de funcionar."
+              "body": "O cmux trata atenção como parte central do workflow. Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Esses atalhos existem para quem roda agentes suficientes para que varrer abas manualmente pare de funcionar."
             },
             {
               "title": "Suporte a worktree é um primitivo, não uma caixa de produto",
@@ -2520,7 +2520,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Campainha visual, comando de campainha e scripts de notificação externa"
               ],
               [
@@ -2542,7 +2542,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -2601,7 +2601,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Geralmente manual ou preso ao produto"
               ],
               [
@@ -2623,7 +2623,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -2700,7 +2700,7 @@
             },
             {
               "title": "Use anéis de notificação como fila de revisão",
-              "body": "Quando um agente emite uma notificação cmux por meio de ganchos, notificação OSC 99/777 ou cmux, cmux marca o espaço de trabalho como não lido e toca o painel. Cmd+Shift+U salta para o último item não lido. Cmd+Control+U marca o item atual como não lido mais antigo e salta para o próximo item não lido mais recente, o que é útil quando vários agentes terminam ao mesmo tempo."
+              "body": "Quando um agente emite uma notificação cmux por meio de ganchos, notificação OSC 99/777 ou cmux, cmux marca o espaço de trabalho como não lido e toca o painel. Cmd+Shift+U salta para o item não lido mais antigo. Cmd+Control+U envia o item atual para o fim da fila de não lidos e salta para o próximo item não lido mais antigo, o que é útil quando vários agentes terminam ao mesmo tempo."
             },
             {
               "title": "Mantenha Claude Code inalterado",
@@ -2717,7 +2717,7 @@
           "faqQ2": "Claude Code e Codex podem rodar lado a lado?",
           "faqA2": "Sim. O cmux é agnóstico a agentes, então Claude Code, Codex, OpenCode e outros agentes CLI podem rodar em workspaces separados ao mesmo tempo.",
           "faqQ3": "Qual atalho é mais importante para agentes paralelos?",
-          "faqA3": "Cmd+Shift+U é o atalho principal de supervisão porque salta para o item não lido mais recente. Cmd+Control+U é útil quando você deseja marcar o item atual como não lido mais antigo e pular para o próximo item não lido mais recente."
+          "faqA3": "Cmd+Shift+U é o atalho principal de supervisão porque salta para o item não lido mais antigo. Cmd+Control+U é útil quando você deseja enviar o item atual para o fim da fila de não lidos e pular para o próximo item não lido mais antigo."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset para agentes de programação com IA - cmux",
@@ -2786,7 +2786,7 @@
             },
             {
               "title": "Atenção é uma superfície de produto",
-              "body": "O cmux foca no momento em que um agente precisa de uma pessoa. Notification rings, badges de unread, painel de notificações, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread tornam sessões concluídas ou bloqueadas fáceis de encontrar."
+              "body": "O cmux foca no momento em que um agente precisa de uma pessoa. Notification rings, badges de unread, painel de notificações, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread tornam sessões concluídas ou bloqueadas fáceis de encontrar."
             },
             {
               "title": "Programabilidade é a saída",
@@ -2918,7 +2918,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Agentes compatíveis com Devin Cloud, Devin Local, Devin CLI e ACP"
               ],
               [
@@ -2999,7 +2999,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Notificações, marcas e alertas OSC, notificações de gatilho e pesquisa de sessão"
               ],
               [
@@ -3080,7 +3080,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Notificações de desktop OSC 99 e notificação de gatinho, com scripts personalizados para fluxos de trabalho não lidos"
               ],
               [
@@ -3102,7 +3102,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -3161,7 +3161,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Geralmente manual ou preso ao produto"
               ],
               [
@@ -3188,7 +3188,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -3238,7 +3238,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Geralmente manual ou preso ao produto"
               ],
               [
@@ -3260,7 +3260,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -3315,7 +3315,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Geralmente manual ou preso ao produto"
               ],
               [
@@ -3337,7 +3337,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -3396,7 +3396,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Geralmente manual ou preso ao produto"
               ],
               [
@@ -3473,7 +3473,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Agentes compatíveis com Devin, Cascade e ACP dentro do Devin Desktop"
               ],
               [
@@ -3495,7 +3495,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -3550,7 +3550,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Emulador de terminal integrado usando Alacritty como backend"
               ],
               [
@@ -3572,7 +3572,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -3709,7 +3709,7 @@
               ],
               [
                 "Modelo de atenção",
-                "Notification rings, Cmd+Shift+U para o unread mais recente e Cmd+Control+U para percorrer trabalho unread",
+                "Notification rings, Cmd+Shift+U para o unread mais antigo e Cmd+Control+U para percorrer trabalho unread",
                 "Geralmente manual ou preso ao produto"
               ],
               [
@@ -3731,7 +3731,7 @@
             },
             {
               "title": "Os atalhos fazem parte do modelo de atenção",
-              "body": "Cmd+Shift+U pula para o pane unread mais recente, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
+              "body": "Cmd+Shift+U pula para o pane unread mais antigo, e Cmd+Control+U percorre trabalho unread sem limpar o estado. Isso transforma agentes concluídos ou bloqueados em uma fila de review."
             },
             {
               "title": "O workflow continua programável",
@@ -3811,7 +3811,7 @@
             },
             {
               "title": "Notificações viram estado navegável",
-              "body": "As notificações na área de trabalho são fáceis de perder depois de apagadas. cmux mantém o estado não lido dentro do aplicativo, toca o painel, marca a barra lateral e permite que Cmd+Shift+U pule para a sessão não lida mais recente."
+              "body": "As notificações na área de trabalho são fáceis de perder depois de apagadas. cmux mantém o estado não lido dentro do aplicativo, toca o painel, marca a barra lateral e permite que Cmd+Shift+U pule para a sessão não lida mais antiga."
             },
             {
               "title": "A automação sai do shell",

@@ -21,7 +21,8 @@ public protocol NotificationNavigationStoreReading: AnyObject {
     /// Mirrors `notificationStore.workspaceUnreadIndicatorIds`.
     var workspaceUnreadIndicatorIds: Set<UUID> { get }
 
-    /// Surface-scoped unread targets owned by per-window Docks.
+    /// Surface-scoped unread targets owned by per-window Docks, oldest first: the order the marks were
+    /// set, which is the order the unread walk takes them (cm-128.11, Tom grill Q94).
     var windowDockUnreadTargets: [WindowDockUnreadTarget] { get }
 
     /// Whether the workspace carries a manually-set unread indicator.

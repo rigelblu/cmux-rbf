@@ -9,6 +9,8 @@ final class FakeOpenRouting: NotificationOpenRouting {
     var routedSucceeds = true
     var windowDockSucceeds = true
     var titles: [UUID: String] = [:]
+    /// Called with every routed open's (tab, surface), so a test can move focus the way a real open does.
+    var onRoutedOpen: ((UUID, UUID?) -> Void)?
     private(set) var log: [String] = []
     private(set) var receivedRowSpaceRevisions: [UInt64?] = []
     private(set) var routedRetargetingValues: [Bool] = []
@@ -25,6 +27,7 @@ final class FakeOpenRouting: NotificationOpenRouting {
     ) -> Bool {
         receivedRowSpaceRevisions.append(scrollRowSpaceRevision)
         routedRetargetingValues.append(retargetsToLiveSurfaceOwner)
+        if routedSucceeds { onRoutedOpen?(tabId, surfaceId) }
         log.append("routed(tab=\(short(tabId)),surf=\(short(surfaceId))\(panel(panelId)),notif=\(short(notificationId)),row=\(row(scrollRow)),total=\(row(scrollTotalRows)))")
         return routedSucceeds
     }

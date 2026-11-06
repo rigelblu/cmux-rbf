@@ -1450,7 +1450,7 @@
         "br-reload": "Recargar página",
         "br-devtools": "Abrir herramientas de desarrollo",
         "nt-panel": "Mostrar panel de notificaciones",
-        "nt-latest": "Ir a la más reciente no leída",
+        "nt-latest": "Ir a la más antigua no leída",
         "nt-flash": "Activar flash",
         "fd-find": "Buscar",
         "fd-next-prev": "Resultado siguiente / anterior",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "El workspace específico que envía la notificación está activo",
       "suppressItem3": "El panel de notificaciones está abierto",
       "notificationPanel": "Panel de notificaciones",
-      "notificationPanelDesc": "Presione <openShortcut>⌘⇧I</openShortcut> para abrir el panel de notificaciones. Haga clic en una notificación para saltar a ese workspace. Presione <jumpShortcut>⌘⇧U</jumpShortcut> para saltar directamente al workspace con la notificación no leída más reciente.",
+      "notificationPanelDesc": "Presione <openShortcut>⌘⇧I</openShortcut> para abrir el panel de notificaciones. Haga clic en una notificación para saltar a ese workspace. Presione <jumpShortcut>⌘⇧U</jumpShortcut> para saltar al panel no leído que más tiempo lleva esperando.",
       "customCommand": "Comando personalizado",
       "customCommandDesc": "Ejecute un comando de shell cada vez que se programe una notificación. Configúrelo en Configuración > App > Comando de notificación. El comando se ejecuta vía /bin/sh -c con estas variables de entorno:",
       "customCommandNote": "El comando se ejecuta independientemente del selector de sonido del sistema. Configure el selector en \"Ninguno\" para usar solo el comando personalizado, o mantenga ambos para un sonido del sistema más una acción personalizada.",
@@ -2203,7 +2203,7 @@
           "metaTitle": "Mejores terminales y espacios de trabajo para agentes de código con IA en 2026 - cmux",
           "metaDescription": "Compara cmux, Superset, Warp, Ghostty, iTerm2, tmux y otras terminales para ejecutar agentes de programación con IA.",
           "title": "Mejores terminales y espacios de trabajo para agentes de código con IA en 2026",
-          "intro": "El mejor terminal o espacio de trabajo para agentes de código es el que mantiene muchas sesiones largas visibles, ágiles y fáciles de controlar. cmux lo crean personas que trabajan con muchos agentes durante todo el día: rendimiento nativo con Swift/AppKit, espacios de trabajo verticales, anillos de notificación, Cmd+Shift+U para el elemento no leído más reciente, Cmd+Control+U para marcar el elemento actual como el no leído más antiguo y saltar al siguiente elemento no leído, y una CLI programable.",
+          "intro": "El mejor terminal o espacio de trabajo para agentes de código es el que mantiene muchas sesiones largas visibles, ágiles y fáciles de controlar. cmux lo crean personas que trabajan con muchos agentes durante todo el día: rendimiento nativo con Swift/AppKit, espacios de trabajo verticales, anillos de notificación, Cmd+Shift+U para el elemento no leído más antiguo, Cmd+Control+U para enviar el elemento actual al final de la cola de no leídos y saltar al siguiente elemento no leído, y una CLI programable.",
           "summaryTitle": "Respuesta breve",
           "summaryBody": "Elige cmux si quieres una terminal nativa de macOS capaz de supervisar muchos agentes sin imponer otro agente, editor, runtime en la nube o sistema de créditos. Elige un workspace de agentes si quieres orquestación de tareas y flujos de revisión integrados. Elige una terminal clásica si casi siempre ejecutas un agente a la vez.",
           "table": {
@@ -2327,7 +2327,7 @@
             },
             {
               "title": "Supervisión centrada en el teclado",
-              "body": "cmux trata la atención como parte principal del flujo. Atajos como saltar al último no leído te llevan directamente al panel que necesita una decisión, en vez de revisar cada pestaña o esperar que las notificaciones de escritorio tengan sentido."
+              "body": "cmux trata la atención como parte principal del flujo. Atajos como saltar al no leído más antiguo te llevan directamente al panel que necesita una decisión, en vez de revisar cada pestaña o esperar que las notificaciones de escritorio tengan sentido."
             },
             {
               "title": "El soporte de worktrees es una primitiva, no una caja de producto",
@@ -2396,7 +2396,7 @@
             },
             {
               "title": "Usa anillos de notificación como cola de revisión",
-              "body": "Cuando un agente emite una notificación de cmux mediante hooks, OSC 99/777 o cmux notify, cmux marca el espacio de trabajo como no leído y enciende el anillo del panel. Cmd+Shift+U salta al elemento no leído más reciente. Cmd+Control+U marca el elemento actual como el no leído más antiguo y salta al siguiente elemento no leído más reciente, algo útil cuando varios agentes terminan a la vez."
+              "body": "Cuando un agente emite una notificación de cmux mediante hooks, OSC 99/777 o cmux notify, cmux marca el espacio de trabajo como no leído y enciende el anillo del panel. Cmd+Shift+U salta al elemento no leído más antiguo. Cmd+Control+U envía el elemento actual al final de la cola de no leídos y salta al siguiente elemento no leído más antiguo, algo útil cuando varios agentes terminan a la vez."
             },
             {
               "title": "Mantén Claude Code sin cambios",
@@ -2413,7 +2413,7 @@
           "faqQ2": "¿Claude Code y Codex pueden ejecutarse uno junto al otro?",
           "faqA2": "Sí. cmux es independiente del agente, así que Claude Code, Codex, OpenCode y otros agentes CLI pueden ejecutarse en workspaces separados al mismo tiempo.",
           "faqQ3": "¿Qué atajo importa más para agentes en paralelo?",
-          "faqA3": "Cmd+Shift+U es el atajo central de supervisión porque salta al elemento no leído más reciente. Cmd+Control+U es útil cuando quieres marcar el elemento actual como el no leído más antiguo y saltar al siguiente elemento no leído más reciente."
+          "faqA3": "Cmd+Shift+U es el atajo central de supervisión porque salta al elemento no leído más antiguo. Cmd+Control+U es útil cuando quieres enviar el elemento actual al final de la cola de no leídos y saltar al siguiente elemento no leído más antiguo."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset para agentes de programación con IA: cmux",
@@ -2482,7 +2482,7 @@
             },
             {
               "title": "La atención es una superficie de producto",
-              "body": "cmux se centra en el momento en que un agente necesita a una persona. Anillos de notificación, insignias de no leído, un panel de notificaciones y saltar al último no leído hacen que las sesiones terminadas o bloqueadas sean fáciles de encontrar."
+              "body": "cmux se centra en el momento en que un agente necesita a una persona. Anillos de notificación, insignias de no leído, un panel de notificaciones y saltar al no leído más antiguo hacen que las sesiones terminadas o bloqueadas sean fáciles de encontrar."
             },
             {
               "title": "La programabilidad es la vía de escape",
@@ -2717,7 +2717,7 @@
             },
             {
               "title": "Las notificaciones se convierten en estado navegable",
-              "body": "Las notificaciones de escritorio son fáciles de perder cuando desaparecen. cmux mantiene el estado de no leído dentro de la app, enciende el anillo del panel, marca la barra lateral y permite que Cmd+Shift+U salte a la sesión no leída más reciente."
+              "body": "Las notificaciones de escritorio son fáciles de perder cuando desaparecen. cmux mantiene el estado de no leído dentro de la app, enciende el anillo del panel, marca la barra lateral y permite que Cmd+Shift+U salte a la sesión no leída más antigua."
             },
             {
               "title": "La automatización llega fuera de la shell",
@@ -2875,7 +2875,7 @@
             },
             {
               "title": "La atención se dirige con teclado",
-              "body": "cmux convierte finalizaciones y preguntas de agentes en estado no leído dentro de la app. Los anillos de notificación, Cmd+Shift+U para saltar al último no leído y Cmd+Control+U para recorrer trabajo no leído hacen navegable la cola de revisión sin revisar cada workspace."
+              "body": "cmux convierte finalizaciones y preguntas de agentes en estado no leído dentro de la app. Los anillos de notificación, Cmd+Shift+U para saltar al no leído más antiguo y Cmd+Control+U para recorrer trabajo no leído hacen navegable la cola de revisión sin revisar cada workspace."
             },
             {
               "title": "La programabilidad queda abierta",
@@ -3037,7 +3037,7 @@
             },
             {
               "title": "Los atajos apuntan a la atención",
-              "body": "Cmd+Shift+U salta al último agente no leído. Cmd+Control+U recorre sesiones no leídas manteniéndolas sin leer. iTerm2 es maduro y configurable, pero estos atajos de revisión de agentes son el tipo de detalle que cmux añade porque está diseñado para multitarea intensa."
+              "body": "Cmd+Shift+U salta al agente no leído más antiguo. Cmd+Control+U recorre sesiones no leídas manteniéndolas sin leer. iTerm2 es maduro y configurable, pero estos atajos de revisión de agentes son el tipo de detalle que cmux añade porque está diseñado para multitarea intensa."
             },
             {
               "title": "cmux hereda fortalezas de Ghostty",
@@ -3122,7 +3122,7 @@
             },
             {
               "title": "Los atajos están hechos para multitarea",
-              "body": "Cmd+Shift+U salta al último agente no leído. Cmd+Control+U realiza un ciclo del trabajo no leído mientras lo mantiene sin leer. Esos atajos existen porque cmux es creado por personas que ejecutan muchos agentes a la vez."
+              "body": "Cmd+Shift+U salta al agente no leído más antiguo. Cmd+Control+U realiza un ciclo del trabajo no leído mientras lo mantiene sin leer. Esos atajos existen porque cmux es creado por personas que ejecutan muchos agentes a la vez."
             },
             {
               "title": "La programabilidad incluye la app",
@@ -3669,7 +3669,7 @@
             },
             {
               "title": "Los atajos codifican la multitarea",
-              "body": "Cmd+Shift+U salta al último panel no leído. Cmd+Control+U recorre sesiones no leídas sin borrarlas. No son atajos genéricos de terminal; son atajos para revisar agentes."
+              "body": "Cmd+Shift+U salta al panel no leído más antiguo. Cmd+Control+U recorre sesiones no leídas sin borrarlas. No son atajos genéricos de terminal; son atajos para revisar agentes."
             },
             {
               "title": "La automatización de navegador vive junto a terminales",

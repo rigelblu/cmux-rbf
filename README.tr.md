@@ -42,7 +42,7 @@ Kodlama ajanları dikkatinizi istediğinde paneller mavi bir halka alır ve sekm
 <tr>
 <td width="40%" valign="middle">
 <h3>Bildirim paneli</h3>
-Bekleyen tüm bildirimleri tek bir yerden görün, en son okunmamışa atlayın
+Bekleyen tüm bildirimleri tek bir yerden görün, en uzun süredir bekleyen okunmamış bölmeye atlayın
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Kenar çubuğu bildirim rozeti" width="100%" />
@@ -126,7 +126,7 @@ Birçok Claude Code ve Codex oturumunu paralel olarak çalıştırıyorum. Ghost
 
 Birkaç kodlama orkestratörü denedim ama çoğu Electron/Tauri uygulamasıydı ve performansları beni rahatsız ediyordu. Ayrıca terminali tercih ediyorum çünkü GUI orkestratörleri sizi kendi iş akışlarına kilitliyor. Bu yüzden cmux'u Swift/AppKit'te yerel bir macOS uygulaması olarak geliştirdim. Terminal görüntüleme için libghostty kullanıyor ve temalar, yazı tipleri ve renkler için mevcut Ghostty yapılandırmanızı okuyor.
 
-Ana eklemeler kenar çubuğu ve bildirim sistemi. Kenar çubuğunda her çalışma alanı için git dalını, bağlantılı PR durumunu/numarasını, çalışma dizinini, dinlenen portları ve en son bildirim metnini gösteren dikey sekmeler var. Bildirim sistemi terminal dizilerini (OSC 9/99/777) yakalıyor ve Claude Code, OpenCode vb. için ajan kancalarına bağlayabileceğiniz bir CLI'ye (`cmux notify`) sahip. Bir ajan beklerken paneli mavi bir halka alıyor ve sekme kenar çubuğunda yanıyor, böylece bölmeler ve sekmeler arasında hangisinin bana ihtiyacı olduğunu görebiliyorum. Cmd+Shift+U en son okunmamışa atlıyor.
+Ana eklemeler kenar çubuğu ve bildirim sistemi. Kenar çubuğunda her çalışma alanı için git dalını, bağlantılı PR durumunu/numarasını, çalışma dizinini, dinlenen portları ve en son bildirim metnini gösteren dikey sekmeler var. Bildirim sistemi terminal dizilerini (OSC 9/99/777) yakalıyor ve Claude Code, OpenCode vb. için ajan kancalarına bağlayabileceğiniz bir CLI'ye (`cmux notify`) sahip. Bir ajan beklerken paneli mavi bir halka alıyor ve sekme kenar çubuğunda yanıyor, böylece bölmeler ve sekmeler arasında hangisinin bana ihtiyacı olduğunu görebiliyorum. Cmd+Shift+U en uzun süredir bekleyen okunmamış panele atlıyor.
 
 Uygulama içi tarayıcının [agent-browser](https://github.com/vercel-labs/agent-browser)'dan aktarılmış betiklenebilir bir API'si var. Ajanlar erişilebilirlik ağacının anlık görüntüsünü alabilir, öğe referansları elde edebilir, tıklayabilir, formları doldurabilir ve JS çalıştırabilir. Terminalinizin yanında bir tarayıcı paneli bölebilir ve Claude Code'un geliştirme sunucunuzla doğrudan etkileşime girmesini sağlayabilirsiniz.
 
@@ -206,9 +206,9 @@ Tarayıcı geliştirici araçları kısayolları Safari varsayılanlarını taki
 | Kısayol | Eylem |
 |----------|--------|
 | ⌘ I | Bildirim panelini göster |
-| ⌘ ⇧ U | En son okunmamışa atla |
+| ⌘ ⇧ U | En uzun süredir bekleyen okunmamış bölmeye atla |
 | ⌥ ⌘ U | Mevcut öğenin okunmamış durumunu aç/kapat |
-| ⌃ ⌘ U | Mevcut öğeyi en eski okunmamış olarak işaretle ve bir sonraki okunmamışa atla |
+| ⌃ ⌘ U | Geçerli öğeyi okunmamışlar kuyruğunun sonuna gönder ve sonrakine atla |
 
 ### Bul
 

@@ -7703,7 +7703,7 @@ struct ContentView: View {
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.jumpUnread",
-                title: constant(String(localized: "command.jumpUnread.title", defaultValue: "Jump to Latest Unread")),
+                title: constant(String(localized: "command.jumpUnread.title", defaultValue: "Jump to Oldest Unread")), // (cm-128.11)
                 subtitle: constant(String(localized: "command.jumpUnread.subtitle", defaultValue: "Notifications")),
                 keywords: ["jump", "unread", "notification"]
             )
@@ -7723,11 +7723,12 @@ struct ContentView: View {
                 title: constant(
                     String(
                         localized: "command.markOldestUnreadAndJumpNext.title",
-                        defaultValue: "Mark as Oldest Unread and Jump to Next Latest Unread"
+                        defaultValue: "Send to Back of Unread Queue and Jump to Next" // (cm-128.11)
                     )
                 ),
                 subtitle: constant(String(localized: "command.jumpUnread.subtitle", defaultValue: "Notifications")),
-                keywords: ["mark", "oldest", "unread", "jump", "next", "notification", "defer"],
+                // (cm-128.11) He finds Send to Back by his own words: "mark" and "oldest" go, "back", "skip", "later" come.
+                keywords: ["unread", "jump", "next", "notification", "defer", "back", "skip", "later"],
                 when: { $0.bool(CommandPaletteContextKeys.hasWorkspace) }
             )
         )
@@ -9086,7 +9087,7 @@ struct ContentView: View {
             AppDelegate.shared?.toggleNotificationsPopover(animated: false)
         }
         registry.register(commandId: "palette.jumpUnread") {
-            AppDelegate.shared?.jumpToLatestUnread()
+            AppDelegate.shared?.jumpToOldestUnread() // (cm-128.11)
         }
         registry.register(commandId: "palette.toggleUnread") {
             AppDelegate.shared?.toggleFocusedNotificationUnread(

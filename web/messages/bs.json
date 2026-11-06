@@ -1450,7 +1450,7 @@
         "br-reload": "Ponovo učitaj stranicu",
         "br-devtools": "Otvori Developer Tools",
         "nt-panel": "Prikaži panel notifikacija",
-        "nt-latest": "Skok na najnoviju nepročitanu",
+        "nt-latest": "Skok na najstariju nepročitanu",
         "nt-flash": "Pokreni bljesak",
         "fd-find": "Pronađi",
         "fd-next-prev": "Pronađi sljedeću / prethodnu",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "Specifični radni prostor koji šalje notifikaciju je aktivan",
       "suppressItem3": "Panel notifikacija je otvoren",
       "notificationPanel": "Panel notifikacija",
-      "notificationPanelDesc": "Pritisnite <openShortcut>⌘⇧I</openShortcut> za otvaranje panela notifikacija. Kliknite na notifikaciju za skok na taj radni prostor. Pritisnite <jumpShortcut>⌘⇧U</jumpShortcut> za direktan skok na radni prostor sa najnovijom nepročitanom notifikacijom.",
+      "notificationPanelDesc": "Pritisnite <openShortcut>⌘⇧I</openShortcut> za otvaranje panela notifikacija. Kliknite na notifikaciju za skok na taj radni prostor. Pritisnite <jumpShortcut>⌘⇧U</jumpShortcut> za skok na nepročitani panel koji najduže čeka.",
       "customCommand": "Prilagođena komanda",
       "customCommandDesc": "Pokrenite shell komandu svaki put kada je notifikacija zakazana. Postavite je u Postavke > Aplikacija > Komanda notifikacije. Komanda se pokreće putem /bin/sh -c sa ovim varijablama okruženja:",
       "customCommandNote": "Komanda se pokreće nezavisno od sistemskog birača zvukova. Postavite birač na \"Ništa\" za korištenje samo prilagođene komande, ili zadržite oboje za sistemski zvuk plus prilagođenu akciju.",
@@ -2345,7 +2345,7 @@
           "metaTitle": "Najbolji terminali i agentski radni prostori za AI kodirajuće agente u 2026 - cmux",
           "metaDescription": "Uporedite cmux, Superset, Warp, Ghostty, iTerm2, tmux i druge terminale za pokretanje AI coding agenata.",
           "title": "Najbolji terminali i agentski radni prostori za AI kodirajuće agente u 2026",
-          "intro": "Najbolji terminal ili agentski radni prostor za kodirajuće agente je onaj koji mnoge dugotrajne sesije drži vidljivim, odzivnim i lakim za kontrolu. cmux su napravili ljudi koji cijeli dan rade kroz mnogo agenata: izvorne Swift/AppKit performanse, vertikalni radni prostori, prstenovi obavještenja, Cmd+Shift+U za najnovije nepročitano, Cmd+Control+U da trenutnu stavku označi kao najstariju nepročitanu i pređe na sljedeću nepročitanu stavku, te programabilni CLI.",
+          "intro": "Najbolji terminal ili agentski radni prostor za kodirajuće agente je onaj koji mnoge dugotrajne sesije drži vidljivim, odzivnim i lakim za kontrolu. cmux su napravili ljudi koji cijeli dan rade kroz mnogo agenata: izvorne Swift/AppKit performanse, vertikalni radni prostori, prstenovi obavještenja, Cmd+Shift+U za najstarije nepročitano, Cmd+Control+U da trenutnu stavku pošalje na kraj reda nepročitanih i pređe na sljedeću nepročitanu stavku, te programabilni CLI.",
           "summaryTitle": "Kratak odgovor",
           "summaryBody": "Odaberite cmux ako želite nativni macOS terminal koji može nadgledati mnogo agenata bez nametanja novog agenta, editora, cloud runtimea ili sistema kredita. Odaberite agent workspace ako želite orkestraciju zadataka i ugrađene review tokove. Odaberite klasični terminal ako uglavnom pokrećete jednog agenta odjednom.",
           "table": {
@@ -2469,7 +2469,7 @@
             },
             {
               "title": "Nadzor prvo tastaturom",
-              "body": "cmux tretira pažnju kao dio workflowa. Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. Te prečice su za ljude koji pokreću dovoljno agenata da ručno skeniranje tabova prestane raditi."
+              "body": "cmux tretira pažnju kao dio workflowa. Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. Te prečice su za ljude koji pokreću dovoljno agenata da ručno skeniranje tabova prestane raditi."
             },
             {
               "title": "Worktree podrška je primitive, ne produktna kutija",
@@ -2520,7 +2520,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Vizuelno zvono, bell komanda i vanjske skripte za obavještenja"
               ],
               [
@@ -2542,7 +2542,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -2601,7 +2601,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Uglavnom ručno ili vezano za njegov proizvod"
               ],
               [
@@ -2623,7 +2623,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -2682,7 +2682,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Devin Cloud, Devin Local, Devin CLI i ACP-kompatibilni agenti"
               ],
               [
@@ -2763,7 +2763,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "OSC obavještenja, oznake i alerti, trigger obavještenja i pretraga sesija"
               ],
               [
@@ -2844,7 +2844,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "OSC 99 desktop obavještenja i kitten notify, uz prilagođeno skriptovanje za nepročitane workflowe"
               ],
               [
@@ -2866,7 +2866,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -2925,7 +2925,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Uglavnom ručno ili vezano za njegov proizvod"
               ],
               [
@@ -2952,7 +2952,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -3002,7 +3002,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Uglavnom ručno ili vezano za njegov proizvod"
               ],
               [
@@ -3024,7 +3024,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -3079,7 +3079,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Uglavnom ručno ili vezano za njegov proizvod"
               ],
               [
@@ -3101,7 +3101,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -3160,7 +3160,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Uglavnom ručno ili vezano za njegov proizvod"
               ],
               [
@@ -3237,7 +3237,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Devin, Cascade i ACP-kompatibilni agenti unutar Devin Desktopa"
               ],
               [
@@ -3259,7 +3259,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -3314,7 +3314,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Ugrađeni terminal emulator koji koristi Alacritty kao backend"
               ],
               [
@@ -3336,7 +3336,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -3391,7 +3391,7 @@
               ],
               [
                 "Model pažnje",
-                "Notification rings, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada",
+                "Notification rings, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada",
                 "Uglavnom ručno ili vezano za njegov proizvod"
               ],
               [
@@ -3413,7 +3413,7 @@
             },
             {
               "title": "Prečice su dio modela pažnje",
-              "body": "Cmd+Shift+U skače na najnoviji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
+              "body": "Cmd+Shift+U skače na najstariji unread pane, a Cmd+Control+U obilazi unread rad bez čišćenja stanja. To pretvara završene ili blokirane agente u review red."
             },
             {
               "title": "Workflow ostaje programabilan",
@@ -3490,7 +3490,7 @@
             },
             {
               "title": "Koristite prstenove obavještenja kao review queue",
-              "body": "Kada agent pošalje cmux obavještenje kroz hookove, OSC 99/777 ili cmux notify, cmux označi workspace nepročitanim i zazvoni pane. Cmd+Shift+U skače na najnoviju nepročitanu stavku. Cmd+Control+U označava trenutnu stavku kao najstariju nepročitanu i skače na sljedeću najnoviju nepročitanu stavku, što je korisno kada nekoliko agenata završi odjednom."
+              "body": "Kada agent pošalje cmux obavještenje kroz hookove, OSC 99/777 ili cmux notify, cmux označi workspace nepročitanim i zazvoni pane. Cmd+Shift+U skače na najstariju nepročitanu stavku. Cmd+Control+U šalje trenutnu stavku na kraj reda nepročitanih i skače na sljedeću najstariju nepročitanu stavku, što je korisno kada nekoliko agenata završi odjednom."
             },
             {
               "title": "Zadržite Claude Code nepromijenjenim",
@@ -3507,7 +3507,7 @@
           "faqQ2": "Mogu li Claude Code i Codex raditi jedan pored drugog?",
           "faqA2": "Da. cmux je agent-agnostic, pa Claude Code, Codex, OpenCode i drugi CLI agenti mogu istovremeno raditi u odvojenim radnim prostorima.",
           "faqQ3": "Koja prečica je najvažnija za paralelne agente?",
-          "faqA3": "Cmd+Shift+U je osnovna prečica za nadzor jer skače na najnoviju nepročitanu stavku. Cmd+Control+U je korisno kada želite trenutnu stavku označiti kao najstariju nepročitanu i preći na sljedeću najnoviju nepročitanu stavku."
+          "faqA3": "Cmd+Shift+U je osnovna prečica za nadzor jer skače na najstariju nepročitanu stavku. Cmd+Control+U je korisno kada želite trenutnu stavku poslati na kraj reda nepročitanih i preći na sljedeću najstariju nepročitanu stavku."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset za AI coding agente - cmux",
@@ -3576,7 +3576,7 @@
             },
             {
               "title": "Pažnja je površina proizvoda",
-              "body": "cmux se fokusira na trenutak kada agent treba čovjeka. Notification rings, unread badges, panel obavještenja, Cmd+Shift+U za najnoviji unread i Cmd+Control+U za obilazak unread rada čine završene ili blokirane sesije lakim za pronalazak."
+              "body": "cmux se fokusira na trenutak kada agent treba čovjeka. Notification rings, unread badges, panel obavještenja, Cmd+Shift+U za najstariji unread i Cmd+Control+U za obilazak unread rada čine završene ili blokirane sesije lakim za pronalazak."
             },
             {
               "title": "Programabilnost je izlaz",
@@ -3811,7 +3811,7 @@
             },
             {
               "title": "Obavještenja postaju navigable state",
-              "body": "Desktop obavještenja je lako propustiti kada nestanu. cmux drži nepročitano stanje u aplikaciji, zazvoni pane, označi sidebar i omogućava da Cmd+Shift+U skoči na najnoviju nepročitanu sesiju."
+              "body": "Desktop obavještenja je lako propustiti kada nestanu. cmux drži nepročitano stanje u aplikaciji, zazvoni pane, označi sidebar i omogućava da Cmd+Shift+U skoči na najstariju nepročitanu sesiju."
             },
             {
               "title": "Automation izlazi izvan shella",

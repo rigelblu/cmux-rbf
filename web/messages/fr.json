@@ -1452,7 +1452,7 @@
         "br-reload": "Recharger la page",
         "br-devtools": "Ouvrir les outils de développement",
         "nt-panel": "Afficher le panneau de notifications",
-        "nt-latest": "Aller à la plus récente non lue",
+        "nt-latest": "Aller à la plus ancienne non lue",
         "nt-flash": "Déclencher le flash",
         "fd-find": "Rechercher",
         "fd-next-prev": "Résultat suivant / précédent",
@@ -1568,7 +1568,7 @@
       "suppressItem2": "L'espace de travail spécifique qui envoie la notification est actif",
       "suppressItem3": "Le panneau de notifications est ouvert",
       "notificationPanel": "Panneau de notifications",
-      "notificationPanelDesc": "Appuyez sur <openShortcut>⌘⇧I</openShortcut> pour ouvrir le panneau de notifications. Cliquez sur une notification pour aller à cet espace de travail. Appuyez sur <jumpShortcut>⌘⇧U</jumpShortcut> pour aller directement à l'espace de travail avec la notification non lue la plus récente.",
+      "notificationPanelDesc": "Appuyez sur <openShortcut>⌘⇧I</openShortcut> pour ouvrir le panneau de notifications. Cliquez sur une notification pour aller à cet espace de travail. Appuyez sur <jumpShortcut>⌘⇧U</jumpShortcut> pour aller au volet non lu qui attend depuis le plus longtemps.",
       "customCommand": "Commande personnalisée",
       "customCommandDesc": "Exécutez une commande shell à chaque fois qu'une notification est planifiée. Définissez-la dans Réglages > App > Commande de notification. La commande s'exécute via /bin/sh -c avec ces variables d'environnement :",
       "customCommandNote": "La commande s'exécute indépendamment du sélecteur de son système. Définissez le sélecteur sur « Aucun » pour utiliser uniquement la commande personnalisée, ou gardez les deux pour un son système plus une action personnalisée.",
@@ -2206,7 +2206,7 @@
           "metaTitle": "Meilleurs terminaux et espaces de travail d’agents pour agents de codage IA en 2026 - cmux",
           "metaDescription": "Comparez cmux, Superset, Warp, Ghostty, iTerm2, tmux et d’autres terminaux pour exécuter des agents de code IA.",
           "title": "Meilleurs terminaux et espaces de travail d’agents pour agents de codage IA en 2026",
-          "intro": "Le meilleur terminal ou espace de travail d’agent pour les agents de codage est celui qui garde de nombreuses sessions longues visibles, réactives et faciles à contrôler. cmux est construit par des personnes qui travaillent toute la journée avec de nombreux agents en parallèle : performances natives Swift/AppKit, espaces de travail verticaux, anneaux de notification, Cmd+Shift+U pour le dernier élément non lu, Cmd+Control+U pour marquer l’élément actuel comme le plus ancien non lu et passer au prochain élément non lu, et une CLI programmable.",
+          "intro": "Le meilleur terminal ou espace de travail d’agent pour les agents de codage est celui qui garde de nombreuses sessions longues visibles, réactives et faciles à contrôler. cmux est construit par des personnes qui travaillent toute la journée avec de nombreux agents en parallèle : performances natives Swift/AppKit, espaces de travail verticaux, anneaux de notification, Cmd+Shift+U pour l’élément non lu le plus ancien, Cmd+Control+U pour envoyer l’élément actuel au bout de la file des non lus et passer au prochain élément non lu, et une CLI programmable.",
           "summaryTitle": "Réponse courte",
           "summaryBody": "Choisissez cmux si vous voulez un terminal macOS natif capable de superviser de nombreux agents sans imposer un nouvel agent, éditeur, runtime cloud ou système de crédits. Choisissez un espace de travail d’agents si vous voulez une orchestration de tâches et des flux de revue intégrés. Choisissez un terminal classique si vous exécutez surtout un agent à la fois.",
           "table": {
@@ -2330,7 +2330,7 @@
             },
             {
               "title": "Supervision au clavier",
-              "body": "cmux traite l’attention comme un flux de première classe. Des raccourcis comme le saut au dernier non-lu vous emmènent directement au panneau qui nécessite une décision au lieu de parcourir chaque onglet ou d’attendre que les notifications bureau aient du sens."
+              "body": "cmux traite l’attention comme un flux de première classe. Des raccourcis comme le saut au plus ancien non-lu vous emmènent directement au panneau qui nécessite une décision au lieu de parcourir chaque onglet ou d’attendre que les notifications bureau aient du sens."
             },
             {
               "title": "Le support des worktrees est une primitive, pas une boîte produit",
@@ -2399,7 +2399,7 @@
             },
             {
               "title": "Utilisez les anneaux de notification comme file de revue",
-              "body": "Quand un agent émet une notification cmux via des hooks, OSC 99/777 ou cmux notify, cmux marque l’espace de travail comme non lu et fait sonner l’anneau du panneau. Cmd+Shift+U passe au dernier élément non lu. Cmd+Control+U marque l’élément actuel comme le plus ancien non lu et passe au prochain élément non lu le plus récent, ce qui est utile lorsque plusieurs agents terminent en même temps."
+              "body": "Quand un agent émet une notification cmux via des hooks, OSC 99/777 ou cmux notify, cmux marque l’espace de travail comme non lu et fait sonner l’anneau du panneau. Cmd+Shift+U passe à l’élément non lu le plus ancien. Cmd+Control+U envoie l’élément actuel au bout de la file des non lus et passe à l’élément non lu le plus ancien suivant, ce qui est utile lorsque plusieurs agents terminent en même temps."
             },
             {
               "title": "Gardez Claude Code inchangé",
@@ -2416,7 +2416,7 @@
           "faqQ2": "Claude Code et Codex peuvent-ils tourner côte à côte ?",
           "faqA2": "Oui. cmux est agnostique aux agents, donc Claude Code, Codex, OpenCode et d’autres agents CLI peuvent tourner en même temps dans des espaces séparés.",
           "faqQ3": "Quel raccourci compte le plus pour les agents parallèles ?",
-          "faqA3": "Cmd+Shift+U est le raccourci central de supervision parce qu’il saute au dernier élément non lu. Cmd+Control+U est utile quand tu veux marquer l’élément actuel comme le plus ancien non lu et passer au prochain élément non lu le plus récent."
+          "faqA3": "Cmd+Shift+U est le raccourci central de supervision parce qu’il saute à l’élément non lu le plus ancien. Cmd+Control+U est utile quand tu veux envoyer l’élément actuel au bout de la file des non lus et passer à l’élément non lu le plus ancien suivant."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset pour agents de code IA : cmux",
@@ -2485,7 +2485,7 @@
             },
             {
               "title": "L’attention est une surface produit",
-              "body": "cmux se concentre sur le moment où un agent a besoin d’un humain. Anneaux de notification, badges non lus, panneau de notifications et saut au dernier non-lu rendent les sessions terminées ou bloquées faciles à trouver."
+              "body": "cmux se concentre sur le moment où un agent a besoin d’un humain. Anneaux de notification, badges non lus, panneau de notifications et saut au plus ancien non-lu rendent les sessions terminées ou bloquées faciles à trouver."
             },
             {
               "title": "La programmabilité est l’échappatoire",
@@ -2720,7 +2720,7 @@
             },
             {
               "title": "Les notifications deviennent un état navigable",
-              "body": "Les notifications desktop sont faciles à manquer une fois disparues. cmux conserve l’état non lu dans l’app, fait sonner l’anneau du panneau, marque la barre latérale et permet à Cmd+Shift+U de passer à la dernière session non lue."
+              "body": "Les notifications desktop sont faciles à manquer une fois disparues. cmux conserve l’état non lu dans l’app, fait sonner l’anneau du panneau, marque la barre latérale et permet à Cmd+Shift+U de passer à la session non lue la plus ancienne."
             },
             {
               "title": "L’automatisation sort du shell",
@@ -2878,7 +2878,7 @@
             },
             {
               "title": "L’attention est adressable au clavier",
-              "body": "cmux transforme l'achèvement de l'agent et les questions en état non lu dans l'application. Les anneaux de notification, Cmd+Shift+U pour les derniers fichiers non lus et Cmd+Control+U pour faire défiler les travaux non lus rendent la file d'attente de révision navigable sans analyser chaque espace de travail."
+              "body": "cmux transforme l'achèvement de l'agent et les questions en état non lu dans l'application. Les anneaux de notification, Cmd+Shift+U pour les plus anciens non lus et Cmd+Control+U pour faire défiler les travaux non lus rendent la file d'attente de révision navigable sans analyser chaque espace de travail."
             },
             {
               "title": "La programmabilité reste ouverte",
@@ -3040,7 +3040,7 @@
             },
             {
               "title": "Les raccourcis visent l’attention",
-              "body": "Cmd+Shift+U accède au dernier agent non lu. Cmd+Control+U cycle les sessions non lues tout en les gardant non lues. iTerm2 est mature et configurable, mais ces raccourcis d'examen des agents sont le genre de détails de produit que cmux ajoute car il est conçu pour un multitâche intensif."
+              "body": "Cmd+Shift+U accède à l’agent non lu le plus ancien. Cmd+Control+U cycle les sessions non lues tout en les gardant non lues. iTerm2 est mature et configurable, mais ces raccourcis d'examen des agents sont le genre de détails de produit que cmux ajoute car il est conçu pour un multitâche intensif."
             },
             {
               "title": "cmux hérite de Ghostty",
@@ -3125,7 +3125,7 @@
             },
             {
               "title": "Les raccourcis sont faits pour le multitâche",
-              "body": "Cmd+Shift+U accède au dernier agent non lu. Cmd+Control+U cycle le travail non lu tout en le gardant non lu. Ces raccourcis existent parce que cmux est construit par des personnes qui exécutent plusieurs agents à la fois."
+              "body": "Cmd+Shift+U accède à l’agent non lu le plus ancien. Cmd+Control+U cycle le travail non lu tout en le gardant non lu. Ces raccourcis existent parce que cmux est construit par des personnes qui exécutent plusieurs agents à la fois."
             },
             {
               "title": "La programmabilité inclut l’enveloppe app",
@@ -3672,7 +3672,7 @@
             },
             {
               "title": "Les raccourcis codent le multitâche",
-              "body": "Cmd+Shift+U passe au dernier volet non lu. Cmd+Control+U cycle les sessions non lues sans les effacer. Ce ne sont pas des raccourcis de terminal génériques; ce sont des raccourcis de révision des agents."
+              "body": "Cmd+Shift+U passe au volet non lu le plus ancien. Cmd+Control+U cycle les sessions non lues sans les effacer. Ce ne sont pas des raccourcis de terminal génériques; ce sont des raccourcis de révision des agents."
             },
             {
               "title": "Le navigateur vit à côté du terminal",

@@ -2483,7 +2483,7 @@ private struct NotificationsPopoverView: View {
                     .background(Capsule().fill(cmuxAccentColor()))
             }
             Spacer()
-            Button(action: jumpToLatestUnread) {
+            Button(action: jumpToOldestUnread) {
                 HStack(spacing: 5) {
                     CmuxSystemSymbolImage(
                         systemName: "arrow.down.to.line",
@@ -2491,7 +2491,7 @@ private struct NotificationsPopoverView: View {
                         weight: .semibold,
                         tint: hasUnreadNotifications ? .primary : .secondary
                     )
-                    Text(String(localized: "notifications.jumpToLatest", defaultValue: "Jump to Latest"))
+                    Text(String(localized: "notifications.jumpToLatest", defaultValue: "Oldest Unread"))
                         .cmuxFont(size: 11)
                     if !jumpToUnreadShortcut.displayString.isEmpty {
                         Text(jumpToUnreadShortcut.displayString)
@@ -2521,7 +2521,7 @@ private struct NotificationsPopoverView: View {
             .accessibilityValue(jumpToUnreadShortcut.displayString)
             .safeHelp(
                 KeyboardShortcutSettings.Action.jumpToUnread.tooltip(
-                    String(localized: "notifications.jumpToLatest", defaultValue: "Jump to Latest")
+                    String(localized: "notifications.jumpToLatest", defaultValue: "Oldest Unread")
                 )
             )
             .disabled(!hasUnreadNotifications)
@@ -2732,9 +2732,9 @@ private struct NotificationsPopoverView: View {
         macMenuProjection.unreadCount
     }
 
-    private func jumpToLatestUnread() {
+    private func jumpToOldestUnread() {
         DispatchQueue.main.async {
-            _ = AppDelegate.shared?.jumpToLatestMacNotificationUnread()
+            _ = AppDelegate.shared?.jumpToOldestUnread() // (cm-128.11)
             onDismiss()
         }
     }

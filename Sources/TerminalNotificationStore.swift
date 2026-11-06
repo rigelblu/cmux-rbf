@@ -1,5 +1,4 @@
 import CmuxFoundation
-import CmuxNotifications
 import AppKit
 import Combine
 import Foundation
@@ -645,7 +644,9 @@ final class TerminalNotificationStore: ObservableObject {
     }
 
     var windowDockUnreadTargets: [WindowDockUnreadTarget] {
-        Array(manualUnreadSurfaceTargetsByRecency.reversed())
+        // (cm-128.11, Tom grill Q94) Oldest first, as the recency list is stored: the walk takes Dock marks
+        // in the order they were set. It used to read newest first.
+        manualUnreadSurfaceTargetsByRecency
     }
 
     private func refreshUnreadPresentation() {
@@ -1716,8 +1717,10 @@ final class TerminalNotificationStore: ObservableObject {
         unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
         unattendedNudgeAgentKey: String? = nil
     ) {
+        var notification = notification // (cm-128.11) it may take over its pane's place below
         var updated = notifications
         var idsToClear: [String] = []
+        var supersededUnreadQueuedAt: [Date] = []
         updated.removeAll { existing in
             guard existing.tabId == notification.tabId, existing.surfaceId == notification.surfaceId else { return false }
             if let correlationKey = notification.correlationKey {
@@ -1728,7 +1731,13 @@ final class TerminalNotificationStore: ObservableObject {
                 guard existing.correlationKey == correlationKey else { return false }
             }
             idsToClear.append(existing.id.uuidString)
+            if !existing.isRead { supersededUnreadQueuedAt.append(existing.queuedAt) }
             return true
+        }
+        // (cm-128.11, Tom grill Q75) A pane that notifies again keeps its place in ⌘⇧U's queue: the new
+        // notification takes the earliest "unread since" among the unread ones it replaces, else its own.
+        if let inherited = supersededUnreadQueuedAt.min(), inherited < notification.queuedAt {
+            notification.queuedAt = inherited
         }
 
         if let existingIndicatorSurfaceId = focusedReadIndicatorByTabId[notification.tabId],
@@ -1963,8 +1972,8 @@ final class TerminalNotificationStore: ObservableObject {
         }
         // The notification itself now provides the workspace unread indicator. Clear any
         // existing manual or restored workspace unread state for the same tab so we don't
-        // double-count it. (Mirrors what markLatestNotificationAsOldestUnread does for the
-        // manual flag — restored hints are a one-time signal from a previous session and
+        // double-count it. (`sendToBack` (cm-128.11) calls this and
+        // then clears his marks too. Restored hints are a one-time signal from a previous session and
         // should also defer to the concrete unread notification.)
         for tabID in tabIDs {
             mutateWorkspaceManualUnread(false, forTabId: tabID)
@@ -2078,63 +2087,80 @@ final class TerminalNotificationStore: ObservableObject {
         setSurfaceManualUnread(false, forTabId: windowId, surfaceId: surfaceId)
     }
 
+    /// Send to Back (cm-128.11, Tom grill Q74, Q93, Q96): puts one pane at the back of ⌘⇧U's queue, unread.
+    /// The one place that sets "unread since" to now; Mark as Unread keeps the old place. For a pane with
+    /// notifications: its newest one is marked unread through the store's unread path (which keeps its
+    /// time), then every unread notification of the pane takes `now`. A Dock surface takes the same rule;
+    /// with no notification it gets a Dock mark at the end of the recency list, and a surface already
+    /// marked moves there, where it used to keep its place (the lead's reading of Q96).
+    /// On a workspace pane, with or without notifications of its own, the workspace's unread workspace-level
+    /// notifications take `now` too: opening one reads the pane (the lead's call, step-2 review finding 1).
+    /// Nothing moves in `notifications`, so the Notifications list stays sorted by time.
+    /// - Returns: whether the pane had notifications. `false` means the caller leaves its own mark:
+    ///   a workspace pane's mark lives in `Workspace`, outside the store, so only the workspace-level
+    ///   mark of the old guard is set here.
     @discardableResult
-    func markLatestWindowDockNotificationAsOldestUnread(
-        windowId: UUID,
-        surfaceId: UUID
-    ) -> UUID? {
-        var updated = notifications
-        guard let index = updated.firstIndex(where: {
-            $0.matches(tabId: windowId, surfaceId: surfaceId)
-        }) else {
-            return nil
-        }
-        return moveNotificationToOldestUnread(at: index, in: &updated)
-    }
-
-    @discardableResult
-    func markLatestNotificationAsOldestUnread(forTabId tabId: UUID, surfaceId: UUID?) -> UUID? {
-        var updated = notifications
-        guard let index = latestNotificationIndex(forTabId: tabId, surfaceId: surfaceId, in: updated) else {
+    func sendToBack(_ target: UnreadQueueTarget, now: Date = Date()) -> Bool {
+        switch target {
+        case .windowDock(let dockTarget):
+            if sendNotificationsToBack(now: now, matching: {
+                $0.matches(tabId: dockTarget.windowId, surfaceId: dockTarget.surfaceId)
+            }) {
+                return true
+            }
+            if manualUnreadSurfaceTargetsByRecency.contains(dockTarget) {
+                manualUnreadSurfaceTargetsByRecency.removeAll { $0 == dockTarget }
+                manualUnreadSurfaceTargetsByRecency.append(dockTarget)
+            } else {
+                markWindowDockSurfaceUnread(windowId: dockTarget.windowId, surfaceId: dockTarget.surfaceId)
+            }
+            return false
+        case .workspace(let tabId, let surfaceId):
+            // (cm-128.11, the lead's call) Opening a workspace-level notification focuses the workspace's focused
+            // pane and reads it, so on a pane the workspace's unread workspace-level notifications go back with it.
+            let sentBackWithIt: ((TerminalNotification) -> Bool)? = surfaceId == nil
+                ? nil
+                : { $0.matches(tabId: tabId, surfaceId: nil) }
+            if sendNotificationsToBack(
+                now: now,
+                matching: { $0.matches(tabId: tabId, surfaceId: surfaceId) },
+                alsoSendingBack: sentBackWithIt
+            ) {
+                return true
+            }
+            // `.4` pinned this guard: with no notification and no pane, the workspace itself is marked.
             if surfaceId == nil, !workspaceIsUnread(forTabId: tabId) {
                 setWorkspaceManualUnread(true, forTabId: tabId)
             }
-            return nil
+            return false
         }
-
-        return moveNotificationToOldestUnread(at: index, in: &updated)
     }
 
-    private func moveNotificationToOldestUnread(
-        at index: Int,
-        in updated: inout [TerminalNotification]
-    ) -> UUID {
-        var notification = updated.remove(at: index)
-        notification.isRead = false
-        let insertionIndex = updated.lastIndex(where: { !$0.isRead }).map { $0 + 1 } ?? updated.endIndex
-        updated.insert(notification, at: insertionIndex)
-        mutateWorkspaceManualUnread(false, forTabId: notification.tabId)
-        if let notificationSurfaceId = notification.surfaceId {
-            mutateSurfaceManualUnread(
-                false,
-                forTabId: notification.tabId,
-                surfaceId: notificationSurfaceId
-            )
+    /// - Returns: whether the pane had a notification. Unread notifications that `alsoSendingBack` accepts
+    ///   take `now` too, whether or not the pane has one.
+    private func sendNotificationsToBack(
+        now: Date,
+        matching isOnPane: (TerminalNotification) -> Bool,
+        alsoSendingBack: ((TerminalNotification) -> Bool)? = nil
+    ) -> Bool {
+        let newest = notifications.first(where: isOnPane)
+        if let newest {
+            markNotificationFeedUnread(ids: [newest.id])
+            // The notification now provides the unread state: drop his marks on it, as the unread path does.
+            mutateWorkspaceManualUnread(false, forTabId: newest.tabId)
+            if let surfaceId = newest.surfaceId {
+                mutateSurfaceManualUnread(false, forTabId: newest.tabId, surfaceId: surfaceId)
+            }
         }
-        notifications = updated
-        notificationFeedHistory.markUnread(ids: [notification.id])
-        return notification.id
-    }
-
-    private func latestNotificationIndex(forTabId tabId: UUID, surfaceId: UUID?, in notifications: [TerminalNotification]) -> Int? {
-        if let exactIndex = notifications.firstIndex(where: { $0.matches(tabId: tabId, surfaceId: surfaceId) }) {
-            return exactIndex
+        var updated = notifications
+        var didSendBack = false
+        for index in updated.indices where !updated[index].isRead
+            && (isOnPane(updated[index]) || alsoSendingBack?(updated[index]) == true) {
+            updated[index].queuedAt = now
+            didSendBack = true
         }
-        if surfaceId != nil,
-           let workspaceIndex = notifications.firstIndex(where: { $0.tabId == tabId && $0.surfaceId == nil }) {
-            return workspaceIndex
-        }
-        return notifications.firstIndex(where: { $0.tabId == tabId })
+        if didSendBack { notifications = updated }
+        return newest != nil
     }
 
     func setFocusedReadIndicator(forTabId tabId: UUID, surfaceId: UUID?) {
@@ -2301,6 +2327,7 @@ final class TerminalNotificationStore: ObservableObject {
             subtitle: notification.subtitle,
             body: notification.body,
             createdAt: notification.createdAt,
+            queuedAt: notification.queuedAt, // (cm-128.11) the copy keeps its place in the queue
             isRead: notification.isRead,
             paneFlash: notification.paneFlash,
             scrollPosition: notification.scrollPosition,
@@ -2425,6 +2452,7 @@ final class TerminalNotificationStore: ObservableObject {
                 subtitle: notification.subtitle,
                 body: notification.body,
                 createdAt: notification.createdAt,
+                queuedAt: notification.queuedAt, // (cm-128.11) a moved pane keeps its place in the queue
                 isRead: notification.isRead,
                 paneFlash: notification.paneFlash,
                 scrollPosition: notification.scrollPosition,

@@ -5,23 +5,15 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct FocusedNotificationMarkerTests {
-    /// Records every notification, workspace, and exact Dock target exclusion
-    /// the marker asks to jump for, and returns a scriptable opened id.
+    /// Records every pane exclusion the marker asks to jump for (cm-128.11: one exclusion in place of
+    /// the notification, workspace and Dock parameters), and returns a scriptable opened id.
     @MainActor
     final class JumpSpy {
         var openedId: UUID?
-        private(set) var calls: [(UUID?, UUID?, WindowDockUnreadTarget?)] = []
+        private(set) var calls: [UnreadQueueTarget?] = []
 
-        func jump(
-            _ excludedNotificationId: UUID?,
-            _ excludedWorkspaceId: UUID?,
-            _ excludedWindowDockTarget: WindowDockUnreadTarget?
-        ) -> UUID? {
-            calls.append((
-                excludedNotificationId,
-                excludedWorkspaceId,
-                excludedWindowDockTarget
-            ))
+        func jump(_ excludedPane: UnreadQueueTarget?) -> UUID? {
+            calls.append(excludedPane)
             return openedId
         }
     }
@@ -32,7 +24,7 @@ struct FocusedNotificationMarkerTests {
     ) -> (FocusedNotificationMarker, JumpSpy) {
         let marker = FocusedNotificationMarker(
             resolver: resolver,
-            jumpToLatestUnread: { jump.jump($0, $1, $2) }
+            jumpToOldestUnread: { jump.jump($0) }
         )
         return (marker, jump)
     }
@@ -156,106 +148,75 @@ struct FocusedNotificationMarkerTests {
 
     // MARK: markOldest + jump
 
-    @Test("mark-oldest marks the focused Dock surface without excluding sibling surfaces")
-    func markOldestMarksWindowDockSurfaceWithoutExcludingOwner() {
-        let target = WindowDockUnreadTarget(windowId: UUID(), surfaceId: UUID())
-        let resolver = FakeFocusedResolving()
-        resolver.focusedTargetValue = .windowDock(target)
-        let (marker, spy) = makeMarker(resolver: resolver)
+    // Scenario 157 (cm-128.11): ⌘⌃U sends the focused pane to the back, then walks without it.
 
-        _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
+    @Test("send to back: a Dock surface is handed to the store and is the one exclusion, whether or not it has a notification")
+    func sendToBackDockSurface() {
+        // The marker treats both cases the same: the store marks, moves or sends back; the fake's answer is ignored.
+        for hasNotification in [false, true] {
+            let target = WindowDockUnreadTarget(windowId: UUID(), surfaceId: UUID())
+            let resolver = FakeFocusedResolving()
+            resolver.focusedTargetValue = .windowDock(target)
+            if hasNotification { resolver.targetsWithNotifications = [.windowDock(target)] }
+            let (marker, spy) = makeMarker(resolver: resolver)
 
-        #expect(resolver.unreadWindowDockTargets == [target])
-        #expect(resolver.mutations == [
-            "markWindowDockSurfaceUnread(\(short(target.surfaceId)))",
-        ])
-        #expect(spy.calls.count == 1)
-        #expect(spy.calls.first?.0 == nil)
-        #expect(spy.calls.first?.1 == nil)
-        #expect(spy.calls.first?.2 == target)
+            _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
+
+            #expect(resolver.mutations == ["sendToBack(dock \(short(target.surfaceId)))"], "the store marks and moves a Dock mark itself")
+            #expect(spy.calls == [.windowDock(target)])
+        }
     }
 
-    @Test("mark-oldest excludes both forms of unread on the focused Dock surface")
-    func markOldestDefersWindowDockNotificationAndExactUnreadTarget() {
-        let target = WindowDockUnreadTarget(windowId: UUID(), surfaceId: UUID())
-        let notificationID = UUID()
-        let resolver = FakeFocusedResolving()
-        resolver.focusedTargetValue = .windowDock(target)
-        resolver.unreadWindowDockTargets = [target]
-        resolver.oldestUnreadIdByWindowDockTarget[target] = notificationID
-        let (marker, spy) = makeMarker(resolver: resolver)
-
-        _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
-
-        #expect(resolver.mutations.isEmpty)
-        #expect(spy.calls.count == 1)
-        #expect(spy.calls.first?.0 == notificationID)
-        #expect(spy.calls.first?.1 == nil)
-        #expect(spy.calls.first?.2 == target)
-    }
-
-    @Test("mark-oldest does not defer a notification from a sibling Dock surface")
-    func markOldestDoesNotDeferSiblingWindowDockNotification() {
-        let target = WindowDockUnreadTarget(windowId: UUID(), surfaceId: UUID())
-        let siblingNotificationID = UUID()
-        let resolver = FakeFocusedResolving()
-        resolver.focusedTargetValue = .windowDock(target)
-        resolver.oldestUnreadIdByTab[target.windowId] = siblingNotificationID
-        let (marker, spy) = makeMarker(resolver: resolver)
-
-        _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
-
-        #expect(resolver.unreadWindowDockTargets == [target])
-        #expect(resolver.mutations == [
-            "markWindowDockSurfaceUnread(\(short(target.surfaceId)))",
-        ])
-        #expect(spy.calls.count == 1)
-        #expect(spy.calls.first?.0 == nil)
-        #expect(spy.calls.first?.1 == nil)
-        #expect(spy.calls.first?.2 == target)
-    }
-
-    @Test("mark-oldest defers to a notification id, then jumps excluding it")
-    func markOldestDefersToNotification() {
-        let tab = UUID(), surface = UUID(), deferredNotif = UUID(), opened = UUID()
+    @Test("send to back: a pane with a notification is sent back; the walk excludes the pane, and nothing else is marked")
+    func sendToBackPaneWithNotification() {
+        let tab = UUID(), surface = UUID(), opened = UUID()
         let resolver = FakeFocusedResolving()
         resolver.focusedTargetValue = .workspace(tabId: tab, surfaceId: surface)
-        resolver.oldestUnreadIdByTab[tab] = deferredNotif
+        resolver.targetsWithNotifications = [.workspace(tabId: tab, surfaceId: surface)]
         let jump = JumpSpy(); jump.openedId = opened
         let (marker, spy) = makeMarker(resolver: resolver, jump: jump)
 
         let result = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
 
         #expect(result == opened)
-        #expect(spy.calls.count == 1)
-        #expect(spy.calls.first?.0 == deferredNotif) // excluded notification id
-        #expect(spy.calls.first?.1 == nil)            // not excluding a workspace
-        // No panel/workspace mutation happened: the notification-deferral path returns early.
-        #expect(resolver.mutations.isEmpty)
+        #expect(spy.calls == [.workspace(tabId: tab, surfaceId: surface)]) // the pane just sent back
+        #expect(resolver.mutations == ["sendToBack(\(short(tab)),\(short(surface)))"], "no mark of his own beside it")
     }
 
-    @Test("mark-oldest with no deferrable notification marks the clean panel unread, then jumps excluding the workspace")
-    func markOldestMarksPanelThenJumpsExcludingWorkspace() {
+    @Test("send to back: a pane with no notification gets his mark, then the walk excludes it")
+    func sendToBackPaneWithNoNotificationMarksPanel() {
         let tab = UUID(), surface = UUID(), opened = UUID()
         let panel = FocusedPanel(tabId: tab, panelId: surface)
         let resolver = FakeFocusedResolving()
         resolver.focusedTargetValue = .workspace(tabId: tab, surfaceId: surface)
         resolver.panelByTabSurface[.init(tabId: tab, surfaceId: surface)] = panel
-        // No deferrable notification and a clean panel → mark panel unread.
         let jump = JumpSpy(); jump.openedId = opened
         let (marker, spy) = makeMarker(resolver: resolver, jump: jump)
 
         let result = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
 
         #expect(result == opened)
-        #expect(resolver.mutations == ["markPanelUnread(\(short(surface)))"])
-        #expect(spy.calls.count == 1)
-        #expect(spy.calls.first?.0 == nil)
-        #expect(spy.calls.first?.1 == tab) // excluding the marked workspace
+        #expect(resolver.mutations == ["sendToBack(\(short(tab)),\(short(surface)))", "markPanelUnread(\(short(surface)))"])
+        #expect(spy.calls == [.workspace(tabId: tab, surfaceId: surface)]) // the marked pane
     }
 
-    @Test("mark-oldest does NOT re-mark an already-unread panel, but still jumps")
-    func markOldestSkipsAlreadyUnreadPanel() {
+    // Review carry-over (a): the focused surface id is not the panel id the mark is kept under.
+    @Test("send to back: the exclusion carries the id the pane's mark is kept under, not the focused surface id")
+    func sendToBackExcludesThePanelIdItMarked() {
+        let tab = UUID(), surface = UUID(), panelId = UUID()
+        let resolver = FakeFocusedResolving()
+        resolver.focusedTargetValue = .workspace(tabId: tab, surfaceId: surface)
+        resolver.panelByTabSurface[.init(tabId: tab, surfaceId: surface)] = FocusedPanel(tabId: tab, panelId: panelId)
+        let (marker, spy) = makeMarker(resolver: resolver)
+
+        _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
+
+        #expect(resolver.mutations.last == "markPanelUnread(\(short(panelId)))")
+        #expect(spy.calls == [.workspace(tabId: tab, surfaceId: panelId)], "the walk compares it with the workspace mark's panel")
+    }
+
+    @Test("send to back: an already-unread panel is not marked again, but is still excluded")
+    func sendToBackSkipsAlreadyUnreadPanel() {
         let tab = UUID(), surface = UUID()
         let panel = FocusedPanel(tabId: tab, panelId: surface)
         let resolver = FakeFocusedResolving()
@@ -266,12 +227,12 @@ struct FocusedNotificationMarkerTests {
 
         _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
 
-        #expect(resolver.mutations.isEmpty)
-        #expect(spy.calls.first?.1 == tab)
+        #expect(resolver.mutations == ["sendToBack(\(short(tab)),\(short(surface)))"])
+        #expect(spy.calls == [.workspace(tabId: tab, surfaceId: surface)])
     }
 
-    @Test("mark-oldest without a panel marks a read workspace unread, then jumps")
-    func markOldestMarksWorkspaceUnread() {
+    @Test("send to back: with no panel, a read workspace is marked unread and the walk excludes the workspace")
+    func sendToBackMarksWorkspaceUnread() {
         let tab = UUID()
         let resolver = FakeFocusedResolving()
         resolver.focusedTargetValue = .workspace(tabId: tab, surfaceId: nil)
@@ -279,11 +240,44 @@ struct FocusedNotificationMarkerTests {
 
         _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
 
-        #expect(resolver.mutations == ["storeMarkUnread(\(short(tab)))"])
-        #expect(spy.calls.first?.1 == tab)
+        #expect(resolver.mutations == ["sendToBack(\(short(tab)),nil)", "storeMarkUnread(\(short(tab)))"])
+        #expect(spy.calls == [.workspace(tabId: tab, surfaceId: nil)]) // no pane: its workspace
     }
 
-    @Test("mark-oldest is a no-op when no store is present")
+    // Step-2 review finding 2 (MX1): when the surface id resolves to no panel, the mark is a workspace mark.
+    @Test("send to back: a surface id that resolves to no panel marks the workspace, and the walk excludes the workspace, not the surface id")
+    func sendToBackWithASurfaceIdAndNoPanelExcludesTheWorkspace() {
+        let tab = UUID(), surface = UUID()
+        let resolver = FakeFocusedResolving()
+        resolver.focusedTargetValue = .workspace(tabId: tab, surfaceId: surface) // no panelByTabSurface entry
+        let (marker, spy) = makeMarker(resolver: resolver)
+
+        _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
+
+        #expect(resolver.mutations == ["sendToBack(\(short(tab)),\(short(surface)))", "storeMarkUnread(\(short(tab)))"])
+        #expect(spy.calls == [.workspace(tabId: tab, surfaceId: nil)], "the mark was set under the workspace")
+    }
+
+    // The seam split: the marker resolves the focused target once and hands it to `sendToBack`.
+    @Test("send to back: the focused target is resolved once, and sendToBack takes it as an argument")
+    func sendToBackTakesTheResolvedTargetAsAnArgument() {
+        let tab = UUID(), surface = UUID()
+        let resolver = FakeFocusedResolving()
+        resolver.focusedTargetValue = .workspace(tabId: tab, surfaceId: surface)
+        resolver.targetsWithNotifications = [.workspace(tabId: tab, surfaceId: surface)]
+        let (marker, _) = makeMarker(resolver: resolver)
+
+        _ = marker.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
+        #expect(resolver.focusedTargetCalls == 1)
+
+        // Another caller passes its own target: no lookup of the focused one.
+        let other = UnreadQueueTarget.workspace(tabId: UUID(), surfaceId: UUID())
+        resolver.targetsWithNotifications.insert(other)
+        #expect(marker.sendToBack(other) == other)
+        #expect(resolver.focusedTargetCalls == 1)
+    }
+
+    @Test("send to back is a no-op when no store is present")
     func markOldestNoStore() {
         let resolver = FakeFocusedResolving()
         resolver.hasNotificationStore = false

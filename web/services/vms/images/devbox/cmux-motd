@@ -45,7 +45,7 @@ printf "  ${bold}⌘⇧D${reset}${subdued}                 Split down${reset}\n"
 printf "  ${bold}⌘⇧P${reset}${subdued}                 Command palette${reset}\n"
 printf "  ${bold}⌘⇧R${reset}${subdued}                 Rename workspace${reset}\n"
 printf "  ${bold}⌘⇧L${reset}${subdued}                 New browser${reset}\n"
-printf "  ${bold}⌘⇧U${reset}${subdued}                 Jump to latest unread${reset}\n"
+printf "  ${bold}⌘⇧U${reset}${subdued}                 Jump to oldest unread${reset}\n"
 printf "  ${bold}⌥⌘U${reset}${subdued}                 Toggle unread${reset}\n"
 printf '\n'
 printf "  ${bold}Docs${reset}${subdued}                https://cmux.com/docs${reset}\n"

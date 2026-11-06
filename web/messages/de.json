@@ -1450,7 +1450,7 @@
         "br-reload": "Seite neu laden",
         "br-devtools": "Entwicklerwerkzeuge öffnen",
         "nt-panel": "Benachrichtigungspanel anzeigen",
-        "nt-latest": "Zur neuesten ungelesenen springen",
+        "nt-latest": "Zur ältesten ungelesenen springen",
         "nt-flash": "Blitz auslösen",
         "fd-find": "Suchen",
         "fd-next-prev": "Nächstes / Vorheriges Ergebnis",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "Der spezifische Workspace, der die Benachrichtigung sendet, aktiv ist",
       "suppressItem3": "Das Benachrichtigungspanel geöffnet ist",
       "notificationPanel": "Benachrichtigungspanel",
-      "notificationPanelDesc": "Drücken Sie <openShortcut>⌘⇧I</openShortcut>, um das Benachrichtigungspanel zu öffnen. Klicken Sie auf eine Benachrichtigung, um zu diesem Workspace zu springen. Drücken Sie <jumpShortcut>⌘⇧U</jumpShortcut>, um direkt zum Workspace mit der neuesten ungelesenen Benachrichtigung zu springen.",
+      "notificationPanelDesc": "Drücken Sie <openShortcut>⌘⇧I</openShortcut>, um das Benachrichtigungspanel zu öffnen. Klicken Sie auf eine Benachrichtigung, um zu diesem Workspace zu springen. Drücken Sie <jumpShortcut>⌘⇧U</jumpShortcut>, um zum ungelesenen Bereich zu springen, der am längsten wartet.",
       "customCommand": "Benutzerdefinierter Befehl",
       "customCommandDesc": "Führen Sie jedes Mal einen Shell-Befehl aus, wenn eine Benachrichtigung geplant wird. Setzen Sie ihn unter Einstellungen > App > Benachrichtigungsbefehl. Der Befehl wird über /bin/sh -c mit diesen Umgebungsvariablen ausgeführt:",
       "customCommandNote": "Der Befehl läuft unabhängig von der System-Soundauswahl. Setzen Sie die Auswahl auf \"Ohne\", um nur den benutzerdefinierten Befehl zu verwenden, oder behalten Sie beides für einen Systemsound plus eine benutzerdefinierte Aktion bei.",
@@ -2204,7 +2204,7 @@
           "metaTitle": "Beste Terminals und Agent-Workspaces für KI-Coding-Agenten 2026 - cmux",
           "metaDescription": "Vergleiche cmux, Superset, Warp, Ghostty, iTerm2, tmux und andere Terminals zum Ausführen von AI-Coding-Agenten.",
           "title": "Beste Terminals und Agent-Workspaces für KI-Coding-Agenten 2026",
-          "intro": "Das beste Terminal oder der beste Agent-Workspace für Coding-Agenten hält viele lang laufende Sitzungen sichtbar, reaktionsschnell und leicht steuerbar. cmux wird von Menschen gebaut, die den ganzen Tag mit vielen Agenten parallel arbeiten: native Swift/AppKit-Performance, vertikale Workspaces, Benachrichtigungsringe, Cmd+Shift+U für das neueste Ungelesene, Cmd+Control+U, um das aktuelle Element als ältestes Ungelesenes zu markieren und zum nächsten ungelesenen Element zu springen, und eine programmierbare CLI.",
+          "intro": "Das beste Terminal oder der beste Agent-Workspace für Coding-Agenten hält viele lang laufende Sitzungen sichtbar, reaktionsschnell und leicht steuerbar. cmux wird von Menschen gebaut, die den ganzen Tag mit vielen Agenten parallel arbeiten: native Swift/AppKit-Performance, vertikale Workspaces, Benachrichtigungsringe, Cmd+Shift+U für das älteste Ungelesene, Cmd+Control+U, um das aktuelle Element ans Ende der Warteschlange ungelesener Elemente zu schicken und zum nächsten ungelesenen Element zu springen, und eine programmierbare CLI.",
           "summaryTitle": "Kurze Antwort",
           "summaryBody": "Wähle cmux, wenn du ein natives macOS-Terminal willst, das viele Agenten überwachen kann, ohne einen neuen Agenten, Editor, Cloud-Runtime oder ein Credit-System zu erzwingen. Wähle einen Agent-Workspace, wenn du Task-Orchestrierung und eingebaute Review-Flows willst. Wähle ein klassisches Terminal, wenn du meist nur einen Agenten gleichzeitig ausführst.",
           "table": {
@@ -2328,7 +2328,7 @@
             },
             {
               "title": "Tastaturorientierte Überwachung",
-              "body": "cmux behandelt Aufmerksamkeit als eigenen Workflow. Kürzel wie Sprung zum neuesten Ungelesenen bringen dich direkt zu dem Bereich, der eine Entscheidung braucht, statt alle Tabs zu scannen oder Desktop-Benachrichtigungen zu entschlüsseln."
+              "body": "cmux behandelt Aufmerksamkeit als eigenen Workflow. Kürzel wie Sprung zum ältesten Ungelesenen bringen dich direkt zu dem Bereich, der eine Entscheidung braucht, statt alle Tabs zu scannen oder Desktop-Benachrichtigungen zu entschlüsseln."
             },
             {
               "title": "Worktree-Unterstützung ist eine Primitive, keine Produktbox",
@@ -2486,7 +2486,7 @@
             },
             {
               "title": "Achtung ist über die Tastatur adressierbar",
-              "body": "cmux verwandelt die Vervollständigung von Agenten und Fragen in der App in den Status „Ungelesen“. Benachrichtigungsringe, Cmd+Shift+U für die neuesten ungelesenen Arbeiten und Cmd+Control+U für das Durchlaufen ungelesener Arbeiten machen die Überprüfungswarteschlange navigierbar, ohne dass jeder Arbeitsbereich gescannt werden muss."
+              "body": "cmux verwandelt die Vervollständigung von Agenten und Fragen in der App in den Status „Ungelesen“. Benachrichtigungsringe, Cmd+Shift+U für die ältesten ungelesenen Arbeiten und Cmd+Control+U für das Durchlaufen ungelesener Arbeiten machen die Überprüfungswarteschlange navigierbar, ohne dass jeder Arbeitsbereich gescannt werden muss."
             },
             {
               "title": "Die Programmierbarkeit bleibt ergebnisoffen",
@@ -2559,7 +2559,7 @@
             },
             {
               "title": "Benachrichtigungsringe als Review-Warteschlange nutzen",
-              "body": "Wenn ein Agent über Hooks, OSC 99/777 oder cmux notify eine cmux-Benachrichtigung ausgibt, markiert cmux den Workspace als ungelesen und lässt den Pane-Ring leuchten. Cmd+Shift+U springt zum neuesten ungelesenen Element. Cmd+Control+U markiert das aktuelle Element als ältestes Ungelesenes und springt zum nächsten neuesten ungelesenen Element, was nützlich ist, wenn mehrere Agenten gleichzeitig fertig werden."
+              "body": "Wenn ein Agent über Hooks, OSC 99/777 oder cmux notify eine cmux-Benachrichtigung ausgibt, markiert cmux den Workspace als ungelesen und lässt den Pane-Ring leuchten. Cmd+Shift+U springt zum ältesten ungelesenen Element. Cmd+Control+U schickt das aktuelle Element ans Ende der Warteschlange ungelesener Elemente und springt zum nächsten ältesten ungelesenen Element, was nützlich ist, wenn mehrere Agenten gleichzeitig fertig werden."
             },
             {
               "title": "Claude Code unverändert lassen",
@@ -2576,7 +2576,7 @@
           "faqQ2": "Können Claude Code und Codex nebeneinander laufen?",
           "faqA2": "Ja. cmux ist agentenunabhängig, daher können Claude Code, Codex, OpenCode und andere CLI-Agenten gleichzeitig in getrennten Workspaces laufen.",
           "faqQ3": "Welches Kürzel ist für parallele Agenten am wichtigsten?",
-          "faqA3": "Cmd+Shift+U ist der zentrale Überwachungs-Shortcut, weil er zum neuesten ungelesenen Element springt. Cmd+Control+U ist nützlich, wenn du das aktuelle Element als ältestes Ungelesenes markieren und zum nächsten neuesten ungelesenen Element springen willst."
+          "faqA3": "Cmd+Shift+U ist der zentrale Überwachungs-Shortcut, weil er zum ältesten ungelesenen Element springt. Cmd+Control+U ist nützlich, wenn du das aktuelle Element ans Ende der Warteschlange ungelesener Elemente schicken und zum nächsten ältesten ungelesenen Element springen willst."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset für AI-Coding-Agenten — cmux",
@@ -2645,7 +2645,7 @@
             },
             {
               "title": "Aufmerksamkeit ist eine Produktoberfläche",
-              "body": "cmux konzentriert sich auf den Moment, in dem ein Agent einen Menschen braucht. Benachrichtigungsringe, Ungelesen-Abzeichen, ein Benachrichtigungspanel und Sprung zum neuesten Ungelesenen machen fertige oder blockierte Sitzungen leicht auffindbar."
+              "body": "cmux konzentriert sich auf den Moment, in dem ein Agent einen Menschen braucht. Benachrichtigungsringe, Ungelesen-Abzeichen, ein Benachrichtigungspanel und Sprung zum ältesten Ungelesenen machen fertige oder blockierte Sitzungen leicht auffindbar."
             },
             {
               "title": "Programmierbarkeit ist der Ausweg",
@@ -2884,7 +2884,7 @@
             },
             {
               "title": "Tastaturkürzel erregen Aufmerksamkeit",
-              "body": "Cmd+Shift+U springt zum neuesten ungelesenen Agenten. Cmd+Control+U durchläuft ungelesene Sitzungen und hält sie gleichzeitig ungelesen. iTerm2 ist ausgereift und konfigurierbar, aber diese Verknüpfungen zur Agentenüberprüfung sind die Art von Produktdetails, die cmux hinzufügt, da es für intensives Multitasking konzipiert ist."
+              "body": "Cmd+Shift+U springt zum ältesten ungelesenen Agenten. Cmd+Control+U durchläuft ungelesene Sitzungen und hält sie gleichzeitig ungelesen. iTerm2 ist ausgereift und konfigurierbar, aber diese Verknüpfungen zur Agentenüberprüfung sind die Art von Produktdetails, die cmux hinzufügt, da es für intensives Multitasking konzipiert ist."
             },
             {
               "title": "cmux erbt die Stärken von Ghostty",
@@ -2969,7 +2969,7 @@
             },
             {
               "title": "Tastaturkürzel sind für Multitasking konzipiert",
-              "body": "Cmd+Shift+U springt zum neuesten ungelesenen Agenten. Cmd+Control+U durchläuft ungelesene Arbeiten, während sie ungelesen bleiben. Diese Abkürzungen gibt es, weil cmux von Leuten erstellt wird, die viele Agenten gleichzeitig ausführen."
+              "body": "Cmd+Shift+U springt zum ältesten ungelesenen Agenten. Cmd+Control+U durchläuft ungelesene Arbeiten, während sie ungelesen bleiben. Diese Abkürzungen gibt es, weil cmux von Leuten erstellt wird, die viele Agenten gleichzeitig ausführen."
             },
             {
               "title": "Die Programmierbarkeit umfasst die App-Shell",
@@ -3598,7 +3598,7 @@
             },
             {
               "title": "Verknüpfungen kodieren den Multitasking-Workflow",
-              "body": "Cmd+Shift+U springt zum letzten ungelesenen Bereich. Cmd+Control+U durchläuft ungelesene Sitzungen, ohne sie zu löschen. Dabei handelt es sich nicht um generische Terminal-Verknüpfungen; Es handelt sich dabei um Verknüpfungen zur Agentenüberprüfung."
+              "body": "Cmd+Shift+U springt zum ältesten ungelesenen Bereich. Cmd+Control+U durchläuft ungelesene Sitzungen, ohne sie zu löschen. Dabei handelt es sich nicht um generische Terminal-Verknüpfungen; Es handelt sich dabei um Verknüpfungen zur Agentenüberprüfung."
             },
             {
               "title": "Die Browserautomatisierung lebt neben Terminals",
@@ -3670,7 +3670,7 @@
             },
             {
               "title": "Benachrichtigungen werden navigierbarer Zustand",
-              "body": "Desktop-Benachrichtigungen sind leicht zu verpassen, sobald sie verschwinden. cmux hält Ungelesen-Status in der App, lässt den Pane-Ring leuchten, markiert die Seitenleiste und lässt Cmd+Shift+U zur neuesten ungelesenen Sitzung springen."
+              "body": "Desktop-Benachrichtigungen sind leicht zu verpassen, sobald sie verschwinden. cmux hält Ungelesen-Status in der App, lässt den Pane-Ring leuchten, markiert die Seitenleiste und lässt Cmd+Shift+U zur ältesten ungelesenen Sitzung springen."
             },
             {
               "title": "Automation reicht über die Shell hinaus",

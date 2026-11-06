@@ -160,7 +160,7 @@ Environment:
 | `dismiss-notification` | Remove one notification, or remove already-read notifications with `--all-read`. |
 | `mark-notification-read` | Mark one notification, a workspace/surface scope, or all notifications read. |
 | `open-notification` | Focus the notification's workspace/surface and mark it read. |
-| `jump-to-unread` | Focus the latest unread notification. |
+| `jump-to-unread` | Focus the unread pane that has waited longest. |
 | `clear-notifications` | Clear queued notifications, optionally scoped to a workspace, surface, and `--window` context. |
 | `right-sidebar` | Control right sidebar visibility, mode, focus, and state reads. |
 | `set-status` | Set a sidebar status pill. |

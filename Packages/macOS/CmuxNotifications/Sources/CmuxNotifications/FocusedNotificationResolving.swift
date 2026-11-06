@@ -48,12 +48,6 @@ public protocol FocusedNotificationResolving: AnyObject {
     /// per-window Dock surface.
     func clearWindowDockSurfaceUnread(_ target: WindowDockUnreadTarget)
 
-    /// Marks only the exact Dock surface's latest notification oldest-unread,
-    /// returning its id. Notifications owned by sibling surfaces are ignored.
-    func markLatestWindowDockNotificationAsOldestUnread(
-        _ target: WindowDockUnreadTarget
-    ) -> UUID?
-
     /// Resolves `surfaceId` to the owning panel within `tabId`'s workspace, or
     /// `nil` when there is no surface or no owning panel. Mirrors
     /// `focusedPanelNotificationTarget(_:)`.
@@ -115,8 +109,9 @@ public protocol FocusedNotificationResolving: AnyObject {
     /// Marks the focused panel unread. Mirrors `workspace.markPanelUnread(_:)`.
     func markPanelUnread(_ panel: FocusedPanel)
 
-    /// Marks the latest notification for `tabId`/`surfaceId` as oldest-unread,
-    /// returning its id when one was deferred. Mirrors
-    /// `notificationStore.markLatestNotificationAsOldestUnread(forTabId:surfaceId:)`.
-    func markLatestNotificationAsOldestUnread(forTabId tabId: UUID, surfaceId: UUID?) -> UUID?
+    /// Send to Back (cm-128.11): puts the pane at the back of the unread queue, unread. Mirrors
+    /// `notificationStore.sendToBack(_:)`, the one place that sets a notification's "unread since" to now.
+    /// - Returns: whether the pane had notifications. `false` means the caller leaves its own mark
+    ///   (a workspace pane's mark lives outside the store); a Dock surface's mark the store sets itself.
+    func sendToBack(_ target: UnreadQueueTarget) -> Bool
 }
