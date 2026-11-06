@@ -10,6 +10,7 @@ extension TerminalNotification {
             panelId: panelId,
             retargetsToLiveSurfaceOwner: retargetsToLiveSurfaceOwner,
             isRead: isRead,
+            queuedAt: queuedAt, // (cm-128.11)
             clickAction: clickAction?.notificationNavigationAction,
             scrollRow: scrollPosition?.row,
             scrollTotalRows: scrollPosition?.totalRows,

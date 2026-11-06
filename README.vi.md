@@ -40,7 +40,7 @@ Các pane có vòng xanh và tab sáng lên khi agent lập trình cần bạn c
 <tr>
 <td width="40%" valign="middle">
 <h3>Bảng thông báo</h3>
-Xem tất cả thông báo đang chờ ở một nơi, nhảy đến thông báo chưa đọc mới nhất
+Xem tất cả thông báo đang chờ ở một nơi, nhảy đến pane chưa đọc đã chờ lâu nhất
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Huy hiệu thông báo ở sidebar" width="100%" />
@@ -124,7 +124,7 @@ Tôi chạy rất nhiều phiên Claude Code và Codex song song. Tôi từng d�
 
 Tôi đã thử vài trình điều phối lập trình nhưng phần lớn là app Electron/Tauri và hiệu năng làm tôi khó chịu. Tôi cũng thích terminal hơn vì các trình điều phối GUI buộc bạn theo workflow của họ. Vì vậy tôi xây cmux như một app macOS gốc bằng Swift/AppKit. Nó dùng libghostty để render terminal và đọc cấu hình Ghostty hiện có của bạn cho theme, font, và màu sắc.
 
-Những bổ sung chính là sidebar và hệ thống thông báo. Sidebar có các tab dọc hiển thị nhánh git, trạng thái/số PR liên kết, thư mục làm việc, các cổng đang lắng nghe, và dòng thông báo mới nhất cho từng workspace. Hệ thống thông báo bắt các chuỗi terminal (OSC 9/99/777) và có CLI (`cmux notify`) để bạn nối vào hook của agent cho Claude Code, OpenCode, v.v. Khi một agent đang chờ, pane của nó có vòng xanh và tab sáng lên ở sidebar, nên tôi có thể biết cái nào cần tôi giữa các split và tab. Cmd+Shift+U nhảy đến thông báo chưa đọc mới nhất.
+Những bổ sung chính là sidebar và hệ thống thông báo. Sidebar có các tab dọc hiển thị nhánh git, trạng thái/số PR liên kết, thư mục làm việc, các cổng đang lắng nghe, và dòng thông báo mới nhất cho từng workspace. Hệ thống thông báo bắt các chuỗi terminal (OSC 9/99/777) và có CLI (`cmux notify`) để bạn nối vào hook của agent cho Claude Code, OpenCode, v.v. Khi một agent đang chờ, pane của nó có vòng xanh và tab sáng lên ở sidebar, nên tôi có thể biết cái nào cần tôi giữa các split và tab. Cmd+Shift+U nhảy đến pane chưa đọc đã chờ lâu nhất.
 
 Trình duyệt trong app có API script được chuyển từ [agent-browser](https://github.com/vercel-labs/agent-browser). Agent có thể chụp cây accessibility, lấy tham chiếu phần tử, click, điền form, và chạy JS. Bạn có thể chia một pane trình duyệt cạnh terminal và để Claude Code tương tác trực tiếp với dev server của bạn.
 
@@ -204,9 +204,9 @@ Các phím tắt điều hướng bảng lệnh, bao gồm ⌃ P, cũng có th�
 | Phím tắt | Hành động |
 |----------|--------|
 | ⌘ I | Hiện bảng thông báo |
-| ⌘ ⇧ U | Nhảy đến thông báo chưa đọc mới nhất |
+| ⌘ ⇧ U | Nhảy đến pane chưa đọc đã chờ lâu nhất |
 | ⌥ ⌘ U | Bật/tắt trạng thái chưa đọc của mục hiện tại |
-| ⌃ ⌘ U | Đánh dấu mục hiện tại là chưa đọc cũ nhất và nhảy đến mục chưa đọc mới nhất tiếp theo |
+| ⌃ ⌘ U | Gửi mục hiện tại xuống cuối hàng đợi chưa đọc và nhảy đến mục tiếp theo |
 
 ### Tìm kiếm
 

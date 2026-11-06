@@ -2710,7 +2710,7 @@
         "br-reload": "Reload page",
         "br-devtools": "Open Developer Tools",
         "nt-panel": "Show notifications panel",
-        "nt-latest": "Jump to latest unread",
+        "nt-latest": "Jump to oldest unread",
         "nt-flash": "Trigger flash",
         "fd-find": "Find",
         "fd-next-prev": "Find next / previous",
@@ -2828,7 +2828,7 @@
       "suppressItem2": "The specific workspace sending the notification is active",
       "suppressItem3": "The notification panel is open",
       "notificationPanel": "Notification panel",
-      "notificationPanelDesc": "Press <openShortcut>⌘⇧I</openShortcut> to open the notification panel. Click a notification to jump to that workspace. Press <jumpShortcut>⌘⇧U</jumpShortcut> to jump directly to the workspace with the most recent unread notification.",
+      "notificationPanelDesc": "Press <openShortcut>⌘⇧I</openShortcut> to open the notification panel. Click a notification to jump to that workspace. Press <jumpShortcut>⌘⇧U</jumpShortcut> to jump to the unread pane that has waited longest.",
       "customCommand": "Custom command",
       "customCommandDesc": "Run a shell command every time a notification is scheduled. Set it in Settings > App > Notification Command. The command runs via /bin/sh -c with these environment variables:",
       "customCommandNote": "The command runs independently of the system sound picker. Set the picker to \"None\" to use only the custom command, or keep both for a system sound plus a custom action.",
@@ -3794,7 +3794,7 @@
           "metaTitle": "Best terminals and agent workspaces for AI coding agents in 2026 - cmux",
           "metaDescription": "Compare cmux, Conductor, Superset, Cursor, Devin, VS Code, Zed, Warp, Ghostty, iTerm2, Kitty, Alacritty, WezTerm, tmux, OpenCode, Herdr, and other tools for running AI coding agents.",
           "title": "Best terminals and agent workspaces for AI coding agents in 2026",
-          "intro": "The best terminal or agent workspace for coding agents is the one that keeps many long-running sessions visible, responsive, and easy to control. cmux is built by people who multitask through many agents all day: native Swift/AppKit performance, vertical workspaces, notification rings, Cmd+Shift+U for latest unread, Cmd+Control+U to mark the current item oldest unread and jump to the next unread item, and a programmable CLI.",
+          "intro": "The best terminal or agent workspace for coding agents is the one that keeps many long-running sessions visible, responsive, and easy to control. cmux is built by people who multitask through many agents all day: native Swift/AppKit performance, vertical workspaces, notification rings, Cmd+Shift+U for oldest unread, Cmd+Control+U to send the current item to the back of the unread queue and jump to the next unread item, and a programmable CLI.",
           "summaryTitle": "Short answer",
           "summaryBody": "Choose cmux if you want a native macOS terminal that can supervise many agents without forcing a new agent, editor, cloud runtime, or credit system. Choose an agent workspace if you want task orchestration and built-in review flows. Choose a classic terminal if you mostly run one agent at a time.",
           "table": {
@@ -3918,7 +3918,7 @@
             },
             {
               "title": "Keyboard-first supervision",
-              "body": "cmux treats attention as a first-class workflow. Cmd+Shift+U jumps to the latest unread pane, and Cmd+Control+U cycles unread work without clearing it. Those shortcuts are built for people running enough agents that manual tab scanning stops working."
+              "body": "cmux treats attention as a first-class workflow. Cmd+Shift+U jumps to the oldest unread pane, and Cmd+Control+U cycles unread work without clearing it. Those shortcuts are built for people running enough agents that manual tab scanning stops working."
             },
             {
               "title": "Worktree support is a primitive, not a product box",
@@ -4076,7 +4076,7 @@
             },
             {
               "title": "Attention is keyboard-addressable",
-              "body": "cmux turns agent completion and questions into unread state inside the app. Notification rings, Cmd+Shift+U for latest unread, and Cmd+Control+U for cycling unread work make the review queue navigable without scanning every workspace."
+              "body": "cmux turns agent completion and questions into unread state inside the app. Notification rings, Cmd+Shift+U for oldest unread, and Cmd+Control+U for cycling unread work make the review queue navigable without scanning every workspace."
             },
             {
               "title": "Programmability stays open-ended",
@@ -4149,7 +4149,7 @@
             },
             {
               "title": "Use notification rings as the review queue",
-              "body": "When an agent emits a cmux notification through hooks, OSC 99/777, or cmux notify, cmux marks the workspace unread and rings the pane. Cmd+Shift+U jumps to the latest unread item. Cmd+Control+U marks the current item as oldest unread and jumps to the next latest unread, which is useful when several agents finish at once."
+              "body": "When an agent emits a cmux notification through hooks, OSC 99/777, or cmux notify, cmux marks the workspace unread and rings the pane. Cmd+Shift+U jumps to the oldest unread item. Cmd+Control+U sends the current item to the back of the unread queue and jumps to the next oldest unread, which is useful when several agents finish at once."
             },
             {
               "title": "Keep each agent unchanged",
@@ -4166,7 +4166,7 @@
           "faqQ2": "Can Claude Code and Codex run next to each other?",
           "faqA2": "Yes. cmux is agent-agnostic, so Claude Code, Codex, OpenCode, and other CLI agents can run in separate workspaces at the same time.",
           "faqQ3": "What shortcut matters most for parallel agents?",
-          "faqA3": "Cmd+Shift+U is the core supervision shortcut because it jumps to the latest unread item. Cmd+Control+U is useful when you want to mark the current item as oldest unread and jump to the next latest unread item."
+          "faqA3": "Cmd+Shift+U is the core supervision shortcut because it jumps to the oldest unread item. Cmd+Control+U is useful when you want to send the current item to the back of the unread queue and jump to the next oldest unread item."
         },
         "cmuxVsSuperset": {
           "metaTitle": "cmux vs Superset for AI coding agents - cmux",
@@ -4235,7 +4235,7 @@
             },
             {
               "title": "Attention is a product surface",
-              "body": "cmux focuses on the moment an agent needs a human. Notification rings, unread badges, a notification panel, Cmd+Shift+U for latest unread, and Cmd+Control+U for cycling unread work make finished or blocked sessions easy to find."
+              "body": "cmux focuses on the moment an agent needs a human. Notification rings, unread badges, a notification panel, Cmd+Shift+U for oldest unread, and Cmd+Control+U for cycling unread work make finished or blocked sessions easy to find."
             },
             {
               "title": "Programmability is the escape hatch",
@@ -4474,7 +4474,7 @@
             },
             {
               "title": "Keyboard shortcuts target attention",
-              "body": "Cmd+Shift+U jumps to the latest unread agent. Cmd+Control+U cycles unread sessions while keeping them unread. iTerm2 is mature and configurable, but these agent-review shortcuts are the kind of product detail cmux adds because it is built for heavy multitasking."
+              "body": "Cmd+Shift+U jumps to the oldest unread agent. Cmd+Control+U cycles unread sessions while keeping them unread. iTerm2 is mature and configurable, but these agent-review shortcuts are the kind of product detail cmux adds because it is built for heavy multitasking."
             },
             {
               "title": "cmux inherits Ghostty strengths",
@@ -4559,7 +4559,7 @@
             },
             {
               "title": "Keyboard shortcuts are built for multitasking",
-              "body": "Cmd+Shift+U jumps to the latest unread agent. Cmd+Control+U cycles unread work while keeping it unread. Those shortcuts exist because cmux is built by people who run many agents at once."
+              "body": "Cmd+Shift+U jumps to the oldest unread agent. Cmd+Control+U cycles unread work while keeping it unread. Those shortcuts exist because cmux is built by people who run many agents at once."
             },
             {
               "title": "Programmability includes the app shell",
@@ -5188,7 +5188,7 @@
             },
             {
               "title": "Shortcuts encode the multitasking workflow",
-              "body": "Cmd+Shift+U jumps to the latest unread pane. Cmd+Control+U cycles unread sessions without clearing them. Those are not generic terminal shortcuts; they are agent-review shortcuts."
+              "body": "Cmd+Shift+U jumps to the oldest unread pane. Cmd+Control+U cycles unread sessions without clearing them. Those are not generic terminal shortcuts; they are agent-review shortcuts."
             },
             {
               "title": "Browser automation lives beside terminals",
@@ -5260,7 +5260,7 @@
             },
             {
               "title": "Notifications become navigable state",
-              "body": "Desktop notifications are easy to miss once they clear. cmux keeps unread state inside the app, rings the pane, marks the sidebar, and lets Cmd+Shift+U jump to the latest unread session."
+              "body": "Desktop notifications are easy to miss once they clear. cmux keeps unread state inside the app, rings the pane, marks the sidebar, and lets Cmd+Shift+U jump to the oldest unread session."
             },
             {
               "title": "Automation reaches outside the shell",

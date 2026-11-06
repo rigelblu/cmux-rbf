@@ -1450,7 +1450,7 @@
         "br-reload": "Sayfayı yenile",
         "br-devtools": "Geliştirici Araçlarını aç",
         "nt-panel": "Bildirim panelini göster",
-        "nt-latest": "En son okunmamışa atla",
+        "nt-latest": "En eski okunmamışa atla",
         "nt-flash": "Yanıp sönmeyi tetikle",
         "fd-find": "Bul",
         "fd-next-prev": "Sonrakini / öncekini bul",
@@ -1566,7 +1566,7 @@
       "suppressItem2": "Bildirimi gönderen belirli çalışma alanı aktif olduğunda",
       "suppressItem3": "Bildirim paneli açık olduğunda",
       "notificationPanel": "Bildirim paneli",
-      "notificationPanelDesc": "Bildirim panelini açmak için <openShortcut>⌘⇧I</openShortcut> tuşuna basın. Bir bildirime tıklayarak o çalışma alanına atlayın. En son okunmamış bildirime sahip çalışma alanına doğrudan atlamak için <jumpShortcut>⌘⇧U</jumpShortcut> tuşuna basın.",
+      "notificationPanelDesc": "Bildirim panelini açmak için <openShortcut>⌘⇧I</openShortcut> tuşuna basın. Bir bildirime tıklayarak o çalışma alanına atlayın. En uzun süredir bekleyen okunmamış bölmeye atlamak için <jumpShortcut>⌘⇧U</jumpShortcut> tuşuna basın.",
       "customCommand": "Özel komut",
       "customCommandDesc": "Her bildirim zamanlandığında bir shell komutu çalıştırın. Ayarlar > Uygulama > Bildirim Komutu'nda ayarlayın. Komut şu ortam değişkenleriyle /bin/sh -c aracılığıyla çalışır:",
       "customCommandNote": "Komut, sistem ses seçicisinden bağımsız olarak çalışır. Yalnızca özel komutu kullanmak için seçiciyi \"Yok\" olarak ayarlayın veya bir sistem sesi artı özel bir eylem için her ikisini de tutun.",
@@ -2202,7 +2202,7 @@
           "metaTitle": "2026'da AI kodlama aracıları için en iyi terminaller ve aracı çalışma alanları - cmux",
           "metaDescription": "cmux, Conductor, Superset, Cursor, Devin, VS Code, Zed, Warp, Ghostty, iTerm2, Kitty, Alacritty, WezTerm, karşılaştırın tmux, OpenCode, Herdr ve AI kodlama aracılarını çalıştırmak için diğer araçlar.",
           "title": "2026'da AI kodlama aracıları için en iyi terminaller ve aracı çalışma alanları",
-          "intro": "Aracıları kodlamak için en iyi terminal veya aracı çalışma alanı, uzun süredir devam eden oturumların çoğunu görünür, duyarlı ve kontrol edilmesi kolay tutandır. cmux, gün boyunca birçok aracı aracılığıyla çoklu görev yapan kişiler tarafından oluşturulmuştur: yerel Swift/AppKit performansı, dikey çalışma alanları, bildirim halkaları, en son okunmamış öğe için Cmd+Shift+U, mevcut en eski okunmamış öğeyi işaretlemek ve bir sonraki okunmamış öğeye atlamak için Cmd+Control+U ve programlanabilir bir CLI.",
+          "intro": "Aracıları kodlamak için en iyi terminal veya aracı çalışma alanı, uzun süredir devam eden oturumların çoğunu görünür, duyarlı ve kontrol edilmesi kolay tutandır. cmux, gün boyunca birçok aracı aracılığıyla çoklu görev yapan kişiler tarafından oluşturulmuştur: yerel Swift/AppKit performansı, dikey çalışma alanları, bildirim halkaları, en eski okunmamış öğe için Cmd+Shift+U, geçerli öğeyi okunmamış kuyruğunun sonuna göndermek ve bir sonraki okunmamış öğeye atlamak için Cmd+Control+U ve programlanabilir bir CLI.",
           "summaryTitle": "Kısa cevap",
           "summaryBody": "Yeni bir aracı, düzenleyici, bulut çalışma zamanı veya kredi sistemini zorlamadan birçok aracıyı denetleyebilen yerel bir macOS terminali istiyorsanız cmux seçeneğini seçin. Görev düzenleme ve yerleşik inceleme akışları istiyorsanız bir aracı çalışma alanı seçin. Çoğunlukla aynı anda bir temsilci çalıştırıyorsanız klasik bir terminal seçin.",
           "table": {
@@ -2326,7 +2326,7 @@
             },
             {
               "title": "Klavye öncelikli denetim",
-              "body": "cmux dikkati birinci sınıf bir iş akışı olarak ele alır. Cmd+Shift+U en son okunmamış bölmeye atlar ve Cmd+Control+U okunmamış çalışmayı temizlemeden döngüye alır. Bu kısayollar, manuel sekme taramanın çalışmayı durduracağı kadar aracı çalıştıran kişiler için oluşturulmuştur."
+              "body": "cmux dikkati birinci sınıf bir iş akışı olarak ele alır. Cmd+Shift+U en eski okunmamış bölmeye atlar ve Cmd+Control+U okunmamış çalışmayı temizlemeden döngüye alır. Bu kısayollar, manuel sekme taramanın çalışmayı durduracağı kadar aracı çalıştıran kişiler için oluşturulmuştur."
             },
             {
               "title": "Worktree desteği bir ürün kutusu değil, ilkel bir destektir",
@@ -2484,7 +2484,7 @@
             },
             {
               "title": "Dikkat klavyeyle adreslenebilir",
-              "body": "cmux, temsilci tamamlama ve soruları uygulama içinde okunmamış duruma dönüştürür. Bildirim zilleri, en son okunmayanlar için Cmd+Shift+U ve okunmamış işler arasında geçiş yapmak için Cmd+Control+U, her çalışma alanını taramadan inceleme kuyruğunda gezinilebilir hale getirir."
+              "body": "cmux, temsilci tamamlama ve soruları uygulama içinde okunmamış duruma dönüştürür. Bildirim zilleri, en eski okunmayanlar için Cmd+Shift+U ve okunmamış işler arasında geçiş yapmak için Cmd+Control+U, her çalışma alanını taramadan inceleme kuyruğunda gezinilebilir hale getirir."
             },
             {
               "title": "Programlanabilirlik açık uçlu kalır",
@@ -2557,7 +2557,7 @@
             },
             {
               "title": "İnceleme kuyruğu olarak bildirim halkalarını kullanın",
-              "body": "Bir aracı kancalar, OSC 99/777 veya cmux bildirimi aracılığıyla bir cmux bildirimi gönderdiğinde, cmux çalışma alanını okunmamış olarak işaretler ve bölmeyi çalar. Cmd+Shift+U en son okunmamış öğeye atlar. Cmd+Control+U geçerli öğeyi okunmamış en eski öğe olarak işaretler ve bir sonraki en son okunmamış öğeye atlar; bu, birkaç aracının aynı anda bitirdiği durumlarda kullanışlıdır."
+              "body": "Bir aracı kancalar, OSC 99/777 veya cmux bildirimi aracılığıyla bir cmux bildirimi gönderdiğinde, cmux çalışma alanını okunmamış olarak işaretler ve bölmeyi çalar. Cmd+Shift+U en eski okunmamış öğeye atlar. Cmd+Control+U geçerli öğeyi okunmamış kuyruğunun sonuna gönderir ve bir sonraki en eski okunmamış öğeye atlar; bu, birkaç aracının aynı anda bitirdiği durumlarda kullanışlıdır."
             },
             {
               "title": "Her aracıyı değiştirmeden tutun",
@@ -2574,7 +2574,7 @@
           "faqQ2": "Claude Code ve Codex yan yana çalışabilir mi?",
           "faqA2": "Evet. cmux aracıdan bağımsızdır, dolayısıyla Claude Code, Codex, OpenCode ve diğer CLI aracıları aynı anda ayrı çalışma alanlarında çalışabilir.",
           "faqQ3": "Paralel aracılar için en önemli kısayol hangisidir?",
-          "faqA3": "Cmd+Shift+U temel denetim kısayoludur çünkü en son okunmamış öğeye atlar. Cmd+Control+U, geçerli öğeyi okunmamış en eski öğe olarak işaretlemek ve bir sonraki en son okunmamış öğeye atlamak istediğinizde kullanışlıdır."
+          "faqA3": "Cmd+Shift+U temel denetim kısayoludur çünkü en eski okunmamış öğeye atlar. Cmd+Control+U, geçerli öğeyi okunmamış kuyruğunun sonuna göndermek ve bir sonraki en eski okunmamış öğeye atlamak istediğinizde kullanışlıdır."
         },
         "cmuxVsSuperset": {
           "metaTitle": "AI kodlama aracıları için cmux ve Superset — cmux",
@@ -2643,7 +2643,7 @@
             },
             {
               "title": "Dikkat bir ürün yüzeyidir",
-              "body": "cmux bir aracının bir insana ihtiyaç duyduğu ana odaklanır. Bildirim halkaları, okunmamış rozetler, bildirim paneli, en son okunmamış çalışmalar için Cmd+Shift+U ve okunmamış çalışmalar arasında geçiş yapmak için Cmd+Control+U, biten veya engellenen oturumların bulunmasını kolaylaştırır."
+              "body": "cmux bir aracının bir insana ihtiyaç duyduğu ana odaklanır. Bildirim halkaları, okunmamış rozetler, bildirim paneli, en eski okunmamış çalışmalar için Cmd+Shift+U ve okunmamış çalışmalar arasında geçiş yapmak için Cmd+Control+U, biten veya engellenen oturumların bulunmasını kolaylaştırır."
             },
             {
               "title": "Programlanabilirlik kaçış kapısıdır",
@@ -2882,7 +2882,7 @@
             },
             {
               "title": "Klavye kısayolları dikkati hedefler",
-              "body": "Cmd+Shift+U en son okunmamış aracıya atlar. Cmd+Control+U okunmamış oturumları döngüye sokar ve bunları okunmamış halde tutar. iTerm2 olgun ve yapılandırılabilirdir, ancak bu aracı inceleme kısayolları, yoğun çoklu görev için tasarlandığından cmux'nin eklediği türde ürün ayrıntılarıdır."
+              "body": "Cmd+Shift+U en eski okunmamış aracıya atlar. Cmd+Control+U okunmamış oturumları döngüye sokar ve bunları okunmamış halde tutar. iTerm2 olgun ve yapılandırılabilirdir, ancak bu aracı inceleme kısayolları, yoğun çoklu görev için tasarlandığından cmux'nin eklediği türde ürün ayrıntılarıdır."
             },
             {
               "title": "cmux, Ghostty gücünü devralır",
@@ -2967,7 +2967,7 @@
             },
             {
               "title": "Çoklu görev için klavye kısayolları geliştirildi",
-              "body": "Cmd+Shift+U en son okunmamış aracıya atlar. Cmd+Control+U okunmamış çalışmayı okunmamış halde tutarken döngüye sokar. Bu kısayollar, cmux'nin aynı anda birçok aracıyı çalıştıran kişiler tarafından oluşturulmuş olması nedeniyle mevcuttur."
+              "body": "Cmd+Shift+U en eski okunmamış aracıya atlar. Cmd+Control+U okunmamış çalışmayı okunmamış halde tutarken döngüye sokar. Bu kısayollar, cmux'nin aynı anda birçok aracıyı çalıştıran kişiler tarafından oluşturulmuş olması nedeniyle mevcuttur."
             },
             {
               "title": "Programlanabilirlik, uygulama kabuğunu içerir",
@@ -3596,7 +3596,7 @@
             },
             {
               "title": "Kısayollar çoklu görev iş akışını kodlar",
-              "body": "Cmd+Shift+U en son okunmamış bölmeye atlar. Cmd+Control+U okunmamış oturumları temizlemeden döngüye alır. Bunlar genel terminal kısayolları değildir; bunlar temsilci inceleme kısayollarıdır."
+              "body": "Cmd+Shift+U en eski okunmamış bölmeye atlar. Cmd+Control+U okunmamış oturumları temizlemeden döngüye alır. Bunlar genel terminal kısayolları değildir; bunlar temsilci inceleme kısayollarıdır."
             },
             {
               "title": "Tarayıcı otomasyonu terminallerin yanında yaşıyor",
@@ -3668,7 +3668,7 @@
             },
             {
               "title": "Bildirimler gezinilebilir duruma gelir",
-              "body": "Masaüstü bildirimleri temizlendikten sonra gözden kaçırılması kolaydır. cmux okunmamış durumu uygulamanın içinde tutar, bölmeyi çalar, kenar çubuğunu işaretler ve Cmd+Shift+U'nin en son okunmamış oturuma atlamasına olanak tanır."
+              "body": "Masaüstü bildirimleri temizlendikten sonra gözden kaçırılması kolaydır. cmux okunmamış durumu uygulamanın içinde tutar, bölmeyi çalar, kenar çubuğunu işaretler ve Cmd+Shift+U'nin en eski okunmamış oturuma atlamasına olanak tanır."
             },
             {
               "title": "Otomasyon kabuğun dışına ulaşıyor",

@@ -42,7 +42,7 @@ Paneli dobijaju plavi prsten, a tabovi se osvjetljavaju kada agenti za programir
 <tr>
 <td width="40%" valign="middle">
 <h3>Panel obavještenja</h3>
-Pregledajte sva obavještenja na čekanju na jednom mjestu, skočite na najnovije nepročitano
+Pregledajte sva obavještenja na čekanju na jednom mjestu, skočite na nepročitani panel koji najduže čeka
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Značka obavještenja u bočnoj traci" width="100%" />
@@ -126,7 +126,7 @@ Pokrećem mnogo Claude Code i Codex sesija paralelno. Koristio sam Ghostty sa go
 
 Isprobao sam nekoliko orkestratora za kodiranje, ali većina ih je bila Electron/Tauri aplikacije i performanse su me nervirale. Također jednostavno preferiram terminal jer GUI orkestratori vas zaključavaju u svoj radni tok. Zato sam izgradio cmux kao nativnu macOS aplikaciju u Swift/AppKit. Koristi libghostty za renderiranje terminala i čita vašu postojeću Ghostty konfiguraciju za teme, fontove i boje.
 
-Glavni dodaci su bočna traka i sistem obavještenja. Bočna traka ima vertikalne tabove koji prikazuju git granu, status/broj povezanog PR-a, radni direktorij, portove koji slušaju i tekst posljednjeg obavještenja za svaki radni prostor. Sistem obavještenja hvata terminalne sekvence (OSC 9/99/777) i ima CLI (`cmux notify`) koji možete povezati sa hookovima agenata za Claude Code, OpenCode itd. Kada agent čeka, njegov panel dobija plavi prsten, a tab se osvjetljava u bočnoj traci, tako da mogu vidjeti koji me treba kroz podjele i tabove. Cmd+Shift+U skače na najnovije nepročitano.
+Glavni dodaci su bočna traka i sistem obavještenja. Bočna traka ima vertikalne tabove koji prikazuju git granu, status/broj povezanog PR-a, radni direktorij, portove koji slušaju i tekst posljednjeg obavještenja za svaki radni prostor. Sistem obavještenja hvata terminalne sekvence (OSC 9/99/777) i ima CLI (`cmux notify`) koji možete povezati sa hookovima agenata za Claude Code, OpenCode itd. Kada agent čeka, njegov panel dobija plavi prsten, a tab se osvjetljava u bočnoj traci, tako da mogu vidjeti koji me treba kroz podjele i tabove. Cmd+Shift+U skače na nepročitani panel koji najduže čeka.
 
 Ugrađeni preglednik ima skriptabilni API portiran iz [agent-browser](https://github.com/vercel-labs/agent-browser). Agenti mogu snimiti stablo pristupačnosti, dobiti reference elemenata, kliknuti, popuniti formulare i evaluirati JS. Možete podijeliti panel preglednika pored terminala i omogućiti Claude Code da direktno komunicira sa vašim razvojnim serverom.
 
@@ -206,9 +206,9 @@ Prečice za navigaciju paletom komandi, uključujući ⌃ P, također se mogu pr
 | Prečica | Akcija |
 |----------|--------|
 | ⌘ I | Prikaži panel obavještenja |
-| ⌘ ⇧ U | Skoči na posljednje nepročitano |
+| ⌘ ⇧ U | Skoči na nepročitani panel koji najduže čeka |
 | ⌥ ⌘ U | Prebaci stanje nepročitanog za trenutnu stavku |
-| ⌃ ⌘ U | Označi trenutnu stavku kao najstarije nepročitano i skoči na sljedeće nepročitano |
+| ⌃ ⌘ U | Pošalji trenutnu stavku na kraj reda nepročitanih i skoči na sljedeću |
 
 ### Pretraga
 

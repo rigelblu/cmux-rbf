@@ -5,7 +5,8 @@ public import Foundation
 /// Workspace IDs and window-Dock owner IDs intentionally occupy separate cases.
 /// This prevents a focused Dock surface from being routed through workspace-only
 /// panel lookup and mutation paths.
-public enum FocusedNotificationTarget: Sendable, Equatable {
+// (cm-128.11) `Hashable`, where upstream had `Equatable`: a target can be a set member (`UnreadQueueTarget` is an alias of this type).
+public enum FocusedNotificationTarget: Sendable, Hashable {
     /// A surface in a workspace, or the workspace itself when `surfaceId` is nil.
     case workspace(tabId: UUID, surfaceId: UUID?)
 
