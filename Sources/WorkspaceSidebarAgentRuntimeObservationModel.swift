@@ -16,6 +16,9 @@ final class WorkspaceSidebarAgentRuntimeObservationModel {
     private(set) var agentPIDKeysByPanelId: [UUID: Set<String>] = [:]
     @ObservationIgnored
     private(set) var agentLifecycleStatesByPanelId: [UUID: [String: AgentHibernationLifecycleState]] = [:]
+    /// Agent keys per pane whose `.error` is a typed usage limit (cm-128.5): the triangle's tooltip reads it.
+    @ObservationIgnored
+    private(set) var agentUsageLimitKeysByPanelId: [UUID: Set<String>] = [:]
     @ObservationIgnored
     private(set) var changeGeneration: UInt64 = 0
 
@@ -54,6 +57,12 @@ final class WorkspaceSidebarAgentRuntimeObservationModel {
     func setAgentPIDKeysByPanelId(_ newValue: [UUID: Set<String>]) {
         guard agentPIDKeysByPanelId != newValue else { return }
         agentPIDKeysByPanelId = newValue
+        notifyChanged()
+    }
+
+    func setAgentUsageLimitKeysByPanelId(_ newValue: [UUID: Set<String>]) {
+        guard agentUsageLimitKeysByPanelId != newValue else { return }
+        agentUsageLimitKeysByPanelId = newValue
         notifyChanged()
     }
 

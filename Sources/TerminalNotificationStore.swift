@@ -1245,7 +1245,9 @@ final class TerminalNotificationStore: ObservableObject {
         agent: TerminalNotificationPolicyAgentContext? = nil,
         soundContext: NotificationSoundOverrideContext? = nil,
         origin: TerminalNotificationOrigin = .local,
-        unattendedNudgeTitle: String? = nil
+        unattendedNudgeTitle: String? = nil,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) -> UUID? {
 #if DEBUG
         cmuxDebugLog(
@@ -1315,7 +1317,9 @@ final class TerminalNotificationStore: ObservableObject {
             agent: agent,
             soundContext: soundContext,
             origin: origin,
-            unattendedNudgeTitle: unattendedNudgeTitle
+            unattendedNudgeTitle: unattendedNudgeTitle,
+            unattendedNudgeKind: unattendedNudgeKind,
+            unattendedNudgeAgentKey: unattendedNudgeAgentKey
         )
         if policyContext.hooks.isEmpty, preRegisteredPolicyRequestId == nil {
             inFlightPolicyRequests.discardPending(
@@ -1501,7 +1505,9 @@ final class TerminalNotificationStore: ObservableObject {
         agent: TerminalNotificationPolicyAgentContext? = nil,
         soundContext: NotificationSoundOverrideContext? = nil,
         origin: TerminalNotificationOrigin = .local,
-        unattendedNudgeTitle: String? = nil
+        unattendedNudgeTitle: String? = nil,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) -> NotificationPolicyContext {
         let appDelegate = AppDelegate.shared
         let focusState = notificationFocusState(tabId: tabId, surfaceId: surfaceId)
@@ -1549,7 +1555,9 @@ final class TerminalNotificationStore: ObservableObject {
                 agent: agent,
                 soundContext: soundContext,
                 origin: origin,
-                unattendedNudgeTitle: unattendedNudgeTitle
+                unattendedNudgeTitle: unattendedNudgeTitle,
+                unattendedNudgeKind: unattendedNudgeKind,
+                unattendedNudgeAgentKey: unattendedNudgeAgentKey
             ),
             scrollPosition: scrollPosition,
             hooks: resolvedHooks ?? (origin.isRemote ? [] : cmuxConfigStore?.notificationHooks(
@@ -1597,7 +1605,9 @@ final class TerminalNotificationStore: ObservableObject {
                 agent: request.agent,
                 soundContext: envelope.context.soundContext,
                 origin: request.origin,
-                unattendedNudgeTitle: request.unattendedNudgeTitle
+                unattendedNudgeTitle: request.unattendedNudgeTitle,
+                unattendedNudgeKind: request.unattendedNudgeKind,
+                unattendedNudgeAgentKey: request.unattendedNudgeAgentKey
             ),
             effects: envelope.effects,
             now: now,
@@ -1668,7 +1678,9 @@ final class TerminalNotificationStore: ObservableObject {
                 effects: effects,
                 now: now,
                 cooldownReservation: cooldownReservation,
-                unattendedNudgeTitle: request.unattendedNudgeTitle
+                unattendedNudgeTitle: request.unattendedNudgeTitle,
+                unattendedNudgeKind: request.unattendedNudgeKind,
+                unattendedNudgeAgentKey: request.unattendedNudgeAgentKey
             )
             return true
         }
@@ -1700,7 +1712,9 @@ final class TerminalNotificationStore: ObservableObject {
         effects: TerminalNotificationPolicyEffects,
         now: Date,
         cooldownReservation: NotificationCooldownReservation?,
-        unattendedNudgeTitle: String?
+        unattendedNudgeTitle: String?,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) {
         var updated = notifications
         var idsToClear: [String] = []
@@ -1740,7 +1754,7 @@ final class TerminalNotificationStore: ObservableObject {
             )
         }
         notifications = updated
-        unattendedNudges.record(notification, title: unattendedNudgeTitle, effects: effects)
+        unattendedNudges.record(notification, title: unattendedNudgeTitle, kind: unattendedNudgeKind ?? .finished, agentKey: unattendedNudgeAgentKey, effects: effects)
         notificationFeedHistory.record(
             notification,
             supersededIDs: Set(idsToClear.compactMap { UUID(uuidString: $0) })

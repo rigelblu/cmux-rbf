@@ -15,6 +15,26 @@ enum ControlSidebarPanelOwner {
         }
     }
 
+    /// The owner of `panelId`: a live Dock first, then the workspace in whichever window holds the panel, with
+    /// `preferredWorkspaceId` as the hint. `AppDelegate.shared` is the registry when `appDelegate` is nil. (cm-128.5)
+    static func owning(panelId: UUID, preferredWorkspaceId: UUID?, appDelegate: AppDelegate? = nil) -> ControlSidebarPanelOwner? {
+        if let dock = DockSplitStore.liveStores.first(where: { $0.containsPanel(panelId) }) {
+            return .dock(dock)
+        }
+        guard let located = (appDelegate ?? AppDelegate.shared)?.workspaceContainingPanel(
+            panelId: panelId, preferredWorkspaceId: preferredWorkspaceId
+        ) else { return nil }
+        return .workspace(located.workspace)
+    }
+
+    /// The agent lifecycle values this owner holds for one pane, by status key. (cm-128.5)
+    func agentLifecycleStates(panelId: UUID) -> [String: AgentHibernationLifecycleState] {
+        switch self {
+        case .workspace(let workspace): workspace.agentLifecycleStatesByPanelId[panelId] ?? [:]
+        case .dock(let dock): dock.agentRuntimeByPanelId[panelId]?.agentLifecycleStates ?? [:]
+        }
+    }
+
     func agentLifecycleRegistryScope(panelId: UUID?) -> ControlSidebarAgentLifecycleRegistryScope {
         switch self {
         case .workspace(let workspace):

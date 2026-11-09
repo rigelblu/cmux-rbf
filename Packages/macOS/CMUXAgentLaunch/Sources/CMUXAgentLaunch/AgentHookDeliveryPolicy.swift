@@ -50,7 +50,8 @@ public struct AgentHookDeliveryPolicy: Sendable {
     private static let auxiliaryQueuedSubcommands: [String: Set<String>] = [
         "amp": ["title-update", "lifecycle"],
         // cm-128.1: `post-tool-use` is installed as a queued hook (it pairs a completion with its Feed wait), so it is accepted here.
-        "claude": ["pre-tool-use", "post-tool-use", "push-notification", "feed"],
+        // cm-128.5: `stop-failure` is a queued lifecycle hook like Stop, so it is accepted here.
+        "claude": ["pre-tool-use", "post-tool-use", "push-notification", "feed", "stop-failure"],
         "codex": ["pre-tool-use", "post-tool-use"],
     ]
 

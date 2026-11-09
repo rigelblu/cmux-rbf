@@ -166,6 +166,21 @@ struct ReplyDeliverySubmitKeyTests {
         makeStore: @MainActor () -> ReplyPanelStore = { ReplyPanelStore() },
         _ body: (Rig, ReplyPanelStore) async throws -> Void
     ) async throws {
+        // cm-128.5 (F2): the rig swaps `AppDelegate.shared`, so it takes the gate every other async test that swaps app
+        // context takes. Ungated, a gated suite running beside it (the Marks and nudge tests) swapped the delegate under
+        // its `addWorkspace`, which traps ("Legacy addWorkspace requires an active window manager").
+        try await AppContextSerialGate.withExclusiveAppContext {
+            try await withRigUngated(
+                transcript: transcript, registersTranscriptPath: registersTranscriptPath, makeStore: makeStore, body)
+        }
+    }
+
+    private static func withRigUngated(
+        transcript: String?,
+        registersTranscriptPath: Bool,
+        makeStore: @MainActor () -> ReplyPanelStore,
+        _ body: (Rig, ReplyPanelStore) async throws -> Void
+    ) async throws {
         let previousAppDelegate = AppDelegate.shared
         let previousService = TerminalController.shared.agentChatTranscriptService
         let appDelegate = AppDelegate()

@@ -342,6 +342,40 @@ extension CLINotifyProcessIntegrationRegressionTests {
         }
     }
 
+    /// cm-128.5 (Scenario 79): Amp's typed `agent_state` decides the kind, so `needs-input` is a question with no words read.
+    func testAmpNeedsInputJournalsAQuestionFromItsTypedState() throws {
+        let context = try makeClaudeHookContext(name: "amp-question")
+        defer { context.cleanup() }
+        startAgentHookMockServerAccepting(context: context)
+        let ampProcess = Process()
+        ampProcess.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        ampProcess.arguments = ["30"]
+        try ampProcess.run()
+        defer {
+            if ampProcess.isRunning {
+                ampProcess.terminate()
+                ampProcess.waitUntilExit()
+            }
+        }
+        let sessionID = "T-amp-question"
+        let start = try runAmpHook(
+            context: context, subcommand: "session-start", sessionID: sessionID,
+            pid: ampProcess.processIdentifier, fields: ["hook_event_name": "SessionStart"])
+        XCTAssertEqual(start.status, 0, start.stderr)
+        let before = context.state.snapshot().count
+        let result = try runAmpHook(
+            context: context, subcommand: "lifecycle", sessionID: sessionID,
+            pid: ampProcess.processIdentifier,
+            fields: ["hook_event_name": "Lifecycle", "agent_state": "needs-input", "message": "Which branch should I use?"])
+        XCTAssertFalse(result.timedOut, result.stderr)
+        XCTAssertEqual(result.status, 0, result.stderr)
+        let commands = Array(context.state.snapshot().dropFirst(before))
+        XCTAssertTrue(
+            AgentJournalAppendCapture.contains(commands, kind: "agent.question.requested", agentKey: "amp", sessionId: sessionID),
+            "Amp needs-input must journal a question from its typed state, saw \(commands)"
+        )
+    }
+
     private func runAmpHook(
         context: ClaudeHookContext,
         subcommand: String,

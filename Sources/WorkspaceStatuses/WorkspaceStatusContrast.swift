@@ -144,6 +144,8 @@ final class WaitingHandOutlineView: NSView {
 /// The waiting hand in the SwiftUI row: the yellow hand, with the eight ink copies under it where the
 /// yellow alone, as drawn at `drawnAlpha` on `rowBackground`, is under 3:1.
 struct WaitingHandView: View {
+    /// `hand.raised.fill` for the hand; the error triangle is its twin and passes `exclamationmark.triangle.fill`. (cm-128.5)
+    var symbolName: String = "hand.raised.fill"
     let pointSize: CGFloat
     let colorScheme: ColorScheme
     let rowBackground: NSColor?
@@ -156,7 +158,7 @@ struct WaitingHandView: View {
             if outlined {
                 ForEach(0..<waitingHandOutlineOffsets.count, id: \.self) { index in
                     CmuxSystemSymbolImage(
-                        systemName: "hand.raised.fill",
+                        systemName: symbolName,
                         pointSize: pointSize,
                         tint: Color(nsColor: waitingHandOutlineInk)
                     )
@@ -167,7 +169,7 @@ struct WaitingHandView: View {
                 }
             }
             CmuxSystemSymbolImage(
-                systemName: "hand.raised.fill",
+                systemName: symbolName,
                 pointSize: pointSize,
                 tint: Color(nsColor: yellow)
             )

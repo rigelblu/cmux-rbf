@@ -205,6 +205,41 @@ struct AgentHookDeliveryQueueTests {
         ])
     }
 
+    /// cm-128.5 (whole-diff review F6): Claude's `stop-failure` replaces Stop for its turn, so it is the only end-of-turn
+    /// signal and takes the same reserved admission capacity Stop does when ordinary lifecycle events fill the queue.
+    @Test("A stop-failure has reserved admission capacity like a stop", arguments: ["stop", "stop-failure"])
+    func stopFailureHasReservedAdmissionCapacity(subcommand: String) async throws {
+        let probe = AgentHookDeliveryTestProbe(blockedPayloads: ["active"])
+        let queue = AgentHookDeliveryQueue(
+            maximumConcurrentDeliveries: 1,
+            maximumResidentEvents: 1,
+            maximumIngressEvents: 2
+        ) { event in
+            await probe.deliver(event)
+        }
+
+        #expect(queue.enqueue(try makeEvent(
+            subcommand: "prompt-submit",
+            payload: "active",
+            surfaceID: "surface-active"
+        )))
+        try await probe.waitUntilStarted(count: 1)
+        #expect(queue.enqueue(try makeEvent(
+            subcommand: "notification",
+            payload: "ordinary-saturated",
+            surfaceID: "surface-ordinary"
+        )))
+        #expect(queue.enqueue(try makeEvent(
+            subcommand: subcommand,
+            payload: "turn-end",
+            surfaceID: "surface-end"
+        )), "the queue was full and \(subcommand) was dropped")
+
+        await probe.release(payload: "active")
+        try await probe.waitUntilCompleted(count: 3)
+        #expect(await probe.completedPayloads() == ["active", "ordinary-saturated", "turn-end"])
+    }
+
     @Test("Terminal lifecycle saturation preserves side effects and finalization")
     func terminalLifecycleDoesNotReplaceProtectedWork() async throws {
         let activePayload = #"{"session_id":"session-a","state":"active"}"#

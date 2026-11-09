@@ -11,6 +11,9 @@ public struct AgentSessionLifecycleState: Sendable, Equatable {
     public var lastSequence: Int64
     /// Producer timestamp of the newest applied event (ms since Unix epoch).
     public var lastOccurredAtMs: Int64
+    /// Whether the error this session is at was a typed usage limit (cm-128.5). Set by an `errorReported` whose source,
+    /// native event and `detail` all match one (`AgentLifecycleReducer.isUsageLimit`); cleared by any other transition.
+    public var usageLimit: Bool
 
     /// Creates a session state.
     ///
@@ -23,11 +26,13 @@ public struct AgentSessionLifecycleState: Sendable, Equatable {
         phase: AgentLifecyclePhase,
         ended: Bool,
         lastSequence: Int64,
-        lastOccurredAtMs: Int64
+        lastOccurredAtMs: Int64,
+        usageLimit: Bool = false
     ) {
         self.phase = phase
         self.ended = ended
         self.lastSequence = lastSequence
         self.lastOccurredAtMs = lastOccurredAtMs
+        self.usageLimit = usageLimit
     }
 }

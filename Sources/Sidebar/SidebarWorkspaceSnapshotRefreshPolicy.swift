@@ -21,6 +21,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let activeCodingAgentCount: Int
         let taskStatusInput: SidebarWorkspaceTaskStatusSnapshot
         let showsRaisedHand: Bool // (#cm-109.3)
+        let erroredAgents: [SidebarErroredAgent] // (cm-128.5)
         let monitoringAgentCount: Int
     }
 
@@ -45,6 +46,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             activeCodingAgentCount: activeCodingAgentCount,
             taskStatusInput: taskStatusInput,
             showsRaisedHand: showsRaisedHand, // (#cm-109.3)
+            erroredAgents: erroredAgents, // (cm-128.5)
             monitoringAgentCount: monitoringAgentCount
         )
     }
@@ -97,6 +99,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             checklistFirstUncheckedText: snapshot.checklistFirstUncheckedText,
             taskStatusInput: snapshot.taskStatusInput,
             showsRaisedHand: snapshot.showsRaisedHand, // (#cm-109.3)
+            erroredAgents: snapshot.erroredAgents, // (cm-128.5)
             monitoringAgentCount: snapshot.monitoringAgentCount
         )
     }

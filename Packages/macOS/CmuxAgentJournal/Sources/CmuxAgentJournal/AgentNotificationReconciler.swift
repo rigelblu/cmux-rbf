@@ -12,6 +12,9 @@ public struct AgentNotificationReconciler: Sendable {
     private static let lateReminderWindowMs: Int64 = 10_000
     /// Claude native events the Feed turns into a wait of its own. (cm-128.1)
     private static let feedAttentionNativeEvents: Set<String> = ["PermissionRequest", "AskUserQuestion", "ExitPlanMode"]
+    /// Claude's form-raising `notification_type` values, and the ones that say a form was answered. (cm-128.5)
+    private static let formTypes: Set<String> = ["elicitation_dialog", "elicitation_url_dialog"]
+    private static let answeredFormTypes: Set<String> = ["elicitation_response", "elicitation_complete"]
 
     private struct Session: Sendable {
         var occurredAtMs: Int64 = -1
@@ -37,6 +40,8 @@ public struct AgentNotificationReconciler: Sendable {
         // Blocking requests, separate from error and completion history.
         var attentionIdentities: Set<String> = []
         var attentionRequestIDs: [String: String] = [:]
+        /// The raising event's `detail` per attention identity: an answered form may retire only a form's wait. (cm-128.5)
+        var attentionTypes: [String: String] = [:]
         var completionIdentity: String?
         var starts: Set<String> = []
         var resolvedRequests: Set<String> = []
@@ -55,6 +60,7 @@ public struct AgentNotificationReconciler: Sendable {
         /// Retires one pending blocking request, returning its producer dismissal handle.
         mutating func retireAttention(_ identity: String) -> String? {
             attentionIdentities.remove(identity)
+            attentionTypes.removeValue(forKey: identity)
             if let request = attentionRequestIDs.removeValue(forKey: identity) { resolvedRequests.insert(request) }
             return delivered.removeValue(forKey: identity)
         }
@@ -108,6 +114,15 @@ public struct AgentNotificationReconciler: Sendable {
         let isResolution = draft.kind == .attentionResolved
             || draft.kind == .childCompleted || draft.kind == .childFailed
         var requestInvalidations: [String] = []
+        if draft.kind == .attentionResolved, context?.requestIdentity == nil,
+           let answered = draft.detail, Self.answeredFormTypes.contains(answered) {
+            // cm-128.5: an id-less resolve retires the session's one open wait whatever raised it, so a form's answer
+            // could retire a permission waiting behind it. It retires only a wait a form raised; any other is an observation.
+            guard session.attentionIdentities.count == 1, let identity = session.attentionIdentities.first,
+                  let raised = session.attentionTypes[identity], Self.formTypes.contains(raised) else {
+                return .init(.observation, projectsLifecycle: false)
+            }
+        }
         if isResolution {
             // Claude also sends unmatched SubagentStop events after a root Stop. (#cm-128.3)
             if draft.source == "claude", draft.kind == .childCompleted || draft.kind == .childFailed {
@@ -244,6 +259,7 @@ public struct AgentNotificationReconciler: Sendable {
             session.attentionIdentities.removeAll()
             session.resolvedRequests.formUnion(session.attentionRequestIDs.values)
             session.attentionRequestIDs.removeAll()
+            session.attentionTypes.removeAll()
             session.completionIdentity = nil
             session.pendingCompletion = nil
         }
@@ -283,6 +299,7 @@ public struct AgentNotificationReconciler: Sendable {
                 session.attentionIdentities.removeAll()
                 session.resolvedRequests.formUnion(session.attentionRequestIDs.values)
                 session.attentionRequestIDs.removeAll()
+                session.attentionTypes.removeAll()
             }
             session.phase = pending ? (session.attentionIdentities.isEmpty ? .running : .needsInput) : .idle
         case .approvalRequested, .questionRequested, .planReviewRequested:
@@ -337,6 +354,7 @@ public struct AgentNotificationReconciler: Sendable {
         if [.approvalRequested, .questionRequested, .planReviewRequested].contains(draft.kind) {
             session.attentionIdentities.insert(identity)
             if let request = context?.requestIdentity { session.attentionRequestIDs[identity] = request }
+            if let detail = draft.detail { session.attentionTypes[identity] = detail }
             // cm-128.1: remember the newest Feed-backed wait, so its late reminder is not mistaken for a new one.
             if draft.source == "claude",
                draft.nativeEvent.map(Self.feedAttentionNativeEvents.contains) == true,

@@ -168,6 +168,14 @@ struct SidebarWorkspaceSnapshotFactory {
             checklistFirstUncheckedText: checklistProgress.firstUncheckedText,
             taskStatusInput: taskStatusInput,
             showsRaisedHand: showsRaisedHand, // (#cm-109.3)
+            // cm-128.5: the triangle is the hand's twin: the same gate, and no status list hides both until `.6`.
+            erroredAgents: hasStatusList
+                ? SidebarAgentErrorSummary.erroredAgents(
+                    showsAgentActivity: settings.details.showAgentActivity,
+                    orderedPanelIds: workspace.sidebarOrderedPanelIds(),
+                    statesByPanelId: workspace.agentLifecycleStatesByPanelId,
+                    usageLimitKeysByPanelId: workspace.agentUsageLimitKeysByPanelId)
+                : [],
             monitoringAgentCount: SidebarAgentActivitySummary.visibleMonitoringAgentCount(
                 showsAgentActivity: showsAgentActivity,
                 statesByPanelId: workspace.agentLifecycleStatesByPanelId

@@ -18,6 +18,8 @@ fileprivate struct QueuedTerminalNotification: Sendable {
     let soundContext: NotificationSoundOverrideContext?
     let correlationKey: String?
     let unattendedNudgeTitle: String?
+    let unattendedNudgeKind: AgentUnattendedNudgeKind?
+    let unattendedNudgeAgentKey: String?
 }
 
 fileprivate enum TerminalSocketMutation {
@@ -84,7 +86,9 @@ final class TerminalMutationBus: @unchecked Sendable {
         soundContext: NotificationSoundOverrideContext? = nil,
         correlationKey: String? = nil,
         coalesces: Bool = true,
-        unattendedNudgeTitle: String? = nil
+        unattendedNudgeTitle: String? = nil,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) {
         enqueueNotification(QueuedTerminalNotification(
             key: QueuedTerminalNotificationKey(tabId: tabId, surfaceId: surfaceId),
@@ -95,7 +99,9 @@ final class TerminalMutationBus: @unchecked Sendable {
             agent: agent,
             soundContext: soundContext,
             correlationKey: correlationKey,
-            unattendedNudgeTitle: unattendedNudgeTitle
+            unattendedNudgeTitle: unattendedNudgeTitle,
+            unattendedNudgeKind: unattendedNudgeKind,
+            unattendedNudgeAgentKey: unattendedNudgeAgentKey
         ), coalesces: coalesces)
     }
 
@@ -506,7 +512,9 @@ final class TerminalMutationBus: @unchecked Sendable {
                     correlationKey: notification.correlationKey,
                     notificationGeneration: entry.notificationGeneration ?? 0,
                     soundContext: notification.soundContext,
-                    unattendedNudgeTitle: notification.unattendedNudgeTitle
+                    unattendedNudgeTitle: notification.unattendedNudgeTitle,
+                    unattendedNudgeKind: notification.unattendedNudgeKind,
+                    unattendedNudgeAgentKey: notification.unattendedNudgeAgentKey
                 )
             case .clearAllNotifications(let boundary):
                 TerminalNotificationStore.shared.clearAll(discardQueuedNotifications: false, throughNotificationGeneration: boundary)

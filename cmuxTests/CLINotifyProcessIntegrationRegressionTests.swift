@@ -2183,7 +2183,9 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         )
     }
 
-    func testGenericAgentNotificationUpdatesLifecycleForNeedsInput() throws {
+    // cmux-rbf: changed on purpose (#cm-128.5): "permission approval required" is words, so it raises no approval and
+    // writes no needs-input record. A typed field or cmux's own decision still does (Scenario 79).
+    func testGenericAgentNotificationWordsDoNotUpdateLifecycleForNeedsInput() throws {
         let context = try makeClaudeHookContext(name: "codex-notification-lifecycle")
         defer { context.cleanup() }
 
@@ -2226,20 +2228,15 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(notification.status, 0, notification.stderr)
 
         let notificationCommands = Array(context.state.commands.dropFirst(notificationStart))
-        XCTAssertTrue(
-            AgentJournalAppendCapture.captures(in: notificationCommands).contains { capture in
-                capture.kind == "agent.approval.requested"
-                    && capture.agentKey == "codex"
-                    && capture.workspaceId == context.workspaceId
-                    && capture.surfaceId == context.surfaceId
-            },
-            "Notification requiring user input must journal a needs-input approval request, saw \(notificationCommands)"
+        XCTAssertFalse(
+            AgentJournalAppendCapture.captures(in: notificationCommands).contains { $0.kind == "agent.approval.requested" },
+            "Words must not journal an approval request, saw \(notificationCommands)"
         )
 
         state = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: stateURL)) as? [String: Any])
         sessions = try XCTUnwrap(state["sessions"] as? [String: Any])
         record = try XCTUnwrap(sessions[sessionId] as? [String: Any])
-        XCTAssertEqual(record["agentLifecycle"] as? String, "needsInput")
+        XCTAssertNotEqual(record["agentLifecycle"] as? String, "needsInput")
     }
 
     func testGenericAgentStaleIdleStopDoesNotOverwriteNewerRunningLifecycle() throws {
@@ -2307,7 +2304,7 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(newRecord["agentLifecycle"] as? String, "running")
     }
 
-    func testGenericAgentStaleIdleNotificationDoesNotOverwriteNewerRunningLifecycle() throws {
+    func testGenericAgentStaleIdleNotificationWordsDoNotOverwriteNewerRunningLifecycle() throws {
         let context = try makeClaudeHookContext(name: "codex-stale-idle-notification-lifecycle")
         defer { context.cleanup() }
 
@@ -2346,14 +2343,15 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         XCTAssertEqual(staleNotification.status, 0, staleNotification.stderr)
 
         let staleNotificationCommands = Array(context.state.commands.dropFirst(staleNotificationStart))
-        XCTAssertTrue(
+        // cmux-rbf: changed on purpose (#cm-128.5): "done" is words, so it journals no completion at all.
+        XCTAssertFalse(
             AgentJournalAppendCapture.contains(
                 staleNotificationCommands,
                 kind: "agent.turn.completed",
                 agentKey: "codex",
                 sessionId: oldSessionId
             ),
-            "A stale idle notification journals the old session's completion (the reducer keeps the newer running session in charge), saw \(staleNotificationCommands)"
+            "A notification's completion words must not journal a completion, saw \(staleNotificationCommands)"
         )
         XCTAssertFalse(
             staleNotificationCommands.contains { $0.hasPrefix("set_status codex ") && $0.contains(" Idle ") },

@@ -1,3 +1,4 @@
+import CMUXAgentLaunch
 import CmuxAgentJournal
 import Foundation
 
@@ -121,32 +122,99 @@ extension CMUXCLI {
     }
 
     /// Resolves the semantic kind for a generic agent hook's `notification`
-    /// action: the native event name maps first (`StopFailure`,
-    /// `pre_approval_request`, …); only when the mapper has nothing stronger
-    /// than an observation does the prose classifier's verdict fill in, as a
-    /// last-resort adapter detail.
+    /// action. Only a fact picks it (cm-128.5, Tom, grill Q32 and Q39): cmux's
+    /// own decision (Cursor's approval), the mapper's verdict from the native
+    /// event name (`StopFailure`, `pre_approval_request`, …), or a typed
+    /// field (Amp's `agent_state`, Campfire's `campfire_event_type`, a
+    /// `notification_type`). A message's words never choose a kind: what none
+    /// of those names is `stateChanged`, an observation that raises and pings
+    /// nothing.
     func agentJournalNotificationKind(
         def: AgentHookDef,
         nativeEvent: String?,
         toolName: String?,
-        summary: AgentHookNotificationSummary
+        rawObject: [String: Any]?,
+        cursorShellNeedsApproval: Bool,
+        lifecycleRoute: AgentHookLifecycleReconciler.Route?
     ) -> AgentJournalEventKind {
-        let mapper = AgentSemanticEventMapper()
+        if cursorShellNeedsApproval { return .approvalRequested }
         if let nativeEvent, !nativeEvent.isEmpty {
-            let mapped = mapper.kind(source: def.name, nativeEvent: nativeEvent, toolName: toolName)
+            let mapped = AgentSemanticEventMapper().kind(source: def.name, nativeEvent: nativeEvent, toolName: toolName)
             if mapped != .stateChanged {
                 return mapped
             }
         }
-        switch summary.status {
-        case .needsInput?:
-            return summary.notifyCategory == .needsPermission ? .approvalRequested : .questionRequested
-        case .error?:
-            return .errorReported
-        case .idle?:
-            return .turnCompleted
-        case nil:
+        if let kind = ampLifecycleJournalKind(route: lifecycleRoute, rawObject: rawObject) { return kind }
+        if def.name == "campfire", let kind = campfireJournalKind(rawObject: rawObject) { return kind }
+        return typedNotificationJournalKind(forNotificationType: typedNotificationType(in: rawObject))
+    }
+
+    /// An agent's typed `notification_type`; grok's permission prompt spells it `notificationType`. (cm-128.5)
+    func typedNotificationType(in rawObject: [String: Any]?) -> String? {
+        rawObject.flatMap { firstString(in: $0, keys: ["notification_type", "notificationType"]) }
+    }
+
+    /// The one typed table every agent's `Notification` goes through, Claude's own handler included. (cm-128.5)
+    /// `agent_needs_input` stays unmapped until a live record shows which session it names (Tom, grill Q35), and a
+    /// needs-you type Claude adds later stays silent until it is mapped here (Tom, grill Q32: "Drop it").
+    func typedNotificationJournalKind(forNotificationType type: String?) -> AgentJournalEventKind {
+        switch type {
+        case "permission_prompt":
+            return .approvalRequested
+        case "idle_prompt":
+            return .idleObserved
+        case "elicitation_dialog", "elicitation_url_dialog":
+            return .questionRequested
+        case "elicitation_response", "elicitation_complete":
+            return .attentionResolved
+        default:
             return .stateChanged
+        }
+    }
+
+    /// The types whose `detail` the reconciler needs: a form's raising event and the answer that may retire it. (cm-128.5)
+    func notificationTypeDetail(_ type: String?, kind: AgentJournalEventKind) -> String? {
+        guard let type, kind == .questionRequested || kind == .attentionResolved else { return nil }
+        switch type {
+        case "elicitation_dialog", "elicitation_url_dialog", "elicitation_response", "elicitation_complete":
+            return type
+        default:
+            return nil
+        }
+    }
+
+    /// Amp's lifecycle protocol, from its typed `agent_state` and `turn_outcome` (cm-128.5). The route already holds
+    /// the decision: the notification action takes `awaiting-approval` and `needs-input`, the terminal one an error.
+    func ampLifecycleJournalKind(
+        route: AgentHookLifecycleReconciler.Route?,
+        rawObject: [String: Any]?
+    ) -> AgentJournalEventKind? {
+        switch route {
+        case .notification?:
+            let state = (rawObject?["agent_state"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+                .replacingOccurrences(of: "_", with: "-")
+            switch state {
+            case "awaiting-approval": return .approvalRequested
+            case "needs-input": return .questionRequested
+            default: return nil
+            }
+        case .terminalNotification?:
+            return .errorReported
+        default:
+            return nil
+        }
+    }
+
+    /// Campfire's observer events, from the typed `campfire_event_type` (cm-128.5). `relay.error` is a connection
+    /// failure and ends no turn, so it keeps its ping as a plain message and never enters the error row (Tom, grill Q39).
+    func campfireJournalKind(rawObject: [String: Any]?) -> AgentJournalEventKind? {
+        guard let rawObject else { return nil }
+        switch campfireEventType(in: rawObject) {
+        case "permission.asked", "join.requested": return .approvalRequested
+        case "relay.error": return .messagePublished
+        default: return nil
         }
     }
 

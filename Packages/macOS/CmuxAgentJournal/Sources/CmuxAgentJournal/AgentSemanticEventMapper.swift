@@ -64,6 +64,9 @@ public struct AgentSemanticEventMapper: Sendable {
             // These Claude-compatible runtimes use Notification as their only
             // reliable completed-turn callback.
             return .turnCompleted
+        case ("pi", "notification"):
+            // cm-128.5: Pi's extension sends `notification` only at a turn's end.
+            return .turnCompleted
         default:
             break
         }
@@ -121,7 +124,7 @@ public struct AgentSemanticEventMapper: Sendable {
     ]
 
     private static let errorEvents: Set<String> = [
-        "stopfailure", "onerror", "error", "posttoolusefailure",
+        "stopfailure", "onerror", "error",
     ]
 
     private static let sessionEndEvents: Set<String> = [

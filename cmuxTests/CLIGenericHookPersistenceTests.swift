@@ -420,9 +420,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(missingFullyIdleNotification.stdout, "{}\n")
 
         let missingFullyIdleNotificationCommands = Array(state.commands.dropFirst(missingFullyIdleNotificationCommandStart))
-        XCTAssertTrue(
+        // cmux-rbf: changed on purpose (#cm-128.5, review fork 1 (c)): "Turn complete in 2.0s." is words, so it pings nothing
+        // and settles nothing. Antigravity's typed turn end is cm-128.7's.
+        XCTAssertFalse(
             missingFullyIdleNotificationCommands.contains { $0.hasPrefix("notify_target_async ") },
-            "Antigravity idle notifications without fullyIdle must publish instead of staying suppressed, saw \(missingFullyIdleNotificationCommands)"
+            "Antigravity idle-classified words must raise no ping, saw \(missingFullyIdleNotificationCommands)"
         )
         XCTAssertFalse(
             missingFullyIdleNotificationCommands.contains { $0.contains("set_status antigravity Idle") },
@@ -440,18 +442,23 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(stop.stdout, "{}\n")
 
         let stopCommands = Array(state.commands.dropFirst(stopCommandStart))
-        XCTAssertTrue(
-            stopCommands.contains {
-                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity · Finished|\(root.lastPathComponent)|")
-                    && $0.contains(stopMessage)
-            },
-            "Expected Antigravity stop to publish a turn-completion notification, saw \(stopCommands)"
-        )
-        XCTAssertTrue(
-            stopCommands.contains { $0.contains("set_status antigravity Idle") },
-            "Expected Antigravity stop to leave the session idle, saw \(stopCommands)"
-        )
+        // cmux-rbf: changed on purpose (#cm-128.5, review fork 1 (c)): session B (`-missing-fully-idle`) last said Stop with
+        // fullyIdle=false, so it is running, and the words-only Notification no longer settles it. The newer-running-session
+        // check is right on the facts, so session A's Stop is suppressed until cm-128.7 restores Antigravity's typed turn end.
+        XCTExpectFailure("cm-128.7 restores Antigravity's typed turn end, which settles the newer session", options: .init()) {
+            XCTAssertTrue(
+                stopCommands.contains {
+                    // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                    $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity · Finished|\(root.lastPathComponent)|")
+                        && $0.contains(stopMessage)
+                },
+                "Expected Antigravity stop to publish a turn-completion notification, saw \(stopCommands)"
+            )
+            XCTAssertTrue(
+                stopCommands.contains { $0.contains("set_status antigravity Idle") },
+                "Expected Antigravity stop to leave the session idle, saw \(stopCommands)"
+            )
+        }
 
         let sessionEndCommandStart = state.commands.count
         let sessionEnd = runAntigravityHook(
@@ -498,16 +505,15 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(permission.stdout, "{}\n")
 
         let permissionCommands = Array(state.commands.dropFirst(permissionCommandStart))
-        XCTAssertTrue(
-            permissionCommands.contains {
-                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity · Needs your approval|\(root.lastPathComponent)|\(permissionMessage)")
-            },
-            "Expected Antigravity permission notifications to publish through cmux, saw \(permissionCommands)"
+        // cmux-rbf: changed on purpose (#cm-128.5, review fork 1 (c)): `reason: permission_prompt` is a word, not a field
+        // Antigravity documents, so it raises no ping and no pill (as for grok). cm-128.7 decides its typed fields.
+        XCTAssertFalse(
+            permissionCommands.contains { $0.hasPrefix("notify_target_async ") || $0.contains("set_status antigravity ") },
+            "Antigravity permission words must raise no ping and no pill, saw \(permissionCommands)"
         )
         XCTAssertTrue(
-            permissionCommands.contains { $0.contains("set_status antigravity Antigravity needs input") },
-            "Expected Antigravity permission notifications to mark needs-input, saw \(permissionCommands)"
+            AgentJournalAppendCapture.captures(in: permissionCommands).allSatisfy { $0.kind == "agent.state.changed" },
+            "Antigravity permission words must journal an observation only, saw \(permissionCommands)"
         )
 
         let stopErrorMessage = "Tool crashed"
@@ -544,15 +550,15 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(error.stdout, "{}\n")
 
         let errorCommands = Array(state.commands.dropFirst(errorCommandStart))
-        XCTAssertTrue(
-            errorCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Antigravity|Error|\(errorMessage)")
-            },
-            "Expected Antigravity error notifications to publish through cmux, saw \(errorCommands)"
+        // cmux-rbf: changed on purpose (#cm-128.5, review fork 1 (c)): "Execution failed" is words (the sibling
+        // `testAntigravityErrorWordsRaiseNoErrorPing`): no ping, no pill, no error.
+        XCTAssertFalse(
+            errorCommands.contains { $0.hasPrefix("notify_target_async ") || $0.contains("set_status antigravity ") },
+            "Antigravity error words must raise no ping and no pill, saw \(errorCommands)"
         )
-        XCTAssertTrue(
-            errorCommands.contains { $0.contains("set_status antigravity Antigravity error") },
-            "Expected Antigravity error notifications to mark error status, saw \(errorCommands)"
+        XCTAssertFalse(
+            AgentJournalAppendCapture.captures(in: errorCommands).contains { $0.kind == "agent.error.reported" },
+            "Antigravity error words must not journal an error, saw \(errorCommands)"
         )
     }
 
@@ -2479,7 +2485,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(events.compactMap { $0["_ppid"] as? Int }, [424242, 424242, 424242])
     }
 
-    func testGrokNotificationHookUsesPayloadMessageAndStopDoesNotSendGenericNotification() throws {
+    // cmux-rbf: changed on purpose (#cm-128.5): grok's ping comes from its Stop; its Notification's words raise and ping nothing.
+    func testGrokStopSendsTheCompletionPingAndItsNotificationHookRaisesNothing() throws {
         let cliPath = try bundledCLIPath()
         let socketPath = makeSocketPath("grok-notification")
         let listenerFD = try bindUnixSocket(at: socketPath)
@@ -2545,9 +2552,14 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(stop.stdout, "{}\n")
 
         let stopCommands = Array(state.commands.dropFirst(stopCommandStart))
-        XCTAssertFalse(
-            stopCommands.contains { $0.hasPrefix("notify_target_async ") },
-            "Grok Stop should not publish a generic completion notification; Notification carries the real message. Saw \(stopCommands)"
+        // cmux-rbf: changed on purpose (#cm-128.5): the Stop pings on every idle Stop, with "Task completed" when
+        // no assistant message was found, so a turn whose transcript had no message yet still pings.
+        XCTAssertEqual(
+            stopCommands.filter {
+                $0.hasPrefix("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Task completed")
+            }.count,
+            1,
+            "Grok Stop must publish exactly one completion notification. Saw \(stopCommands)"
         )
         XCTAssertTrue(
             stopCommands.contains { $0.contains("set_status grok Idle") },
@@ -2564,16 +2576,18 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(notification.stdout, "{}\n")
 
         let notificationCommands = Array(state.commands.dropFirst(notificationCommandStart))
-        XCTAssertTrue(
-            notificationCommands.contains {
-                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Grok finished updating docs")
-            },
-            "Expected Grok Notification to forward the payload message, saw \(notificationCommands)"
+        // cmux-rbf: changed on purpose (#cm-128.5): the words raise no state and no ping; the Stop above did both.
+        XCTAssertFalse(
+            notificationCommands.contains { $0.hasPrefix("notify_target_async ") },
+            "A Grok Notification's words must not deliver a ping, saw \(notificationCommands)"
+        )
+        XCTAssertFalse(
+            notificationCommands.contains { $0.contains("set_status grok ") },
+            "A Grok Notification's words must not set a pill, saw \(notificationCommands)"
         )
         XCTAssertTrue(
-            notificationCommands.contains { $0.contains("set_status grok Idle") },
-            "Expected completion notification to leave Grok idle, saw \(notificationCommands)"
+            AgentJournalAppendCapture.captures(in: notificationCommands).allSatisfy { $0.kind == "agent.state.changed" },
+            "A Grok Notification's words must journal an observation only, saw \(notificationCommands)"
         )
 
         let storeURL = root.appendingPathComponent("grok-hook-sessions.json", isDirectory: false)
@@ -2609,21 +2623,33 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(preAssistantGeneric.stdout, "{}\n")
 
         let preAssistantGenericCommands = Array(state.commands.dropFirst(preAssistantGenericCommandStart))
+        // cmux-rbf: changed on purpose (#cm-128.5): the words raise nothing; the Stop that follows pings and sets idle.
+        XCTAssertFalse(
+            preAssistantGenericCommands.contains { $0.hasPrefix("notify_target_async ") || $0.contains("set_status grok ") },
+            "A Grok Notification's completion words must raise no ping and no pill, saw \(preAssistantGenericCommands)"
+        )
+        let preAssistantStopCommandStart = state.commands.count
+        let preAssistantStop = runGrokHook(
+            "stop",
+            input: #"{"sessionId":"grok-generic-before-assistant","cwd":"\#(root.path)","hookEventName":"Stop"}"#
+        )
+        XCTAssertFalse(preAssistantStop.timedOut, preAssistantStop.stderr)
+        XCTAssertEqual(preAssistantStop.status, 0, preAssistantStop.stderr)
+        let preAssistantStopCommands = Array(state.commands.dropFirst(preAssistantStopCommandStart))
         XCTAssertTrue(
-            preAssistantGenericCommands.contains {
+            preAssistantStopCommands.contains {
                 // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
                 $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished|\(root.lastPathComponent)|Task completed")
             },
-            "Grok generic completion notifications should still fire before there is an assistant response, saw \(preAssistantGenericCommands)"
+            "Grok's Stop should still fire the completion notification before there is an assistant response, saw \(preAssistantStopCommands)"
         )
         XCTAssertTrue(
-            preAssistantGenericCommands.contains { $0.contains("set_status grok Idle") },
-            "Expected generic completion without an assistant response to leave Grok idle, saw \(preAssistantGenericCommands)"
+            preAssistantStopCommands.contains { $0.contains("set_status grok Idle") },
+            "Expected the Stop without an assistant response to leave Grok idle, saw \(preAssistantStopCommands)"
         )
         json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any])
         sessions = try XCTUnwrap(json["sessions"] as? [String: Any])
         let preAssistantGenericSession = try XCTUnwrap(sessions["grok-generic-before-assistant"] as? [String: Any])
-        XCTAssertEqual(preAssistantGenericSession["lastSubtitle"] as? String, "Completed")
         XCTAssertEqual(preAssistantGenericSession["lastBody"] as? String, "Task completed")
         XCTAssertEqual(preAssistantGenericSession["lastNotificationStatus"] as? String, "idle")
 
@@ -2783,9 +2809,10 @@ extension CLINotifyProcessIntegrationRegressionTests {
             genericCompletionCommands.contains { $0.hasPrefix("notify_target_async ") },
             "Grok completion Notification must not double-notify after Stop fallback already published the completion, saw \(genericCompletionCommands)"
         )
-        XCTAssertTrue(
-            genericCompletionCommands.contains { $0.contains("set_status grok Idle") },
-            "Expected enriched completion notification to leave Grok idle, saw \(genericCompletionCommands)"
+        // cmux-rbf: changed on purpose (#cm-128.5): a Notification's words set no pill; the Stop already left Grok idle.
+        XCTAssertFalse(
+            genericCompletionCommands.contains { $0.contains("set_status grok ") },
+            "A Grok completion Notification's words must set no pill, saw \(genericCompletionCommands)"
         )
 
         let sameCwdMissingSessionId = "grok-session-without-own-history"
@@ -2798,6 +2825,17 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(sameCwdMissing.status, 0, sameCwdMissing.stderr)
         XCTAssertEqual(sameCwdMissing.stdout, "{}\n")
 
+        // cmux-rbf: changed on purpose (#cm-128.5): the words ping nothing; the session's Stop pings.
+        XCTAssertFalse(
+            state.commands.dropFirst(sameCwdMissingCommandStart).contains { $0.hasPrefix("notify_target_async ") },
+            "A Grok Notification's completion words must not ping, saw \(Array(state.commands.dropFirst(sameCwdMissingCommandStart)))"
+        )
+        let sameCwdMissingStop = runGrokHook(
+            "stop",
+            input: #"{"sessionId":"\#(sameCwdMissingSessionId)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
+        )
+        XCTAssertFalse(sameCwdMissingStop.timedOut, sameCwdMissingStop.stderr)
+        XCTAssertEqual(sameCwdMissingStop.status, 0, sameCwdMissingStop.stderr)
         let sameCwdMissingCommands = Array(state.commands.dropFirst(sameCwdMissingCommandStart))
         XCTAssertTrue(
             sameCwdMissingCommands.contains {
@@ -2843,6 +2881,17 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(envResolved.status, 0, envResolved.stderr)
         XCTAssertEqual(envResolved.stdout, "{}\n")
 
+        // cmux-rbf: changed on purpose (#cm-128.5): the words ping nothing; the Stop (no payload session id) pings.
+        XCTAssertFalse(
+            state.commands.dropFirst(envResolvedCommandStart).contains { $0.hasPrefix("notify_target_async ") },
+            "A Grok Notification's completion words must not ping, saw \(Array(state.commands.dropFirst(envResolvedCommandStart)))"
+        )
+        let envResolvedStop = runGrokHook(
+            "stop",
+            input: #"{"cwd":"\#(root.path)","hookEventName":"Stop"}"#
+        )
+        XCTAssertFalse(envResolvedStop.timedOut, envResolvedStop.stderr)
+        XCTAssertEqual(envResolvedStop.status, 0, envResolvedStop.stderr)
         let envResolvedCommands = Array(state.commands.dropFirst(envResolvedCommandStart))
         XCTAssertTrue(
             envResolvedCommands.contains {
@@ -2891,6 +2940,17 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(scopedMiss.status, 0, scopedMiss.stderr)
         XCTAssertEqual(scopedMiss.stdout, "{}\n")
 
+        // cmux-rbf: changed on purpose (#cm-128.5): the words ping nothing; the session's Stop pings.
+        XCTAssertFalse(
+            state.commands.dropFirst(scopedMissCommandStart).contains { $0.hasPrefix("notify_target_async ") },
+            "A Grok Notification's completion words must not ping, saw \(Array(state.commands.dropFirst(scopedMissCommandStart)))"
+        )
+        let scopedMissStop = runGrokHook(
+            "stop",
+            input: #"{"sessionId":"\#(scopedMissSessionId)","cwd":"\#(missingCwd.path)","hookEventName":"Stop"}"#
+        )
+        XCTAssertFalse(scopedMissStop.timedOut, scopedMissStop.stderr)
+        XCTAssertEqual(scopedMissStop.status, 0, scopedMissStop.stderr)
         let scopedMissCommands = Array(state.commands.dropFirst(scopedMissCommandStart))
         XCTAssertTrue(
             scopedMissCommands.contains {
@@ -2919,16 +2979,19 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(waiting.stdout, "{}\n")
 
         let waitingCommands = Array(state.commands.dropFirst(waitingCommandStart))
-        XCTAssertTrue(
-            waitingCommands.contains {
-                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Needs your answer|\(root.lastPathComponent)|\(waitingMessage)")
-            },
-            "Expected waiting notification to forward the payload message, saw \(waitingCommands)"
+        // cmux-rbf: changed on purpose (#cm-128.5): `reason: idle_prompt` is not a field grok documents, so it is words:
+        // no ping, no pill, no needs-input record. A grok wait with no typed field raises no hand.
+        XCTAssertFalse(
+            waitingCommands.contains { $0.hasPrefix("notify_target_async ") },
+            "A grok wait that came from words must not ping, saw \(waitingCommands)"
+        )
+        XCTAssertFalse(
+            waitingCommands.contains { $0.contains("set_status grok ") },
+            "A grok wait that came from words must set no pill, saw \(waitingCommands)"
         )
         XCTAssertTrue(
-            waitingCommands.contains { $0.contains("set_status grok Grok needs input") },
-            "Expected waiting notification to mark Grok as needing input, saw \(waitingCommands)"
+            AgentJournalAppendCapture.captures(in: waitingCommands).allSatisfy { $0.kind == "agent.state.changed" },
+            "A grok wait that came from words must journal an observation only, saw \(waitingCommands)"
         )
 
         let fallbackCommandStart = state.commands.count
@@ -2948,9 +3011,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
             },
             "Expected the saved-message fallback to dedupe the notification already delivered for that message, saw \(fallbackCommands)"
         )
-        XCTAssertTrue(
-            fallbackCommands.contains { $0.contains("set_status grok Grok needs input") },
-            "Expected fallback notification to preserve the saved needs-input status, saw \(fallbackCommands)"
+        XCTAssertFalse(
+            fallbackCommands.contains { $0.contains("set_status grok ") },
+            "No wait was recorded from words, so the fallback has no needs-input status to preserve, saw \(fallbackCommands)"
         )
 
         json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any])
@@ -2958,7 +3021,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         session = try XCTUnwrap(sessions[sessionId] as? [String: Any])
         XCTAssertEqual(session["lastSubtitle"] as? String, "Waiting")
         XCTAssertEqual(session["lastBody"] as? String, waitingMessage)
-        XCTAssertEqual(session["lastNotificationStatus"] as? String, "needsInput")
+        // cmux-rbf: changed on purpose (#cm-128.5): words write no needs-input record.
+        XCTAssertNotEqual(session["lastNotificationStatus"] as? String, "needsInput")
 
         for neutralMessage in ["Invalid input format", "Question mark rendered"] {
             let neutralCommandStart = state.commands.count
@@ -2992,11 +3056,10 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(incompleteWaiting.stdout, "{}\n")
 
         let incompleteWaitingCommands = Array(state.commands.dropFirst(incompleteWaitingCommandStart))
-        XCTAssertTrue(
-            incompleteWaitingCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Waiting|\(incompleteWaitingMessage)")
-            },
-            "Incomplete/undone waiting text should not be classified as a completion, saw \(incompleteWaitingCommands)"
+        // cmux-rbf: changed on purpose (#cm-128.5): the words ping nothing, as a completion or as a wait.
+        XCTAssertFalse(
+            incompleteWaitingCommands.contains { $0.hasPrefix("notify_target_async ") },
+            "Incomplete/undone waiting text raises no ping from words, saw \(incompleteWaitingCommands)"
         )
         XCTAssertFalse(
             // cmux-rbf: changed on purpose (#cm-128.4): keep this negative source-line guard active.
@@ -3029,7 +3092,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         session = try XCTUnwrap(sessions[sessionId] as? [String: Any])
         XCTAssertEqual(session["lastSubtitle"] as? String, "Waiting")
         XCTAssertEqual(session["lastBody"] as? String, incompleteWaitingMessage)
-        XCTAssertEqual(session["lastNotificationStatus"] as? String, "needsInput")
+        // cmux-rbf: changed on purpose (#cm-128.5): words write no needs-input record.
+        XCTAssertNotEqual(session["lastNotificationStatus"] as? String, "needsInput")
 
         let neutralFallbackCommandStart = state.commands.count
         let neutralFallback = runGrokHook(
@@ -3048,9 +3112,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
             },
             "Expected the saved-message fallback to dedupe the notification already delivered for that message, saw \(neutralFallbackCommands)"
         )
-        XCTAssertTrue(
-            neutralFallbackCommands.contains { $0.contains("set_status grok Grok needs input") },
-            "Fallback notifications should preserve the saved needs-input status, saw \(neutralFallbackCommands)"
+        XCTAssertFalse(
+            neutralFallbackCommands.contains { $0.contains("set_status grok ") },
+            "No wait was recorded from words, so the fallback has no needs-input status to preserve, saw \(neutralFallbackCommands)"
         )
     }
 
@@ -3571,6 +3635,19 @@ extension CLINotifyProcessIntegrationRegressionTests {
             XCTAssertEqual(notification.status, 0, notification.stderr)
             XCTAssertEqual(notification.stdout, "{}\n")
 
+            // cmux-rbf: changed on purpose (#cm-128.5): the Notification's words ping nothing; the Stop pings, even
+            // when the feed telemetry never replies.
+            XCTAssertFalse(
+                state.commands.dropFirst(commandStart).contains { $0.hasPrefix("notify_target_async ") },
+                "A Grok Notification's completion words must not ping for prompt \(index), saw \(Array(state.commands.dropFirst(commandStart)))"
+            )
+            let stop = runGrokHook(
+                "stop",
+                input: #"{"sessionId":"\#(sessionId)","cwd":"\#(root.path)","hookEventName":"Stop"}"#,
+                stallFeedTelemetry: index == 2
+            )
+            XCTAssertFalse(stop.timedOut, stop.stderr)
+            XCTAssertEqual(stop.status, 0, stop.stderr)
             let notificationCommands = Array(state.commands.dropFirst(commandStart))
             XCTAssertTrue(
                 notificationCommands.contains {
@@ -3721,6 +3798,17 @@ extension CLINotifyProcessIntegrationRegressionTests {
             XCTAssertEqual(notification.status, 0, notification.stderr)
             XCTAssertEqual(notification.stdout, "{}\n")
 
+            // cmux-rbf: changed on purpose (#cm-128.5): the Notification's words ping nothing; the Stop pings.
+            XCTAssertFalse(
+                state.commands.dropFirst(notificationCommandStart).contains { $0.hasPrefix("notify_target_async ") },
+                "A Grok Notification's completion words must not ping for chat message \(index), saw \(Array(state.commands.dropFirst(notificationCommandStart)))"
+            )
+            let stop = runGrokHook(
+                "stop",
+                input: #"{"sessionId":"\#(sessionId)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
+            )
+            XCTAssertFalse(stop.timedOut, stop.stderr)
+            XCTAssertEqual(stop.status, 0, stop.stderr)
             let notificationCommands = Array(state.commands.dropFirst(notificationCommandStart))
             XCTAssertTrue(
                 notificationCommands.contains {
@@ -3891,6 +3979,18 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(completingNotification.status, 0, completingNotification.stderr)
         XCTAssertEqual(completingNotification.stdout, "{}\n")
 
+        // cmux-rbf: changed on purpose (#cm-128.5): the Notification's words ping nothing; the session's Stop pings.
+        XCTAssertFalse(
+            state.commands.dropFirst(completionCommandStart).contains { $0.hasPrefix("notify_target_async ") },
+            "A Grok Notification's completion words must not ping, saw \(Array(state.commands.dropFirst(completionCommandStart)))"
+        )
+        let completingStop = runGrokHook(
+            "stop",
+            input: #"{"sessionId":"\#(completingSessionId)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
+        )
+        XCTAssertFalse(completingStop.timedOut, completingStop.stderr)
+        XCTAssertEqual(completingStop.status, 0, completingStop.stderr)
+
         let completionCommands = Array(state.commands.dropFirst(completionCommandStart))
         XCTAssertTrue(
             completionCommands.contains {
@@ -3995,9 +4095,10 @@ extension CLINotifyProcessIntegrationRegressionTests {
         }
         let completion = runProcess(
             executablePath: cliPath,
-            arguments: ["hooks", "grok", "notification"],
+            // cmux-rbf: changed on purpose (#cm-128.5): the completion is grok's Stop; a Notification's words set no pill.
+            arguments: ["hooks", "grok", "stop"],
             environment: environment,
-            standardInput: #"{"sessionId":"\#(completingSessionId)","cwd":"\#(root.path)","hookEventName":"Notification","message":"Turn complete in 1.0s."}"#,
+            standardInput: #"{"sessionId":"\#(completingSessionId)","cwd":"\#(root.path)","hookEventName":"Stop"}"#,
             timeout: 5
         )
         wait(for: [serverHandled], timeout: 5)

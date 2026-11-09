@@ -1,8 +1,12 @@
 /// The live signals a workspace samples to infer its ``WorkspaceTaskStatus``.
 /// A pure value so inference is unit-testable without live app state.
 public struct WorkspaceTaskStatusSignals: Equatable, Sendable {
-    /// Whether any agent in the workspace is waiting on user input.
+    /// Whether any agent in the workspace needs the user: waiting on an answer, or stopped on an error (cm-128.5).
     public var anyAgentNeedsInput: Bool
+    /// Whether any agent is waiting on an answer, an error excluded. The hand reads this one (cm-128.5).
+    public var anyAgentWaiting: Bool
+    /// Whether any agent stopped on an error (cm-128.5).
+    public var anyAgentError: Bool
     /// Whether any agent in the workspace is running.
     public var anyAgentRunning: Bool
     /// Whether any agent has finished its turn and is watching background work.
@@ -24,9 +28,14 @@ public struct WorkspaceTaskStatusSignals: Equatable, Sendable {
         hasPullRequests: Bool = false,
         allPullRequestsMergedOrClosed: Bool = false,
         isGitDirty: Bool = false,
-        anyAgentMonitoring: Bool = false
+        anyAgentMonitoring: Bool = false,
+        anyAgentWaiting: Bool? = nil,
+        anyAgentError: Bool = false
     ) {
         self.anyAgentNeedsInput = anyAgentNeedsInput
+        // A sample that only says "needs input" still raises the hand, as before the error had its own value.
+        self.anyAgentWaiting = anyAgentWaiting ?? anyAgentNeedsInput
+        self.anyAgentError = anyAgentError
         self.anyAgentRunning = anyAgentRunning
         self.anyAgentMonitoring = anyAgentMonitoring
         self.anyOpenPullRequest = anyOpenPullRequest

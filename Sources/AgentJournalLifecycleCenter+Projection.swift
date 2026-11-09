@@ -31,7 +31,8 @@ extension AgentJournalLifecycleCenter {
             assignment: AgentLifecycleAssignment(
                 surfaceId: surfaceId,
                 agentKey: canonical.agentKey,
-                phase: state.combinedPhase(surfaceId: surfaceId, agentKey: canonical.agentKey)
+                phase: state.combinedPhase(surfaceId: surfaceId, agentKey: canonical.agentKey),
+                usageLimit: state.hasUsageLimit(surfaceId: surfaceId, agentKey: canonical.agentKey)
             ),
             workspaceHint: canonical.draft.workspaceId
         )
@@ -95,7 +96,8 @@ extension AgentJournalLifecycleCenter {
         for (surfaceId, byAgent) in startup.phases {
             for (agentKey, phase) in byAgent {
                 assignments.append(
-                    AgentLifecycleAssignment(surfaceId: surfaceId, agentKey: agentKey, phase: phase)
+                    AgentLifecycleAssignment(surfaceId: surfaceId, agentKey: agentKey, phase: phase,
+                        usageLimit: startup.usageLimitAgentKeys[surfaceId]?.contains(agentKey) == true)
                 )
             }
         }
@@ -260,6 +262,15 @@ extension AgentJournalLifecycleCenter {
             return
         }
         if let phase = assignment.phase {
+            // The flag first: the lifecycle write publishes the row, which reads it. A Dock pane has no triangle.
+            if phase == .error, case .workspace(let workspace) = owner {
+                // An error to an error with no limit drops a flag the key held: the reducer already did.
+                if assignment.usageLimit {
+                    workspace.setAgentUsageLimit(key: assignment.agentKey, panelId: panelId)
+                } else {
+                    workspace.removeAgentUsageLimit(key: assignment.agentKey, panelId: panelId)
+                }
+            }
             owner.setAgentLifecycle(
                 key: assignment.agentKey,
                 panelId: panelId,
@@ -276,10 +287,8 @@ extension AgentJournalLifecycleCenter {
 #endif
     }
 
-    /// Projects the journal phase onto the sidebar's lifecycle enum. The
-    /// sidebar has no dedicated error rendering yet, so `error` uses the
-    /// needs-input treatment (matching the pre-journal pipeline) while the
-    /// journal retains the honest phase.
+    /// Projects the journal phase onto the sidebar's lifecycle enum. An error is its own per-pane value (cm-128.5, Tom,
+    /// grill Q10): the hand reads needs-input only, and every other needs-you reader counts the error too.
     static func lifecycle(for phase: AgentLifecyclePhase) -> AgentHibernationLifecycleState {
         switch phase {
         case .unknown: .unknown
@@ -287,7 +296,7 @@ extension AgentJournalLifecycleCenter {
         case .monitoring: .monitoring
         case .needsInput: .needsInput
         case .idle: .idle
-        case .error: .needsInput
+        case .error: .error
         }
     }
 
