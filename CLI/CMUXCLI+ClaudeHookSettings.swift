@@ -13,6 +13,8 @@ extension CMUXCLI {
         )] = [
             ("SessionStart", "", "session-start"),
             ("Stop", "", "stop"),
+            // cm-128.5: a turn that ends on an API error runs this instead of Stop. The empty matcher takes every error type.
+            ("StopFailure", "", "stop-failure"),
             ("SessionEnd", "", "session-end"),
             ("Notification", "", "notification"),
             ("UserPromptSubmit", "", "prompt-submit"),

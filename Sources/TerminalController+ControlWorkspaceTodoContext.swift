@@ -76,7 +76,8 @@ extension TerminalController: ControlWorkspaceTodoContext {
                 hasPullRequests: signals.hasPullRequests,
                 allPullRequestsMergedOrClosed: signals.allPullRequestsMergedOrClosed,
                 isGitDirty: signals.isGitDirty,
-                anyAgentMonitoring: signals.anyAgentMonitoring
+                anyAgentMonitoring: signals.anyAgentMonitoring,
+                anyAgentError: signals.anyAgentError
             ),
             statusID: statusID
         )

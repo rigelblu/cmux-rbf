@@ -16787,21 +16787,37 @@ struct TabItemView: View, Equatable {
                         .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                         .transition(.opacity)
                     }
-
-                    if slotResolution.showsHand { // (#cm-109.3)
-                        WaitingHandView( // (#cm-109.7)
-                            pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
-                            colorScheme: colorScheme, // (#cm-109.7)
-                            rowBackground: rowContrastBackground, // (#cm-109.7)
-                            drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7)
-                        ) // (#cm-109.3)
-                        .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
-                        .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
-                        .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
-                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
-                    } // (#cm-109.3)
                 }
                 .opacity(rowContentAlpha)
+
+                // cm-128.5 (Tom, grill Q34): no agent mark dims, so the hand and the triangle sit outside the Done dim, as the
+                // spinner and the waveform do, and their outline is judged at full strength.
+                if slotResolution.showsHand { // (#cm-109.3)
+                    WaitingHandView( // (#cm-109.7)
+                        pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
+                        colorScheme: colorScheme, // (#cm-109.7)
+                        rowBackground: rowContrastBackground, // (#cm-109.7)
+                        drawnAlpha: 1 // cm-128.5
+                    ) // (#cm-109.3)
+                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
+                    .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                    .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
+                }
+
+                if !workspaceSnapshot.erroredAgents.isEmpty { // cm-128.5 the hand's twin: a pane stopped on an error
+                    WaitingHandView(
+                        symbolName: "exclamationmark.triangle.fill",
+                        pointSize: scaledLoadingSpinnerSize * 0.8,
+                        colorScheme: colorScheme,
+                        rowBackground: rowContrastBackground,
+                        drawnAlpha: 1
+                    )
+                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize)
+                    .safeHelp(SidebarAgentErrorSummary.tooltip(for: workspaceSnapshot.erroredAgents))
+                    .accessibilityLabel(SidebarAgentErrorSummary.tooltip(for: workspaceSnapshot.erroredAgents))
+                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
+                }
 
                 // cm-128.1: the spinner set to the left draws after the glyph and the hand, beside them.
                 if slotResolution.markSpinner {

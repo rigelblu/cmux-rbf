@@ -35,6 +35,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private var handImageView: NSImageView? // (#cm-109.3)
     private var monitoringImageView: NSImageView? // (#cm-128.3)
     private var handOutlineView: WaitingHandOutlineView? // (#cm-109.7)
+    private var errorTriangleView: NSImageView? // (cm-128.5)
+    private var errorTriangleOutlineView: WaitingHandOutlineView? // (cm-128.5)
     private let pinImageView = NSImageView()
     private let muteImageView = NSImageView()
     private let mediaAudioView = NSImageView()
@@ -694,6 +696,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     func toggleStatusPopoverForTesting() { toggleStatusPopover() }
     var handForTesting: NSImageView? { handImageView } // (#cm-109.3)
     var handOutlineForTesting: NSView? { handOutlineView } // (#cm-109.7)
+    var errorTriangleForTesting: NSImageView? { errorTriangleView } // (cm-128.5)
+    var errorTriangleOutlineForTesting: NSView? { errorTriangleOutlineView } // (cm-128.5)
     var markSpinnerForTesting: GPUSpinnerNSView? { markSpinner } // (#cm-109.3)
     var trailingSpinnerForTesting: GPUSpinnerNSView? { trailingSpinner } // (#cm-109.3)
     var leadingBadgeForTesting: SidebarRowUnreadBadgeView { leadingBadge } // (#cm-109.3)
@@ -791,21 +795,41 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let waitingTooltip = handVisible ? String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer") : "" // (#cm-109.3)
         let handYellow = waitingHandYellow(for: palette.colorScheme) // (#cm-109.7)
         let handOutlined = Self.rowContrastBackground(model: model, palette: palette) // (#cm-109.7)
-            .map { handNeedsOutline(yellow: handYellow, on: $0, drawnAt: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: model.snapshot.taskStatus)) } ?? false // (#cm-109.7)
+            .map { handNeedsOutline(yellow: handYellow, on: $0, drawnAt: 1) } ?? false // (#cm-109.7) cm-128.5: no agent mark dims, so full strength
+        // cm-128.5 (Tom, grill Q34): the hand and the triangle sit in the cell itself, outside the Done dim, as the spinner and
+        // the waveform do.
         let hand = Self.updateAgentMark( // (#cm-109.3)
             existing: handImageView, // (#cm-109.3)
             visible: handVisible, // (#cm-109.3)
             color: handYellow, // (#cm-109.7)
             tooltip: waitingTooltip, // (#cm-109.3)
-            in: contentContainer // (#cm-109.3)
+            in: self // (#cm-109.3)
         ) // (#cm-109.3)
         handImageView = hand // (#cm-109.7)
         handOutlineView = Self.updateHandOutline( // (#cm-109.7)
             existing: handOutlineView, // (#cm-109.7)
             hand: hand, // (#cm-109.7)
             visible: handVisible && handOutlined, // (#cm-109.7)
-            in: contentContainer // (#cm-109.7)
+            in: self // (#cm-109.7)
         ) // (#cm-109.7)
+        let errorTooltip = SidebarAgentErrorSummary.tooltip(for: model.snapshot.erroredAgents)
+        let triangleVisible = !model.snapshot.erroredAgents.isEmpty
+        let triangle = Self.updateAgentMark(
+            existing: errorTriangleView,
+            visible: triangleVisible,
+            color: handYellow,
+            tooltip: errorTooltip,
+            symbolName: "exclamationmark.triangle.fill",
+            pointSize: max(10, 12 * model.fontScale),
+            in: self
+        )
+        errorTriangleView = triangle
+        errorTriangleOutlineView = Self.updateHandOutline(
+            existing: errorTriangleOutlineView,
+            hand: triangle,
+            visible: triangleVisible && handOutlined,
+            in: self
+        )
     }
 
     /// The row's own background for the contrast floors: the sidebar stand-in under the row's wash. (#cm-109.7)
@@ -1350,6 +1374,13 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             } // (#cm-109.7)
             x += spinnerSide + titleRowSpacing // (#cm-109.3)
         } // (#cm-109.3)
+        if let triangle = errorTriangleView, !triangle.isHidden { // cm-128.5 the hand's twin, beside it
+            place(triangle, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
+            if let outline = errorTriangleOutlineView, !outline.isHidden {
+                place(outline, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
+            }
+            x += spinnerSide + titleRowSpacing
+        }
         // cm-128.1: the left spinner draws after the glyph and the hand, beside them.
         if let spinner = markSpinner, !spinner.isHidden {
             place(spinner, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)

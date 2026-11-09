@@ -43,6 +43,9 @@ struct AgentSemanticEventMapperTests {
         ("codebuddy", "Notification", nil, .turnCompleted),
         ("factory", "Notification", nil, .turnCompleted),
         ("grok", "Notification", nil, .stateChanged),
+        // cm-128.5: Pi's extension sends `notification` only at a turn's end.
+        ("pi", "Notification", nil, .turnCompleted),
+        ("pi", "notification", nil, .turnCompleted),
         // Blocking tools outrank event names.
         ("claude", "PreToolUse", "AskUserQuestion", .questionRequested),
         ("claude", "PreToolUse", "ExitPlanMode", .planReviewRequested),

@@ -14,6 +14,7 @@ struct AgentHookDeliveryEvent: Sendable {
 
     private static let reservedTerminalStateSubcommands: Set<String> = [
         "stop",
+        "stop-failure", // (cm-128.5) replaces Stop for its turn, so it is the only end-of-turn signal
         "session-end",
         "session-finalize",
     ]

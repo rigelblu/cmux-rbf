@@ -22,7 +22,7 @@ extension Workspace {
     /// leaves, does not count, and neither does Dock-pane state.
     var hasClearableAgentState: Bool {
         for (panelId, states) in agentLifecycleStatesByPanelId where panels[panelId] != nil {
-            for (key, state) in states where Self.isAgentMarkLifecycleKey(key) && (state == .needsInput || state == .running || state == .monitoring) {
+            for (key, state) in states where Self.isAgentMarkLifecycleKey(key) && (state == .needsInput || state == .error || state == .running || state == .monitoring) {
                 return true
             }
         }
@@ -48,7 +48,7 @@ extension Workspace {
                     // A slot with no pending decision behind it: nobody else will remove it.
                     clearAgentLifecycle(key: key, panelId: panelId)
                     droppedSlotKeysByPanel[panelId, default: []].append(key)
-                } else if state == .needsInput || state == .running || state == .monitoring {
+                } else if state == .needsInput || state == .error || state == .running || state == .monitoring {
                     // `unknown`, never a removal: with no key left the pane would fall back to the CLI's record, which can be
                     // `idle` and hibernatable.
                     setAgentLifecycle(key: key, panelId: panelId, lifecycle: .unknown)

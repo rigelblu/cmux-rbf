@@ -30,6 +30,12 @@ extension Workspace {
         set { sidebarAgentRuntimeObservation.setAgentPIDKeysByPanelId(newValue) }
     }
 
+    /// Agent keys per pane whose `.error` is a typed usage limit; cleared whenever that key leaves `.error`. (cm-128.5)
+    var agentUsageLimitKeysByPanelId: [UUID: Set<String>] {
+        get { sidebarAgentRuntimeObservation.agentUsageLimitKeysByPanelId }
+        set { sidebarAgentRuntimeObservation.setAgentUsageLimitKeysByPanelId(newValue) }
+    }
+
     var agentLifecycleStatesByPanelId: [UUID: [String: AgentHibernationLifecycleState]] {
         get { sidebarAgentRuntimeObservation.agentLifecycleStatesByPanelId }
         set {
@@ -97,7 +103,7 @@ extension Workspace {
                 statusEntriesForPanel[statusKey] = statusEntry
             }
         }
-        for (statusKey, lifecycle) in lifecycleStates where lifecycle == .needsInput {
+        for (statusKey, lifecycle) in lifecycleStates where lifecycle == .needsInput || lifecycle == .error { // (cm-128.5) an error keeps its pill with the pane
             if let statusEntry = statusEntries[statusKey] {
                 statusEntriesForPanel[statusKey] = statusEntry
             }
@@ -114,7 +120,8 @@ extension Workspace {
             agentPIDs: agentPIDsForPanel,
             agentPIDProcessIdentities: agentPIDIdentitiesForPanel,
             agentPIDKeys: pidKeys,
-            agentLifecycleStates: lifecycleStates
+            agentLifecycleStates: lifecycleStates,
+            agentUsageLimitKeys: (agentUsageLimitKeysByPanelId[panelId] ?? []).filter { lifecycleStates[$0] == .error }
         )
     }
 
@@ -136,7 +143,7 @@ extension Workspace {
             return true
         }
         if agentLifecycleStatesByPanelId.values.contains(where: {
-            $0[statusKey] == .needsInput
+            $0[statusKey] == .needsInput || $0[statusKey] == .error // (cm-128.5) an error is a live runtime too
         }) {
             return true
         }
@@ -456,6 +463,9 @@ extension Workspace {
             recordAgentPIDOwnership(key: key, panelId: runtimeState.panelId)
         }
         for (key, lifecycle) in runtimeState.agentLifecycleStates {
+            if lifecycle == .error, runtimeState.agentUsageLimitKeys.contains(key) {
+                setAgentUsageLimit(key: key, panelId: runtimeState.panelId) // (cm-128.5) before the write that publishes the row
+            }
             setAgentLifecycle(key: key, panelId: runtimeState.panelId, lifecycle: lifecycle)
         }
         if didAdoptAgentPID {

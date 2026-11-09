@@ -38,9 +38,16 @@ struct CampfireHookNotificationTests {
         #expect(notification.status == 0, Comment(rawValue: notification.stderr))
 
         let notificationCommands = Array(context.state.snapshot().dropFirst(notificationStart))
+        // cmux-rbf: changed on purpose (#cm-128.5: .4 left it stale). This suite's mock records the journal append and never
+        // turns it into a `notify_target_async` line, and .4 moved the title and subtitle. The line now comes from the
+        // production reconciler and claim (`AgentHookTestNotificationPipeline`, fed every command in order), so it proves
+        // the ping is delivered, not just that a candidate was built.
+        let pipeline = AgentHookTestNotificationPipeline()
+        let delivered = context.state.snapshot().flatMap { pipeline.effects(for: $0) }
         #expect(
-            notificationCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Campfire|Permission|Alice asked for permission to run a shell command|c=needs-permission;p=0")
+            delivered.contains {
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Campfire · Needs your approval|")
+                    && $0.contains("|Alice asked for permission to run a shell command|c=needs-permission;p=0")
             },
             "Campfire permission notification should be localized and notification-gated in Swift, saw \(notificationCommands)"
         )
@@ -59,6 +66,56 @@ struct CampfireHookNotificationTests {
         let sessions = try #require(state["sessions"] as? [String: Any])
         let record = try #require(sessions[sessionId] as? [String: Any])
         #expect(record["agentLifecycle"] as? String == "needsInput")
+    }
+
+    /// cm-128.5 (Scenario 79): Campfire's kind comes from its typed `campfire_event_type`, not from the words in its summary.
+    private func campfireNotificationCommands(eventType: String) throws -> (commands: [String], delivered: [String], record: [String: Any]) {
+        let context = try makeHookContext(name: "campfire-\(eventType.prefix(4))")
+        defer { context.cleanup() }
+        let sessionId = "campfire-typed-session"
+        let launchEnvironment = agentLaunchEnvironment(context: context, kind: "campfire", executable: "/usr/local/bin/campfire")
+        startAgentHookMockServerAccepting(context: context, connectionLimit: 64)
+        let prompt = runAgentHook(
+            context: context, agent: "campfire", subcommand: "prompt-submit",
+            standardInput: #"{"session_id":"\#(sessionId)","cwd":"\#(context.root.path)","hook_event_name":"UserPromptSubmit","prompt":"continue"}"#,
+            extraEnvironment: launchEnvironment)
+        #expect(prompt.status == 0, Comment(rawValue: prompt.stderr))
+        let start = context.state.snapshot().count
+        let notification = runAgentHook(
+            context: context, agent: "campfire", subcommand: "notification",
+            standardInput: #"{"session_id":"\#(sessionId)","cwd":"\#(context.root.path)","hook_event_name":"Notification","campfire_event_type":"\#(eventType)","display_name":"Alice"}"#,
+            extraEnvironment: launchEnvironment)
+        #expect(notification.timedOut == false, Comment(rawValue: notification.stderr))
+        #expect(notification.status == 0, Comment(rawValue: notification.stderr))
+        let stateURL = context.root.appendingPathComponent("campfire-hook-sessions.json")
+        let state = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: stateURL)) as? [String: Any])
+        let record = try #require((state["sessions"] as? [String: Any])?[sessionId] as? [String: Any])
+        // Every command in order through the production reconciler: what it accepts is what the app would deliver.
+        let pipeline = AgentHookTestNotificationPipeline()
+        let delivered = context.state.snapshot().flatMap { pipeline.effects(for: $0) }
+        return (Array(context.state.snapshot().dropFirst(start)), delivered, record)
+    }
+
+    @Test func joinRequestJournalsAnApprovalRequest() throws {
+        let result = try campfireNotificationCommands(eventType: "join.requested")
+        #expect(
+            AgentJournalAppendCapture.captures(in: result.commands).contains { $0.kind == "agent.approval.requested" && $0.agentKey == "campfire" },
+            "join.requested must journal a needs-input approval request, saw \(result.commands)"
+        )
+        #expect(result.record["agentLifecycle"] as? String == "needsInput")
+    }
+
+    @Test func relayErrorKeepsItsPingAsAPlainMessageAndRaisesNoTriangle() throws {
+        let result = try campfireNotificationCommands(eventType: "relay.error")
+        let captures = AgentJournalAppendCapture.captures(in: result.commands)
+        #expect(captures.contains { $0.kind == "agent.message.published" && $0.agentKey == "campfire" },
+                "relay.error must journal a plain message, saw \(result.commands)")
+        #expect(!captures.contains { $0.kind == "agent.error.reported" }, "relay.error must not enter the error row, saw \(result.commands)")
+        #expect(result.delivered.contains { $0.contains("Campfire relay connection failed") },
+                "relay.error must keep its ping, saw \(result.commands)")
+        #expect(!result.commands.contains { $0.hasPrefix("set_status campfire ") && $0.contains("exclamationmark.triangle.fill") },
+                "relay.error must write no error pill, saw \(result.commands)")
+        #expect(result.record["lastNotificationStatus"] as? String != "error")
     }
 
     private final class BundleProbe {}
