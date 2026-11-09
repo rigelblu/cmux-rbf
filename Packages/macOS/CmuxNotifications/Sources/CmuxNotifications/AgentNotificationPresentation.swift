@@ -14,6 +14,8 @@ public struct AgentNotificationPresentation: Equatable, Sendable {
         case error
         /// A finished turn remains unread after one minute.
         case unreadReminder
+        /// An agent error turn remains unread after one minute.
+        case errorUnreadReminder
     }
 
     /// The agent's display name, optional session title, and localized kind.
@@ -39,6 +41,8 @@ public struct AgentNotificationPresentation: Equatable, Sendable {
             label = String(localized: "agent.notification.kind.error", defaultValue: "Stopped on an error")
         case .unreadReminder:
             label = String(localized: "agent.notification.kind.unreadReminder", defaultValue: "Finished 1 min ago, still unread")
+        case .errorUnreadReminder:
+            label = String(localized: "agent.notification.kind.errorUnreadReminder", defaultValue: "Stopped on an error 1 min ago, still unread")
         case nil:
             label = nil
         }

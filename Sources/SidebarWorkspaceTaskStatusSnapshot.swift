@@ -55,7 +55,7 @@ struct SidebarWorkspaceTaskStatusSnapshot: Equatable {
                 list: list // (#cm-109.4)
             ), // (#cm-109.4)
             colorHexes: colorHexes, // (#cm-109.4)
-            isAgentWaiting: signals.anyAgentNeedsInput // (#cm-109.4)
+            isAgentWaiting: signals.anyAgentWaiting // (#cm-109.4)
         ) // (#cm-109.4)
     }
 }

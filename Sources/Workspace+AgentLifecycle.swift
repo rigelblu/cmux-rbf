@@ -501,10 +501,22 @@ extension Workspace {
     ) {
         let targetPanelId = panelId ?? focusedPanelId
         guard let targetPanelId, panels[targetPanelId] != nil else { return }
+        if lifecycle != .error { removeAgentUsageLimit(key: key, panelId: targetPanelId) }
         agentLifecycleStatesByPanelId[targetPanelId, default: [:]][key] = lifecycle
         if !AgentHibernationLifecycleStatusKeys.isManualKey(key) {
             recordAgentLifecycleChange(panelId: targetPanelId)
         }
+    }
+
+    /// Marks a pane's agent key as stopped on a typed usage limit; the next transition off `.error` clears it. (cm-128.5)
+    func setAgentUsageLimit(key: String, panelId: UUID) {
+        agentUsageLimitKeysByPanelId[panelId, default: []].insert(key)
+    }
+
+    func removeAgentUsageLimit(key: String, panelId: UUID) {
+        guard agentUsageLimitKeysByPanelId[panelId]?.contains(key) == true else { return }
+        agentUsageLimitKeysByPanelId[panelId]?.remove(key)
+        if agentUsageLimitKeysByPanelId[panelId]?.isEmpty == true { agentUsageLimitKeysByPanelId.removeValue(forKey: panelId) }
     }
 
     @discardableResult
@@ -514,6 +526,7 @@ extension Workspace {
         let panelIds = panelId.map { [$0] } ?? Array(agentLifecycleStatesByPanelId.keys)
         for panelId in panelIds {
             guard agentLifecycleStatesByPanelId[panelId]?[key] != nil else { continue }
+            removeAgentUsageLimit(key: key, panelId: panelId)
             agentLifecycleStatesByPanelId[panelId]?.removeValue(forKey: key)
             if agentLifecycleStatesByPanelId[panelId]?.isEmpty == true {
                 agentLifecycleStatesByPanelId.removeValue(forKey: panelId)
@@ -534,6 +547,7 @@ extension Workspace {
     }
 
     func clearAgentLifecycleStates(panelId: UUID) {
+        agentUsageLimitKeysByPanelId.removeValue(forKey: panelId) // (cm-128.5) the flag goes with the states
         guard let removed = agentLifecycleStatesByPanelId.removeValue(forKey: panelId) else { return }
         let manualStates = removed.filter { AgentHibernationLifecycleStatusKeys.isManualKey($0.key) }
         if !manualStates.isEmpty {
@@ -557,6 +571,7 @@ extension Workspace {
         let panelIds = Array(agentLifecycleStatesByPanelId.keys)
         guard !panelIds.isEmpty else { return }
         agentLifecycleStatesByPanelId.removeAll()
+        agentUsageLimitKeysByPanelId.removeAll() // (cm-128.5)
         for panelId in panelIds {
             recordAgentLifecycleChange(panelId: panelId)
         }

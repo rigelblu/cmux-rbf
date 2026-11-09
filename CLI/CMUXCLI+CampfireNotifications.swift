@@ -7,9 +7,7 @@ extension CMUXCLI {
     ) -> AgentHookNotificationSummary? {
         guard def.name == "campfire" else { return nil }
         let extra = (object["extra"] as? [String: Any]) ?? [:]
-        let eventType = firstString(in: object, keys: ["campfire_event_type", "campfireEventType"])
-            ?? firstString(in: extra, keys: ["campfire_event_type", "campfireEventType"])
-        guard let eventType else { return nil }
+        guard let eventType = campfireEventType(in: object) else { return nil }
         let displayName = firstString(in: object, keys: ["display_name", "displayName"])
             ?? firstString(in: extra, keys: ["display_name", "displayName"])
         switch eventType {
@@ -68,6 +66,13 @@ extension CMUXCLI {
         default:
             return nil
         }
+    }
+
+    /// Campfire's typed event, at the top level or under `extra`.
+    func campfireEventType(in object: [String: Any]) -> String? {
+        let extra = (object["extra"] as? [String: Any]) ?? [:]
+        return firstString(in: object, keys: ["campfire_event_type", "campfireEventType"])
+            ?? firstString(in: extra, keys: ["campfire_event_type", "campfireEventType"])
     }
 
     private func campfireCapabilityLabel(_ capability: String?) -> String {

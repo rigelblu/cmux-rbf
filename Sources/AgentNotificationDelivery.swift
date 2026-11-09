@@ -1,3 +1,4 @@
+import CmuxAgentJournal
 import CmuxSettings
 import CmuxNotifications
 import Foundation
@@ -36,9 +37,22 @@ struct AgentNotificationDelivery: Sendable {
         sessionId: String? = nil,
         coalesces: Bool = false,
         sourceTitle: String? = nil,
-        isPromptTurn: Bool = false
+        isPromptTurn: Bool = false,
+        journalKind: AgentJournalEventKind? = nil,
+        agentKey: String? = nil
     ) -> Bool {
         guard allows(category: category, pending: pending) else { return false }
+        let isTurnCompleteNudge = category == .turnComplete && !pending && !isPromptTurn && idleEnabled
+        let isErrorNudge = journalKind == .errorReported && !isPromptTurn && idleEnabled
+        let unattendedNudgeKind: AgentUnattendedNudgeKind? = isErrorNudge ? .error : (isTurnCompleteNudge ? .finished : nil)
+        let unattendedNudgeTitle: String?
+        if isErrorNudge {
+            unattendedNudgeTitle = AgentNotificationPresentation(agentTitle: sourceTitle ?? title, kind: .errorUnreadReminder, cwd: nil).title
+        } else if isTurnCompleteNudge {
+            unattendedNudgeTitle = AgentNotificationPresentation(agentTitle: sourceTitle ?? title, kind: .unreadReminder, cwd: nil).title
+        } else {
+            unattendedNudgeTitle = nil
+        }
         TerminalMutationBus.shared.enqueueNotification(
             tabId: workspaceID,
             surfaceId: surfaceID,
@@ -56,8 +70,9 @@ struct AgentNotificationDelivery: Sendable {
             soundContext: soundContext,
             correlationKey: correlationKey,
             coalesces: coalesces,
-            unattendedNudgeTitle: category == .turnComplete && !pending && !isPromptTurn && idleEnabled
-                ? AgentNotificationPresentation(agentTitle: sourceTitle ?? title, kind: .unreadReminder, cwd: nil).title : nil
+            unattendedNudgeTitle: unattendedNudgeTitle,
+            unattendedNudgeKind: unattendedNudgeKind,
+            unattendedNudgeAgentKey: isErrorNudge ? agentKey : nil
         )
         return true
     }

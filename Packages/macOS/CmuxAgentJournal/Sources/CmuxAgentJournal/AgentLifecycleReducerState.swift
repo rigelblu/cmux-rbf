@@ -47,12 +47,22 @@ public struct AgentLifecycleReducerState: Sendable, Equatable {
         return live.map(\.phase).max { $0.combinePrecedence < $1.combinePrecedence }
     }
 
+    /// Whether the agent's error on `surfaceId` is a typed usage limit (cm-128.5): its combined phase is `.error` and the
+    /// newest session at `.error` carries the flag.
+    public func hasUsageLimit(surfaceId: String, agentKey: String) -> Bool {
+        guard let bySession = sessions[surfaceId]?[agentKey] else { return false }
+        let live = bySession.values.filter { !$0.ended }
+        guard live.map(\.phase).max(by: { $0.combinePrecedence < $1.combinePrecedence }) == .error else { return false }
+        return live.filter { $0.phase == .error }.max(by: { $0.lastSequence < $1.lastSequence })?.usageLimit == true
+    }
+
     /// Full combined snapshot across all surfaces and agents.
     ///
     /// - Returns: The snapshot the projection layer diffs and applies.
     public func snapshot() -> AgentLifecycleSnapshot {
         var phases: [String: [String: AgentLifecyclePhase]] = [:]
         var newestOccurredAtMs: [String: [String: Int64]] = [:]
+        var usageLimitAgentKeys: [String: Set<String>] = [:]
         for (surfaceId, byAgent) in sessions {
             for (agentKey, bySession) in byAgent {
                 let live = bySession.values.filter { !$0.ended }
@@ -62,9 +72,13 @@ public struct AgentLifecycleReducerState: Sendable, Equatable {
                 phases[surfaceId, default: [:]][agentKey] = phase
                 newestOccurredAtMs[surfaceId, default: [:]][agentKey] =
                     live.map(\.lastOccurredAtMs).max() ?? 0
+                if hasUsageLimit(surfaceId: surfaceId, agentKey: agentKey) {
+                    usageLimitAgentKeys[surfaceId, default: []].insert(agentKey)
+                }
             }
         }
-        return AgentLifecycleSnapshot(phases: phases, newestOccurredAtMs: newestOccurredAtMs)
+        return AgentLifecycleSnapshot(
+            phases: phases, newestOccurredAtMs: newestOccurredAtMs, usageLimitAgentKeys: usageLimitAgentKeys)
     }
 
     mutating func recordUnattributed(_ event: AgentJournalEvent) {

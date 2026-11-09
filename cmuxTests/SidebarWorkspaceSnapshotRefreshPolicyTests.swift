@@ -222,6 +222,20 @@ import Testing
         #expect(decision.hasDeferredWorkspaceObservationInvalidation)
     }
 
+    /// cm-128.5: the triangle is a leading row glyph like the hand, so an error appearing applies at once with the menu open.
+    @Test func agentErrorChangeAppliesImmediatelyWhileContextMenuIsOpen() {
+        let current = Self.snapshot(listeningPorts: [3000])
+        let next = Self.snapshot(
+            listeningPorts: [3000, 4000],
+            erroredAgents: [SidebarErroredAgent(statusKey: "claude_code", displayName: "Claude Code", usageLimit: true)]
+        )
+        let decision = SidebarWorkspaceSnapshotRefreshPolicy().decision(
+            current: current, next: next, force: false, contextMenuVisible: true)
+        #expect(decision.workspaceSnapshotStorage?.erroredAgents == next.erroredAgents,
+                "stored \(String(describing: decision.workspaceSnapshotStorage?.erroredAgents))")
+        #expect(decision.workspaceSnapshotStorage?.listeningPorts == [3000], "control: telemetry stays frozen")
+    }
+
     @Test func closedContextMenuStoresNextAndClearsPending() {
         let current = Self.snapshot(title: "old", isPinned: false)
         let next = Self.snapshot(title: "new", isPinned: true)
@@ -252,6 +266,7 @@ import Testing
         activeCodingAgentCount: Int = 0,
         attentionTaskStatus: WorkspaceTaskStatus? = nil,
         showsRaisedHand: Bool = false,
+        erroredAgents: [SidebarErroredAgent] = [],
         taskStatus: WorkspaceTaskStatus? = nil
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         var s = SidebarWorkspaceSnapshotBuilder.Snapshot(
@@ -292,6 +307,7 @@ import Testing
             checklistFirstUncheckedText: nil
         )
         s.showsRaisedHand = showsRaisedHand
+        s.erroredAgents = erroredAgents
         return s
     }
 

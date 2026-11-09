@@ -1425,15 +1425,16 @@ struct WorkspaceStatusEntrancesTests {
 
     /// A built waiting row (his list, an agent waiting) with the sidebar stand-in `standIn`; `isActive` makes it the
     /// selected row, which has no workspace color so the accent fill is its background.
-    private func waitingHandModel(dark: Bool, isActive: Bool, standIn: String, status: String? = nil, waiting: Bool = true) throws -> SidebarWorkspaceRowModel { // (#cm-109.7)
+    private func waitingHandModel(dark: Bool, isActive: Bool, standIn: String, status: String? = nil, waiting: Bool = true, errored: Bool = false) throws -> SidebarWorkspaceRowModel { // (#cm-109.7)
         let (settings, cleanUp) = settings() // (#cm-109.7)
         defer { cleanUp() } // (#cm-109.7)
         let workspace = Workspace() // (#cm-109.7)
         let panelId = try #require(workspace.focusedPanelId) // (#cm-109.7)
-        workspace.agentLifecycleStatesByPanelId[panelId] = waiting ? ["waiter": .needsInput] : ["runner": .running] // (#cm-109.7)
+        workspace.agentLifecycleStatesByPanelId[panelId] = errored ? ["claude_code": .error] : waiting ? ["waiter": .needsInput] : ["runner": .running] // (#cm-109.7) cm-128.5: or an error
         if let status { workspace.setOwnStatus(try #require(Self.hisList.entry(id: status))) } // (#cm-109.7)
         let snapshot = factory(workspace, list: Self.hisList, settings: settings, showsAgentActivity: true).makeSnapshot() // (#cm-109.7)
-        #expect(snapshot.showsRaisedHand == waiting) // (#cm-109.7)
+        #expect(snapshot.showsRaisedHand == (waiting && !errored)) // (#cm-109.7)
+        #expect(snapshot.erroredAgents.isEmpty != errored) // cm-128.5
         return SidebarWorkspaceRowModel( // (#cm-109.7)
             workspaceId: workspace.id, // (#cm-109.7)
             index: 0, // (#cm-109.7)
@@ -1469,13 +1470,28 @@ struct WorkspaceStatusEntrancesTests {
         ) // (#cm-109.7)
     } // (#cm-109.7)
 
-    private func waitingHandCell(dark: Bool, isActive: Bool, standIn: String, status: String? = nil) throws -> SidebarWorkspaceRowTableCellView { // (#cm-109.7)
-        let model = try waitingHandModel(dark: dark, isActive: isActive, standIn: standIn, status: status) // (#cm-109.7)
+    private func waitingHandCell(dark: Bool, isActive: Bool, standIn: String, status: String? = nil, errored: Bool = false) throws -> SidebarWorkspaceRowTableCellView { // (#cm-109.7)
+        let model = try waitingHandModel(dark: dark, isActive: isActive, standIn: standIn, status: status, errored: errored) // (#cm-109.7)
         let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40)) // (#cm-109.7)
         cell.configurePresentation(model: model) // (#cm-109.7)
         cell.layout() // (#cm-109.7)
         return cell // (#cm-109.7)
     } // (#cm-109.7)
+
+    /// cm-128.5 (Scenario 75): the triangle is judged like the hand. Outline on a Light resting row and on the selected accent
+    /// in both modes; none on a Dark resting row.
+    @Test(arguments: [
+        (false, false, "#C2C0CB", true), (true, false, "#333846", false),
+        (false, true, "#C2C0CB", true), (true, true, "#333846", true),
+    ])
+    func theTriangleIsOutlinedWhereTheHandIs(dark: Bool, isActive: Bool, standIn: String, outlined: Bool) throws {
+        let cell = try waitingHandCell(dark: dark, isActive: isActive, standIn: standIn, errored: true)
+        let triangle = try #require(cell.errorTriangleForTesting)
+        #expect(!triangle.isHidden)
+        let outline = cell.errorTriangleOutlineForTesting
+        #expect((outline?.isHidden == false) == outlined, "dark \(dark) selected \(isActive): outline \(String(describing: outline))")
+        if outlined { #expect(outline?.frame == triangle.frame, "outline \(String(describing: outline?.frame)) triangle \(triangle.frame)") }
+    }
 
     /// Scenario 81 (#cm-109.7): in Light, a resting waiting row draws the hand in systemYellow with its outline visible.
     @Test func theHandIsYellowWithAnOutlineOnALightRestingRow() throws { // (#cm-109.7)
@@ -1523,22 +1539,19 @@ struct WorkspaceStatusEntrancesTests {
         #expect(cell.handOutlineForTesting?.isHidden == false) // (#cm-109.7)
     } // (#cm-109.7)
 
-    /// Scenario 81 (#cm-109.7): a Done row dims its content to 0.6, and the hand is judged as drawn. On `#606068` in Dark
-    /// the plain yellow clears 3:1 (4.4) but dimmed does not (2.6), so the outline draws.
-    @Test func theHandIsOutlinedOnADimmedDoneRowWherePlainYellowWouldClear() throws { // (#cm-109.7)
-        let cell = try waitingHandCell(dark: true, isActive: false, standIn: "#606068", status: "shipped") // (#cm-109.7)
-        #expect(cell.statusGlyphModelForTesting?.drawnAlpha == 0.6) // (#cm-109.7)
-        let hand = try #require(cell.handForTesting) // (#cm-109.7)
-        #expect(hand.isHidden == false) // (#cm-109.7)
-        #expect(cell.handOutlineForTesting?.isHidden == false) // (#cm-109.7)
-    } // (#cm-109.7)
-
-    /// The same row, resting and not Done, draws plain: the dim is what tips it.
-    @Test func theHandIsPlainOnTheSameRowWhenItIsNotDone() throws { // (#cm-109.7)
-        let cell = try waitingHandCell(dark: true, isActive: false, standIn: "#606068") // (#cm-109.7)
-        #expect(cell.handForTesting?.isHidden == false) // (#cm-109.7)
-        #expect(cell.handOutlineForTesting?.isHidden != false) // (#cm-109.7)
-    } // (#cm-109.7)
+    /// cm-128.5 (Tom, grill Q34: no agent mark dims), changed on purpose from cm-109.7's Scenario 81: a Done row dims its title
+    /// to 0.6 but not the hand, so the hand is judged at full strength. On `#606068` in Dark the yellow is 4.4:1, so it needs no
+    /// outline, Done or not. This folds `theHandIsPlainOnTheSameRowWhenItIsNotDone` in: both now test the same thing.
+    @Test func theHandIsJudgedAtFullStrengthOnADoneRow() throws {
+        for status in ["shipped", nil] as [String?] {
+            let cell = status.map { try? waitingHandCell(dark: true, isActive: false, standIn: "#606068", status: $0) } ?? (try? waitingHandCell(dark: true, isActive: false, standIn: "#606068"))
+            let resolved = try #require(cell, "status \(status ?? "none")")
+            if status != nil { #expect(resolved.statusGlyphModelForTesting?.drawnAlpha == 0.6, "the title still dims") }
+            let hand = try #require(resolved.handForTesting)
+            #expect(hand.isHidden == false, "status \(status ?? "none")")
+            #expect(resolved.handOutlineForTesting?.isHidden != false, "status \(status ?? "none"): no outline at full strength")
+        }
+    }
 
     /// Scenario 81 (#cm-109.7): the spinner keeps its grey, `palette.secondary(0.55)`, on a row with an agent running.
     @Test func theSpinnerKeepsItsGreyWhileTheHandIsYellow() throws { // (#cm-109.7)
