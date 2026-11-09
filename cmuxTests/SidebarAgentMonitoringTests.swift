@@ -83,7 +83,7 @@ struct SidebarAgentMonitoringTests {
     }
 
     @Test(arguments: [false, true])
-    func doneDimsTheHandButLeavesBothActivityMarksAtTheirContrastStrength(isDark: Bool) throws {
+    func doneDimsNoAgentMarkEachKeepsItsContrastStrength(isDark: Bool) throws { // cm-128.5 (Tom, grill Q34): the hand no longer dims
         var snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: "#777777",
             activeCodingAgentCount: 1, showsRaisedHand: true, taskStatus: .done)
         snapshot.monitoringAgentCount = 1
@@ -105,7 +105,7 @@ struct SidebarAgentMonitoringTests {
             }
             return alpha
         }
-        #expect(effectiveAlpha(hand) == 0.6)
+        #expect(effectiveAlpha(hand) == 1)
         #expect(effectiveAlpha(spinner) == 1)
         #expect(effectiveAlpha(waveform) == 1)
         let palette = SidebarRowPalette(model: model)

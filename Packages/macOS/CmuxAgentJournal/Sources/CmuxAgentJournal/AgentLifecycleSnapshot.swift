@@ -9,6 +9,8 @@ public struct AgentLifecycleSnapshot: Sendable, Equatable {
     /// Producer timestamp (ms since Unix epoch) of the newest live event
     /// behind each entry; used by replay policy decisions.
     public var newestOccurredAtMs: [String: [String: Int64]]
+    /// Agent keys per surface whose error is a typed usage limit (cm-128.5), for the triangle's tooltip.
+    public var usageLimitAgentKeys: [String: Set<String>]
 
     /// Creates a snapshot.
     ///
@@ -17,10 +19,12 @@ public struct AgentLifecycleSnapshot: Sendable, Equatable {
     ///   - newestOccurredAtMs: Newest producer timestamp behind each entry.
     public init(
         phases: [String: [String: AgentLifecyclePhase]] = [:],
-        newestOccurredAtMs: [String: [String: Int64]] = [:]
+        newestOccurredAtMs: [String: [String: Int64]] = [:],
+        usageLimitAgentKeys: [String: Set<String>] = [:]
     ) {
         self.phases = phases
         self.newestOccurredAtMs = newestOccurredAtMs
+        self.usageLimitAgentKeys = usageLimitAgentKeys
     }
 
     /// Computes the assignments needed to move the sidebar from `previous`
@@ -32,9 +36,12 @@ public struct AgentLifecycleSnapshot: Sendable, Equatable {
     public func assignments(since previous: AgentLifecycleSnapshot) -> [AgentLifecycleAssignment] {
         var result: [AgentLifecycleAssignment] = []
         for (surfaceId, byAgent) in phases {
-            for (agentKey, phase) in byAgent where previous.phases[surfaceId]?[agentKey] != phase {
+            for (agentKey, phase) in byAgent {
+                let usageLimit = usageLimitAgentKeys[surfaceId]?.contains(agentKey) == true
+                let previousUsageLimit = previous.usageLimitAgentKeys[surfaceId]?.contains(agentKey) == true
+                guard previous.phases[surfaceId]?[agentKey] != phase || usageLimit != previousUsageLimit else { continue }
                 result.append(
-                    AgentLifecycleAssignment(surfaceId: surfaceId, agentKey: agentKey, phase: phase)
+                    AgentLifecycleAssignment(surfaceId: surfaceId, agentKey: agentKey, phase: phase, usageLimit: usageLimit)
                 )
             }
         }

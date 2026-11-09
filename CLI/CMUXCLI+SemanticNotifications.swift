@@ -8,7 +8,8 @@ extension CMUXCLI {
     func semanticNotificationCommand(
         source: String, agentKey: String, sessionId: String?,
         workspaceId: String, surfaceId: String, kind: AgentJournalEventKind,
-        rawObject: [String: Any]?, payload: String, pendingWork: Bool = false, cwd: String? = nil
+        rawObject: [String: Any]?, payload: String, pendingWork: Bool = false, cwd: String? = nil,
+        detail: String? = nil
     ) throws -> String {
         let fields = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
         guard fields.count >= 3 else { throw CLIError(message: String(localized: "cli.notification.invalidPayload", defaultValue: "Invalid notification payload")) }
@@ -19,13 +20,14 @@ extension CMUXCLI {
             category: category, correlationKey: meta.first { $0.hasPrefix("k=") }.map { String($0.dropFirst(2)) })
         return try semanticNotificationCommand(source: source, agentKey: agentKey, sessionId: sessionId,
             workspaceId: workspaceId, surfaceId: surfaceId, kind: kind, rawObject: rawObject,
-            notification: notification, pendingWork: pendingWork || meta.contains("p=1"), isSubagent: meta.contains("n=1"), cwd: cwd)
+            notification: notification, pendingWork: pendingWork || meta.contains("p=1"), isSubagent: meta.contains("n=1"), cwd: cwd,
+            detail: detail)
     }
 
     func semanticNotificationCommand(
         source: String, agentKey: String, sessionId: String?, workspaceId: String, surfaceId: String,
         kind: AgentJournalEventKind, rawObject: [String: Any]?, notification: AgentJournalNotification,
-        pendingWork: Bool = false, isSubagent: Bool = false, cwd: String? = nil
+        pendingWork: Bool = false, isSubagent: Bool = false, cwd: String? = nil, detail: String? = nil
     ) throws -> String {
         var context = Self.semanticAttentionContext(rawObject)
         var notification = notification
@@ -56,7 +58,7 @@ extension CMUXCLI {
             source: source, agentKey: agentKey, sessionId: sessionId,
             workspaceId: workspaceId, surfaceId: surfaceId,
             isSubagent: isSubagent, pendingWork: pendingWork,
-            nativeEvent: rawObject?["hook_event_name"] as? String, attention: context)
+            nativeEvent: rawObject?["hook_event_name"] as? String, detail: detail, attention: context)
         let data = try JSONEncoder().encode(draft)
         return "agent_journal_append \(String(decoding: data, as: UTF8.self))"
     }

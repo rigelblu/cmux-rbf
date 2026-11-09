@@ -75,6 +75,7 @@ extension ControlCommandCoordinator {
                 "any_agent_needs_input": .bool(status.signals.anyAgentNeedsInput),
                 "any_agent_running": .bool(status.signals.anyAgentRunning),
                 "any_agent_monitoring": .bool(status.signals.anyAgentMonitoring),
+                "any_agent_error": .bool(status.signals.anyAgentError),
                 "any_open_pull_request": .bool(status.signals.anyOpenPullRequest),
                 "has_pull_requests": .bool(status.signals.hasPullRequests),
                 "all_pull_requests_merged_or_closed": .bool(status.signals.allPullRequestsMergedOrClosed),

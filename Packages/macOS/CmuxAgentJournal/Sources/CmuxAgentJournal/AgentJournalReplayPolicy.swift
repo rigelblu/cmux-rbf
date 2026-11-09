@@ -24,6 +24,7 @@ public struct AgentJournalReplayPolicy: Sendable {
     public func startupSnapshot(from snapshot: AgentLifecycleSnapshot) -> AgentLifecycleSnapshot {
         var phases: [String: [String: AgentLifecyclePhase]] = [:]
         var newest: [String: [String: Int64]] = [:]
+        var usageLimit: [String: Set<String>] = [:]
         for (surfaceId, byAgent) in snapshot.phases {
             for (agentKey, phase) in byAgent {
                 switch phase {
@@ -31,11 +32,15 @@ public struct AgentJournalReplayPolicy: Sendable {
                     phases[surfaceId, default: [:]][agentKey] = phase
                     newest[surfaceId, default: [:]][agentKey] =
                         snapshot.newestOccurredAtMs[surfaceId]?[agentKey] ?? 0
+                    // Or the line reads "stopped on an error" after every relaunch (Scenario 75).
+                    if phase == .error, snapshot.usageLimitAgentKeys[surfaceId]?.contains(agentKey) == true {
+                        usageLimit[surfaceId, default: []].insert(agentKey)
+                    }
                 case .running, .monitoring, .idle, .unknown:
                     continue
                 }
             }
         }
-        return AgentLifecycleSnapshot(phases: phases, newestOccurredAtMs: newest)
+        return AgentLifecycleSnapshot(phases: phases, newestOccurredAtMs: newest, usageLimitAgentKeys: usageLimit)
     }
 }

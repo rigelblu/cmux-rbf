@@ -78,7 +78,11 @@ public struct AgentLifecycleReducer: Sendable {
             phase: transition.phase,
             ended: transition.ended,
             lastSequence: event.sequence,
-            lastOccurredAtMs: max(previous?.lastOccurredAtMs ?? 0, event.draft.occurredAtMs)
+            lastOccurredAtMs: max(previous?.lastOccurredAtMs ?? 0, event.draft.occurredAtMs),
+            // A signal that leaves an error standing (a helper's stop, an idle observation) keeps the usage limit it
+            // already had; only a new `errorReported` decides it afresh. (cm-128.5, whole-diff review F4)
+            usageLimit: transition.phase == .error && (Self.isUsageLimit(event.draft)
+                || (event.draft.kind != .errorReported && previous?.phase == .error && previous?.usageLimit == true))
         )
         let combinedBefore = state.combinedPhase(surfaceId: surfaceId, agentKey: agentKey)
         state.updateSession(
@@ -89,6 +93,19 @@ public struct AgentLifecycleReducer: Sendable {
         )
         let combinedAfter = state.combinedPhase(surfaceId: surfaceId, agentKey: agentKey)
         return combinedBefore != combinedAfter
+    }
+
+    /// A typed usage limit (cm-128.5, Tom, grill Q31): the key is source, native event and `detail` together, never the
+    /// `detail` string alone, since the generic path writes free text into it for every `errorReported`.
+    /// Two producers write such a `detail`: Claude's `StopFailure` of type `rate_limit`, and Codex's `Stop` hook or
+    /// `task_complete` monitor carrying `codex_error_info == "usage_limit_exceeded"`.
+    static func isUsageLimit(_ draft: AgentJournalEventDraft) -> Bool {
+        guard draft.kind == .errorReported else { return false }
+        switch (draft.source, draft.nativeEvent, draft.detail) {
+        case ("claude", "StopFailure"?, "rate_limit"?): return true
+        case ("codex", "Stop"?, "usage_limit_exceeded"?), ("codex", "task_complete"?, "usage_limit_exceeded"?): return true
+        default: return false
+        }
     }
 
     private func transition(

@@ -2,8 +2,10 @@ import XCTest
 import Darwin
 
 extension CLINotifyProcessIntegrationRegressionTests {
-    func testGrokRepeatedWaitingNotificationsDedupe() throws {
-        let context = try makeGrokNoiseContext(name: "grok-wait-dedupe")
+    // cmux-rbf: changed on purpose (#cm-128.5): a grok Notification's words raise no state and no ping, so repeated
+    // waiting words have nothing to dedupe. The structured grok ping comes from its Stop.
+    func testGrokWaitingWordsRaiseNothingEvenWhenRepeated() throws {
+        let context = try makeGrokNoiseContext(name: "grok-wait-words")
         defer { context.cleanup() }
 
         try runGrokNoiseHook(context, "session-start", payload: grokNoisePayload(context, event: "SessionStart"))
@@ -12,10 +14,16 @@ extension CLINotifyProcessIntegrationRegressionTests {
         try runGrokNoiseHook(context, "notification", payload: grokNoisePayload(context, event: "Notification", message: "waiting for input"))
 
         let commands = Array(context.state.snapshot().dropFirst(firstStart))
-        XCTAssertEqual(notifyCommands(in: commands).count, 1, "Repeated waiting events should dedupe, saw \(commands)")
+        XCTAssertEqual(notifyCommands(in: commands).count, 0, "Waiting words must not ping, saw \(commands)")
+        XCTAssertTrue(
+            AgentJournalAppendCapture.captures(in: commands).allSatisfy { $0.kind == "agent.state.changed" },
+            "Waiting words must journal an observation only, saw \(commands)"
+        )
     }
 
-    func testGrokUnclassifiedFallbackRebuildIsGateableAndDedupeable() throws {
+    // cmux-rbf: changed on purpose (#cm-128.5): the rebuilt-from-stored-summary Notification carries no typed field
+    // either, so it raises and pings nothing, however many times it arrives.
+    func testGrokUnclassifiedFallbackRebuildRaisesNothing() throws {
         let context = try makeGrokNoiseContext(name: "grok-fallback-gate", sessionId: nil)
         defer { context.cleanup() }
 
@@ -28,26 +36,17 @@ extension CLINotifyProcessIntegrationRegressionTests {
         try runGrokNoiseHook(context, "notification", payload: unclassified)
         try runGrokNoiseHook(context, "notification", payload: unclassified)
 
-        let notifications = notifyCommands(in: Array(context.state.snapshot().dropFirst(fallbackStart)))
-        XCTAssertEqual(notifications.count, 1, "Unclassified fallback re-notification should dedupe, saw \(notifications)")
-        // The meta may carry trailing agent-event context (`;a=<kind>[;n=<0|1>]`);
-        // the nested flag depends on the host process ancestry, so assert the
-        // gating fields and agent kind without pinning it.
-        XCTAssertTrue(
-            notifications.first?.contains("|c=idle-reminder;p=0") == true,
-            "Fallback re-notification should be gateable as idle-reminder, saw \(notifications)"
-        )
-        XCTAssertTrue(
-            notifications.first?.contains(";a=grok") == true,
-            "Fallback re-notification should carry the agent kind, saw \(notifications)"
-        )
-        XCTAssertTrue(
-            notifications.first?.contains(";s=needsInput") == true,
-            "Fallback re-notification should carry the sound alert type, saw \(notifications)"
+        let commands = Array(context.state.snapshot().dropFirst(fallbackStart))
+        XCTAssertEqual(notifyCommands(in: commands).count, 0, "A words-only fallback re-notification must not ping, saw \(commands)")
+        XCTAssertFalse(
+            AgentJournalAppendCapture.captures(in: commands).contains { $0.kind != "agent.state.changed" },
+            "A words-only fallback re-notification must journal an observation only, saw \(commands)"
         )
     }
 
-    func testGrokIncidentalCompletionCueAfterInterleavedNotificationDoesNotReding() throws {
+    // cmux-rbf: changed on purpose (#cm-128.5): the notifications ping nothing; the one completion is the Stop's, and
+    // an incidental completion cue after it still does not re-ding.
+    func testGrokIncidentalCompletionCueAfterTheStopDoesNotReding() throws {
         let context = try makeGrokNoiseContext(name: "grok-incidental")
         defer { context.cleanup() }
 
@@ -55,18 +54,19 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let start = context.state.snapshot().count
         try runGrokNoiseHook(context, "notification", payload: grokNoisePayload(context, event: "Notification", message: "Turn complete in 1.2s."))
         try runGrokNoiseHook(context, "notification", payload: grokNoisePayload(context, event: "Notification", message: "waiting for input"))
+        XCTAssertEqual(notifyCommands(in: Array(context.state.snapshot().dropFirst(start))).count, 0, "The words must not ping")
+        try runGrokNoiseHook(context, "stop", payload: grokNoisePayload(context, event: "Stop"))
         try runGrokNoiseHook(context, "notification", payload: grokNoisePayload(context, event: "Notification", message: "All done reviewing the files you asked about"))
 
-        // This is already green pre-fix because old waiting events do not
-        // overwrite the single legacy fingerprint slot. Keep it as a guard that
-        // the new multi-fingerprint store does not regress the eviction case.
         let notifications = notifyCommands(in: Array(context.state.snapshot().dropFirst(start)))
-        XCTAssertEqual(notifications.count, 2, "Incidental completion cue should not send after a real completion, saw \(notifications)")
+        XCTAssertEqual(notifications.count, 1, "Only the Stop should ping, saw \(notifications)")
         // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
         XCTAssertEqual(notifications.filter { $0.contains("Grok · Finished|\(context.root.lastPathComponent)|") }.count, 1, notifications.joined(separator: "\n"))
     }
 
-    func testGrokSessionStartRefireDoesNotRearmCompletionDedupe() throws {
+    // cmux-rbf: changed on purpose (#cm-128.5): the notifications ping nothing, a SessionStart refire changes nothing,
+    // and the completion is the one the Stop sends.
+    func testGrokSessionStartRefireDoesNotAddACompletionPing() throws {
         let context = try makeGrokNoiseContext(name: "grok-start-refire")
         defer { context.cleanup() }
 
@@ -77,9 +77,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
         try runGrokNoiseHook(context, "notification", payload: completionPayload)
         try runGrokNoiseHook(context, "session-start", payload: startPayload)
         try runGrokNoiseHook(context, "notification", payload: completionPayload)
+        XCTAssertEqual(notifyCommands(in: Array(context.state.snapshot().dropFirst(start))).count, 0, "The words must not ping")
+        try runGrokNoiseHook(context, "stop", payload: grokNoisePayload(context, event: "Stop"))
 
         let notifications = notifyCommands(in: Array(context.state.snapshot().dropFirst(start)))
-        XCTAssertEqual(notifications.count, 1, "SessionStart refire should not re-arm the same completion notification, saw \(notifications)")
+        XCTAssertEqual(notifications.count, 1, "Only the Stop should ping, saw \(notifications)")
     }
 
     func testGrokRepeatedIdenticalPermissionPromptsDedupePerTurn() throws {
@@ -123,7 +125,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertTrue(notifications.allSatisfy { $0.contains(";s=needsInput") }, notifications.joined(separator: "\n"))
     }
 
-    func testAntigravityErrorNotificationCarriesErrorSoundContext() throws {
+    // cmux-rbf: changed on purpose (#cm-128.5): the mapper has no agy `notification` arm, so its kind came only from
+    // the shared word fallback, which .5 cuts. The words now raise no error and no error ping (agy's typed error is .7's).
+    func testAntigravityErrorWordsRaiseNoErrorPing() throws {
         let context = try makeGrokNoiseContext(name: "antigravity-error", agent: "antigravity")
         defer { context.cleanup() }
 
@@ -131,12 +135,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let start = context.state.snapshot().count
         try runGrokNoiseHook(context, "notification", payload: antigravityNoisePayload(context, event: "Notification", message: "Build failed: exit 1"))
 
-        let notifications = notifyCommands(in: Array(context.state.snapshot().dropFirst(start)))
-        XCTAssertEqual(notifications.count, 1, "Expected one Antigravity error notification, saw \(notifications)")
-        XCTAssertTrue(
-            notifications.first?.contains(";a=antigravity") == true
-                && notifications.first?.contains(";s=errorStalled") == true,
-            "Error notifications should carry the error sound context, saw \(notifications)"
+        let commands = Array(context.state.snapshot().dropFirst(start))
+        XCTAssertTrue(notifyCommands(in: commands).isEmpty, "Error words must not ping, saw \(commands)")
+        XCTAssertFalse(
+            AgentJournalAppendCapture.captures(in: commands).contains { $0.kind == "agent.error.reported" },
+            "Error words must not journal an error, saw \(commands)"
         )
     }
 
