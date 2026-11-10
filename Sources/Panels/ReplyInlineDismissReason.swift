@@ -11,4 +11,6 @@ enum ReplyInlineDismissReason: String, Equatable {
     case pane
     /// The agent exited while the toolbar showed; Reply found no live session.
     case agentGone
+    /// `reply.inline.enabled` was turned off while the toolbar showed.
+    case setting
 }

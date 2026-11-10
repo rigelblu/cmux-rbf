@@ -1273,6 +1273,7 @@
         "reply": {
           "description": "Painel de respostas",
           "maxMessagesBack": "Quantas respostas sem notas não enviadas a seta de voltar percorre. Respostas com notas não enviadas sempre permanecem acessíveis.",
+          "inline": "Mostra um botão Responder sobre o texto selecionado no painel de um agente. Defina enabled como false para desativá-lo em todas as janelas. ⌘⇧-arrastar ainda inicia uma resposta no painel.",
           "labels": "Rótulos rápidos exibidos acima de uma nota aberta, em ordem. Os que couberem são chips; o restante fica no menu ⌄. Clicar em um coloca seu texto na nota. Uma lista vazia significa nenhum rótulo."
         },
         "shortcuts": {

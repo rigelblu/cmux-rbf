@@ -698,6 +698,22 @@ final class CmuxSettingsFileStore {
         } else if section.keys.contains("labels") {
             logInvalid("reply.labels", sourcePath: sourcePath)
         }
+
+        // `cm-136.2`. The Reply button over a selection, one switch for all
+        // of cmux. Like `labels`, **writes nothing when the key is absent**:
+        // a parser that stored `true` would overwrite a Settings toggle the
+        // user switched off.
+        if let inline = section["inline"] as? [String: Any] {
+            if let value = jsonBool(inline["enabled"]) {
+                snapshot.managedUserDefaults[ReplyCatalogSection().inlineEnabled.userDefaultsKey] = .bool(value)
+            } else if inline.keys.contains("enabled") {
+                logInvalid("reply.inline.enabled", sourcePath: sourcePath)
+            }
+        } else if section.keys.contains("inline") {
+            // `"inline": false` is the switch at the wrong level. Logged, not
+            // ignored, so the user sees why the button did not turn off.
+            logInvalid("reply.inline", sourcePath: sourcePath)
+        }
     }
 
     /// `panes.arrangePatterns` — user-defined Arrange Splits patterns (`#cm-67.1`),

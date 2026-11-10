@@ -1,13 +1,15 @@
 import AppKit
 import Combine
 import CmuxAgentChat
+import CmuxSettings
 import Foundation
 
 /// Everything the Reply toolbar reads from, or does to, the world outside its
 /// own pane. Production wires the real app; a test passes fakes, which is how
 /// the wiring is proven rather than read.
 struct ReplyInlineEnvironment {
-    /// The cached setting. `cm-136.1` has no off switch, so this is `true`.
+    /// `reply.inline.enabled`, read at each release. Not cached: a `UserDefaults`
+    /// read is in-process and cheap.
     var settingEnabled: () -> Bool
     /// `registry.liveSession(surfaceID:) != nil` — `#cm-89`'s live-only rule.
     var isAgentPane: (UUID) -> Bool
@@ -20,6 +22,10 @@ struct ReplyInlineEnvironment {
     /// Calls `onChange` after any change to the window's sidebar; the caller
     /// re-reads ``sidebarShowingReply``. Cancel to stop observing.
     var observeSidebar: (NSWindow, @escaping () -> Void) -> AnyCancellable?
+    /// Calls `onChange` after any defaults write in the app; the caller re-reads
+    /// ``settingEnabled``. Fires for every write, so it is held only while a
+    /// toolbar shows. Cancel to stop observing.
+    var observeSetting: (@escaping () -> Void) -> AnyCancellable?
     /// A window-scoped local monitor for mouse-down and key-down.
     var installMonitor: (@escaping (NSEvent) -> NSEvent?) -> Any?
     var removeMonitor: (Any) -> Void
@@ -34,7 +40,7 @@ struct ReplyInlineEnvironment {
     @MainActor
     static let production: ReplyInlineEnvironment = {
         ReplyInlineEnvironment(
-            settingEnabled: { true },
+            settingEnabled: { SettingCatalog().reply.inlineEnabled.value(in: .standard) },
             isAgentPane: { panelID in
                 TerminalController.shared.agentChatTranscriptService?
                     .registry.liveSession(surfaceID: panelID.uuidString) != nil
@@ -86,6 +92,11 @@ struct ReplyInlineEnvironment {
                 return sidebar.objectWillChange.sink { _ in
                     DispatchQueue.main.async { onChange() }
                 }
+            },
+            observeSetting: { onChange in
+                NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+                    .receive(on: DispatchQueue.main)
+                    .sink { _ in onChange() }
             },
             installMonitor: { handler in
                 NSEvent.addLocalMonitorForEvents(

@@ -1273,6 +1273,7 @@
         "reply": {
           "description": "Antwortpanel",
           "maxMessagesBack": "Wie viele Antworten ohne unversendete Notizen der Zurück-Pfeil durchläuft. Antworten mit unversendeten Notizen bleiben immer erreichbar.",
+          "inline": "Zeigt eine Antworten-Schaltfläche über markiertem Text im Bereich eines Agenten. Setze enabled auf false, um sie in allen Fenstern auszuschalten. ⌘⇧-Ziehen startet weiterhin eine Antwort im Feld.",
           "labels": "Schnelle Labels werden über einer geöffneten Notiz angezeigt, in Reihenfolge. So viele wie passen, erscheinen als Chips; die übrigen stehen im ⌄-Menü. Ein Klick setzt den Text in die Notiz. Eine leere Liste bedeutet keine Labels."
         },
         "shortcuts": {

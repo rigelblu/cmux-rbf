@@ -13,4 +13,6 @@ enum ReplyInlineEvent: Equatable {
     /// The window's sidebar changed; whether it now shows Reply.
     case sidebarChanged(showingReply: Bool)
     case paneClosed
+    /// `reply.inline.enabled` changed; `enabled` is its value now.
+    case settingChanged(enabled: Bool)
 }

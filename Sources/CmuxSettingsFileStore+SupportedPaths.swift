@@ -158,6 +158,7 @@ extension CmuxSettingsFileStore {
         "fileExplorer.doubleClickAction",
         "reply.maxMessagesBack",
         "reply.labels",
+        "reply.inline.enabled",
         "figma.defaultFolder",
         "figma.folders",
         "shortcuts.bindings",

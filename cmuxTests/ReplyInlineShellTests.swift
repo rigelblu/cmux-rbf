@@ -39,6 +39,9 @@ struct ReplyInlineShellTests {
         var sidebarObservers = 0
         var sidebarCancelled = 0
         var sidebarOnChange: (() -> Void)?
+        var settingObservers = 0
+        var settingCancelled = 0
+        var settingOnChange: (() -> Void)?
         var pastes: [(events: [TextBoxSubmit.DispatchEvent], panel: UUID)] = []
         var logs: [String] = []
 
@@ -61,6 +64,11 @@ struct ReplyInlineShellTests {
                     self.sidebarObservers += 1
                     self.sidebarOnChange = onChange
                     return AnyCancellable { self.sidebarCancelled += 1 }
+                },
+                observeSetting: { onChange in
+                    self.settingObservers += 1
+                    self.settingOnChange = onChange
+                    return AnyCancellable { self.settingCancelled += 1 }
                 },
                 installMonitor: { handler in
                     self.monitorsInstalled += 1
@@ -645,5 +653,58 @@ struct ReplyInlineShellTests {
         #expect(rig.controller.shown == nil)
         #expect(rig.world.logs.contains("dismissed reason=pane"))
         #expect(rig.world.monitorsRemoved == 1)
+    }
+
+    // MARK: the setting: off takes a showing toolbar away, and is watched only while one shows
+
+    @Test("Turning the setting off while the toolbar shows dismisses it")
+    func settingOffWhileShownDismisses() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        release(rig)
+        #expect(rig.controller.shown != nil)
+        rig.world.settingEnabled = false
+        let onChange = try #require(rig.world.settingOnChange)
+        onChange()
+        #expect(rig.controller.shown == nil)
+        #expect(rig.world.logs.contains("dismissed reason=setting"))
+    }
+
+    @Test("The setting still on, with the toolbar showing, keeps it")
+    func settingStillOnKeepsTheToolbar() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        release(rig)
+        let onChange = try #require(rig.world.settingOnChange)
+        onChange()
+        #expect(rig.controller.shown != nil)
+        #expect(!rig.world.logs.contains { $0.hasPrefix("dismissed") })
+    }
+
+    @Test("The setting observer exists only while a toolbar shows")
+    func settingObserverOnlyWhileShown() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        #expect(rig.world.settingObservers == 0)
+        release(rig)
+        #expect(rig.world.settingObservers == 1)
+        rig.controller.hide(reason: .click)
+        #expect(rig.world.settingCancelled == 1)
+    }
+
+    @Test("Setting off, a release mounts nothing; setting back on, the next release mounts it")
+    func settingOffThenOnShowsAgain() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        // A regression guard for the gate, which predates round 2: it was green before the
+        // production read and the observer existed. Its red does not count.
+        rig.world.settingEnabled = false
+        release(rig)
+        #expect(rig.controller.shown == nil)
+        #expect(rig.hosted.subviews.allSatisfy { !($0 is ReplyInlineToolbarView) }, "no toolbar mounted in the pane")
+        rig.world.settingEnabled = true
+        release(rig)
+        #expect(rig.controller.shown != nil)
+        #expect(rig.hosted.subviews.contains { $0 is ReplyInlineToolbarView }, "the next release mounts it")
     }
 }
