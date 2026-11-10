@@ -5,8 +5,8 @@ import CoreGraphics // (#cm-109.3)
 /// Pure function resolving which marks the workspace row draws: the badge, the spinner, the raised hand. (#cm-109.3)
 ///
 /// Nothing hides another mark (#cm-128.1):
-/// - The badge set to the left keeps the leading slot alone.
-/// - The spinner set to the left is not a slot: it draws in the agent-mark group, after the status glyph and the hand.
+/// - The badge set to the left keeps the leading slot alone, first on the line under the name (cm-128.9).
+/// - The spinner set to the left is not a slot: it draws with the agent marks on the line under the name, after the hand (cm-128.9).
 /// - On the right the badge takes the edge, and the spinner sits beside it when both show there.
 /// - A visible close button replaces both right-hand marks. The left-hand marks stay.
 struct SidebarWorkspaceSlotResolution: Equatable, Sendable {
@@ -20,7 +20,7 @@ struct SidebarWorkspaceSlotResolution: Equatable, Sendable {
     let trailing: SlotContent
     /// The mark beside the title when the badge and the spinner both sit trailing: the badge is `trailing`, at the edge.
     let trailingInner: SlotContent
-    /// The spinner, set to the left, draws in the agent-mark group after the status glyph and the hand.
+    /// The spinner, set to the left, draws with the agent marks on the line under the name, after the hand (cm-128.9).
     let markSpinner: Bool
     let showsHand: Bool // (#cm-109.3)
 
@@ -87,6 +87,55 @@ struct SidebarWorkspaceSlotResolution: Equatable, Sendable {
 
     /// Diameter of a manual mark inside the unchanged sixteen-point badge slot.
     static func unreadMarkDiameter(fontScale: CGFloat) -> CGFloat { 6 * fontScale }
+
+    /// Whether the line under the status-and-name line shows (cm-128.9).
+    /// Two halves: marks on line or agent activity, and unread half.
+    /// A mark that draws on the line always brings the line, whatever showsAgentActivity says.
+    static func showsMarkLine(
+        agentLists: SidebarAgentStateLists,
+        showsAgentActivity: Bool,
+        loadingSpinnerPosition: SidebarIndicatorPosition,
+        notificationBadgePosition: SidebarIndicatorPosition,
+        unreadCount: Int,
+        markedUnread: Bool
+    ) -> Bool {
+        let marksOnLine = !agentLists.waiting.isEmpty
+            || !agentLists.error.isEmpty
+            || ((!agentLists.running.isEmpty || agentLists.loaderCount > 0) && loadingSpinnerPosition == .leading)
+            || !agentLists.monitoring.isEmpty
+        // Waiting, error, monitoring and a left loader bring the line through marksOnLine (cm-128.9).
+        let agentHalf = showsAgentActivity && (!agentLists.running.isEmpty || !agentLists.idle.isEmpty)
+        let unreadHalf = notificationBadgePosition == .leading && (unreadCount > 0 || markedUnread)
+        return marksOnLine || agentHalf || unreadHalf
+    }
+
+    /// Whether the quiet "Idle" word shows on the mark line (cm-128.9).
+    static func showsIdleWord(
+        agentLists: SidebarAgentStateLists,
+        showsAgentActivity: Bool,
+        loadingSpinnerPosition: SidebarIndicatorPosition,
+        notificationBadgePosition: SidebarIndicatorPosition,
+        unreadCount: Int,
+        markedUnread: Bool
+    ) -> Bool {
+        guard showsMarkLine(
+            agentLists: agentLists,
+            showsAgentActivity: showsAgentActivity,
+            loadingSpinnerPosition: loadingSpinnerPosition,
+            notificationBadgePosition: notificationBadgePosition,
+            unreadCount: unreadCount,
+            markedUnread: markedUnread
+        ) else { return false }
+        // The line guard already implies an agent list, a left loader or left news; with the other four lists empty and
+        // the loader and news rejected below, idle is the only one left (cm-128.9).
+        guard agentLists.waiting.isEmpty,
+              agentLists.error.isEmpty,
+              agentLists.running.isEmpty,
+              agentLists.monitoring.isEmpty else { return false }
+        if agentLists.loaderCount > 0 && loadingSpinnerPosition == .leading { return false }
+        if notificationBadgePosition == .leading && (unreadCount > 0 || markedUnread) { return false }
+        return true
+    }
 
     /// Width the title reserves at the row's trailing edge: the trailing marks and their gap, or the close button's
     /// width when that is wider (it replaces the marks on hover, so it must fit in the same place).

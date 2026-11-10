@@ -3,6 +3,7 @@ import SwiftUI
 import CmuxAppKitSupportUI
 import CmuxCommandPalette
 import CmuxControlSocket
+import CmuxNotifications
 import CmuxSettings
 import CmuxSidebar
 import CmuxWorkspaces
@@ -1130,7 +1131,10 @@ struct WorkspaceStatusEntrancesTests {
         #expect(cell.leadingBadgeForTesting.isHidden == false)
         #expect(cell.leadingBadgeForTesting.frame.maxX <= hand.frame.minX)
         #expect(abs(markSpinner.frame.minX - (hand.frame.maxX + 8)) < 0.001, "spinner minX \(markSpinner.frame.minX), hand maxX \(hand.frame.maxX)")
-        #expect(cell.titleFrameForTesting.minX >= markSpinner.frame.maxX)
+        // cmux-rbf: changed on purpose (#cm-128.9)
+        // Marks are on the mark line under the title line; title minX stays at leading + glyphSlot and does not move with the spinner
+        #expect(markSpinner.frame.minY >= cell.titleFrameForTesting.maxY + 4)
+        #expect(cell.titleFrameForTesting.minX == 39.0)
         let standardSpinnerSide = max(10, 12 * waitingModel.fontScale)
         #expect(abs(hand.frame.size.width - standardSpinnerSide) < 0.001)
         #expect(abs(hand.frame.size.height - standardSpinnerSide) < 0.001)
@@ -1241,9 +1245,9 @@ struct WorkspaceStatusEntrancesTests {
         #expect(abs(scaledHand.frame.size.height - scaledSpinnerSide) < 0.001)
     }
 
-    /// Change A (#cm-109.3): The raised hand draws right after the status glyph, before the title,
-    /// in both spinner settings. With no glyph (Auto), the hand still sits before the title.
-    @Test func appKitSidebarRowDrawsRaisedHandImmediatelyAfterStatusGlyphBeforeTitle() throws { // (#cm-109.3)
+    /// Change A (#cm-109.3, #cm-128.9): The raised hand draws on the mark line under the status and name,
+    /// in both spinner settings. With no glyph (Auto), the hand still sits on the mark line.
+    @Test func appKitSidebarRowDrawsRaisedHandOnMarkLineUnderStatusAndName() throws { // (#cm-109.3)
         let (settings, cleanUp) = settings() // (#cm-109.3)
         defer { cleanUp() } // (#cm-109.3)
         let workspace = Workspace() // (#cm-109.3)
@@ -1311,11 +1315,13 @@ struct WorkspaceStatusEntrancesTests {
             #expect(!hand.isHidden, "hand is showing") // (#cm-109.3)
             let titleFrame = cell.titleFrameForTesting // (#cm-109.3)
 
-            #expect(hand.frame.minX >= glyph.frame.maxX, "spinnerPos \(spinnerPos): hand minX (\(hand.frame.minX)) >= glyph maxX (\(glyph.frame.maxX))") // (#cm-109.3)
-            #expect(titleFrame.minX >= hand.frame.maxX, "spinnerPos \(spinnerPos): title minX (\(titleFrame.minX)) >= hand maxX (\(hand.frame.maxX))") // (#cm-109.3)
+            // cmux-rbf: changed on purpose (#cm-128.9)
+            // Hand is on the mark line under the title line, starting at leading + badgeSide + 8
+            #expect(hand.frame.minY >= titleFrame.maxY + 4, "spinnerPos \(spinnerPos): hand minY (\(hand.frame.minY)) >= title maxY + 4 (\(titleFrame.maxY + 4))")
+            #expect(hand.frame.minX == 40.0, "spinnerPos \(spinnerPos): hand minX (\(hand.frame.minX)) == 40")
         } // (#cm-109.3)
 
-        // With no glyph (Auto), the hand still sits before the title.
+        // With no glyph (Auto), the hand still draws on the mark line under the title (cm-128.9).
         workspace.clearTaskStatusOverride() // (#cm-109.3)
         let autoSnapshot = factory( // (#cm-109.3)
             workspace, // (#cm-109.3)
@@ -1364,7 +1370,10 @@ struct WorkspaceStatusEntrancesTests {
         let autoHand = try #require(autoCell.handForTesting) // (#cm-109.3)
         #expect(!autoHand.isHidden, "hand is showing on Auto") // (#cm-109.3)
         let autoTitleFrame = autoCell.titleFrameForTesting // (#cm-109.3)
-        #expect(autoTitleFrame.minX >= autoHand.frame.maxX, "title minX (\(autoTitleFrame.minX)) >= hand maxX (\(autoHand.frame.maxX))") // (#cm-109.3)
+        // cmux-rbf: changed on purpose (#cm-128.9)
+        // Hand is on the mark line under the title line, starting at leading + badgeSide + 8
+        #expect(autoHand.frame.minY >= autoTitleFrame.maxY + 4, "auto hand minY (\(autoHand.frame.minY)) >= title maxY + 4 (\(autoTitleFrame.maxY + 4))")
+        #expect(autoHand.frame.minX == 40.0, "auto hand minX (\(autoHand.frame.minX)) == 40")
     } // (#cm-109.3)
 
     private static func descendants<T: NSView>(ofType type: T.Type, in root: NSView) -> [T] {
@@ -1657,26 +1666,31 @@ struct WorkspaceStatusEntrancesTests {
         return cell
     }
 
-    /// cm-128.1 (Scenario 17, AppKit row): with the spinner set to the left it draws after the status glyph, beside the
-    /// hand and after it; the badge keeps the leading slot alone, and the name starts after the last mark.
-    @Test func appKitLeftSpinnerDrawsAfterTheGlyphBesideTheHandAndTheBadgeKeepsTheLeadingSlot() throws {
+    /// cm-128.1, cm-128.9 (Scenario 17, AppKit row): with the spinner set to the left it draws on the mark line
+    /// after the badge's slot and the hand; the badge keeps the leading slot alone.
+    @Test func appKitLeftSpinnerDrawsOnMarkLineAfterBadgeSlotAndHand() throws {
         let cell = try markRowCell(spinnerAt: .leading, badgeAt: .leading, unread: 3, waiting: true, running: true, status: .review)
         let badge = cell.leadingBadgeForTesting
         let glyph = cell.statusGlyphButtonForTesting
         let hand = try #require(cell.handForTesting)
         let spinner = try #require(cell.markSpinnerForTesting)
         #expect(!badge.isHidden && !glyph.isHidden && !hand.isHidden && !spinner.isHidden)
-        #expect(badge.frame.maxX <= glyph.frame.minX, "badge \(badge.frame), glyph \(glyph.frame)")
-        #expect(glyph.frame.maxX <= hand.frame.minX, "glyph \(glyph.frame), hand \(hand.frame)")
+        // cmux-rbf: changed on purpose (#cm-128.9)
+        // Badge is on the mark line under the title line; it sits before the hand on that line
+        #expect(badge.frame.minY >= glyph.frame.maxY + 4, "badge \(badge.frame), glyph \(glyph.frame)")
+        #expect(badge.frame.maxX <= hand.frame.minX, "badge \(badge.frame), hand \(hand.frame)")
         #expect(abs(spinner.frame.minX - (hand.frame.maxX + 8)) < 0.001, "spinner \(spinner.frame), hand \(hand.frame)")
-        #expect(cell.titleFrameForTesting.minX >= spinner.frame.maxX)
+        // Title stays on title line, not displaced by mark line
+        #expect(spinner.frame.minY >= cell.titleFrameForTesting.maxY + 4)
         #expect(cell.trailingSpinnerForTesting?.isHidden != false)
 
         let spinnerOnly = try markRowCell(spinnerAt: .leading, badgeAt: .leading, unread: 0, waiting: false, running: true, status: .review)
         let onlySpinner = try #require(spinnerOnly.markSpinnerForTesting)
         #expect(!onlySpinner.isHidden)
-        #expect(onlySpinner.frame.minX >= spinnerOnly.statusGlyphButtonForTesting.frame.maxX, "the spinner follows the glyph, not the leading slot")
-        #expect(spinnerOnly.titleFrameForTesting.minX >= onlySpinner.frame.maxX)
+        // cmux-rbf: changed on purpose (#cm-128.9)
+        // The spinner sits on the mark line after the reserved leading badge slot (24 pt in from leading), not following the glyph
+        #expect(onlySpinner.frame.minX == 40.0, "spinner starts after reserved badge slot")
+        #expect(onlySpinner.frame.minY >= spinnerOnly.titleFrameForTesting.maxY + 4)
     }
 
     /// cm-128.1 (Scenario 17, AppKit row): both set to the right, the badge sits at the row's edge, the spinner beside it
@@ -1692,7 +1706,10 @@ struct WorkspaceStatusEntrancesTests {
         #expect(cell.titleFrameForTesting.maxX <= spinner.frame.minX, "title \(cell.titleFrameForTesting), spinner \(spinner.frame)")
         let hand = try #require(cell.handForTesting)
         #expect(!hand.isHidden)
-        #expect(cell.titleFrameForTesting.minX >= hand.frame.maxX)
+        // cmux-rbf: changed on purpose (#cm-128.9)
+        // Hand is on the mark line under the title line, starting at leading (16)
+        #expect(hand.frame.minY >= cell.titleFrameForTesting.maxY + 4)
+        #expect(hand.frame.minX == 16.0)
     }
 
     /// cm-128.1: hovering the row swaps both trailing marks for the close button, and the title must not move: it reserves the
@@ -1748,6 +1765,1111 @@ struct WorkspaceStatusEntrancesTests {
         let extra = outlineInk - handInk // (#cm-109.7)
         #expect(extra >= 1.0 && extra <= 1.5, "the outline is \(extra) pt wider than the hand (\(handInk)), expected about 1.0") // (#cm-109.7)
     } // (#cm-109.7)
+
+    // MARK: - cm-128.9 Scenarios 130–136 (Mark Line Under Title)
+
+    private func makeMarkLineTestCell(
+        badgeAt: SidebarIndicatorPosition = .leading,
+        spinnerAt: SidebarIndicatorPosition = .leading,
+        unread: Int = 0,
+        markedUnread: Bool = false,
+        waiting: Bool = false,
+        error: Bool = false,
+        running: Bool = false,
+        monitoring: Bool = false,
+        idle: Bool = false,
+        customAgentStates: [String: AgentHibernationLifecycleState]? = nil,
+        loaderCount: Int = 0,
+        status: WorkspaceTaskStatus? = .review,
+        zoomPercent: Int = 100,
+        width: CGFloat = 215,
+        hideAllDetails: Bool = false,
+        canClose: Bool = true,
+        showsAgentActivity: Bool = true,
+        indent: Int = 0,
+        isPinned: Bool = false,
+        hasMedia: Bool = false,
+        isActive: Bool = false,
+        prepare: (Workspace) -> Void = { _ in }
+    ) throws -> (cell: SidebarWorkspaceRowTableCellView, model: SidebarWorkspaceRowModel) {
+        let suite = "WorkspaceStatusEntrancesTests.markLine.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(spinnerAt.rawValue, forKey: "sidebarLoadingSpinnerPosition")
+        defaults.set(badgeAt.rawValue, forKey: "sidebarNotificationBadgePosition")
+        defaults.set(showsAgentActivity, forKey: "sidebarShowAgentActivity")
+        if hideAllDetails {
+            defaults.set(true, forKey: "sidebarHideAllDetails")
+        }
+        let rowSettings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let workspace = Workspace()
+        if isPinned {
+            workspace.isPinned = true
+        }
+        let panelId = try #require(workspace.focusedPanelId)
+        var states: [String: AgentHibernationLifecycleState] = [:]
+        if let customAgentStates {
+            states = customAgentStates
+        } else {
+            if waiting { states["waiter"] = .needsInput }
+            if error { states["codex"] = .error }
+            if running { states["runner"] = .running }
+            if monitoring { states["claude_code"] = .monitoring }
+            if idle { states["idler"] = .idle }
+        }
+        workspace.agentLifecycleStatesByPanelId[panelId] = states
+        if let status { workspace.setTaskStatusOverride(status) }
+        if hasMedia {
+            workspace.setBrowserMediaActivityForTesting(BrowserMediaActivity(isPlayingAudio: true))
+        }
+        prepare(workspace)
+        var snapshot = factory(workspace, list: Self.hisList, settings: rowSettings, showsAgentActivity: showsAgentActivity).makeSnapshot()
+        if loaderCount > 0 {
+            snapshot.agentLists.loaderCount = loaderCount
+        }
+        var model = SidebarWorkspaceRowModel(
+            workspaceId: workspace.id, index: 0, snapshot: snapshot, settings: rowSettings, isActive: isActive,
+            isMultiSelected: false, hasUserCustomTitle: false, canCloseWorkspace: canClose, accessibilityWorkspaceCount: 1,
+            unreadCount: unread, markedUnread: markedUnread, latestNotificationText: nil, showsAgentActivity: showsAgentActivity, rowSpacing: 8, isBeingDragged: false,
+            topDropIndicatorVisible: false, bottomDropIndicatorVisible: false, isGrouped: false, isColorSectionMember: false,
+            isFirstRow: true, shortcutHintText: nil, showsShortcutHints: false, colorSchemeIsDark: true,
+            globalFontMagnificationPercent: zoomPercent, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
+            isChecklistPopoverPresented: false, editingChecklistItemId: nil, todoControlsEnabled: true,
+            isMetadataExpanded: false, isMarkdownExpanded: false
+        )
+        if indent > 0 {
+            model.depth = indent
+        }
+        let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: width, height: 40))
+        cell.configurePresentation(model: model)
+        cell.layout()
+        return (cell, model)
+    }
+
+    /// Scenario 130: Badge and marks draw on one line under the title (100%, 150%, 50%).
+    @Test func scenario130_badgeAndMarksDrawOnOneLineUnderTheTitle() throws {
+        // 100%: badge 16, marks 12, line height max(16, 12) = 16
+        let res100 = try makeMarkLineTestCell(
+            unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100
+        )
+        let cell100 = res100.cell
+        let badge100 = cell100.leadingBadgeForTesting
+        let hand100 = try #require(cell100.handForTesting)
+        let triangle100 = try #require(cell100.errorTriangleForTesting)
+        let spinner100 = try #require(cell100.markSpinnerForTesting)
+        let waveform100 = try #require(cell100.monitoringImageViewForTesting)
+
+        #expect(!badge100.isHidden && !hand100.isHidden && !triangle100.isHidden && !spinner100.isHidden && !waveform100.isHidden)
+        #expect(badge100.frame.minX == 16.0)
+        #expect(badge100.frame.width == 16.0)
+        #expect(hand100.frame.minX == 40.0) // 16 + 16 + 8
+        #expect(hand100.frame.width == 12.0)
+        #expect(triangle100.frame.minX == 60.0) // 40 + 12 + 8
+        #expect(triangle100.frame.width == 12.0)
+        #expect(spinner100.frame.minX == 80.0) // 60 + 12 + 8
+        #expect(spinner100.frame.width == 12.0)
+        #expect(waveform100.frame.minX == 100.0) // 80 + 12 + 8
+        #expect(waveform100.frame.width == 12.0)
+
+        // Line is below title line
+        let titleFrame100 = cell100.titleFrameForTesting
+        #expect(badge100.frame.minY >= titleFrame100.maxY + 4)
+        let markLineCenter100 = titleFrame100.maxY + 4 + 16.0 / 2
+        #expect(abs(badge100.frame.midY - markLineCenter100) <= 0.5)
+        #expect(abs(hand100.frame.midY - markLineCenter100) <= 0.5)
+        #expect(abs(triangle100.frame.midY - markLineCenter100) <= 0.5)
+        #expect(abs(spinner100.frame.midY - markLineCenter100) <= 0.5)
+        #expect(abs(waveform100.frame.midY - markLineCenter100) <= 0.5)
+
+        // 150%: badge 24, marks 18, line height max(24, 18) = 24
+        let res150 = try makeMarkLineTestCell(
+            unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 150
+        )
+        let cell150 = res150.cell
+        let badge150 = cell150.leadingBadgeForTesting
+        let hand150 = try #require(cell150.handForTesting)
+        let triangle150 = try #require(cell150.errorTriangleForTesting)
+        let spinner150 = try #require(cell150.markSpinnerForTesting)
+        let waveform150 = try #require(cell150.monitoringImageViewForTesting)
+
+        #expect(!badge150.isHidden && !hand150.isHidden && !triangle150.isHidden && !spinner150.isHidden && !waveform150.isHidden)
+        #expect(badge150.frame.minX == 16.0)
+        #expect(badge150.frame.width == 24.0)
+        #expect(hand150.frame.minX == 48.0) // 16 + 24 + 8
+        #expect(hand150.frame.width == 18.0)
+        #expect(triangle150.frame.minX == 74.0) // 48 + 18 + 8
+        #expect(triangle150.frame.width == 18.0)
+        #expect(spinner150.frame.minX == 100.0) // 74 + 18 + 8
+        #expect(spinner150.frame.width == 18.0)
+        #expect(waveform150.frame.minX == 126.0) // 100 + 18 + 8
+        #expect(waveform150.frame.width == 18.0)
+
+        let titleFrame150 = cell150.titleFrameForTesting
+        #expect(badge150.frame.minY >= titleFrame150.maxY + 4)
+        let markLineCenter150 = titleFrame150.maxY + 4 + 24.0 / 2
+        #expect(abs(badge150.frame.midY - markLineCenter150) <= 0.5)
+        #expect(abs(hand150.frame.midY - markLineCenter150) <= 0.5)
+        #expect(abs(triangle150.frame.midY - markLineCenter150) <= 0.5)
+        #expect(abs(spinner150.frame.midY - markLineCenter150) <= 0.5)
+        #expect(abs(waveform150.frame.midY - markLineCenter150) <= 0.5)
+
+        // 50%: badge 8 (16*0.5), marks 10 (floor max(10, 12*0.5)), line height max(8, 10) = 10
+        let res50 = try makeMarkLineTestCell(
+            unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 50
+        )
+        let cell50 = res50.cell
+        let badge50 = cell50.leadingBadgeForTesting
+        let hand50 = try #require(cell50.handForTesting)
+        let triangle50 = try #require(cell50.errorTriangleForTesting)
+        let spinner50 = try #require(cell50.markSpinnerForTesting)
+        let waveform50 = try #require(cell50.monitoringImageViewForTesting)
+
+        #expect(!badge50.isHidden && !hand50.isHidden && !triangle50.isHidden && !spinner50.isHidden && !waveform50.isHidden)
+        #expect(badge50.frame.minX == 16.0)
+        #expect(badge50.frame.width == 8.0)
+        #expect(hand50.frame.minX == 32.0) // 16 + 8 + 8
+        #expect(hand50.frame.width == 10.0)
+        #expect(triangle50.frame.minX == 50.0) // 32 + 10 + 8
+        #expect(triangle50.frame.width == 10.0)
+        #expect(spinner50.frame.minX == 68.0) // 50 + 10 + 8
+        #expect(spinner50.frame.width == 10.0)
+        #expect(waveform50.frame.minX == 86.0) // 68 + 10 + 8
+        #expect(waveform50.frame.width == 10.0)
+
+        let titleFrame50 = cell50.titleFrameForTesting
+        #expect(badge50.frame.minY >= titleFrame50.maxY + 4)
+        let markLineCenter50 = titleFrame50.maxY + 4 + 10.0 / 2
+        #expect(abs(badge50.frame.midY - markLineCenter50) <= 0.5)
+        #expect(abs(hand50.frame.midY - markLineCenter50) <= 0.5)
+        #expect(abs(triangle50.frame.midY - markLineCenter50) <= 0.5)
+        #expect(abs(spinner50.frame.midY - markLineCenter50) <= 0.5)
+        #expect(abs(waveform50.frame.midY - markLineCenter50) <= 0.5)
+
+        // S4: the same row pinned, and with a media glyph, gives the same minX values on the mark line
+        let resPinnedMedia = try makeMarkLineTestCell(
+            unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100, isPinned: true, hasMedia: true
+        )
+        let cellPM = resPinnedMedia.cell
+        let badgePM = cellPM.leadingBadgeForTesting
+        let handPM = try #require(cellPM.handForTesting)
+        #expect(badgePM.frame.minX == badge100.frame.minX)
+        #expect(handPM.frame.minX == hand100.frame.minX)
+
+        // S4: nested-group indent: leading includes the indent (indentPoints > 0)
+        let resIndent = try makeMarkLineTestCell(
+            unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100, indent: 1
+        )
+        let cellIndent = resIndent.cell
+        let badgeIndent = cellIndent.leadingBadgeForTesting
+        let handIndent = try #require(cellIndent.handForTesting)
+        let indentExpected = 16.0 + resIndent.model.indentPoints(width: 215)
+        #expect(resIndent.model.indentPoints(width: 215) > 0)
+        #expect(badgeIndent.frame.minX == indentExpected)
+        #expect(handIndent.frame.minX == indentExpected + 16.0 + 8.0)
+    }
+
+    /// Scenario 131: The name never moves (100% 136 pt, 150% 122.5 pt across all four states).
+    @Test func scenario131_theNameNeverMoves() throws {
+        // At 100%: 199 - (16 + 15 + 8) - (16 + 8) = 136 pt
+        let clean100 = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100, width: 215)
+        let news100 = try makeMarkLineTestCell(unread: 3, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100, width: 215)
+        let marks100 = try makeMarkLineTestCell(unread: 0, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100, width: 215)
+        let both100 = try makeMarkLineTestCell(unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100, width: 215)
+
+        let titleClean100 = clean100.cell.titleFrameForTesting
+        let titleNews100 = news100.cell.titleFrameForTesting
+        let titleMarks100 = marks100.cell.titleFrameForTesting
+        let titleBoth100 = both100.cell.titleFrameForTesting
+
+        #expect(titleClean100.minX == titleNews100.minX)
+        #expect(titleClean100.minX == titleMarks100.minX)
+        #expect(titleClean100.minX == titleBoth100.minX)
+
+        #expect(titleClean100.width == 136.0)
+        #expect(titleNews100.width == 136.0)
+        #expect(titleMarks100.width == 136.0)
+        #expect(titleBoth100.width == 136.0)
+
+        // At 150%: 122.5 pt
+        let clean150 = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 150, width: 215)
+        let news150 = try makeMarkLineTestCell(unread: 3, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 150, width: 215)
+        let marks150 = try makeMarkLineTestCell(unread: 0, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 150, width: 215)
+        let both150 = try makeMarkLineTestCell(unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 150, width: 215)
+
+        let titleClean150 = clean150.cell.titleFrameForTesting
+        let titleNews150 = news150.cell.titleFrameForTesting
+        let titleMarks150 = marks150.cell.titleFrameForTesting
+        let titleBoth150 = both150.cell.titleFrameForTesting
+
+        #expect(titleClean150.minX == titleNews150.minX)
+        #expect(titleClean150.minX == titleMarks150.minX)
+        #expect(titleClean150.minX == titleBoth150.minX)
+
+        #expect(titleClean150.width == 122.5)
+        #expect(titleNews150.width == 122.5)
+        #expect(titleMarks150.width == 122.5)
+        #expect(titleBoth150.width == 122.5)
+    }
+
+    /// Scenario 132: The marks never move with news (100% and 150%).
+    @Test func scenario132_theMarksNeverMoveWithNews() throws {
+        // 100%: compare marks without news (unread 0) vs with news (unread 3)
+        let marks0 = try makeMarkLineTestCell(unread: 0, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100)
+        let marks3 = try makeMarkLineTestCell(unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100)
+
+        let hand0 = try #require(marks0.cell.handForTesting)
+        let hand3 = try #require(marks3.cell.handForTesting)
+        #expect(hand0.frame == hand3.frame)
+
+        let triangle0 = try #require(marks0.cell.errorTriangleForTesting)
+        let triangle3 = try #require(marks3.cell.errorTriangleForTesting)
+        #expect(triangle0.frame == triangle3.frame)
+
+        let spinner0 = try #require(marks0.cell.markSpinnerForTesting)
+        let spinner3 = try #require(marks3.cell.markSpinnerForTesting)
+        #expect(spinner0.frame == spinner3.frame)
+
+        let waveform0 = try #require(marks0.cell.monitoringImageViewForTesting)
+        let waveform3 = try #require(marks3.cell.monitoringImageViewForTesting)
+        #expect(waveform0.frame == waveform3.frame)
+
+        // 150%
+        let marks0_150 = try makeMarkLineTestCell(unread: 0, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 150)
+        let marks3_150 = try makeMarkLineTestCell(unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 150)
+
+        let hand0_150 = try #require(marks0_150.cell.handForTesting)
+        let hand3_150 = try #require(marks3_150.cell.handForTesting)
+        #expect(hand0_150.frame == hand3_150.frame)
+
+        let triangle0_150 = try #require(marks0_150.cell.errorTriangleForTesting)
+        let triangle3_150 = try #require(marks3_150.cell.errorTriangleForTesting)
+        #expect(triangle0_150.frame == triangle3_150.frame)
+
+        let spinner0_150 = try #require(marks0_150.cell.markSpinnerForTesting)
+        let spinner3_150 = try #require(marks3_150.cell.markSpinnerForTesting)
+        #expect(spinner0_150.frame == spinner3_150.frame)
+
+        let waveform0_150 = try #require(marks0_150.cell.monitoringImageViewForTesting)
+        let waveform3_150 = try #require(marks3_150.cell.monitoringImageViewForTesting)
+        #expect(waveform0_150.frame == waveform3_150.frame)
+
+        // His mark dot in the badge's place moves no mark either, at 100% and 150% (whole-diff review S1).
+        for (zoom, clean) in [(100, marks0), (150, marks0_150)] {
+            let dot = try makeMarkLineTestCell(markedUnread: true, waiting: true, error: true, running: true, monitoring: true, zoomPercent: zoom)
+            #expect(dot.cell.handForTesting?.frame == clean.cell.handForTesting?.frame && dot.cell.markSpinnerForTesting?.frame == clean.cell.markSpinnerForTesting?.frame, "\(zoom)%: the marks stay put beside his mark dot")
+        }
+    }
+
+    /// Scenario 133: When the line shows (48 pt vs 68 pt, fast path snapshot, 150% 28 pt difference).
+    @Test func scenario133_whenTheLineShows() throws {
+        // Clean row: no mark line
+        let clean = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100)
+        #expect(clean.model.showsMarkLine == false)
+        let hClean = clean.cell.layoutContent(model: clean.model, width: 215, apply: false)
+        #expect(hClean == 48.0)
+
+        // News only (badge leading)
+        let news = try makeMarkLineTestCell(unread: 3, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100)
+        #expect(news.model.showsMarkLine == true)
+        let hNews = news.cell.layoutContent(model: news.model, width: 215, apply: false)
+        #expect(hNews == 68.0)
+
+        // Marked unread alone (unreadCount 0, markedUnread true, badge leading)
+        let marked = try makeMarkLineTestCell(unread: 0, markedUnread: true, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100)
+        #expect(marked.model.showsMarkLine == true)
+        let hMarked = marked.cell.layoutContent(model: marked.model, width: 215, apply: false)
+        #expect(hMarked == 68.0)
+
+        // Hand alone
+        let handOnly = try makeMarkLineTestCell(unread: 0, waiting: true, error: false, running: false, monitoring: false, zoomPercent: 100)
+        #expect(handOnly.model.showsMarkLine == true)
+        let hHand = handOnly.cell.layoutContent(model: handOnly.model, width: 215, apply: false)
+        #expect(hHand == 68.0)
+
+        // Triangle alone
+        let triangleOnly = try makeMarkLineTestCell(unread: 0, waiting: false, error: true, running: false, monitoring: false, zoomPercent: 100)
+        #expect(triangleOnly.model.showsMarkLine == true)
+        let hTriangle = triangleOnly.cell.layoutContent(model: triangleOnly.model, width: 215, apply: false)
+        #expect(hTriangle == 68.0)
+
+        // Spinner alone
+        let spinnerOnly = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: true, monitoring: false, zoomPercent: 100)
+        #expect(spinnerOnly.model.showsMarkLine == true)
+        let hSpinner = spinnerOnly.cell.layoutContent(model: spinnerOnly.model, width: 215, apply: false)
+        #expect(hSpinner == 68.0)
+
+        // Waveform alone
+        let waveOnly = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: false, monitoring: true, zoomPercent: 100)
+        #expect(waveOnly.model.showsMarkLine == true)
+        let hWave = waveOnly.cell.layoutContent(model: waveOnly.model, width: 215, apply: false)
+        #expect(hWave == 68.0)
+
+        // Manual loader alone (spinner leading)
+        let loaderOnly = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: false, monitoring: false, loaderCount: 1, zoomPercent: 100)
+        #expect(loaderOnly.model.showsMarkLine == true)
+        let hLoader = loaderOnly.cell.layoutContent(model: loaderOnly.model, width: 215, apply: false)
+        #expect(hLoader == 68.0)
+
+        // Trailing badge alone: NO mark line
+        let trailingBadgeOnly = try makeMarkLineTestCell(badgeAt: .trailing, unread: 3, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100)
+        #expect(trailingBadgeOnly.model.showsMarkLine == false)
+        let hTrailingBadge = trailingBadgeOnly.cell.layoutContent(model: trailingBadgeOnly.model, width: 215, apply: false)
+        #expect(hTrailingBadge == 48.0)
+
+        // Trailing spinner alone with running agent: line shows empty (68 pt)
+        let trailingSpinnerOnly = try makeMarkLineTestCell(spinnerAt: .trailing, unread: 0, waiting: false, error: false, running: true, monitoring: false, zoomPercent: 100)
+        #expect(trailingSpinnerOnly.model.showsMarkLine == true)
+        let hTrailingSpinner = trailingSpinnerOnly.cell.layoutContent(model: trailingSpinnerOnly.model, width: 215, apply: false)
+        #expect(hTrailingSpinner == 68.0)
+
+        // Loader alone, spinner set right: NO mark line (48 pt)
+        let trailingLoaderOnly = try makeMarkLineTestCell(spinnerAt: .trailing, unread: 0, waiting: false, error: false, running: false, monitoring: false, loaderCount: 1, zoomPercent: 100)
+        #expect(trailingLoaderOnly.model.showsMarkLine == false)
+        let hTrailingLoader = trailingLoaderOnly.cell.layoutContent(model: trailingLoaderOnly.model, width: 215, apply: false)
+        #expect(hTrailingLoader == 48.0)
+
+        // R2: Idle alone -> 68 pt
+        let idleAlone = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: false, monitoring: false, idle: true, zoomPercent: 100)
+        #expect(idleAlone.model.showsMarkLine == true)
+        let hIdle = idleAlone.cell.layoutContent(model: idleAlone.model, width: 215, apply: false)
+        #expect(hIdle == 68.0)
+
+        // R2: Vault-key idle alone -> 68 pt
+        let vaultIdleAlone = try makeMarkLineTestCell(unread: 0, customAgentStates: ["my-vault-agent": .idle], zoomPercent: 100)
+        #expect(vaultIdleAlone.model.showsMarkLine == true)
+        let hVaultIdle = vaultIdleAlone.cell.layoutContent(model: vaultIdleAlone.model, width: 215, apply: false)
+        #expect(hVaultIdle == 68.0)
+
+        // R2: Dead agent (unknown) alone -> 48 pt
+        let unknownAlone = try makeMarkLineTestCell(unread: 0, customAgentStates: ["dead-agent": .unknown], zoomPercent: 100)
+        #expect(unknownAlone.model.showsMarkLine == false)
+        let hUnknown = unknownAlone.cell.layoutContent(model: unknownAlone.model, width: 215, apply: false)
+        #expect(hUnknown == 48.0)
+
+        // R2: Three agents (idle + running + waiting) without news -> 68 pt
+        let threeAgentsNoNews = try makeMarkLineTestCell(unread: 0, waiting: true, error: false, running: true, monitoring: false, idle: true, zoomPercent: 100)
+        #expect(threeAgentsNoNews.model.showsMarkLine == true)
+        let hThreeNoNews = threeAgentsNoNews.cell.layoutContent(model: threeAgentsNoNews.model, width: 215, apply: false)
+        #expect(hThreeNoNews == 68.0)
+
+        // R2: Three agents (idle + running + waiting) with news 1 -> 68 pt
+        let threeAgentsWithNews = try makeMarkLineTestCell(unread: 1, waiting: true, error: false, running: true, monitoring: false, idle: true, zoomPercent: 100)
+        #expect(threeAgentsWithNews.model.showsMarkLine == true)
+        let hThreeWithNews = threeAgentsWithNews.cell.layoutContent(model: threeAgentsWithNews.model, width: 215, apply: false)
+        #expect(hThreeWithNews == 68.0)
+
+        // Agent marks present but showsAgentActivity is false: NO mark line
+        let activityOff = try makeMarkLineTestCell(unread: 0, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100, showsAgentActivity: false)
+        #expect(activityOff.model.showsMarkLine == false)
+        let hActivityOff = activityOff.cell.layoutContent(model: activityOff.model, width: 215, apply: false)
+        #expect(hActivityOff == 48.0)
+
+        // At 150%: difference is exactly 28 pt (4 spacing + 24 line)
+        let clean150 = try makeMarkLineTestCell(unread: 0, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 150)
+        let line150 = try makeMarkLineTestCell(unread: 3, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 150)
+        let hClean150 = clean150.cell.layoutContent(model: clean150.model, width: 215, apply: false)
+        let hLine150 = line150.cell.layoutContent(model: line150.model, width: 215, apply: false)
+        #expect(hLine150 - hClean150 == 28.0)
+    }
+
+    /// Scenario 133 & Amendment 4 (finding E4): Row height cache follows mark line through prepareRows
+    /// when news arrives through the unread fast path rebuild closure (markedUnread: true) and back when read.
+    @Test func scenario133_rowHeightCacheFollowsMarkLineOnUnreadFastPath() throws {
+        let workspace = Workspace()
+        let suite = "WorkspaceStatusEntrancesTests.cache.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(SidebarIndicatorPosition.leading.rawValue, forKey: "sidebarNotificationBadgePosition")
+        let rowSettings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+
+        var snapshot = factory(workspace, list: Self.hisList, settings: rowSettings, showsAgentActivity: true).makeSnapshot()
+        snapshot.agentLists = SidebarAgentStateLists()
+
+        let baseModel = SidebarWorkspaceRowModel(
+            workspaceId: workspace.id, index: 0, snapshot: snapshot, settings: rowSettings, isActive: false,
+            isMultiSelected: false, hasUserCustomTitle: false, canCloseWorkspace: false, accessibilityWorkspaceCount: 1,
+            unreadCount: 0, markedUnread: false, latestNotificationText: nil, showsAgentActivity: true, rowSpacing: 8, isBeingDragged: false,
+            topDropIndicatorVisible: false, bottomDropIndicatorVisible: false, isGrouped: false, isColorSectionMember: false,
+            isFirstRow: true, shortcutHintText: nil, showsShortcutHints: false, colorSchemeIsDark: true,
+            globalFontMagnificationPercent: 100, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
+            isChecklistPopoverPresented: false, editingChecklistItemId: nil, todoControlsEnabled: true,
+            isMetadataExpanded: false, isMarkdownExpanded: false
+        )
+
+        let environment = SidebarWorkspaceTableEnvironmentSnapshot(
+            colorScheme: .dark,
+            globalFontMagnificationPercent: 100,
+            lazyContractProbe: SidebarLazyContractProbe()
+        )
+
+        let row = SidebarWorkspaceTableRowConfiguration(
+            workspaceRowModel: baseModel,
+            actions: SidebarWorkspaceRowSuspensionTests.makeActions(
+                model: baseModel,
+                workspace: workspace
+            ),
+            groupId: nil,
+            isPinned: false,
+            environment: environment,
+            workspace: workspace,
+            rebuild: { baseModel },
+            unreadRebuild: { snapshot in
+                let summary = snapshot.summary(forWorkspaceId: workspace.id)
+                var fresh = baseModel
+                fresh.unreadCount = summary.unreadCount
+                fresh.markedUnread = summary.markedUnread
+                fresh.latestNotificationText = summary.latestNotificationText
+                return fresh
+            }
+        )
+
+        let cache = SidebarWorkspaceTableRowHeightCache()
+        _ = cache.prepareRows(at: [0], in: [row], columnWidth: 215)
+        #expect(cache.height(for: row, columnWidth: 215) == 48.0)
+
+        // News arrives through the unread fast path with markedUnread set ("only his mark" case, E4)
+        let newsSnapshot = SidebarUnreadSnapshot(
+            summaryByWorkspaceId: [workspace.id: SidebarWorkspaceUnreadSummary(
+                unreadCount: 0,
+                latestNotificationText: nil,
+                markedUnread: true
+            )]
+        )
+        let rowWithNews = row.applyingUnreadSnapshot(newsSnapshot)
+        #expect(rowWithNews.appKitWorkspaceRowModel?.markedUnread == true)
+        #expect(rowWithNews.appKitWorkspaceRowModel?.showsMarkLine == true)
+
+        let newsChanges = cache.prepareRows(at: [0], in: [rowWithNews], columnWidth: 215)
+        #expect(newsChanges == IndexSet(integer: 0))
+        #expect(cache.height(for: rowWithNews, columnWidth: 215) == 68.0)
+
+        // News is cleared / marked read
+        let readSnapshot = SidebarUnreadSnapshot(
+            summaryByWorkspaceId: [workspace.id: SidebarWorkspaceUnreadSummary(
+                unreadCount: 0,
+                latestNotificationText: nil,
+                markedUnread: false
+            )]
+        )
+        let rowAfterRead = rowWithNews.applyingUnreadSnapshot(readSnapshot)
+        #expect(rowAfterRead.appKitWorkspaceRowModel?.markedUnread == false)
+        #expect(rowAfterRead.appKitWorkspaceRowModel?.showsMarkLine == false)
+
+        let readChanges = cache.prepareRows(at: [0], in: [rowAfterRead], columnWidth: 215)
+        #expect(readChanges == IndexSet(integer: 0))
+        #expect(cache.height(for: rowAfterRead, columnWidth: 215) == 48.0)
+
+        // One unread notification through the same fast path brings the line too (whole-diff review S1).
+        let countSnapshot = SidebarUnreadSnapshot(summaryByWorkspaceId: [workspace.id: SidebarWorkspaceUnreadSummary(unreadCount: 1, latestNotificationText: nil, markedUnread: false)])
+        let rowWithCount = rowAfterRead.applyingUnreadSnapshot(countSnapshot)
+        _ = cache.prepareRows(at: [0], in: [rowWithCount], columnWidth: 215)
+        #expect(cache.height(for: rowWithCount, columnWidth: 215) == 68.0, "count 1 through applyingUnreadSnapshot and prepareRows")
+    }
+
+    /// Scenario 134: A right-set badge stays at the right of the title line.
+    @Test func scenario134_aRightSetBadgeStaysAtTheRightOfTheTitleLine() throws {
+        // Badge and spinner both trailing, marks present
+        let res = try makeMarkLineTestCell(
+            badgeAt: .trailing, spinnerAt: .trailing, unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 100, width: 215
+        )
+        let cell = res.cell
+        let trailingBadge = cell.trailingBadgeForTesting
+        let trailingSpinner = try #require(cell.trailingSpinnerForTesting)
+        let leadingBadge = cell.leadingBadgeForTesting
+
+        #expect(!trailingBadge.isHidden)
+        #expect(!trailingSpinner.isHidden)
+        #expect(leadingBadge.isHidden)
+
+        // Trailing badge and spinner sit on title line
+        let titleFrame = cell.titleFrameForTesting
+        #expect(abs(trailingBadge.frame.midY - titleFrame.midY) <= 1.0)
+        #expect(abs(trailingSpinner.frame.midY - titleFrame.midY) <= 1.0)
+
+        // Trailing reserve at 100%: 16*I + 6 + 12*I = 34 pt
+        let outerPad = SidebarWorkspaceListMetrics.rowOuterHorizontalPadding
+        let contentPad = SidebarWorkspaceListMetrics.rowContentHorizontalPadding
+        let trailing = 215 - outerPad - contentPad
+        #expect(trailingBadge.frame.maxX == trailing)
+        #expect(trailingSpinner.frame.maxX == trailing - 16 - 6)
+
+        // Marks are on mark line starting at leading (16), because badge is trailing
+        let hand = try #require(cell.handForTesting)
+        #expect(hand.frame.minX == 16.0)
+        #expect(hand.frame.minY >= titleFrame.maxY + 4)
+
+        // Title width at 100%: 118 pt (199 - 34 - 8 - 39)
+        #expect(titleFrame.width == 118.0)
+        #expect(res.cell.layoutContent(model: res.model, width: 215, apply: false) == 68.0)
+
+        // Hovering keeps the title still
+        let restingTitle = cell.titleFrameForTesting
+        cell.enforcePointerHovering(true)
+        cell.layout()
+        #expect(cell.titleFrameForTesting.width == restingTitle.width)
+        #expect(cell.titleFrameForTesting.minX == restingTitle.minX)
+        cell.enforcePointerHovering(false)
+        cell.layout()
+
+        // 150%: badge 24, spinner 18, reserve 48; line height 24 pt
+        let res150 = try makeMarkLineTestCell(
+            badgeAt: .trailing, spinnerAt: .trailing, unread: 3, waiting: true, error: true, running: true, monitoring: true, zoomPercent: 150, width: 215
+        )
+        let cell150 = res150.cell
+        let titleFrame150 = cell150.titleFrameForTesting
+        // At 150%: 199 - 48 (trailingReserve) - 8 (spacing) - 44.5 (leading 16 + glyph 20.5 + gap 8) = 98.5 pt
+        #expect(titleFrame150.width == 98.5)
+        let hand150 = try #require(cell150.handForTesting)
+        #expect(hand150.frame.minX == 16.0)
+        #expect(hand150.frame.minY >= titleFrame150.maxY + 4)
+        #expect(hand150.frame.size.height == 18.0)
+    }
+
+    /// Scenario 136: Hide All Details keeps the line (31 pt vs 51 pt at 100%, 28 pt diff at 150%).
+    @Test func scenario136_hideAllDetailsKeepsTheLine() throws {
+        // 100%: compact row without line is 31 pt, with line is 51 pt
+        let compactClean100 = try makeMarkLineTestCell(
+            unread: 0, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100, width: 215, hideAllDetails: true
+        )
+        let hClean100 = compactClean100.cell.layoutContent(model: compactClean100.model, width: 215, apply: false)
+        #expect(hClean100 == 31.0)
+
+        let compactLine100 = try makeMarkLineTestCell(
+            unread: 3, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 100, width: 215, hideAllDetails: true
+        )
+        let hLine100 = compactLine100.cell.layoutContent(model: compactLine100.model, width: 215, apply: false)
+        #expect(hLine100 == 51.0)
+
+        // S3: Running agent under Hide All Details (compact row with line: 51 pt)
+        let compactRunning100 = try makeMarkLineTestCell(
+            unread: 0, waiting: false, error: false, running: true, monitoring: false, zoomPercent: 100, width: 215, hideAllDetails: true
+        )
+        let hRunning100 = compactRunning100.cell.layoutContent(model: compactRunning100.model, width: 215, apply: false)
+        #expect(hRunning100 == 51.0)
+        let spinner100 = try #require(compactRunning100.cell.markSpinnerForTesting)
+        let titleFrame100 = compactRunning100.cell.titleFrameForTesting
+        #expect(spinner100.frame.minY >= titleFrame100.maxY + 4)
+
+        // 150%: compact row difference is 28 pt
+        let compactClean150 = try makeMarkLineTestCell(
+            unread: 0, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 150, width: 215, hideAllDetails: true
+        )
+        let compactLine150 = try makeMarkLineTestCell(
+            unread: 3, waiting: false, error: false, running: false, monitoring: false, zoomPercent: 150, width: 215, hideAllDetails: true
+        )
+        let hClean150 = compactClean150.cell.layoutContent(model: compactClean150.model, width: 215, apply: false)
+        let hLine150 = compactLine150.cell.layoutContent(model: compactLine150.model, width: 215, apply: false)
+        #expect(hLine150 - hClean150 == 28.0)
+    }
+
+    /// Scenario 140: an idle agent's line reads "Idle" (cm-128.9), every case the scenario lists, at 100% and 150%.
+    /// The word is text, so its size is `model.scaled(10)`; its place is `leading + badgeSide + titleRowSpacing`, where the
+    /// first mark draws, under both badge settings; its colour is the spinner's and the waveform's (`agentActivityColor()`).
+    @Test func scenario140_anIdleAgentsLineReadsIdle() throws {
+        let idleText = String(localized: "sidebar.workspace.agentLine.idle", defaultValue: "Idle")
+        let leading: CGFloat = 16
+        func shownWord(_ row: (cell: SidebarWorkspaceRowTableCellView, model: SidebarWorkspaceRowModel)) -> SidebarRowTextView? {
+            row.cell.idleWordForTesting.isHidden ? nil : row.cell.idleWordForTesting
+        }
+        func height(_ row: (cell: SidebarWorkspaceRowTableCellView, model: SidebarWorkspaceRowModel)) -> CGFloat {
+            row.cell.layoutContent(model: row.model, width: 215, apply: false)
+        }
+        for zoom in [100, 150] {
+            let scale = CGFloat(zoom) / 100
+            let badgeSide = 16 * scale
+            let lineHeight = max(badgeSide, max(10, 12 * scale))
+            let wordX = leading + badgeSide + 8
+            let lineGrowth = 4 + lineHeight
+            let cleanHeight = height(try makeMarkLineTestCell(zoomPercent: zoom))
+            if zoom == 100 { #expect(cleanHeight == 48) }
+
+            // One agent idle, nothing unread, badge set left: the word, 24 pt in at 100% (32 at 150%), centred on the line.
+            let idle = try makeMarkLineTestCell(idle: true, zoomPercent: zoom)
+            let word = try #require(shownWord(idle), "\(zoom)%: one idle agent shows the word")
+            #expect(word.stringValue == idleText)
+            #expect(word.frame.minX == wordX, "\(zoom)%: the word's minX \(word.frame.minX), expected \(wordX)")
+            let lineCenter = idle.cell.titleFrameForTesting.maxY + 4 + lineHeight / 2
+            #expect(abs(word.frame.midY - lineCenter) <= 0.5, "\(zoom)%: the word's midY \(word.frame.midY), line centre \(lineCenter)")
+            #expect(Double(word.font?.pointSize ?? 0) == Double(idle.model.scaled(10)), "\(zoom)%: model.scaled(10)")
+            #expect(zoom == 100 || (word.font?.pointSize ?? 0) > 10, "\(zoom)%: the word grows with the zoom")
+            #expect(word.font?.fontDescriptor.symbolicTraits.contains(.bold) == false, "regular weight")
+            #expect(word.superview === idle.cell, "a direct subview of the cell, like the marks")
+            #expect(height(idle) == cleanHeight + lineGrowth, "\(zoom)%: the line is there")
+            if zoom == 100 { #expect(height(idle) == 68) }
+
+            // Its colour is the spinner's (the waveform's tint is the same `agentActivityColor()`), unselected and selected.
+            for isActive in [false, true] {
+                let idleRow = try makeMarkLineTestCell(idle: true, zoomPercent: zoom, isActive: isActive)
+                let waveRow = try makeMarkLineTestCell(monitoring: true, zoomPercent: zoom, isActive: isActive)
+                let wave = try #require(waveRow.cell.monitoringImageViewForTesting)
+                #expect(shownWord(idleRow)?.textColor == wave.contentTintColor, "\(zoom)% active \(isActive): the spinner's colour")
+            }
+
+            // No word with: news (the badge instead), his mark (the dot), a running agent beside it (its spinner where the
+            // word was), a running agent alone set right, idle plus running set right (the line shown and empty), a loader's
+            // spinner on the line, the agent cleared to unknown (no line), agent activity off.
+            let news = try makeMarkLineTestCell(unread: 1, idle: true, zoomPercent: zoom)
+            #expect(shownWord(news) == nil, "\(zoom)%: news")
+            #expect(news.cell.leadingBadgeForTesting.isHidden == false)
+            let marked = try makeMarkLineTestCell(markedUnread: true, idle: true, zoomPercent: zoom)
+            #expect(shownWord(marked) == nil, "\(zoom)%: his mark")
+            #expect(marked.cell.leadingBadgeForTesting.isHidden == false)
+            let besideRunning = try makeMarkLineTestCell(running: true, idle: true, zoomPercent: zoom)
+            #expect(shownWord(besideRunning) == nil, "\(zoom)%: a running agent beside it")
+            let spinner = try #require(besideRunning.cell.markSpinnerForTesting)
+            #expect(!spinner.isHidden && spinner.frame.minX == wordX, "\(zoom)%: the spinner draws where the word was")
+            let runningRight = try makeMarkLineTestCell(spinnerAt: .trailing, running: true, zoomPercent: zoom)
+            #expect(shownWord(runningRight) == nil, "\(zoom)%: one agent running, spinner set right")
+            let idleRunningRight = try makeMarkLineTestCell(spinnerAt: .trailing, running: true, idle: true, zoomPercent: zoom)
+            #expect(shownWord(idleRunningRight) == nil, "\(zoom)%: idle plus running, spinner set right")
+            #expect(height(idleRunningRight) == cleanHeight + lineGrowth, "\(zoom)%: the line shows, empty")
+            #expect(idleRunningRight.cell.markSpinnerForTesting?.isHidden ?? true, "\(zoom)%: no spinner on the line")
+            let loaderLeft = try makeMarkLineTestCell(idle: true, loaderCount: 1, zoomPercent: zoom)
+            #expect(shownWord(loaderLeft) == nil, "\(zoom)%: a loader's spinner on the line")
+            #expect(loaderLeft.cell.markSpinnerForTesting?.isHidden == false)
+            let cleared = try makeMarkLineTestCell(customAgentStates: ["claude_code": .unknown], zoomPercent: zoom)
+            #expect(shownWord(cleared) == nil, "\(zoom)%: cleared to unknown")
+            #expect(height(cleared) == cleanHeight, "\(zoom)%: no line")
+            let activityOff = try makeMarkLineTestCell(idle: true, zoomPercent: zoom, showsAgentActivity: false)
+            #expect(shownWord(activityOff) == nil, "\(zoom)%: agent activity off")
+
+            // Badge set right, news, agent idle: the word, at the same place as set left.
+            let right = try makeMarkLineTestCell(badgeAt: .trailing, unread: 1, idle: true, zoomPercent: zoom)
+            let rightWord = try #require(shownWord(right), "\(zoom)%: badge set right with news")
+            #expect(rightWord.frame.minX == wordX, "\(zoom)%: set right, the word's minX \(rightWord.frame.minX)")
+            #expect(right.cell.trailingBadgeForTesting.isHidden == false)
+
+            // A registered Vault agent idle: the word, read by its nameless line.
+            let vault = try makeMarkLineTestCell(customAgentStates: ["my-vault-agent": .idle], zoomPercent: zoom)
+            let vaultWord = try #require(shownWord(vault), "\(zoom)%: a Vault agent idle")
+            #expect(vaultWord.toolTip == "An agent is idle")
+            #expect(vaultWord.accessibilityLabel() == "An agent is idle")
+
+            // Idle plus a running loader, spinner set right (Tom's grill Q43): the word, the loader's spinner on the title line.
+            let loaderRight = try makeMarkLineTestCell(spinnerAt: .trailing, idle: true, loaderCount: 1, zoomPercent: zoom)
+            #expect(shownWord(loaderRight) != nil, "\(zoom)%: idle beside a loader set right")
+            #expect(loaderRight.cell.trailingSpinnerForTesting?.isHidden == false, "\(zoom)%: the loader's spinner on the title line")
+
+            // On a Done row the word keeps full strength while the content dims.
+            let done = try makeMarkLineTestCell(idle: true, status: .done, zoomPercent: zoom)
+            let doneWord = try #require(shownWord(done), "\(zoom)%: Done row")
+            #expect(doneWord.alphaValue == 1)
+            #expect(done.cell.contentAlphaForTesting == 0.6)
+            #expect(doneWord.superview === done.cell, "outside the Done dim")
+
+            // Hide All Details keeps the word and its line.
+            let compactClean = try makeMarkLineTestCell(zoomPercent: zoom, hideAllDetails: true)
+            let compact = try makeMarkLineTestCell(idle: true, zoomPercent: zoom, hideAllDetails: true)
+            #expect(shownWord(compact) != nil, "\(zoom)%: Hide All Details")
+            #expect(height(compact) == height(compactClean) + lineGrowth)
+            if zoom == 100 { #expect(height(compact) == 51) }
+
+            // The words are `.6`'s builder's idle lines, tooltip and accessibility label both.
+            let claude = try makeMarkLineTestCell(customAgentStates: ["claude_code": .idle], zoomPercent: zoom)
+            let claudeWord = try #require(shownWord(claude))
+            let lines = SidebarAgentMarkTooltip.text(.idle, in: claude.model.snapshot.agentLists)
+            #expect(lines == "Claude Code is idle")
+            #expect(claudeWord.toolTip == lines)
+            #expect(claudeWord.accessibilityLabel() == lines)
+
+            // Its source is the per-agent state, never the hooks' pill: a stored "Idle" pill with the agent at unknown draws
+            // no word, and the word writes no status entry.
+            var pillWorkspace: Workspace?
+            let pill = try makeMarkLineTestCell(customAgentStates: ["claude_code": .unknown], zoomPercent: zoom) { workspace in
+                workspace.statusEntries["claude_code"] = SidebarStatusEntry(key: "claude_code", value: "Idle")
+                pillWorkspace = workspace
+            }
+            #expect(shownWord(pill) == nil, "\(zoom)%: the hooks' Idle pill alone")
+            #expect(pillWorkspace?.statusEntries.keys.sorted() == ["claude_code"])
+            var idleWorkspace: Workspace?
+            let entries = try makeMarkLineTestCell(idle: true, zoomPercent: zoom) { idleWorkspace = $0 }
+            #expect(shownWord(entries) != nil)
+            #expect(idleWorkspace?.statusEntries.isEmpty == true, "\(zoom)%: the word is not a status entry")
+        }
+    }
+
+    // MARK: - Scenario 135: SwiftUI row mark line under title (cm-128.9)
+
+    private static func renderHostBitmap(host: NSView, width: Int = 215, height: Int = 100) throws -> NSBitmapImageRep {
+        host.wantsLayer = true
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+        let hostLayer = try #require(host.layer, "the hosting view has no layer")
+        let rep = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: width * 2, pixelsHigh: height * 2,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+            isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        let graphics = try #require(NSGraphicsContext(bitmapImageRep: rep))
+        graphics.cgContext.setFillColor(NSColor.white.cgColor)
+        graphics.cgContext.fill(CGRect(x: 0, y: 0, width: width * 2, height: height * 2))
+        graphics.cgContext.scaleBy(x: 2, y: 2)
+        hostLayer.render(in: graphics.cgContext)
+        return rep
+    }
+
+    private static func findDarkBounds(in rep: NSBitmapImageRep, maxScanY: CGFloat = 80) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? {
+        var minX = CGFloat.infinity, maxX = -CGFloat.infinity, minY = CGFloat.infinity, maxY = -CGFloat.infinity
+        var found = false
+        for y in 0..<rep.pixelsHigh {
+            let ptY = CGFloat(rep.pixelsHigh - 1 - y) / 2.0
+            guard ptY <= maxScanY else { continue }
+            for x in 0..<rep.pixelsWide {
+                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                if c.redComponent < 0.4 && c.greenComponent < 0.4 && c.blueComponent < 0.4 && c.alphaComponent > 0.5 {
+                    let ptX = CGFloat(x) / 2.0
+                    minX = min(minX, ptX)
+                    maxX = max(maxX, ptX)
+                    minY = min(minY, ptY)
+                    maxY = max(maxY, ptY)
+                    found = true
+                }
+            }
+        }
+        return found ? (minX, maxX, minY, maxY) : nil
+    }
+
+    private static func findBlueBounds(in rep: NSBitmapImageRep) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? {
+        var minX = CGFloat.infinity, maxX = -CGFloat.infinity, minY = CGFloat.infinity, maxY = -CGFloat.infinity
+        var found = false
+        for y in 0..<rep.pixelsHigh {
+            let ptY = CGFloat(rep.pixelsHigh - 1 - y) / 2.0
+            for x in 0..<rep.pixelsWide {
+                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                if c.blueComponent > 0.7 && c.redComponent < 0.4 && c.alphaComponent > 0.5 {
+                    let ptX = CGFloat(x) / 2.0
+                    minX = min(minX, ptX)
+                    maxX = max(maxX, ptX)
+                    minY = min(minY, ptY)
+                    maxY = max(maxY, ptY)
+                    found = true
+                }
+            }
+        }
+        return found ? (minX, maxX, minY, maxY) : nil
+    }
+
+    /// Scenario 135: SwiftUI TabItemView puts the leading badge and the marks on a line under the title (cm-128.9).
+    /// (The AppKit half is covered by Scenario 130.)
+    @Test func scenario135_swiftUIRowPutsTheBadgeAndTheMarksUnderTheTitle() throws {
+        let suite = "WorkspaceStatusEntrancesTests.s135.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(SidebarIndicatorPosition.leading.rawValue, forKey: "sidebarNotificationBadgePosition")
+        defaults.set(SidebarIndicatorPosition.leading.rawValue, forKey: "sidebarLoadingSpinnerPosition")
+        defaults.set(true, forKey: "sidebarShowAgentActivity")
+        let rowSettings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+
+        func makeHost(unread: Int, running: Bool, zoomPercent: Int = 100) throws -> (host: NSHostingView<AnyView>, window: NSWindow) {
+            let workspace = Workspace()
+            _ = workspace.setCustomTitle("Workspace Title")
+            var snapshot = factory(workspace, list: Self.hisList, settings: rowSettings, showsAgentActivity: true).makeSnapshot()
+            snapshot.agentLists = SidebarAgentStateLists()
+            if running {
+                snapshot.agentLists.running = [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: false)]
+            }
+            let input = SidebarWorkspaceRowInput(
+                workspaceId: workspace.id, groupId: nil, isColorSectionMember: false, index: 0, workspaceCount: 1,
+                workspace: snapshot, isActive: false, isMultiSelected: false, hasUserCustomTitle: true,
+                hasCustomTitle: true, hasCustomDescription: false, customTitle: "Workspace Title", workspaceShortcutDigit: nil,
+                workspaceShortcutModifierSymbol: "⌘", canCloseWorkspace: false, unreadCount: unread, latestNotificationText: nil,
+                showsAgentActivity: true, rowSpacing: 0, showsModifierShortcutHints: false, isPointerHovering: false,
+                isBeingDragged: false, topDropIndicatorVisible: false, bottomDropIndicatorVisible: false,
+                settings: rowSettings, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
+                isChecklistPopoverPresented: false, isRemoteContextMenuEligible: false, remoteConnectionState: .disconnected,
+                contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false
+            )
+            let rowSnapshot = self.rowSnapshot(input)
+            let row = TabItemView(
+                snapshot: rowSnapshot,
+                actions: SidebarWorkspaceContextMenuWindowTargetsTests.actions(currentWindowMoveTargets: { [] })
+            )
+            let root = AnyView(
+                row
+                    .environment(\.colorScheme, .light)
+                    .environment(\.cmuxGlobalFontMagnificationPercent, zoomPercent)
+                    .frame(width: 215, alignment: .leading)
+            )
+            let host = NSHostingView(rootView: root)
+            host.frame = NSRect(x: 0, y: 0, width: 215, height: 100)
+            let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            for _ in 0..<10 {
+                host.layoutSubtreeIfNeeded()
+                _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.002))
+            }
+            return (host, window)
+        }
+
+        // 1. Clean row with nothing
+        let (cleanHost, cleanWindow) = try makeHost(unread: 0, running: false, zoomPercent: 100)
+        defer { cleanWindow.close() }
+        let cleanRep = try Self.renderHostBitmap(host: cleanHost)
+        let cleanTitle = try #require(Self.findDarkBounds(in: cleanRep), "clean row must render dark title text")
+
+        // 2. Row with unread 1 and running agent at 100%
+        let (host100, window100) = try makeHost(unread: 1, running: true, zoomPercent: 100)
+        defer { window100.close() }
+        let rep100 = try Self.renderHostBitmap(host: host100)
+        let title100 = try #require(Self.findDarkBounds(in: rep100), "host100 must render dark title text")
+        let badge100 = try #require(Self.findBlueBounds(in: rep100), "host100 must render blue unread badge")
+
+        // Title minX is identical between clean row and unread row (name never moves with news):
+        #expect(abs(title100.minX - cleanTitle.minX) <= 1.0, "title minX with news (\(title100.minX)) must equal clean title minX (\(cleanTitle.minX))")
+
+        // Badge is placed below the title line at the leading content edge:
+        #expect(badge100.minY >= cleanTitle.maxY - 1.0, "badge minY (\(badge100.minY)) must be below title maxY (\(cleanTitle.maxY))")
+        #expect(badge100.minX <= 18.0, "badge minX (\(badge100.minX)) must sit at leading content edge (~16 pt)")
+
+        // Spinner at 100%:
+        let spinners100 = Self.descendants(ofType: GPUSpinnerNSView.self, in: host100)
+        let spinner100 = try #require(spinners100.first)
+        let spinnerFrame100 = spinner100.convert(spinner100.bounds, to: host100)
+        #expect(spinnerFrame100.minX == 40.0, "spinner minX at 100% must be 40 pt (16 leading + 16 badge + 8 spacing)")
+        #expect(spinnerFrame100.width == 12.0, "spinner width at 100% must be 12 pt")
+        #expect(spinnerFrame100.height == 12.0, "spinner height at 100% must be 12 pt")
+        #expect(spinnerFrame100.minY >= cleanTitle.maxY + 4.0, "spinner must be under the title line (derived from title maxY + 4)")
+
+        // 3. Unread 0, running true at 100%: badge slot stays reserved, spinner stays at 40 pt (kills s2-b)
+        let (hostUnread0, windowUnread0) = try makeHost(unread: 0, running: true, zoomPercent: 100)
+        defer { windowUnread0.close() }
+        let spinnersUnread0 = Self.descendants(ofType: GPUSpinnerNSView.self, in: hostUnread0)
+        let spinnerUnread0 = try #require(spinnersUnread0.first)
+        let spinnerFrameUnread0 = spinnerUnread0.convert(spinnerUnread0.bounds, to: hostUnread0)
+        #expect(spinnerFrameUnread0.minX == 40.0, "with unread 0, badge slot remains reserved when badge position is .leading, keeping spinner at 40 pt")
+        #expect(spinnerFrameUnread0.width == 12.0, "spinner width must be 12 pt")
+
+        // 4. Row with unread 1 and running agent at 150%: marks scaled by .16 local indicatorScale (kills s2-c)
+        let (cleanHost150, cleanWindow150) = try makeHost(unread: 0, running: false, zoomPercent: 150)
+        defer { cleanWindow150.close() }
+        let cleanRep150 = try Self.renderHostBitmap(host: cleanHost150)
+        let cleanTitle150 = try #require(Self.findDarkBounds(in: cleanRep150), "clean 150% row must render dark title text")
+
+        let (host150, window150) = try makeHost(unread: 1, running: true, zoomPercent: 150)
+        defer { window150.close() }
+        let spinners150 = Self.descendants(ofType: GPUSpinnerNSView.self, in: host150)
+        let spinner150 = try #require(spinners150.first)
+        let spinnerFrame150 = spinner150.convert(spinner150.bounds, to: host150)
+        #expect(spinnerFrame150.minX == 48.0, "spinner minX at 150% must be 48 pt (16 leading + 24 badge + 8 spacing)")
+        #expect(spinnerFrame150.width == 18.0, "spinner width at 150% must be 18 pt (12 * 1.5)")
+        #expect(spinnerFrame150.height == 18.0, "spinner height at 150% must be 18 pt (12 * 1.5)")
+        #expect(spinnerFrame150.minY >= cleanTitle150.maxY + 4.0, "spinner at 150% must be under the title line (derived from title maxY + 4)")
+
+        // 5. 50% case: line height is 10 pt (floored max(8, 10)), not 8 pt (kills s2-a)
+        let (cleanHost50, cleanWindow50) = try makeHost(unread: 0, running: false, zoomPercent: 50)
+        defer { cleanWindow50.close() }
+        let (host50, window50) = try makeHost(unread: 1, running: true, zoomPercent: 50)
+        defer { window50.close() }
+        let spinners50 = Self.descendants(ofType: GPUSpinnerNSView.self, in: host50)
+        let spinner50 = try #require(spinners50.first)
+        let spinnerFrame50 = spinner50.convert(spinner50.bounds, to: host50)
+        #expect(spinnerFrame50.width == 10.0, "spinner width at 50% must be floored to 10 pt")
+        #expect(spinnerFrame50.height == 10.0, "spinner height at 50% must be 10 pt")
+        let heightDiff50 = host50.fittingSize.height - cleanHost50.fittingSize.height
+        #expect(heightDiff50 >= 14.0, "mark line height + 4 pt spacing at 50% (\(heightDiff50)) must be >= 14 pt (10 pt line + 4 pt spacing, not 8 pt badge + 4 pt)")
+    }
+
+    /// Ink (anything clearly darker than the white backdrop) in the band of point rows strictly between `belowY` and `aboveY`
+    /// that `base` does not have at the same pixel. Both renders are the same size; what is left is what the second row adds
+    /// in that band. (The band keeps out what the taller row only moves down, such as the row's last line.)
+    private static func findAddedInkBounds(in rep: NSBitmapImageRep, over base: NSBitmapImageRep, belowY: CGFloat, aboveY: CGFloat) -> (minX: CGFloat, maxX: CGFloat, minY: CGFloat, maxY: CGFloat)? {
+        func inked(_ c: NSColor?) -> Bool {
+            guard let c = c?.usingColorSpace(.sRGB) else { return false }
+            return c.redComponent < 0.8 && c.greenComponent < 0.8 && c.blueComponent < 0.8 && c.alphaComponent > 0.5
+        }
+        var minX = CGFloat.infinity, maxX = -CGFloat.infinity, minY = CGFloat.infinity, maxY = -CGFloat.infinity
+        var found = false
+        for y in 0..<rep.pixelsHigh {
+            let ptY = CGFloat(rep.pixelsHigh - 1 - y) / 2.0
+            guard ptY > belowY, ptY < aboveY else { continue }
+            for x in 0..<rep.pixelsWide where inked(rep.colorAt(x: x, y: y)) && !inked(base.colorAt(x: x, y: y)) {
+                let ptX = CGFloat(x) / 2.0
+                minX = min(minX, ptX)
+                maxX = max(maxX, ptX)
+                minY = min(minY, ptY)
+                maxY = max(maxY, ptY)
+                found = true
+            }
+        }
+        return found ? (minX, maxX, minY, maxY) : nil
+    }
+
+    /// Scenario 140, SwiftUI half: the Idle word draws on the line under the title, where the first mark draws
+    /// (`16 + badgeSide + 8`), under both badge settings, at 100% and 150% (cm-128.9). Which rows show it is the shared
+    /// rule's (`SidebarMarkLineRuleTests`); its words are `agentMarkTooltips.idle` (`SidebarAgentMarkTooltipTests`).
+    @Test func scenario140_swiftUIIdleWordSitsWhereTheFirstMarkDraws() throws {
+        func makeHost(badgeAt: SidebarIndicatorPosition, idle: Bool, zoomPercent: Int) throws -> (host: NSHostingView<AnyView>, window: NSWindow) {
+            let suite = "WorkspaceStatusEntrancesTests.s140.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            defaults.set(badgeAt.rawValue, forKey: "sidebarNotificationBadgePosition")
+            defaults.set(SidebarIndicatorPosition.leading.rawValue, forKey: "sidebarLoadingSpinnerPosition")
+            defaults.set(true, forKey: "sidebarShowAgentActivity")
+            let rowSettings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+            let workspace = Workspace()
+            _ = workspace.setCustomTitle("Workspace Title")
+            var snapshot = factory(workspace, list: Self.hisList, settings: rowSettings, showsAgentActivity: true).makeSnapshot()
+            snapshot.agentLists = SidebarAgentStateLists()
+            if idle {
+                snapshot.agentLists.idle = [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: false)]
+            }
+            let input = SidebarWorkspaceRowInput(
+                workspaceId: workspace.id, groupId: nil, isColorSectionMember: false, index: 0, workspaceCount: 1,
+                workspace: snapshot, isActive: false, isMultiSelected: false, hasUserCustomTitle: true,
+                hasCustomTitle: true, hasCustomDescription: false, customTitle: "Workspace Title", workspaceShortcutDigit: nil,
+                workspaceShortcutModifierSymbol: "⌘", canCloseWorkspace: false, unreadCount: 0, latestNotificationText: nil,
+                showsAgentActivity: true, rowSpacing: 0, showsModifierShortcutHints: false, isPointerHovering: false,
+                isBeingDragged: false, topDropIndicatorVisible: false, bottomDropIndicatorVisible: false,
+                settings: rowSettings, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
+                isChecklistPopoverPresented: false, isRemoteContextMenuEligible: false, remoteConnectionState: .disconnected,
+                contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false
+            )
+            let row = TabItemView(
+                snapshot: self.rowSnapshot(input),
+                actions: SidebarWorkspaceContextMenuWindowTargetsTests.actions(currentWindowMoveTargets: { [] })
+            )
+            let root = AnyView(
+                row
+                    .environment(\.colorScheme, .light)
+                    .environment(\.cmuxGlobalFontMagnificationPercent, zoomPercent)
+                    .frame(width: 215, alignment: .leading)
+            )
+            let host = NSHostingView(rootView: root)
+            host.frame = NSRect(x: 0, y: 0, width: 215, height: 100)
+            let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            window.contentView = host
+            for _ in 0..<10 {
+                host.layoutSubtreeIfNeeded()
+                _ = RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.002))
+            }
+            return (host, window)
+        }
+
+        for zoom in [100, 150] {
+            let scale = CGFloat(zoom) / 100
+            let badgeSide = 16 * scale
+            let wordX = 16 + badgeSide + 8
+            let lineHeight = max(badgeSide, max(10, 12 * scale))
+            for badgeAt in [SidebarIndicatorPosition.leading, .trailing] {
+                let (cleanHost, cleanWindow) = try makeHost(badgeAt: badgeAt, idle: false, zoomPercent: zoom)
+                defer { cleanWindow.close() }
+                let cleanRep = try Self.renderHostBitmap(host: cleanHost)
+                let cleanTitle = try #require(Self.findDarkBounds(in: cleanRep), "\(zoom)% \(badgeAt): the clean row's title")
+
+                let (idleHost, idleWindow) = try makeHost(badgeAt: badgeAt, idle: true, zoomPercent: zoom)
+                defer { idleWindow.close() }
+                let idleRep = try Self.renderHostBitmap(host: idleHost)
+                let idleTitle = try #require(Self.findDarkBounds(in: idleRep, maxScanY: cleanTitle.maxY))
+                #expect(abs(idleTitle.minX - cleanTitle.minX) <= 1.0, "\(zoom)% \(badgeAt): the name does not move")
+                let ink = try #require(Self.findAddedInkBounds(in: idleRep, over: cleanRep, belowY: cleanTitle.maxY, aboveY: cleanTitle.maxY + 4 + lineHeight + 3), "\(zoom)% \(badgeAt): the word draws under the title")
+                #expect(ink.minX >= wordX && ink.minX <= wordX + 1.5, "\(zoom)% \(badgeAt): the word's ink starts at \(ink.minX), expected \(wordX) to \(wordX + 1.5)")
+                #expect(ink.minY >= cleanTitle.maxY + 4, "\(zoom)% \(badgeAt): the word's ink top \(ink.minY) sits on the line under the title (title ink bottom \(cleanTitle.maxY))")
+            }
+        }
+    }
+}
+
+/// The line's rule and the Idle word's rule, as the one pure function both renderers call (cm-128.9, step 2 review R2):
+/// one case per term, so a mutation that drops or flips any live term fails a named expectation here. Each case says the
+/// term it pins. Five equivalent terms (no input told them apart) were deleted from the rule; each comment there says why.
+@MainActor
+@Suite("Mark line rule (cm-128.9)")
+struct SidebarMarkLineRuleTests {
+    private static func lists(
+        waiting: Bool, error: Bool, running: Bool, monitoring: Bool, idle: Bool, loaderCount: Int
+    ) -> SidebarAgentStateLists {
+        let entry = [SidebarAgentStateEntry(statusKey: "k", displayName: "d", paneCount: 1, usageLimit: false)]
+        var lists = SidebarAgentStateLists()
+        if waiting { lists.waiting = entry }
+        if error { lists.error = entry }
+        if running { lists.running = entry }
+        if monitoring { lists.monitoring = entry }
+        if idle { lists.idle = entry }
+        lists.loaderCount = loaderCount
+        return lists
+    }
+
+    private func line(
+        waiting: Bool = false, error: Bool = false, running: Bool = false, monitoring: Bool = false, idle: Bool = false,
+        loaderCount: Int = 0, showsAgentActivity: Bool = true, spinnerPos: SidebarIndicatorPosition = .leading,
+        badgePos: SidebarIndicatorPosition = .leading, unread: Int = 0, marked: Bool = false
+    ) -> Bool {
+        SidebarWorkspaceSlotResolution.showsMarkLine(
+            agentLists: Self.lists(waiting: waiting, error: error, running: running, monitoring: monitoring, idle: idle,
+                                   loaderCount: loaderCount),
+            showsAgentActivity: showsAgentActivity, loadingSpinnerPosition: spinnerPos,
+            notificationBadgePosition: badgePos, unreadCount: unread, markedUnread: marked
+        )
+    }
+
+    private func idleWord(
+        waiting: Bool = false, error: Bool = false, running: Bool = false, monitoring: Bool = false, idle: Bool = true,
+        loaderCount: Int = 0, showsAgentActivity: Bool = true, spinnerPos: SidebarIndicatorPosition = .leading,
+        badgePos: SidebarIndicatorPosition = .leading, unread: Int = 0, marked: Bool = false
+    ) -> Bool {
+        SidebarWorkspaceSlotResolution.showsIdleWord(
+            agentLists: Self.lists(waiting: waiting, error: error, running: running, monitoring: monitoring, idle: idle,
+                                   loaderCount: loaderCount),
+            showsAgentActivity: showsAgentActivity, loadingSpinnerPosition: spinnerPos,
+            notificationBadgePosition: badgePos, unreadCount: unread, markedUnread: marked
+        )
+    }
+
+    /// `showsMarkLine`: marks on the line, the agent half, the unread half.
+    @Test func slotResolutionShowsMarkLinePerTerm() {
+        // Nothing there: no line, gate on or off.
+        #expect(!line(showsAgentActivity: false))
+        #expect(!line(showsAgentActivity: true))
+
+        // Marks on the line bring it with the gate off. One case per term of `marksOnLine`:
+        #expect(line(waiting: true, showsAgentActivity: false), "marksOnLine: waiting")
+        #expect(line(error: true, showsAgentActivity: false), "marksOnLine: error")
+        #expect(line(running: true, showsAgentActivity: false, spinnerPos: .leading), "marksOnLine: running")
+        #expect(line(loaderCount: 1, showsAgentActivity: false, spinnerPos: .leading), "marksOnLine: loader")
+        #expect(line(monitoring: true, showsAgentActivity: false), "marksOnLine: monitoring")
+        #expect(!line(running: true, showsAgentActivity: false, spinnerPos: .trailing), "marksOnLine: the spinner-left gate")
+        #expect(!line(loaderCount: 1, showsAgentActivity: false, spinnerPos: .trailing), "marksOnLine: the spinner-left gate")
+
+        // The agent half: running and idle, behind the gate (waiting, error, monitoring and a left loader come through
+        // `marksOnLine`).
+        #expect(line(running: true, showsAgentActivity: true, spinnerPos: .trailing), "agentHalf: running, whatever the spinner")
+        #expect(line(idle: true, showsAgentActivity: true), "agentHalf: idle")
+        #expect(!line(idle: true, showsAgentActivity: false), "agentHalf: the showsAgentActivity gate")
+        #expect(!line(loaderCount: 1, showsAgentActivity: true, spinnerPos: .trailing), "a loader set right brings no line")
+
+        // The unread half.
+        #expect(line(showsAgentActivity: false, badgePos: .leading, unread: 2), "unreadHalf: count > 0")
+        #expect(line(showsAgentActivity: false, badgePos: .leading, marked: true), "unreadHalf: marked")
+        #expect(!line(showsAgentActivity: false, badgePos: .trailing, unread: 2), "unreadHalf: the badge-left gate")
+        #expect(!line(showsAgentActivity: false, badgePos: .trailing, marked: true), "unreadHalf: the badge-left gate")
+    }
+
+    /// `showsIdleWord`: only while the line shows, an agent is idle, no other list holds one, no left loader and no left news.
+    /// It has no idle term of its own: with the line guard and the four empty lists, only idle, a left loader or left news
+    /// can bring the line, and the last two checks reject the loader and the news.
+    @Test func slotResolutionShowsIdleWordPerTerm() {
+        // One idle agent, nothing else: the word (also pins the loader check's `loaderCount > 0` conjunct).
+        #expect(idleWord(), "one idle agent alone")
+        #expect(!idleWord(idle: false), "no agent, no word")
+        #expect(!idleWord(showsAgentActivity: false), "the showsMarkLine guard: the line is not there")
+
+        // Every other list empty, one case each.
+        #expect(!idleWord(waiting: true), "waiting must be empty")
+        #expect(!idleWord(error: true), "error must be empty")
+        #expect(!idleWord(running: true, spinnerPos: .trailing), "running must be empty (the spinner on the title line)")
+        #expect(!idleWord(running: true, spinnerPos: .leading), "running must be empty (the spinner on the line)")
+        #expect(!idleWord(monitoring: true), "monitoring must be empty")
+
+        // A loader's spinner on the line takes the word's place; set right, the word stays (Tom's grill Q43).
+        #expect(!idleWord(loaderCount: 1, spinnerPos: .leading), "the loader check")
+        #expect(idleWord(loaderCount: 1, spinnerPos: .trailing), "the loader check's spinner-left gate")
+
+        // Left news takes the word's place; set right, the badge is on the title line and the word stays.
+        #expect(!idleWord(badgePos: .leading, unread: 1), "the unread check: count > 0")
+        #expect(!idleWord(badgePos: .leading, marked: true), "the unread check: marked")
+        #expect(idleWord(badgePos: .trailing, unread: 1), "the unread check's badge-left gate")
+        #expect(idleWord(badgePos: .trailing, marked: true), "the unread check's badge-left gate")
+    }
 }
 
 @MainActor
