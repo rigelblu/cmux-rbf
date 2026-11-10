@@ -316,4 +316,43 @@ extension AgentNotificationRegressionTests {
         #expect(fixture.store.hasUnreadNotification(forTabId: fixture.source.id, surfaceId: fixture.panelId))
     }
 
+    /// cm-128.5 (Scenario 71): one Claude StopFailure, through the app's journal path, delivers exactly one
+    /// "Claude Code · Stopped on an error" notification that asks for the error sound; the next prompt removes it.
+    @Test func claudeStopFailureDeliversOneStoppedOnAnErrorWithTheErrorSoundAndThePromptRemovesIt() throws {
+        let fixture = try makeFixture()
+        defer { fixture.restore() }
+        fixture.source.surfaceResumeBindingsByPanelId[fixture.panelId] = SurfaceResumeBindingSnapshot(
+            name: "claude", kind: "claude", command: "agent resume", checkpointId: "session", source: "agent-hook", updatedAt: 1)
+        var deliveries: [TerminalNotificationPolicyEffects] = []
+        fixture.store.configureNotificationDeliveryHandlerForTesting { _, _, effects in deliveries.append(effects) }
+        func draft(_ kind: AgentJournalEventKind, at occurredAt: Int64, turn: String,
+                   notification: AgentJournalNotification? = nil) -> AgentJournalEventDraft {
+            AgentJournalEventDraft(kind: kind, occurredAtMs: occurredAt, source: "claude", agentKey: "claude_code",
+                sessionId: "session", workspaceId: fixture.source.id.uuidString,
+                surfaceId: fixture.panelId.uuidString,
+                attention: AgentAttentionContext(turnIdentity: turn, notification: notification))
+        }
+        var reconciler = AgentNotificationReconciler()
+        let started = AgentJournalEvent(sequence: 1, committedAtMs: 1, draft: draft(.turnStarted, at: 1, turn: "turn-1"))
+        _ = reconciler.apply(started)
+        let failed = AgentJournalEvent(sequence: 2, committedAtMs: 2, draft: draft(.errorReported, at: 2, turn: "turn-1",
+            notification: AgentJournalNotification(title: "Claude Code · Stopped on an error", subtitle: "",
+                body: "Session limit reached", category: "other")))
+        let decision = reconciler.apply(failed)
+        AgentJournalLifecycleCenter.deliverNotification(failed, identity: try #require(decision.identity))
+        TerminalMutationBus.shared.drainForTesting()
+        #expect(deliveries.count == 1, "one StopFailure must deliver one notification, delivered \(deliveries.count)")
+        #expect(fixture.store.notifications.count == 1)
+        let notification = try #require(fixture.store.notifications.first)
+        #expect(notification.title == "Claude Code · Stopped on an error", "title \(notification.title)")
+        #expect(notification.soundContext?.agentID == "claude", "sound context \(String(describing: notification.soundContext))")
+        #expect(notification.soundContext?.alertType == .errorStalled,
+                "sound context \(String(describing: notification.soundContext))")
+        // The next UserPromptSubmit starts a turn; the error notification leaves the store.
+        let next = AgentJournalEvent(sequence: 3, committedAtMs: 3, draft: draft(.turnStarted, at: 3, turn: "turn-2"))
+        AgentJournalLifecycleCenter.clearInvalidatedNotifications(next, decision: reconciler.apply(next))
+        TerminalMutationBus.shared.drainForTesting()
+        #expect(fixture.store.notifications.isEmpty, "the prompt must remove the error notification: \(fixture.store.notifications.map(\.title))")
+    }
+
 }

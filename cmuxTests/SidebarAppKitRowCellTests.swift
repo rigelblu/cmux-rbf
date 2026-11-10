@@ -1946,6 +1946,26 @@ struct SidebarAppKitRowCellTests {
         #expect(activeCell.currentModelForMeasurement?.isActive == true)
     }
 
+    /// cm-128.5 (Scenario 75): with one errored Claude pane the AppKit cell shows the warning triangle: its symbol,
+    /// its tooltip and its accessibility label.
+    @Test
+    func anErroredPaneShowsTheWarningTriangleWithItsSymbolTooltipAndLabel() throws {
+        var snapshot = Self.makeSnapshot()
+        snapshot.erroredAgents = [SidebarErroredAgent(statusKey: "claude_code", displayName: "Claude Code", usageLimit: false)]
+        let model = Self.makeModel(snapshot: snapshot)
+        let cell = Self.configuredCell(model: model)
+        _ = cell.layoutContent(model: model, width: 420, apply: true)
+        let triangle = try #require(cell.errorTriangleForTesting)
+        #expect(!triangle.isHidden)
+        #expect(triangle.toolTip == "Claude Code stopped on an error")
+        #expect(triangle.accessibilityLabel() == "Claude Code stopped on an error")
+        let expected = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: max(10, 12 * model.fontScale), weight: .semibold))
+        let expectedBytes = try #require(expected?.tiffRepresentation, "the expected symbol did not render")
+        let shownBytes = try #require(triangle.image?.tiffRepresentation, "the triangle shows no image")
+        #expect(shownBytes == expectedBytes, "the triangle must draw exclamationmark.triangle.fill")
+    }
+
     @Test
     func defaultSettingsResolveTheSameStackedVerticalBranchLayoutForBothRows() {
         let settings = SidebarTabItemSettingsSnapshot(defaults: Self.makeDefaults())
