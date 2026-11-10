@@ -222,7 +222,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         iconImageView.contentTintColor = model.tintHex.flatMap { NSColor(hex: $0) }
             ?? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme)
         if !model.hasOwnWorkspace { // (#cm-106) a dot where the icon was
-            iconImageView.image = SidebarHeaderOnlyLook.dotImage
+            iconImageView.image = SidebarHeaderOnlyLook.dotImage(scale: model.indicatorScale) // (cm-128.16)
             iconImageView.contentTintColor = SidebarHeaderOnlyLook.dotTint(tintHex: model.tintHex, colorScheme: colorScheme)
                 ?? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme)
         }
@@ -247,7 +247,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
                 count: model.anchorUnreadCount,
                 markedUnread: model.anchorMarkedUnread,
                 markColor: headerPalette.unreadMarkColor(isActive: model.isAnchorActive, colorScheme: colorScheme, sidebarStandIn: model.contrastBackgroundHex.flatMap { NSColor(hex: $0) }, drawsBand: !(model.statusHeaderKind?.isSection ?? false)),
-                markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.fontScale),
+                markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), // (cm-128.16)
                 fillColor: .controlAccentColor,
                 textColor: .white,
                 font: unreadBadgeFont
@@ -370,6 +370,12 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
 
     /// Where the icon view sits, in the cell's own coordinates (#cm-106).
     var iconFrameForTesting: NSRect { iconImageView.frame }
+
+    var chevronButtonForTesting: NSView { chevronButton } // (cm-128.16)
+    var pinImageViewForTesting: NSImageView { pinImageView } // (cm-128.16)
+    var plusButtonForTesting: NSView { plusButton } // (cm-128.16)
+    var unreadBadgeViewForTesting: SidebarRowUnreadBadgeView { unreadBadgeView } // (cm-128.16)
+    var nameFontForTesting: NSFont? { nameField.font } // (cm-128.16)
 #endif
 
     private func updatePlusVisibility() {
@@ -489,17 +495,28 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
 
     // MARK: Layout
 
+    /// Deterministic header row height for the given font scale and zoom percent. // (cm-128.16)
+    static func preferredHeight(fontScale: CGFloat, globalFontMagnificationPercent: Int) -> CGFloat { // (cm-128.16)
+        let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: fontScale) // (cm-128.16)
+        let percent = globalFontMagnificationPercent // (cm-128.16)
+        let nameFont = NSFont.systemFont( // (cm-128.16)
+            ofSize: GlobalFontMagnification.scaledSize(metrics.nameFontSize, percent: percent), // (cm-128.16)
+            weight: .semibold // (cm-128.16)
+        ) // (cm-128.16)
+        let nameLineHeight = ceil(nameFont.ascender - nameFont.descender + nameFont.leading) // (cm-128.16)
+        let chevronFrame = GlobalFontMagnification.scaledSize(metrics.chevronFrame, percent: percent) // (cm-128.16)
+        let iconFrame = GlobalFontMagnification.scaledSize(metrics.iconFrame, percent: percent) // (cm-128.16)
+        let plusFrame = GlobalFontMagnification.scaledSize(metrics.plusFrame, percent: percent) // (cm-128.16)
+        let content = max(chevronFrame, iconFrame, plusFrame, nameLineHeight) // (cm-128.16)
+        return ceil(content + 10) // (cm-128.16)
+    } // (cm-128.16)
+
     /// Deterministic row height; must stay in lockstep with `layout()`.
     static func preferredHeight(model: SidebarGroupHeaderRowModel) -> CGFloat {
-        let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale)
-        let percent = model.globalFontMagnificationPercent
-        let nameFont = NSFont.systemFont(
-            ofSize: GlobalFontMagnification.scaledSize(metrics.nameFontSize, percent: percent),
-            weight: .semibold
-        )
-        let nameLineHeight = ceil(nameFont.ascender - nameFont.descender + nameFont.leading)
-        let content = max(metrics.chevronFrame, metrics.iconFrame, metrics.plusFrame, nameLineHeight)
-        return ceil(content + 10)
+        preferredHeight( // (cm-128.16)
+            fontScale: model.fontScale, // (cm-128.16)
+            globalFontMagnificationPercent: model.globalFontMagnificationPercent // (cm-128.16)
+        ) // (cm-128.16)
     }
 
     override func layout() {
@@ -511,6 +528,10 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
         let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale)
+        let percent = model.globalFontMagnificationPercent // (cm-128.16)
+        let chevronFrame = GlobalFontMagnification.scaledSize(metrics.chevronFrame, percent: percent) // (cm-128.16)
+        let iconFrame = GlobalFontMagnification.scaledSize(metrics.iconFrame, percent: percent) // (cm-128.16)
+        let plusFrame = GlobalFontMagnification.scaledSize(metrics.plusFrame, percent: percent) // (cm-128.16)
         let outerPad = SidebarWorkspaceListMetrics.rowOuterHorizontalPadding
         // A nested header's band starts at its own indent, 12 pt per level; a top-level header's is full width (#cm-106).
         let indent = SidebarNestedIndent.points(levels: model.depth, availableWidth: bounds.width)
@@ -525,17 +546,17 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         }
 
         if !pinImageView.isHidden {
-            pinImageView.frame = centered(metrics.iconFrame)
+            pinImageView.frame = centered(iconFrame) // (cm-128.16)
             x = pinImageView.frame.maxX + 4
         }
-        chevronButton.frame = centered(metrics.chevronFrame)
+        chevronButton.frame = centered(chevronFrame) // (cm-128.16)
         x = chevronButton.frame.maxX + 4
 
-        let plusSide = metrics.plusFrame
+        let plusSide = plusFrame // (cm-128.16)
         plusButton.frame = NSRect(x: contentMaxX - plusSide, y: midY - plusSide / 2, width: plusSide, height: plusSide)
 
         if !iconImageView.isHidden { // (#cm-110.1)
-            iconImageView.frame = centered(metrics.iconFrame) // (#cm-110.1)
+            iconImageView.frame = centered(iconFrame) // (#cm-110.1) (cm-128.16)
             x = iconImageView.frame.maxX + 6 // (#cm-110.1)
         } // (#cm-110.1)
 
@@ -544,7 +565,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         var badgeSize = NSSize.zero
         if !unreadBadgeView.isHidden {
             if model.anchorUnreadCount == 0 && model.anchorMarkedUnread {
-                badgeSize = NSSize(width: 16 * model.fontScale, height: 16 * model.fontScale)
+                let badgeSide = 16 * model.indicatorScale // (cm-128.16)
+                badgeSize = NSSize(width: badgeSide, height: badgeSide) // (cm-128.16)
             } else {
                 let textSize = NSString(string: "\(model.anchorUnreadCount)")
                     .size(withAttributes: [.font: unreadBadgeFont])
@@ -1091,7 +1113,7 @@ extension SidebarGroupHeaderTableCellView { // (#cm-110.1)
                     glyph: model.statusGlyph, // (#cm-110.1)
                     behavesAs: model.statusBehavesAs // (#cm-110.1)
                 ), // (#cm-110.1)
-                fontScale: model.fontScale, // (#cm-110.1)
+                fontScale: model.indicatorScale, // (cm-128.16)
                 colorScheme: colorScheme, // (#cm-110.1)
                 nameColor: nameTextColor(model, palette: headerPalette), // (#cm-110.1)
                 tickColor: headerPalette.compositedBandColor // (#cm-110.1)
@@ -1119,7 +1141,7 @@ extension SidebarGroupHeaderTableCellView { // (#cm-110.1)
                 count: model.anchorUnreadCount,
                 markedUnread: model.anchorMarkedUnread,
                 markColor: headerPalette.unreadMarkColor(isActive: model.isAnchorActive, colorScheme: colorScheme, sidebarStandIn: model.contrastBackgroundHex.flatMap { NSColor(hex: $0) }, drawsBand: !(model.statusHeaderKind?.isSection ?? false)),
-                markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.fontScale), // (#cm-110.1)
+                markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), // (cm-128.16)
                 fillColor: .controlAccentColor, // (#cm-110.1)
                 textColor: .white, // (#cm-110.1)
                 font: unreadBadgeFont // (#cm-110.1)

@@ -188,11 +188,11 @@ struct SidebarWorkspaceStatusDropPaintTests {
             for item in f.items {
                 switch item {
                 case .statusesHeader:
-                    rows.append(VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusesArea, presentation: nil, memberCount: 1, memberIds: [], folds: .init(), environment: environment, onToggle: {}))
+                    rows.append(VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusesArea, presentation: nil, memberCount: 1, memberIds: [], folds: .init(), environment: environment, sidebarFontScale: 1.0, onToggle: {})) // (cm-128.16)
                 case .statusGroupHeader:
                     rows.append(VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusGroup("parked"),
                         presentation: .init(name: "Parked", tintHex: "#555555", glyph: nil, behavesAs: .todo), memberCount: f.members.count,
-                        memberIds: Set(f.members), folds: .init(collapsedStatusIds: landing == .foldedHeader ? ["parked"] : []), environment: environment, onToggle: {}))
+                        memberIds: Set(f.members), folds: .init(collapsedStatusIds: landing == .foldedHeader ? ["parked"] : []), environment: environment, sidebarFontScale: 1.0, onToggle: {})) // (cm-128.16)
                 case .workspace(let id):
                     var model = SidebarAppKitRowCellTests.makeModel(workspaceId: id, colorSchemeIsDark: false)
                     model.depth = f.members.contains(id) ? 2 : 0

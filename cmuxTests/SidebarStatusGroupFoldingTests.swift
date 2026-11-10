@@ -279,6 +279,7 @@ struct SidebarStatusGroupFoldingTests {
             kind: kind, presentation: .init(name: "Parked", tintHex: nil, glyph: nil, behavesAs: .todo),
             memberCount: ids.count, memberIds: ids, folds: folds,
             environment: .init(colorScheme: .light, globalFontMagnificationPercent: 100, lazyContractProbe: .init()),
+            sidebarFontScale: 1.0, // (cm-128.16)
             onToggle: onToggle, onFocusAnchor: onFocusAnchor
         )
     }

@@ -146,7 +146,9 @@ extension VerticalTabsSidebar {
             let id = group.statusId
             if let view = Self.sidebarStatusGroupHeaderRow(statusId: id, projection: renderContext.statusGroupProjection,
                 presentations: renderContext.statusGroupPresentationById, listWidth: renderContext.listWidth,
-                environment: renderContext.environment, folds: renderContext.statusGroupFolds,
+                environment: renderContext.environment,
+                sidebarFontScale: renderContext.tabItemSettings.sidebarFontScale, // (cm-128.16)
+                folds: renderContext.statusGroupFolds,
                 unreadSnapshot: unreadSnapshot, onToggle: { toggle(.statusGroup(id)) }) {
                 groups[id] = wrapped(view, kind: .statusGroup(id))
             }
