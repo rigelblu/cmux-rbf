@@ -310858,115 +310858,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إظهار المؤشر على يسار صف مساحة العمل (بمشاركة موضع شارة غير المقروء) أو على يمينه."
+            "value": "إظهار المؤشر مع علامات الوكيل أسفل اسم مساحة العمل، أو على يمين صف مساحة العمل."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Prikazuje indikator lijevo (dijeli mjesto sa značkom nepročitanog) ili desno u redu radnog prostora."
+            "value": "Prikazuje indikator uz oznake agenata ispod naziva radnog prostora ili desno u redu radnog prostora."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Viser indikatoren til venstre (deler plads med ulæst-mærket) eller til højre i arbejdsområdets række."
+            "value": "Viser indikatoren sammen med agentmærkerne under arbejdsområdets navn eller til højre i arbejdsområdets række."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zeigt den Indikator links (teilt den Platz mit der Ungelesen-Plakette) oder rechts in der Arbeitsbereichszeile."
+            "value": "Zeigt den Indikator bei den Agent-Markierungen unter dem Namen des Arbeitsbereichs oder rechts in der Arbeitsbereichszeile."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show the spinner on the left (sharing the unread badge slot) or the right of the workspace row."
+            "value": "Show the spinner with the agent marks under the workspace name, or at the right of the workspace row."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Muestra el indicador a la izquierda (compartiendo el espacio de la insignia de no leídos) o a la derecha de la fila del espacio de trabajo."
+            "value": "Muestra el indicador junto a las marcas del agente bajo el nombre del espacio de trabajo, o a la derecha de la fila del espacio de trabajo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Affiche l’indicateur à gauche (partageant l’emplacement du badge non lu) ou à droite de la ligne de l’espace de travail."
+            "value": "Affiche l’indicateur avec les marques d’agent sous le nom de l’espace de travail, ou à droite de la ligne de l’espace de travail."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mostra l’indicatore a sinistra (condividendo lo spazio del badge non letti) o a destra della riga dello spazio di lavoro."
+            "value": "Mostra l’indicatore con i segni dell’agente sotto il nome dello spazio di lavoro, oppure a destra della riga dello spazio di lavoro."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "スピナーをワークスペース行の左（未読バッジの位置を共有）または右に表示します。"
+            "value": "スピナーをワークスペース名の下のエージェントマークと一緒に、またはワークスペース行の右に表示します。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បង្ហាញសញ្ញាកំពុងផ្ទុកជាមួយសញ្ញាភ្នាក់ងារនៅក្រោមឈ្មោះកន្លែងធ្វើការ ឬនៅខាងស្ដាំនៃជួរកន្លែងធ្វើការ។"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "워크스페이스 행의 왼쪽(읽지 않음 배지 자리 공유) 또는 오른쪽에 스피너를 표시합니다."
+            "value": "스피너를 워크스페이스 이름 아래의 에이전트 표시와 함께 또는 워크스페이스 행의 오른쪽에 표시합니다."
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Viser indikatoren til venstre (deler plass med ulest-merket) eller til høyre i arbeidsområderaden."
+            "value": "Viser indikatoren sammen med agentmerkene under arbeidsområdets navn, eller til høyre i arbeidsområderaden."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pokazuje wskaźnik po lewej stronie (współdzieląc miejsce z plakietką nieprzeczytanych) lub po prawej stronie wiersza obszaru roboczego."
+            "value": "Pokazuje wskaźnik obok znaczników agentów pod nazwą obszaru roboczego lub po prawej stronie wiersza obszaru roboczego."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mostra o indicador à esquerda (compartilhando o espaço do selo de não lidos) ou à direita da linha do espaço de trabalho."
+            "value": "Mostra o indicador com as marcas do agente abaixo do nome do espaço de trabalho ou à direita da linha do espaço de trabalho."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Показывает индикатор слева (совместно со значком непрочитанного) или справа в строке рабочего пространства."
+            "value": "Показывает индикатор вместе с метками агентов под названием рабочего пространства или справа в строке рабочего пространства."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "แสดงตัวบ่งชี้ทางซ้าย (ใช้ตำแหน่งเดียวกับป้ายยังไม่ได้อ่าน) หรือทางขวาของแถวเวิร์กสเปซ"
+            "value": "แสดงตัวบ่งชี้พร้อมเครื่องหมายเอเจนต์ใต้ชื่อเวิร์กสเปซ หรือทางขวาของแถวเวิร์กสเปซ"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Göstergeyi çalışma alanı satırının solunda (okunmamış rozetiyle aynı yeri paylaşır) veya sağında gösterir."
+            "value": "Göstergeyi çalışma alanı adının altındaki ajan işaretleriyle birlikte veya çalışma alanı satırının sağında gösterir."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Показує індикатор ліворуч (спільно зі значком непрочитаного) або праворуч у рядку робочого простору."
+            "value": "Показує індикатор разом із позначками агентів під назвою робочого простору або праворуч у рядку робочого простору."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在工作区行的左侧（与未读标记共用位置）或右侧显示指示器。"
+            "value": "在工作区名称下方与代理标记一起显示指示器，或在工作区行的右侧显示。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在工作區列的左側（與未讀標記共用位置）或右側顯示指示器。"
+            "value": "在工作區名稱下方與代理標記一起顯示指示器，或在工作區列的右側顯示。"
           }
         }
       }
@@ -426620,6 +426626,131 @@
           "stringUnit": {
             "state": "translated",
             "value": "啟用以聚焦此工作區。拖曳以重新排序，或使用上移和下移動作。"
+          }
+        }
+      }
+    },
+    "sidebar.workspace.agentLine.idle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "خامل"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Miruje"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inaktiv"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inaktiv"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idle"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inactivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inactif"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inattivo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待機中"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ទំនេរ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inaktiv"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bezczynny"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inativo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Простаивает"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไม่ได้ทำงาน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boşta"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Простоює"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空闲"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閒置"
           }
         }
       }

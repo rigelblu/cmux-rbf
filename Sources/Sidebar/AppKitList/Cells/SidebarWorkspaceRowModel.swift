@@ -105,6 +105,30 @@ struct SidebarWorkspaceRowModel: Equatable {
         GlobalFontMagnification.scaledSize(base * fontScale, percent: globalFontMagnificationPercent)
     }
 
+    /// Whether the line under the status-and-name line shows (cm-128.9).
+    var showsMarkLine: Bool {
+        SidebarWorkspaceSlotResolution.showsMarkLine(
+            agentLists: snapshot.agentLists,
+            showsAgentActivity: showsAgentActivity,
+            loadingSpinnerPosition: settings.loadingSpinnerPosition,
+            notificationBadgePosition: settings.notificationBadgePosition,
+            unreadCount: unreadCount,
+            markedUnread: markedUnread
+        )
+    }
+
+    /// Whether the quiet "Idle" word shows on the mark line (cm-128.9).
+    var showsIdleWord: Bool {
+        SidebarWorkspaceSlotResolution.showsIdleWord(
+            agentLists: snapshot.agentLists,
+            showsAgentActivity: showsAgentActivity,
+            loadingSpinnerPosition: settings.loadingSpinnerPosition,
+            notificationBadgePosition: settings.notificationBadgePosition,
+            unreadCount: unreadCount,
+            markedUnread: markedUnread
+        )
+    }
+
     /// Equality over every field that can influence the measured row height.
     /// `index` feeds only the accessibility label and `isFirstRow` only the
     /// drop-indicator frame in the apply pass (`layoutContent(apply: true)`),
