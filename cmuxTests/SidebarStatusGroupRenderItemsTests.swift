@@ -939,7 +939,8 @@ import CmuxWorkspaces
             memberCount: memberCount,
             unreadCount: 0,
             isCollapsed: false,
-            environment: environment()
+            environment: environment(),
+            sidebarFontScale: 1.0 // (cm-128.16)
         )
     }
 
@@ -1082,7 +1083,7 @@ import CmuxWorkspaces
         #expect(cell.accessibilityHelp() == nil)
 
         let area = Sidebar.statusHeaderModel(
-            kind: .statusesArea, presentation: nil, memberCount: 3, unreadCount: 0, isCollapsed: false, environment: Self.environment()
+            kind: .statusesArea, presentation: nil, memberCount: 3, unreadCount: 0, isCollapsed: false, environment: Self.environment(), sidebarFontScale: 1.0 // (cm-128.16)
         )
         cell.configurePresentation(model: area)
         #expect(cell.accessibilityIdentifier() == "sidebarStatusesArea")
@@ -1161,7 +1162,7 @@ import CmuxWorkspaces
         #expect(gone.tintHex == nil)
         // The AppKit model carries what the presentation says.
         let model = Sidebar.statusHeaderModel(
-            kind: .statusGroup("parked"), presentation: parked, memberCount: 0, unreadCount: 0, isCollapsed: false, environment: Self.environment()
+            kind: .statusGroup("parked"), presentation: parked, memberCount: 0, unreadCount: 0, isCollapsed: false, environment: Self.environment(), sidebarFontScale: 1.0 // (cm-128.16)
         )
         #expect(model.statusBehavesAs == .todo)
         #expect(model.statusGlyph == nil)
@@ -1213,19 +1214,16 @@ import CmuxWorkspaces
             kind: .statusGroup("done"), presentation: presentation, memberCount: 1, unreadCount: 0,
             isCollapsed: false, environment: .init(
                 colorScheme: .light, globalFontMagnificationPercent: 150, lazyContractProbe: SidebarLazyContractProbe()
-            )
+            ),
+            sidebarFontScale: 1.0 // cmux-rbf: changed on purpose (#cm-128.16)
         )
         let header = SidebarStatusGroupSwiftUIHeader(
             statusId: "done", presentation: presentation, memberCount: 1, isCollapsed: false,
             listWidth: 320, colorScheme: .light, fontScale: model.fontScale,
             globalFontMagnificationPercent: model.globalFontMagnificationPercent
         )
-        let expectedSide = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale).iconFrame
-        #expect(header.glyphImage.size == NSSize(width: expectedSide, height: expectedSide))
-        #expect(header.glyphImage.size != NSSize(
-            width: SidebarWorkspaceGroupHeaderMetrics(fontScale: 1).iconFrame,
-            height: SidebarWorkspaceGroupHeaderMetrics(fontScale: 1).iconFrame
-        ))
+        #expect(header.glyphImage.size == NSSize(width: 21, height: 21)) // cmux-rbf: changed on purpose (#cm-128.16) — glyph now drawn at indicatorScale, 14 × 1.5 — glyph now drawn at indicatorScale, 14 × 1.5
+        #expect(header.glyphImage.size != NSSize(width: 14, height: 14)) // cmux-rbf: changed on purpose (#cm-128.16) — glyph now drawn at indicatorScale, 14 × 1.5
     }
 
     @Test func theMountedSwiftUIStatusHeaderUsesItsRowModelsScaleAndAppKitTypography() throws {
@@ -1238,15 +1236,17 @@ import CmuxWorkspaces
         ])
         let model = Sidebar.statusHeaderModel(
             kind: .statusGroup("done"), presentation: presentation, memberCount: 1, unreadCount: 0,
-            isCollapsed: false, environment: environment
+            isCollapsed: false, environment: environment,
+            sidebarFontScale: 1.0 // cmux-rbf: changed on purpose (#cm-128.16)
         )
         let header = try #require(Sidebar.sidebarStatusGroupHeaderRow(
             statusId: "done", projection: projection, presentations: ["done": presentation],
-            listWidth: 320, environment: environment
+            listWidth: 320, environment: environment,
+            sidebarFontScale: 1.0 // cmux-rbf: changed on purpose (#cm-128.16)
         ))
         #expect(header.fontScale == model.fontScale)
         let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale)
-        #expect(header.glyphImage.size == NSSize(width: metrics.iconFrame, height: metrics.iconFrame))
+        #expect(header.glyphImage.size == NSSize(width: 21, height: 21)) // cmux-rbf: changed on purpose (#cm-128.16) — glyph now drawn at indicatorScale, 14 × 1.5
         let cell = SidebarGroupHeaderTableCellView(frame: NSRect(x: 0, y: 0, width: 320, height: 42))
         cell.configurePresentation(model: model)
         let name = try #require(cell.subviews.compactMap { $0 as? NSTextField }.first { $0.stringValue == "Done" })
@@ -1316,7 +1316,8 @@ import CmuxWorkspaces
         let presentation = SidebarStatusGroupPresentation(name: "Done", tintHex: "#6B7280", glyph: nil, behavesAs: .done)
         let model = Sidebar.statusHeaderModel(
             kind: .statusGroup("done"), presentation: presentation, memberCount: 1, unreadCount: 0,
-            isCollapsed: false, environment: Self.environment()
+            isCollapsed: false, environment: Self.environment(),
+            sidebarFontScale: 1.0 // (cm-128.16)
         )
         let cell = SidebarGroupHeaderTableCellView(frame: NSRect(x: 0, y: 0, width: 320, height: 28))
         cell.configurePresentation(model: model)

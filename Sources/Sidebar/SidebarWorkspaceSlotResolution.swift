@@ -1,3 +1,4 @@
+import CmuxFoundation // (cm-128.16)
 import CmuxSettings
 import CoreGraphics // (#cm-109.3)
 
@@ -75,6 +76,11 @@ struct SidebarWorkspaceSlotResolution: Equatable, Sendable {
     static func handRaisedSymbolPointSize(spinnerSide: CGFloat) -> CGFloat { // (#cm-109.3)
         spinnerSide * 8.5 / 12.0 // (#cm-109.3)
     } // (#cm-109.3)
+
+    /// Combined indicator scale: fontScale * magnification scale. (cm-128.16)
+    static func indicatorScale(fontScale: CGFloat, magnificationPercent: Int) -> CGFloat { // (cm-128.16)
+        fontScale * GlobalFontMagnification.scale(for: magnificationPercent)
+    }
 
     /// The gap between a trailing badge and the spinner beside it, in points: the code's spinner spacing.
     static let trailingMarkGap: CGFloat = 6

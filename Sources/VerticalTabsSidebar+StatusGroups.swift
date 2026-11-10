@@ -360,6 +360,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         memberIds: Set<UUID>,
         folds: WorkspaceStatusGroupsState,
         environment: SidebarWorkspaceTableEnvironmentSnapshot,
+        sidebarFontScale: CGFloat, // (cm-128.16)
         onToggle: @escaping @MainActor () -> Void,
         isBeingDragged: Bool = false,
         onFocusAnchor: @escaping (NSEvent.ModifierFlags) -> Void = { _ in }
@@ -373,7 +374,9 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         }
         let model = statusHeaderModel(
             kind: kind, presentation: presentation, memberCount: memberCount,
-            unreadCount: 0, isCollapsed: collapsed, environment: environment, isBeingDragged: isBeingDragged
+            unreadCount: 0, isCollapsed: collapsed, environment: environment,
+            sidebarFontScale: sidebarFontScale, // (cm-128.16)
+            isBeingDragged: isBeingDragged
         )
         var configuration = SidebarWorkspaceTableRowConfiguration(
             statusHeaderModel: model, statusHeaderKind: kind,
@@ -443,6 +446,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         presentations: [String: SidebarStatusGroupPresentation],
         listWidth: CGFloat?,
         environment: SidebarWorkspaceTableEnvironmentSnapshot,
+        sidebarFontScale: CGFloat, // (cm-128.16)
         folds: WorkspaceStatusGroupsState = WorkspaceStatusGroupsState(),
         unreadSnapshot: SidebarUnreadSnapshot = SidebarUnreadSnapshot(),
         onToggle: @escaping @MainActor () -> Void = {}
@@ -456,7 +460,8 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         let model = Self.statusHeaderModel(
             kind: .statusGroup(statusId), presentation: presentation,
             memberCount: memberIds.count, unreadCount: unreadCount,
-            isCollapsed: collapsed, environment: environment
+            isCollapsed: collapsed, environment: environment,
+            sidebarFontScale: sidebarFontScale // (cm-128.16)
         )
         return SidebarStatusGroupSwiftUIHeader(
             statusId: statusId, presentation: presentation,
@@ -476,6 +481,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
         unreadCount: Int,
         isCollapsed: Bool,
         environment: SidebarWorkspaceTableEnvironmentSnapshot,
+        sidebarFontScale: CGFloat, // (cm-128.16)
         isBeingDragged: Bool = false
     ) -> SidebarGroupHeaderRowModel {
         let identity: UUID
@@ -526,7 +532,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             shortcutHintText: nil,
             shortcutHintXOffset: 0,
             shortcutHintYOffset: 0,
-            fontScale: CGFloat(environment.globalFontMagnificationPercent) / 100,
+            fontScale: sidebarFontScale, // (cm-128.16)
             globalFontMagnificationPercent: environment.globalFontMagnificationPercent,
             cwdContextMenuItems: [],
             rowSpacing: 0,
@@ -580,6 +586,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             memberCount: renderContext.statusGroupProjection?.groups.count ?? 0,
             memberIds: renderContext.statusGroupProjection?.allDisplayMemberWorkspaceIds ?? [],
             folds: renderContext.statusGroupFolds, environment: renderContext.environment,
+            sidebarFontScale: renderContext.tabItemSettings.sidebarFontScale, // (cm-128.16)
             onToggle: { toggle(.statusesArea) },
             isBeingDragged: dragState.draggedTabId == SidebarStatusHeaderIdentity.statusesAreaUUID
         )
@@ -597,6 +604,7 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             kind: .statusGroup(statusId), presentation: presentation,
             memberCount: memberIds.count, memberIds: memberIds,
             folds: renderContext.statusGroupFolds, environment: renderContext.environment,
+            sidebarFontScale: renderContext.tabItemSettings.sidebarFontScale, // (cm-128.16)
             onToggle: { toggle(.statusGroup(statusId)) },
             isBeingDragged: dragState.draggedTabId == SidebarStatusHeaderIdentity.uuid(forStatusId: statusId)
         )

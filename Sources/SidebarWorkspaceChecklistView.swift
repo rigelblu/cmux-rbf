@@ -175,6 +175,7 @@ struct SidebarWorkspaceChecklistSection: View {
     let summaryFont: Font
     let itemFont: Font
     let fontScale: CGFloat
+    let indicatorScale: CGFloat // (cm-128.16)
     /// Whether add-item entry points are exposed by the remote controls flag.
     let canAddItems: Bool
     let onToggleExpansion: () -> Void
@@ -394,7 +395,7 @@ struct SidebarWorkspaceChecklistSection: View {
             Spacer(minLength: 0)
             WorkspaceChecklistAttachmentMenu(
                 item: item,
-                iconPointSize: 9 * fontScale,
+                iconPointSize: 9 * indicatorScale, // (cm-128.16)
                 foregroundColor: secondaryColor,
                 countFont: itemFont,
                 addAttachments: actions.addAttachments,
@@ -472,7 +473,7 @@ struct SidebarWorkspaceChecklistSection: View {
             actions.removeItem(item.id)
         } label: {
             CmuxSystemSymbolImage(magnified: "xmark.circle.fill", pointSize: 9 * fontScale, tint: secondaryColor)
-                .frame(width: 9 * fontScale + 8, height: 9 * fontScale + 8, alignment: .center)
+                .frame(width: 9 * indicatorScale + 8, height: 9 * indicatorScale + 8, alignment: .center) // (cm-128.16)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

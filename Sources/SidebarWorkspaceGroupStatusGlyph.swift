@@ -59,7 +59,7 @@ extension VerticalTabsSidebar {
 extension SidebarGroupHeaderTableCellView {
     func applyGroupStatusGlyph(_ model: SidebarGroupHeaderRowModel, palette: SidebarGroupHeaderBandPalette) {
         guard let glyph = model.groupStatusGlyph else { return }
-        iconImageView.image = glyph.image(fontScale: model.fontScale,
+        iconImageView.image = glyph.image(fontScale: model.indicatorScale, // (cm-128.16)
                                          colorScheme: model.colorSchemeIsDark ? .dark : .light, band: palette)
         iconImageView.contentTintColor = nil
     }

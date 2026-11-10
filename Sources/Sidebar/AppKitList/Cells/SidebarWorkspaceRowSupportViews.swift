@@ -556,8 +556,8 @@ final class SidebarRowPullRequestLine: NSView {
     ) {
         let color = palette.secondary(0.75)
         let font = NSFont.systemFont(ofSize: model.scaled(10), weight: .semibold)
-        iconView.configure(status: display.status, color: color, fontScale: model.fontScale)
-        iconSize = SidebarRowPullRequestIconView.size(status: display.status, fontScale: model.fontScale)
+        iconView.configure(status: display.status, color: color, fontScale: model.indicatorScale) // (cm-128.16)
+        iconSize = SidebarRowPullRequestIconView.size(status: display.status, fontScale: model.indicatorScale) // (cm-128.16)
         let title = "\(display.label) #\(display.number)"
         titleButton.isHidden = !clickable
         titleLabel.isHidden = clickable
@@ -617,6 +617,10 @@ final class SidebarRowPullRequestLine: NSView {
             width: ceil(statusSize.width), height: statusSize.height
         )
     }
+
+#if DEBUG
+    var iconViewForTesting: SidebarRowPullRequestIconView { iconView } // (cm-128.16)
+#endif
 }
 
 /// Borderless underlined text-link button (PR titles, ports).

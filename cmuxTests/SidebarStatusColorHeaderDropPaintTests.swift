@@ -379,11 +379,14 @@ struct SidebarStatusColorHeaderDropPaintTests {
                         makeContent: { _, _ in AnyView(header) }))
                 case .statusesHeader:
                     rows.append(VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusesArea, presentation: nil,
-                        memberCount: 0, memberIds: [], folds: .init(), environment: environment, onToggle: {}))
+                        memberCount: 0, memberIds: [], folds: .init(), environment: environment,
+                        sidebarFontScale: 1.0, // (cm-128.16)
+                        onToggle: {}))
                 case .statusGroupHeader(let id):
                     rows.append(VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusGroup(id),
                         presentation: .init(name: id, tintHex: nil, glyph: nil, behavesAs: .working),
                         memberCount: id == "a" ? 1 : 0, memberIds: [], folds: .init(), environment: environment,
+                        sidebarFontScale: 1.0, // (cm-128.16)
                         onToggle: {}, isBeingDragged: SidebarStatusHeaderIdentity.uuid(forStatusId: id) == fixture.sourceId))
                 case .workspace(let id):
                     rows.append(.init(id: item.id, workspaceId: id, groupId: nil, isGroupHeader: false,

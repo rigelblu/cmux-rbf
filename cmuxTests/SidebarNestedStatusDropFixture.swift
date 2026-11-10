@@ -296,13 +296,16 @@ final class SidebarNestedStatusDropFixture {
             case .statusesHeader:
                 return VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusesArea,presentation: nil,
                     memberCount: projection?.groups.count ?? 0,memberIds: projection?.allMemberWorkspaceIds ?? [],folds: state.statusGroups ?? .init(),
-                    environment: environment,onToggle: { [self] in state.toggleStatusesArea() })
+                    environment: environment,
+                    sidebarFontScale: 1.0, // (cm-128.16)
+                    onToggle: { [self] in state.toggleStatusesArea() })
             case .statusGroupHeader(let id):
                 let entry = list.entry(id: id)!
                 let members = projection?.group(for: id)?.memberWorkspaceIds ?? []
                 return VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusGroup(id),
                     presentation: .init(name: WorkspaceStatusPresentation.text(entry.label),tintHex: hexes[id]!,glyph: nil,behavesAs: entry.behavesAs),
                     memberCount: members.count,memberIds: Set(members),folds: state.statusGroups ?? .init(),environment: environment,
+                    sidebarFontScale: 1.0, // (cm-128.16)
                     onToggle: { [self] in state.toggleStatusGroup(id: id) })
             case .workspace(let id):
                 let workspace = manager.tabs.first { $0.id == id }!
