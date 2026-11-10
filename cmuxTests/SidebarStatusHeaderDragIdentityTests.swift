@@ -162,7 +162,9 @@ struct SidebarStatusHeaderDragIdentityTests {
     private static func configuration(kind: SidebarStatusHeaderKind) -> SidebarWorkspaceTableRowConfiguration {
         VerticalTabsSidebar.statusHeaderConfiguration(kind: kind, presentation: nil, memberCount: 0, memberIds: [],
             folds: .init(), environment: .init(colorScheme: .light, globalFontMagnificationPercent: 100,
-                                              lazyContractProbe: .init()), onToggle: {})
+                                              lazyContractProbe: .init()),
+            sidebarFontScale: 1.0, // (cm-128.16)
+            onToggle: {})
     }
     private static func mount(kind: SidebarStatusHeaderKind, actions: SidebarWorkspaceTableActions? = nil)
         async -> (SidebarWorkspaceTableController, SidebarWorkspaceTableContainerView) {

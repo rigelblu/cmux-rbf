@@ -239,7 +239,7 @@ final class SidebarRowChecklistItemLine: NSView {
         guard let model else { return nil }
         let checkboxSize = checkbox.glyphImage?.size ?? .zero
         let attachSize = attachmentButton.measuredSize()
-        let removeSlot = 9 * model.fontScale + 8
+        let removeSlot = 9 * model.indicatorScale + 8 // (cm-128.16)
         // HStack(spacing: 4): checkbox·text·Spacer·attachment·remove — the
         // spacer contributes two spacings even at zero width.
         let textWidth = max(10, width - checkboxSize.width - 4 - 8 - attachSize.width - 4 - removeSlot)
@@ -405,4 +405,11 @@ final class SidebarRowChecklistItemLine: NSView {
         })
         return menu
     }
+
+#if DEBUG // (cm-128.16)
+    var attachmentButtonForTesting: SidebarRowChecklistAttachmentButton { attachmentButton } // (cm-128.16)
+    var removeSlotForTesting: CGFloat { // (cm-128.16)
+        metrics(width: 200)?.removeSlot ?? 0 // (cm-128.16)
+    } // (cm-128.16)
+#endif // (cm-128.16)
 }

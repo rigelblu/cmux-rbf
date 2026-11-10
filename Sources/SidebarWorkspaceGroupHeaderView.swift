@@ -231,6 +231,13 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
 #if DEBUG
         let _ = { sidebarLazyContractProbe.groupHeaderRowBody?() }()
 #endif
+        let indicatorScale = SidebarWorkspaceSlotResolution.indicatorScale( // (cm-128.16)
+            fontScale: fontScale, // (cm-128.16)
+            magnificationPercent: globalFontMagnificationPercent // (cm-128.16)
+        ) // (cm-128.16)
+        let chevronFrame = GlobalFontMagnification.scaledSize(metrics.chevronFrame, percent: globalFontMagnificationPercent) // (cm-128.16)
+        let iconFrame = GlobalFontMagnification.scaledSize(metrics.iconFrame, percent: globalFontMagnificationPercent) // (cm-128.16)
+        let plusFrame = GlobalFontMagnification.scaledSize(metrics.plusFrame, percent: globalFontMagnificationPercent) // (cm-128.16)
         HStack(spacing: 4) {
             if isPinned {
                 CmuxSystemSymbolImage(
@@ -239,7 +246,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     weight: .semibold,
                     tint: .secondary
                 )
-                .frame(width: metrics.iconFrame, height: metrics.iconFrame)
+                .frame(width: iconFrame, height: iconFrame) // (cm-128.16)
                 .safeHelp(pinnedGroupTooltip)
                 .accessibilityLabel(Text(pinnedGroupTooltip))
             }
@@ -249,7 +256,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                 weight: .semibold,
                 tint: .secondary,
                 appliesGlobalFontMagnification: true)
-                .frame(width: metrics.chevronFrame, height: metrics.chevronFrame)
+                .frame(width: chevronFrame, height: chevronFrame) // (cm-128.16)
                 .contentShape(Rectangle())
                 .onTapGesture { actions.onToggleCollapsed() }
                 .accessibilityAddTraits(.isButton)
@@ -268,7 +275,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     weight: .semibold,
                     tint: iconColor,
                     appliesGlobalFontMagnification: true)
-                    .frame(width: metrics.iconFrame, height: metrics.iconFrame)
+                    .frame(width: iconFrame, height: iconFrame) // (cm-128.16)
                     .accessibilityHidden(true)
                     // (#cm-106) a header with no workspace draws a dot where the icon was; the icon keeps its frame
                     .opacity(hasOwnWorkspace ? 1 : 0)
@@ -276,14 +283,14 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                         if !hasOwnWorkspace {
                             Circle()
                                 .fill(dotColor)
-                                .frame(width: SidebarHeaderOnlyLook.dotDiameter, height: SidebarHeaderOnlyLook.dotDiameter)
+                                .frame(width: SidebarHeaderOnlyLook.dotDiameter * indicatorScale, height: SidebarHeaderOnlyLook.dotDiameter * indicatorScale) // (cm-128.16)
                         }
                     }
                     .opacity(groupStatusGlyph == nil ? 1 : 0) // (#cm-110.2)
                     .overlay { // (#cm-110.2)
                         if let groupStatusGlyph { // (#cm-110.2)
                             SidebarWorkspaceGroupStatusGlyphButton(glyph: groupStatusGlyph, menu: groupStatusMenu, // (#cm-110.2)
-                                fontScale: fontScale, colorScheme: colorScheme, band: bandPalette, apply: actions.onSetStatus) // (#cm-110.2)
+                                fontScale: indicatorScale, colorScheme: colorScheme, band: bandPalette, apply: actions.onSetStatus) // (cm-128.16)
                         } // (#cm-110.2)
                     } // (#cm-110.2)
                 Text(name)
@@ -322,12 +329,12 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                     weight: .medium,
                     tint: .secondary,
                     appliesGlobalFontMagnification: true)
-                    .frame(width: metrics.plusFrame, height: metrics.plusFrame)
+                    .frame(width: plusFrame, height: plusFrame) // (cm-128.16)
                     .contentShape(Rectangle())
                     .opacity(plusVisible ? 1 : 0)
             }
             .buttonStyle(.plain)
-            .frame(width: metrics.plusFrame, height: metrics.plusFrame)
+            .frame(width: plusFrame, height: plusFrame) // (cm-128.16)
             .allowsHitTesting(plusVisible)
             .accessibilityHidden(!plusVisible)
             .accessibilityLabel(Text(String(

@@ -43,6 +43,14 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     let shortcutHintYOffset: Double
     let fontScale: CGFloat
     let globalFontMagnificationPercent: Int
+
+    /// Scaling for fixed-point indicators that grow with Everything Zoom (cm-128.16).
+    var indicatorScale: CGFloat {
+        SidebarWorkspaceSlotResolution.indicatorScale(
+            fontScale: fontScale,
+            magnificationPercent: globalFontMagnificationPercent
+        )
+    } // (cm-128.16)
     let cwdContextMenuItems: [CmuxResolvedConfigContextMenuItem]
     let rowSpacing: CGFloat
     let isFirstRow: Bool

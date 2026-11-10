@@ -212,6 +212,7 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
         let header = try #require(Sidebar.sidebarStatusGroupHeaderRow(statusId: "parked", projection: p,
             presentations: Sidebar.statusGroupPresentations(projection: p, list: list, colorHexes: colors), listWidth: 240,
             environment: .init(colorScheme: .light, globalFontMagnificationPercent: 100, lazyContractProbe: .init()),
+            sidebarFontScale: 1.0, // (cm-128.16)
             folds: .init(collapsedStatusIds: ["parked"]), unreadSnapshot: unread))
         #expect(header.unreadCount == 4)
         #expect(header.memberCount == 4)

@@ -12,12 +12,27 @@ struct SidebarStatusUnreadBadge: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.sidebarContrastBackgroundHex) private var sidebarContrastBackgroundHex
 
+    private var indicatorScale: CGFloat { // (cm-128.16)
+        SidebarWorkspaceSlotResolution.indicatorScale( // (cm-128.16)
+            fontScale: fontScale, // (cm-128.16)
+            magnificationPercent: globalFontMagnificationPercent // (cm-128.16)
+        ) // (cm-128.16)
+    } // (cm-128.16)
+
+    private var markDiameter: CGFloat { // (cm-128.16)
+        SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: indicatorScale) // (cm-128.16)
+    } // (cm-128.16)
+
+    private var slotSize: CGFloat { // (cm-128.16)
+        16 * indicatorScale // (cm-128.16)
+    } // (cm-128.16)
+
     var body: some View {
         let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: fontScale)
         if count == 0 && markedUnread {
             Circle().fill(markColor ?? defaultMarkColor)
-                .frame(width: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: fontScale), height: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: fontScale))
-                .frame(width: 16 * fontScale, height: 16 * fontScale)
+                .frame(width: markDiameter, height: markDiameter) // (cm-128.16)
+                .frame(width: slotSize, height: slotSize) // (cm-128.16)
         } else {
             Text("\(count)")
             .font(.system(size: GlobalFontMagnification.scaledSize(metrics.unreadFontSize,
@@ -40,4 +55,9 @@ struct SidebarStatusUnreadBadge: View {
             selectionColorHex: nil, notificationBadgeColorHex: nil, attentionTaskStatus: nil)
             .unreadMarkColor(sidebarStandIn: fill))
     }
+
+#if DEBUG // (cm-128.16)
+    var markDiameterForTesting: CGFloat { markDiameter } // (cm-128.16)
+    var slotSizeForTesting: CGFloat { slotSize } // (cm-128.16)
+#endif // (cm-128.16)
 }

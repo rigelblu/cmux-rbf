@@ -73,7 +73,7 @@ struct SidebarNewWorkspaceTabIndexTests {
                         }
                     }
                     configurations.append(VerticalTabsSidebar.statusHeaderConfiguration(kind: kind, presentation: nil, memberCount: hidden.count, memberIds: Set(hidden),
-                        folds: folds, environment: environment, onToggle: {}))
+                        folds: folds, environment: environment, sidebarFontScale: 1.0, onToggle: {})) // (cm-128.16)
                 case .groupHeader(let name, let pinned, let folded, let pinnedByGroup):
                     let anchorId = id(name), hidden = folded.map(id)
                     let group = WorkspaceGroup(id: UUID(), name: name, isCollapsed: !hidden.isEmpty, isPinned: pinned, anchorWorkspaceId: anchorId, customColor: nil, iconSymbol: nil)
@@ -390,7 +390,7 @@ struct SidebarNewWorkspaceTabIndexTests {
         let environment = SidebarWorkspaceTableEnvironmentSnapshot(colorScheme: .light, globalFontMagnificationPercent: 100, lazyContractProbe: .init())
         let model = VerticalTabsSidebar.statusHeaderModel(kind: .statusGroup("parked"),
             presentation: SidebarStatusGroupPresentation(name: "Parked", tintHex: "#6B7280", glyph: .symbol("archivebox"), behavesAs: .todo),
-            memberCount: 2, unreadCount: 0, isCollapsed: true, environment: environment)
+            memberCount: 2, unreadCount: 0, isCollapsed: true, environment: environment, sidebarFontScale: 1.0) // (cm-128.16)
         let hidden = [UUID(), UUID()]
         func changed(_ snapshot: SidebarUnreadSnapshot) -> SidebarGroupHeaderRowModel { var next = model; next.anchorUnreadCount = 3; return next }
         var statusHeader = SidebarWorkspaceTableRowConfiguration(statusHeaderModel: model, statusHeaderKind: .statusGroup("parked"),

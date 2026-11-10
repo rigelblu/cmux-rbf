@@ -245,7 +245,7 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
         HStack(spacing: 7) {
             Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
                 .font(.system(size: chevronFontPointSize, weight: .semibold))
-                .frame(width: 10)
+                .frame(width: chevronFrameWidth) // (cm-128.16)
             Image(nsImage: glyphImage)
             Text(presentation.name)
                 .font(.system(size: nameFontPointSize, weight: .semibold))
@@ -258,7 +258,7 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 2)
-        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26)
+        .frame(maxWidth: .infinity, minHeight: calculatedBandHeight, maxHeight: calculatedBandHeight) // (cm-128.16)
         .contentShape(Rectangle())
         .onTapGesture { onToggle() }
         .background(Color(nsColor: palette.bandColor).opacity(palette.bandOpacity))
@@ -289,8 +289,12 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
 
     var glyphImage: NSImage {
         let palette = bandPalette
+        let indicatorScale = SidebarWorkspaceSlotResolution.indicatorScale( // (cm-128.16)
+            fontScale: fontScale, // (cm-128.16)
+            magnificationPercent: globalFontMagnificationPercent // (cm-128.16)
+        ) // (cm-128.16)
         return SidebarStatusHeaderGlyphImage.make(
-            presentation: presentation, fontScale: fontScale, colorScheme: colorScheme,
+            presentation: presentation, fontScale: indicatorScale, colorScheme: colorScheme, // (cm-128.16)
             nameColor: palette.primaryTextColor, tickColor: palette.compositedBandColor
         )
     }
@@ -304,6 +308,21 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
             multiSelectionBackgroundStyle: .clear,
             renderedAppearance: .init(colorScheme: colorScheme, contrast: colorSchemeContrast)
         )
+    }
+
+    var chevronFrameWidth: CGFloat {
+        let indicatorScale = SidebarWorkspaceSlotResolution.indicatorScale( // (cm-128.16)
+            fontScale: fontScale, // (cm-128.16)
+            magnificationPercent: globalFontMagnificationPercent // (cm-128.16)
+        ) // (cm-128.16)
+        return 10 * indicatorScale // (cm-128.16)
+    }
+
+    var calculatedBandHeight: CGFloat {
+        SidebarGroupHeaderTableCellView.preferredHeight( // (cm-128.16)
+            fontScale: fontScale, // (cm-128.16)
+            globalFontMagnificationPercent: globalFontMagnificationPercent // (cm-128.16)
+        ) // (cm-128.16)
     }
 }
 
