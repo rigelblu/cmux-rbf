@@ -770,21 +770,22 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             presentationActive: isPresentationActive,
             in: self // (#cm-128.3)
         )
-        let agentCount = model.snapshot.activeCodingAgentCount
-        let tooltip = agentCount == 1
-            ? String(localized: "sidebar.agentActivity.tooltip.one", defaultValue: "Loading (1 active task)")
-            : String.localizedStringWithFormat(
-                String(localized: "sidebar.agentActivity.tooltip.many", defaultValue: "Loading (%lld active tasks)"),
-                agentCount
-            )
-        markSpinner?.toolTip = tooltip
-        trailingSpinner?.toolTip = tooltip
+        // cm-128.6: the one builder names the agents; the loaders' line comes last.
+        let tooltip = SidebarAgentMarkTooltip.text(.running, in: model.snapshot.agentLists)
+        for spinner in [markSpinner, trailingSpinner] {
+            spinner?.toolTip = tooltip
+            // cm-128.6: a plain NSView is no accessibility element, so VoiceOver would skip the label. Same role as the hand and
+            // the triangle, which are NSImageViews.
+            spinner?.setAccessibilityElement(true)
+            spinner?.setAccessibilityRole(.image)
+            spinner?.setAccessibilityLabel(tooltip)
+        }
 
         monitoringImageView = Self.updateAgentMark(
             existing: monitoringImageView,
             visible: model.showsAgentActivity && model.snapshot.monitoringAgentCount > 0,
             color: palette.semantic(spinnerColor),
-            tooltip: String(localized: "sidebar.agentMonitoring.tooltip", defaultValue: "Watching a background job"),
+            tooltip: SidebarAgentMarkTooltip.text(.monitoring, in: model.snapshot.agentLists), // (cm-128.6)
             symbolName: "waveform.path.ecg",
             pointSize: max(10, 12 * model.fontScale),
             weight: SidebarWorkspaceMonitoringWaveform.symbolWeight,
@@ -792,7 +793,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         )
 
         let handVisible = slotResolution.showsHand // (#cm-109.3)
-        let waitingTooltip = handVisible ? String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer") : "" // (#cm-109.3)
+        let waitingTooltip = handVisible ? SidebarAgentMarkTooltip.text(.waiting, in: model.snapshot.agentLists) : "" // (#cm-109.3) cm-128.6: the builder
         let handYellow = waitingHandYellow(for: palette.colorScheme) // (#cm-109.7)
         let handOutlined = Self.rowContrastBackground(model: model, palette: palette) // (#cm-109.7)
             .map { handNeedsOutline(yellow: handYellow, on: $0, drawnAt: 1) } ?? false // (#cm-109.7) cm-128.5: no agent mark dims, so full strength
@@ -812,8 +813,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             visible: handVisible && handOutlined, // (#cm-109.7)
             in: self // (#cm-109.7)
         ) // (#cm-109.7)
-        let errorTooltip = SidebarAgentErrorSummary.tooltip(for: model.snapshot.erroredAgents)
-        let triangleVisible = !model.snapshot.erroredAgents.isEmpty
+        let errorTooltip = SidebarAgentMarkTooltip.text(.error, in: model.snapshot.agentLists) // (cm-128.6)
+        let triangleVisible = !model.snapshot.agentLists.error.isEmpty // (cm-128.6)
         let triangle = Self.updateAgentMark(
             existing: errorTriangleView,
             visible: triangleVisible,

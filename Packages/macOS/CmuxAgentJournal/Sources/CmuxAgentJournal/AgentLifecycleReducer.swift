@@ -3,8 +3,8 @@
 /// Determinism contract (unit-tested): the fold's result is a pure function
 /// of the *set* of events, independent of delivery order or re-delivery —
 /// each session keeps only its newest event by journal sequence, duplicates
-/// and stale arrivals are dropped, and the surface-level phase is a
-/// precedence combine over live sessions.
+/// and stale arrivals are dropped, and the surface-level phase is the
+/// newest live session's (cm-128.6).
 ///
 /// ```swift
 /// var state = AgentLifecycleReducerState()
