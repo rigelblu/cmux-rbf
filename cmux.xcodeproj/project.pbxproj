@@ -2018,6 +2018,7 @@
 		124760000000000000000007 /* GhosttyNSView+PreparedImageTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 124770000000000000000007 /* GhosttyNSView+PreparedImageTransfer.swift */; };
 		265FFB2D782433ED46B87F32 /* GhosttyNSView+RemoteReconnect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47895BD8BBB2418438E708F5 /* GhosttyNSView+RemoteReconnect.swift */; };
 		C75100010000000000000001 /* GhosttyNSView+SelectionTranslation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75100010000000000000002 /* GhosttyNSView+SelectionTranslation.swift */; };
+		C136B0000000000000000011 /* GhosttyNSView+ReplyInline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000011 /* GhosttyNSView+ReplyInline.swift */; };
 		EC010E01 /* GhosttyNSView+TerminalCustomUpload.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC010E02 /* GhosttyNSView+TerminalCustomUpload.swift */; };
 		C54860070000000000000001 /* GhosttyNSViewSurfaceLinkCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54860070000000000000002 /* GhosttyNSViewSurfaceLinkCopy.swift */; };
 		C0DE12220000000000000003 /* GhosttyNumericLocaleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE12220000000000000004 /* GhosttyNumericLocaleController.swift */; };
@@ -2769,6 +2770,22 @@
 		A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */; };
 		804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804100000000000000000004 /* ReorderShortcutActionTests.swift */; };
 		A5009001 /* ReplyAnnotationManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5009000 /* ReplyAnnotationManifest.swift */; };
+		C136B0000000000000000003 /* ReplyInlinePaste.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000003 /* ReplyInlinePaste.swift */; };
+		C136B0000000000000000002 /* ReplyInlinePlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000002 /* ReplyInlinePlacement.swift */; };
+		C136B0000000000000000001 /* ReplyInlineTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000001 /* ReplyInlineTrigger.swift */; };
+		C136B0000000000000000005 /* ReplyInlineToolbarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000005 /* ReplyInlineToolbarController.swift */; };
+		C136B0000000000000000010 /* ReplyInlinePasteTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000010 /* ReplyInlinePasteTarget.swift */; };
+		C136B000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift */; };
+		C136B000000000000000000E /* ReplyInlineEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000E /* ReplyInlineEnvironment.swift */; };
+		C136B000000000000000000D /* ReplyInlineDismissal.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000D /* ReplyInlineDismissal.swift */; };
+		C136B000000000000000000C /* ReplyInlineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000C /* ReplyInlineEvent.swift */; };
+		C136B000000000000000000B /* ReplyInlineDismissReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000B /* ReplyInlineDismissReason.swift */; };
+		C136B000000000000000000A /* ReplyInlineTriggerDecision.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000A /* ReplyInlineTriggerDecision.swift */; };
+		C136B0000000000000000009 /* ReplyInlinePassage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000009 /* ReplyInlinePassage.swift */; };
+		C136B0000000000000000008 /* ReplyInlineTriggerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000008 /* ReplyInlineTriggerInput.swift */; };
+		C136B0000000000000000007 /* ReplyInlineGridGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000007 /* ReplyInlineGridGeometry.swift */; };
+		C136B0000000000000000006 /* ReplyInlineSelectionGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000006 /* ReplyInlineSelectionGeometry.swift */; };
+		C136B0000000000000000004 /* ReplyInlineToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000004 /* ReplyInlineToolbarView.swift */; };
 		69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */; };
 		D8850002D8850002D8850002 /* ReplyLabelMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */; };
 		285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */; };
@@ -3683,6 +3700,11 @@
 		126570000000000000000004 /* TerminalPortalTestWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 126570000000000000000003 /* TerminalPortalTestWorkspace.swift */; };
 		D0F101000000000000000003 /* TerminalRawMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F101000000000000000013 /* TerminalRawMode.swift */; };
 		D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */; };
+		C136D0000000000000000004 /* ReplyInlineDismissTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000004 /* ReplyInlineDismissTests.swift */; };
+		C136D0000000000000000005 /* ReplyInlineShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000005 /* ReplyInlineShellTests.swift */; };
+		C136D0000000000000000003 /* ReplyInlinePasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000003 /* ReplyInlinePasteTests.swift */; };
+		C136D0000000000000000002 /* ReplyInlinePlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */; };
+		C136D0000000000000000001 /* ReplyInlineTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */; };
 		D5671001D5671001D5671001 /* TerminalScrollSpeedSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671002D5671002D5671002 /* TerminalScrollSpeedSettings.swift */; };
 		D5671101D5671101D5671101 /* TerminalScrollSpeedSettingsFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671102D5671102D5671102 /* TerminalScrollSpeedSettingsFileStoreTests.swift */; };
 		862C77A9D235803A22B715B5 /* TerminalSearchNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E62F3D413D19EEA3E96B1271 /* TerminalSearchNavigation.swift */; };
@@ -6174,6 +6196,7 @@
 		124770000000000000000007 /* GhosttyNSView+PreparedImageTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/GhosttyNSView+PreparedImageTransfer.swift"; sourceTree = SOURCE_ROOT; };
 		47895BD8BBB2418438E708F5 /* GhosttyNSView+RemoteReconnect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GhosttyNSView+RemoteReconnect.swift"; sourceTree = "<group>"; };
 		C75100010000000000000002 /* GhosttyNSView+SelectionTranslation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GhosttyNSView+SelectionTranslation.swift"; sourceTree = "<group>"; };
+		C136A0000000000000000011 /* GhosttyNSView+ReplyInline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GhosttyNSView+ReplyInline.swift"; sourceTree = "<group>"; };
 		EC010E02 /* GhosttyNSView+TerminalCustomUpload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GhosttyNSView+TerminalCustomUpload.swift"; sourceTree = "<group>"; };
 		C54860070000000000000002 /* GhosttyNSViewSurfaceLinkCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyNSViewSurfaceLinkCopy.swift; sourceTree = "<group>"; };
 		C0DE12220000000000000004 /* GhosttyNumericLocaleController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyNumericLocaleController.swift; sourceTree = "<group>"; };
@@ -6911,6 +6934,22 @@
 		A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReopenLastClosedTests.swift; sourceTree = "<group>"; };
 		804100000000000000000004 /* ReorderShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderShortcutActionTests.swift; sourceTree = "<group>"; };
 		A5009000 /* ReplyAnnotationManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyAnnotationManifest.swift; sourceTree = "<group>"; };
+		C136A0000000000000000003 /* ReplyInlinePaste.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlinePaste.swift; sourceTree = "<group>"; };
+		C136A0000000000000000002 /* ReplyInlinePlacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlinePlacement.swift; sourceTree = "<group>"; };
+		C136A0000000000000000001 /* ReplyInlineTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineTrigger.swift; sourceTree = "<group>"; };
+		C136A0000000000000000005 /* ReplyInlineToolbarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineToolbarController.swift; sourceTree = "<group>"; };
+		C136A0000000000000000010 /* ReplyInlinePasteTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlinePasteTarget.swift; sourceTree = "<group>"; };
+		C136A000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineWorkspacePasteTarget.swift; sourceTree = "<group>"; };
+		C136A000000000000000000E /* ReplyInlineEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineEnvironment.swift; sourceTree = "<group>"; };
+		C136A000000000000000000D /* ReplyInlineDismissal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineDismissal.swift; sourceTree = "<group>"; };
+		C136A000000000000000000C /* ReplyInlineEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineEvent.swift; sourceTree = "<group>"; };
+		C136A000000000000000000B /* ReplyInlineDismissReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineDismissReason.swift; sourceTree = "<group>"; };
+		C136A000000000000000000A /* ReplyInlineTriggerDecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineTriggerDecision.swift; sourceTree = "<group>"; };
+		C136A0000000000000000009 /* ReplyInlinePassage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlinePassage.swift; sourceTree = "<group>"; };
+		C136A0000000000000000008 /* ReplyInlineTriggerInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineTriggerInput.swift; sourceTree = "<group>"; };
+		C136A0000000000000000007 /* ReplyInlineGridGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineGridGeometry.swift; sourceTree = "<group>"; };
+		C136A0000000000000000006 /* ReplyInlineSelectionGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineSelectionGeometry.swift; sourceTree = "<group>"; };
+		C136A0000000000000000004 /* ReplyInlineToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineToolbarView.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyAnnotationManifestRenderTests.swift; sourceTree = "<group>"; };
 		D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelMenuTests.swift; sourceTree = "<group>"; };
 		D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelsFileParserTests.swift; sourceTree = "<group>"; };
@@ -7816,6 +7855,11 @@
 		126570000000000000000003 /* TerminalPortalTestWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalPortalTestWorkspace.swift"; sourceTree = "<group>"; };
 		D0F101000000000000000013 /* TerminalRawMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRawMode.swift; sourceTree = "<group>"; };
 		D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReplyStartTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000004 /* ReplyInlineDismissTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineDismissTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000005 /* ReplyInlineShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineShellTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000003 /* ReplyInlinePasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlinePasteTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlinePlacementTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineTriggerTests.swift; sourceTree = "<group>"; };
 		D5671002D5671002D5671002 /* TerminalScrollSpeedSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/TerminalScrollSpeedSettings.swift; sourceTree = "<group>"; };
 		D5671102D5671102D5671102 /* TerminalScrollSpeedSettingsFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalScrollSpeedSettingsFileStoreTests.swift; sourceTree = "<group>"; };
 		E62F3D413D19EEA3E96B1271 /* TerminalSearchNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Find/TerminalSearchNavigation.swift; sourceTree = "<group>"; };
@@ -9941,6 +9985,7 @@
 				C7261F030000000000000002 /* GhosttyNSView+PointerFocusActivation.swift */,
 				47895BD8BBB2418438E708F5 /* GhosttyNSView+RemoteReconnect.swift */,
 				C75100010000000000000002 /* GhosttyNSView+SelectionTranslation.swift */,
+				C136A0000000000000000011 /* GhosttyNSView+ReplyInline.swift */,
 				D0B1000BA1B2C3D4E5F60001 /* GhosttyTerminalViewSupport.swift */,
 				D0B10013A1B2C3D4E5F60001 /* GhosttyApp+SurfaceConfigurationReload.swift */,
 				D3571001A1B2C3D4E5F60718 /* GhosttyNSView+IMEComposition.swift */,
@@ -10673,6 +10718,22 @@
 				A5001419 /* MarkdownPanelView.swift */,
 				A50014F4 /* MarkdownWebRenderer.swift */,
 				A5009000 /* ReplyAnnotationManifest.swift */,
+				C136A0000000000000000003 /* ReplyInlinePaste.swift */,
+				C136A0000000000000000002 /* ReplyInlinePlacement.swift */,
+				C136A0000000000000000001 /* ReplyInlineTrigger.swift */,
+				C136A0000000000000000005 /* ReplyInlineToolbarController.swift */,
+				C136A0000000000000000010 /* ReplyInlinePasteTarget.swift */,
+				C136A000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift */,
+				C136A000000000000000000E /* ReplyInlineEnvironment.swift */,
+				C136A000000000000000000D /* ReplyInlineDismissal.swift */,
+				C136A000000000000000000C /* ReplyInlineEvent.swift */,
+				C136A000000000000000000B /* ReplyInlineDismissReason.swift */,
+				C136A000000000000000000A /* ReplyInlineTriggerDecision.swift */,
+				C136A0000000000000000009 /* ReplyInlinePassage.swift */,
+				C136A0000000000000000008 /* ReplyInlineTriggerInput.swift */,
+				C136A0000000000000000007 /* ReplyInlineGridGeometry.swift */,
+				C136A0000000000000000006 /* ReplyInlineSelectionGeometry.swift */,
+				C136A0000000000000000004 /* ReplyInlineToolbarView.swift */,
 				A50014F8 /* MarkdownWebSupport.swift */,
 				A50014F1 /* MarkdownViewerAssets.swift */,
 				C0DE86520000000000000010 /* FilePreviewFileState.swift */,
@@ -11981,6 +12042,11 @@
 				D8820001D8820001D8820001 /* ReplyNoteStepTests.swift */,
 				D8830001D8830001D8830001 /* ReplyNoteEntranceTests.swift */,
 				D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */,
+				C136C0000000000000000004 /* ReplyInlineDismissTests.swift */,
+				C136C0000000000000000005 /* ReplyInlineShellTests.swift */,
+				C136C0000000000000000003 /* ReplyInlinePasteTests.swift */,
+				C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */,
+				C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */,
 				D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */,
 				D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */,
 				D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */,
@@ -14341,6 +14407,7 @@
 				124760000000000000000007 /* GhosttyNSView+PreparedImageTransfer.swift in Sources */,
 				265FFB2D782433ED46B87F32 /* GhosttyNSView+RemoteReconnect.swift in Sources */,
 				C75100010000000000000001 /* GhosttyNSView+SelectionTranslation.swift in Sources */,
+				C136B0000000000000000011 /* GhosttyNSView+ReplyInline.swift in Sources */,
 				EC010E01 /* GhosttyNSView+TerminalCustomUpload.swift in Sources */,
 				C54860070000000000000001 /* GhosttyNSViewSurfaceLinkCopy.swift in Sources */,
 				C0DE12220000000000000003 /* GhosttyNumericLocaleController.swift in Sources */,
@@ -14829,6 +14896,22 @@
 				D36A00070000000000000001 /* RendererRealizationReclaimTrigger.swift in Sources */,
 				D36A00080000000000000001 /* RendererRealizationSurface.swift in Sources */,
 				A5009001 /* ReplyAnnotationManifest.swift in Sources */,
+				C136B0000000000000000003 /* ReplyInlinePaste.swift in Sources */,
+				C136B0000000000000000002 /* ReplyInlinePlacement.swift in Sources */,
+				C136B0000000000000000001 /* ReplyInlineTrigger.swift in Sources */,
+				C136B0000000000000000005 /* ReplyInlineToolbarController.swift in Sources */,
+				C136B0000000000000000010 /* ReplyInlinePasteTarget.swift in Sources */,
+				C136B000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift in Sources */,
+				C136B000000000000000000E /* ReplyInlineEnvironment.swift in Sources */,
+				C136B000000000000000000D /* ReplyInlineDismissal.swift in Sources */,
+				C136B000000000000000000C /* ReplyInlineEvent.swift in Sources */,
+				C136B000000000000000000B /* ReplyInlineDismissReason.swift in Sources */,
+				C136B000000000000000000A /* ReplyInlineTriggerDecision.swift in Sources */,
+				C136B0000000000000000009 /* ReplyInlinePassage.swift in Sources */,
+				C136B0000000000000000008 /* ReplyInlineTriggerInput.swift in Sources */,
+				C136B0000000000000000007 /* ReplyInlineGridGeometry.swift in Sources */,
+				C136B0000000000000000006 /* ReplyInlineSelectionGeometry.swift in Sources */,
+				C136B0000000000000000004 /* ReplyInlineToolbarView.swift in Sources */,
 				CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */,
 				CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */,
 				B7F100070000000000000001 /* ResolvedNotificationSoundPlaybackSelection.swift in Sources */,
@@ -17159,6 +17242,11 @@
 				C12681010000000000000001 /* TerminalPortalGeometryFixture.swift in Sources */,
 				126570000000000000000004 /* TerminalPortalTestWorkspace.swift in Sources */,
 				D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */,
+				C136D0000000000000000004 /* ReplyInlineDismissTests.swift in Sources */,
+				C136D0000000000000000005 /* ReplyInlineShellTests.swift in Sources */,
+				C136D0000000000000000003 /* ReplyInlinePasteTests.swift in Sources */,
+				C136D0000000000000000002 /* ReplyInlinePlacementTests.swift in Sources */,
+				C136D0000000000000000001 /* ReplyInlineTriggerTests.swift in Sources */,
 				D5671101D5671101D5671101 /* TerminalScrollSpeedSettingsFileStoreTests.swift in Sources */,
 				222425EC9FE2E318D8F6F46A /* TerminalSearchNavigationTests.swift in Sources */,
 				C0DE53360000000000000001 /* TerminalSearchOverlayMouseReleaseTests.swift in Sources */,
