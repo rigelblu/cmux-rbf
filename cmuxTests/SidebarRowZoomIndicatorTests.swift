@@ -238,12 +238,12 @@ struct SidebarRowZoomIndicatorTests {
         return model
     }
 
-    // MARK: - Scenario 200: Title Line Marks Grow With Zoom
+    // MARK: - Scenario 200: Mark Line Marks Grow With Zoom
 
-    /// Scenario 200: at 150%, every title-line mark grows (badge 24, glyph slot 20.5x17.5,
-    /// hand/triangle/spinner/waveform 18, glyph model fontScale 1.5). At 100%: 16, 15x13, 12, fontScale 1.
+    /// Scenario 200: at 150%, every mark-line mark grows (badge 24, glyph slot 20.5x17.5 on title line,
+    /// hand/triangle/spinner/waveform 18 on mark line, glyph model fontScale 1.5). At 100%: 16, 15x13, 12, fontScale 1.
     @Test
-    func titleLineMarksGrowWithZoom() throws {
+    func markLineMarksGrowWithZoom() throws {
         // At 150%: badgeSide = 24, spinnerSide = 18, statusGlyph occupiedSize = 20.5 x 17.5
         let snapshot150 = Self.makeSnapshot(
             unreadCount: 3,
@@ -298,10 +298,12 @@ struct SidebarRowZoomIndicatorTests {
         #expect(Double(waveform150.frame.width) == 18.0)
         #expect(Double(waveform150.frame.height) == 18.0)
 
-        // Centered on title first line within 0.5 pt
-        let titleCenterY150 = cell150.titleFrameForTesting.midY
-        #expect(abs(Double(cell150.leadingBadgeForTesting.frame.midY - titleCenterY150)) <= 0.5)
-        #expect(abs(Double(hand150.frame.midY - titleCenterY150)) <= 0.5)
+        // cmux-rbf: changed on purpose (#cm-128.9)
+        // Badge and marks are on the line under the title line, centered on the line within 0.5 pt
+        let titleFrame150 = cell150.titleFrameForTesting
+        let markLineCenterY150 = titleFrame150.maxY + 4 + 24.0 / 2 // title maxY + spacing + badgeSide/2
+        #expect(abs(Double(cell150.leadingBadgeForTesting.frame.midY - markLineCenterY150)) <= 0.5)
+        #expect(abs(Double(hand150.frame.midY - markLineCenterY150)) <= 0.5)
 
         // Controls at 100%: 16 badge, 15x13 slot, 12 symbols
         let snapshot100 = Self.makeSnapshot(
@@ -560,15 +562,17 @@ struct SidebarRowZoomIndicatorTests {
         // At 150%, badgeSide is 24, so leading badge height is 24
         #expect(Double(cell.leadingBadgeForTesting.frame.height) == 24.0)
 
+        // cmux-rbf: changed on purpose (#cm-128.9)
         // Measured row height: a row with leading badge at 150% is taller than a row with trailing badge
-        // because the 24-pt badge sets the line height in max(titleHeight, leadingSlotActive ? badgeSide : 0)
+        // because the left badge adds the mark line (4 pt spacing + 24 pt badgeSide = 28 pt), while the
+        // right badge stays on the title line and adds no mark line.
         let modelLeftBadge = Self.makeModel(unreadCount: 3, notificationBadgePosition: .leading, globalFontMagnificationPercent: 150)
         let modelRightBadge = Self.makeModel(unreadCount: 3, notificationBadgePosition: .trailing, globalFontMagnificationPercent: 150)
         let cellLeft = Self.configuredCell(model: modelLeftBadge)
         let cellRight = Self.configuredCell(model: modelRightBadge)
         let heightLeft = cellLeft.layoutContent(model: modelLeftBadge, width: 215, apply: false)
         let heightRight = cellRight.layoutContent(model: modelRightBadge, width: 215, apply: false)
-        #expect(heightLeft > heightRight)
+        #expect(heightLeft - heightRight == 28.0)
     }
 
     // MARK: - Scenario 211: Sites That Already Zoom Stay Once

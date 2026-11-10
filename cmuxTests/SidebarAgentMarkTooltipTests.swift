@@ -193,4 +193,24 @@ struct SidebarAgentMarkTooltipTests {
             #expect(text == SidebarAgentMarkTooltip.text(mark, in: all), "\(mark)")
         }
     }
+
+    /// Scenario 140 (cm-128.9): the SwiftUI row's Idle word reads `agentMarkTooltips.idle`, the builder's idle lines. That its
+    /// `.help` and `.accessibilityLabel` read this value is a code read (`Sources/ContentView.swift`, the line's row).
+    @Test func theSwiftUIRowsIdleWordIsTheBuildersIdleLines() throws {
+        let suite = "SidebarAgentMarkTooltipTests.idle.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot()
+        snapshot.agentLists = SidebarAgentStateLists()
+        // Panes 1 and 2 hold `claude_code` idle.
+        snapshot.agentLists.idle = [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 2, usageLimit: false)]
+        let entrances = WorkspaceStatusEntrancesTests()
+        let input = entrances.rowInput(snapshot, settings: SidebarTabItemSettingsSnapshot(defaults: defaults))
+        let row = TabItemView(
+            snapshot: entrances.rowSnapshot(input),
+            actions: SidebarWorkspaceContextMenuWindowTargetsTests.actions(currentWindowMoveTargets: { [] }))
+        let words = row.agentMarkTooltips
+        #expect(words.idle == "Claude Code is idle (2)", Comment(rawValue: words.idle))
+        #expect(words.idle == SidebarAgentMarkTooltip.text(.idle, in: snapshot.agentLists))
+    }
 }

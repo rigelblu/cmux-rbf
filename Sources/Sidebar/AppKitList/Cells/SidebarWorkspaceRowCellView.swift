@@ -37,6 +37,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private var handOutlineView: WaitingHandOutlineView? // (#cm-109.7)
     private var errorTriangleView: NSImageView? // (cm-128.5)
     private var errorTriangleOutlineView: WaitingHandOutlineView? // (cm-128.5)
+    /// The quiet "Idle" word on the line under the title: in the cell itself with the marks, so outside the Done dim. (cm-128.9)
+    private let idleWordLabel = SidebarRowTextView(lines: 1)
     private let pinImageView = NSImageView()
     private let muteImageView = NSImageView()
     private let mediaAudioView = NSImageView()
@@ -226,6 +228,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         statusGlyphButton.onClick = { [weak self] in self?.toggleStatusPopover() }
         contentContainer.addSubview(statusGlyphButton)
         addSubview(leadingBadge)
+        idleWordLabel.isHidden = true // (cm-128.9)
+        addSubview(idleWordLabel) // (cm-128.9)
         contentContainer.addSubview(titleView)
         cloudImageView.setAccessibilityIdentifier("sidebarCloudBadge")
         cloudImageView.setAccessibilityElement(false)
@@ -704,6 +708,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     var leadingBadgeForTesting: SidebarRowUnreadBadgeView { leadingBadge } // (#cm-109.3)
     var trailingBadgeForTesting: SidebarRowUnreadBadgeView { trailingBadge } // (#cm-109.3)
     var monitoringImageViewForTesting: NSImageView? { monitoringImageView } // (cm-128.16)
+    var idleWordForTesting: SidebarRowTextView { idleWordLabel } // (cm-128.9)
     var closeButtonForTesting: SidebarHeaderGlyphButton { closeButton } // (cm-128.16)
     var pinImageViewForTesting: NSImageView { pinImageView } // (cm-128.16)
     var pullRequestLinesForTesting: [SidebarRowPullRequestLine] { pullRequestRows } // (cm-128.16)
@@ -841,6 +846,19 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             visible: triangleVisible && handOutlined,
             in: self
         )
+
+        // cm-128.9: the quiet "Idle" word, while every agent there is idle and nothing else is on the line. It is text, so
+        // `model.scaled(10)` regular, never `10 × indicatorScale`; the spinner's colour; `.6`'s idle lines for its words.
+        let showsIdleWord = model.showsIdleWord // (cm-128.9)
+        idleWordLabel.isHidden = !showsIdleWord // (cm-128.9)
+        if showsIdleWord { // (cm-128.9)
+            let idleLines = SidebarAgentMarkTooltip.text(.idle, in: model.snapshot.agentLists)
+            idleWordLabel.stringValue = String(localized: "sidebar.workspace.agentLine.idle", defaultValue: "Idle")
+            idleWordLabel.font = .systemFont(ofSize: model.scaled(10))
+            idleWordLabel.textColor = palette.semantic(spinnerColor)
+            idleWordLabel.toolTip = idleLines
+            idleWordLabel.setAccessibilityLabel(idleLines)
+        }
     }
 
     /// The row's own background for the contrast floors: the sidebar stand-in under the row's wash. (#cm-109.7)
@@ -1353,11 +1371,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             )
         }
 
-        let leadingSlotActive = !leadingBadge.isHidden // (#cm-128.1) the badge alone holds the leading slot
-        if leadingSlotActive {
-            place(leadingBadge, size: NSSize(width: badgeSide, height: badgeSide), centerY: firstLineCenter)
-            x += badgeSide + titleRowSpacing
-        }
         if !pinImageView.isHidden {
             let side = model.scaled(9) + 4
             place(pinImageView, size: NSSize(width: side, height: side), centerY: firstLineCenter)
@@ -1377,30 +1390,6 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             let glyphSize = SidebarRowTaskStatusGlyphButton.occupiedSize(fontScale: model.indicatorScale) // (cm-128.16)
             place(statusGlyphButton, size: glyphSize, centerY: firstLineCenter)
             x += glyphSize.width + titleRowSpacing
-        }
-        if let hand = handImageView, !hand.isHidden { // (#cm-109.3)
-            place(hand, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter) // (#cm-109.3)
-            if let outline = handOutlineView, !outline.isHidden { // (#cm-109.7)
-                place(outline, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter) // (#cm-109.7)
-            } // (#cm-109.7)
-            x += spinnerSide + titleRowSpacing // (#cm-109.3)
-        } // (#cm-109.3)
-        if let triangle = errorTriangleView, !triangle.isHidden { // cm-128.5 the hand's twin, beside it
-            place(triangle, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
-            if let outline = errorTriangleOutlineView, !outline.isHidden {
-                place(outline, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
-            }
-            x += spinnerSide + titleRowSpacing
-        }
-        // cm-128.1: the left spinner draws after the glyph and the hand, beside them.
-        if let spinner = markSpinner, !spinner.isHidden {
-            place(spinner, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
-            x += spinnerSide + titleRowSpacing
-        }
-
-        if let waveform = monitoringImageView, !waveform.isHidden { // (#cm-128.3)
-            place(waveform, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
-            x += spinnerSide + titleRowSpacing
         }
 
         x = cloudImageView.layoutLeadingSidebarWorkspaceAccessory(
@@ -1448,7 +1437,60 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                 }
             }
         }
-        y += max(titleHeight, leadingSlotActive ? badgeSide : 0)
+        y += titleHeight // (cm-128.9) badge term dropped from title line height
+
+        // Mark line under title line (cm-128.9, moved from title line; preserves #cm-109.3, #cm-109.7, #cm-128.1, #cm-128.3)
+        if model.showsMarkLine {
+            y += spacing
+            let markLineHeight = max(badgeSide, spinnerSide)
+            let markLineCenter = y + markLineHeight / 2
+            var lineX = leading
+            func placeMark(_ view: NSView, size: NSSize) {
+                guard apply else { return }
+                view.frame = NSRect(
+                    x: lineX, y: markLineCenter - size.height / 2,
+                    width: size.width, height: size.height
+                )
+            }
+            if model.settings.notificationBadgePosition == .leading {
+                if !leadingBadge.isHidden {
+                    placeMark(leadingBadge, size: NSSize(width: badgeSide, height: badgeSide))
+                }
+                lineX += badgeSide + titleRowSpacing
+            }
+            // cm-128.9: the Idle word draws where the first mark draws, under both badge settings, centred on the line.
+            if apply, !idleWordLabel.isHidden {
+                let wordX = leading + badgeSide + titleRowSpacing
+                let wordSize = idleWordLabel.sidebarNaturalCellSize
+                idleWordLabel.frame = NSRect(
+                    x: wordX, y: markLineCenter - wordSize.height / 2,
+                    width: min(wordSize.width, max(0, trailing - wordX)), height: wordSize.height
+                )
+            }
+            if let hand = handImageView, !hand.isHidden {
+                placeMark(hand, size: NSSize(width: spinnerSide, height: spinnerSide))
+                if let outline = handOutlineView, !outline.isHidden {
+                    placeMark(outline, size: NSSize(width: spinnerSide, height: spinnerSide))
+                }
+                lineX += spinnerSide + titleRowSpacing
+            }
+            if let triangle = errorTriangleView, !triangle.isHidden {
+                placeMark(triangle, size: NSSize(width: spinnerSide, height: spinnerSide))
+                if let outline = errorTriangleOutlineView, !outline.isHidden {
+                    placeMark(outline, size: NSSize(width: spinnerSide, height: spinnerSide))
+                }
+                lineX += spinnerSide + titleRowSpacing
+            }
+            if let spinner = markSpinner, !spinner.isHidden {
+                placeMark(spinner, size: NSSize(width: spinnerSide, height: spinnerSide))
+                lineX += spinnerSide + titleRowSpacing
+            }
+            if let waveform = monitoringImageView, !waveform.isHidden {
+                placeMark(waveform, size: NSSize(width: spinnerSide, height: spinnerSide))
+                lineX += spinnerSide + titleRowSpacing
+            }
+            y += markLineHeight
+        }
 
         func placeBlock(_ view: SidebarRowTextView) {
             guard !view.isHidden else { return }

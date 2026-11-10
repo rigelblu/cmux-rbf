@@ -18,7 +18,7 @@ extension SidebarSection {
         SettingsCardRow(
             configurationReview: .json("sidebar.loadingSpinnerPosition"),
             String(localized: "settings.app.loadingSpinnerPosition", defaultValue: "Loading Spinner Position"),
-            subtitle: String(localized: "settings.app.loadingSpinnerPosition.subtitle", defaultValue: "Show the spinner on the left (sharing the unread badge slot) or the right of the workspace row.")
+            subtitle: String(localized: "settings.app.loadingSpinnerPosition.subtitle", defaultValue: "Show the spinner with the agent marks under the workspace name, or at the right of the workspace row.") // (cm-128.9)
         ) {
             Picker("", selection: Binding(
                 get: { loadingSpinnerPosition.current },

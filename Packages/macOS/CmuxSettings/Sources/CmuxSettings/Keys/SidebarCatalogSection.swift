@@ -149,8 +149,8 @@ public struct SidebarCatalogSection: SettingCatalogSection {
     )
 
     /// Which side of the workspace row the loading spinner appears on
-    /// (`sidebar.loadingSpinnerPosition`). Defaults to leading (left), sharing
-    /// the unread-badge slot.
+    /// (`sidebar.loadingSpinnerPosition`). Defaults to leading (left), with the
+    /// agent marks on the line under the workspace name (cm-128.9).
     public let loadingSpinnerPosition = DefaultsKey<SidebarIndicatorPosition>(
         id: "sidebar.loadingSpinnerPosition",
         defaultValue: .leading,

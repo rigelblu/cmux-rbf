@@ -255,7 +255,7 @@ extension Array where Element == CuratedSettingEntry {
                 section: .sidebarAppearance,
                 id: "loading-spinner-position",
                 title: String(localized: "settings.app.loadingSpinnerPosition", defaultValue: "Loading Spinner Position"),
-                detailText: String(localized: "settings.app.loadingSpinnerPosition.subtitle", defaultValue: "Show the spinner on the left (sharing the unread badge slot) or the right of the workspace row."),
+                detailText: String(localized: "settings.app.loadingSpinnerPosition.subtitle", defaultValue: "Show the spinner with the agent marks under the workspace name, or at the right of the workspace row."), // (cm-128.9)
                 paths: ["sidebar.loadingSpinnerPosition"],
                 synonyms: "sidebar.loadingSpinnerPosition loading spinner position left right leading trailing side"
             ),

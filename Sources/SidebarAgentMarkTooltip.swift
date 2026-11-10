@@ -18,12 +18,15 @@ enum SidebarAgentMarkTooltip {
         let error: String
         let running: String
         let monitoring: String
+        /// The Idle word's tooltip and accessibility label (cm-128.9).
+        let idle: String
 
         init(_ lists: SidebarAgentStateLists) {
             waiting = SidebarAgentMarkTooltip.text(.waiting, in: lists)
             error = SidebarAgentMarkTooltip.text(.error, in: lists)
             running = SidebarAgentMarkTooltip.text(.running, in: lists)
             monitoring = SidebarAgentMarkTooltip.text(.monitoring, in: lists)
+            idle = SidebarAgentMarkTooltip.text(.idle, in: lists) // (cm-128.9)
         }
     }
 
