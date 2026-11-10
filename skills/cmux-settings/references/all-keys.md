@@ -164,6 +164,7 @@ Reply panel settings — the right sidebar's Reply mode. Top-level rather than u
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `reply.maxMessagesBack` | integer | `5` | How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable. |
+| `reply.inline.enabled` | boolean | `true` | Show a Reply button over text selected in an agent's pane. Set `false` to turn it off in every window. `⌘⇧`-drag still starts a reply in the panel. |
 
 ## figma
 

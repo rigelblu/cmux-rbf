@@ -16,6 +16,7 @@ import SwiftUI
 @MainActor
 public struct ReplySection: View {
     @State private var labels: DefaultsValueModel<[String]>
+    @State private var inlineEnabled: DefaultsValueModel<Bool>
 
     /// The rows as typed. Every edit is saved through the same normaliser the
     /// file uses — so a blank row never becomes an empty chip — and the rows
@@ -32,11 +33,29 @@ public struct ReplySection: View {
         let model = DefaultsValueModel(store: defaultsStore, key: catalog.reply.labels)
         _labels = State(initialValue: model)
         _drafts = State(initialValue: model.current)
+        _inlineEnabled = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.reply.inlineEnabled))
     }
 
     public var body: some View {
         Group {
             SettingsSectionHeader(String(localized: "settings.section.reply", defaultValue: "Reply"), section: .reply)
+            // `cm-136.2`. One switch for the Reply button over a selection.
+            SettingsCard {
+                SettingsCardRow(
+                    configurationReview: .json("reply.inline.enabled"),
+                    searchAnchorID: "setting:reply:inline-reply",
+                    String(localized: "settings.reply.inline.title", defaultValue: "Show Reply on selections"),
+                    subtitle: String(localized: "settings.reply.inline.subtitle", defaultValue: "Selecting text in an agent's pane shows a button over it: Reply, or Add to reply when the Reply panel is open. ⌘⇧-drag still starts a reply in the panel.")
+                ) {
+                    Toggle("", isOn: Binding(get: { inlineEnabled.current }, set: { inlineEnabled.set($0) }))
+                        .labelsHidden()
+                        .controlSize(.small)
+                }
+            }
+            Text(String(localized: "settings.reply.inline.jsonHint", defaultValue: "Also settable as reply.inline.enabled in cmux.json."))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
             Text(String(localized: "settings.reply.quickLabels.header", defaultValue: "Quick Labels"))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -65,7 +84,10 @@ public struct ReplySection: View {
                 .foregroundStyle(.secondary)
                 .padding(.leading, 2)
         }
-        .task { labels.startObserving() }
+        .task {
+            labels.startObserving()
+            inlineEnabled.startObserving()
+        }
         // A write from elsewhere — `cmux.json`, or Reset — replaces the rows,
         // but never while one is being typed into.
         .onChange(of: labels.current) { stored in

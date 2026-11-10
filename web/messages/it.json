@@ -1273,6 +1273,7 @@
         "reply": {
           "description": "Pannello risposte",
           "maxMessagesBack": "Quante risposte senza note non inviate la freccia indietro attraversa. Le risposte con note non inviate restano sempre raggiungibili.",
+          "inline": "Mostra un pulsante Rispondi sopra il testo selezionato nel pannello di un agente. Imposta enabled su false per disattivarlo in tutte le finestre. ⌘⇧-trascina avvia ancora una risposta nel pannello.",
           "labels": "Etichette rapide offerte sopra una nota aperta, in ordine. Quelle che ci stanno sono chip; le altre sono nel menu ⌄. Un clic su una inserisce il suo testo nella nota. Un elenco vuoto significa nessuna etichetta."
         },
         "shortcuts": {

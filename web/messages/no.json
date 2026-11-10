@@ -1273,6 +1273,7 @@
         "reply": {
           "description": "Svarpanel",
           "maxMessagesBack": "Hvor mange svar uten usendte notater tilbakepilen går gjennom. Svar med usendte notater forblir alltid tilgjengelige.",
+          "inline": "Viser en Svar-knapp over tekst som er markert i en agents panel. Sett enabled til false for å slå den av i alle vinduer. ⌘⇧-dra starter fortsatt et svar i panelet.",
           "labels": "Hurtigetiketter som tilbys over et åpent notat, i rekkefølge. De som får plass, vises som chips; resten er i ⌄-menyen. Å klikke på en legger teksten i notatet. En tom liste betyr ingen etiketter."
         },
         "shortcuts": {

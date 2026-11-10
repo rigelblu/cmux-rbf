@@ -58,6 +58,18 @@ public struct ReplyCatalogSection: SettingCatalogSection {
         userDefaultsKey: "replyLabels"
     )
 
+    /// Whether the Reply button shows over a selection in an agent's pane
+    /// (`cm-136.2`).
+    ///
+    /// One switch for all of cmux, not one per workspace (Tom, 2026-11-05),
+    /// on by default. Off, no selection in any window brings the button up;
+    /// `⌘⇧`-drag still starts a reply in the panel.
+    public let inlineEnabled = DefaultsKey<Bool>(
+        id: "reply.inline.enabled",
+        defaultValue: true,
+        userDefaultsKey: "replyInlineEnabled"
+    )
+
     /// Cleans a raw label list from `cmux.json` or the Settings editor.
     ///
     /// Trims whitespace, drops blank entries, and skips anything that is not a
