@@ -9,9 +9,10 @@ import Foundation
 extension Workspace {
     // MARK: - Status signals
 
-    /// Samples the live signals that drive task-status inference: agent
-    /// lifecycle states (needs-input / running / monitoring) for panels that still exist,
-    /// the sidebar pull-request rows, and git working-tree dirtiness.
+    /// Samples the live signals that drive task-status inference: the five agent signals (needs-input, waiting, error,
+    /// running, monitoring), read from the per-agent states of `agentPaneStates(panelIds:)` for panels that still exist
+    /// (a Feed slot stands in for its agent, a loader counts as running; cm-128.6), the sidebar pull-request rows, and git
+    /// working-tree dirtiness.
     ///
     /// Takes the panel order **once** and hands it to both sidebar queries.
     /// Each of them otherwise calls `sidebarOrderedPanelIds()` itself, and that
@@ -27,20 +28,15 @@ extension Workspace {
 
     /// The sampling above, for a caller that already holds the panel order.
     func taskStatusSignals(orderedPanelIds: [UUID]) -> WorkspaceTaskStatusSignals {
-        var anyAgentNeedsInput = false
-        var anyAgentRunning = false
-        var anyAgentMonitoring = false
-        var anyAgentWaiting = false
-        var anyAgentError = false
-        for (panelId, states) in agentLifecycleStatesByPanelId where panels[panelId] != nil {
-            for state in states.values {
-                // cm-128.5: an error is its own value; every needs-you reader counts it, only the hand does not.
-                if state == .needsInput { anyAgentNeedsInput = true; anyAgentWaiting = true }
-                if state == .error { anyAgentNeedsInput = true; anyAgentError = true }
-                if state == .running { anyAgentRunning = true }
-                if state == .monitoring { anyAgentMonitoring = true }
-            }
-        }
+        // cm-128.6: the five agent signals read the per-agent states the row reads, so the hand, Auto's status, Cycle Status
+        // and the socket cannot disagree. cm-128.5: an error is its own value; every needs-you reader counts it, only the hand
+        // does not. A running loader still counts as running.
+        let paneStates = agentPaneStates(panelIds: Array(agentLifecycleStatesByPanelId.keys))
+        let anyAgentWaiting = paneStates.entries.contains { $0.state == .needsInput }
+        let anyAgentError = paneStates.entries.contains { $0.state == .error }
+        let anyAgentNeedsInput = anyAgentWaiting || anyAgentError
+        let anyAgentRunning = paneStates.loaderCount > 0 || paneStates.entries.contains { $0.state == .running }
+        let anyAgentMonitoring = paneStates.entries.contains { $0.state == .monitoring }
         let orderedPanelIds = orderedPanelIds ?? sidebarOrderedPanelIds()
         let pullRequests = sidebarPullRequestsInDisplayOrder(orderedPanelIds: orderedPanelIds)
         return WorkspaceTaskStatusSignals(
@@ -56,6 +52,41 @@ extension Workspace {
             anyAgentWaiting: anyAgentWaiting,
             anyAgentError: anyAgentError
         )
+    }
+
+    // MARK: - Per-agent states
+
+    /// Each live pane's per-agent states, in the given pane order (cm-128.6): one entry for each agent, its keys that pass
+    /// ``isAgentMarkLifecycleKey(_:)``, with a Feed attention slot `cmux.feed.attention:<agent>` standing in for that agent's own
+    /// key while it exists. A `cmux workspace loading` loader is no agent: a running one adds to `loaderCount`. Within one agent
+    /// the journal reducer has already picked the newest session. The row's lists and ``taskStatusSignals(orderedPanelIds:)`` both
+    /// read this, so they agree. Hibernation's `aggregate` keeps every key and does not read it.
+    func agentPaneStates(panelIds: [UUID]) -> WorkspaceAgentPaneStates { // (cm-128.6)
+        var result = WorkspaceAgentPaneStates()
+        let slotPrefix = FeedCoordinator.attentionStatusKeyPrefix
+        for panelId in panelIds where panels[panelId] != nil {
+            guard let keyed = agentLifecycleStatesByPanelId[panelId] else { continue }
+            var byAgent: [String: AgentHibernationLifecycleState] = [:]
+            for (key, state) in keyed {
+                // The one "is this an agent key" test (cm-128.6): a key that fails it is a loader.
+                if !Self.isAgentMarkLifecycleKey(key) {
+                    if state == .running { result.loaderCount += 1 }
+                } else if !key.hasPrefix(slotPrefix) {
+                    byAgent[key] = state
+                }
+            }
+            // The slot stands in for its agent's own key, so it is read last.
+            for (key, state) in keyed where key.hasPrefix(slotPrefix) {
+                byAgent[String(key.dropFirst(slotPrefix.count))] = state
+            }
+            for agentKey in byAgent.keys.sorted() {
+                guard let state = byAgent[agentKey] else { continue }
+                result.entries.append(WorkspaceAgentPaneState(
+                    panelId: panelId, agentKey: agentKey, state: state,
+                    usageLimit: state == .error && agentUsageLimitKeysByPanelId[panelId]?.contains(agentKey) == true))
+            }
+        }
+        return result
     }
 
     // MARK: - Status resolution
@@ -334,4 +365,20 @@ extension Workspace {
         todoState.statusHidden = snapshot.taskStatusHidden ?? false
         todoState.checklist = snapshot.restoredChecklist
     }
+}
+
+/// One agent's state on one pane. (cm-128.6)
+struct WorkspaceAgentPaneState: Equatable, Sendable {
+    let panelId: UUID
+    /// The agent's key, a Feed slot's `cmux.feed.attention:` taken off.
+    let agentKey: String
+    let state: AgentHibernationLifecycleState
+    /// Whether an `.error` is a typed usage limit.
+    let usageLimit: Bool
+}
+
+/// A workspace's per-agent pane states and its running loaders, from ``Workspace/agentPaneStates(panelIds:)``. (cm-128.6)
+struct WorkspaceAgentPaneStates: Equatable, Sendable {
+    var entries: [WorkspaceAgentPaneState] = []
+    var loaderCount = 0
 }

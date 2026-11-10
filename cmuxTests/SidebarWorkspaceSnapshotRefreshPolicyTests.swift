@@ -227,12 +227,12 @@ import Testing
         let current = Self.snapshot(listeningPorts: [3000])
         let next = Self.snapshot(
             listeningPorts: [3000, 4000],
-            erroredAgents: [SidebarErroredAgent(statusKey: "claude_code", displayName: "Claude Code", usageLimit: true)]
+            errors: [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: true)] // cmux-rbf: changed on purpose (#cm-128.6)
         )
         let decision = SidebarWorkspaceSnapshotRefreshPolicy().decision(
             current: current, next: next, force: false, contextMenuVisible: true)
-        #expect(decision.workspaceSnapshotStorage?.erroredAgents == next.erroredAgents,
-                "stored \(String(describing: decision.workspaceSnapshotStorage?.erroredAgents))")
+        #expect(decision.workspaceSnapshotStorage?.agentLists.error == next.agentLists.error, // cmux-rbf: changed on purpose (#cm-128.6)
+                "stored \(String(describing: decision.workspaceSnapshotStorage?.agentLists.error))")
         #expect(decision.workspaceSnapshotStorage?.listeningPorts == [3000], "control: telemetry stays frozen")
     }
 
@@ -266,7 +266,8 @@ import Testing
         activeCodingAgentCount: Int = 0,
         attentionTaskStatus: WorkspaceTaskStatus? = nil,
         showsRaisedHand: Bool = false,
-        erroredAgents: [SidebarErroredAgent] = [],
+        monitoringAgentCount: Int = 0, // (cm-128.6)
+        errors: [SidebarAgentStateEntry] = [],
         taskStatus: WorkspaceTaskStatus? = nil
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         var s = SidebarWorkspaceSnapshotBuilder.Snapshot(
@@ -287,7 +288,6 @@ import Testing
             metadataBlocks: [],
             latestLog: nil,
             progress: nil,
-            activeCodingAgentCount: activeCodingAgentCount,
             compactGitBranchSummaryText: nil,
             compactDirectoryCandidates: [],
             compactBranchDirectoryCandidates: [],
@@ -306,9 +306,24 @@ import Testing
             checklistTotalCount: 0,
             checklistFirstUncheckedText: nil
         )
-        s.showsRaisedHand = showsRaisedHand
-        s.erroredAgents = erroredAgents
+        // cmux-rbf: changed on purpose (#cm-128.6): the three old fields are computed from the lists, so the counts become the lists they mean.
+        s.agentLists = Self.lists(waiting: showsRaisedHand ? 1 : 0, running: activeCodingAgentCount,
+                                  monitoring: monitoringAgentCount, errors: errors)
         return s
+    }
+
+    /// cm-128.6: the lists a fixture means by counts: one nameless entry for waiting and for running, Claude Code for
+    /// monitoring (no nameless agent can monitor), and the given error entries.
+    static func lists(waiting: Int = 0, running: Int = 0, monitoring: Int = 0,
+                      errors: [SidebarAgentStateEntry] = []) -> SidebarAgentStateLists {
+        func nameless(_ count: Int) -> [SidebarAgentStateEntry] {
+            count > 0 ? [SidebarAgentStateEntry(statusKey: "", displayName: nil, paneCount: count, usageLimit: false)] : []
+        }
+        return SidebarAgentStateLists(
+            waiting: nameless(waiting), error: errors, running: nameless(running),
+            monitoring: monitoring > 0
+                ? [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: monitoring, usageLimit: false)]
+                : [])
     }
 
     static func presentationKey(

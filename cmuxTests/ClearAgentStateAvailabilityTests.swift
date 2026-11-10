@@ -55,4 +55,34 @@ struct ClearAgentStateAvailabilityTests {
         #expect(manager.canClearAgentState(workspaceIds: [quiet.id, busy.id]))
         #expect(!manager.canClearAgentState(workspaceIds: [UUID()]))
     }
+
+    // MARK: cm-128.6, Scenario 96: a Vault agent is clearable, a loader never
+
+    private func rowSnapshot(_ workspace: Workspace) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
+        let suite = "ClearAgentStateAvailabilityTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        return SidebarWorkspaceSnapshotFactory(
+            workspace: workspace, settings: SidebarTabItemSettingsSnapshot(defaults: defaults), showsAgentActivity: true,
+            todoControlsEnabled: true, statusList: .cmuxFive, statusColorHexes: [:]
+        ).makeSnapshot()
+    }
+
+    @Test func clearAgentStateTakesAVaultAgentAndKeepsALoader() async throws {
+        try await ClearAgentStateHarness.run { harness in
+            harness.workspace.agentLifecycleStatesByPanelId[harness.panel] = ["my-vault-agent": .running, "manual:build": .running]
+            #expect(harness.workspace.hasClearableAgentState, "a Vault agent's running mark can be cleared")
+            #expect(harness.workspace.clearAgentState(journal: harness.center))
+            #expect(harness.marks["my-vault-agent"] == .unknown)
+            #expect(harness.marks["manual:build"] == .running, "a loader is not agent state")
+            #expect(rowSnapshot(harness.workspace).activeCodingAgentCount == 1, "only the loader still spins")
+        }
+    }
+
+    @Test func aLoaderAloneIsNothingToClear() throws {
+        let workspace = Workspace()
+        let panel = try #require(workspace.focusedPanelId)
+        workspace.agentLifecycleStatesByPanelId[panel] = ["manual:build": .running]
+        #expect(!workspace.hasClearableAgentState)
+    }
 }
