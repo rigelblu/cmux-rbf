@@ -133,7 +133,9 @@ struct SidebarDebugHeaderDropTests {
         for (index, item) in items.enumerated() {
             if case .statusesHeader = item {
                 let status = VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusesArea, presentation: nil,
-                    memberCount: 0, memberIds: [], folds: .init(), environment: environment, onToggle: {})
+                    memberCount: 0, memberIds: [], folds: .init(), environment: environment,
+                    sidebarFontScale: 1.0, // (cm-128.16)
+                    onToggle: {})
                 rows.append(status)
                 continue
             }
@@ -173,7 +175,9 @@ struct SidebarDebugHeaderDropTests {
         window.contentView = container
         let configuration = VerticalTabsSidebar.statusHeaderConfiguration(kind: .statusGroup("measured"),
             presentation: nil, memberCount: 0, memberIds: [], folds: .init(),
-            environment: .init(colorScheme: .light, globalFontMagnificationPercent: 100, lazyContractProbe: .init()), onToggle: {})
+            environment: .init(colorScheme: .light, globalFontMagnificationPercent: 100, lazyContractProbe: .init()),
+            sidebarFontScale: 1.0, // (cm-128.16)
+            onToggle: {})
         // Include native status targets only for header planning; workspace semantics remain guarded by the adapter.
         controller.apply(rows: [configuration], actions: Self.tableActions(), workspaceIds: [],
             selectedWorkspaceId: nil, selectedScrollTargetWorkspaceId: nil)

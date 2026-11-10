@@ -49,8 +49,8 @@ final class SidebarRowChecklistAttachmentButton: NSControl {
     ) {
         self.item = item
         self.actions = actions
-        // Legacy passes `iconPointSize: 9 * fontScale` (no magnification).
-        iconPointSize = 9 * model.fontScale
+        // Passes `iconPointSize: 9 * indicatorScale` (SwiftUI parity). // (cm-128.16)
+        iconPointSize = 9 * model.indicatorScale // (cm-128.16)
         iconView.image = RenderableSystemSymbol.configuredAppKitImage(
             systemName: "paperclip", pointSize: iconPointSize, weight: nil
         )
@@ -183,4 +183,9 @@ final class SidebarRowChecklistAttachmentButton: NSControl {
         }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: bounds.height + 2), in: self)
     }
+
+#if DEBUG // (cm-128.16)
+    var iconPointSizeForTesting: CGFloat { iconPointSize } // (cm-128.16)
+    var chevronPointSizeForTesting: CGFloat { iconPointSize * 0.65 } // (cm-128.16)
+#endif // (cm-128.16)
 }

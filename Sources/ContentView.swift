@@ -16702,14 +16702,18 @@ struct TabItemView: View, Equatable {
             maxDisplayedLines: titleLineLimit,
             maxDisplayedCharacters: Self.maxDisplayedTitleCharacters
         )
-        let scaledUnreadBadgeSize = 16 * fontScale
-        let scaledLoadingSpinnerSize = max(10, 12 * fontScale)
+        let indicatorScale = SidebarWorkspaceSlotResolution.indicatorScale( // (cm-128.16)
+            fontScale: fontScale, // (cm-128.16)
+            magnificationPercent: globalFontMagnificationPercent // (cm-128.16)
+        ) // (cm-128.16)
+        let scaledUnreadBadgeSize = 16 * indicatorScale // (cm-128.16)
+        let scaledLoadingSpinnerSize = max(10, 12 * indicatorScale) // (cm-128.16)
         let titleFirstLineCenter = GlobalFontMagnification.scaledSize(
             scaledFontSize(12.5),
             percent: globalFontMagnificationPercent
         ) * 0.6
         let todoControlsEnabled = WorkspaceTodoFeature.isEnabled
-        let scaledCloseButtonHitSize = max(16, 16 * fontScale)
+        let scaledCloseButtonHitSize = max(16, 16 * indicatorScale) // (cm-128.16)
         let scaledCloseButtonWidth = max(
             SidebarTrailingAccessoryWidthPolicy().closeButtonWidth,
             scaledCloseButtonHitSize
@@ -16785,7 +16789,7 @@ struct TabItemView: View, Equatable {
                             usesMonochrome: usesInvertedActiveForeground,
                             monochromeColor: activeSecondaryColor(0.8),
                             neutralColor: activeSecondaryColor(0.8),
-                            fontScale: fontScale, // (#cm-109.7)
+                            fontScale: indicatorScale, // (cm-128.16)
                             contrastBackground: rowContrastBackground, // (#cm-109.7)
                             drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7) // (#cm-110.13)
                         )
@@ -16966,7 +16970,7 @@ struct TabItemView: View, Equatable {
                                 .scaleEffect(x: progressFraction, y: 1, anchor: .leading)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: max(3, 3 * fontScale))
+                        .frame(height: max(3, 3 * indicatorScale)) // (cm-128.16)
 
                         if let label = progress.label {
                             Text(label)
@@ -17077,7 +17081,7 @@ struct TabItemView: View, Equatable {
                                 PullRequestStatusIcon(
                                     status: pullRequest.status,
                                     color: pullRequestForegroundColor,
-                                    fontScale: fontScale
+                                    fontScale: indicatorScale // (cm-128.16)
                                 )
                                 Text(pullRequestTitle).underline(settings.makesPullRequestsClickable).lineLimit(1).truncationMode(.tail)
                                 Text(pullRequestStatusLabel(pullRequest.status)).lineLimit(1)
@@ -17139,6 +17143,7 @@ struct TabItemView: View, Equatable {
                         summaryFont: magnifiedFont(scaledFontSize(10), weight: .semibold, monospacedDigit: true),
                         itemFont: magnifiedFont(scaledFontSize(10)),
                         fontScale: fontScale,
+                        indicatorScale: indicatorScale, // (cm-128.16)
                         canAddItems: todoControlsEnabled,
                         onToggleExpansion: actions.onToggleChecklistExpansion,
                         onPopoverPresentedChange: actions.onChecklistPopoverPresentedChange,
@@ -17399,7 +17404,7 @@ struct TabItemView: View, Equatable {
                     .scaleEffect(fontScale)
                     .frame(width: customFrameSize, height: customFrameSize)
             case .closed:
-                CmuxSystemSymbolImage(magnified: "xmark.circle", pointSize: 7 * fontScale, weight: .regular, tint: color)
+                CmuxSystemSymbolImage(systemName: "xmark.circle", pointSize: 7 * fontScale, weight: .regular, tint: color) // (cm-128.16)
                     .frame(width: closedFrameSize, height: closedFrameSize)
             }
         }
