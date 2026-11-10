@@ -16730,7 +16730,6 @@ struct TabItemView: View, Equatable {
             notificationBadgePosition: settings.notificationBadgePosition, // (#cm-109.3)
             showsCloseButton: false // (#cm-109.3)
         ) // (#cm-109.3)
-        let leadingSlotActive = slotResolution.leading != .none // (#cm-109.3)
         let trailingStatusActive = slotResolution.trailing != .none // (#cm-109.3)
         let titleRowSpacing: CGFloat = 8 // (#cm-128.1) no spinner leads any more, so no 6 pt case
         let badgeFont = magnifiedFont(scaledFontSize(9), weight: .semibold)
@@ -16744,13 +16743,6 @@ struct TabItemView: View, Equatable {
         let rowContentAlpha = Double(SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus))
         let rowView = VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .sidebarTitleFirstLineCenter, spacing: titleRowSpacing) {
-
-                if leadingSlotActive {
-                    // The mark keeps the badge's reserved width and its contrast strength on Done rows.
-                    SidebarWorkspaceLeadingStatusSlot(unreadCount: unreadCount, markedUnread: snapshot.markedUnread, markColor: unreadDotColor, side: scaledUnreadBadgeSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor) // (#cm-109.3)
-                        .opacity(unreadCount == 0 && snapshot.markedUnread ? 1 : rowContentAlpha)
-                }
-
                 Group { // (#cm-128.3) normal content keeps the Done dim.
                     if workspaceSnapshot.isPinned {
                         CmuxSystemSymbolImage(magnified: "pin.fill", pointSize: scaledFontSize(9), weight: .semibold, tint: activeSecondaryColor(0.8))
@@ -16798,48 +16790,6 @@ struct TabItemView: View, Equatable {
                     }
                 }
                 .opacity(rowContentAlpha)
-
-                // cm-128.5 (Tom, grill Q34): no agent mark dims, so the hand and the triangle sit outside the Done dim, as the
-                // spinner and the waveform do, and their outline is judged at full strength.
-                if slotResolution.showsHand { // (#cm-109.3)
-                    WaitingHandView( // (#cm-109.7)
-                        pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
-                        colorScheme: colorScheme, // (#cm-109.7)
-                        rowBackground: rowContrastBackground, // (#cm-109.7)
-                        drawnAlpha: 1 // cm-128.5
-                    ) // (#cm-109.3)
-                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
-                    .safeHelp(markTooltips.waiting) // (#cm-109.3) cm-128.6: the builder
-                    .accessibilityLabel(markTooltips.waiting) // (#cm-109.3)
-                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
-                }
-
-                if !workspaceSnapshot.agentLists.error.isEmpty { // cm-128.5 the hand's twin: a pane stopped on an error (cm-128.6: the error list)
-                    WaitingHandView(
-                        symbolName: "exclamationmark.triangle.fill",
-                        pointSize: scaledLoadingSpinnerSize * 0.8,
-                        colorScheme: colorScheme,
-                        rowBackground: rowContrastBackground,
-                        drawnAlpha: 1
-                    )
-                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize)
-                    .safeHelp(markTooltips.error)
-                    .accessibilityLabel(markTooltips.error)
-                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
-                }
-
-                // cm-128.1: the spinner set to the left draws after the glyph and the hand, beside them.
-                if slotResolution.markSpinner {
-                    SidebarWorkspaceLoadingSpinner(side: scaledLoadingSpinnerSize, color: spinnerColor, tooltip: spinnerTooltip)
-                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
-                }
-
-                if showsMonitoring { // (#cm-128.3)
-                    SidebarWorkspaceMonitoringWaveform(side: scaledLoadingSpinnerSize, color: spinnerColor)
-                        .safeHelp(markTooltips.monitoring) // (cm-128.6) the builder
-                        .accessibilityLabel(markTooltips.monitoring)
-                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
-                }
 
                 Group { // (#cm-128.3) normal content keeps the Done dim.
                     SidebarCloudWorkspaceBadgeView(label: workspaceSnapshot.cloudWorkspaceLabel, pointSize: scaledFontSize(10), tint: activeSecondaryColor(0.7))
@@ -16890,6 +16840,88 @@ struct TabItemView: View, Equatable {
                 if trailingStatusActive || canCloseWorkspace {
                     SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, markedUnread: snapshot.markedUnread, markColor: unreadDotColor, side: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, slotWidth: SidebarWorkspaceSlotResolution.trailingReserve(trailing: slotResolution.trailing, trailingInner: slotResolution.trailingInner, badgeSide: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, closeButtonWidth: scaledCloseButtonWidth), closeButtonWidth: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace, contentAlpha: rowContentAlpha) // (#cm-128.3)
                 }
+            }
+
+            // cm-128.9: One line under the status-and-name line for the left-set badge and marks.
+            let showsMarkLine = SidebarWorkspaceSlotResolution.showsMarkLine(
+                agentLists: workspaceSnapshot.agentLists,
+                showsAgentActivity: showsAgentActivity,
+                loadingSpinnerPosition: settings.loadingSpinnerPosition,
+                notificationBadgePosition: settings.notificationBadgePosition,
+                unreadCount: unreadCount,
+                markedUnread: snapshot.markedUnread
+            )
+            let markLineHeight = max(scaledUnreadBadgeSize, scaledLoadingSpinnerSize) // (cm-128.9)
+            let showsIdleWord = SidebarWorkspaceSlotResolution.showsIdleWord( // (cm-128.9) the same rule as the AppKit cell
+                agentLists: workspaceSnapshot.agentLists,
+                showsAgentActivity: showsAgentActivity,
+                loadingSpinnerPosition: settings.loadingSpinnerPosition,
+                notificationBadgePosition: settings.notificationBadgePosition,
+                unreadCount: unreadCount,
+                markedUnread: snapshot.markedUnread
+            )
+
+            // cm-128.5 (Tom, grill Q34): no agent mark dims, so the hand and the triangle sit outside the Done dim, as the
+            // spinner and the waveform do, and their outline is judged at full strength.
+            // The mark keeps the badge's reserved width and its contrast strength on Done rows.
+            if showsMarkLine {
+                HStack(alignment: .center, spacing: titleRowSpacing) {
+                    if settings.notificationBadgePosition == .leading {
+                        SidebarWorkspaceLeadingStatusSlot(unreadCount: unreadCount, markedUnread: snapshot.markedUnread, markColor: unreadDotColor, side: scaledUnreadBadgeSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor) // (#cm-109.3)
+                            .opacity(unreadCount == 0 && snapshot.markedUnread ? 1 : rowContentAlpha)
+                    }
+
+                    // cm-128.9: the quiet "Idle" word, where the first mark draws under both badge settings: set right there is
+                    // no slot, so a clear one of the badge's width keeps the place. Text, so the subtitle's font; the spinner's
+                    // colour; no dim, as the marks.
+                    if showsIdleWord {
+                        if settings.notificationBadgePosition != .leading {
+                            Color.clear.frame(width: scaledUnreadBadgeSize, height: 1)
+                        }
+                        Text(String(localized: "sidebar.workspace.agentLine.idle", defaultValue: "Idle"))
+                            .font(magnifiedFont(scaledFontSize(10)))
+                            .foregroundColor(Color(nsColor: spinnerColor))
+                            .lineLimit(1)
+                            .safeHelp(markTooltips.idle)
+                            .accessibilityLabel(markTooltips.idle)
+                    }
+
+                    if slotResolution.showsHand { // (#cm-109.3)
+                        WaitingHandView( // (#cm-109.7)
+                            pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
+                            colorScheme: colorScheme, // (#cm-109.7)
+                            rowBackground: rowContrastBackground, // (#cm-109.7)
+                            drawnAlpha: 1 // cm-128.5
+                        ) // (#cm-109.3)
+                        .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
+                        .safeHelp(markTooltips.waiting) // (#cm-109.3) cm-128.6: the builder
+                        .accessibilityLabel(markTooltips.waiting) // (#cm-109.3)
+                    }
+
+                    if !workspaceSnapshot.agentLists.error.isEmpty { // cm-128.5 the hand's twin: a pane stopped on an error (cm-128.6: the error list)
+                        WaitingHandView(
+                            symbolName: "exclamationmark.triangle.fill",
+                            pointSize: scaledLoadingSpinnerSize * 0.8,
+                            colorScheme: colorScheme,
+                            rowBackground: rowContrastBackground,
+                            drawnAlpha: 1
+                        )
+                        .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize)
+                        .safeHelp(markTooltips.error)
+                        .accessibilityLabel(markTooltips.error)
+                    }
+
+                    if slotResolution.markSpinner {
+                        SidebarWorkspaceLoadingSpinner(side: scaledLoadingSpinnerSize, color: spinnerColor, tooltip: spinnerTooltip)
+                    }
+
+                    if showsMonitoring { // (#cm-128.3)
+                        SidebarWorkspaceMonitoringWaveform(side: scaledLoadingSpinnerSize, color: spinnerColor)
+                            .safeHelp(markTooltips.monitoring) // (cm-128.6) the builder
+                            .accessibilityLabel(markTooltips.monitoring)
+                    }
+                }
+                .frame(height: markLineHeight)
             }
 
             Group { // (#cm-128.3) details stay at the existing Done opacity.
