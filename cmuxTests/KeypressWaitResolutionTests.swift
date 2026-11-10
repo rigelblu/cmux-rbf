@@ -115,6 +115,18 @@ struct KeypressWaitResolutionTests {
         #expect(fixture.input(escape: true).isEmpty)
     }
 
+    /// cm-128.5 (Scenario 70): an agent that stopped on an error is not running, so Esc in its pane drafts nothing
+    /// and leaves the error mark standing.
+    @Test func escapeOnAnErroredPaneDraftsNothingAndLeavesTheError() {
+        var fixture = Fixture()
+        fixture.append(.turnStarted)
+        fixture.append(.errorReported)
+        #expect(fixture.phase == .error, "phase \(String(describing: fixture.phase))")
+        #expect(fixture.input(escape: true).isEmpty, "Esc on an errored pane must draft nothing")
+        #expect(fixture.input().isEmpty)
+        #expect(fixture.phase == .error)
+    }
+
     @Test func aFeedQuestionSurvivesItsToolIdAndEndsOnIdentitylessPaneInput() {
         var fixture = Fixture()
         fixture.append(.questionRequested, request: "tool-id")
