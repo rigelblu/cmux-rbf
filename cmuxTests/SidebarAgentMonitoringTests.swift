@@ -47,10 +47,29 @@ struct SidebarAgentMonitoringTests {
         #expect(snapshot.activeCodingAgentCount == 0)
     }
 
+    /// cm-128.6 (Scenario 97): the lists are compared, not only their counts. Claude Code running and Pi running are both one
+    /// agent, yet a row that changed which agent runs redraws at once with the menu open, and the other details stay frozen.
+    @Test func aChangedRunningListRedrawsTheRowWhileTheMenuKeepsOtherDetailsFrozen() {
+        let claude = SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: false)
+        let pi = SidebarAgentStateEntry(statusKey: "pi", displayName: "Pi", paneCount: 1, usageLimit: false)
+        var current = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "old")
+        current.agentLists = SidebarAgentStateLists(running: [claude])
+        var next = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "new")
+        next.agentLists = SidebarAgentStateLists(running: [pi])
+        #expect(current.activeCodingAgentCount == next.activeCodingAgentCount, "control: the counts are the same")
+        let open = SidebarWorkspaceSnapshotRefreshPolicy().decision(current: current, next: next,
+            force: false, contextMenuVisible: true)
+        #expect(open.workspaceSnapshotStorage?.agentLists.running == [pi],
+                "stored \(String(describing: open.workspaceSnapshotStorage?.agentLists))")
+        #expect(open.workspaceSnapshotStorage?.latestConversationMessage == "old")
+        let closed = SidebarWorkspaceSnapshotRefreshPolicy().decision(current: current, next: next,
+            force: false, contextMenuVisible: false)
+        #expect(closed.workspaceSnapshotStorage == next, "a changed name redraws the row")
+    }
+
     @Test func aWaveformUpdatesWhileTheMenuKeepsOtherDetailsFrozen() {
         let current = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "old")
-        var next = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "new")
-        next.monitoringAgentCount = 1
+        let next = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "new", monitoringAgentCount: 1) // cmux-rbf: changed on purpose (#cm-128.6)
         let decision = SidebarWorkspaceSnapshotRefreshPolicy().decision(current: current, next: next,
             force: false, contextMenuVisible: true)
         #expect(decision.workspaceSnapshotStorage?.monitoringAgentCount == 1)
@@ -59,13 +78,12 @@ struct SidebarAgentMonitoringTests {
     }
 
     @Test func appKitShowsAStaticTwelvePointWaveformAndRemovesItWhenMonitoringEnds() throws {
-        var snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot()
-        snapshot.monitoringAgentCount = 1
+        var snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(monitoringAgentCount: 1) // cmux-rbf: changed on purpose (#cm-128.6)
         let model = SidebarAppKitRowCellTests.makeModel(snapshot: snapshot)
         #expect(model.showsAgentActivity, "control: agent activity is enabled for this renderer")
         let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
         _ = cell.layoutContent(model: model, width: 420, apply: true)
-        let tooltip = String(localized: "sidebar.agentMonitoring.tooltip", defaultValue: "Watching a background job")
+        let tooltip = SidebarAgentMarkTooltip.text(.monitoring, in: snapshot.agentLists) // cmux-rbf: changed on purpose (#cm-128.6): the builder's line for this fixture
         let waveform = try #require(SidebarAppKitRowCellTests.descendants(of: cell).compactMap { $0 as? NSImageView }
             .first { $0.toolTip == tooltip && !$0.isHidden })
         #expect(waveform.image != nil)
@@ -75,7 +93,7 @@ struct SidebarAgentMonitoringTests {
         #expect(cell.markSpinnerForTesting?.isHidden ?? true)
         #expect(cell.trailingSpinnerForTesting?.isHidden ?? true)
 
-        snapshot.monitoringAgentCount = 0
+        snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot() // cmux-rbf: changed on purpose (#cm-128.6): no agents
         let quiet = SidebarAppKitRowCellTests.makeModel(snapshot: snapshot)
         cell.configure(model: quiet, actions: SidebarAppKitRowCellTests.makeActions(model: quiet),
             isPointerHovering: false, contextMenuDidOpen: {}, contextMenuDidClose: {})
@@ -84,13 +102,12 @@ struct SidebarAgentMonitoringTests {
 
     @Test(arguments: [false, true])
     func doneDimsNoAgentMarkEachKeepsItsContrastStrength(isDark: Bool) throws { // cm-128.5 (Tom, grill Q34): the hand no longer dims
-        var snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: "#777777",
-            activeCodingAgentCount: 1, showsRaisedHand: true, taskStatus: .done)
-        snapshot.monitoringAgentCount = 1
+        let snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: "#777777",
+            activeCodingAgentCount: 1, showsRaisedHand: true, monitoringAgentCount: 1, taskStatus: .done) // (cm-128.6)
         let model = SidebarAppKitRowCellTests.makeModel(isActive: true, colorSchemeIsDark: isDark, snapshot: snapshot)
         let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
         _ = cell.layoutContent(model: model, width: 420, apply: true)
-        let tooltip = String(localized: "sidebar.agentMonitoring.tooltip", defaultValue: "Watching a background job")
+        let tooltip = SidebarAgentMarkTooltip.text(.monitoring, in: snapshot.agentLists) // (cm-128.6) the builder's line for this fixture
         let waveform = try #require(SidebarAppKitRowCellTests.descendants(of: cell).compactMap { $0 as? NSImageView }
             .first { $0.toolTip == tooltip && !$0.isHidden })
         let spinner = try #require([cell.markSpinnerForTesting, cell.trailingSpinnerForTesting]

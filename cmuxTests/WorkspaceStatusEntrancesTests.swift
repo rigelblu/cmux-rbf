@@ -950,10 +950,11 @@ struct WorkspaceStatusEntrancesTests {
         #expect(snapshotWithList.showsRaisedHand == true)
         #expect(snapshotWithList.contextMenuImmediateFields.showsRaisedHand == true)
 
-        // Case B: Waiting agent with default list (.cmuxFive) -> showsRaisedHand == false
+        // Case B: Waiting agent with default list (.cmuxFive) -> showsRaisedHand == true
+        // cmux-rbf: changed on purpose (#cm-128.6, Tom's item 9): the hand shows without a status list.
         let snapshotDefaultList = factory(workspace, list: .cmuxFive, settings: settings, showsAgentActivity: true).makeSnapshot()
-        #expect(snapshotDefaultList.showsRaisedHand == false)
-        #expect(snapshotDefaultList.contextMenuImmediateFields.showsRaisedHand == false)
+        #expect(snapshotDefaultList.showsRaisedHand == true)
+        #expect(snapshotDefaultList.contextMenuImmediateFields.showsRaisedHand == true)
 
         // Case C: Running (not waiting) agent with his list -> showsRaisedHand == false
         workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .running]
@@ -1014,8 +1015,8 @@ struct WorkspaceStatusEntrancesTests {
         #expect(snapshot.contextMenuImmediateFields.showsRaisedHand == false)
     }
 
-    /// Piece 4 (#cm-109.4): AppKit sidebar row renders hand.raised.fill when agent is waiting under a status list,
-    /// winning over the spinner and badge.
+    /// Piece 4 (#cm-109.4): AppKit sidebar row renders hand.raised.fill when an agent is waiting, with or without a status
+    /// list (cm-128.6, Tom's item 9), winning over the spinner and badge.
     @Test func appKitSidebarRowShowsRaisedHandDuringWaitAndWinsOverSpinnerAndBadge() throws {
         let (settings, cleanUp) = settings()
         defer { cleanUp() }
@@ -1026,7 +1027,8 @@ struct WorkspaceStatusEntrancesTests {
             "waiter": .needsInput
         ]
 
-        // 1. Without a status list (.cmuxFive), the spinner shows and the hand does not.
+        // 1. Without a status list (.cmuxFive), the spinner and the hand both show.
+        // cmux-rbf: changed on purpose (#cm-128.6, Tom's item 9): the hand shows without a status list.
         let defaultListSnapshot = factory(
             workspace,
             list: .cmuxFive,
@@ -1034,7 +1036,7 @@ struct WorkspaceStatusEntrancesTests {
             showsAgentActivity: true
         ).makeSnapshot()
         #expect(defaultListSnapshot.activeCodingAgentCount == 1)
-        #expect(defaultListSnapshot.showsRaisedHand == false)
+        #expect(defaultListSnapshot.showsRaisedHand == true)
 
         let initialModel = SidebarWorkspaceRowModel(
             workspaceId: workspace.id,
@@ -1072,9 +1074,9 @@ struct WorkspaceStatusEntrancesTests {
         let cell = SidebarWorkspaceRowTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 40))
         cell.configurePresentation(model: initialModel)
         #expect(cell.markSpinnerForTesting?.isHidden == false)
-        #expect(cell.handForTesting?.isHidden != false) // (#cm-109.3)
+        #expect(cell.handForTesting?.isHidden == false) // (#cm-109.3) cmux-rbf: changed on purpose (#cm-128.6): the hand shows without a status list
 
-        // 2. Under his list, hand becomes active, winning over the existing spinner and badge.
+        // 2. Under his list, the hand is just as active, beside the existing spinner and badge.
         let hisListSnapshot = factory(
             workspace,
             list: Self.hisList,
@@ -1137,6 +1139,55 @@ struct WorkspaceStatusEntrancesTests {
         #expect(hand.toolTip == expectedTooltip)
         #expect(hand.accessibilityLabel() == expectedTooltip)
         #expect(hand.image?.accessibilityDescription == expectedTooltip)
+
+        // cmux-rbf: added (#cm-128.6, step 1 review F2): step 1 removed the only cell-level hidden-hand assertion, so the
+        // same reused cell now gets an agent that only runs, and the hand has to go hidden again.
+        workspace.agentLifecycleStatesByPanelId[panelId] = ["runner": .running]
+        let runningOnlySnapshot = factory(
+            workspace,
+            list: Self.hisList,
+            settings: settings,
+            showsAgentActivity: true
+        ).makeSnapshot()
+        #expect(runningOnlySnapshot.showsRaisedHand == false)
+        cell.configurePresentation(model: SidebarWorkspaceRowModel(
+            workspaceId: workspace.id,
+            index: 0,
+            snapshot: runningOnlySnapshot,
+            settings: settings,
+            isActive: false,
+            isMultiSelected: false,
+            hasUserCustomTitle: false,
+            canCloseWorkspace: false,
+            accessibilityWorkspaceCount: 1,
+            unreadCount: 5,
+            latestNotificationText: nil,
+            showsAgentActivity: true,
+            rowSpacing: 8,
+            isBeingDragged: false,
+            topDropIndicatorVisible: false,
+            bottomDropIndicatorVisible: false,
+            isGrouped: false,
+            isColorSectionMember: false,
+            isFirstRow: true,
+            shortcutHintText: nil,
+            showsShortcutHints: false,
+            colorSchemeIsDark: true,
+            globalFontMagnificationPercent: 100,
+            isChecklistExpanded: false,
+            checklistAddFieldActivationToken: 0,
+            isChecklistPopoverPresented: false,
+            editingChecklistItemId: nil,
+            todoControlsEnabled: true,
+            isMetadataExpanded: false,
+            isMarkdownExpanded: false
+        ))
+        #expect(cell.handForTesting?.isHidden != false, "a reused cell hides the hand when the snapshot shows none")
+        // The later scaled-font case builds its own snapshot, so put the waiting agent back for it.
+        workspace.agentLifecycleStatesByPanelId[panelId] = [
+            "runner": .running,
+            "waiter": .needsInput
+        ]
 
         // 3. Test at scaled font scale (sidebarFontSize: 18 pt -> fontScale: 1.44 -> spinnerSide: 17.28 pt)
         let suite = "WorkspaceStatusEntrancesTests.scaled.\(UUID().uuidString)"
@@ -1434,7 +1485,7 @@ struct WorkspaceStatusEntrancesTests {
         if let status { workspace.setOwnStatus(try #require(Self.hisList.entry(id: status))) } // (#cm-109.7)
         let snapshot = factory(workspace, list: Self.hisList, settings: settings, showsAgentActivity: true).makeSnapshot() // (#cm-109.7)
         #expect(snapshot.showsRaisedHand == (waiting && !errored)) // (#cm-109.7)
-        #expect(snapshot.erroredAgents.isEmpty != errored) // cm-128.5
+        #expect(snapshot.agentLists.error.isEmpty != errored) // cm-128.5 (cm-128.6: the error list)
         return SidebarWorkspaceRowModel( // (#cm-109.7)
             workspaceId: workspace.id, // (#cm-109.7)
             index: 0, // (#cm-109.7)

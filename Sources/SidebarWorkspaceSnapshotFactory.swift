@@ -111,9 +111,6 @@ struct SidebarWorkspaceSnapshotFactory {
             todoControlsEnabled: todoControlsEnabled, // (#cm-109.4)
             list: statusList // (#cm-109.4)
         )
-        let isAgentWaiting = taskStatusInput.isAgentWaiting // (#cm-109.3)
-        let hasStatusList = statusList.source != .cmux // (#cm-109.3)
-        let showsRaisedHand = hasStatusList && isAgentWaiting && settings.details.showAgentActivity // (#cm-109.3)
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
             title: workspace.title,
@@ -136,18 +133,15 @@ struct SidebarWorkspaceSnapshotFactory {
                     || workspace.remoteConnectionState == .disconnected),
             copyableSidebarSSHError: copyableSidebarSSHError,
             latestConversationMessage: workspace.latestConversationMessage,
+            // cm-128.6 (Tom's item 10): cmux's agent pills leave the row; the store and every other reader keep them.
             metadataEntries: detailVisibility.showsMetadata
-                ? workspace.sidebarStatusEntriesInDisplayOrder()
+                ? workspace.sidebarStatusEntriesInDisplayOrder().filter { !Workspace.isAgentStatusPillKey($0.key) }
                 : [],
             metadataBlocks: detailVisibility.showsMetadata
                 ? workspace.sidebarMetadataBlocksInDisplayOrder()
                 : [],
             latestLog: detailVisibility.showsLog ? workspace.logEntries.last : nil,
             progress: detailVisibility.showsProgress ? workspace.progress : nil,
-            activeCodingAgentCount: SidebarAgentActivitySummary.visibleActiveCodingAgentCount(
-                showsAgentActivity: showsAgentActivity,
-                statesByPanelId: workspace.agentLifecycleStatesByPanelId
-            ),
             compactGitBranchSummaryText: compactGitBranchSummaryText,
             compactDirectoryCandidates: compactDirectoryCandidates,
             compactBranchDirectoryCandidates: compactBranchDirectoryCandidates,
@@ -167,18 +161,13 @@ struct SidebarWorkspaceSnapshotFactory {
             checklistTotalCount: checklistProgress.totalCount,
             checklistFirstUncheckedText: checklistProgress.firstUncheckedText,
             taskStatusInput: taskStatusInput,
-            showsRaisedHand: showsRaisedHand, // (#cm-109.3)
-            // cm-128.5: the triangle is the hand's twin: the same gate, and no status list hides both until `.6`.
-            erroredAgents: hasStatusList
-                ? SidebarAgentErrorSummary.erroredAgents(
-                    showsAgentActivity: settings.details.showAgentActivity,
-                    orderedPanelIds: workspace.sidebarOrderedPanelIds(),
-                    statesByPanelId: workspace.agentLifecycleStatesByPanelId,
-                    usageLimitKeysByPanelId: workspace.agentUsageLimitKeysByPanelId)
-                : [],
-            monitoringAgentCount: SidebarAgentActivitySummary.visibleMonitoringAgentCount(
+            // cm-128.6: Tom's item 9, a status list no longer gates the hand or the triangle. Each list keeps its mark's gate:
+            // waiting and error behind the setting, running, monitoring and idle behind `showsAgentActivity`. The lists take the
+            // one pane order read above; the workspace's agent signals read the same per-agent states, in no particular order.
+            agentLists: SidebarAgentActivitySummary.lists(
+                showsNeedsYouMarks: settings.details.showAgentActivity,
                 showsAgentActivity: showsAgentActivity,
-                statesByPanelId: workspace.agentLifecycleStatesByPanelId
+                paneStates: workspace.agentPaneStates(panelIds: orderedPanelIds)
             )
         )
     }

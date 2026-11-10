@@ -34,44 +34,51 @@ public struct AgentLifecycleReducerState: Sendable, Equatable {
         return "@\(draft.source)"
     }
 
-    /// Combined phase for one surface/agent pair across its live sessions,
-    /// or `nil` when every session has ended (the sidebar entry clears).
+    /// The newest live session of one agent (cm-128.6): the greater `lastOccurredAtMs`, and on a tie the greater
+    /// `lastSequence`. Older live sessions of the same agent draw nothing, and a running one no longer outranks a newer
+    /// waiting one. `nil` when every session has ended.
+    private static func newestLiveSession(
+        in bySession: [String: AgentSessionLifecycleState]
+    ) -> AgentSessionLifecycleState? {
+        bySession.values.filter { !$0.ended }.max { lhs, rhs in
+            if lhs.lastOccurredAtMs != rhs.lastOccurredAtMs { return lhs.lastOccurredAtMs < rhs.lastOccurredAtMs }
+            return lhs.lastSequence < rhs.lastSequence
+        }
+    }
+
+    /// Combined phase for one surface/agent pair: the newest live session's phase (cm-128.6), or `nil` when every
+    /// session has ended (the sidebar entry clears).
     ///
     /// - Parameters:
     ///   - surfaceId: The surface UUID string as recorded on events.
     ///   - agentKey: The sidebar lifecycle status key.
     /// - Returns: The combined phase, or `nil`.
-    public func combinedPhase(surfaceId: String, agentKey: String) -> AgentLifecyclePhase? {
+    public func combinedPhase(surfaceId: String, agentKey: String) -> AgentLifecyclePhase? { // (cm-128.6)
         guard let bySession = sessions[surfaceId]?[agentKey] else { return nil }
-        let live = bySession.values.filter { !$0.ended }
-        return live.map(\.phase).max { $0.combinePrecedence < $1.combinePrecedence }
+        return Self.newestLiveSession(in: bySession)?.phase
     }
 
-    /// Whether the agent's error on `surfaceId` is a typed usage limit (cm-128.5): its combined phase is `.error` and the
-    /// newest session at `.error` carries the flag.
-    public func hasUsageLimit(surfaceId: String, agentKey: String) -> Bool {
-        guard let bySession = sessions[surfaceId]?[agentKey] else { return false }
-        let live = bySession.values.filter { !$0.ended }
-        guard live.map(\.phase).max(by: { $0.combinePrecedence < $1.combinePrecedence }) == .error else { return false }
-        return live.filter { $0.phase == .error }.max(by: { $0.lastSequence < $1.lastSequence })?.usageLimit == true
+    /// Whether the agent's error on `surfaceId` is a typed usage limit (cm-128.5): the newest live session is at `.error`
+    /// and carries the flag. cm-128.6: the winning session's own flag, not the newest error session's.
+    public func hasUsageLimit(surfaceId: String, agentKey: String) -> Bool { // (cm-128.6)
+        guard let bySession = sessions[surfaceId]?[agentKey],
+              let newest = Self.newestLiveSession(in: bySession), newest.phase == .error else { return false }
+        return newest.usageLimit
     }
 
     /// Full combined snapshot across all surfaces and agents.
     ///
     /// - Returns: The snapshot the projection layer diffs and applies.
-    public func snapshot() -> AgentLifecycleSnapshot {
+    public func snapshot() -> AgentLifecycleSnapshot { // (cm-128.6)
         var phases: [String: [String: AgentLifecyclePhase]] = [:]
         var newestOccurredAtMs: [String: [String: Int64]] = [:]
         var usageLimitAgentKeys: [String: Set<String>] = [:]
         for (surfaceId, byAgent) in sessions {
             for (agentKey, bySession) in byAgent {
-                let live = bySession.values.filter { !$0.ended }
-                guard let phase = live.map(\.phase).max(by: {
-                    $0.combinePrecedence < $1.combinePrecedence
-                }) else { continue }
-                phases[surfaceId, default: [:]][agentKey] = phase
-                newestOccurredAtMs[surfaceId, default: [:]][agentKey] =
-                    live.map(\.lastOccurredAtMs).max() ?? 0
+                guard let newest = Self.newestLiveSession(in: bySession) else { continue }
+                phases[surfaceId, default: [:]][agentKey] = newest.phase
+                // The newest live session's own time, which is also the largest (cm-128.6).
+                newestOccurredAtMs[surfaceId, default: [:]][agentKey] = newest.lastOccurredAtMs
                 if hasUsageLimit(surfaceId: surfaceId, agentKey: agentKey) {
                     usageLimitAgentKeys[surfaceId, default: []].insert(agentKey)
                 }

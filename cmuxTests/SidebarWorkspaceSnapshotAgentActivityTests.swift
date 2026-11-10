@@ -57,24 +57,20 @@ extension SidebarWorkspaceSnapshotRefreshPolicyTests {
         #expect(visible.showsAgentActivity)
     }
 
-    @Test func disabledSpinnerDoesNotReadAgentLifecycleStates() {
+    // cmux-rbf: changed on purpose (#cm-128.6): the laziness guard follows the lists builder, which is the code that ships.
+    @Test func disabledMarksDoNotReadAgentLifecycleStates() {
         var didReadAgentLifecycleStates = false
-        let agentLifecycleStates: () -> [UUID: [String: AgentHibernationLifecycleState]] = {
+        let paneStates: () -> WorkspaceAgentPaneStates = {
             didReadAgentLifecycleStates = true
-            return [
-                UUID(): [
-                    "codex": .running,
-                    "claude_code": .running,
-                ],
-            ]
+            return WorkspaceAgentPaneStates(entries: [
+                WorkspaceAgentPaneState(panelId: UUID(), agentKey: "codex", state: .running, usageLimit: false),
+            ])
         }
 
-        let count = SidebarAgentActivitySummary.visibleActiveCodingAgentCount(
-            showsAgentActivity: false,
-            statesByPanelId: agentLifecycleStates()
-        )
+        let lists = SidebarAgentActivitySummary.lists(
+            showsNeedsYouMarks: false, showsAgentActivity: false, paneStates: paneStates())
 
-        #expect(count == 0)
+        #expect(lists == SidebarAgentStateLists())
         #expect(!didReadAgentLifecycleStates)
     }
 }

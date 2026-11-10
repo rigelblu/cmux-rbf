@@ -82,12 +82,12 @@ struct AgentLifecycleMonitoringTests {
         #expect(settled.decisions.last?.disposition == .accepted)
     }
 
-    @Test func rawPendingWorkStillMeansRunningAndMonitoringHasItsOwnRank() {
+    @Test func rawPendingWorkStillMeansRunning() {
         var state = AgentLifecycleReducerState()
         AgentLifecycleReducer().apply(event(1, .turnCompleted, pending: true), to: &state)
         #expect(state.snapshot().phases[surface]?["claude"] == .running)
-        let order: [AgentLifecyclePhase] = [.running, .needsInput, .monitoring, .error, .unknown, .idle]
-        #expect(order.map(\.combinePrecedence) == [6, 5, 4, 3, 2, 1])
+        // cmux-rbf: changed on purpose (#cm-128.6): `combinePrecedence` is gone; the newest live session decides, so there
+        // is no phase order left to pin.
     }
 
     @Test(arguments: [AgentJournalEventKind.sessionStarted, .idleObserved, .attentionResolved,

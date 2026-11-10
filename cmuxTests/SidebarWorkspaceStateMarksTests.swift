@@ -93,9 +93,9 @@ struct SidebarWorkspaceStateMarksTests {
             observeError(harness, source: "claude", native: "StopFailure", detail: "server_error")
             await harness.settle()
             let snapshot = rowSnapshot(harness.workspace)
-            #expect(snapshot.erroredAgents.map(\.displayName) == ["Claude Code"], "\(snapshot.erroredAgents)")
+            #expect(snapshot.agentLists.error.map(\.displayName) == ["Claude Code"], "\(snapshot.agentLists.error)")
             #expect(!snapshot.showsRaisedHand)
-            #expect(SidebarAgentErrorSummary.tooltip(for: snapshot.erroredAgents) == "Claude Code stopped on an error")
+            #expect(SidebarAgentMarkTooltip.text(.error, in: snapshot.agentLists) == "Claude Code stopped on an error")
             let signals = harness.workspace.taskStatusSignals()
             #expect(signals.anyAgentNeedsInput && signals.anyAgentError && !signals.anyAgentWaiting)
         }
@@ -107,7 +107,7 @@ struct SidebarWorkspaceStateMarksTests {
             observeError(harness, source: "codex", native: "Stop", detail: "usage_limit_exceeded")
             observeError(harness, source: "pi", native: "Stop", detail: "usage_limit_exceeded")
             await harness.settle()
-            let lines = SidebarAgentErrorSummary.tooltipLines(for: rowSnapshot(harness.workspace).erroredAgents)
+            let lines = SidebarAgentMarkTooltip.lines(.error, in: rowSnapshot(harness.workspace).agentLists)
             #expect(lines.contains("Claude Code hit its usage limit"), "\(lines)")
             #expect(lines.contains("Codex hit its usage limit"), "\(lines)")
             #expect(lines.contains("Pi stopped on an error"), "the same detail from another source is free text: \(lines)")
@@ -123,7 +123,7 @@ struct SidebarWorkspaceStateMarksTests {
             harness.observe(.turnStarted)
             await harness.settle()
             #expect(harness.workspace.agentUsageLimitKeysByPanelId[harness.panel] == nil)
-            #expect(rowSnapshot(harness.workspace).erroredAgents.isEmpty)
+            #expect(rowSnapshot(harness.workspace).agentLists.error.isEmpty)
         }
     }
 
@@ -132,14 +132,14 @@ struct SidebarWorkspaceStateMarksTests {
             harness.workspace.agentLifecycleStatesByPanelId[harness.panel] = ["claude_code": .needsInput, "codex": .error]
             let snapshot = rowSnapshot(harness.workspace)
             #expect(snapshot.showsRaisedHand)
-            #expect(snapshot.erroredAgents.map(\.statusKey) == ["codex"])
+            #expect(snapshot.agentLists.error.map(\.statusKey) == ["codex"])
         }
     }
 
     @Test(arguments: [false, true])
     func theAppKitTriangleIsTheHandsTwinOutsideTheDoneDim(isDark: Bool) throws {
         var snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: "#777777", showsRaisedHand: true, taskStatus: .done)
-        snapshot.erroredAgents = [SidebarErroredAgent(statusKey: "claude_code", displayName: "Claude Code", usageLimit: false)]
+        snapshot.agentLists.error = [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: false)]
         let model = SidebarAppKitRowCellTests.makeModel(isActive: false, colorSchemeIsDark: isDark, snapshot: snapshot)
         let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
         _ = cell.layoutContent(model: model, width: 420, apply: true)
@@ -179,32 +179,39 @@ extension SidebarWorkspaceStateMarksTests {
             observeError(harness, source: "claude", native: "StopFailure", detail: "rate_limit", session: "a")
             observeError(harness, source: "claude", native: "StopFailure", detail: "server_error", session: "b", panel: second)
             await harness.settle()
-            let lines = SidebarAgentErrorSummary.tooltipLines(for: rowSnapshot(harness.workspace).erroredAgents)
+            let lines = SidebarAgentMarkTooltip.lines(.error, in: rowSnapshot(harness.workspace).agentLists)
             #expect(lines == ["Claude Code hit its usage limit", "Claude Code stopped on an error"], "\(lines)")
         }
     }
 
-    @Test func theLinesFollowThePaneOrderNotTheKeyOrderNorThePaneIdOrder() {
-        let high = UUID(uuidString: "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")!
-        let low = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
-        let agents = SidebarAgentErrorSummary.erroredAgents(
-            showsAgentActivity: true, orderedPanelIds: [high, low],
-            statesByPanelId: [high: ["pi": .error, "claude_code": .error], low: ["codex": .error]],
-            usageLimitKeysByPanelId: [:])
-        #expect(agents.map(\.statusKey) == ["claude_code", "pi", "codex"], "the first pane's keys by name, then the next pane: \(agents.map(\.statusKey))")
-        let reversed = SidebarAgentErrorSummary.erroredAgents(
-            showsAgentActivity: true, orderedPanelIds: [low, high],
-            statesByPanelId: [high: ["pi": .error], low: ["codex": .error]], usageLimitKeysByPanelId: [:])
-        #expect(reversed.map(\.statusKey) == ["codex", "pi"], "\(reversed.map(\.statusKey))")
+    @Test func theLinesFollowThePaneOrderNotTheKeyOrderNorThePaneIdOrder() async throws {
+        try await ClearAgentStateHarness.run { harness in
+            let second = try secondPane(harness)
+            harness.workspace.agentLifecycleStatesByPanelId = [
+                harness.panel: ["pi": .error, "claude_code": .error], second: ["codex": .error]]
+            @MainActor func names(_ order: [UUID]) -> [String] {
+                SidebarAgentActivitySummary.lists(showsNeedsYouMarks: true, showsAgentActivity: true,
+                    paneStates: harness.workspace.agentPaneStates(panelIds: order)).error.map(\.statusKey)
+            }
+            #expect(names([harness.panel, second]) == ["claude_code", "pi", "codex"], "the first pane's keys by name, then the next pane")
+            #expect(names([second, harness.panel]) == ["codex", "claude_code", "pi"], "the order given is the order read")
+        }
     }
 
-    @Test func theSameLineIsSaidOnce() {
+    /// cmux-rbf: changed on purpose (#cm-128.6, Q41): panes holding the same agent in the same state are one entry, and its line
+    /// carries the count, where `.5` said the same line once.
+    @Test func theSameAgentInTheSameStateIsOneEntryWithItsCount() {
         let a = UUID(), b = UUID()
-        let agents = SidebarAgentErrorSummary.erroredAgents(
-            showsAgentActivity: true, orderedPanelIds: [a, b],
-            statesByPanelId: [a: ["claude_code": .error], b: ["claude_code": .error]],
-            usageLimitKeysByPanelId: [a: ["claude_code"], b: ["claude_code"]])
-        #expect(SidebarAgentErrorSummary.tooltipLines(for: agents) == ["Claude Code hit its usage limit"], "\(agents)")
+        func error(_ panel: UUID, _ flagged: Bool) -> WorkspaceAgentPaneState {
+            WorkspaceAgentPaneState(panelId: panel, agentKey: "claude_code", state: .error, usageLimit: flagged)
+        }
+        let lists = SidebarAgentActivitySummary.lists(showsNeedsYouMarks: true, showsAgentActivity: true,
+            paneStates: WorkspaceAgentPaneStates(entries: [error(a, true), error(b, true)]))
+        #expect(lists.error.count == 1 && lists.error.first?.paneCount == 2, "\(lists.error)")
+        #expect(SidebarAgentMarkTooltip.lines(.error, in: lists) == ["Claude Code hit its usage limit (2)"], "\(lists.error)")
+        let split = SidebarAgentActivitySummary.lists(showsNeedsYouMarks: true, showsAgentActivity: true,
+            paneStates: WorkspaceAgentPaneStates(entries: [error(a, true), error(b, false)]))
+        #expect(split.error.count == 2, "a usage limit and a plain error stay separate: \(split.error)")
     }
 
     // MARK: F6, one name table
@@ -212,27 +219,14 @@ extension SidebarWorkspaceStateMarksTests {
     @Test func everyBuiltInAgentIsNamedByItsOwnDefinition() {
         for definition in CmuxTaskManagerCodingAgentDefinition.builtIns {
             let key = FeedCoordinator.lifecycleStatusKey(forSource: definition.id)
-            #expect(SidebarAgentErrorSummary.displayName(forStatusKey: key) == definition.displayName, "\(key)")
+            #expect(SidebarAgentMarkTooltip.knownDisplayName(forStatusKey: key) == definition.displayName, "\(key)")
         }
         let kimi = CmuxTaskManagerCodingAgentDefinition.builtIns.first { $0.id == "kimi" }
-        #expect(SidebarAgentErrorSummary.displayName(forStatusKey: "kimi") == kimi?.displayName)
-        #expect(SidebarAgentErrorSummary.displayName(forStatusKey: "unheard-of") == "unheard-of", "the bare key is the fallback")
-    }
-
-    // MARK: F7, the pane order is read only when a pane holds an error
-
-    @Test func thePaneOrderIsNotReadWhenNoPaneHoldsAnError() {
-        var reads = 0
-        let panel = UUID()
-        let none = SidebarAgentErrorSummary.erroredAgents(
-            showsAgentActivity: true, orderedPanelIds: { reads += 1; return [panel] }(),
-            statesByPanelId: [panel: ["claude_code": .needsInput]], usageLimitKeysByPanelId: [:])
-        #expect(none.isEmpty)
-        #expect(reads == 0, "the order was read \(reads) time(s) for a row with no error")
-        let some = SidebarAgentErrorSummary.erroredAgents(
-            showsAgentActivity: true, orderedPanelIds: { reads += 1; return [panel] }(),
-            statesByPanelId: [panel: ["claude_code": .error]], usageLimitKeysByPanelId: [:])
-        #expect(some.count == 1 && reads == 1, "control: an error reads the order once")
+        #expect(SidebarAgentMarkTooltip.knownDisplayName(forStatusKey: "kimi") == kimi?.displayName)
+        #expect(SidebarAgentMarkTooltip.knownDisplayName(forStatusKey: "cmux.feed.attention:kimi") == kimi?.displayName,
+                "a Feed slot is named for its agent")
+        // cmux-rbf: changed on purpose (#cm-128.6): the total function is gone; an unknown key has no name, and is never its key.
+        #expect(SidebarAgentMarkTooltip.knownDisplayName(forStatusKey: "unheard-of") == nil, "no name: the nameless lines, never the key")
     }
 
     // MARK: F5, the usage-limit set follows the states
@@ -247,7 +241,7 @@ extension SidebarWorkspaceStateMarksTests {
             #expect(harness.marks["claude_code"] == .error, "marks \(harness.marks)")
             #expect(harness.workspace.agentUsageLimitKeysByPanelId[harness.panel]?.contains("claude_code") != true,
                     "the second error is not a usage limit: \(harness.workspace.agentUsageLimitKeysByPanelId)")
-            let lines = SidebarAgentErrorSummary.tooltipLines(for: rowSnapshot(harness.workspace).erroredAgents)
+            let lines = SidebarAgentMarkTooltip.lines(.error, in: rowSnapshot(harness.workspace).agentLists)
             #expect(lines == ["Claude Code stopped on an error"], "\(lines)")
         }
     }
@@ -283,7 +277,7 @@ extension SidebarWorkspaceStateMarksTests {
             #expect(destination.agentLifecycleStatesByPanelId[moved]?["claude_code"] == .error, "control: the state moved")
             #expect(destination.agentUsageLimitKeysByPanelId[moved]?.contains("claude_code") == true,
                     "the limit stayed behind: \(destination.agentUsageLimitKeysByPanelId)")
-            let lines = SidebarAgentErrorSummary.tooltipLines(for: rowSnapshot(destination).erroredAgents)
+            let lines = SidebarAgentMarkTooltip.lines(.error, in: rowSnapshot(destination).agentLists)
             #expect(lines == ["Claude Code hit its usage limit"], "\(lines)")
         }
     }
@@ -336,18 +330,47 @@ extension SidebarWorkspaceStateMarksTests {
             harness.center.noteStartupReplayReady()
             await harness.settle()
             #expect(harness.marks["claude_code"] == .error, "the replay painted \(harness.marks)")
-            let lines = SidebarAgentErrorSummary.tooltipLines(for: rowSnapshot(harness.workspace).erroredAgents)
+            let lines = SidebarAgentMarkTooltip.lines(.error, in: rowSnapshot(harness.workspace).agentLists)
             #expect(lines == ["Claude Code hit its usage limit"], "\(lines)")
         }
     }
 
-    @Test func theTriangleHidesWithTheHandWhenThereIsNoStatusListOrAgentActivityIsOff() async throws {
+    // cmux-rbf: changed on purpose (#cm-128.6, Tom's item 9): no status list no longer hides the triangle. Was
+    // `theTriangleHidesWithTheHandWhenThereIsNoStatusListOrAgentActivityIsOff`.
+    @Test func theTriangleShowsWithoutAStatusListAndHidesWhenAgentActivityIsOff() async throws {
         try await ClearAgentStateHarness.run { harness in
             harness.workspace.setAgentLifecycle(key: "claude_code", panelId: harness.panel, lifecycle: .error)
-            #expect(rowSnapshot(harness.workspace).erroredAgents.count == 1, "control: his list, activity on")
+            #expect(rowSnapshot(harness.workspace).agentLists.error.count == 1, "control: his list, activity on")
             let noList = WorkspaceStatusList(entries: WorkspaceStatusEntrancesTests.hisEntries, source: .cmux)
-            #expect(rowSnapshot(harness.workspace, list: noList).erroredAgents.isEmpty, "no status list hides the triangle")
-            #expect(rowSnapshot(harness.workspace, agentActivityOn: false).erroredAgents.isEmpty, "agent activity off hides the triangle")
+            #expect(rowSnapshot(harness.workspace, list: noList).agentLists.error.count == 1, "no status list still shows the triangle")
+            #expect(rowSnapshot(harness.workspace, agentActivityOn: false).agentLists.error.isEmpty, "agent activity off hides the triangle")
+        }
+    }
+
+    // MARK: Scenario 17, the `.6` half: no status list hides no mark (Tom's item 9)
+
+    @Test func withNoStatusListAWaitingAgentShowsTheHandAndAnErrorTheTriangle() async throws {
+        try await ClearAgentStateHarness.run { harness in
+            let noList = WorkspaceStatusList.cmuxFive
+            harness.workspace.setAgentLifecycle(key: "claude_code", panelId: harness.panel, lifecycle: .needsInput)
+            let waiting = rowSnapshot(harness.workspace, list: noList)
+            #expect(waiting.showsRaisedHand, "with statusList.source == .cmux a waiting agent raises the hand")
+            harness.workspace.setAgentLifecycle(key: "claude_code", panelId: harness.panel, lifecycle: .error)
+            let errored = rowSnapshot(harness.workspace, list: noList)
+            #expect(errored.agentLists.error.count == 1, "with statusList.source == .cmux an error raises the triangle: \(errored.agentLists.error)")
+            #expect(!errored.showsRaisedHand, "an error is not the hand")
+        }
+    }
+
+    /// The hand and the triangle only; the spinner and the waveform have their own gate. Step 2's lists check the rest.
+    @Test func withAgentActivityOffNeitherNeedsYouMarkShowsWhateverTheList() async throws {
+        try await ClearAgentStateHarness.run { harness in
+            let noList = WorkspaceStatusList.cmuxFive
+            harness.workspace.setAgentLifecycle(key: "claude_code", panelId: harness.panel, lifecycle: .needsInput)
+            for list in [noList, WorkspaceStatusEntrancesTests.hisList] {
+                let off = rowSnapshot(harness.workspace, list: list, agentActivityOn: false)
+                #expect(!off.showsRaisedHand && off.agentLists.error.isEmpty, "setting off hides the hand and the triangle, list source \(list.source)")
+            }
         }
     }
 
@@ -360,7 +383,7 @@ extension SidebarWorkspaceStateMarksTests {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         var snapshot = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(taskStatus: done ? .done : .todo)
-        snapshot.erroredAgents = [SidebarErroredAgent(statusKey: "claude_code", displayName: "Claude Code", usageLimit: false)]
+        snapshot.agentLists.error = [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: false)]
         let entrances = WorkspaceStatusEntrancesTests()
         let input = entrances.rowInput(snapshot, settings: SidebarTabItemSettingsSnapshot(defaults: defaults))
         let row = TabItemView(

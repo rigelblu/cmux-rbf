@@ -51,7 +51,6 @@ struct SidebarWorkspaceSnapshotBuilder {
         let metadataBlocks: [SidebarMetadataBlock]
         let latestLog: SidebarLogEntry?
         let progress: SidebarProgressState?
-        let activeCodingAgentCount: Int
         let compactGitBranchSummaryText: String?
         let compactDirectoryCandidates: [String]
         let compactBranchDirectoryCandidates: [String]
@@ -80,12 +79,16 @@ struct SidebarWorkspaceSnapshotBuilder {
         let checklistTotalCount: Int
         let checklistFirstUncheckedText: String?
         var taskStatusInput = SidebarWorkspaceTaskStatusSnapshot()
+        /// For each state a mark draws, the agents in it (cm-128.6). The hand, the triangle, the spinner and the waveform
+        /// each show when their list is not empty, and the three counts below are computed from it, with no setter, so
+        /// production keeps one source. A memberwise init that does not name it gets no agents.
+        var agentLists = SidebarAgentStateLists()
         /// Whether the raised hand indicator should show. (#cm-109.3)
-        var showsRaisedHand: Bool = false // (#cm-109.3)
-        /// The agents stopped on an error: the triangle shows when this is not empty, with the hand's gate. (cm-128.5)
-        var erroredAgents: [SidebarErroredAgent] = []
-        /// How many agent states are watching background work after their turn ended. (#cm-128.3)
-        var monitoringAgentCount: Int = 0
+        var showsRaisedHand: Bool { agentLists.showsRaisedHand } // (#cm-109.3) cm-128.6: computed from the lists
+        /// The spinner's count: running agent panes plus running loaders. (cm-128.6: computed from the lists)
+        var activeCodingAgentCount: Int { agentLists.activeCodingAgentCount }
+        /// How many agent states are watching background work after their turn ended. (#cm-128.3, cm-128.6: computed)
+        var monitoringAgentCount: Int { agentLists.monitoringAgentCount }
 
         /// One menu decision for both renderers, their popovers, and tests. (#cm-110.13)
         func statusMenuModel(controlsEnabled: Bool) -> SidebarWorkspaceCompactStatusMenuModel? { // (#cm-110.13)
