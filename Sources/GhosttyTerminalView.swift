@@ -4196,6 +4196,9 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     /// extends a selection already on screen, so only a real drag may start a
     /// reply.
     private var pendingLeftMouseDidDrag = false
+    /// `cm-136.1` — the press's `clickCount`, so the release can tell a
+    /// double- or triple-click from a single click that left a selection as it was.
+    private var pendingLeftMouseClickCount = 0
     private static var terminalReplySeq = 0
 #if DEBUG
     private var lastSizeSkipSignature: String?
@@ -5365,7 +5368,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     }
 
     // Convenience accessor for the ghostty surface
-    private var surface: ghostty_surface_t? {
+    var surface: ghostty_surface_t? {
         terminalSurface?.surface
     }
 
@@ -7871,6 +7874,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             ghostty_surface_mouse_pos(surface, mouseState.surfacePoint.x, mouseState.surfacePoint.y, mouseState.mods)
         }
         pendingLeftMouseDidDrag = false
+        pendingLeftMouseClickCount = event.clickCount
         _ = sendGhosttyMouseButton(
             surface,
             state: GHOSTTY_MOUSE_PRESS,
@@ -7941,6 +7945,13 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         )
         _ = finishGhosttyMouseSession(pendingSession)
         startReplyFromTerminalIfRequested(with: event, didDrag: pendingLeftMouseDidDrag, surface: surface)
+        showReplyInlineIfRequested(
+            with: event,
+            pressFlags: releaseFlags,
+            didDrag: pendingLeftMouseDidDrag,
+            clickCount: pendingLeftMouseClickCount,
+            surface: surface
+        )
         return true
     }
 
@@ -10780,9 +10791,19 @@ final class GhosttySurfaceScrollView: NSView {
         _ = synchronizeGeometryAndContent()
     }
 
-    private var sessionContentFrame: CGRect {
+    var sessionContentFrame: CGRect {
         sessionContentWidthPresentation.contentFrame(in: bounds)
     }
+
+    // MARK: Reply inline (`cm-136.1`)
+
+    /// This pane's Reply toolbar, made by its first show. Accessors are in
+    /// `GhosttyNSView+ReplyInline.swift`.
+    var replyInlineStorage: ReplyInlineToolbarController?
+
+    /// The environment a controller takes when it is made. Nil in the app; a test
+    /// sets it so a release can show before the controller exists.
+    var replyInlineEnvironmentForNewController: ReplyInlineEnvironment?
 
     func setMobileViewportBorder(size: CGSize?, drawRight: Bool, drawBottom: Bool) {
         let isVisible = drawRight || drawBottom
