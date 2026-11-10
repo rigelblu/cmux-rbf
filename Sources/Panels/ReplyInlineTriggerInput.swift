@@ -17,7 +17,7 @@ struct ReplyInlineTriggerInput {
     let didDrag: Bool
     /// The press's `clickCount`.
     let clickCount: Int
-    /// The cached setting. `cm-136.1` has none, so the caller passes `true`.
+    /// `reply.inline.enabled`, read by the caller at the release.
     let settingEnabled: Bool
     /// `ghostty_surface_has_selection`.
     let hasSelection: () -> Bool

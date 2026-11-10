@@ -26,6 +26,7 @@ final class ReplyInlineToolbarController {
     private weak var host: NSView?
     private var monitor: Any?
     private var sidebarObservation: AnyCancellable?
+    private var settingObservation: AnyCancellable?
     private var selectionTimer: Timer?
 
     init(host: NSView, environment: ReplyInlineEnvironment? = nil) {
@@ -33,9 +34,11 @@ final class ReplyInlineToolbarController {
         self.environment = environment ?? .production
     }
 
-    /// Whether the window monitor, the sidebar observer and the selection
-    /// compare are installed: all three or none.
-    var isWatching: Bool { monitor != nil && sidebarObservation != nil && selectionTimer != nil }
+    /// Whether the window monitor, the sidebar observer, the setting observer and
+    /// the selection compare are installed: all four or none.
+    var isWatching: Bool {
+        monitor != nil && sidebarObservation != nil && settingObservation != nil && selectionTimer != nil
+    }
 
     /// The selection compare's timer, so a test can hold it and check it is
     /// invalid once the toolbar is gone (a live timer would outlive the toolbar).
@@ -196,6 +199,12 @@ final class ReplyInlineToolbarController {
             guard let self else { return }
             self.handle(.sidebarChanged(showingReply: self.environment.sidebarShowingReply(window)))
         } ?? AnyCancellable {}
+        // `UserDefaults.didChangeNotification` fires for every defaults write in
+        // the app, so it is held only while a toolbar shows.
+        settingObservation = environment.observeSetting { [weak self] in
+            guard let self else { return }
+            self.handle(.settingChanged(enabled: self.environment.settingEnabled()))
+        } ?? AnyCancellable {}
         let timer = Timer(timeInterval: environment.selectionPollInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.checkSelection() }
         }
@@ -208,6 +217,8 @@ final class ReplyInlineToolbarController {
         monitor = nil
         sidebarObservation?.cancel()
         sidebarObservation = nil
+        settingObservation?.cancel()
+        settingObservation = nil
         selectionTimer?.invalidate()
         selectionTimer = nil
     }

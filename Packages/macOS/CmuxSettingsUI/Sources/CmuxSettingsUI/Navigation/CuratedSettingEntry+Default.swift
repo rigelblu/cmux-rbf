@@ -223,6 +223,7 @@ extension Array where Element == CuratedSettingEntry {
             .init(section: .textBox, id: "textbox-max-lines", title: String(localized: "settings.textBox.maxLines", defaultValue: "TextBox Max Lines"), synonyms: "TextBox Max Lines terminal.textBoxMaxLines textbox text box rich input prompt max height lines grow scroll beta"),
 
             // Sidebar appearance + sidebar workspace row details
+            .init(section: .reply, id: "inline-reply", title: String(localized: "settings.reply.inline.title", defaultValue: "Show Reply on selections"), synonyms: "reply.inline.enabled reply button selection toolbar inline quote"),
             .init(section: .reply, id: "quick-labels", title: "Quick Labels", synonyms: "reply.labels canned notes chips redline lgtm reply panel annotate"),
             .init(section: .sidebarAppearance, id: "match-terminal", title: String(localized: "settings.sidebarAppearance.matchTerminalBackground", defaultValue: "Match Terminal Background"), synonyms: "Match Terminal Background sidebarAppearance.matchTerminalBackground transparent background material terminal background sync"),
             .init(section: .sidebarAppearance, id: "hide-sidebar-details", title: String(localized: "settings.app.hideAllSidebarDetails", defaultValue: "Hide All Sidebar Details"), synonyms: "Hide All Sidebar Details sidebar.hideAllDetails compact sidebar hide details only title minimal left rail"),

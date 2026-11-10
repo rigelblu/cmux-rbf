@@ -103,4 +103,14 @@ struct ReplyInlineDismissTests {
     func paneClosedDismisses() {
         #expect(reason(.paneClosed) == .pane)
     }
+
+    @Test("The setting turned off takes a showing toolbar away")
+    func settingOffDismisses() {
+        #expect(reason(.settingChanged(enabled: false)) == .setting)
+    }
+
+    @Test("The setting still on, or turned back on, leaves it")
+    func settingOnStays() {
+        #expect(reason(.settingChanged(enabled: true)) == nil)
+    }
 }

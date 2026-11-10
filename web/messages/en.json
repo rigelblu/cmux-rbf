@@ -2510,6 +2510,7 @@
         "reply": {
           "description": "Reply panel",
           "maxMessagesBack": "How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable.",
+          "inline": "Show a Reply button over text selected in an agent's pane. Set enabled to false to turn it off in every window. ⌘⇧-drag still starts a reply in the panel.",
           "labels": "Quick labels offered above an open note, in order. As many as fit are chips; the rest are in the ⌄ menu. Clicking one puts its text in the note. An empty list means no labels."
         },
         "shortcuts": {

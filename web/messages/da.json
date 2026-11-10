@@ -1273,6 +1273,7 @@
         "reply": {
           "description": "Svarpanel",
           "maxMessagesBack": "Hvor mange svar uden usendte noter tilbagepilen går igennem. Svar med usendte noter forbliver altid tilgængelige.",
+          "inline": "Viser en Svar-knap over tekst, der er markeret i en agents rude. Sæt enabled til false for at slå den fra i alle vinduer. ⌘⇧-træk starter stadig et svar i panelet.",
           "labels": "Hurtige mærker vises over en åben note, i rækkefølge. Dem, der er plads til, vises som chips; resten er i ⌄-menuen. Et klik sætter dets tekst i noten. En tom liste betyder ingen mærker."
         },
         "shortcuts": {

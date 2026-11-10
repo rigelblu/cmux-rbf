@@ -27,6 +27,8 @@ enum ReplyInlineDismissal {
             return nil
         case .sidebarChanged(let showingReply):
             return showingReply == sidebarShowingReplyAtShow ? nil : .sidebar
+        case .settingChanged(let enabled):
+            return enabled ? nil : .setting
         case .paneClosed:
             return .pane
         }

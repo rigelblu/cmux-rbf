@@ -1834,6 +1834,20 @@
           "default": ["lgtm", "why?", "redline"],
           "description": "Quick labels offered above an open note, in order. As many as fit are chips; the rest are in the ⌄ menu. Clicking one puts its text in the note. An empty list means no labels.",
           "descriptionKey": "schemaDescriptions.reply.labels"
+        },
+        "inline": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Show a Reply button over text selected in an agent's pane. Set enabled to false to turn it off in every window. ⌘⇧-drag still starts a reply in the panel.",
+          "descriptionKey": "schemaDescriptions.reply.inline",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Show a Reply button over text selected in an agent's pane. Set enabled to false to turn it off in every window. ⌘⇧-drag still starts a reply in the panel.",
+              "descriptionKey": "schemaDescriptions.reply.inline"
+            }
+          }
         }
       }
     },

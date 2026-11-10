@@ -171,6 +171,9 @@ extension CmuxSettingsFileStore {
                 "reply": [
                     "maxMessagesBack": SettingCatalog().reply.maxMessagesBack.defaultValue,
                     "labels": SettingCatalog().reply.labels.defaultValue,
+                    "inline": [
+                        "enabled": SettingCatalog().reply.inlineEnabled.defaultValue,
+                    ],
                 ],
             ],
             [

@@ -1273,6 +1273,7 @@
         "reply": {
           "description": "Yanıt paneli",
           "maxMessagesBack": "Geri okunun kaç yanıt arasında, gönderilmemiş not içermeyenler için ilerlediği. Gönderilmemiş not taşıyan yanıtlar her zaman erişilebilir kalır.",
+          "inline": "Bir ajanın bölmesinde seçilen metnin üzerinde Yanıtla düğmesini gösterir. Tüm pencerelerde kapatmak için enabled değerini false yapın. ⌘⇧ ile sürükleme, panelde yanıt başlatmaya devam eder.",
           "labels": "Açık bir notun üzerinde sırayla sunulan hızlı etiketler. Sığanlar çip, geri kalanı ⌄ menüsündedir. Birine tıklamak metnini nota ekler. Boş liste, etiket olmadığı anlamına gelir."
         },
         "shortcuts": {

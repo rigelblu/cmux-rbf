@@ -1274,6 +1274,7 @@
         "reply": {
           "description": "Panel odpowiedzi",
           "maxMessagesBack": "Ile odpowiedzi bez niewysłanych notatek strzałka wstecz przechodzi. Odpowiedzi z niewysłanymi notatkami zawsze pozostają dostępne.",
+          "inline": "Pokazuje przycisk Odpowiedz nad tekstem zaznaczonym w panelu agenta. Ustaw enabled na false, aby go wyłączyć we wszystkich oknach. Przeciągnięcie z ⌘⇧ nadal rozpoczyna odpowiedź w panelu.",
           "labels": "Szybkie etykiety wyświetlane nad otwartą notatką, w kolejności. Te, które się mieszczą, są chipami; pozostałe znajdują się w menu ⌄. Kliknięcie wstawia jej tekst do notatki. Pusta lista oznacza brak etykiet."
         },
         "shortcuts": {

@@ -558391,6 +558391,381 @@
         }
       }
     },
+    "settings.reply.inline.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إظهار زر الرد عند التحديد"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prikaži dugme Odgovori pri označavanju"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis Svar ved markering"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antworten bei Markierungen anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Reply on selections"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar Responder al seleccionar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher Répondre sur les sélections"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra Rispondi sulle selezioni"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択範囲に返信ボタンを表示"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "បង្ហាញប៊ូតុងឆ្លើយតបពេលជ្រើសរើស"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택 영역에 답장 표시"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis Svar ved markering"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pokazuj przycisk Odpowiedz przy zaznaczeniu"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar Responder ao selecionar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать «Ответить» при выделении"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "แสดงปุ่มตอบกลับเมื่อเลือกข้อความ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçimlerde Yanıtla düğmesini göster"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показувати «Відповісти» під час виділення"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在选中内容上显示“回复”"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在選取內容上顯示「回覆」"
+          }
+        }
+      }
+    },
+    "settings.reply.inline.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تحديد النص في جزء الوكيل يعرض فوقه زر «رد»، أو «إضافة إلى الرد» عندما تكون لوحة الرد مفتوحة. والسحب مع ⌘⇧ ما زال يبدأ ردًا في اللوحة."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Označavanje teksta u panelu agenta prikazuje dugme iznad njega: Odgovori, ili Dodaj u odgovor kada je panel za odgovore otvoren. Prevlačenje uz ⌘⇧ i dalje pokreće odgovor u panelu."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når du markerer tekst i en agents rude, vises en knap over den: Svar, eller Tilføj til svar, når svarpanelet er åbent. ⌘⇧-træk starter stadig et svar i panelet."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn du Text im Bereich eines Agenten markierst, erscheint darüber eine Schaltfläche: Antworten, oder Zur Antwort hinzufügen, wenn das Antwortfeld geöffnet ist. ⌘⇧-Ziehen startet weiterhin eine Antwort im Feld."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecting text in an agent's pane shows a button over it: Reply, or Add to reply when the Reply panel is open. ⌘⇧-drag still starts a reply in the panel."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al seleccionar texto en el panel de un agente aparece un botón encima: Responder, o Añadir a la respuesta si el panel de respuestas está abierto. ⌘⇧-arrastrar sigue iniciando una respuesta en el panel."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionner du texte dans le panneau d'un agent affiche un bouton au-dessus : Répondre, ou Ajouter à la réponse si le panneau Répondre est ouvert. ⌘⇧-glisser lance toujours une réponse dans le panneau."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selezionare testo nel pannello di un agente mostra un pulsante sopra di esso: Rispondi, o Aggiungi alla risposta se il pannello Rispondi è aperto. ⌘⇧-trascina avvia ancora una risposta nel pannello."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エージェントのペインでテキストを選択すると、その上にボタンが表示されます。返信パネルが開いていれば「返信に追加」、閉じていれば「返信」です。⌘⇧ドラッグでは、引き続きパネルで返信を始められます。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ការជ្រើសរើសអត្ថបទនៅក្នុងផ្ទាំងរបស់ភ្នាក់ងារ បង្ហាញប៊ូតុងនៅពីលើវា៖ ឆ្លើយតប ឬ បន្ថែមទៅការឆ្លើយតប នៅពេលផ្ទាំងឆ្លើយតបបើក។ ⌘⇧-អូសនៅតែចាប់ផ្តើមការឆ្លើយតបនៅក្នុងផ្ទាំង។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "에이전트 창에서 텍스트를 선택하면 그 위에 버튼이 나타납니다. 답장 패널이 열려 있으면 '답장에 추가', 아니면 '답장'입니다. ⌘⇧-드래그는 여전히 패널에서 답장을 시작합니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når du markerer tekst i en agents panel, vises en knapp over den: Svar, eller Legg til i svar når svarpanelet er åpent. ⌘⇧-dra starter fortsatt et svar i panelet."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaznaczenie tekstu w panelu agenta pokazuje nad nim przycisk: Odpowiedz, lub Dodaj do odpowiedzi, gdy panel odpowiedzi jest otwarty. Przeciągnięcie z ⌘⇧ nadal rozpoczyna odpowiedź w panelu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecionar texto no painel de um agente mostra um botão sobre ele: Responder, ou Adicionar à resposta quando o painel de respostas está aberto. ⌘⇧-arrastar ainda inicia uma resposta no painel."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выделение текста в панели агента показывает над ним кнопку: «Ответить», а если панель ответов открыта — «Добавить к ответу». Перетаскивание с ⌘⇧ по-прежнему начинает ответ в панели."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "เมื่อเลือกข้อความในพาเนลของเอเจนต์ จะมีปุ่มแสดงอยู่เหนือข้อความ คือ ตอบกลับ หรือ เพิ่มลงในการตอบกลับ เมื่อพาเนลตอบกลับเปิดอยู่ การลากด้วย ⌘⇧ ยังเริ่มการตอบกลับในพาเนลได้เหมือนเดิม"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir ajanın bölmesinde metin seçmek, üzerinde bir düğme gösterir: Yanıtla veya Yanıta ekle (Yanıt paneli açıksa). ⌘⇧ ile sürükleme, panelde yanıt başlatmaya devam eder."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виділення тексту в панелі агента показує над ним кнопку: «Відповісти», або «Додати до відповіді», якщо панель відповідей відкрита. Перетягування з ⌘⇧ і далі починає відповідь на панелі."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在智能体窗格中选中文本时，其上方会显示一个按钮：“回复”；回复面板打开时则显示“添加到回复”。按住 ⌘⇧ 拖动仍会在面板中开始回复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在代理程式窗格中選取文字時，其上方會顯示一個按鈕：「回覆」；回覆面板開啟時則顯示「新增至回覆」。按住 ⌘⇧ 拖曳仍會在面板中開始回覆。"
+          }
+        }
+      }
+    },
+    "settings.reply.inline.jsonHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يمكن ضبطه أيضًا كـ reply.inline.enabled في cmux.json."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Također se može podesiti kao reply.inline.enabled u cmux.json."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kan også indstilles som reply.inline.enabled i cmux.json."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auch einstellbar als reply.inline.enabled in cmux.json."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also settable as reply.inline.enabled in cmux.json."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "También se puede definir como reply.inline.enabled en cmux.json."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aussi réglable via reply.inline.enabled dans cmux.json."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostabile anche come reply.inline.enabled in cmux.json."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json では reply.inline.enabled としても設定できます。"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ក៏អាចកំណត់ជា reply.inline.enabled ក្នុង cmux.json បានដែរ។"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json에서 reply.inline.enabled로도 설정할 수 있습니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kan også settes som reply.inline.enabled i cmux.json."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Można też ustawić jako reply.inline.enabled w cmux.json."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Também configurável como reply.inline.enabled no cmux.json."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Также задаётся как reply.inline.enabled в cmux.json."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ตั้งค่าเป็น reply.inline.enabled ใน cmux.json ได้เช่นกัน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux.json içinde reply.inline.enabled olarak da ayarlanabilir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Також задається як reply.inline.enabled у cmux.json."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "也可在 cmux.json 中设置为 reply.inline.enabled。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "也可在 cmux.json 中設定為 reply.inline.enabled。"
+          }
+        }
+      }
+    },
     "settings.reply.quickLabels.add": {
       "extractionState": "manual",
       "localizations": {

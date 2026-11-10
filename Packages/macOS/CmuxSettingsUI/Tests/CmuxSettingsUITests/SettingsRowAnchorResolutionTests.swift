@@ -196,6 +196,8 @@ struct SettingsRowAnchorResolutionTests {
         "setting:reset:reset-all",
         // `cm-69.3`: the Reply section's Reset row carries this anchor.
         "setting:reply:quick-labels",
+        // `cm-136.2`: the Reply section's Show Reply on selections row carries this anchor.
+        "setting:reply:inline-reply",
         "setting:terminal:restart-allowlisted-commands",
     ]
 
