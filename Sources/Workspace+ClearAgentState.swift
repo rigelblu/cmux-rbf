@@ -11,10 +11,11 @@ extension Workspace {
         return AgentHibernationLifecycleStatusKeys.isAllowed(head)
     }
 
-    /// Whether a per-pane lifecycle key can hold an agent mark: an allowed agent key, or a Feed attention slot. Manual
-    /// loading keys (`manual`, `manual:<id>`) are neither.
-    nonisolated static func isAgentMarkLifecycleKey(_ key: String) -> Bool {
-        AgentHibernationLifecycleStatusKeys.isAllowed(key) || key.hasPrefix(FeedCoordinator.attentionStatusKeyPrefix)
+    /// Whether a per-pane lifecycle key can hold an agent mark: every key but a `cmux workspace loading` loader's (`manual`,
+    /// `manual:<id>`). cm-128.6: a registered Vault agent's key counts, as the built-in keys and the Feed attention slot do. The
+    /// per-agent states, the enabled check and the clear all read this one function.
+    nonisolated static func isAgentMarkLifecycleKey(_ key: String) -> Bool { // (cm-128.6)
+        !AgentHibernationLifecycleStatusKeys.isManualKey(key)
     }
 
     /// **The** enabled check for Clear Agent State, read by the menu item (both builders) and the palette entry: any agent
@@ -59,7 +60,7 @@ extension Workspace {
         let slotPrefix = FeedCoordinator.attentionStatusKeyPrefix
         for (panelId, slotKeys) in droppedSlotKeysByPanel where panels[panelId] != nil {
             let hasAgentKey = (agentLifecycleStatesByPanelId[panelId] ?? [:]).keys.contains {
-                !AgentHibernationLifecycleStatusKeys.isManualKey($0)
+                Self.isAgentMarkLifecycleKey($0) // (cm-128.6) the same test as the loop above
             }
             guard !hasAgentKey, let slotKey = slotKeys.first else { continue }
             let agentKey = String(slotKey.dropFirst(slotPrefix.count))

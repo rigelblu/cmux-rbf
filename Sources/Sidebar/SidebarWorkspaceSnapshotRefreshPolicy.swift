@@ -18,11 +18,13 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let checklistCompletedCount: Int
         let checklistTotalCount: Int
         let checklistFirstUncheckedText: String?
-        let activeCodingAgentCount: Int
         let taskStatusInput: SidebarWorkspaceTaskStatusSnapshot
-        let showsRaisedHand: Bool // (#cm-109.3)
-        let erroredAgents: [SidebarErroredAgent] // (cm-128.5)
-        let monitoringAgentCount: Int
+        /// cm-128.6: the lists in the places of the spinner's count, the hand, the triangle and the waveform's count; the
+        /// three counts below are computed from them, so a changed name or count redraws the row.
+        let agentLists: SidebarAgentStateLists
+        var showsRaisedHand: Bool { agentLists.showsRaisedHand } // (#cm-109.3)
+        var activeCodingAgentCount: Int { agentLists.activeCodingAgentCount }
+        var monitoringAgentCount: Int { agentLists.monitoringAgentCount }
     }
 
     var contextMenuImmediateFields: ContextMenuImmediateFields {
@@ -43,11 +45,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             checklistCompletedCount: checklistCompletedCount,
             checklistTotalCount: checklistTotalCount,
             checklistFirstUncheckedText: checklistFirstUncheckedText,
-            activeCodingAgentCount: activeCodingAgentCount,
             taskStatusInput: taskStatusInput,
-            showsRaisedHand: showsRaisedHand, // (#cm-109.3)
-            erroredAgents: erroredAgents, // (cm-128.5)
-            monitoringAgentCount: monitoringAgentCount
+            agentLists: agentLists // (cm-128.6)
         )
     }
 
@@ -71,9 +70,6 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             metadataBlocks: metadataBlocks,
             latestLog: latestLog,
             progress: progress,
-            // The loading spinner is a leading row glyph like mediaActivity, so
-            // it also updates immediately while the context menu is open.
-            activeCodingAgentCount: snapshot.activeCodingAgentCount,
             compactGitBranchSummaryText: compactGitBranchSummaryText,
             compactDirectoryCandidates: compactDirectoryCandidates,
             compactBranchDirectoryCandidates: compactBranchDirectoryCandidates,
@@ -98,9 +94,9 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             checklistTotalCount: snapshot.checklistTotalCount,
             checklistFirstUncheckedText: snapshot.checklistFirstUncheckedText,
             taskStatusInput: snapshot.taskStatusInput,
-            showsRaisedHand: snapshot.showsRaisedHand, // (#cm-109.3)
-            erroredAgents: snapshot.erroredAgents, // (cm-128.5)
-            monitoringAgentCount: snapshot.monitoringAgentCount
+            // cm-128.6: the lists carry the hand, the triangle, the spinner and the waveform, which are leading row glyphs like
+            // mediaActivity, so they also update immediately while the context menu is open.
+            agentLists: snapshot.agentLists
         )
     }
 }

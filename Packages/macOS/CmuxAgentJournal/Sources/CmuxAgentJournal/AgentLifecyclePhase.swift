@@ -17,20 +17,4 @@ public enum AgentLifecyclePhase: String, Codable, Sendable, CaseIterable, Equata
     case idle
     /// The agent reported an error and is not making progress.
     case error
-
-    /// Precedence used when several sessions of the same agent share one
-    /// surface: the surface shows the most demanding live session.
-    ///
-    /// Order (most to least demanding): `running` > `needsInput` >
-    /// `monitoring` > `error` > `unknown` > `idle`.
-    public var combinePrecedence: Int {
-        switch self {
-        case .running: 6
-        case .needsInput: 5
-        case .monitoring: 4
-        case .error: 3
-        case .unknown: 2
-        case .idle: 1
-        }
-    }
 }

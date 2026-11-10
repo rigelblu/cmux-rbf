@@ -1056,7 +1056,6 @@ struct WorkspaceStatusIconDrawingTests {
             metadataBlocks: [], // (#cm-109.7)
             latestLog: nil, // (#cm-109.7)
             progress: nil, // (#cm-109.7)
-            activeCodingAgentCount: 0, // (#cm-109.7)
             compactGitBranchSummaryText: nil, // (#cm-109.7)
             compactDirectoryCandidates: [], // (#cm-109.7)
             compactBranchDirectoryCandidates: [], // (#cm-109.7)

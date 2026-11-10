@@ -144,14 +144,15 @@ struct AgentLifecycleReducerTests {
         ])
         #expect(state.combinedPhase(surfaceId: surface, agentKey: "claude_code") == .running)
 
-        // Once the newer session completes, the stuck old session would pin
-        // needsInput — unless it ends.
+        // Once the newer session completes, it is still the newest, so it decides.
+        // cmux-rbf: changed on purpose (#cm-128.6): the stuck old session no longer pins needsInput; within one agent the
+        // newest live session's state shows and older sessions draw nothing.
         let stuck = fold([
             event(1, .approvalRequested, session: "old"),
             event(2, .turnStarted, session: "new"),
             event(3, .turnCompleted, session: "new"),
         ])
-        #expect(stuck.combinedPhase(surfaceId: surface, agentKey: "claude_code") == .needsInput)
+        #expect(stuck.combinedPhase(surfaceId: surface, agentKey: "claude_code") == .idle)
 
         let cleaned = fold([
             event(1, .approvalRequested, session: "old"),

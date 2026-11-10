@@ -294,6 +294,9 @@ struct AgentClearHibernationTests {
             let snapshot = rowSnapshot(harness.workspace)
             #expect(!snapshot.showsRaisedHand)
             #expect(snapshot.metadataEntries.isEmpty)
+            // cmux-rbf: changed on purpose (#cm-128.6): the row now drops cmux's own agent pills whatever the store holds, so
+            // `metadataEntries.isEmpty` alone no longer proves the clear removed the pill. The store is checked here.
+            #expect(harness.workspace.statusEntries["claude_code"] == nil)
             let signals = harness.workspace.taskStatusSignals()
             #expect(!signals.anyAgentNeedsInput && !signals.anyAgentRunning)
             #expect(harness.marks["claude_code"] == .unknown)
