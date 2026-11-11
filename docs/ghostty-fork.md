@@ -1815,6 +1815,56 @@ tend to conflict together during rebases.
     `App.focusedSurface`, or the embedded surface close path should preserve
     serialization of registry/focus mutation across create and free.
 
+### 15) IO thread writes its own mode 2031 report (cmux-rbf, #cm-120.2)
+
+- Commits:
+  - `1cb1aaa67` (fix | switch appearance without a terminal's IO thread
+    waiting forever on its own mailbox), on `rigelblu/ghostty-rbf` `main` via
+    PR #7 (merge `2d7dc614f`, 2026-11-11). cmux pins `1cb1aaa67` (#cm-120.2)
+  - The runtime change is a copy of upstream ghostty-org `297507f498`
+    ("termio: send the config change color scheme report directly", Fixes
+    #14833, 2026-10-24), with its exact text and position. The tests and the
+    `global.zig` fallback are ours. `manaflow-ai/ghostty` `main` didn't carry
+    `297507f498` at the 2026-11-09 check
+- Files:
+  - `src/termio/stream_handler.zig`
+  - `src/termio/Termio.zig`
+  - `src/global.zig` (test-only)
+- Summary:
+  - The IO thread is the only thread that drains a surface's termio mailbox.
+    `StreamHandler.changeConfig` queued a mode 2031 `color_scheme_report` into
+    that mailbox with a blocking send while the IO thread handled
+    `.change_config` (added upstream in `836d794b9`). On a full mailbox the IO
+    thread waited on itself forever, and the main thread's next push for that
+    surface froze the app. A cmux hang sample from a light/dark switch
+    (2026-11-05) showed main and one `io` thread in that wait.
+  - `StreamHandler.changeConfig` no longer queues the report.
+    `Termio.changeConfig` writes it last, with
+    `colorSchemeReportLocked(td, false)`, inside the renderer lock it already
+    holds.
+  - `global.tmpDirPath` returns `/tmp` in tests with no global state, so a
+    test can build a real `Termio`.
+- Conflict notes:
+  - The sync that brings `297507f498` makes the same change on both sides.
+    Keep one copy: after it, `grep -c 'colorSchemeReportLocked(td, false)'
+    src/termio/Termio.zig` prints `1`, and `StreamHandler.changeConfig` sends
+    nothing. A copy of the same lines in another spot would merge cleanly
+    into two reports per config change, which is why ours matches upstream's
+    position. Once the sync is in, the runtime change is upstream's; shorten
+    this section to the tests and the `global.zig` fallback
+  - Two tests guard it: `changeConfig returns on a full termio mailbox` and
+    `changeConfig writes one mode 2031 report with the new theme and queues
+    none`. The second starts dark and switches to light
+  - `manaflow-ai/ghostty` `fca69640ec` (#270, "keep reported color scheme
+    independent of parsed config") removes `DerivedConfig.conditional_state`
+    and makes the report read `Termio.color_scheme`, a runtime value, instead
+    of the config. At the sync that brings it, the second test stops
+    compiling: set the starting and new scheme through `color_scheme` the way
+    that commit does, and keep the dark-to-light switch
+  - More generally, no code the IO thread runs while draining may send into
+    its own termio mailbox with a blocking send. `fullReset`'s report runs on
+    `io-reader` and is fine.
+
 The current cmux pin is the merged head `34cbf180d`, which merges the surface
 registry serialization (`e5c962a72`, section 14, landed on cmux `main` via
 branch `issue-5458-surface-registry-lock`) into the Cmd-click link fix line
