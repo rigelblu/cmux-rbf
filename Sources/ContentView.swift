@@ -16400,6 +16400,9 @@ struct TabItemView: View, Equatable {
     private static let maxDisplayedTitleCharacters = 2048
 
     var workspaceSnapshot: SidebarWorkspaceSnapshotBuilder.Snapshot { snapshot.workspace }
+    /// cm-128.6: every agent mark's tooltip and accessibility label, from the one builder. The body reads this and nothing else
+    /// for the marks' words (the AppKit cell reads the same builder), so a test holds the row to it.
+    var agentMarkTooltips: SidebarAgentMarkTooltip.Texts { SidebarAgentMarkTooltip.Texts(workspaceSnapshot.agentLists) }
     var workspaceId: UUID { snapshot.workspaceId }
     var index: Int { snapshot.index }
     var isActive: Bool { snapshot.isActive }
@@ -16727,7 +16730,8 @@ struct TabItemView: View, Equatable {
         let trailingStatusActive = slotResolution.trailing != .none // (#cm-109.3)
         let titleRowSpacing: CGFloat = 8 // (#cm-128.1) no spinner leads any more, so no 6 pt case
         let badgeFont = magnifiedFont(scaledFontSize(9), weight: .semibold)
-        let spinnerTooltip = SidebarWorkspaceLoadingTooltip.text(count: workspaceSnapshot.activeCodingAgentCount)
+        let markTooltips = agentMarkTooltips // (cm-128.6) the one builder, read once for every mark
+        let spinnerTooltip = markTooltips.running
         // Must match the AppKit cell, which derives this from the palette's
         // primary (white over the corrected fill). Deriving it from the global
         // selection colour instead made the two renderers disagree whenever a
@@ -16801,12 +16805,12 @@ struct TabItemView: View, Equatable {
                         drawnAlpha: 1 // cm-128.5
                     ) // (#cm-109.3)
                     .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
-                    .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
-                    .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                    .safeHelp(markTooltips.waiting) // (#cm-109.3) cm-128.6: the builder
+                    .accessibilityLabel(markTooltips.waiting) // (#cm-109.3)
                     .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
                 }
 
-                if !workspaceSnapshot.erroredAgents.isEmpty { // cm-128.5 the hand's twin: a pane stopped on an error
+                if !workspaceSnapshot.agentLists.error.isEmpty { // cm-128.5 the hand's twin: a pane stopped on an error (cm-128.6: the error list)
                     WaitingHandView(
                         symbolName: "exclamationmark.triangle.fill",
                         pointSize: scaledLoadingSpinnerSize * 0.8,
@@ -16815,8 +16819,8 @@ struct TabItemView: View, Equatable {
                         drawnAlpha: 1
                     )
                     .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize)
-                    .safeHelp(SidebarAgentErrorSummary.tooltip(for: workspaceSnapshot.erroredAgents))
-                    .accessibilityLabel(SidebarAgentErrorSummary.tooltip(for: workspaceSnapshot.erroredAgents))
+                    .safeHelp(markTooltips.error)
+                    .accessibilityLabel(markTooltips.error)
                     .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                 }
 
@@ -16828,6 +16832,8 @@ struct TabItemView: View, Equatable {
 
                 if showsMonitoring { // (#cm-128.3)
                     SidebarWorkspaceMonitoringWaveform(side: scaledLoadingSpinnerSize, color: spinnerColor)
+                        .safeHelp(markTooltips.monitoring) // (cm-128.6) the builder
+                        .accessibilityLabel(markTooltips.monitoring)
                         .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                 }
 

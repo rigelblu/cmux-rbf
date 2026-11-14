@@ -40,7 +40,6 @@ struct SidebarAppKitRowCellTests {
             metadataBlocks: metadataBlocks,
             latestLog: nil,
             progress: nil,
-            activeCodingAgentCount: 0,
             compactGitBranchSummaryText: nil,
             compactDirectoryCandidates: [],
             compactBranchDirectoryCandidates: [],
@@ -1951,7 +1950,7 @@ struct SidebarAppKitRowCellTests {
     @Test
     func anErroredPaneShowsTheWarningTriangleWithItsSymbolTooltipAndLabel() throws {
         var snapshot = Self.makeSnapshot()
-        snapshot.erroredAgents = [SidebarErroredAgent(statusKey: "claude_code", displayName: "Claude Code", usageLimit: false)]
+        snapshot.agentLists.error = [SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: false)] // cmux-rbf: changed on purpose (#cm-128.6)
         let model = Self.makeModel(snapshot: snapshot)
         let cell = Self.configuredCell(model: model)
         _ = cell.layoutContent(model: model, width: 420, apply: true)

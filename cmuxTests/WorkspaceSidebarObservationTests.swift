@@ -328,9 +328,7 @@ struct WorkspaceSidebarObservationTests {
         let panelId = try #require(workspace.focusedPanelId)
         workspace.setAgentLifecycle(key: "manual", panelId: panelId, lifecycle: .running)
         #expect(
-            SidebarAgentActivitySummary.activeCodingAgentCount(
-                statesByPanelId: workspace.agentLifecycleStatesByPanelId
-            ) == 1
+            spinnerCount(workspace) == 1 // cmux-rbf: changed on purpose (#cm-128.6)
         )
 
         // The workspace-scoped `cmux workspace loading off` path clears with a
@@ -338,9 +336,7 @@ struct WorkspaceSidebarObservationTests {
         // specific panel (the cross-surface off bug).
         #expect(workspace.clearAgentLifecycle(key: "manual", panelId: nil))
         #expect(
-            SidebarAgentActivitySummary.activeCodingAgentCount(
-                statesByPanelId: workspace.agentLifecycleStatesByPanelId
-            ) == 0
+            spinnerCount(workspace) == 0 // cmux-rbf: changed on purpose (#cm-128.6)
         )
     }
 
@@ -355,9 +351,7 @@ struct WorkspaceSidebarObservationTests {
         #expect(!workspace.hasRunningAgentLifecycle(key: "manual"))
         #expect(workspace.hasRunningAgentLifecycle(key: "codex"))
         #expect(
-            SidebarAgentActivitySummary.activeCodingAgentCount(
-                statesByPanelId: workspace.agentLifecycleStatesByPanelId
-            ) == 1
+            spinnerCount(workspace) == 1 // cmux-rbf: changed on purpose (#cm-128.6)
         )
     }
 
@@ -375,48 +369,44 @@ struct WorkspaceSidebarObservationTests {
         #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["manual"] == .running)
     }
 
+    // cmux-rbf: changed on purpose (#cm-128.6): the spinner's count as the row computes it, through the lists (the old per-key counter is gone).
+    private func spinnerCount(_ workspace: Workspace) -> Int {
+        SidebarAgentActivitySummary.lists(
+            showsNeedsYouMarks: true, showsAgentActivity: true,
+            paneStates: workspace.agentPaneStates(panelIds: Array(workspace.agentLifecycleStatesByPanelId.keys))
+        ).activeCodingAgentCount
+    }
+
+    // cmux-rbf: changed on purpose (#cm-128.6): the per-key counter is gone; the lists count the running panes.
     @Test func activeCodingAgentCountOnlyCountsRunningAgents() {
         let firstPanelId = UUID()
         let secondPanelId = UUID()
+        func pane(_ panel: UUID, _ key: String, _ state: AgentHibernationLifecycleState) -> WorkspaceAgentPaneState {
+            WorkspaceAgentPaneState(panelId: panel, agentKey: key, state: state, usageLimit: false)
+        }
+        let lists = SidebarAgentActivitySummary.lists(
+            showsNeedsYouMarks: true, showsAgentActivity: true,
+            paneStates: WorkspaceAgentPaneStates(entries: [
+                pane(firstPanelId, "codex", .running), pane(firstPanelId, "claude_code", .idle),
+                pane(firstPanelId, "gemini", .needsInput), pane(secondPanelId, "opencode", .running),
+                pane(secondPanelId, "kiro", .unknown),
+            ]))
 
-        let count = SidebarAgentActivitySummary.activeCodingAgentCount(
-            statesByPanelId: [
-                firstPanelId: [
-                    "codex": .running,
-                    "claude_code": .idle,
-                    "gemini": .needsInput,
-                ],
-                secondPanelId: [
-                    "opencode": .running,
-                    "kiro": .unknown,
-                ],
-            ]
-        )
-
-        #expect(count == 2)
+        #expect(lists.activeCodingAgentCount == 2)
     }
 
-    @Test func visibleActiveCodingAgentCountReturnsZeroWhenSettingIsDisabled() {
+    // cmux-rbf: changed on purpose (#cm-128.6): the gate is the lists builder's, which is the code that ships.
+    @Test func theSpinnerCountIsZeroWhenAgentActivityIsDisabled() {
         let panelId = UUID()
-        let statesByPanelId = [
-            panelId: [
-                "codex": AgentHibernationLifecycleState.running,
-                "claude_code": AgentHibernationLifecycleState.running,
-            ],
-        ]
+        let states = WorkspaceAgentPaneStates(entries: [
+            WorkspaceAgentPaneState(panelId: panelId, agentKey: "codex", state: .running, usageLimit: false),
+            WorkspaceAgentPaneState(panelId: panelId, agentKey: "claude_code", state: .running, usageLimit: false),
+        ])
 
-        #expect(
-            SidebarAgentActivitySummary.visibleActiveCodingAgentCount(
-                showsAgentActivity: false,
-                statesByPanelId: statesByPanelId
-            ) == 0
-        )
-        #expect(
-            SidebarAgentActivitySummary.visibleActiveCodingAgentCount(
-                showsAgentActivity: true,
-                statesByPanelId: statesByPanelId
-            ) == 2
-        )
+        #expect(SidebarAgentActivitySummary.lists(
+            showsNeedsYouMarks: true, showsAgentActivity: false, paneStates: states).activeCodingAgentCount == 0)
+        #expect(SidebarAgentActivitySummary.lists(
+            showsNeedsYouMarks: true, showsAgentActivity: true, paneStates: states).activeCodingAgentCount == 2)
     }
 }
 
