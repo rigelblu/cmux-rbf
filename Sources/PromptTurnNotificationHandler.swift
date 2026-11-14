@@ -1,5 +1,6 @@
 import CmuxTerminalCore
 import CmuxSettings
+import CmuxNotifications
 import Foundation
 
 /// Debounces prompt candidates and verifies their exact foreground process before notifying.
@@ -128,14 +129,13 @@ actor PromptTurnNotificationHandler {
         }
         deliveredConfirmationIdentifierByAgentID[agentID] = confirmation.identifier
 
+        let presentation = AgentNotificationPresentation(agentTitle: definition.displayName,
+            kind: .finished, cwd: recheck.cwd)
         AgentNotificationDelivery().enqueue(
             workspaceID: recheck.workspaceID,
             surfaceID: surfaceID,
-            title: definition.displayName,
-            subtitle: String(
-                localized: "agent.generic.notification.subtitle.completed",
-                defaultValue: "Completed"
-            ),
+            title: presentation.title,
+            subtitle: presentation.subtitle,
             body: String(
                 localized: "agent.generic.notification.body.taskCompleted",
                 defaultValue: "Task completed"
@@ -149,7 +149,8 @@ actor PromptTurnNotificationHandler {
             // Prompt-line detection verifies the pane's foreground agent
             // process itself, so this is always a top-level session.
             agentKind: definition.id,
-            isSubagent: false
+            isSubagent: false,
+            isPromptTurn: true
         )
     }
 
@@ -189,7 +190,7 @@ actor PromptTurnNotificationHandler {
     private static func currentTurnContext(
         surfaceID: UUID,
         preferredWorkspaceID: UUID
-    ) -> (workspaceID: UUID, foregroundPID: Int)? {
+    ) -> (workspaceID: UUID, foregroundPID: Int, cwd: String)? {
         guard let located = AppDelegate.shared?.workspaceContainingPanel(
             panelId: surfaceID,
             preferredWorkspaceId: preferredWorkspaceID
@@ -198,6 +199,8 @@ actor PromptTurnNotificationHandler {
               let foregroundPID = terminal.surface.foregroundProcessID() else {
             return nil
         }
-        return (located.workspace.id, foregroundPID)
+        let cwd = located.workspace.panelDirectories[surfaceID]
+            ?? located.workspace.currentDirectory
+        return (located.workspace.id, foregroundPID, cwd)
     }
 }

@@ -87,7 +87,10 @@ extension TerminalNotificationStore {
         agent: TerminalNotificationPolicyAgentContext? = nil,
         correlationKey: String? = nil,
         notificationGeneration: UInt64,
-        soundContext: NotificationSoundOverrideContext? = nil
+        soundContext: NotificationSoundOverrideContext? = nil,
+        unattendedNudgeTitle: String? = nil,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) {
         guard let target = AppDelegate.shared?.agentNotificationDeliveryTarget(
             claimedTabId: claimedTabId,
@@ -116,7 +119,10 @@ extension TerminalNotificationStore {
             correlationKey: correlationKey,
             notificationGeneration: notificationGeneration,
             agent: agent,
-            soundContext: soundContext
+            soundContext: soundContext,
+            unattendedNudgeTitle: unattendedNudgeTitle,
+            unattendedNudgeKind: unattendedNudgeKind,
+            unattendedNudgeAgentKey: unattendedNudgeAgentKey
         )
     }
 
@@ -145,7 +151,10 @@ extension TerminalNotificationStore {
             isFocusedPanel: request.isFocusedPanel,
             agent: request.agent,
             soundContext: request.soundContext,
-            origin: request.origin
+            origin: request.origin,
+            unattendedNudgeTitle: request.unattendedNudgeTitle,
+            unattendedNudgeKind: request.unattendedNudgeKind,
+            unattendedNudgeAgentKey: request.unattendedNudgeAgentKey
         )
     }
 }

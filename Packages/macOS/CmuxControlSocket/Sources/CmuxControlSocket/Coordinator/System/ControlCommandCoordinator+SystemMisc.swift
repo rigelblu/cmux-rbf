@@ -107,6 +107,7 @@ extension ControlCommandCoordinator {
             "current_directory": .string(workspace.currentDirectory),
             "custom_color": orNull(workspace.customColor),
             "unread_count": .int(Int64(workspace.unreadCount)),
+            "marked_unread": .bool(workspace.markedUnread),
             "latest_notification_text": orNull(workspace.latestNotificationText),
             "latest_conversation_message": orNull(workspace.latestConversationMessage),
             "latest_submitted_message": orNull(workspace.latestSubmittedMessage),

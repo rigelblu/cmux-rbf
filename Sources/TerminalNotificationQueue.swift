@@ -17,6 +17,9 @@ fileprivate struct QueuedTerminalNotification: Sendable {
     let agent: TerminalNotificationPolicyAgentContext?
     let soundContext: NotificationSoundOverrideContext?
     let correlationKey: String?
+    let unattendedNudgeTitle: String?
+    let unattendedNudgeKind: AgentUnattendedNudgeKind?
+    let unattendedNudgeAgentKey: String?
 }
 
 fileprivate enum TerminalSocketMutation {
@@ -82,7 +85,10 @@ final class TerminalMutationBus: @unchecked Sendable {
         agent: TerminalNotificationPolicyAgentContext? = nil,
         soundContext: NotificationSoundOverrideContext? = nil,
         correlationKey: String? = nil,
-        coalesces: Bool = true
+        coalesces: Bool = true,
+        unattendedNudgeTitle: String? = nil,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) {
         enqueueNotification(QueuedTerminalNotification(
             key: QueuedTerminalNotificationKey(tabId: tabId, surfaceId: surfaceId),
@@ -92,7 +98,10 @@ final class TerminalMutationBus: @unchecked Sendable {
             replyShape: replyShape,
             agent: agent,
             soundContext: soundContext,
-            correlationKey: correlationKey
+            correlationKey: correlationKey,
+            unattendedNudgeTitle: unattendedNudgeTitle,
+            unattendedNudgeKind: unattendedNudgeKind,
+            unattendedNudgeAgentKey: unattendedNudgeAgentKey
         ), coalesces: coalesces)
     }
 
@@ -502,7 +511,10 @@ final class TerminalMutationBus: @unchecked Sendable {
                     agent: notification.agent,
                     correlationKey: notification.correlationKey,
                     notificationGeneration: entry.notificationGeneration ?? 0,
-                    soundContext: notification.soundContext
+                    soundContext: notification.soundContext,
+                    unattendedNudgeTitle: notification.unattendedNudgeTitle,
+                    unattendedNudgeKind: notification.unattendedNudgeKind,
+                    unattendedNudgeAgentKey: notification.unattendedNudgeAgentKey
                 )
             case .clearAllNotifications(let boundary):
                 TerminalNotificationStore.shared.clearAll(discardQueuedNotifications: false, throughNotificationGeneration: boundary)

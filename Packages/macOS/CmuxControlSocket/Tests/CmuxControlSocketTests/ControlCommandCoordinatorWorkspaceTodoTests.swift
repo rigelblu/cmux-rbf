@@ -153,6 +153,23 @@ struct ControlCommandCoordinatorWorkspaceTodoTests {
         #expect(signals["any_agent_running"] == .bool(false))
     }
 
+    /// cm-128.5 (Scenario 73): an error counts in `any_agent_needs_input` and has its own `any_agent_error`.
+    @Test(arguments: [true, false])
+    func anErrorHasItsOwnSignalInTheStatusJSON(errored: Bool) throws {
+        let (coordinator, context) = makeCoordinator()
+        context.statusResolution = .resolved(windowID: nil, status: ControlWorkspaceTodoStatusSnapshot(
+            workspaceID: UUID(), effective: "todo", inferred: "todo", overrideStatus: nil, overrideInferredAt: nil,
+            signals: .init(anyAgentNeedsInput: errored, anyAgentRunning: false, anyOpenPullRequest: false,
+                hasPullRequests: false, allPullRequestsMergedOrClosed: false, isGitDirty: false, anyAgentError: errored)))
+        let result = try #require(coordinator.handle(request("workspace.status.get")))
+        guard case .ok(.object(let payload)) = result, case .object(let signals) = payload["signals"] else {
+            Issue.record("expected a status signals payload, got \(result)")
+            return
+        }
+        #expect(signals["any_agent_error"] == .bool(errored))
+        #expect(signals["any_agent_needs_input"] == .bool(errored))
+    }
+
     @Test func statusGetShapesOverrideAndSignals() throws {
         let (coordinator, context) = makeCoordinator()
         let workspaceID = UUID()
@@ -172,6 +189,7 @@ struct ControlCommandCoordinatorWorkspaceTodoTests {
             "any_agent_needs_input": .bool(false),
             "any_agent_running": .bool(true),
             "any_agent_monitoring": .bool(false),
+            "any_agent_error": .bool(false), // cm-128.5: changed on purpose, the payload gains the key
             "any_open_pull_request": .bool(false),
             "has_pull_requests": .bool(false),
             "all_pull_requests_merged_or_closed": .bool(false),

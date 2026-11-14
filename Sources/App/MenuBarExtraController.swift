@@ -381,7 +381,7 @@ enum NotificationMenuSnapshotBuilder {
             if !notification.isRead {
                 count += 1
             }
-        } + workspaceUnreadIndicatorCount
+        }
 
         let inlineLimit = max(0, maxInlineNotificationItems)
         return NotificationMenuSnapshot(

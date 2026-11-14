@@ -18,6 +18,8 @@ extension Workspace {
         /// Active lifecycle values follow a live panel into and out of a Dock,
         /// alongside its structured PID ownership.
         var agentLifecycleStates: [String: AgentHibernationLifecycleState] = [:]
+        /// The agent keys at `.error` whose error was a typed usage limit, so the triangle's line survives a move. (cm-128.5)
+        var agentUsageLimitKeys: Set<String> = []
     }
 
     struct DetachedSurfaceTransfer {

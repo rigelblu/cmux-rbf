@@ -17,6 +17,8 @@ struct ClaudeNotificationStatusLifecycleTests {
             ttySurfaceId: context.surfaceId
         )
 
+        // cmux-rbf: changed on purpose (#cm-128.5): the Needs input state comes from the typed notification_type, not from
+        // the words "needs your input" (Tom, grill Q32), so the payload carries one. What the test guards is the PID.
         var environment = harness.claudeHookEnvironment(
             context: context,
             surfaceId: context.surfaceId,
@@ -29,7 +31,7 @@ struct ClaudeNotificationStatusLifecycleTests {
             executablePath: context.cliPath,
             arguments: ["hooks", "claude", "notification"],
             environment: environment,
-            standardInput: #"{"session_id":"claude-notify-pid-session","cwd":"\#(context.root.path)","hook_event_name":"Notification","message":"Claude needs your input"}"#,
+            standardInput: #"{"session_id":"claude-notify-pid-session","cwd":"\#(context.root.path)","hook_event_name":"Notification","notification_type":"permission_prompt","message":"Claude needs your input"}"#,
             timeout: 5
         )
 

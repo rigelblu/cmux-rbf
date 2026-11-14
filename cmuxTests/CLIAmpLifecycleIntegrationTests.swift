@@ -92,7 +92,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertTrue(
             approvalCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Needs your approval|\(context.root.lastPathComponent)|")
             },
             "Amp approval did not use agent notification delivery: \(approvalCommands)"
         )
@@ -124,7 +125,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertTrue(
             completionCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Finished|\(context.root.lastPathComponent)|")
                     && $0.contains("Completed Amp work")
             },
             "Amp completion did not use the generic turn-complete notification path: \(completionCommands)"
@@ -165,7 +167,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let idleErrorCommands = Array(context.state.snapshot().dropFirst(beforeIdleError))
         XCTAssertTrue(
             idleErrorCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Stopped on an error|\(context.root.lastPathComponent)|")
                     && $0.contains("The task reported an error")
             },
             "Amp idle-after-error did not use agent error notification delivery: \(idleErrorCommands)"
@@ -337,6 +340,40 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 "Dead Amp process published a journal lifecycle event for \(state): \(commands)"
             )
         }
+    }
+
+    /// cm-128.5 (Scenario 79): Amp's typed `agent_state` decides the kind, so `needs-input` is a question with no words read.
+    func testAmpNeedsInputJournalsAQuestionFromItsTypedState() throws {
+        let context = try makeClaudeHookContext(name: "amp-question")
+        defer { context.cleanup() }
+        startAgentHookMockServerAccepting(context: context)
+        let ampProcess = Process()
+        ampProcess.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        ampProcess.arguments = ["30"]
+        try ampProcess.run()
+        defer {
+            if ampProcess.isRunning {
+                ampProcess.terminate()
+                ampProcess.waitUntilExit()
+            }
+        }
+        let sessionID = "T-amp-question"
+        let start = try runAmpHook(
+            context: context, subcommand: "session-start", sessionID: sessionID,
+            pid: ampProcess.processIdentifier, fields: ["hook_event_name": "SessionStart"])
+        XCTAssertEqual(start.status, 0, start.stderr)
+        let before = context.state.snapshot().count
+        let result = try runAmpHook(
+            context: context, subcommand: "lifecycle", sessionID: sessionID,
+            pid: ampProcess.processIdentifier,
+            fields: ["hook_event_name": "Lifecycle", "agent_state": "needs-input", "message": "Which branch should I use?"])
+        XCTAssertFalse(result.timedOut, result.stderr)
+        XCTAssertEqual(result.status, 0, result.stderr)
+        let commands = Array(context.state.snapshot().dropFirst(before))
+        XCTAssertTrue(
+            AgentJournalAppendCapture.contains(commands, kind: "agent.question.requested", agentKey: "amp", sessionId: sessionID),
+            "Amp needs-input must journal a question from its typed state, saw \(commands)"
+        )
     }
 
     private func runAmpHook(

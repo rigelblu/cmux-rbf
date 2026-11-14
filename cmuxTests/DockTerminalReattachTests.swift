@@ -94,6 +94,69 @@ extension DockSocketLifecycleTests {
         )
     }
 
+    /// cm-128.5 (Scenario 72): a Dock pane at `.error` carries attention like one that waits; an idle one does not.
+    @Test("A Dock pane at error carries agent attention")
+    @MainActor
+    func dockPaneAtErrorCarriesAgentAttention() throws {
+        let store = DockSplitStore(workspaceId: UUID(), baseDirectoryProvider: { nil })
+        defer { store.closeAllPanels() }
+        let rootPane = try #require(store.bonsplitController.allPaneIds.first)
+        func attach(_ state: AgentHibernationLifecycleState) throws -> UUID {
+            let panel = DockTransferTestPanel()
+            let runtime = Workspace.DetachedAgentRuntimeState(
+                panelId: panel.id, statusEntries: [:], agentPIDs: [:], agentPIDProcessIdentities: [:],
+                agentPIDKeys: [], agentLifecycleStates: ["claude_code": state])
+            let detached = detachedTerminalTransfer(panel: panel, sourceWorkspaceId: UUID(), agentRuntime: runtime)
+            #expect(store.attachDetachedSurface(detached, inPane: rootPane, focus: false) == panel.id)
+            return panel.id
+        }
+        let idle = try attach(.idle)
+        let waiting = try attach(.needsInput)
+        let errored = try attach(.error)
+        let attention = store.agentNeedsInputAttention.surfaceIds
+        #expect(!attention.contains(idle), "control: an idle pane has no attention")
+        #expect(attention.contains(waiting), "control: a waiting pane has attention")
+        #expect(attention.contains(errored), "an errored pane has no attention: \(attention)")
+    }
+
+    /// cm-128.5 (whole-diff review F5): a rate-limited pane that moves into the Dock and stops on a different error keeps no
+    /// usage-limit key, so moving it back never brings the old line back. The Dock's lifecycle writes drop the key on the same
+    /// terms as `Workspace.setAgentLifecycle` and `clearAgentLifecycle`.
+    @Test("A Dock pane that leaves a usage limit drops the usage-limit key")
+    @MainActor
+    func dockPaneLeavingAUsageLimitDropsTheKey() throws {
+        let store = DockSplitStore(workspaceId: UUID(), baseDirectoryProvider: { nil })
+        defer { store.closeAllPanels() }
+        let rootPane = try #require(store.bonsplitController.allPaneIds.first)
+        func attachRateLimited() throws -> UUID {
+            let panel = DockTransferTestPanel()
+            // A second agent keeps the pane's runtime alive when the first is cleared, so the key is read off a real entry.
+            let runtime = Workspace.DetachedAgentRuntimeState(
+                panelId: panel.id, statusEntries: [:], agentPIDs: [:], agentPIDProcessIdentities: [:],
+                agentPIDKeys: [], agentLifecycleStates: ["claude_code": .error, "pi": .idle],
+                agentUsageLimitKeys: ["claude_code"])
+            let detached = detachedTerminalTransfer(panel: panel, sourceWorkspaceId: UUID(), agentRuntime: runtime)
+            #expect(store.attachDetachedSurface(detached, inPane: rootPane, focus: false) == panel.id)
+            return panel.id
+        }
+        let prompted = try attachRateLimited()
+        let cleared = try attachRateLimited()
+        #expect(store.agentRuntimeByPanelId[prompted]?.agentUsageLimitKeys == ["claude_code"], "control: the key rode in")
+
+        // The prompt runs again, then a server error stops it: the lifecycle is `.error` once more, with no usage limit.
+        store.setAgentLifecycle(key: "claude_code", panelId: prompted, lifecycle: .running)
+        store.setAgentLifecycle(key: "claude_code", panelId: prompted, lifecycle: .error)
+        #expect(store.agentRuntimeByPanelId[prompted]?.agentUsageLimitKeys.isEmpty == true,
+            "a Dock pane kept a usage-limit key after leaving .error: \(String(describing: store.agentRuntimeByPanelId[prompted]?.agentUsageLimitKeys))")
+        let movedBack = try #require(store.detachSurface(panelId: prompted))
+        #expect(movedBack.agentRuntime?.agentLifecycleStates["claude_code"] == .error)
+        #expect(movedBack.agentRuntime?.agentUsageLimitKeys.isEmpty == true, "the stale key rides back out with the pane")
+
+        #expect(store.clearAgentLifecycle(key: "claude_code", panelId: cleared))
+        let clearedRuntime = try #require(store.agentRuntimeByPanelId[cleared], "control: the pane's other agent keeps its runtime")
+        #expect(clearedRuntime.agentUsageLimitKeys.isEmpty, "a cleared Dock pane kept its key: \(clearedRuntime.agentUsageLimitKeys)")
+    }
+
     @Test("Live terminal attach into Dock requests a view reattach")
     @MainActor
     func liveTerminalAttachIntoDockRequestsViewReattach() throws {

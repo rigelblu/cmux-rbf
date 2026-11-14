@@ -58,6 +58,7 @@ def generated_claude_hook_settings() -> str:
 
     hooks = {
         "SessionStart": [queued("session-start")],
+        "StopFailure": [queued("stop-failure")],
         "Stop": [
             queued("stop"),
             queued("feed"),
@@ -652,7 +653,7 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
         failures,
     )
     hooks = settings.get("hooks", {})
-    expected_hooks = {"SessionStart", "Stop", "SubagentStart", "SubagentStop", "SessionEnd", "Notification", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest"}
+    expected_hooks = {"SessionStart", "Stop", "StopFailure", "SubagentStart", "SubagentStop", "SessionEnd", "Notification", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest"}
     expect(set(hooks.keys()) == expected_hooks, f"unexpected hook keys: {hooks.keys()}, expected {expected_hooks}", failures)
     for hook_name, expected_subcommand in {
         "SessionStart": "session-start",
@@ -823,7 +824,7 @@ def test_live_socket_merges_user_settings_into_hooks(failures: list[str]) -> Non
         failures,
     )
     expected_hooks = {
-        "SessionStart", "Stop", "SubagentStart", "SubagentStop", "SessionEnd",
+        "SessionStart", "Stop", "StopFailure", "SubagentStart", "SubagentStop", "SessionEnd",
         "Notification", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest",
     }
     expect(

@@ -21,7 +21,7 @@ extension VerticalTabsSidebar {
             identifier: "sidebarWorkspacesArea", isCollapsed: collapsed,
             unreadCount: collapsed ? memberIds.reduce(0) {
                 $0 + unreadSnapshot.unreadCount(forWorkspaceId: $1)
-            } : 0, onToggle: onToggle)
+            } : 0, markedUnread: collapsed && memberIds.contains { unreadSnapshot.hasUnreadMark(forWorkspaceId: $0) }, onToggle: onToggle)
     }
 
     func sidebarPinnedAreaTableConfiguration(renderContext: WorkspaceListRenderContext) -> SidebarWorkspaceTableRowConfiguration { // (#cm-110.5)
@@ -42,6 +42,6 @@ extension VerticalTabsSidebar {
             identifier: "sidebarPinnedArea", isCollapsed: collapsed,
             unreadCount: collapsed ? memberIds.reduce(0) {
                 $0 + unreadSnapshot.unreadCount(forWorkspaceId: $1)
-            } : 0, onToggle: onToggle)
+            } : 0, markedUnread: collapsed && memberIds.contains { unreadSnapshot.hasUnreadMark(forWorkspaceId: $0) }, onToggle: onToggle)
     }
 }

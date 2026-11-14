@@ -43,14 +43,9 @@ extension VerticalTabsSidebar {
         // A folded parent's badge leaves out the rows shown under a status (ruling (23), #cm-110.3).
         let badgeWorkspaceIds = Self.foldedGroupBadgeWorkspaceIds(group: group, memberWorkspaceIds: memberWorkspaceIds,
             projection: renderContext.statusGroupProjection, tabs: renderContext.tabs, groups: renderContext.workspaceGroups)
-        let anchorUnreadCount: Int = {
-            if group.isCollapsed {
-                return badgeWorkspaceIds.reduce(0) { partial, workspaceId in
-                    partial + unreadSnapshot.unreadCount(forWorkspaceId: workspaceId)
-                }
-            }
-            return liveAnchorId.map { unreadSnapshot.unreadCount(forWorkspaceId: $0) } ?? 0
-        }()
+        let anchorUnreadSummary = unreadSnapshot.badgeSummary(forWorkspaceIds:
+            group.isCollapsed ? badgeWorkspaceIds : liveAnchorId.map { [$0] } ?? [])
+        let anchorUnreadCount = anchorUnreadSummary.unreadCount
         let anchorIds = liveAnchorId.map { [$0] } ?? []
         let canMarkAnchorRead = unreadSnapshot.canMarkWorkspaceRead(forWorkspaceIds: anchorIds)
         let canMarkAnchorUnread = unreadSnapshot.canMarkWorkspaceUnread(forWorkspaceIds: anchorIds)
@@ -102,6 +97,7 @@ extension VerticalTabsSidebar {
             multiSelectionBackgroundStyle: multiSelectionBackgroundStyle,
             memberCount: memberWorkspaceIds.count,
             anchorUnreadCount: anchorUnreadCount,
+            anchorMarkedUnread: anchorUnreadSummary.markedUnread,
             canMarkRead: canMarkAnchorRead,
             canMarkUnread: canMarkAnchorUnread,
             hasLatestNotifications: anchorHasLatestNotification,
@@ -127,7 +123,7 @@ extension VerticalTabsSidebar {
             isBeingDragged: dragState.draggedTabId == dragIdentity,
             topDropIndicatorVisible: topDropIndicatorVisible,
             bottomDropIndicatorVisible: bottomDropIndicatorVisible,
-            colorSchemeIsDark: renderContext.environment.colorScheme == .dark,
+            colorSchemeIsDark: renderContext.environment.colorScheme == .dark, contrastBackgroundHex: renderContext.environment.sidebarContrastBackgroundHex,
             depth: Self.groupHeaderDepth(of: group.id, renderContext: renderContext), // (#cm-106) (#cm-110.2) (#cm-110.12)
             hasOwnWorkspace: headerOnlyLook.hasOwnWorkspace, // (#cm-106)
             isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
@@ -157,11 +153,10 @@ extension VerticalTabsSidebar {
                 // changes rebuild this configuration. Reuse the render context's
                 // indexed members instead of rescanning every tab per unread row.
                 var fresh = model
-                fresh.anchorUnreadCount = isCollapsed
-                    ? badgeWorkspaceIds.reduce(0) {
-                        $0 + snapshot.unreadCount(forWorkspaceId: $1)
-                    }
-                    : liveAnchorId.map { snapshot.unreadCount(forWorkspaceId: $0) } ?? 0
+                let summary = snapshot.badgeSummary(forWorkspaceIds:
+                    isCollapsed ? badgeWorkspaceIds : liveAnchorId.map { [$0] } ?? [])
+                fresh.anchorUnreadCount = summary.unreadCount
+                fresh.anchorMarkedUnread = summary.markedUnread
                 fresh.canMarkRead = snapshot.canMarkWorkspaceRead(
                     forWorkspaceIds: liveAnchorId.map { [$0] } ?? []
                 )
@@ -247,14 +242,9 @@ extension VerticalTabsSidebar {
         // A folded parent's badge leaves out the rows shown under a status (ruling (23), #cm-110.3).
         let badgeWorkspaceIds = Self.foldedGroupBadgeWorkspaceIds(group: group, memberWorkspaceIds: memberWorkspaceIds,
             projection: renderContext.statusGroupProjection, tabs: renderContext.tabs, groups: renderContext.workspaceGroups)
-        let anchorUnreadCount: Int = {
-            if group.isCollapsed {
-                return badgeWorkspaceIds.reduce(0) { partial, workspaceId in
-                    partial + (unreadSummariesByWorkspaceId[workspaceId]?.unreadCount ?? 0)
-                }
-            }
-            return liveAnchorId.flatMap { unreadSummariesByWorkspaceId[$0]?.unreadCount } ?? 0
-        }()
+        let anchorUnreadSummary = unreadSnapshot.badgeSummary(forWorkspaceIds:
+            group.isCollapsed ? badgeWorkspaceIds : liveAnchorId.map { [$0] } ?? [])
+        let anchorUnreadCount = anchorUnreadSummary.unreadCount
         let canMarkAnchorRead = unreadSnapshot.canMarkWorkspaceRead(
             forWorkspaceIds: liveAnchorId.map { [$0] } ?? []
         )
@@ -310,6 +300,7 @@ extension VerticalTabsSidebar {
             multiSelectionBackgroundStyle: multiSelectionBackgroundStyle,
             memberCount: memberWorkspaceIds.count,
             anchorUnreadCount: anchorUnreadCount,
+            anchorMarkedUnread: anchorUnreadSummary.markedUnread,
             canMarkRead: canMarkAnchorRead,
             canMarkUnread: canMarkAnchorUnread,
             hasLatestNotifications: anchorHasLatestNotification,
@@ -371,6 +362,7 @@ extension VerticalTabsSidebar {
             multiSelectionBackgroundStyle: snapshot.multiSelectionBackgroundStyle,
             memberCount: snapshot.memberCount,
             anchorUnreadCount: snapshot.anchorUnreadCount,
+            anchorMarkedUnread: snapshot.anchorMarkedUnread,
             canMarkRead: snapshot.canMarkRead,
             canMarkUnread: snapshot.canMarkUnread,
             hasLatestNotifications: snapshot.hasLatestNotifications,

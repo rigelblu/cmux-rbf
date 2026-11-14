@@ -30,9 +30,13 @@ extension Workspace {
         var anyAgentNeedsInput = false
         var anyAgentRunning = false
         var anyAgentMonitoring = false
+        var anyAgentWaiting = false
+        var anyAgentError = false
         for (panelId, states) in agentLifecycleStatesByPanelId where panels[panelId] != nil {
             for state in states.values {
-                if state == .needsInput { anyAgentNeedsInput = true }
+                // cm-128.5: an error is its own value; every needs-you reader counts it, only the hand does not.
+                if state == .needsInput { anyAgentNeedsInput = true; anyAgentWaiting = true }
+                if state == .error { anyAgentNeedsInput = true; anyAgentError = true }
                 if state == .running { anyAgentRunning = true }
                 if state == .monitoring { anyAgentMonitoring = true }
             }
@@ -48,7 +52,9 @@ extension Workspace {
                 && pullRequests.allSatisfy { $0.status != .open },
             isGitDirty: sidebarGitBranchesInDisplayOrder(orderedPanelIds: orderedPanelIds)
                 .contains { $0.isDirty },
-            anyAgentMonitoring: anyAgentMonitoring
+            anyAgentMonitoring: anyAgentMonitoring,
+            anyAgentWaiting: anyAgentWaiting,
+            anyAgentError: anyAgentError
         )
     }
 

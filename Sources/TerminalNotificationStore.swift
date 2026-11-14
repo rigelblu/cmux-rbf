@@ -152,6 +152,13 @@ final class TerminalNotificationStore: ObservableObject {
         )
     )
     let notificationHookCache = CmuxNotificationHookCache()
+    lazy var unattendedNudges = AgentUnattendedNudgeDelivery(store: self, clock: ContinuousClock())
+    private var phoneForwardingEnabledProvider: () -> Bool = {
+        PhonePushClient.shared.configuration().forwardingEnabled
+    }
+    private var notificationPhoneForwarder: (TerminalNotification, Int) -> Void = { notification, badge in
+        PhonePushClient.shared.forward(notification, badgeCount: badge)
+    }
 
     static let authorizationStatusDidChangeNotification = Notification.Name("cmux.terminalNotificationAuthorizationStatusDidChange")
     static let categoryIdentifier = "com.cmuxterm.app.userNotification"
@@ -184,8 +191,7 @@ final class TerminalNotificationStore: ObservableObject {
 
     /// The number of unread notification *entries* — the count the iOS app icon
     /// badge mirrors. The phone's banners mirror notification entries, so its
-    /// badge counts exactly those. (The Mac Dock badge additionally counts
-    /// workspace-level manual unread indicators, which have no phone banner.)
+    /// badge counts exactly those, matching the Mac's displayed numbers.
     var unreadNotificationCount: Int { indexes.unreadCount }
 
     /// Recently dismissed/cleared notification ids, kept so the phone's
@@ -355,6 +361,7 @@ final class TerminalNotificationStore: ObservableObject {
     @Published private(set) var notifications: [TerminalNotification] = [] {
         didSet {
             indexes = Self.buildIndexes(for: notifications)
+            unattendedNudges.reconcile(notifications: notifications)
             refreshUnreadPresentation()
             if !suppressNotificationDiffPublishing { CmuxEventBus.shared.publishNotificationChanges(oldValue: oldValue, newValue: notifications) }
         }
@@ -424,11 +431,12 @@ final class TerminalNotificationStore: ObservableObject {
     private var notificationSettingsURLOpener: (URL) -> Void = { url in
         NSWorkspace.shared.open(url)
     }
-    private var notificationDeliveryHandler: (TerminalNotificationStore, TerminalNotification, TerminalNotificationPolicyEffects) -> Void = {
+    private var notificationDeliveryHandler: (TerminalNotificationStore, TerminalNotification, TerminalNotificationPolicyEffects, Bool) -> Void = {
         store,
         notification,
-        effects in
-        store.scheduleUserNotification(notification, effects: effects)
+        effects,
+        requiresUnreadOriginal in
+        store.scheduleUserNotification(notification, effects: effects, requiresUnreadOriginal: requiresUnreadOriginal)
     }
     private var nativeNotificationDeliveryHooks: NativeNotificationDeliveryHooks
     /// Owns admitted sound, feedback, and native-delivery preparation
@@ -474,6 +482,7 @@ final class TerminalNotificationStore: ObservableObject {
         userDefaultsObserver = NotificationCenter.default.addUserDefaultsObserver(object: nil) { [weak self] in
             Task { @MainActor [weak self] in
                 self?.refreshDockBadge()
+                self?.unattendedNudges.settingsDidChange()
             }
         }
         refreshDockBadge()
@@ -577,22 +586,24 @@ final class TerminalNotificationStore: ObservableObject {
     ) {
         guard !identifiers.isEmpty else { return }
         cancelNotificationEffectTasks(withIdentifiers: identifiers)
+        // cmux-rbf: reads clear the original and its banner-only reminder.
+        let requestIdentifiers = identifiers.flatMap { [$0, "\($0).reminder"] }
         Task { [userNotificationCenter] in
             let deliveredResult = await userNotificationCenter.removeDeliveredNotifications(
-                withIdentifiers: identifiers
+                withIdentifiers: requestIdentifiers
             )
             let pendingResult = await userNotificationCenter.removePendingNotificationRequests(
-                withIdentifiers: identifiers
+                withIdentifiers: requestIdentifiers
             )
             guard case .success = deliveredResult, case .success = pendingResult else {
-                for identifier in identifiers {
+                for identifier in requestIdentifiers {
                     await NotificationSoundSettings.deferPendingNotificationSound(
                         referenceID: identifier
                     )
                 }
                 return
             }
-            for identifier in identifiers {
+            for identifier in requestIdentifiers {
                 await NotificationSoundSettings.releasePendingNotificationSound(
                     referenceID: identifier
                 )
@@ -620,7 +631,7 @@ final class TerminalNotificationStore: ObservableObject {
     }
 
     var unreadCount: Int {
-        indexes.unreadCount + workspaceUnreadIndicatorCount
+        indexes.unreadCount
     }
 
     var workspaceUnreadIndicatorIds: Set<UUID> {
@@ -660,9 +671,9 @@ final class TerminalNotificationStore: ObservableObject {
     }
 
     /// Publishes one per-window Dock surface mutation without rebuilding the
-    /// notification-derived summaries and surface index. Window-Dock owner ids
-    /// are not workspace rows, so only the surface key and global owner count can
-    /// change here.
+    /// notification-derived summaries or surface index. When the owner mark
+    /// changes, also refreshes that owner's workspace summary under its existing
+    /// identity, even though a window-Dock owner is not a workspace row.
     private func refreshSurfaceManualUnreadPresentation(
         for key: SidebarSurfaceUnreadKey,
         ownerUnreadChanged: Bool
@@ -676,7 +687,13 @@ final class TerminalNotificationStore: ObservableObject {
             totalUnreadCount: unreadCount
         )
         guard ownerUnreadChanged else { return }
-
+        // Preserve the existing owner identity: a window-Dock mark is not
+        // reassigned to whichever workspace happens to be selected.
+        sidebarUnread.applyWorkspaceSummaryProjection(
+            forWorkspaceId: key.workspaceId,
+            summary: buildSidebarUnreadSummary(forTabId: key.workspaceId),
+            totalUnreadCount: unreadCount
+        )
         refreshUnreadIndicatorTotals()
     }
 
@@ -714,6 +731,7 @@ final class TerminalNotificationStore: ObservableObject {
         var ids = Set(indexes.unreadCountByTabId.keys)
         ids.formUnion(indexes.latestByTabId.keys)
         ids.formUnion(workspaceUnreadIndicatorIds)
+        ids.formUnion(manualUnreadSurfaceIdsByOwnerId.keys)
         var result: [UUID: SidebarWorkspaceUnreadSummary] = [:]
         result.reserveCapacity(ids.count)
         for id in ids {
@@ -727,20 +745,22 @@ final class TerminalNotificationStore: ObservableObject {
     private func buildSidebarUnreadSummary(
         forTabId tabId: UUID
     ) -> SidebarWorkspaceUnreadSummary? {
-        let count = unreadCount(forTabId: tabId)
+        let count = unreadNotificationCount(forTabId: tabId)
+        let marked = hasUnreadMark(forTabId: tabId)
         let latestNotification = indexes.latestByTabId[tabId]
         let latestText: String? = latestNotification.flatMap { notification in
             let text = notification.body.isEmpty ? notification.title : notification.body
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        guard count > 0 || latestNotification != nil else { return nil }
+        guard count > 0 || marked || latestNotification != nil else { return nil }
         return SidebarWorkspaceUnreadSummary(
             unreadCount: count,
             latestNotificationText: latestText,
             latestNotificationId: latestNotification?.id,
             latestNotificationCreatedAt: latestNotification?.createdAt,
-            hasLatestNotification: latestNotification != nil
+            hasLatestNotification: latestNotification != nil,
+            markedUnread: marked
         )
     }
 
@@ -1113,14 +1133,22 @@ final class TerminalNotificationStore: ObservableObject {
         setSurfaceManualUnread(false, forTabId: tabId, surfaceId: surfaceId)
     }
 
-    // Per-workspace badges treat workspace indicators as unread activity;
-    // summing these counts can exceed indexes.unreadCount.
-    func unreadCount(forTabId tabId: UUID) -> Int {
-        let hasWorkspaceUnreadIndicator = manualUnreadWorkspaceIds.contains(tabId) ||
+    /// Notification news only, for Mac numbers and the extension snapshot.
+    func unreadNotificationCount(forTabId tabId: UUID) -> Int {
+        indexes.unreadCountByTabId[tabId] ?? 0
+    }
+
+    /// All existing mark kinds, without changing their owner identities.
+    func hasUnreadMark(forTabId tabId: UUID) -> Bool {
+        manualUnreadWorkspaceIds.contains(tabId) ||
             manualUnreadSurfaceIdsByOwnerId[tabId]?.isEmpty == false ||
             panelDerivedUnreadWorkspaceIds.contains(tabId) ||
             restoredUnreadWorkspaceIds.contains(tabId)
-        return (indexes.unreadCountByTabId[tabId] ?? 0) + (hasWorkspaceUnreadIndicator ? 1 : 0)
+    }
+
+    // Legacy unread meaning for actions, autosave, and the iPhone.
+    func unreadCount(forTabId tabId: UUID) -> Int {
+        unreadNotificationCount(forTabId: tabId) + (hasUnreadMark(forTabId: tabId) ? 1 : 0)
     }
 
     func workspaceIsUnread(forTabId tabId: UUID) -> Bool {
@@ -1216,7 +1244,10 @@ final class TerminalNotificationStore: ObservableObject {
         notificationID: UUID? = nil,
         agent: TerminalNotificationPolicyAgentContext? = nil,
         soundContext: NotificationSoundOverrideContext? = nil,
-        origin: TerminalNotificationOrigin = .local
+        origin: TerminalNotificationOrigin = .local,
+        unattendedNudgeTitle: String? = nil,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) -> UUID? {
 #if DEBUG
         cmuxDebugLog(
@@ -1285,7 +1316,10 @@ final class TerminalNotificationStore: ObservableObject {
             resolvedHooks: resolvedHooks,
             agent: agent,
             soundContext: soundContext,
-            origin: origin
+            origin: origin,
+            unattendedNudgeTitle: unattendedNudgeTitle,
+            unattendedNudgeKind: unattendedNudgeKind,
+            unattendedNudgeAgentKey: unattendedNudgeAgentKey
         )
         if policyContext.hooks.isEmpty, preRegisteredPolicyRequestId == nil {
             inFlightPolicyRequests.discardPending(
@@ -1470,7 +1504,10 @@ final class TerminalNotificationStore: ObservableObject {
         resolvedHooks: [CmuxResolvedNotificationHook]?,
         agent: TerminalNotificationPolicyAgentContext? = nil,
         soundContext: NotificationSoundOverrideContext? = nil,
-        origin: TerminalNotificationOrigin = .local
+        origin: TerminalNotificationOrigin = .local,
+        unattendedNudgeTitle: String? = nil,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) -> NotificationPolicyContext {
         let appDelegate = AppDelegate.shared
         let focusState = notificationFocusState(tabId: tabId, surfaceId: surfaceId)
@@ -1517,7 +1554,10 @@ final class TerminalNotificationStore: ObservableObject {
                 isFocusedPanel: isFocusedPanel,
                 agent: agent,
                 soundContext: soundContext,
-                origin: origin
+                origin: origin,
+                unattendedNudgeTitle: unattendedNudgeTitle,
+                unattendedNudgeKind: unattendedNudgeKind,
+                unattendedNudgeAgentKey: unattendedNudgeAgentKey
             ),
             scrollPosition: scrollPosition,
             hooks: resolvedHooks ?? (origin.isRemote ? [] : cmuxConfigStore?.notificationHooks(
@@ -1564,7 +1604,10 @@ final class TerminalNotificationStore: ObservableObject {
                 isFocusedPanel: request.isFocusedPanel,
                 agent: request.agent,
                 soundContext: envelope.context.soundContext,
-                origin: request.origin
+                origin: request.origin,
+                unattendedNudgeTitle: request.unattendedNudgeTitle,
+                unattendedNudgeKind: request.unattendedNudgeKind,
+                unattendedNudgeAgentKey: request.unattendedNudgeAgentKey
             ),
             effects: envelope.effects,
             now: now,
@@ -1585,8 +1628,10 @@ final class TerminalNotificationStore: ObservableObject {
         scrollPosition: TerminalNotificationScrollPosition?,
         clickAction: TerminalNotificationClickAction?,
         notificationID: UUID,
-        policyRequestId: UUID? = nil
+        policyRequestId: UUID? = nil,
+        isUnattendedNudge: Bool = false
     ) -> Bool {
+        guard !isUnattendedNudge || isUnreadNudgeAdmitted(notificationID: notificationID) else { return false }
         guard inFlightPolicyRequests.claim(policyRequestId) else { return false }
         guard let request = notificationPolicyRequestAtLiveOwner(request) else {
             restoreCooldownReservation(cooldownReservation)
@@ -1603,7 +1648,7 @@ final class TerminalNotificationStore: ObservableObject {
             restoreCooldownReservation(cooldownReservation)
             return false
         }
-        let shouldSuppressExternalDelivery = shouldSuppressExternalDelivery(
+        let shouldSuppressExternalDelivery = !isUnattendedNudge && shouldSuppressExternalDelivery(
             tabId: request.tabId,
             surfaceId: request.surfaceId
         )
@@ -1632,7 +1677,10 @@ final class TerminalNotificationStore: ObservableObject {
                 shouldSuppressExternalDelivery: shouldSuppressExternalDelivery,
                 effects: effects,
                 now: now,
-                cooldownReservation: cooldownReservation
+                cooldownReservation: cooldownReservation,
+                unattendedNudgeTitle: request.unattendedNudgeTitle,
+                unattendedNudgeKind: request.unattendedNudgeKind,
+                unattendedNudgeAgentKey: request.unattendedNudgeAgentKey
             )
             return true
         }
@@ -1653,7 +1701,8 @@ final class TerminalNotificationStore: ObservableObject {
         deliverNotificationSideEffects(
             notification,
             shouldSuppressExternalDelivery: shouldSuppressExternalDelivery,
-            effects: effects
+            effects: effects,
+            isUnattendedNudge: isUnattendedNudge
         )
         return false
     }
@@ -1662,7 +1711,10 @@ final class TerminalNotificationStore: ObservableObject {
         shouldSuppressExternalDelivery: Bool,
         effects: TerminalNotificationPolicyEffects,
         now: Date,
-        cooldownReservation: NotificationCooldownReservation?
+        cooldownReservation: NotificationCooldownReservation?,
+        unattendedNudgeTitle: String?,
+        unattendedNudgeKind: AgentUnattendedNudgeKind? = nil,
+        unattendedNudgeAgentKey: String? = nil
     ) {
         var updated = notifications
         var idsToClear: [String] = []
@@ -1702,6 +1754,7 @@ final class TerminalNotificationStore: ObservableObject {
             )
         }
         notifications = updated
+        unattendedNudges.record(notification, title: unattendedNudgeTitle, kind: unattendedNudgeKind ?? .finished, agentKey: unattendedNudgeAgentKey, effects: effects)
         notificationFeedHistory.record(
             notification,
             supersededIDs: Set(idsToClear.compactMap { UUID(uuidString: $0) })
@@ -1743,10 +1796,24 @@ final class TerminalNotificationStore: ObservableObject {
             && focusState.isFocusedSurface
     }
 
+    func isUnreadNudgeAdmitted(notificationID: UUID) -> Bool {
+        NotificationsCatalogSection().agentIdleReminder.value(in: .standard)
+            && notifications.contains { $0.id == notificationID && !$0.isRead }
+    }
+
+    func unattendedNudgeState(notificationID: UUID, present: Bool) -> AgentUnattendedNudgeState {
+        let original = notifications.first { $0.id == notificationID }
+        let focused = original.map { shouldSuppressExternalDelivery(tabId: $0.tabId, surfaceId: $0.surfaceId) } ?? false
+        return .init(enabled: NotificationsCatalogSection().agentIdleReminder.value(in: .standard),
+            exists: original != nil, unread: original?.isRead == false,
+            focusedInFrontmostApp: focused, present: present)
+    }
+
     private func deliverNotificationSideEffects(
         _ notification: TerminalNotification,
         shouldSuppressExternalDelivery: Bool,
-        effects: TerminalNotificationPolicyEffects
+        effects: TerminalNotificationPolicyEffects,
+        isUnattendedNudge: Bool = false
     ) {
 #if DEBUG
         cmuxDebugLog(
@@ -1757,10 +1824,11 @@ final class TerminalNotificationStore: ObservableObject {
             if shouldSuppressExternalDelivery {
                 suppressedNotificationFeedbackHandler(self, notification, effects)
             } else {
-                notificationDeliveryHandler(self, notification, effects)
+                notificationDeliveryHandler(self, notification, effects, isUnattendedNudge)
             }
         }
 
+        guard !isUnattendedNudge else { return }
         let key = SupersededPhoneDismissBuffer.key(
             tabId: notification.tabId,
             surfaceId: notification.surfaceId
@@ -1768,15 +1836,11 @@ final class TerminalNotificationStore: ObservableObject {
         let shouldAttemptPhone = !shouldSuppressExternalDelivery
             && Self.shouldAttemptPhoneForward(
                 effects: effects,
-                phoneForwardingEnabled: PhonePushClient.shared
-                    .configuration().forwardingEnabled,
+                phoneForwardingEnabled: phoneForwardingEnabledProvider(),
                 categoryAllowsDelivery: true
             )
         if shouldAttemptPhone {
-            PhonePushClient.shared.forward(
-                notification,
-                badgeCount: indexes.unreadCount
-            )
+            notificationPhoneForwarder(notification, indexes.unreadCount)
         }
         let superseded = supersededPhoneDismissBuffer.flush(forKey: key)
         if !superseded.isEmpty {
@@ -2430,17 +2494,28 @@ final class TerminalNotificationStore: ObservableObject {
 
     private func isNotificationDeliveryAdmitted(
         notificationID: UUID,
-        recordsNotification: Bool
+        recordsNotification: Bool,
+        requiresUnreadOriginal: Bool = false
     ) -> Bool {
         guard !Task.isCancelled else { return false }
+        if requiresUnreadOriginal { return isUnreadNudgeAdmitted(notificationID: notificationID) }
         return !recordsNotification
             || notifications.contains(where: { $0.id == notificationID })
     }
 
     private func scheduleUserNotification(
         _ notification: TerminalNotification,
-        effects: TerminalNotificationPolicyEffects
+        effects: TerminalNotificationPolicyEffects,
+        requiresUnreadOriginal: Bool = false
     ) {
+        let playbackAdmission: NativeNotificationDeliveryHooks.PlaybackAdmission?
+        if requiresUnreadOriginal {
+            playbackAdmission = { [weak self] in
+                self?.isUnreadNudgeAdmitted(notificationID: notification.id) == true
+            }
+        } else {
+            playbackAdmission = nil
+        }
         guard effects.desktop else {
             playLocalNotificationFeedback(
                 title: resolvedNotificationTitle(for: notification),
@@ -2448,7 +2523,9 @@ final class TerminalNotificationStore: ObservableObject {
                 body: notification.body,
                 effects: effects,
                 soundContext: notification.soundContext,
-                origin: notification.origin
+                origin: notification.origin,
+                ownerID: requiresUnreadOriginal ? nativeFallbackTaskOwnerID(for: notification.id.uuidString) : nil,
+                playbackAdmission: playbackAdmission
             )
             return
         }
@@ -2467,16 +2544,22 @@ final class TerminalNotificationStore: ObservableObject {
         let categoryIdentifier = notification.replyShape == .text
             ? Self.textReplyCategoryIdentifier
             : Self.categoryIdentifier
-        let notificationIdentifier = notificationId.uuidString
-        let deliveryOwnerID = nativeDeliveryTaskOwnerID(for: notificationIdentifier)
-        let fallbackOwnerID = nativeFallbackTaskOwnerID(for: notificationIdentifier)
+        let originalNotificationIdentifier = notificationId.uuidString
+        let notificationIdentifier = requiresUnreadOriginal
+            ? "\(originalNotificationIdentifier).reminder"
+            : originalNotificationIdentifier
+        // Cancellation belongs to the stored turn; native requests/sound leases
+        // use separate ids so macOS's asynchronous removal cannot delete the nudge.
+        let deliveryOwnerID = nativeDeliveryTaskOwnerID(for: originalNotificationIdentifier)
+        let fallbackOwnerID = nativeFallbackTaskOwnerID(for: originalNotificationIdentifier)
         let handleAuthorization: NativeNotificationDeliveryHooks.AuthorizationCompletion = { [weak self] authorized, effectiveAuthorizationState in
             guard authorized else {
                 self?.enqueueNotificationFeedback(ownerID: fallbackOwnerID) { [weak self] in
                     guard let self,
                           self.isNotificationDeliveryAdmitted(
                               notificationID: notificationId,
-                              recordsNotification: effects.record
+                              recordsNotification: effects.record,
+                              requiresUnreadOriginal: requiresUnreadOriginal
                           ) else { return }
                     await nativeDeliveryHooks.playUnavailableFeedback(
                         effects: Self.fallbackEffects(
@@ -2492,7 +2575,8 @@ final class TerminalNotificationStore: ObservableObject {
                 guard let self,
                       self.isNotificationDeliveryAdmitted(
                           notificationID: notificationId,
-                          recordsNotification: effects.record
+                          recordsNotification: effects.record,
+                          requiresUnreadOriginal: requiresUnreadOriginal
                       ) else {
                     await NotificationSoundSettings.releasePendingNotificationSound(
                         referenceID: notificationIdentifier
@@ -2515,7 +2599,8 @@ final class TerminalNotificationStore: ObservableObject {
                 }
                 guard self.isNotificationDeliveryAdmitted(
                     notificationID: notificationId,
-                    recordsNotification: effects.record
+                    recordsNotification: effects.record,
+                    requiresUnreadOriginal: requiresUnreadOriginal
                 ) else {
                     await NotificationSoundSettings.releasePendingNotificationSound(
                         referenceID: notificationIdentifier
@@ -2529,7 +2614,8 @@ final class TerminalNotificationStore: ObservableObject {
                 }
                 guard self.isNotificationDeliveryAdmitted(
                     notificationID: notificationId,
-                    recordsNotification: effects.record
+                    recordsNotification: effects.record,
+                    requiresUnreadOriginal: requiresUnreadOriginal
                 ) else {
                     await NotificationSoundSettings.releasePendingNotificationSound(
                         referenceID: notificationIdentifier
@@ -2553,7 +2639,7 @@ final class TerminalNotificationStore: ObservableObject {
                     content.userInfo[key] = value
                 }
                 let request = UNNotificationRequest(
-                    identifier: notificationId.uuidString,
+                    identifier: notificationIdentifier,
                     content: content,
                     trigger: nil
                 )
@@ -2561,11 +2647,31 @@ final class TerminalNotificationStore: ObservableObject {
                 let commandSubtitle = content.subtitle
                 let commandBody = content.body
 
+                if requiresUnreadOriginal {
+                    // cmux-rbf: removal is fire-and-forget in macOS, so the
+                    // reminder uses a derived id (Tom, 2026-11-02). Still post
+                    // if removal fails; click metadata retains the original id.
+                    _ = await nativeDeliveryHooks.userNotificationCenter.removeDeliveredNotifications(
+                        withIdentifiers: [originalNotificationIdentifier]
+                    )
+                    guard self.isNotificationDeliveryAdmitted(
+                        notificationID: notificationId,
+                        recordsNotification: effects.record,
+                        requiresUnreadOriginal: requiresUnreadOriginal
+                    ) else {
+                        await NotificationSoundSettings.releasePendingNotificationSound(referenceID: notificationIdentifier)
+                        return
+                    }
+                }
                 let scheduleError = await nativeDeliveryHooks.schedule(request)
                 guard self.isNotificationDeliveryAdmitted(
                     notificationID: notificationId,
-                    recordsNotification: effects.record
+                    recordsNotification: effects.record,
+                    requiresUnreadOriginal: requiresUnreadOriginal
                 ) else {
+                    if requiresUnreadOriginal {
+                        self.removeNotificationRequestsAndReleaseSoundReferences(withIdentifiers: [originalNotificationIdentifier])
+                    }
                     await NotificationSoundSettings.releasePendingNotificationSound(
                         referenceID: notificationIdentifier
                     )
@@ -2580,7 +2686,8 @@ final class TerminalNotificationStore: ObservableObject {
                     )
                     guard self.isNotificationDeliveryAdmitted(
                         notificationID: notificationId,
-                        recordsNotification: effects.record
+                        recordsNotification: effects.record,
+                        requiresUnreadOriginal: requiresUnreadOriginal
                     ) else { return }
                     await nativeDeliveryHooks.playUnavailableFeedback(
                         effects: effects,
@@ -2589,7 +2696,8 @@ final class TerminalNotificationStore: ObservableObject {
                 } else if effects.command {
                     guard self.isNotificationDeliveryAdmitted(
                         notificationID: notificationId,
-                        recordsNotification: effects.record
+                        recordsNotification: effects.record,
+                        requiresUnreadOriginal: requiresUnreadOriginal
                     ) else { return }
                     nativeDeliveryHooks.runCommand(
                         title: commandTitle,
@@ -2625,7 +2733,9 @@ final class TerminalNotificationStore: ObservableObject {
         body: String,
         effects: TerminalNotificationPolicyEffects,
         soundContext: NotificationSoundOverrideContext? = nil,
-        origin: TerminalNotificationOrigin = .local
+        origin: TerminalNotificationOrigin = .local,
+        ownerID: String? = nil,
+        playbackAdmission: NativeNotificationDeliveryHooks.PlaybackAdmission? = nil
     ) {
         let hooks = nativeNotificationDeliveryHooks
         if effects.command {
@@ -2634,13 +2744,15 @@ final class TerminalNotificationStore: ObservableObject {
         guard effects.sound else { return }
         var soundEffects = effects
         soundEffects.command = false
-        enqueueNotificationFeedback {
+        enqueueNotificationFeedback(ownerID: ownerID) {
+            guard !Task.isCancelled, playbackAdmission?() ?? true else { return }
             await hooks.runLocalFeedback(
                 title: title,
                 subtitle: subtitle,
                 body: body,
                 effects: soundEffects,
                 soundContext: soundContext,
+                playbackAdmission: playbackAdmission,
                 origin: origin
             )
         }
@@ -2915,6 +3027,19 @@ final class TerminalNotificationStore: ObservableObject {
     }
 
 #if DEBUG
+    func configurePhoneForwardingForTesting(enabled: @escaping () -> Bool,
+                                           forward: @escaping (TerminalNotification, Int) -> Void) {
+        phoneForwardingEnabledProvider = enabled
+        notificationPhoneForwarder = forward
+    }
+
+    func resetPhoneForwardingForTesting() {
+        phoneForwardingEnabledProvider = { PhonePushClient.shared.configuration().forwardingEnabled }
+        notificationPhoneForwarder = { notification, badge in
+            PhonePushClient.shared.forward(notification, badgeCount: badge)
+        }
+    }
+
     func configureNotificationSettingsPromptHooksForTesting(
         windowProvider: @escaping () -> NSWindow?,
         alertFactory: @escaping () -> NSAlert,
@@ -2940,10 +3065,14 @@ final class TerminalNotificationStore: ObservableObject {
         hasPromptedForSettings = false
     }
 
+    static func makeForTesting(userNotificationCenter: UserNotificationCenterService) -> TerminalNotificationStore {
+        TerminalNotificationStore(userNotificationCenter: userNotificationCenter)
+    }
+
     func configureNotificationDeliveryHandlerForTesting(
         _ handler: @escaping (TerminalNotificationStore, TerminalNotification) -> Void
     ) {
-        notificationDeliveryHandler = { store, notification, _ in
+        notificationDeliveryHandler = { store, notification, _, _ in
             handler(store, notification)
         }
     }
@@ -2951,12 +3080,12 @@ final class TerminalNotificationStore: ObservableObject {
     func configureNotificationDeliveryHandlerForTesting(
         _ handler: @escaping (TerminalNotificationStore, TerminalNotification, TerminalNotificationPolicyEffects) -> Void
     ) {
-        notificationDeliveryHandler = handler
+        notificationDeliveryHandler = { store, notification, effects, _ in handler(store, notification, effects) }
     }
 
     func resetNotificationDeliveryHandlerForTesting() {
-        notificationDeliveryHandler = { store, notification, effects in
-            store.scheduleUserNotification(notification, effects: effects)
+        notificationDeliveryHandler = { store, notification, effects, requiresUnreadOriginal in
+            store.scheduleUserNotification(notification, effects: effects, requiresUnreadOriginal: requiresUnreadOriginal)
         }
     }
 

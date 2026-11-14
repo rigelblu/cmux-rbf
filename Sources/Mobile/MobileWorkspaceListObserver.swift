@@ -282,7 +282,7 @@ final class MobileWorkspaceListObserver {
             hasher.combine(summary.latestNotificationId)
             hasher.combine(summary.latestNotificationCreatedAt)
             hasher.combine(isUnread)
-            hasher.combine(summary.unreadCount)
+            hasher.combine(summary.unreadCountIncludingMarks)
             signatures[workspace.id] = hasher.finalize()
         }
         return signatures

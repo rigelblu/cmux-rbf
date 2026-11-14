@@ -304,6 +304,7 @@ extension DockSplitStore {
         lifecycle: AgentHibernationLifecycleState
     ) {
         mutateAgentRuntime(panelId: panelId, updatesAgentAttention: true) {
+            if lifecycle != .error { $0.agentUsageLimitKeys.remove(key) } // (cm-128.5) as Workspace.setAgentLifecycle does
             $0.agentLifecycleStates[key] = lifecycle
         }
     }
@@ -329,6 +330,7 @@ extension DockSplitStore {
         var didClear = false
         mutateAgentRuntime(panelId: panelId, updatesAgentAttention: true) {
             didClear = $0.agentLifecycleStates.removeValue(forKey: key) != nil
+            $0.agentUsageLimitKeys.remove(key) // (cm-128.5) as Workspace.clearAgentLifecycle does
         }
         return didClear
     }
@@ -395,7 +397,7 @@ extension DockSplitStore {
         runtime: Workspace.DetachedAgentRuntimeState?
     ) {
         (panels[panelId] as? TerminalPanel)?.surface.updateAgentInputPhase(runtime?.agentLifecycleStates ?? [:]) // cm-128.1: the pane's key-filter phase
-        let needsInput = runtime?.agentLifecycleStates.values.contains(.needsInput) == true
+        let needsInput = runtime?.agentLifecycleStates.values.contains(where: { $0 == .needsInput || $0 == .error }) == true // (cm-128.5) an error needs you too
         agentNeedsInputAttention.setAttention(needsInput, forSurfaceId: panelId)
     }
 

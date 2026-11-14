@@ -100,8 +100,8 @@ struct WorkspaceStatusContrastTests {
         #expect(handNeedsOutline(yellow: darkYellow, on: hexColor("#8F7408")) == false)
     }
 
-    /// A Done row's dim is part of what the hand is judged by (#cm-109.7). Dark's yellow on `#606068` is 4.4:1
-    /// plain and 2.6:1 at 0.6, so only the dimmed reading needs the outline.
+    /// The function judges the hand as drawn at `drawnAt` (#cm-109.7). Dark's yellow on `#606068` is 4.4:1 plain and 2.6:1 at
+    /// 0.6. No row dims the hand since cm-128.5 (Tom, grill Q34), so the row passes 1; the parameter stays for this direct test.
     @Test func handNeedsOutlineIsJudgedAsDrawnAfterTheRowsDim() {
         var darkYellow: NSColor = .clear
         NSAppearance(named: .darkAqua)?.performAsCurrentDrawingAppearance {
@@ -128,8 +128,8 @@ struct WorkspaceStatusContrastTests {
         return count(host)
     }
 
-    /// Scenario 81 (#cm-109.7), the SwiftUI row's hand: ink copies on a light row, none on a dark one, and the
-    /// row's dim decides it too.
+    /// Scenario 81 (#cm-109.7), the SwiftUI row's hand: ink copies on a light row, none on a dark one. No row dims the hand
+    /// since cm-128.5, so `drawnAlpha` stays only for this direct test of the view.
     @Test func theSwiftUIHandDrawsItsInkCopiesOnlyWhereYellowAloneIsUnderThreeToOne() {
         #expect(hostedHandCount(colorScheme: .light, rowBackground: hexColor("#C2C0CB")) == 9)
         #expect(hostedHandCount(colorScheme: .dark, rowBackground: hexColor("#333846")) == 1)

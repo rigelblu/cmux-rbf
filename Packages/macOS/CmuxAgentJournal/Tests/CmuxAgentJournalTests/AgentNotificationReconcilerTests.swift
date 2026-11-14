@@ -438,4 +438,56 @@ struct AgentNotificationReconcilerTests {
         #expect(open.unidentifiedTurn == nil)
         #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
     }
+    // MARK: cm-128.5 — an answered form retires only a form's wait
+
+    private func typedEvent(_ sequence: Int64, _ kind: AgentJournalEventKind, detail: String?, request: String? = nil,
+                            notify: Bool = false, occurredAt: Int64? = nil) -> AgentJournalEvent {
+        AgentJournalEvent(sequence: sequence, committedAtMs: 1000 + sequence,
+            draft: AgentJournalEventDraft(eventId: "typed-\(sequence)", kind: kind, occurredAtMs: occurredAt ?? sequence,
+                source: "claude", agentKey: "claude_code", sessionId: "session", workspaceId: workspace, surfaceId: surface,
+                nativeEvent: "Notification", detail: detail, attention: AgentAttentionContext(
+                    requestIdentity: request,
+                    notification: notify ? AgentJournalNotification(title: "Claude", subtitle: "", body: "Pick one",
+                        category: "idle-reminder") : nil)))
+    }
+
+    @Test(arguments: ["elicitation_dialog", "elicitation_url_dialog"])
+    func answeredTypeRetiresAFormWait(formType: String) {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(typedEvent(1, .turnStarted, detail: nil))
+        _ = reconciler.apply(typedEvent(2, .questionRequested, detail: formType))
+        let raised = reconciler.apply(typedEvent(3, .questionRequested, detail: formType, notify: true))
+        #expect(raised.disposition == .accepted)
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 1)
+        for answered in ["elicitation_response", "elicitation_complete"] {
+            var copy = reconciler
+            let resolved = copy.apply(typedEvent(4, .attentionResolved, detail: answered))
+            #expect(!resolved.invalidatedCorrelationKeys.isEmpty, "\(answered) retired nothing")
+            #expect(copy.openRequests(source: "claude", sessionId: "session").count == 0, "\(answered)")
+        }
+    }
+
+    @Test(arguments: ["permission_prompt", nil] as [String?])
+    func answeredTypeRetiresNothingWhenThePendingWaitIsNotAForm(raisedType: String?) {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(typedEvent(1, .turnStarted, detail: nil))
+        _ = reconciler.apply(typedEvent(2, .approvalRequested, detail: raisedType))
+        let raised = reconciler.apply(typedEvent(3, .approvalRequested, detail: raisedType, notify: true))
+        #expect(raised.disposition == .accepted)
+        for answered in ["elicitation_response", "elicitation_complete"] {
+            let resolved = reconciler.apply(typedEvent(4, .attentionResolved, detail: answered))
+            #expect(resolved.invalidatedCorrelationKeys.isEmpty, "\(answered) retired \(raisedType ?? "an untyped wait")")
+            #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 1, "\(answered)")
+        }
+    }
+
+    @Test func answeredTypeRetiresNothingWhenAFeedRequestWaits() {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(typedEvent(1, .turnStarted, detail: nil))
+        let raised = reconciler.apply(typedEvent(2, .approvalRequested, detail: nil, request: "feed-1", notify: true))
+        #expect(raised.disposition == .accepted)
+        let resolved = reconciler.apply(typedEvent(3, .attentionResolved, detail: "elicitation_response"))
+        #expect(resolved.invalidatedCorrelationKeys.isEmpty)
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").identified == ["feed-1"])
+    }
 }

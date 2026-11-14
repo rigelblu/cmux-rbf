@@ -2,6 +2,7 @@ import Foundation
 import CMUXAgentLaunch
 import CmuxAgentJournal
 import CmuxFoundation
+import CmuxNotifications
 import CmuxSettings
 import CmuxSimulator
 import CmuxSudoBroker
@@ -28190,7 +28191,7 @@ struct CMUXCLI {
                     _ = try? sendV1Command(try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                         sessionId: parsedInput.sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
                         kind: .turnCompleted, rawObject: parsedInput.rawObject, payload: payload,
-                        pendingWork: hasPendingBackgroundWork), client: client)
+                        pendingWork: hasPendingBackgroundWork, cwd: hookCwd), client: client)
                 }
                 printClaudeHookAck()
             } catch {
@@ -28521,9 +28522,7 @@ struct CMUXCLI {
             // ping); `idle_prompt` = the ~60s idle nag, which fires even while a
             // background task runs — its payload lacks `background_tasks`, so read
             // the pending flag cached by the most recent Stop.
-            let notificationType = parsedInput.rawObject.flatMap {
-                firstString(in: $0, keys: ["notification_type"])
-            }
+            let notificationType = typedNotificationType(in: parsedInput.rawObject)
             let notifyCategory: AgentHookNotifyCategory
             let notifyPending: Bool
             switch notificationType {
@@ -28537,10 +28536,17 @@ struct CMUXCLI {
                 // cannot prove the pane safe to hibernate after Escape.
                 // cm-128.1: a session with no record gives no evidence of activity, so it is not pending.
                 notifyPending = mappedSession.map { $0.hadPendingBackgroundWorkAtStop != false } ?? false
+            case "elicitation_dialog", "elicitation_url_dialog":
+                // cm-128.5: a form is a real blocking request, never gated by background work.
+                notifyCategory = .idleReminder
+                notifyPending = false
+            case "elicitation_response", "elicitation_complete":
+                notifyCategory = .other
+                notifyPending = false
             default:
-                // No (or unknown) notification_type: fall back to the summarizer's
-                // cue classification so older clients still gate under the right
-                // setting. Unclassified alerts stay .other and always deliver.
+                // No (or unknown) notification_type: the cue classification only picks the gate for the banner's
+                // text. It picks no state (cm-128.5): that comes from the type alone, below.
+                // Unclassified alerts stay .other and always deliver.
                 switch classifiedSubtitle {
                 case "Permission":
                     notifyCategory = .needsPermission
@@ -28558,13 +28564,6 @@ struct CMUXCLI {
                 }
             }
 
-            // An idle reminder while background work is still pending is not a
-            // real "waiting for input" state: the pane is still running (the Stop
-            // hook set it to Running) and the app suppresses this banner. Skip the
-            // "Needs input" pill/lifecycle so the idle nag can't undo the Running
-            // status; the app still gates the (tagged) notification itself.
-            let suppressNeedsInputState = (notifyCategory == .idleReminder && notifyPending)
-
             // `.other` remains ungated. Error alerts carry a contextual
             // `errorStalled` sound type; other uncategorized alerts omit the
             // metadata and retain the legacy payload shape.
@@ -28572,43 +28571,25 @@ struct CMUXCLI {
             // few older Claude clients attach a stale permission/idle type to
             // an error payload; serializing that category would reject the
             // `errorStalled` context and silently lose the sound override.
+            // Semantic kind for the journal: the structured notification_type
+            // decides, and nothing else does (cm-128.5, Tom, grill Q32). Words, a
+            // missing type and an unmapped type journal an observation that raises
+            // and pings nothing. The payload's error flag follows it too, never the words.
+            let journalKind = typedNotificationJournalKind(forNotificationType: notificationType)
+            let journalDetail = notificationTypeDetail(notificationType, kind: journalKind)
             let payload = notificationPayload(
                 title: title,
                 subtitle: localizedClaudeNotificationSubtitle(summary.subtitle),
                 body: summary.body,
                 meta: Self.agentNotificationMeta(
                     category: notifyCategory,
-                    isError: classifiedSubtitle == "Error",
+                    isError: journalKind == .errorReported,
                     pending: notifyPending,
                     agentID: "claude",
                     isSubagent: isNestedAgentSession
                 )
             )
 
-            // Semantic kind for the journal: the structured notification_type
-            // decides first; the prose classifier's verdict is only the
-            // adapter fallback for older clients; nothing ever fabricates a
-            // needs-input state out of an unparseable message.
-            let journalKind: AgentJournalEventKind
-            switch notificationType {
-            case "permission_prompt":
-                journalKind = .approvalRequested
-            case "idle_prompt":
-                journalKind = .idleObserved
-            default:
-                switch classifiedSubtitle {
-                case "Permission":
-                    journalKind = .approvalRequested
-                case "Waiting":
-                    journalKind = suppressNeedsInputState ? .stateChanged : .questionRequested
-                case "Completed":
-                    journalKind = .turnCompleted
-                case "Error":
-                    journalKind = .errorReported
-                default:
-                    journalKind = .stateChanged
-                }
-            }
             emitAgentJournalEvent(
                 client: client,
                 kind: journalKind,
@@ -28618,8 +28599,9 @@ struct CMUXCLI {
                 workspaceId: workspaceId,
                 surfaceId: surfaceId,
                 isSubagent: isNestedAgentSession,
-                pendingWork: notifyPending,
+                pendingWork: journalKind == .attentionResolved ? false : notifyPending,
                 nativeEvent: reportedHookEventName(from: parsedInput) ?? "Notification",
+                detail: journalDetail,
                         attention: Self.semanticAttentionContext(parsedInput.rawObject),
                         occurredAtMs: Self.semanticOccurredAtMs(parsedInput.rawObject),
                 store: sessionStore,
@@ -28653,12 +28635,78 @@ struct CMUXCLI {
             }
             // A notification with nothing to show is state signal only: the
             // journal recorded it; no banner is fabricated for it.
-            if !summary.body.isEmpty {
+            if !summary.body.isEmpty && journalKind != .attentionResolved {
                 _ = try sendV1Command(try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                     sessionId: parsedInput.sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
                     kind: journalKind, rawObject: parsedInput.rawObject, payload: payload,
-                    pendingWork: notifyPending), client: client)
+                    pendingWork: notifyPending, cwd: hookCwd, detail: journalDetail), client: client)
             }
+            printClaudeHookAck()
+        case "stop-failure":
+            // cm-128.5: a turn that ended on an API error runs this instead of Stop. One semantic event, so one triangle and
+            // one "Stopped on an error" notification come from the same signal. The session record, the Stop cache and the
+            // agent pills are untouched: the per-pane error wins before any of them is read.
+            telemetry.breadcrumb("claude-hook.stop-failure")
+            let failureType = parsedInput.rawObject.flatMap { firstString(in: $0, keys: ["error"]) } ?? "unknown"
+            let failureMappedSession = parsedInput.sessionId.flatMap { try? sessionStore.lookup(sessionId: $0) }
+            guard let failureTarget = try resolveClaudeHookDeliveryTarget(
+                mappedSession: failureMappedSession,
+                routing: hookRouting,
+                client: client
+            ), failureTarget.isAuthoritative else {
+                didSendFeedTelemetry = true
+                telemetry.breadcrumb("claude-hook.stop-failure.unresolved")
+                emitAgentJournalEvent(
+                    client: client,
+                    kind: .stateChanged,
+                    source: "claude",
+                    agentKey: Self.claudeCodeStatusKey,
+                    sessionId: parsedInput.sessionId,
+                    workspaceId: nil,
+                    surfaceId: nil,
+                    unattributedReason: "target-unresolved",
+                    nativeEvent: reportedHookEventName(from: parsedInput) ?? "StopFailure",
+                    attention: Self.semanticAttentionContext(parsedInput.rawObject),
+                    occurredAtMs: Self.semanticOccurredAtMs(parsedInput.rawObject),
+                    store: sessionStore,
+                    telemetry: telemetry
+                )
+                printClaudeHookAck()
+                return
+            }
+            let failureWorkspaceId = failureTarget.workspaceId
+            let failureSurfaceId = failureTarget.surfaceId
+            sendClaudeFeedTelemetry(workspaceId: failureWorkspaceId, surfaceId: failureSurfaceId)
+            // A helper runs in Claude's own process, so the ancestry check cannot see it; the payload's `agent_id` does
+            // (Tom, 2026-11-05, grill Q39: "Mark it a helper"). The reconciler drops a subagent's event.
+            let failureHasHelperId = parsedInput.rawObject.flatMap { firstString(in: $0, keys: ["agent_id"]) } != nil
+            let failureIsNested = nestedAgentSessionDetected(
+                currentAgentPID: liveClaudePID(mapped: failureMappedSession),
+                env: ProcessInfo.processInfo.environment
+            ) || failureHasHelperId
+            let failureBody: String = {
+                let raw = parsedInput.rawObject
+                let message = raw.flatMap { firstString(in: $0, keys: ["last_assistant_message"]) }
+                    ?? raw.flatMap { firstString(in: $0, keys: ["error_details"]) }
+                    ?? failureType
+                return truncate(normalizedSingleLine(message), maxLength: 180)
+            }()
+            let failurePayload = notificationPayload(
+                title: String(localized: "cli.claude-hook.notification.title", defaultValue: "Claude Code"),
+                subtitle: "",
+                body: failureBody,
+                meta: Self.agentNotificationMeta(
+                    category: .other,
+                    isError: true,
+                    pending: false,
+                    agentID: "claude",
+                    isSubagent: failureIsNested
+                )
+            )
+            _ = try sendV1Command(try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
+                sessionId: parsedInput.sessionId, workspaceId: failureWorkspaceId, surfaceId: failureSurfaceId,
+                kind: .errorReported, rawObject: parsedInput.rawObject, payload: failurePayload,
+                cwd: hookCwd, detail: failureType), client: client)
             printClaudeHookAck()
         case "post-tool-use":
             // cm-128.1: only a recorded permission can resolve here. The form-specific
@@ -28992,7 +29040,7 @@ struct CMUXCLI {
                         try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                             sessionId: sessionId, workspaceId: workspaceId, surfaceId: existingSurfaceId,
                             kind: toolName == "AskUserQuestion" ? .questionRequested : .planReviewRequested,
-                            rawObject: parsedInput.rawObject, payload: payload),
+                            rawObject: parsedInput.rawObject, payload: payload, cwd: hookCwd),
                         client: client
                     )
                 }
@@ -30945,6 +30993,7 @@ struct CMUXCLI {
             ?? ""
         let turnId = optionValue(commandArgs, name: "--turn")
         var transcriptPath = optionValue(commandArgs, name: "--transcript")
+        let cwd = optionValue(commandArgs, name: "--cwd")
         let leasePath = optionValue(commandArgs, name: "--lease")
 
         guard !workspaceId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -30983,6 +31032,7 @@ struct CMUXCLI {
                         userInput,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
+                        cwd: cwd,
                         client: client
                     )
                 }
@@ -30997,6 +31047,7 @@ struct CMUXCLI {
                         failure,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
+                        cwd: cwd,
                         client: client
                     )
                     return
@@ -31036,22 +31087,27 @@ struct CMUXCLI {
         _ userInput: CodexHookUserInputCandidate,
         workspaceId: String,
         surfaceId: String?,
+        cwd: String?,
         client: SocketClient
     ) {
-        let subtitle = String(localized: "agent.codex.input.subtitle.waiting", defaultValue: "Waiting")
         let body = userInput.question ?? String(
             localized: "agent.codex.input.body.needsInput",
             defaultValue: "Codex is asking a question"
         )
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         if let surfaceId, !surfaceId.isEmpty {
-            let payload = notificationPayload(
-                title: String(
+            let presentation = AgentNotificationPresentation(
+                agentTitle: String(
                     localized: "cli.codexMonitor.notification.title",
                     defaultValue: "Codex",
                     bundle: bundle
                 ),
-                subtitle: subtitle,
+                kind: .answer,
+                cwd: cwd
+            )
+            let payload = notificationPayload(
+                title: presentation.title,
+                subtitle: presentation.subtitle,
                 body: body,
                 meta: AgentHookNotifyCategory.needsPermission.metaSegment(
                     pending: false,
@@ -31071,18 +31127,24 @@ struct CMUXCLI {
         _ failure: CodexHookFailureCandidate,
         workspaceId: String,
         surfaceId: String?,
+        cwd: String?,
         client: SocketClient
     ) {
         let summary = summarizeCodexHookFailureCandidate(failure)
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         if let surfaceId, !surfaceId.isEmpty {
-            let payload = notificationPayload(
-                title: String(
+            let presentation = AgentNotificationPresentation(
+                agentTitle: String(
                     localized: "cli.codexMonitor.notification.title",
                     defaultValue: "Codex",
                     bundle: bundle
                 ),
-                subtitle: summary.subtitle,
+                kind: .error,
+                cwd: cwd
+            )
+            let payload = notificationPayload(
+                title: presentation.title,
+                subtitle: presentation.subtitle,
                 body: summary.body,
                 meta: AgentHookNotifyCategory.other.metaSegment(
                     pending: false,
@@ -35146,7 +35208,8 @@ export default CMUXSessionRestore;
                     return
                 }
             }
-            let failureRestoresRunning = !failed || cursorShellFailureIsExplicitDenial(from: input)
+            // cm-128.5 (Tom, grill Q39: "Show running"): a failed tool is the agent's work and never enters the error row, so every
+            // shell completion, failed or not, takes the finished shell's path: running, the blue pill, a running record.
             let mapped = sessionId.isEmpty
                 ? nil
                 : (try? store.lookup(sessionId: sessionId, deadline: cursorShellDeadline))
@@ -35256,7 +35319,7 @@ export default CMUXSessionRestore;
                     let evidence = remaining?.toolUseId.map { ["tool_use_id": $0] }
                     if let command = try? semanticNotificationCommand(source: def.name, agentKey: def.statusKey,
                         sessionId: sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
-                        kind: .approvalRequested, rawObject: evidence, payload: pendingPayload) {
+                        kind: .approvalRequested, rawObject: evidence, payload: pendingPayload, cwd: hookCwd) {
                         sendCursorCriticalCommand(command)
                     }
                     return
@@ -35274,13 +35337,9 @@ export default CMUXSessionRestore;
                     excludingSessionId: sessionId,
                     deadline: cursorShellDeadline
                 ), !hasOtherPending else { return }
-                let runningStatus = failureRestoresRunning
-                    ? String(localized: "agent.generic.status.running", defaultValue: "Running")
-                    : agentErrorStatusValue(for: def)
+                let runningStatus = String(localized: "agent.generic.status.running", defaultValue: "Running")
                 sendCursorCriticalCommand(
-                    failureRestoresRunning
-                        ? "set_status \(def.statusKey) \(runningStatus) --icon=bolt.fill --color=#4C8DFF --tab=\(workspaceId)\(socketPanelOption(surfaceId))"
-                        : "set_status \(def.statusKey) \(runningStatus) --icon=exclamationmark.triangle.fill --color=#FF453A --priority=100 --tab=\(workspaceId)\(socketPanelOption(surfaceId))"
+                    "set_status \(def.statusKey) \(runningStatus) --icon=bolt.fill --color=#4C8DFF --tab=\(workspaceId)\(socketPanelOption(surfaceId))"
                 )
             }
 
@@ -35306,7 +35365,7 @@ export default CMUXSessionRestore;
                 toolUseId: cursorShellToolUseId(from: input),
                 hookEventName: persistedHookEventName,
                 deadline: cursorShellDeadline,
-                failureWasError: failed && !failureRestoresRunning
+                failureWasError: false
             )
             if let resolution {
                 reconcileCursorShellUI(resolution)
@@ -35387,7 +35446,7 @@ export default CMUXSessionRestore;
                 )
             }
             emitJournal(
-                failed && !failureRestoresRunning ? .errorReported : .turnStarted,
+                .turnStarted,
                 workspaceId: workspaceId,
                 surfaceId: surfaceId,
                 detail: failed ? "shell-failed" : "shell-completed",
@@ -36243,14 +36302,24 @@ export default CMUXSessionRestore;
                 guard let cwd, !cwd.isEmpty else { return nil }
                 return URL(fileURLWithPath: NSString(string: cwd).expandingTildeInPath).lastPathComponent
             }()
+            // cm-128.5: a Stop has one outcome. It is an error when a Codex or agy failure was found, as before, or when
+            // the mapper maps the Stop's native event to `errorReported` (Rovo Dev's `on_error` runs this same
+            // subcommand). Every reader below takes that one value, so no append can read "finished".
+            let stopMapsToError = AgentSemanticEventMapper().kind(
+                source: def.name,
+                nativeEvent: reportedHookEventName(from: input) ?? "",
+                toolName: nil
+            ) == .errorReported
             var subtitle = codexFailure?.subtitle ?? String(
                 localized: "agent.codex.completion.subtitle.completed",
                 defaultValue: "Completed"
             )
             if let antigravityFailure {
                 subtitle = antigravityFailure.subtitle
+            } else if codexFailure == nil, stopMapsToError {
+                subtitle = String(localized: "agent.generic.notification.subtitle.error", defaultValue: "Error")
             }
-            if codexFailure == nil, antigravityFailure == nil, let projectName, !projectName.isEmpty {
+            if codexFailure == nil, antigravityFailure == nil, !stopMapsToError, let projectName, !projectName.isEmpty {
                 subtitle = String.localizedStringWithFormat(
                     String(
                         localized: "agent.codex.completion.subtitle.completedInProject",
@@ -36263,13 +36332,18 @@ export default CMUXSessionRestore;
                 ?? antigravityFailure?.body
                 ?? lastMsg.map { truncate(normalizedSingleLine($0), maxLength: 200) }
                 ?? grokAssistantMessage.map { truncate(normalizedSingleLine($0), maxLength: 200) }
-                ?? String(
-                    localized: "agent.generic.notification.body.taskCompleted",
-                    defaultValue: "Task completed"
-                )
+                ?? (stopMapsToError
+                    ? String.localizedStringWithFormat(
+                        String(localized: "agent.generic.notification.body.stoppedOnError", defaultValue: "%@ stopped on an error"),
+                        def.displayName
+                    )
+                    : String(
+                        localized: "agent.generic.notification.body.taskCompleted",
+                        defaultValue: "Task completed"
+                    ))
             let antigravityHasActiveBackgroundWork = hasActiveAntigravityBackgroundWork()
             var hasActiveBackgroundWork = antigravityHasActiveBackgroundWork || codexHasActiveBackgroundWork
-            let stopNotificationStatus: AgentHookNotificationStatus = (codexFailure == nil && antigravityFailure == nil) ? .idle : .error
+            let stopNotificationStatus: AgentHookNotificationStatus = (codexFailure == nil && antigravityFailure == nil && !stopMapsToError) ? .idle : .error
             var lifecycleAfterStop: AgentHibernationLifecycleState = {
                 if hasActiveBackgroundWork && stopNotificationStatus == .idle {
                     return .running
@@ -36440,7 +36514,7 @@ export default CMUXSessionRestore;
             // reducer's per-session fold handles stale sessions (a newer
             // running session outranks this one) and subagent tagging keeps
             // nested sessions off the pane badge — no emit-side guessing.
-            let stopHadFailure = codexFailure != nil || antigravityFailure != nil
+            let stopHadFailure = codexFailure != nil || antigravityFailure != nil || stopMapsToError
             emitJournal(
                 stopHadFailure ? .errorReported : .turnCompleted,
                 workspaceId: workspaceId,
@@ -36511,10 +36585,10 @@ export default CMUXSessionRestore;
                 && def.publishesStopNotification
                 && !stopNotificationAlreadyRouted
                 && (!hasActiveBackgroundWork || stopNotificationStatus == .error)
-            let hasGrokTranscriptContext = def.name == "grok" && normalizedHookValue(cwd) != nil
+            // cm-128.5: grok's Stop pings on every idle Stop, with the assistant's message as the body or, without
+            // one, "Task completed". Its Notification's words raise and ping nothing, so the Stop is where it pings.
             let shouldPublishGrokStopFallbackNotification = def.name == "grok"
                 && stopNotificationStatus == .idle
-                && (grokAssistantMessage != nil || !hasGrokTranscriptContext)
             let shouldPublishStopAlert = (shouldPublishStopNotification || shouldPublishGrokStopFallbackNotification)
                 && !suppressCompletionNotification
                 && (codexStopDecision?.shouldNotify ?? true)
@@ -36545,7 +36619,7 @@ export default CMUXSessionRestore;
                 let notifyCommand = try semanticNotificationCommand(source: def.name, agentKey: def.statusKey,
                     sessionId: sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
                     kind: stopNotificationStatus == .error ? .errorReported : .turnCompleted,
-                    rawObject: input.rawObject, payload: payload, pendingWork: hasActiveBackgroundWork)
+                    rawObject: input.rawObject, payload: payload, pendingWork: hasActiveBackgroundWork, cwd: hookCwd)
 #if DEBUG
                 agentHookDebugLog(
                     "agentHook.stop.notify agent=\(def.name) session=\(agentHookDebugShort(sessionId)) resumed=\(env["CMUX_AGENT_RESUME_LAUNCH"] == "1" ? 1 : 0) fallback=\(shouldPublishGrokStopFallbackNotification ? 1 : 0) workspace=\(agentHookDebugShort(workspaceId)) surface=\(agentHookDebugShort(surfaceId)) subtitleLen=\(subtitle.count) bodyLen=\(body.count)",
@@ -36604,7 +36678,7 @@ export default CMUXSessionRestore;
                             client: client
                         )
                     }
-                } else if antigravityFailure != nil {
+                } else if antigravityFailure != nil || stopMapsToError {
                     let statusValue = agentErrorStatusValue(for: def)
                     if def.name == "cursor" {
                         sendCursorCriticalCommand(
@@ -36934,6 +37008,38 @@ export default CMUXSessionRestore;
             let suppressPendingWaitingState = summary.notifyCategory == .idleReminder
                 && hasActiveAntigravityBackgroundWork()
 
+            // cm-128.5: only a fact picks the journal kind (cmux's own decision, the mapper's verdict, a typed field).
+            // Everything below that used to write a state from the classifier's words (the session record, the pill,
+            // the stale-idle and pending checks) follows this kind, so the words stay the notification's text only.
+            let typedType = typedNotificationType(in: input.rawObject)
+            let mappedJournalKind = agentJournalNotificationKind(
+                def: def,
+                nativeEvent: reportedHookEventName(from: input) ?? subcommand,
+                toolName: nil,
+                rawObject: input.rawObject,
+                cursorShellNeedsApproval: cursorShellNeedsApproval,
+                lifecycleRoute: lifecycleRoute
+            )
+            let notificationJournalKind: AgentJournalEventKind =
+                suppressPendingWaitingState
+                    && (mappedJournalKind == .approvalRequested || mappedJournalKind == .questionRequested)
+                    ? .stateChanged
+                    : mappedJournalKind
+            let journalStatus: AgentHookNotificationStatus? = {
+                switch notificationJournalKind {
+                case .approvalRequested, .questionRequested, .planReviewRequested: return .needsInput
+                case .errorReported: return .error
+                case .turnCompleted: return .idle
+                default: return nil
+                }
+            }()
+            // One value feeds both journal appends, so neither can fold a pending session to idle on its own: the
+            // payload's typed `pending_work`, or Antigravity's `fullyIdle == false`.
+            let notificationPendingWork = (notificationJournalKind == .turnCompleted || notificationJournalKind == .idleObserved)
+                && ((input.rawObject?["pending_work"] as? Bool) == true || hasActiveAntigravityBackgroundWork())
+            let notificationKeepsRunning = suppressPendingWaitingState
+                || (journalStatus == .idle && notificationPendingWork)
+
 #if DEBUG
             agentHookDebugLog(
                 "agentHook.notification.summary agent=\(def.name) session=\(agentHookDebugShort(sessionId)) status=\(summary.status?.rawValue ?? "nil") fallback=\(summary.isFallback ? 1 : 0) subtitleLen=\(summary.subtitle.count) bodyLen=\(summary.body.count)",
@@ -36945,7 +37051,7 @@ export default CMUXSessionRestore;
             // A rebuilt stored summary is an intentional re-notification, not
             // grok notification noise: it bypasses the nil-status filter (the
             // rebuilt summary deliberately claims no lifecycle status).
-            if def.name == "grok", summary.status == nil, !rebuiltFromStoredSummary {
+            if def.name == "grok", summary.status == nil, notificationJournalKind == .stateChanged, !rebuiltFromStoredSummary {
 #if DEBUG
                 agentHookDebugLog(
                     "agentHook.notification.skip agent=\(def.name) session=\(agentHookDebugShort(sessionId)) reason=nonTerminalNotification subtitleLen=\(summary.subtitle.count) bodyLen=\(summary.body.count)",
@@ -37000,7 +37106,7 @@ export default CMUXSessionRestore;
                 return
             }
 
-            let staleIdleNotificationHasNewerRunningSession = summary.status == .idle &&
+            let staleIdleNotificationHasNewerRunningSession = journalStatus == .idle &&
                 hasNewerRunningSession(workspaceId: workspaceId, surfaceId: surfaceId)
             if staleIdleNotificationHasNewerRunningSession {
 #if DEBUG
@@ -37031,14 +37137,14 @@ export default CMUXSessionRestore;
                     fallbackKind: def.name,
                     cwd: hookCwd ?? mapped?.cwd
                 )
-                let lifecycle = suppressPendingWaitingState ? .running : agentLifecycle(for: summary.status)
-                let storedRuntimeStatus: AgentHookRuntimeStatus? = suppressPendingWaitingState ? .running : runtimeStatus(for: summary.status)
+                let lifecycle = notificationKeepsRunning ? .running : agentLifecycle(for: journalStatus)
+                let storedRuntimeStatus: AgentHookRuntimeStatus? = notificationKeepsRunning ? .running : runtimeStatus(for: journalStatus)
                 // These agents use completion notifications as turn boundaries;
                 // keep the route but close nested prompt depth.
                 if (notificationCompletesTurn
                         || def.name == "grok"
                         || def.name == "antigravity"),
-                   summary.status == .idle || summary.status == .error {
+                   journalStatus == .idle || journalStatus == .error {
                     _ = try? store.recordPromptStop(
                         sessionId: sessionId,
                         workspaceId: workspaceId,
@@ -37052,7 +37158,7 @@ export default CMUXSessionRestore;
                         hookEventName: persistedHookEventName,
                         lastSubtitle: summary.subtitle,
                         lastBody: summary.body,
-                        lastNotificationStatus: summary.status,
+                        lastNotificationStatus: journalStatus,
                         updateLastNotificationStatus: true,
                         runtimeStatus: storedRuntimeStatus,
                         updateRuntimeStatus: true,
@@ -37076,36 +37182,26 @@ export default CMUXSessionRestore;
                         hookEventName: persistedHookEventName,
                         lastSubtitle: summary.subtitle,
                         lastBody: summary.body,
-                        lastNotificationStatus: summary.status,
-                        updateLastNotificationStatus: true,
+                        lastNotificationStatus: journalStatus,
+                        // cm-128.5: an observation (no status from a fact) leaves the status the last Stop or fact wrote.
+                        updateLastNotificationStatus: journalStatus != nil,
                         runtimeStatus: storedRuntimeStatus,
-                        updateRuntimeStatus: summary.status != nil,
+                        updateRuntimeStatus: journalStatus != nil,
                         deadline: cursorShellNeedsApproval ? cursorShellDeadline : nil
                     )
                 }
             }
 
-            // Journal the semantic event: the native hook event name maps
-            // first; the prose classifier's verdict is only the adapter
-            // fallback, and a pending waiting-nag never claims needs-input.
-            let mappedJournalKind = agentJournalNotificationKind(
-                def: def,
-                nativeEvent: reportedHookEventName(from: input),
-                toolName: nil,
-                summary: summary
-            )
-            let notificationJournalKind: AgentJournalEventKind =
-                suppressPendingWaitingState
-                    && (mappedJournalKind == .approvalRequested || mappedJournalKind == .questionRequested)
-                    ? .stateChanged
-                    : mappedJournalKind
+            // Journal the semantic event: the kind computed above, from facts only. A pending waiting-nag never
+            // claims needs-input.
             emitJournal(
                 notificationJournalKind,
                 workspaceId: workspaceId,
                 surfaceId: surfaceId,
-                pendingWork: (summary.notifyCategory == .turnComplete || summary.notifyCategory == .idleReminder)
-                    && hasActiveAntigravityBackgroundWork(),
-                detail: notificationJournalKind == .errorReported ? summary.body : nil,
+                pendingWork: notificationPendingWork,
+                detail: notificationJournalKind == .errorReported
+                    ? summary.body
+                    : notificationTypeDetail(typedType, kind: notificationJournalKind),
                 responseTimeout: cursorShellNeedsApproval ? cursorCriticalTimeout() : nil
             )
 
@@ -37114,7 +37210,7 @@ export default CMUXSessionRestore;
                 category: summary.notifyCategory,
                 body: summary.body
             )
-            if !summary.body.isEmpty {
+            if !summary.body.isEmpty && notificationJournalKind != .attentionResolved {
                 // One ancestry walk per delivered notification, feeding the
                 // notify payload's subagent tag below.
                 let notificationEventPID = preferredAgentHookEventPID(
@@ -37139,11 +37235,20 @@ export default CMUXSessionRestore;
                 // Error status wins over a classifier category so every
                 // error carries the contextual error sound tag, even if an
                 // integration supplied an inconsistent category.
+                // cm-128.5: when a fact chose the kind, the gate category follows the kind, never the words: a Pi turn end whose
+                // message says "failed" must still gate as a turn end and keep its `p=`/`n=` tags (an `.other` meta is nil).
+                let notificationMetaCategory: AgentHookNotifyCategory
+                switch notificationJournalKind {
+                case .turnCompleted: notificationMetaCategory = .turnComplete
+                case .approvalRequested, .planReviewRequested: notificationMetaCategory = .needsPermission
+                case .questionRequested, .idleObserved: notificationMetaCategory = .idleReminder
+                case .errorReported, .messagePublished: notificationMetaCategory = .other
+                default: notificationMetaCategory = summary.notifyCategory
+                }
                 let notificationMeta = Self.agentNotificationMeta(
-                    category: summary.notifyCategory,
-                    isError: summary.status == .error,
-                    pending: (summary.notifyCategory == .turnComplete || summary.notifyCategory == .idleReminder)
-                        && hasActiveAntigravityBackgroundWork(),
+                    category: notificationMetaCategory,
+                    isError: notificationJournalKind == .errorReported,
+                    pending: notificationPendingWork,
                     agentID: def.name,
                     isSubagent: isNestedAgentSession,
                     correlationKey: cursorShellNeedsApproval
@@ -37158,7 +37263,10 @@ export default CMUXSessionRestore;
                 )
                 let notifyCommand = try semanticNotificationCommand(source: def.name, agentKey: def.statusKey,
                     sessionId: sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
-                    kind: notificationJournalKind, rawObject: input.rawObject, payload: payload)
+                    kind: notificationJournalKind, rawObject: input.rawObject, payload: payload, cwd: hookCwd,
+                    detail: notificationJournalKind == .errorReported
+                        ? nil
+                        : notificationTypeDetail(typedType, kind: notificationJournalKind))
 #if DEBUG
                 agentHookDebugLog(
                     "agentHook.notification.notify agent=\(def.name) session=\(agentHookDebugShort(sessionId)) workspace=\(agentHookDebugShort(workspaceId)) surface=\(agentHookDebugShort(surfaceId))",
@@ -37204,11 +37312,7 @@ export default CMUXSessionRestore;
 #endif
             }
 
-            switch summary.status {
-            case .needsInput? where suppressPendingWaitingState:
-                // Suppressed pending waiting cue: leave the Running pill in
-                // place; the fullyIdle turn boundary reconciles.
-                break
+            switch journalStatus {
             case .needsInput?:
                 let statusValue = agentNeedsInputStatusValue(for: def)
                 if cursorShellNeedsApproval {
@@ -37227,6 +37331,9 @@ export default CMUXSessionRestore;
                     "set_status \(def.statusKey) \(statusValue) --icon=exclamationmark.triangle.fill --color=#FF453A --priority=100 --tab=\(workspaceId)\(socketPanelOption(surfaceId))",
                     client: client
                 )
+            case .idle? where notificationKeepsRunning:
+                // A pending turn end leaves the Running pill in place; the real turn boundary reconciles.
+                break
             case .idle?:
                 setIdleStatusUnlessAnotherSessionIsRunning(workspaceId: workspaceId, surfaceId: surfaceId)
             case nil:
@@ -38055,6 +38162,7 @@ export default CMUXSessionRestore;
         case "subagent-start": return "SubagentStart"
         case "subagent-stop": return "SubagentStop"
         case "stop", "idle": return "Stop"
+        case "stop-failure": return "StopFailure"
         case "session-end": return "SessionEnd"
         case "notification", "notify": return "Notification"
         default: return ""

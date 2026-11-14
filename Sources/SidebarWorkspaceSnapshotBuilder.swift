@@ -82,6 +82,8 @@ struct SidebarWorkspaceSnapshotBuilder {
         var taskStatusInput = SidebarWorkspaceTaskStatusSnapshot()
         /// Whether the raised hand indicator should show. (#cm-109.3)
         var showsRaisedHand: Bool = false // (#cm-109.3)
+        /// The agents stopped on an error: the triangle shows when this is not empty, with the hand's gate. (cm-128.5)
+        var erroredAgents: [SidebarErroredAgent] = []
         /// How many agent states are watching background work after their turn ended. (#cm-128.3)
         var monitoringAgentCount: Int = 0
 

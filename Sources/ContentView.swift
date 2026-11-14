@@ -13150,6 +13150,7 @@ struct VerticalTabsSidebar: View, Equatable {
             canCloseWorkspace: input.canCloseWorkspace,
             accessibilityWorkspaceCount: input.workspaceCount,
             unreadCount: input.unreadCount,
+            markedUnread: input.markedUnread,
             latestNotificationText: input.latestNotificationText,
             showsAgentActivity: input.showsAgentActivity,
             rowSpacing: input.rowSpacing,
@@ -13319,6 +13320,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 let summary = snapshot.summary(forWorkspaceId: workspaceId)
                 var fresh = model
                 fresh.unreadCount = summary.unreadCount
+                fresh.markedUnread = summary.markedUnread
                 fresh.latestNotificationText = showsNotificationMessage
                     ? summary.latestNotificationText
                     : nil
@@ -15606,6 +15608,7 @@ struct VerticalTabsSidebar: View, Equatable {
             workspaceShortcutModifierSymbol: renderContext.workspaceNumberShortcut.numberedDigitHintPrefix,
             canCloseWorkspace: renderContext.canCloseWorkspace,
             unreadCount: unreadSummary.unreadCount,
+            markedUnread: unreadSummary.markedUnread,
             latestNotificationText: liveLatestNotificationText,
             showsAgentActivity: renderContext.showsAgentActivity,
             rowSpacing: tabRowSpacing,
@@ -16484,6 +16487,13 @@ struct TabItemView: View, Equatable {
         )
     }
 
+    private var unreadDotColor: Color {
+        guard unreadCount == 0 && snapshot.markedUnread else { return .clear }
+        let fill = sidebarContrastBackgroundHex.flatMap { NSColor(hex: $0) }
+            ?? SidebarAppearanceColorResolver().resolvedColor(.windowBackgroundColor, for: colorScheme)
+        return Color(nsColor: rowVisualPalette.unreadMarkColor(sidebarStandIn: fill))
+    }
+
     private var rowContrastBackground: NSColor? { // (#cm-109.7)
         guard let hex = sidebarContrastBackgroundHex, let sidebarStandIn = NSColor(hex: hex) else { // (#cm-109.7)
             return nil // (#cm-109.7)
@@ -16707,7 +16717,7 @@ struct TabItemView: View, Equatable {
         let slotResolution = SidebarWorkspaceSlotResolution.resolve( // (#cm-109.3)
             showsHand: showsHand, // (#cm-109.3)
             showsSpinner: showsLoadingSpinner, // (#cm-109.3)
-            unreadCount: unreadCount, // (#cm-109.3)
+            unreadCount: unreadCount, markedUnread: snapshot.markedUnread, // (#cm-109.3)
             loadingSpinnerPosition: settings.loadingSpinnerPosition, // (#cm-109.3)
             notificationBadgePosition: settings.notificationBadgePosition, // (#cm-109.3)
             showsCloseButton: false // (#cm-109.3)
@@ -16726,12 +16736,13 @@ struct TabItemView: View, Equatable {
         let rowView = VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .sidebarTitleFirstLineCenter, spacing: titleRowSpacing) {
 
-                Group { // (#cm-128.3) normal content keeps the Done dim.
-                    if leadingSlotActive {
-                        // cm-128.1: the leading slot holds the unread badge alone, so it is always the badge's width.
-                        SidebarWorkspaceLeadingStatusSlot(unreadCount: unreadCount, side: scaledUnreadBadgeSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor) // (#cm-109.3)
-                    }
+                if leadingSlotActive {
+                    // The mark keeps the badge's reserved width and its contrast strength on Done rows.
+                    SidebarWorkspaceLeadingStatusSlot(unreadCount: unreadCount, markedUnread: snapshot.markedUnread, markColor: unreadDotColor, side: scaledUnreadBadgeSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor) // (#cm-109.3)
+                        .opacity(unreadCount == 0 && snapshot.markedUnread ? 1 : rowContentAlpha)
+                }
 
+                Group { // (#cm-128.3) normal content keeps the Done dim.
                     if workspaceSnapshot.isPinned {
                         CmuxSystemSymbolImage(magnified: "pin.fill", pointSize: scaledFontSize(9), weight: .semibold, tint: activeSecondaryColor(0.8))
                             .safeHelp(protectedWorkspaceTooltip)
@@ -16776,21 +16787,37 @@ struct TabItemView: View, Equatable {
                         .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
                         .transition(.opacity)
                     }
-
-                    if slotResolution.showsHand { // (#cm-109.3)
-                        WaitingHandView( // (#cm-109.7)
-                            pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
-                            colorScheme: colorScheme, // (#cm-109.7)
-                            rowBackground: rowContrastBackground, // (#cm-109.7)
-                            drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: workspaceSnapshot.taskStatus) // (#cm-109.7)
-                        ) // (#cm-109.3)
-                        .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
-                        .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
-                        .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
-                        .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
-                    } // (#cm-109.3)
                 }
                 .opacity(rowContentAlpha)
+
+                // cm-128.5 (Tom, grill Q34): no agent mark dims, so the hand and the triangle sit outside the Done dim, as the
+                // spinner and the waveform do, and their outline is judged at full strength.
+                if slotResolution.showsHand { // (#cm-109.3)
+                    WaitingHandView( // (#cm-109.7)
+                        pointSize: SidebarWorkspaceSlotResolution.handRaisedSymbolPointSize(spinnerSide: scaledLoadingSpinnerSize), // (#cm-109.7)
+                        colorScheme: colorScheme, // (#cm-109.7)
+                        rowBackground: rowContrastBackground, // (#cm-109.7)
+                        drawnAlpha: 1 // cm-128.5
+                    ) // (#cm-109.3)
+                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize) // (#cm-109.3)
+                    .safeHelp(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                    .accessibilityLabel(String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer")) // (#cm-109.3)
+                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] } // (#cm-109.3)
+                }
+
+                if !workspaceSnapshot.erroredAgents.isEmpty { // cm-128.5 the hand's twin: a pane stopped on an error
+                    WaitingHandView(
+                        symbolName: "exclamationmark.triangle.fill",
+                        pointSize: scaledLoadingSpinnerSize * 0.8,
+                        colorScheme: colorScheme,
+                        rowBackground: rowContrastBackground,
+                        drawnAlpha: 1
+                    )
+                    .frame(width: scaledLoadingSpinnerSize, height: scaledLoadingSpinnerSize)
+                    .safeHelp(SidebarAgentErrorSummary.tooltip(for: workspaceSnapshot.erroredAgents))
+                    .accessibilityLabel(SidebarAgentErrorSummary.tooltip(for: workspaceSnapshot.erroredAgents))
+                    .alignmentGuide(.sidebarTitleFirstLineCenter) { $0[VerticalAlignment.center] }
+                }
 
                 // cm-128.1: the spinner set to the left draws after the glyph and the hand, beside them.
                 if slotResolution.markSpinner {
@@ -16850,7 +16877,7 @@ struct TabItemView: View, Equatable {
                 .opacity(rowContentAlpha)
 
                 if trailingStatusActive || canCloseWorkspace {
-                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, side: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, slotWidth: SidebarWorkspaceSlotResolution.trailingReserve(trailing: slotResolution.trailing, trailingInner: slotResolution.trailingInner, badgeSide: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, closeButtonWidth: scaledCloseButtonWidth), closeButtonWidth: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace, contentAlpha: rowContentAlpha) // (#cm-128.3)
+                    SidebarWorkspaceTrailingStatusSlot(showsSpinner: slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner, showsBadge: slotResolution.trailing == .badge, unreadCount: unreadCount, markedUnread: snapshot.markedUnread, markColor: unreadDotColor, side: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, slotWidth: SidebarWorkspaceSlotResolution.trailingReserve(trailing: slotResolution.trailing, trailingInner: slotResolution.trailingInner, badgeSide: scaledUnreadBadgeSize, spinnerSide: scaledLoadingSpinnerSize, closeButtonWidth: scaledCloseButtonWidth), closeButtonWidth: scaledCloseButtonWidth, height: scaledCloseButtonHitSize, badgeFont: badgeFont, badgeFillColor: activeUnreadBadgeFillColor, badgeTextColor: activeUnreadBadgeTextColor, spinnerColor: spinnerColor, spinnerTooltip: spinnerTooltip, canCloseWorkspace: canCloseWorkspace, showsCloseButton: showCloseButton, closeButtonTooltip: closeButtonTooltip, closeButtonColor: activeSecondaryColor(0.7), closeButtonFontSize: scaledFontSize(9), closeAction: actions.closeWorkspace, contentAlpha: rowContentAlpha) // (#cm-128.3)
                 }
             }
 
