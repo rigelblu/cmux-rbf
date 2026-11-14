@@ -1,34 +1,43 @@
 import AppKit
 import CmuxFoundation
+import CmuxSettings
 import CmuxWorkspaces
 import SwiftUI
 
-// Everything the `Statuses` header and a status group's header draw or say, in both sidebar renderers. (#cm-110.1)
+// Everything the `Workblocks` header and a status group's header draw or say, in both sidebar renderers. (#cm-110.1)
 // The AppKit cell (`SidebarGroupHeaderRowView`) and the two SwiftUI views below take these values and read no store.
 
 /// The words of the two headers: accessibility labels, and the chevron's action. (#cm-110.1)
 enum SidebarStatusHeaderText {
+    /// Only this text layer reads overrides; rows and debug snapshots share its answer.
+    private static func sectionTitle(_ section: SidebarSectionNames.Key, defaultTitle: String) -> String {
+        let object = UserDefaults.standard.dictionary(forKey: SidebarCatalogSection().sectionNames.userDefaultsKey) ?? [:]
+        return SidebarSectionNames.normalized(object)[section.rawValue] ?? defaultTitle
+    }
+
     static var statusesAreaTitle: String {
-        String(localized: "sidebar.statusesArea.title", defaultValue: "Statuses")
+        sectionTitle(.statuses, defaultTitle: String(localized: "sidebar.statusesArea.title", defaultValue: "Workblocks"))
     }
 
     static var workspacesAreaTitle: String {
-        String(localized: "sidebar.workspacesArea.title", defaultValue: "Workspaces")
+        sectionTitle(.workspaces, defaultTitle: String(localized: "sidebar.workspacesArea.title", defaultValue: "Workspaces"))
     }
 
     static var pinnedAreaTitle: String { // (#cm-110.5)
-        String(localized: "sidebar.tree.group.pinned", defaultValue: "Pinned")
+        sectionTitle(.pinned, defaultTitle: String(localized: "sidebar.tree.group.pinned", defaultValue: "Pinned"))
     }
 
     static func workspacesAreaLabel(isCollapsed: Bool) -> String {
         String.localizedStringWithFormat(
-            String(localized: "sidebar.workspacesArea.accessibility", defaultValue: "Workspaces, %@"),
+            String(localized: "sidebar.workspacesArea.accessibility", defaultValue: "%1$@, %2$@"),
+            workspacesAreaTitle,
             stateWord(isCollapsed: isCollapsed))
     }
 
     static func pinnedAreaLabel(isCollapsed: Bool) -> String { // (#cm-110.5)
         String.localizedStringWithFormat(
-            String(localized: "sidebar.pinnedArea.accessibility", defaultValue: "Pinned, %@"),
+            String(localized: "sidebar.pinnedArea.accessibility", defaultValue: "%1$@, %2$@"),
+            pinnedAreaTitle,
             stateWord(isCollapsed: isCollapsed))
     }
 
@@ -52,14 +61,15 @@ enum SidebarStatusHeaderText {
         )
     }
 
-    /// "Statuses, 3 status groups, expanded".
+    /// "Workblocks, 3 status groups, expanded".
     static func statusesAreaLabel(groupCount: Int, isCollapsed: Bool) -> String {
         let countText = String(
             localized: "sidebar.statusesArea.groupCount",
             defaultValue: "\(groupCount) status groups"
         )
         return String.localizedStringWithFormat(
-            String(localized: "sidebar.statusesArea.accessibility", defaultValue: "Statuses, %1$@, %2$@"),
+            String(localized: "sidebar.statusesArea.accessibility", defaultValue: "%1$@, %2$@, %3$@"),
+            statusesAreaTitle,
             countText,
             stateWord(isCollapsed: isCollapsed)
         )
@@ -69,17 +79,29 @@ enum SidebarStatusHeaderText {
     static func chevronLabel(kind: SidebarStatusHeaderKind, isCollapsed: Bool) -> String {
         switch (kind, isCollapsed) {
         case (.pinnedArea, true): // (#cm-110.5)
-            return String(localized: "sidebar.pinnedArea.chevron.expand", defaultValue: "Expand pinned area")
+            return String.localizedStringWithFormat(
+                String(localized: "sidebar.pinnedArea.chevron.expand", defaultValue: "Expand %@ area"),
+                pinnedAreaTitle)
         case (.pinnedArea, false): // (#cm-110.5)
-            return String(localized: "sidebar.pinnedArea.chevron.collapse", defaultValue: "Collapse pinned area")
+            return String.localizedStringWithFormat(
+                String(localized: "sidebar.pinnedArea.chevron.collapse", defaultValue: "Collapse %@ area"),
+                pinnedAreaTitle)
         case (.workspacesArea, true):
-            return String(localized: "sidebar.workspacesArea.chevron.expand", defaultValue: "Expand workspaces area")
+            return String.localizedStringWithFormat(
+                String(localized: "sidebar.workspacesArea.chevron.expand", defaultValue: "Expand %@ area"),
+                workspacesAreaTitle)
         case (.workspacesArea, false):
-            return String(localized: "sidebar.workspacesArea.chevron.collapse", defaultValue: "Collapse workspaces area")
+            return String.localizedStringWithFormat(
+                String(localized: "sidebar.workspacesArea.chevron.collapse", defaultValue: "Collapse %@ area"),
+                workspacesAreaTitle)
         case (.statusesArea, true):
-            return String(localized: "sidebar.statusesArea.chevron.expand", defaultValue: "Expand statuses area")
+            return String.localizedStringWithFormat(
+                String(localized: "sidebar.statusesArea.chevron.expand", defaultValue: "Expand %@ area"),
+                statusesAreaTitle)
         case (.statusesArea, false):
-            return String(localized: "sidebar.statusesArea.chevron.collapse", defaultValue: "Collapse statuses area")
+            return String.localizedStringWithFormat(
+                String(localized: "sidebar.statusesArea.chevron.collapse", defaultValue: "Collapse %@ area"),
+                statusesAreaTitle)
         case (.statusGroup, true):
             return String(localized: "sidebar.statusGroup.chevron.expand", defaultValue: "Expand status group")
         case (.statusGroup, false):
@@ -157,20 +179,33 @@ enum SidebarStatusHeaderGlyphImage {
     }
 }
 
-/// The `Statuses` header in the SwiftUI list: no band, a hairline above, a muted name. (#cm-110.1)
+/// The `Workblocks` header in the SwiftUI list: no band, a hairline above, a muted name. (#cm-110.1)
 struct SidebarStatusesAreaSwiftUIHeader: View, Equatable {
     let groupCount: Int
     let isCollapsed: Bool
     var unreadCount: Int = 0
     var onToggle: @MainActor () -> Void = {}
 
+    private let title: String
+    private let label: String
+
+    init(groupCount: Int, isCollapsed: Bool, unreadCount: Int = 0, onToggle: @escaping @MainActor () -> Void = {}) {
+        self.groupCount = groupCount
+        self.isCollapsed = isCollapsed
+        self.unreadCount = unreadCount
+        self.onToggle = onToggle
+        title = SidebarStatusHeaderText.statusesAreaTitle
+        label = SidebarStatusHeaderText.statusesAreaLabel(groupCount: groupCount, isCollapsed: isCollapsed)
+    }
+
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.groupCount == rhs.groupCount && lhs.isCollapsed == rhs.isCollapsed && lhs.unreadCount == rhs.unreadCount
+            && lhs.title == rhs.title && lhs.label == rhs.label
     }
 
     var body: some View {
-        SidebarSectionSwiftUIHeader(title: SidebarStatusHeaderText.statusesAreaTitle,
-            label: SidebarStatusHeaderText.statusesAreaLabel(groupCount: groupCount, isCollapsed: isCollapsed),
+        SidebarSectionSwiftUIHeader(title: title,
+            label: label,
             identifier: "sidebarStatusesArea", isCollapsed: isCollapsed, unreadCount: unreadCount, onToggle: onToggle)
     }
 }

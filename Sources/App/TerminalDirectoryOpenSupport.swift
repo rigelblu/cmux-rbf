@@ -1130,7 +1130,8 @@ extension WorkspaceShortcutEligibility {
         workspaces: [Workspace],
         groups: [WorkspaceGroup],
         todoControlsEnabled: Bool,
-        groupsShownUnderAStatus: Set<UUID> = [] // (#cm-110.3)
+        groupsShownUnderAStatus: Set<UUID> = [], // (#cm-110.3)
+        workspaceIdsShownInPinned: Set<UUID> = []
     ) -> WorkspaceShortcutEligibility {
         // Keyed exactly the way `SidebarWorkspaceRenderItem.renderItems` keys it,
         // and both flags resolved through the *same* lookup, so this rule and the
@@ -1146,7 +1147,8 @@ extension WorkspaceShortcutEligibility {
             let group = workspace.groupId.flatMap { groupsById[$0] }
             return Candidate(
                 isGroupAnchor: group?.anchorWorkspaceId == workspace.id,
-                isInCollapsedGroup: group?.isCollapsed == true || (group.map { hiddenGroupIds.contains($0.id) } ?? false),
+                isInCollapsedGroup: !workspaceIdsShownInPinned.contains(workspace.id)
+                    && (group?.isCollapsed == true || (group.map { hiddenGroupIds.contains($0.id) } ?? false)),
                 // The lane comes from the same place the sidebar reads it, never
                 // a local re-derivation: the palette that owns strip suppression,
                 // so "numbered" and "striped" answer to one definition.
@@ -1171,7 +1173,8 @@ extension TabManager {
             workspaces: tabs,
             groups: workspaceGroups,
             todoControlsEnabled: WorkspaceTodoFeature.isEnabled,
-            groupsShownUnderAStatus: workspaces.groupIdsShownUnderAStatus() // (#cm-110.3) the one answer the rows are drawn from
+            groupsShownUnderAStatus: workspaces.groupIdsShownOutsideParent(), // (#cm-110.3) the one answer the rows are drawn from
+            workspaceIdsShownInPinned: workspaces.workspaceIdsShownInPinned() // (#cm-110.18) a model fold does not hide these rows
         )
     }
 }

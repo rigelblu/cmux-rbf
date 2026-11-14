@@ -3,7 +3,7 @@ import Testing
 @testable import CmuxWorkspaces
 
 // `cm-110.3`: folding the parent of a group the sidebar draws under a status. The model has no status list, so the app
-// hands it the groups shown under a status (`groupIdsShownUnderAStatus`); empty is "as today". Decisions, 2026-10-24
+// hands it the groups shown under a status (`groupIdsShownOutsideParent`); empty is "as today". Decisions, 2026-10-24
 // rulings (7), and the 2026-10-25 rulings (21) to (23).
 @MainActor
 struct WorkspaceGroupNestedShownUnderStatusTests {
@@ -21,7 +21,7 @@ struct WorkspaceGroupNestedShownUnderStatusTests {
             }
         }
         let ids = Set(shown.map { lab.id($0) })
-        world.model.groupIdsShownUnderAStatus = { ids }
+        world.model.groupIdsShownOutsideParent = { ids }
         return world
     }
 
@@ -114,7 +114,7 @@ struct WorkspaceGroupNestedShownUnderStatusTests {
         )
         let w = NestedWorld(window, selected: lab.id("n1"))
         let shown: Set<UUID> = [lab.id("Q")]
-        w.model.groupIdsShownUnderAStatus = { shown }
+        w.model.groupIdsShownOutsideParent = { shown }
         w.groups.toggleWorkspaceGroupCollapsed(groupId: lab.id("A"))
         #expect(w.model.selectedTabId == lab.id("n1"))
     }
@@ -127,7 +127,7 @@ struct WorkspaceGroupNestedShownUnderStatusTests {
         let q = lab.id("Q")
         if let index = w.model.workspaceGroups.firstIndex(where: { $0.id == q }) { w.model.workspaceGroups[index].statusId = "s" }
         let model = w.model
-        w.model.groupIdsShownUnderAStatus = { model.workspaceGroups.contains { $0.id == q && $0.statusId != nil } ? [q] : [] }
+        w.model.groupIdsShownOutsideParent = { model.workspaceGroups.contains { $0.id == q && $0.statusId != nil } ? [q] : [] }
         return w
     }
 

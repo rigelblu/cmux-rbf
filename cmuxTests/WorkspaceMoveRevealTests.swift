@@ -377,6 +377,104 @@ struct WorkspaceMoveRevealTests {
         }
     }
 
+    @Test func theHeaderMenusPinToggleOpensPinnedAndKeepsTheGroupsFold() async throws {
+        try await inNested { rig, world in
+            let m = rig.manager
+            m.selectWorkspace(world.w("u"))
+            world.fold(world.g, true)
+            setFolds(rig, pinned: true)
+            try #require(!world.group(world.g).isPinned, "G starts unpinned")
+            m.toggleWorkspaceGroupPinned(groupId: world.g)
+            try #require(world.group(world.g).isPinned, "the toggle pinned G")
+            #expect(!pinnedFolded(rig), "Pinned is still folded after the header menu's Pin")
+            #expect(folded(rig, world.g), "G opened; a whole group moved keeps its own fold")
+        }
+    }
+
+    @Test(arguments: ["hide", "auto"])
+    func aNestedGroupThatLosesItsStatusOpensTheFoldedParentItFallsBackInto(_ how: String) async throws {
+        try await inNested(list: Nested.bothStatuses) { rig, world in
+            let m = rig.manager
+            try world.setStatus(world.n, "doing")
+            try #require(world.group(world.n).statusId == "doing")
+            m.selectWorkspace(world.w("u"))
+            world.fold(world.r, true)
+            world.fold(world.n, true)
+            let actions = WorkspaceGroupStatusUIActions(tabManager: m,
+                writer: .init(list: AppDelegate.statusListInUse, resolveColor: { $0 }), controlsEnabled: true)
+            try #require(actions.applyGroup(how == "hide" ? .hide : .auto, groupId: world.n))
+            try #require(world.group(world.n).statusId == nil, "N lost its status")
+            #expect(!folded(rig, world.r), "R is still folded; N falls back into it")
+            #expect(folded(rig, world.n), "N opened; a whole group moved keeps its own fold")
+        }
+    }
+
+    // A group's place is where the sidebar draws it. A write on a nested group that leaves it drawn inside its parent moves
+    // nothing, so the parent's fold stays (#cm-110.14, fix round 2).
+    @Test func aStatusOnANestedGroupInsideAStatusRootOpensNothing() async throws {
+        try await inNested(list: Nested.bothStatuses) { rig, world in
+            let m = rig.manager
+            try world.setStatus(world.r, "doing")
+            m.selectWorkspace(world.w("u"))
+            world.fold(world.r, true); world.fold(world.n, true)
+            setFolds(rig, statuses: ["doing", "parked"], area: true)
+            let before = rig.state.statusGroups
+            try world.setStatus(world.n, "parked")
+            try #require(world.group(world.n).statusId == "parked")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); N is still drawn inside R")
+            #expect(rig.state.statusGroups == before, "the status side changed for a group that did not move")
+        }
+    }
+
+    @Test func aColorThatPicksAStatusOnANestedGroupInsideAStatusRootOpensNothing() async throws {
+        try await inNested(list: Nested.bothStatuses) { rig, world in
+            let m = rig.manager
+            try world.setStatus(world.r, "doing")
+            m.selectWorkspace(world.w("u"))
+            world.fold(world.r, true); world.fold(world.n, true)
+            setFolds(rig, statuses: ["doing", "parked"], area: true)
+            let before = rig.state.statusGroups
+            m.setWorkspaceGroupColor(groupId: world.n, hex: "#112233")
+            try #require(world.group(world.n).statusId == "parked", "the color picked the status")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); N is still drawn inside R")
+            #expect(rig.state.statusGroups == before, "the status side changed for a group that did not move")
+        }
+    }
+
+    @Test func aCyclePressOnANestedGroupInsideAStatusRootOpensNothing() async throws {
+        try await inNested(list: Self.fiveStatuses) { rig, world in
+            let m = rig.manager
+            try world.setStatus(world.r, "e1")
+            try world.setStatus(world.n, "e3")
+            m.selectWorkspace(world.w("n"))
+            world.fold(world.r, true); world.fold(world.n, true)
+            setFolds(rig, statuses: ["e1", "e2", "e3", "e4"], area: true)
+            let before = rig.state.statusGroups
+            let actions = WorkspaceGroupStatusUIActions(tabManager: m,
+                writer: .init(list: AppDelegate.statusListInUse, resolveColor: { $0 }), controlsEnabled: true)
+            try #require(actions.cycleSelected())
+            try #require(world.group(world.n).statusId == "e4", "the press moved N one place")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); N is still drawn inside R")
+            #expect(rig.state.statusGroups == before, "the status side changed for a group that did not move")
+        }
+    }
+
+    @Test func pinningANestedGroupOpensPinnedAndKeepsItsOwnAndItsParentsFolds() async throws {
+        try await inNested { rig, world in
+            let m = rig.manager
+            m.selectWorkspace(world.w("u"))
+            world.fold(world.r, true); world.fold(world.n, true)
+            setFolds(rig, pinned: true)
+            let before = rig.state.statusGroups
+            m.toggleWorkspaceGroupPinned(groupId: world.n)
+            try #require(world.group(world.n).isPinned && world.group(world.n).parentGroupId == world.r, "N is pinned and still inside R")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "the hoisted group keeps its own and its parent's folds")
+            var expected = before
+            expected?.pinnedCollapsed = false
+            #expect(rig.state.statusGroups == expected, "the nested group's pin opens Pinned (#cm-110.18)")
+        }
+    }
+
     // MARK: A workspace status (D4, D5, E1, E2, E5, F1, F3)
 
     @Test func aStatusFromTheMenuOnARowThatIsNotSelectedOpensItsGroupAndTheArea() async throws {
@@ -433,16 +531,40 @@ struct WorkspaceMoveRevealTests {
         }
     }
 
-    @Test func aStatusOnAPinnedWorkspaceChangesNoFold() async throws {
+    // cm-110.14 fix round 1: this test was `aStatusOnAPinnedWorkspaceChangesNoFold`, which pinned a row with no color and
+    // expected a status to change nothing. A status writes its color, so that row lands in a pinned color group and the move
+    // opens it (Decisions, 2026-10-31). What stays true is the row that already wears the status's color.
+    @Test func aStatusThatLeavesAPinnedWorkspaceInItsColorGroupChangesNoFold() async throws {
+        try await inNested(list: Nested.bothStatuses) { rig, world in
+            let m = rig.manager
+            m.selectWorkspace(world.w("v"))
+            m.setTabColor(tabId: world.w("u").id, color: Self.doingColor)
+            m.setPinned(world.w("u"), pinned: true)
+            setFolds(rig, statuses: ["doing"], area: true, workspaces: true, pinned: true)
+            rig.state.toggleColorSection(hex: Self.doingColor)
+            try #require(rig.state.collapsedColorSectionHexes.contains(Self.doingColor), "the pinned color group is folded")
+            let before = rig.state.statusGroups
+            let colorsBefore = rig.state.collapsedColorSectionHexes
+            WorkspaceTodoActions.applyStatusOverride(.status(id: "doing"), to: [world.w("u")])
+            try #require(world.w("u").todoState.ownStatus?.id == "doing")
+            try #require(world.w("u").customColor.flatMap(WorkspaceColorHex.normalized) == Self.doingColor, "the color stayed")
+            #expect(rig.state.statusGroups == before, "the folds changed for a row that did not move")
+            #expect(rig.state.collapsedColorSectionHexes == colorsBefore, "a color group opened for a row that stayed in its own")
+        }
+    }
+
+    @Test func aStatusThatMovesAPinnedWorkspaceIntoAFoldedPinnedColorGroupOpensIt() async throws {
         try await inNested(list: Nested.bothStatuses) { rig, world in
             let m = rig.manager
             m.selectWorkspace(world.w("v"))
             m.setPinned(world.w("u"), pinned: true)
-            setFolds(rig, statuses: ["doing"], area: true, workspaces: true, pinned: true)
-            let before = rig.state.statusGroups
+            setFolds(rig)
+            rig.state.toggleColorSection(hex: Self.doingColor)
+            try #require(rig.state.collapsedColorSectionHexes.contains(Self.doingColor), "the pinned color group is folded")
             WorkspaceTodoActions.applyStatusOverride(.status(id: "doing"), to: [world.w("u")])
             try #require(world.w("u").todoState.ownStatus?.id == "doing")
-            #expect(rig.state.statusGroups == before, "the folds changed for a row that did not move")
+            try #require(world.w("u").customColor.flatMap(WorkspaceColorHex.normalized) == Self.doingColor, "the status wrote its color")
+            #expect(!rig.state.collapsedColorSectionHexes.contains(Self.doingColor), "the pinned color group is still folded")
         }
     }
 
@@ -510,6 +632,47 @@ struct WorkspaceMoveRevealTests {
             setFolds(rig, workspaces: true)
             m.setPinned(world.w("u"), pinned: false)
             #expect(!workspacesFolded(rig), "Workspaces is still folded after an unpin")
+        }
+    }
+
+    /// The two lists a pin is tried with: the user's own, and cmux's built-in five (no `workspaceStatuses`), where the sidebar has
+    /// no status projection to ask where a row is drawn (#cm-110.14, fix round 2).
+    static let pinLists = ["listed", "builtin"]
+    static func pinListSource(_ name: String) -> String? { name == "builtin" ? "{}" : nil }
+
+    @Test(arguments: WorkspaceMoveRevealTests.pinLists)
+    func pinningAMemberOfAFoldedGroupOnlyOpensPinnedWithAUserList(_ listName: String) async throws {
+        try await inNested(list: Self.pinListSource(listName)) { rig, world in
+            if listName == "builtin" { try #require(AppDelegate.statusListInUse.source == .cmux, "the built-in list is in use") }
+            let m = rig.manager
+            m.selectWorkspace(world.w("v"))
+            for id in [world.r, world.n] { world.fold(id, true) }
+            setFolds(rig, pinned: true)
+            let before = rig.state.statusGroups
+            m.setPinned(world.w("n1"), pinned: true)
+            try #require(world.w("n1").isPinned && world.w("n1").groupId == world.n, "n1 is pinned and still in N")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); pinning this member must not unfold R or N")
+            var expected = before
+            if listName == "listed" { expected?.pinnedCollapsed = false }
+            #expect(rig.state.statusGroups == expected, "only Pinned opens when the member is drawn there (#cm-110.18)")
+        }
+    }
+
+    @Test(arguments: WorkspaceMoveRevealTests.pinLists)
+    func pinningMembersByIdFromTheCliOnlyOpensPinnedWithAUserList(_ listName: String) async throws {
+        try await inNested(list: Self.pinListSource(listName)) { rig, world in
+            if listName == "builtin" { try #require(AppDelegate.statusListInUse.source == .cmux, "the built-in list is in use") }
+            let m = rig.manager
+            m.selectWorkspace(world.w("v"))
+            for id in [world.r, world.n] { world.fold(id, true) }
+            setFolds(rig, pinned: true)
+            let before = rig.state.statusGroups
+            let changed = m.setPinned(workspaceIds: [world.w("n1").id], pinned: true)
+            try #require(changed == [world.w("n1").id] && world.w("n1").groupId == world.n, "n1 is pinned and still in N")
+            #expect(folded(rig, world.r) && folded(rig, world.n), "R folded=\(folded(rig, world.r)) N folded=\(folded(rig, world.n)); pinning this member must not unfold R or N")
+            var expected = before
+            if listName == "listed" { expected?.pinnedCollapsed = false }
+            #expect(rig.state.statusGroups == expected, "only Pinned opens when the member is drawn there (#cm-110.18)")
         }
     }
 

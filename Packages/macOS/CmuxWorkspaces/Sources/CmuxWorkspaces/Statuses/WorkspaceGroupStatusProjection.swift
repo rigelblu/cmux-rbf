@@ -32,6 +32,8 @@ public struct WorkspaceGroupStatusProjection: Equatable, Sendable {
         var rootOf: [UUID: UUID] = [:]
         if list.source != .cmux {
             for group in groups {
+                let pin = group.sidebarPin(in: byId, sectionsShown: true)
+                guard !pin.isPinned else { continue }
                 // The chain from the top: the first group with its own listed status is the root. A pinned group on
                 // the way keeps itself and everything below it out (`Pinned` shows its own glyph and color). // (#cm-110.3)
                 for id in tree.ancestors(of: group.id).reversed() + [group.id] {
@@ -54,6 +56,7 @@ public struct WorkspaceGroupStatusProjection: Equatable, Sendable {
             depths[group.id] = tree.depth(of: group.id) - tree.depth(of: root) + 2
         }
         for workspace in workspaces {
+            guard !workspace.sidebarPin(in: byId, sectionsShown: true).isOutsideGroup else { continue }
             guard let groupId = workspace.groupId, let status = groupStatuses[groupId], let root = rootOf[groupId] else { continue }
             workspaceStatuses[workspace.id] = status
             depths[workspace.id] = tree.depth(of: groupId) - tree.depth(of: root) + 3

@@ -1086,7 +1086,7 @@ import CmuxWorkspaces
         )
         cell.configurePresentation(model: area)
         #expect(cell.accessibilityIdentifier() == "sidebarStatusesArea")
-        #expect(cell.accessibilityLabel() == "Statuses, 3 status groups, expanded")
+        #expect(cell.accessibilityLabel() == "Workblocks, 3 status groups, expanded")
 
         // The same cell, reused for a workspace group's header: the group's own look, and no button role.
         cell.prepareForReuse()
@@ -1133,13 +1133,13 @@ import CmuxWorkspaces
     @Test func theWordsSayHowManyAndWhatThePressDoes() {
         #expect(SidebarStatusHeaderText.statusGroupLabel(name: "Parked", memberCount: 1, isCollapsed: false) == "Status group, Parked, 1 workspace, expanded")
         #expect(SidebarStatusHeaderText.statusGroupLabel(name: "Parked", memberCount: 0, isCollapsed: true) == "Status group, Parked, 0 workspaces, collapsed")
-        #expect(SidebarStatusHeaderText.statusesAreaLabel(groupCount: 1, isCollapsed: false) == "Statuses, 1 status group, expanded")
-        #expect(SidebarStatusHeaderText.statusesAreaLabel(groupCount: 4, isCollapsed: true) == "Statuses, 4 status groups, collapsed")
+        #expect(SidebarStatusHeaderText.statusesAreaLabel(groupCount: 1, isCollapsed: false) == "Workblocks, 1 status group, expanded")
+        #expect(SidebarStatusHeaderText.statusesAreaLabel(groupCount: 4, isCollapsed: true) == "Workblocks, 4 status groups, collapsed")
         // The chevron names the action, not the state.
         #expect(SidebarStatusHeaderText.chevronLabel(kind: .statusGroup("x"), isCollapsed: false) == "Collapse status group")
         #expect(SidebarStatusHeaderText.chevronLabel(kind: .statusGroup("x"), isCollapsed: true) == "Expand status group")
-        #expect(SidebarStatusHeaderText.chevronLabel(kind: .statusesArea, isCollapsed: false) == "Collapse statuses area")
-        #expect(SidebarStatusHeaderText.chevronLabel(kind: .statusesArea, isCollapsed: true) == "Expand statuses area")
+        #expect(SidebarStatusHeaderText.chevronLabel(kind: .statusesArea, isCollapsed: false) == "Collapse Workblocks area")
+        #expect(SidebarStatusHeaderText.chevronLabel(kind: .statusesArea, isCollapsed: true) == "Expand Workblocks area")
     }
 
     // MARK: What a header shows

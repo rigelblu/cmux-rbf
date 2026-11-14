@@ -211,13 +211,14 @@ Since v0.33.0, a workspace's status can be one of your own, in your words and yo
 - No list, no change: cmux's own five statuses work as before.
 
 ## 🟠⋯ See your workspaces grouped by status
-Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at the bottom of the sidebar, one group per status.
+Since v0.34.0, workspaces on one of your statuses sit in a **Workblocks** area at the bottom of the sidebar, one group per status. It was called **Statuses** before section names became customizable.
 
 - It shows with a `workspaceStatuses` list in `~/.config/cmux/cmux.json` and **Settings → Beta Features → Workspace Todo Controls** on.
 - Drop a workspace on a status group to set that status and its color. A pinned workspace stays pinned.
-- Drag a status group, or the **Statuses** header, to reorder; the order survives a relaunch.
+- Drag a status group, or the **Workblocks** header, to reorder; the order survives a relaunch.
 - Click a header to fold it; a folded header shows the unread count inside.
-- Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Statuses**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups.
+- Since v0.34.1 the sidebar has three sections: **Pinned** at the top, then **Workspaces** (no status) and **Workblocks**. Drag either of the last two headers to swap them; each folds on its own. Rows under Pinned and Workspaces sit one step in, like the status groups. A workspace row pinned inside an unpinned workspace group shows only under **Pinned**, while staying a member of its group. Unpin it to show it in its group again, first among the group's unpinned rows.
+- Rename any section with `sidebar.sectionNames` in `cmux.json`, for example `"sidebar": { "sectionNames": { "workspaces": "Loose", "statuses": "Board" } }`. The keys are `pinned`, `workspaces` and `statuses`; names update when you save. Omit a name, or leave it blank, to use its localized default.
 - A whole workspace group, nested or not, takes a status and sits under it with everything inside. Drop its header on a status group, or set it from its Status menu or Group Color.
 - Drag a tab out of a workspace onto a status group to make a new workspace already on that status.
 - Since v0.34.2 a workspace on **None** shows a small dot in the status glyph's place and sits under **Workspaces**, never in a status group, whatever its color. Click the dot to pick a status.
@@ -227,9 +228,9 @@ Since v0.34.0, workspaces on one of your statuses sit in a **Statuses** area at 
 Since v0.32.0, a workspace group can sit inside another group, to any depth, so one header can hold a whole area of work.
 
 - Right-click a group's header and choose **Move Group to**, then a group, or **Top Level** to take it back out. Dragging a header does not nest it yet.
-- Each depth indents its rows. Collapsing a group hides everything inside it, and its header shows the unread count of all of it.
+- Each depth indents its rows. Collapsing a group hides the rows drawn inside it, and its header sums their unread count. Rows drawn separately under **Pinned** stay visible and keep their own unread counts.
 - A group that still holds other groups keeps its header when its last own workspace closes. That header shows a dot in the group's colour where its icon was, and a click on its name collapses or expands it.
-- A pinned group inside a group sits among that group's pinned rows, not at the top of the sidebar.
+- With Workspace Todo Controls on and a status list in use, a pinned child group shows under **Pinned** with everything inside it, while staying its parent's child. Unpin it to show it inside its parent again. With no section headers, it sits among its parent's pinned rows.
 - The nesting, the row order, and each group's collapsed and pinned state come back after you quit and reopen.
 - From the CLI, `cmux workspace-group list --json` names the group that holds each group in `parent_group_id`.
 - Always on; no setting or migration. An older build opens the same saved file and shows the groups without the nesting.
@@ -259,7 +260,7 @@ Workspaces that carry a colour but sit outside any group now gather under compac
 
 - **A colour section is not a group.** It has a chevron, a swatch, and a title, and nothing else — no folder icon, no workspace number, no active state, no group actions. Membership is derived from the colour, so there is nothing to maintain.
 - **Real group membership always wins.** A coloured workspace inside a group stays in that group; only loose workspaces gather. Recolouring a group member changes its colour and moves nothing.
-- Sections are keyed by hex, so renaming or clearing a colour's label retitles the header without disturbing the section or its collapsed state. Settings, menus, commands, and CLI keep their existing combined **Label (Colour)** names. An unlisted colour reads as **Custom (#RRGGBB)**.
+- Sections are keyed by hex, so renaming or clearing a colour's label retitles the header without disturbing the section or its collapsed state. Settings, menus, commands, and CLI keep their existing combined **Label (Colour)** names. An unlisted colour reads as **Custom (#RRGGBB)** — unless the section headers show and it is one of your statuses' colours: then the section under **Pinned** reads as that status's name, **Parked** say (the first status in your list with that colour). A colour the palette names keeps the palette's name.
 - Pinned and unpinned tiers stay separate — the same colour can head a section in each, and both share one collapsed state.
 - Collapsing survives relaunch, and selecting a workspace hidden inside a collapsed section expands it first, whether you got there by sidebar history, `⌘1…9`, the CLI, or session restore.
 - Reordering works within a colour section and pin tier. Dragging into a real workspace group also works, matching what **Move to Group** does from the row's menu — the workspace joins the group and keeps its colour. Every other drop — another colour section, a standalone row, the other pin tier — is refused without changing colour, group, pin, or order.

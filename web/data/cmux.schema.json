@@ -1059,6 +1059,28 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "sectionNames": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Names for the sidebar section headers. Defaults are localized. Omitted, blank or non-string names use their section's default; a non-object sectionNames uses all three defaults.",
+          "properties": {
+            "pinned": {
+              "type": "string",
+              "default": "Pinned",
+              "description": "The name of the Pinned sidebar section's header."
+            },
+            "workspaces": {
+              "type": "string",
+              "default": "Workspaces",
+              "description": "The name of the Workspaces sidebar section's header."
+            },
+            "statuses": {
+              "type": "string",
+              "default": "Workblocks",
+              "description": "The name of the status sidebar section's header."
+            }
+          }
+        },
         "hideAllDetails": {
           "type": "boolean",
           "default": false,

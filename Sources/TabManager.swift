@@ -700,11 +700,16 @@ class TabManager: ObservableObject {
         // from the very first insertion, matching the legacy @Published
         // observer timing.
         workspaces.attach(host: self)
-        // The model cannot know which nested groups the sidebar draws under a status; this is the sidebar's own answer,
+        // The model cannot know which nested groups the sidebar draws outside their parent; this is the sidebar's answer,
         // from the same projection (weak: the model is owned by this manager). (#cm-110.3)
-        workspaces.groupIdsShownUnderAStatus = { [weak self] in
+        workspaces.groupIdsShownOutsideParent = { [weak self] in
+            guard let self, self.workspaceGroups.contains(where: { $0.parentGroupId != nil && ($0.statusId != nil || $0.isPinned) }) else { return [] }
+            let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: self.tabs, groups: self.workspaceGroups)
+            return VerticalTabsSidebar.groupsShownOutsideTheirParent(groups: self.workspaceGroups, projection: projection)
+        }
+        workspaces.workspaceIdsShownInPinned = { [weak self] in
             guard let self else { return [] }
-            return VerticalTabsSidebar.groupsShownUnderAStatus(tabs: self.tabs, groups: self.workspaceGroups)
+            return VerticalTabsSidebar.workspaceIdsShownInPinned(tabs: self.tabs, groups: self.workspaceGroups)
         }
         workspaceReordering.attach(host: self)
         workspaceGrouping.attach(host: self)
@@ -2270,16 +2275,14 @@ class TabManager: ObservableObject {
     }
 
     func setPinned(_ tab: Workspace, pinned: Bool) {
-        let changed = tab.isPinned != pinned // (#cm-110.14)
-        workspaceReordering.setPinned(tab, pinned: pinned)
-        if changed { revealMoved([tab.id]) } // (#cm-110.14)
+        // (#cm-110.14) a pin opens folds only when it moved the row: a member of a group stays where it was
+        revealingMoves(of: [tab], cause: .move) { workspaceReordering.setPinned(tab, pinned: pinned) }
     }
 
     @discardableResult
     func setPinned(workspaceIds: [UUID], pinned: Bool) -> [UUID] {
-        let changed = workspaceReordering.setPinned(workspaceIds: workspaceIds, pinned: pinned)
-        revealMoved(changed) // (#cm-110.14)
-        return changed
+        let targets = tabs.filter { workspaceIds.contains($0.id) } // (#cm-110.14) same rule as the single pin
+        return revealingMoves(of: targets, cause: .move) { workspaceReordering.setPinned(workspaceIds: workspaceIds, pinned: pinned) }
     }
 
     // MARK: - Workspace Groups (WorkspaceGroupCoordinator, CmuxWorkspaces)
@@ -2408,7 +2411,9 @@ class TabManager: ObservableObject {
     }
 
     func toggleWorkspaceGroupPinned(groupId: UUID) {
-        workspaceGrouping.toggleWorkspaceGroupPinned(groupId: groupId)
+        // (#cm-110.14) the header menu toggles; one path for a group pin, so one reveal
+        let isPinned = workspaceGroups.first { $0.id == groupId }?.isPinned ?? false
+        setWorkspaceGroupPinned(groupId: groupId, isPinned: !isPinned)
     }
 
     func setWorkspaceGroupPinned(groupId: UUID, isPinned: Bool) {

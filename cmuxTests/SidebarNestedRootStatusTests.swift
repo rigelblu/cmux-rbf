@@ -156,9 +156,9 @@ struct SidebarNestedRootStatusTests {
             let grouped = try #require(world.projection()?.workspaceGroups)
             #expect(grouped.rootGroupIds == [world.n] && grouped.nestedRootGroupIds == [world.n])
             #expect(grouped.statusIdByGroupId == [world.n: "parked", world.m: "parked"])
-            #expect(Sidebar.groupsShownUnderAStatus(tabs: world.manager.tabs, groups: world.manager.workspaceGroups) == [world.n])
+            #expect(Sidebar.groupsShownOutsideTheirParent(groups: world.manager.workspaceGroups, projection: world.projection()) == [world.n])
             // TabManager hands the model the sidebar's own answer; an unset closure would answer "none" and leave every fold as it was.
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus() == [world.n])
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent() == [world.n])
         }
     }
 
@@ -172,8 +172,8 @@ struct SidebarNestedRootStatusTests {
                 let builtIn = try #require(WorkspaceStatusList.cmuxFive.entries.first?.id)
                 world.manager.workspaceGroups[index].statusId = builtIn
                 #expect(AppDelegate.statusListInUse.source == .cmux && AppDelegate.statusListInUse.entry(id: builtIn) != nil)
-                #expect(Sidebar.groupsShownUnderAStatus(tabs: world.manager.tabs, groups: world.manager.workspaceGroups).isEmpty)
-                #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+                #expect(Sidebar.groupsShownOutsideTheirParent(groups: world.manager.workspaceGroups, projection: world.projection()).isEmpty)
+                #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
                 #expect(world.projection()?.workspaceGroups?.statusIdByGroupId.isEmpty != false)
             }
             do {
@@ -182,8 +182,8 @@ struct SidebarNestedRootStatusTests {
                 let index = try #require(world.manager.workspaceGroups.firstIndex { $0.id == world.n })
                 world.manager.workspaceGroups[index].statusId = "parked"
                 #expect(world.projection() == nil)
-                #expect(Sidebar.groupsShownUnderAStatus(tabs: world.manager.tabs, groups: world.manager.workspaceGroups).isEmpty)
-                #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+                #expect(Sidebar.groupsShownOutsideTheirParent(groups: world.manager.workspaceGroups, projection: world.projection()).isEmpty)
+                #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
             }
         }
     }
@@ -194,9 +194,9 @@ struct SidebarNestedRootStatusTests {
             let world = try World()
             let index = try #require(world.manager.workspaceGroups.firstIndex { $0.id == world.n })
             world.manager.workspaceGroups[index].customColor = "#112233"
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
             world.manager.workspaceGroups[index].statusId = "unlisted"
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
             #expect(!world.items().contains(.statusGroup("unlisted")))
         }
     }
@@ -207,10 +207,10 @@ struct SidebarNestedRootStatusTests {
             let world = try World()
             world.manager.toggleWorkspaceGroupPinned(groupId: world.r)
             try world.setStatus(world.n, "parked")      // depth 1
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
             try world.setStatus(world.n, nil)
             try world.setStatus(world.m, "parked")      // depth 2
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
             let items = world.items()
             #expect(items.first == .pinnedArea())
             try world.setStatus(world.n, "parked")
@@ -226,7 +226,7 @@ struct SidebarNestedRootStatusTests {
             let world = try World()
             try world.setStatus(world.r, "doing")
             try world.setStatus(world.n, "parked")
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
             let items = world.items()
             #expect(slice(items, from: .statusGroup("parked"), to: .statusGroup("doing")).isEmpty, "Parked lists nothing")
             let doing = Array(items.drop { $0 != .statusGroup("doing") })
@@ -313,7 +313,7 @@ struct SidebarNestedRootStatusTests {
             empty.statusId = "parked"
             world.manager.workspaceGroups.append(empty)
             try world.setStatus(world.n, "parked")
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus() == [id, world.n])
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent() == [id, world.n])
             let parked = slice(world.items(), from: .statusGroup("parked"), to: .statusGroup("doing"))
             #expect(parked.first == .group(id), "before N: it sorts where R's run starts")
             #expect(parked.dropFirst().first == .group(world.n))
@@ -414,15 +414,15 @@ struct SidebarNestedRootStatusTests {
             let inside = world.manager.workspaces.workspaceIdsInside(world.r)
             #expect(Set(inside) == Set(["r", "r1", "r2", "n", "n1", "m", "m1", "n2"].map { world.w($0).id }), "Mark All Read and Delete Group still see everything")
             let projection = world.projection()
-            let badge = Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.r), memberWorkspaceIds: inside, projection: projection)
+            let badge = Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.r), memberWorkspaceIds: inside, projection: projection, tabs: world.manager.tabs, groups: world.manager.workspaceGroups)
             #expect(Set(badge) == Set(["r", "r1", "r2"].map { world.w($0).id }))
             // The root's own badge, and a group inside it, keep every row they hold.
             let ownInside = world.manager.workspaces.workspaceIdsInside(world.n)
-            #expect(Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.n), memberWorkspaceIds: ownInside, projection: projection) == ownInside)
+            #expect(Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.n), memberWorkspaceIds: ownInside, projection: projection, tabs: world.manager.tabs, groups: world.manager.workspaceGroups) == ownInside)
             let innerInside = world.manager.workspaces.workspaceIdsInside(world.m)
-            #expect(Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.m), memberWorkspaceIds: innerInside, projection: projection) == innerInside)
+            #expect(Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.m), memberWorkspaceIds: innerInside, projection: projection, tabs: world.manager.tabs, groups: world.manager.workspaceGroups) == innerInside)
             // Without a projection, as with controls off, nothing is left out.
-            #expect(Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.r), memberWorkspaceIds: inside, projection: nil) == inside)
+            #expect(Sidebar.foldedGroupBadgeWorkspaceIds(group: world.group(world.r), memberWorkspaceIds: inside, projection: nil, tabs: world.manager.tabs, groups: world.manager.workspaceGroups) == inside)
         }
     }
 
@@ -438,7 +438,7 @@ struct SidebarNestedRootStatusTests {
                 #expect(world.group(world.n).parentGroupId == world.q && world.group(world.n).statusId == "parked")
                 let parked = slice(world.items(), from: .statusGroup("parked"), to: .statusGroup("doing"))
                 #expect(parked.first == .group(world.n))
-                #expect(world.manager.workspaces.groupIdsShownUnderAStatus() == [world.n])
+                #expect(world.manager.workspaces.groupIdsShownOutsideParent() == [world.n])
             }
             // Into a group with a status: inside it, under that group's status (Q8).
             do {
@@ -448,7 +448,7 @@ struct SidebarNestedRootStatusTests {
                 let doing = Array(world.items().drop { $0 != .statusGroup("doing") })
                 #expect(doing.contains(.group(world.n)) && doing.contains(.workspace(world.w("n1").id)))
                 #expect(slice(world.items(), from: .statusGroup("parked"), to: .statusGroup("doing")).isEmpty)
-                #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+                #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
             }
             // Into a pinned group: in Pinned, with its status's glyph and color, and not under its status.
             do {
@@ -468,7 +468,7 @@ struct SidebarNestedRootStatusTests {
                 #expect(world.manager.moveWorkspaceGroup(groupId: world.n, intoParent: nil) == .moved)
                 #expect(world.group(world.n).parentGroupId == nil)
                 #expect(slice(world.items(), from: .statusGroup("parked"), to: .statusGroup("doing")).first == .group(world.n))
-                #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty, "a top-level root is not a nested root")
+                #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty, "a top-level root is not a nested root")
             }
         }
     }
@@ -519,7 +519,7 @@ struct SidebarNestedRootStatusTests {
             world.manager.toggleWorkspaceGroupPinned(groupId: world.r)
             let pinned = Dictionary(uniqueKeysWithValues: world.manager.workspaceGroups.map { ($0.id, $0) })
             #expect(Sidebar.isPinnedByGroup(groupId: world.n, groupsById: pinned))
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty)
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty)
         }
     }
 
@@ -581,7 +581,7 @@ struct SidebarNestedRootStatusTests {
             #expect(world.group(world.r).isCollapsed && world.items().contains(.workspace(world.w("n1").id)))
             if how == "listChange" { try handle.rewrite(Self.onlyDoing) }
             else { UserDefaults.standard.set(false, forKey: BetaFeaturesCatalogSection().workspaceTodoControls.userDefaultsKey) }
-            #expect(world.manager.workspaces.groupIdsShownUnderAStatus().isEmpty && world.group(world.r).isCollapsed, "nothing announced it yet")
+            #expect(world.manager.workspaces.groupIdsShownOutsideParent().isEmpty && world.group(world.r).isCollapsed, "nothing announced it yet")
             world.manager.revealSelectionIfItsGroupLeftItsStatus()
             #expect(!world.group(world.r).isCollapsed)
             #expect(world.items().contains(.workspace(world.w("n1").id)))

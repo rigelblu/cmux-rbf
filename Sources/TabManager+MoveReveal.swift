@@ -20,20 +20,14 @@ enum MoveRevealCause: Equatable {
 }
 
 /// Where the status side of the sidebar puts a workspace: its status group or `Pinned`, its color group, its workspace group.
-/// A write that leaves it unchanged moves nothing and opens nothing.
+/// A write that leaves it unchanged moves nothing and opens nothing. `colorHex` is the color group the row is drawn in, which a
+/// pinned loose row has: a status writes its color, so a status can move a pinned row between pinned color groups (#cm-110.14).
 struct SidebarMovePlace: Equatable {
     var statusId: String?
     var isPinned = false
     var colorHex: String?
     var groupId: UUID?
 
-    /// Whether a write moved the workspace. A status write also writes the status's color, and a pinned row wearing a color sits
-    /// in a pinned color group; that is not a move of a status, so only a color write compares the color.
-    func differs(from other: SidebarMovePlace, includingColor: Bool) -> Bool {
-        var mine = self, theirs = other
-        if !includingColor { mine.colorHex = nil; theirs.colorHex = nil }
-        return mine != theirs
-    }
 }
 
 /// A window's sidebar side of the reveal, set by `SidebarState.installMoveReveal(on:)`.
@@ -75,20 +69,32 @@ extension TabManager {
         let before = workspaces.map { sink.place($0) }
         let result = write()
         var changed: [UUID] = []
-        let includingColor = cause == .color
-        for (workspace, was) in zip(workspaces, before) where sink.place(workspace).differs(from: was, includingColor: includingColor) { changed.append(workspace.id) }
+        for (workspace, was) in zip(workspaces, before) where sink.place(workspace) != was { changed.append(workspace.id) }
         revealMoved(changed, cause: cause)
         return result
     }
 
+    /// Where the sidebar draws a group, not what is stored on it (#cm-110.14, fix round 2): a status or a pin written on a nested group
+    /// that stays drawn inside its parent moves nothing; a nested pin drawn in Pinned changes its section (#cm-110.18).
     private struct GroupPlace: Equatable {
+        /// The status group it is drawn under, only when it is a status root itself.
         var statusId: String?
+        /// Its drawn pin tier from the shared sidebar placement.
         var isPinned: Bool
-        var parentGroupId: UUID?
+        // A nested group drawn outside its parent changes either its status-root placement or its pin tier.
+        // Those fields already detect that view change; ordinary reparenting reveals its destination at the writer.
     }
 
     private func groupPlace(_ groupId: UUID) -> GroupPlace? {
-        workspaceGroups.first { $0.id == groupId }.map { GroupPlace(statusId: $0.statusId, isPinned: $0.isPinned, parentGroupId: $0.parentGroupId) }
+        let groups = workspaceGroups
+        guard let group = groups.first(where: { $0.id == groupId }) else { return nil }
+        let projection = VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabs, groups: groups)?.workspaceGroups
+        let isRoot = projection?.rootGroupIds.contains(groupId) ?? false
+        let pin = group.sidebarPin(in: Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) }), sectionsShown: projection != nil)
+        return GroupPlace(
+            statusId: isRoot ? projection?.statusIdByGroupId[groupId] : nil,
+            isPinned: pin.isPinned
+        )
     }
 
     /// The same, for a write on a whole group (its status, its color, a pin).
@@ -96,7 +102,8 @@ extension TabManager {
     func revealingGroupMove<R>(_ groupId: UUID, cause: MoveRevealCause, _ write: () -> R) -> R {
         let before = groupPlace(groupId)
         let result = write()
-        if let after = groupPlace(groupId), after != before { revealMovedGroup(groupId, cause: cause) }
+        // A group that loses its status falls back into its parent, so the folds above it open (#cm-110.14); the walk stops at a group drawn under a status.
+        if let after = groupPlace(groupId), after != before { revealMovedGroup(groupId, cause: cause, opensAbove: true) }
         return result
     }
 

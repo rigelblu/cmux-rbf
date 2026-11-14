@@ -42,7 +42,7 @@ extension VerticalTabsSidebar {
         let unreadSnapshot = SidebarUnreadSnapshot()
         // A folded parent's badge leaves out the rows shown under a status (ruling (23), #cm-110.3).
         let badgeWorkspaceIds = Self.foldedGroupBadgeWorkspaceIds(group: group, memberWorkspaceIds: memberWorkspaceIds,
-            projection: renderContext.statusGroupProjection)
+            projection: renderContext.statusGroupProjection, tabs: renderContext.tabs, groups: renderContext.workspaceGroups)
         let anchorUnreadCount: Int = {
             if group.isCollapsed {
                 return badgeWorkspaceIds.reduce(0) { partial, workspaceId in
@@ -246,7 +246,7 @@ extension VerticalTabsSidebar {
         let newWorkspacePlacement = resolvedConfig?.newWorkspacePlacement
         // A folded parent's badge leaves out the rows shown under a status (ruling (23), #cm-110.3).
         let badgeWorkspaceIds = Self.foldedGroupBadgeWorkspaceIds(group: group, memberWorkspaceIds: memberWorkspaceIds,
-            projection: renderContext.statusGroupProjection)
+            projection: renderContext.statusGroupProjection, tabs: renderContext.tabs, groups: renderContext.workspaceGroups)
         let anchorUnreadCount: Int = {
             if group.isCollapsed {
                 return badgeWorkspaceIds.reduce(0) { partial, workspaceId in

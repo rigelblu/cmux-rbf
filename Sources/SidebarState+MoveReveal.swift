@@ -27,11 +27,15 @@ extension SidebarState {
             resolvedHexByStatusId: AppDelegate.shared?.workspaceStatusListStore.colorHexes ?? [:],
             workspaceGroups: tabManager.workspaceGroups
         )
+        let pin = WorkspaceGroupWorkspaceItem(workspace).sidebarPin(
+            in: Dictionary(uniqueKeysWithValues: tabManager.workspaceGroups.map { ($0.id, $0) }),
+            sectionsShown: place != nil && WorkspaceTodoFeature.isEnabled
+        )
         return SidebarMovePlace(
             statusId: place?.statusId,
-            isPinned: place?.isPinned ?? workspace.isPinned,
-            // The color group the row is drawn in: a row in a workspace group, or under a status group, is not in one.
-            colorHex: workspace.groupId == nil && place?.statusId == nil ? workspace.customColor.flatMap(WorkspaceColorHex.normalized) : nil,
+            isPinned: place?.isPinned ?? pin.isPinned,
+            // A separately drawn pin takes its own color group; rows held by a workspace/status group do not.
+            colorHex: (workspace.groupId == nil || pin.isOutsideGroup) && place?.statusId == nil ? workspace.customColor.flatMap(WorkspaceColorHex.normalized) : nil,
             groupId: workspace.groupId
         )
     }

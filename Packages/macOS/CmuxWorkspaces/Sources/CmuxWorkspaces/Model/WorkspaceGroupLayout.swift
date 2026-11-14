@@ -54,11 +54,43 @@ public struct WorkspaceGroupWorkspaceItem: Equatable, Sendable {
         self.isPinned = isPinned
     }
 
+    /// The sidebar's pin placement, without changing membership or order (#cm-110.18).
+    ///
+    /// A member's own pin draws it outside its group only while sections show and no containing group is pinned.
+    /// An anchor always follows its header; a member held by a pinned group follows the outermost pinned group.
+    /// - Parameters:
+    ///   - groupsById: The window's groups, keyed by identity.
+    ///   - sectionsShown: Whether the sidebar draws its section headers; false preserves the ordinary group layout.
+    /// - Returns: The drawn pin tier, whether this member is separate, and the outermost group holding the pinned run.
+    public func sidebarPin(in groupsById: [UUID: WorkspaceGroup], sectionsShown: Bool) -> (isPinned: Bool, isOutsideGroup: Bool, pinRootGroupId: UUID?) {
+        let group = groupsById.values.first { $0.liveAnchorWorkspaceId == id }
+            ?? groupId.flatMap { groupsById[$0] }
+        guard let group else { return (isPinned, false, nil) }
+        var chain = [group]
+        var seen: Set<UUID> = [group.id]
+        var next = group.parentGroupId
+        while let parentId = next, seen.insert(parentId).inserted, let parent = groupsById[parentId] {
+            chain.append(parent)
+            next = parent.parentGroupId
+        }
+        let outside = sectionsShown && isPinned && group.liveAnchorWorkspaceId != id && !chain.contains { $0.isPinned }
+        let root = sectionsShown ? chain.last(where: { $0.isPinned }) : chain.last.flatMap { $0.isPinned ? $0 : nil }
+        return (outside || root != nil, outside, root?.id)
+    }
+
     @MainActor
     public init<Tab: WorkspaceTabRepresenting>(_ tab: Tab) {
         self.id = tab.id
         self.groupId = tab.groupId
         self.isPinned = tab.isPinned
+    }
+}
+
+extension WorkspaceGroup {
+    /// A group follows its own pin and its pinned ancestors, independently of its anchor workspace's pin.
+    public func sidebarPin(in groupsById: [UUID: WorkspaceGroup], sectionsShown: Bool) -> (isPinned: Bool, isOutsideGroup: Bool, pinRootGroupId: UUID?) {
+        WorkspaceGroupWorkspaceItem(id: anchorWorkspaceId, groupId: id, isPinned: false)
+            .sidebarPin(in: groupsById, sectionsShown: sectionsShown)
     }
 }
 

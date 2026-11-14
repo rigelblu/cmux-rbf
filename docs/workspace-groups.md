@@ -48,13 +48,19 @@ Where the group lands:
 
 A group's rows read, top to bottom: its anchor (the header itself), its pinned rows, then its unpinned rows. Workspaces and child groups share one order within the pinned rows and within the unpinned rows, as they do in the sidebar, and a row stays where you put it. So a workspace directly in the group can come below a child group's rows; the indent tells them apart.
 
+With Workspace Todo Controls on and a status list in use, the sidebar shows section headers. With no pinned group above it, a workspace row pinned on its own shows only under **Pinned**; a pinned child group shows there with everything inside it. Both remain in their parent group. A workspace inside a pinned group stays with that group, even if the workspace is pinned on its own too. Unpinning an item returns it to its parent; any members still pinned on their own follow the same rule. A workspace unpinned in either a flat window or one with nested groups lands first among its group's unpinned rows.
+
+The default section names are localized: **Pinned**, **Workspaces** and **Workblocks** in English. Set `sidebar.sectionNames.pinned`, `.workspaces` or `.statuses` in `cmux.json` to give their headers your own names; saving the file updates them without a relaunch. Names are trimmed; a blank or non-string name uses that section's default. If `sectionNames` is not an object, all three sections use their defaults. These names apply to the section headers and their VoiceOver labels.
+
 Each depth indents a row 12 pt more. The indent never takes more than 40% of the sidebar's width, so a name keeps room at any width; rows deeper than that are drawn at the same indent. A name is cut at its end when room runs out, so two names that differ only at their end can read the same when cut.
 
-Collapsing a group hides every row inside it, at every depth. A child group remembers whether it was collapsed. Selecting a hidden workspace — from a notification, the CLI, or next and previous workspace — expands every group above it. If a collapse with the chevron hides the selected workspace, the group's anchor becomes selected instead; a group with no anchor leaves the selection where it is. Collapsing from the CLI never changes the selection.
+Collapsing a group hides every row drawn inside it, at every depth. Rows drawn separately under **Pinned** stay visible; selecting one does not open its parent group's folds. A child group remembers whether it was collapsed. Selecting a hidden workspace — from a notification, the CLI, or next and previous workspace — expands every group above it. If a collapse with the chevron hides the selected workspace, the group's anchor becomes selected instead; a group with no anchor leaves the selection where it is. Collapsing from the CLI never changes the selection.
+
+A grouped pin keeps the keyboard digit and Next/Previous Workspace position of its tab-order slot, even when it is drawn under **Pinned**.
 
 Only workspace rows on screen carry a number. A group header carries none, and collapsing a group at any depth removes the numbers of the rows inside it, so the rows below renumber.
 
-A collapsed parent shows the unread count of every workspace inside it, at every depth.
+A collapsed parent sums the unread count of the rows drawn inside it, at every depth. Rows drawn separately under **Pinned** show their own unread and do not count in that parent's badge. **Mark All Read** and other group-wide actions still include them.
 
 #### A group with no anchor
 
@@ -121,7 +127,7 @@ The current anchor carries explicit provenance. Only an anchor created by cmux c
 
 Groups can be pinned independently of individual workspace pins. In the sidebar and inside every group, pinned rows — workspaces and groups — stay above unpinned rows, and within each pin state the rows keep the order you drag them into.
 
-A pinned group inside another group joins that parent's pinned rows, after the ones already pinned, above the parent's unpinned rows. It does not go to the top of the sidebar: pinning a child never moves its parent, and a collapsed parent hides its pinned child with its other rows. **Unpin Group** leaves the group in the same parent, first among the parent's unpinned rows, unless the group is empty (see [Empty groups](#empty-groups)), which that rule places.
+With no section headers, a pinned group inside another group joins that parent's pinned rows, after the ones already pinned, above the parent's unpinned rows. It does not go to the top of the sidebar: pinning a child never moves its parent, and a collapsed parent hides its pinned child with its other rows. **Unpin Group** leaves the group in the same parent, first among the parent's unpinned rows, unless the group is empty (see [Empty groups](#empty-groups)), which that rule places.
 
 The layout, top to bottom, in the sidebar and inside every group:
 1. Pinned rows (workspaces and groups).

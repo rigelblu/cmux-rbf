@@ -14,6 +14,7 @@ extension WorkspacesModel {
     /// hands over to `nestedExpandWorkspaceGroups(containing:)`; a flat window's group has no group above it.
     func expandWorkspaceGroups(containing workspaceId: UUID) {
         if hasNestedWorkspaceGroup { return nestedExpandWorkspaceGroups(containing: workspaceId) }
+        guard !workspaceIdsShownInPinned().contains(workspaceId) else { return }
         guard let groupId = tabs.first(where: { $0.id == workspaceId })?.groupId,
               let index = workspaceGroups.firstIndex(where: { $0.id == groupId }),
               workspaceGroups[index].isCollapsed,
@@ -25,7 +26,7 @@ extension WorkspacesModel {
     /// fold above it that hides it, so the walk stops there. A window with no nested group has nothing above a group.
     public func expandWorkspaceGroups(above groupId: UUID) {
         guard hasNestedWorkspaceGroup else { return }
-        let shown = groupIdsShownUnderAStatus()
+        let shown = groupIdsShownOutsideParent()
         var chain = [groupId] + nestedGroupTree().ancestors(of: groupId)
         if let root = chain.firstIndex(where: shown.contains) { chain = Array(chain[...root]) }
         for id in chain.dropFirst() {

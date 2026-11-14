@@ -57,9 +57,14 @@ Notification behavior from Settings > Notifications.
 
 Sidebar content and metadata visibility from Settings > Sidebar.
 
+`sidebar.sectionNames` is an optional object. Its defaults are localized. Names are trimmed; blank or non-string names use their section's default. A non-object `sectionNames` uses all three defaults.
+
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `sidebar.hideAllDetails` | boolean | `false` | Hide all per-workspace detail rows. |
+| `sidebar.sectionNames.pinned` | string | `"Pinned"` | Name of the Pinned sidebar section header. |
+| `sidebar.sectionNames.workspaces` | string | `"Workspaces"` | Name of the Workspaces sidebar section header. |
+| `sidebar.sectionNames.statuses` | string | `"Workblocks"` | Name of the status sidebar section header. |
 | `sidebar.showWorkspaceDescription` | boolean | `true` | Show custom workspace descriptions in the sidebar. |
 | `sidebar.branchLayout` | `"vertical"` or `"inline"` | `"vertical"` | Show git branch details stacked vertically or inline. |
 | `sidebar.showNotificationMessage` | boolean | `true` | Show the latest notification text in the sidebar. |

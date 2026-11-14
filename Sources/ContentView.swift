@@ -12187,14 +12187,16 @@ struct VerticalTabsSidebar: View, Equatable {
             groupsById: workspaceGroupById,
             effectiveMembership: workspaceGroupIdByWorkspaceId
         )
+        let statusGroupProjection = Self.currentStatusGroupProjection(tabs: tabs, groups: workspaceGroups, storedOrder: sidebarState.statusGroups?.order) // (#cm-110.1) (#cm-110.2) (#cm-110.3) before the base items: the walk reads it
         let rowDepthById = SidebarNestedWorkspaceRows.depthById(
             groupsById: workspaceGroupById,
-            effectiveMembership: workspaceGroupIdByWorkspaceId
-        ) // (#cm-106)
+            effectiveMembership: workspaceGroupIdByWorkspaceId,
+            sectionsShown: statusGroupProjection != nil
+        ) // (#cm-106) (#cm-110.18)
+        let modelGroupTree = WorkspaceGroupTree(groups: workspaceGroups)
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
-            items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name, depth: rowDepthById[$0.id] ?? 0) }
+            items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name, depth: modelGroupTree.depth(of: $0.id)) }
         )
-        let statusGroupProjection = Self.currentStatusGroupProjection(tabs: tabs, groups: workspaceGroups, storedOrder: sidebarState.statusGroups?.order) // (#cm-110.1) (#cm-110.2) (#cm-110.3) before the base items: the walk reads it
         let baseWorkspaceRenderItems = Self.baseRenderItems( // (#cm-110.3)
             tabs: tabs,
             groupsById: workspaceGroupById,
@@ -12213,7 +12215,8 @@ struct VerticalTabsSidebar: View, Equatable {
                 )
             },
             collapsedHexes: sidebarState.collapsedColorSectionHexes, // (#cm-110.1)
-            statusGroupProjection: statusGroupProjection // (#cm-110.1)
+            statusGroupProjection: statusGroupProjection, // (#cm-110.1)
+            groups: workspaceGroups // (#cm-110.18)
         ) // (#cm-110.1)
 
         let statusRenderItems = Self.resolveRenderItems( // (#cm-110.1)
@@ -12315,6 +12318,11 @@ struct VerticalTabsSidebar: View, Equatable {
         .accessibilityIdentifier("Sidebar")
         .ignoresSafeArea()
         .environment(\.sidebarContrastBackgroundHex, sidebarContrastBackground.hexString()) // (#cm-109.7)
+        .onChange(of: statusGroupProjection != nil) { wasShown, isShown in
+            if wasShown && !isShown {
+                tabManager.revealSelectionIfItsGroupLeftItsStatus(sectionsStoppedShowing: true) // (#cm-110.18) ruling (J)
+            }
+        }
         // (#cm-109) A change of the status list (or of the app's colors, which the store folds into its revision)
         // rebuilds every row's snapshot, in both sidebars: the cached snapshot holds the picker's rows. It sits on the
         // chain that is built for every sidebar, so a change while a custom sidebar shows also refreshes the cached
@@ -12347,6 +12355,7 @@ struct VerticalTabsSidebar: View, Equatable {
             NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
                 .receive(on: DispatchQueue.main)
         ) { _ in
+            // Section names also reload here; keep their invalidation if this observer is narrowed to palette keys. (#cm-110.19)
             workspaceColorPaletteRevision &+= 1
             tabManager.revealSelectionIfItsGroupLeftItsStatus() // (#cm-110.3) ruling (27): Workspace Todo Controls is a defaults setting
         }
@@ -15119,7 +15128,8 @@ struct VerticalTabsSidebar: View, Equatable {
                     )
                 },
                 collapsedHexes: [], // (#cm-110.1)
-                statusGroupProjection: statusGroupProj // (#cm-110.1)
+                statusGroupProjection: statusGroupProj, // (#cm-110.1)
+                groups: tabManager.workspaceGroups // (#cm-110.18)
             )
             guard let freshSection = freshProjection.sectionByWorkspaceId[plan.draggedWorkspaceId],
                   freshSection.memberWorkspaceIds == memberWorkspaceIds,
@@ -15554,6 +15564,9 @@ struct VerticalTabsSidebar: View, Equatable {
             }
         }
 
+        let pinPlacement = WorkspaceGroupWorkspaceItem(id: tab.id,
+            groupId: renderContext.workspaceGroupIdByWorkspaceId[tab.id] ?? nil, isPinned: tab.isPinned)
+            .sidebarPin(in: renderContext.workspaceGroupById, sectionsShown: renderContext.statusGroupProjection != nil)
         let result = SidebarWorkspaceRowInput(
             workspaceId: tab.id,
             groupId: renderContext.workspaceGroupIdByWorkspaceId[tab.id] ?? nil,
@@ -15595,8 +15608,9 @@ struct VerticalTabsSidebar: View, Equatable {
             isTodoStatusHidden: workspaceSnapshot.taskStatusInput.isHidden,
             depth: Self.rowDepth(of: tab.id, rowDepthById: renderContext.rowDepthById, statusGroupProjection: renderContext.statusGroupProjection,
                 sectionIndent: renderContext.sectionIndentLevels(of: .workspace(tab.id)),
-                heldLevels: (renderContext.workspaceGroupIdByWorkspaceId[tab.id] ?? nil) != nil
-                    || renderContext.colorSectionProjection.sectionByWorkspaceId[tab.id] != nil ? 1 : 0), // (#cm-106) (#cm-110.1) (#cm-110.12)
+                heldLevels: (!pinPlacement.isOutsideGroup && (renderContext.workspaceGroupIdByWorkspaceId[tab.id] ?? nil) != nil)
+                    || renderContext.colorSectionProjection.sectionByWorkspaceId[tab.id] != nil ? 1 : 0,
+                isOutsideGroup: pinPlacement.isOutsideGroup), // (#cm-106) (#cm-110.1) (#cm-110.12)
             dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil, // (#cm-106)
             listWidth: renderContext.listWidth
         )
