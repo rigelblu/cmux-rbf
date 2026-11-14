@@ -4101,7 +4101,8 @@ final class SocketClient {
                 isStructuredProtocolResponse: true,
                 v2Retryable: data?["retryable"] as? Bool == true,
                 vmBackendCode: data?["backend_code"] as? String,
-                vmBackendHTTPStatus: (data?["http_status"] as? NSNumber)?.intValue
+                vmBackendHTTPStatus: (data?["http_status"] as? NSNumber)?.intValue,
+                v2Reason: data?["reason"] as? String // cmux-rbf (#cm-73.44)
             )
         }
 

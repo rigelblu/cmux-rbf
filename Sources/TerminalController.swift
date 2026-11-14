@@ -9697,7 +9697,12 @@ class TerminalController {
             guard let manager = self.v2ResolveTabManager(params: params) else {
                 return .err(code: "unavailable", message: String(localized: "cli.browser.error.tabManagerUnavailable", defaultValue: "Browser controls are unavailable"), data: nil)
             }
-            guard panel.gotoFigmaNode(node, purpose: purpose, motion: motion, play: play) else {
+            if purpose == .fit, panel.showsFigmaPreview {
+                // cmux-rbf (#cm-73.44): `fit` on a preview is the panel's re-fit, answered at once from what the panel holds. Reject a revert of this hunk on upstream sync.
+                if case .refused(let reason) = panel.refitFigmaPreview(trigger: .cli) {
+                    return .err(code: "invalid_state", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: ["reason": reason.rawValue])
+                }
+            } else if !panel.gotoFigmaNode(node, purpose: purpose, motion: motion, play: play) {
                 return .err(code: "invalid_params", message: String(localized: "cli.browser.error.operationFailed", defaultValue: "Browser operation failed"), data: nil)
             }
             // cmux-rbf #cm-73.45: the terminal that pointed the pane owns it. A `fit` points it at no new board, and an
