@@ -30,9 +30,15 @@ extension ShortcutAction {
         case .commandPalettePrevious: return "Command Palette: Previous"
         case .sendFeedback: return "Send Feedback"
         case .showNotifications: return "Show Notifications"
-        case .jumpToUnread: return "Jump to Latest Unread"
+        // (cm-128.11) Localized lookups on the keys the shortcut list shares with the menus (Tom, grill Q98).
+        case .jumpToUnread:
+            return String(localized: "shortcut.jumpToUnread.label", defaultValue: "Jump to Oldest Unread")
         case .toggleUnread: return "Toggle Unread"
-        case .markOldestUnreadAndJumpNext: return "Mark as Oldest Unread and Jump to Next Latest Unread"
+        case .markOldestUnreadAndJumpNext:
+            return String(
+                localized: "shortcut.markOldestUnreadAndJumpNext.label",
+                defaultValue: "Send to Back of Unread Queue and Jump to Next"
+            )
         case .markAllNotificationsRead:
             return String(localized: "shortcut.markAllNotificationsRead.label", defaultValue: "Mark All Notifications Read")
         case .clearAllNotifications:

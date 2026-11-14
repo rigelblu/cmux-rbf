@@ -23,6 +23,9 @@ public struct NotificationNavSnapshot: Sendable, Equatable, Identifiable {
     public let retargetsToLiveSurfaceOwner: Bool
     /// Whether the notification has already been read.
     public let isRead: Bool
+    /// When the notification went unread: the pane's place in ⌘⇧U's queue, oldest first
+    /// (`cm-128.11`). Reading it leaves it as it is; only Send to Back sets it to now.
+    public let queuedAt: Date
     /// The notification's click action, if any. When present the notification
     /// opens via ``NotificationClickRouting`` (a side effect such as revealing a
     /// path in Finder) rather than focusing a terminal surface.
@@ -45,6 +48,8 @@ public struct NotificationNavSnapshot: Sendable, Equatable, Identifiable {
     ///     into its current owning workspace. Defaults to `true` for trusted
     ///     local notifications and backward compatibility.
     ///   - isRead: Whether the notification has already been read.
+    ///   - queuedAt: When it went unread, its pane's place in the unread queue (`cm-128.11`).
+    ///     Required: there is no honest default, and a default would leave ties to random ids.
     ///   - clickAction: Side effect to perform instead of terminal navigation.
     ///   - scrollRow: Captured bottom-relative terminal scrollback row.
     ///   - scrollTotalRows: Total scrollback rows at capture time.
@@ -55,6 +60,7 @@ public struct NotificationNavSnapshot: Sendable, Equatable, Identifiable {
         panelId: UUID? = nil,
         retargetsToLiveSurfaceOwner: Bool = true,
         isRead: Bool,
+        queuedAt: Date,
         clickAction: NotificationNavClickAction?,
         scrollRow: Int? = nil,
         scrollTotalRows: Int? = nil,
@@ -66,6 +72,7 @@ public struct NotificationNavSnapshot: Sendable, Equatable, Identifiable {
         self.panelId = panelId
         self.retargetsToLiveSurfaceOwner = retargetsToLiveSurfaceOwner
         self.isRead = isRead
+        self.queuedAt = queuedAt
         self.clickAction = clickAction
         self.scrollRow = scrollRow
         self.scrollTotalRows = scrollTotalRows
@@ -89,5 +96,26 @@ public struct NotificationNavSnapshot: Sendable, Equatable, Identifiable {
             return false
         }
         return !hasClickAction
+    }
+}
+
+extension NotificationNavSnapshot {
+    /// Whether the notification sits on `pane` (cm-128.11): the same workspace and surface (a
+    /// surface id may name the notification's surface or its panel), or, for a target with no
+    /// surface, anywhere in the workspace; a workspace-level notification counts as on every pane of its workspace. A Dock target matches the Dock surface's notifications.
+    func isOnPane(_ pane: UnreadQueueTarget?) -> Bool {
+        switch pane {
+        case nil:
+            return false
+        case .workspace(let tabId, let surfaceId)?:
+            guard self.tabId == tabId else { return false }
+            guard let surfaceId else { return true }
+            // A workspace-level notification (no surface) opens by focusing the workspace's focused pane,
+            // which is the sent-back pane, and the open reads it: it counts as on that pane (cm-128.11).
+            if self.surfaceId == nil && panelId == nil { return true }
+            return self.surfaceId == surfaceId || panelId == surfaceId
+        case .windowDock(let target)?:
+            return tabId == target.windowId && (surfaceId == target.surfaceId || panelId == target.surfaceId)
+        }
     }
 }

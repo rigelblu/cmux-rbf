@@ -279,7 +279,7 @@ extension TerminalController: ControlNotificationContext {
     }
 
     func controlNotificationJumpToUnread() -> ControlNotificationSnapshot? {
-        guard let opened = AppDelegate.shared?.jumpToLatestUnread() else { return nil }
+        guard let opened = AppDelegate.shared?.jumpToOldestUnread() else { return nil } // (cm-128.11)
         let store = TerminalNotificationStore.shared
         let current = store.notifications.first(where: { $0.id == opened.id }) ?? opened
         return Self.controlSnapshot(current, surfaceID: current.panelId ?? current.surfaceId)

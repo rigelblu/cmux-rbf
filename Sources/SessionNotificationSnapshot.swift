@@ -7,6 +7,10 @@ struct SessionNotificationSnapshot: Codable, Sendable {
     var subtitle: String
     var body: String
     var createdAt: TimeInterval
+    /// When the notification went unread, its place in ⌘⇧U's queue (cm-128.11, Tom V1). Optional keeps
+    /// snapshots written before it compatible: a file without it restores at `createdAt`, and an older build
+    /// ignores the key.
+    var queuedAt: TimeInterval?
     var isRead: Bool
     var paneFlash: Bool?
     var retargetsToLiveSurfaceOwner: Bool?
@@ -23,6 +27,7 @@ struct SessionNotificationSnapshot: Codable, Sendable {
         subtitle: String,
         body: String,
         createdAt: TimeInterval,
+        queuedAt: TimeInterval? = nil, // (cm-128.11)
         isRead: Bool,
         paneFlash: Bool? = nil,
         retargetsToLiveSurfaceOwner: Bool? = nil,
@@ -36,6 +41,7 @@ struct SessionNotificationSnapshot: Codable, Sendable {
         self.subtitle = subtitle
         self.body = body
         self.createdAt = createdAt
+        self.queuedAt = queuedAt // (cm-128.11)
         self.isRead = isRead
         self.paneFlash = paneFlash
         self.retargetsToLiveSurfaceOwner = retargetsToLiveSurfaceOwner
@@ -55,6 +61,7 @@ struct SessionNotificationSnapshot: Codable, Sendable {
             subtitle: notification.subtitle,
             body: notification.body,
             createdAt: notification.createdAt.timeIntervalSince1970,
+            queuedAt: notification.queuedAt.timeIntervalSince1970, // (cm-128.11)
             isRead: notification.isRead,
             paneFlash: notification.paneFlash,
             retargetsToLiveSurfaceOwner: notification.retargetsToLiveSurfaceOwner,
@@ -80,6 +87,8 @@ struct SessionNotificationSnapshot: Codable, Sendable {
             subtitle: subtitle,
             body: body,
             createdAt: Date(timeIntervalSince1970: createdAt),
+            // (cm-128.11) A file saved before `queuedAt` restores at `createdAt`, the init's default for nil.
+            queuedAt: queuedAt.map { Date(timeIntervalSince1970: $0) },
             isRead: isRead,
             paneFlash: paneFlash ?? true,
             scrollPosition: restoredScrollPosition,

@@ -24,16 +24,18 @@ final class FakeFocusedResolving: FocusedNotificationResolving {
     var storeRestoredUnreadTabs: Set<UUID> = []
     var workspaceUnreadTabs: Set<UUID> = []
     var unreadWindowDockTargets: Set<WindowDockUnreadTarget> = []
-    var oldestUnreadIdByWindowDockTarget: [WindowDockUnreadTarget: UUID] = [:]
-    /// The notification id `markLatestNotificationAsOldestUnread` returns per tab.
-    var oldestUnreadIdByTab: [UUID: UUID] = [:]
+    /// Targets whose pane holds a notification: `sendToBack` returns true for them.
+    var targetsWithNotifications: Set<FocusedNotificationTarget> = []
+    /// How many times the marker asked for the focused target.
+    private(set) var focusedTargetCalls = 0
 
     private(set) var mutations: [String] = []
 
     struct PanelKey: Hashable { let tabId: UUID; let surfaceId: UUID? }
 
     func focusedTarget(preferredWindowToken: AnyObject?) -> FocusedNotificationTarget? {
-        focusedTargetValue
+        focusedTargetCalls += 1
+        return focusedTargetValue
     }
 
     func windowDockSurfaceIsUnread(_ target: WindowDockUnreadTarget) -> Bool {
@@ -48,12 +50,6 @@ final class FakeFocusedResolving: FocusedNotificationResolving {
     func clearWindowDockSurfaceUnread(_ target: WindowDockUnreadTarget) {
         unreadWindowDockTargets.remove(target)
         mutations.append("clearWindowDockSurfaceUnread(\(short(target.surfaceId)))")
-    }
-
-    func markLatestWindowDockNotificationAsOldestUnread(
-        _ target: WindowDockUnreadTarget
-    ) -> UUID? {
-        oldestUnreadIdByWindowDockTarget[target]
     }
 
     func focusedPanel(forTabId tabId: UUID, surfaceId: UUID?) -> FocusedPanel? {
@@ -112,8 +108,14 @@ final class FakeFocusedResolving: FocusedNotificationResolving {
         mutations.append("markPanelUnread(\(short(panel.panelId)))")
     }
 
-    func markLatestNotificationAsOldestUnread(forTabId tabId: UUID, surfaceId: UUID?) -> UUID? {
-        oldestUnreadIdByTab[tabId]
+    func sendToBack(_ target: UnreadQueueTarget) -> Bool {
+        switch target {
+        case .windowDock(let dock):
+            mutations.append("sendToBack(dock \(short(dock.surfaceId)))")
+        case .workspace(let tabId, let surfaceId):
+            mutations.append("sendToBack(\(short(tabId)),\(surfaceId.map(short) ?? "nil"))")
+        }
+        return targetsWithNotifications.contains(target)
     }
 
     private func short(_ id: UUID) -> String { String(id.uuidString.prefix(4)) }

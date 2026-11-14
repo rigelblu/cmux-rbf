@@ -42,7 +42,7 @@ Bereiche erhalten einen blauen Ring und Tabs leuchten auf, wenn Coding-Agenten I
 <tr>
 <td width="40%" valign="middle">
 <h3>Benachrichtigungspanel</h3>
-Alle ausstehenden Benachrichtigungen auf einen Blick sehen und zur neuesten ungelesenen springen
+Alle ausstehenden Benachrichtigungen auf einen Blick sehen und zum ungelesenen Bereich springen, der am längsten wartet
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Seitenleisten-Benachrichtigungsabzeichen" width="100%" />
@@ -126,7 +126,7 @@ Ich führe viele Claude Code- und Codex-Sitzungen parallel aus. Ich habe Ghostty
 
 Ich habe einige Coding-Orchestratoren ausprobiert, aber die meisten waren Electron/Tauri-Apps und die Performance hat mich gestört. Ich bevorzuge außerdem das Terminal, da GUI-Orchestratoren einen in ihren Workflow einschließen. Also habe ich cmux als native macOS-App in Swift/AppKit gebaut. Es verwendet libghostty für das Terminal-Rendering und liest Ihre vorhandene Ghostty-Konfiguration für Themes, Schriftarten und Farben.
 
-Die wesentlichen Ergänzungen sind die Seitenleiste und das Benachrichtigungssystem. Die Seitenleiste hat vertikale Tabs, die Git-Branch, verknüpften PR-Status/Nummer, Arbeitsverzeichnis, lauschende Ports und den neuesten Benachrichtigungstext für jeden Arbeitsbereich anzeigen. Das Benachrichtigungssystem erkennt Terminal-Sequenzen (OSC 9/99/777) und bietet eine CLI (`cmux notify`), die Sie in Agent-Hooks für Claude Code, OpenCode usw. einbinden können. Wenn ein Agent wartet, bekommt sein Bereich einen blauen Ring und der Tab leuchtet in der Seitenleiste auf, sodass ich über Teilungen und Tabs hinweg erkennen kann, welcher mich braucht. ⌘⇧U springt zur neuesten ungelesenen Benachrichtigung.
+Die wesentlichen Ergänzungen sind die Seitenleiste und das Benachrichtigungssystem. Die Seitenleiste hat vertikale Tabs, die Git-Branch, verknüpften PR-Status/Nummer, Arbeitsverzeichnis, lauschende Ports und den neuesten Benachrichtigungstext für jeden Arbeitsbereich anzeigen. Das Benachrichtigungssystem erkennt Terminal-Sequenzen (OSC 9/99/777) und bietet eine CLI (`cmux notify`), die Sie in Agent-Hooks für Claude Code, OpenCode usw. einbinden können. Wenn ein Agent wartet, bekommt sein Bereich einen blauen Ring und der Tab leuchtet in der Seitenleiste auf, sodass ich über Teilungen und Tabs hinweg erkennen kann, welcher mich braucht. ⌘⇧U springt zum ungelesenen Bereich, der am längsten wartet.
 
 Der integrierte Browser hat eine skriptfähige API, portiert von [agent-browser](https://github.com/vercel-labs/agent-browser). Agenten können den Barrierefreiheitsbaum erfassen, Elementreferenzen erhalten, klicken, Formulare ausfüllen und JS ausführen. Sie können einen Browser-Bereich neben Ihrem Terminal teilen und Claude Code direkt mit Ihrem Entwicklungsserver interagieren lassen.
 
@@ -206,9 +206,9 @@ Navigationstastenkürzel der Befehlspalette, einschließlich ⌃ P, sind ebenfal
 | Tastenkürzel | Aktion |
 |----------|--------|
 | ⌘ I | Benachrichtigungspanel anzeigen |
-| ⌘ ⇧ U | Zur neuesten ungelesenen springen |
+| ⌘ ⇧ U | Zum ungelesenen Bereich springen, der am längsten wartet |
 | ⌥ ⌘ U | Ungelesen-Status des aktuellen Eintrags umschalten |
-| ⌃ ⌘ U | Aktuellen Eintrag als älteste ungelesene markieren und zur nächsten neuesten ungelesenen springen |
+| ⌃ ⌘ U | Aktuellen Eintrag ans Ende der Warteschlange der ungelesenen verschieben und zum nächsten springen |
 
 ### Suchen
 

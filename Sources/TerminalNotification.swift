@@ -13,6 +13,10 @@ struct TerminalNotification: Identifiable, Hashable, Sendable {
     let subtitle: String
     let body: String
     let createdAt: Date
+    /// When the notification went unread: its pane's place in ⌘⇧U's queue, oldest first (cm-128.11, Tom V1).
+    /// Set to `createdAt` when recorded; a newer notification on the pane inherits the earliest of the
+    /// unread ones it replaces. Reading and Mark as Unread leave it; only Send to Back sets it to now.
+    var queuedAt: Date
     var isRead: Bool
     var paneFlash: Bool = true
     var scrollPosition: TerminalNotificationScrollPosition?
@@ -34,6 +38,7 @@ struct TerminalNotification: Identifiable, Hashable, Sendable {
         subtitle: String,
         body: String,
         createdAt: Date,
+        queuedAt: Date? = nil,
         isRead: Bool,
         paneFlash: Bool = true,
         scrollPosition: TerminalNotificationScrollPosition? = nil,
@@ -52,6 +57,7 @@ struct TerminalNotification: Identifiable, Hashable, Sendable {
         self.subtitle = subtitle
         self.body = body
         self.createdAt = createdAt
+        self.queuedAt = queuedAt ?? createdAt
         self.isRead = isRead
         self.paneFlash = paneFlash
         self.scrollPosition = scrollPosition

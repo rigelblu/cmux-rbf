@@ -138,8 +138,8 @@ public protocol ControlNotificationContext: AnyObject {
     /// - Returns: The open resolution.
     func controlNotificationOpen(id: UUID) -> ControlNotificationOpenResolution
 
-    /// Jumps to and opens the latest unread notification for
-    /// `notification.jump_to_unread`.
+    /// Jumps to and opens the unread pane that has waited longest, for
+    /// `notification.jump_to_unread` (cm-128.11).
     ///
     /// - Returns: The opened notification's snapshot, or `nil` when there was
     ///   nothing unread to open.

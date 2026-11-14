@@ -97,7 +97,7 @@ Inside a machine:
 
 ## Navigation
 
-Use `Cmd+Shift+U` to jump to the latest unread notification. Use `Ctrl+Cmd+U` to mark the current item as oldest unread and jump to the next latest unread. Both shortcuts are configurable in Settings > Keyboard Shortcuts and in `~/.config/cmux/cmux.json`.
+Use `Cmd+Shift+U` to jump to the unread pane that has waited longest; a pane that notifies again keeps its place. Use `Ctrl+Cmd+U` to send the current pane to the back, as the newest unread, and jump to the next oldest. Mark as Unread puts a notification back where it was in the queue. Both shortcuts are configurable in Settings > Keyboard Shortcuts and in `~/.config/cmux/cmux.json`.
 
 ## Suppress only the focused surface
 

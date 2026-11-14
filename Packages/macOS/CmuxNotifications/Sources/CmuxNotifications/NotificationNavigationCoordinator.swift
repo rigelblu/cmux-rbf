@@ -21,7 +21,7 @@ import Observation
 /// the ``FocusedNotificationResolving`` seam; the coordinator exposes the two
 /// public focused-mark entry points and forwards to the marker, which delegates
 /// its jump step back to
-/// ``jumpToLatestUnread(excludingNotificationId:excludingWorkspaceId:excludingWindowDockTarget:)``.
+/// ``jumpToOldestUnread(excludingPane:openRestartSummary:)``.
 @MainActor
 @Observable
 public final class NotificationNavigationCoordinator: NotificationDeliveryTerminalNavigating {
@@ -31,7 +31,7 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
     private let openRouting: any NotificationOpenRouting
     private let clickRouting: any NotificationClickRouting
     private let focusedResolving: any FocusedNotificationResolving
-    private let explicitFocusedJump: ((UUID?, UUID?, WindowDockUnreadTarget?) -> UUID?)?
+    private let explicitFocusedJump: ((UnreadQueueTarget?) -> UUID?)?
     /// The focused-mark state machine. Lazy so its default jump closure can
     /// capture `self` (allowed only after all stored properties are initialized);
     /// the closure is invoked later, on the main actor. `@ObservationIgnored`
@@ -41,13 +41,10 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
     @ObservationIgnored
     private lazy var focusedMarker: FocusedNotificationMarker = FocusedNotificationMarker(
         resolver: focusedResolving,
-        jumpToLatestUnread: explicitFocusedJump ?? {
-            [unowned self] excludedNotificationId, excludedWorkspaceId, excludedWindowDockTarget in
-            self.jumpToLatestUnread(
-                excludingNotificationId: excludedNotificationId,
-                excludingWorkspaceId: excludedWorkspaceId,
-                excludingWindowDockTarget: excludedWindowDockTarget
-            )
+        jumpToOldestUnread: explicitFocusedJump ?? {
+            // (cm-128.11) one pane exclusion in place of the notification, workspace and Dock parameters
+            [unowned self] excludedPane in
+            self.jumpToOldestUnread(excludingPane: excludedPane)
         }
     )
 
@@ -57,13 +54,13 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
     /// the focused `(tabId, surfaceId?)`. No-op in production builds.
     public var onDidFocusForJumpUnread: ((UUID, UUID?) -> Void)?
 
-    /// - Parameter focusedJump: the jump the focused-mark flow performs after
-    ///   marking oldest-unread, returning the opened notification id. Injected so
-    ///   the app target can route it through its own recorder-wrapped
-    ///   `jumpToLatestUnread` (which fires the `#if DEBUG` `jumpUnreadInvoked`
-    ///   UI-test recorder and applies the nil-store guard), preserving byte-identical
-    ///   recorder behavior. Defaults to this coordinator's plain
-    ///   ``jumpToLatestUnread(excludingNotificationId:excludingWorkspaceId:excludingWindowDockTarget:)``.
+    /// - Parameter focusedJump: (cm-128.11) the jump the focused-mark flow performs after
+    ///   sending the focused pane to the back, returning the opened notification id
+    ///   (`nil` when a restart summary or a mark opened). Injected so the app target
+    ///   can route it through its own recorder-wrapped, summary-aware
+    ///   `jumpToOldestUnread` (which fires the `#if DEBUG` `jumpUnreadInvoked`
+    ///   UI-test recorder and applies the nil-store guard). Defaults to this
+    ///   coordinator's plain ``jumpToOldestUnread(excludingPane:openRestartSummary:)``.
     public init(
         store: any NotificationNavigationStoreReading,
         windows: any MainWindowContextResolving,
@@ -71,11 +68,7 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
         openRouting: any NotificationOpenRouting,
         clickRouting: any NotificationClickRouting,
         focusedResolving: any FocusedNotificationResolving,
-        focusedJump: ((
-            _ excludingNotificationId: UUID?,
-            _ excludingWorkspaceId: UUID?,
-            _ excludingWindowDockTarget: WindowDockUnreadTarget?
-        ) -> UUID?)? = nil
+        focusedJump: ((_ excludingPane: UnreadQueueTarget?) -> UUID?)? = nil
     ) {
         self.store = store
         self.windows = windows
@@ -96,8 +89,8 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
         focusedMarker.toggleFocusedNotificationUnread(preferredWindowToken: preferredWindowToken)
     }
 
-    /// Marks the focused notification oldest-unread, then jumps to the next
-    /// latest unread, returning the opened notification id. Forwards to
+    /// Sends the focused pane to the back of the unread queue, then jumps to the next
+    /// oldest unread (cm-128.11), returning the opened notification id. Forwards to
     /// ``FocusedNotificationMarker``. Mirrors
     /// `AppDelegate.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread`.
     @discardableResult
@@ -111,60 +104,155 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
 
     // MARK: Jump
 
-    /// Opens the latest openable unread notification, returning its id, or `nil`
-    /// when nothing could be opened. Mirrors `AppDelegate.jumpToLatestUnread`.
-    @discardableResult
-    public func jumpToLatestUnread(
-        excludingNotificationId excludedNotificationId: UUID? = nil,
-        excludingWorkspaceId excludedWorkspaceId: UUID? = nil,
-        excludingWindowDockTarget excludedWindowDockTarget: WindowDockUnreadTarget? = nil
-    ) -> UUID? {
-        for notification in store.orderedNotifications
-        where notification.isOpenableForJump(
-            excludingNotificationId: excludedNotificationId,
-            excludingWorkspaceId: excludedWorkspaceId
-        ) {
-            if openNotification(notification) {
-                return notification.id
-            }
-        }
-        if openLatestWindowDockUnread(excludingTarget: excludedWindowDockTarget) {
-            return nil
-        }
-        _ = openLatestWorkspaceUnread(excludingWorkspaceId: excludedWorkspaceId)
-        return nil
+    /// One pane in the unread queue: its place and the notification the press opens (cm-128.11).
+    private struct QueueStop {
+        let target: UnreadQueueTarget
+        let queuedAt: Date
+        /// The id of the earliest member, the tie-break between two panes queued at the same time.
+        let tieBreakId: UUID
+        /// The pane's newest unread notification: store order is newest first.
+        let newest: NotificationNavSnapshot
     }
 
-    private func openLatestWindowDockUnread(
-        excludingTarget excludedTarget: WindowDockUnreadTarget?
-    ) -> Bool {
+    /// The queue: unread, openable notifications grouped by pane, oldest `queuedAt` first, ties by
+    /// notification id (cm-128.11). The stop is the pane, not the workspace (Tom, grill Q92). A
+    /// notification with no surface groups by its workspace.
+    private func unreadQueue(excludingPane excludedPane: UnreadQueueTarget?) -> [QueueStop] {
+        struct Key: Hashable { let tabId: UUID; let surfaceId: UUID? }
+        var order: [Key] = []
+        var members: [Key: [NotificationNavSnapshot]] = [:]
+        for notification in store.orderedNotifications
+        where notification.isOpenableForJump(excludingNotificationId: nil, excludingWorkspaceId: nil)
+            && !notification.isOnPane(excludedPane) {
+            let key = Key(tabId: notification.tabId, surfaceId: notification.surfaceId)
+            if members[key] == nil { order.append(key) }
+            members[key, default: []].append(notification)
+        }
+        return order.compactMap { key -> QueueStop? in
+            guard let group = members[key],
+                  let newest = group.first,
+                  let earliest = group.min(by: { lhs, rhs in
+                      lhs.queuedAt != rhs.queuedAt
+                          ? lhs.queuedAt < rhs.queuedAt
+                          : lhs.id.uuidString < rhs.id.uuidString
+                  }) else { return nil }
+            return QueueStop(
+                target: .workspace(tabId: key.tabId, surfaceId: key.surfaceId),
+                queuedAt: earliest.queuedAt,
+                tieBreakId: earliest.id,
+                newest: newest
+            )
+        }
+        .sorted { lhs, rhs in
+            lhs.queuedAt != rhs.queuedAt
+                ? lhs.queuedAt < rhs.queuedAt
+                : lhs.tieBreakId.uuidString < rhs.tieBreakId.uuidString
+        }
+    }
+
+    /// Opens the pane that has been unread longest, returning the opened notification's id, or `nil`
+    /// when nothing could be opened or a mark or restart summary opened instead (cm-128.11).
+    ///
+    /// Order: the queue of panes with unread news, oldest first; then Dock-surface marks in the
+    /// order the store lists them (oldest first); then workspace marks, as before. When the next stop
+    /// is the pane he's on, the press reads it and goes to the one after; with nothing else, it
+    /// reads it and stays. `excludedPane` is the pane ⌘⌃U just sent back: its notifications and
+    /// mark are skipped and never read. `openRestartSummary` is asked at each stop with that stop's
+    /// `queuedAt` (`nil` when no news stop is left): when an unread summary is as old, it opens it
+    /// and the walk ends.
+    @discardableResult
+    public func jumpToOldestUnread(
+        excludingPane excludedPane: UnreadQueueTarget? = nil,
+        openRestartSummary: ((_ before: Date?) -> Bool)? = nil
+    ) -> UUID? {
+        var staying: UUID?
+        for stop in unreadQueue(excludingPane: excludedPane) {
+            if openRestartSummary?(stop.queuedAt) == true { return nil }
+            // Asked before the open: opening moves focus, and the pane he lands on is not the one he was on.
+            let hesHere = isFrontmostFocusedPane(stop.target)
+            guard openNotification(stop.newest) else { continue }
+            if hesHere {
+                // He is already here: opening it read the pane. Go on to the next stop.
+                staying = staying ?? stop.newest.id
+                continue
+            }
+            return stop.newest.id
+        }
+        if openRestartSummary?(nil) == true { return nil }
+        if openOldestWindowDockUnread(excludingPane: excludedPane) { return nil }
+        if openOldestWorkspaceUnread(excludingPane: excludedPane) { return nil }
+        // Nothing else opened: he is on the only stop left, and the press has read it.
+        return staying
+    }
+
+    /// Workspaces whose mark belongs to the excluded pane (cm-128.11): the whole workspace when the
+    /// target names no pane, else the workspace when its preferred panel is the excluded pane.
+    private func excludedWorkspaceMarks(_ excludedPane: UnreadQueueTarget?) -> Set<UUID> {
+        guard case .workspace(let tabId, let surfaceId)? = excludedPane else { return [] }
+        guard let surfaceId else { return [tabId] }
+        // (cm-128.11) The preferred panel may be the container of the excluded surface (a remote tmux pane).
+        guard let preferred = unreadTargeting.preferredUnreadPanelIdForJump(workspaceId: tabId) else { return [] }
+        let owner = unreadTargeting.owningPanelId(workspaceId: tabId, surfaceId: surfaceId)
+        return preferred == surfaceId || preferred == owner ? [tabId] : []
+    }
+
+    /// Whether `target` is the pane he's on (cm-128.11). One side at a time is mapped to its owning panel,
+    /// never both: a mark on a remote tmux pane's container belongs to that pane, but two panes in one
+    /// container keep their own notifications, so they stay two panes.
+    private func isFrontmostFocusedPane(_ target: UnreadQueueTarget) -> Bool {
+        guard let focused = unreadTargeting.frontmostFocusedPane() else { return false }
+        switch (target, focused) {
+        case (.windowDock(let wanted), .windowDock(let current)):
+            return wanted == current
+        case (.workspace(let tabId, let surfaceId), .workspace(let focusedTabId, let focusedSurfaceId)):
+            guard tabId == focusedTabId else { return false }
+            guard let surfaceId else { return true }
+            guard let focusedSurfaceId else { return false }
+            return surfaceId == focusedSurfaceId
+                || surfaceId == unreadTargeting.owningPanelId(workspaceId: tabId, surfaceId: focusedSurfaceId)
+                || unreadTargeting.owningPanelId(workspaceId: tabId, surfaceId: surfaceId) == focusedSurfaceId
+        default:
+            return false
+        }
+    }
+
+    /// Opens the oldest Dock-surface mark; a mark on the Dock surface he's on is cleared and passed (cm-128.11).
+    private func openOldestWindowDockUnread(excludingPane excludedPane: UnreadQueueTarget?) -> Bool {
         for target in store.windowDockUnreadTargets
-        where target != excludedTarget {
+        where excludedPane != .windowDock(target) {
+            let hesHere = isFrontmostFocusedPane(.windowDock(target))
             guard openRouting.openWindowDockUnread(target) else { continue }
             signalDidFocusForJumpUnread(
                 tabId: target.windowId,
                 surfaceId: target.surfaceId
             )
             store.clearWindowDockUnread(target)
+            if hesHere {
+                // His own Dock surface's mark: cleared; the press goes to the next mark.
+                continue
+            }
             return true
         }
         return false
     }
 
-    private func openLatestWorkspaceUnread(excludingWorkspaceId excludedWorkspaceId: UUID? = nil) -> Bool {
+    private func openOldestWorkspaceUnread(excludingPane excludedPane: UnreadQueueTarget?) -> Bool {
         var unreadWorkspaceIds = store.workspaceUnreadIndicatorIds
-        if let excludedWorkspaceId {
-            unreadWorkspaceIds.remove(excludedWorkspaceId)
-        }
+        unreadWorkspaceIds.subtract(excludedWorkspaceMarks(excludedPane))
         guard !unreadWorkspaceIds.isEmpty else { return false }
 
+        // (cm-128.11) A mark on the pane he's on is cleared and passed: the press goes to the next mark.
+        var passedOwnMarks = Set<UUID>()
         for target in windows.orderedTargetsForUnreadJump {
             for workspaceId in target.workspaceIds where unreadWorkspaceIds.contains(workspaceId) {
-                if openWorkspaceUnread(workspaceId: workspaceId, in: target) {
-                    return true
+                switch openWorkspaceUnread(workspaceId: workspaceId, in: target) {
+                case .stopped: return true
+                case .passedOwnPane: passedOwnMarks.insert(workspaceId)
+                case .failed: break
                 }
             }
         }
+        unreadWorkspaceIds.subtract(passedOwnMarks)
 
         // The legacy fallback used the active tab manager's first unread
         // workspace, which is NOT necessarily in the window-context registry:
@@ -193,8 +281,13 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
         return didOpen
     }
 
-    private func openWorkspaceUnread(workspaceId: UUID, in target: MainWindowTarget) -> Bool {
+    /// How a workspace-mark stop ended (cm-128.11).
+    private enum WorkspaceMarkOutcome { case stopped, passedOwnPane, failed }
+
+    /// Opens one workspace mark; reports whether it was the pane he's on, which the walk passes (cm-128.11).
+    private func openWorkspaceUnread(workspaceId: UUID, in target: MainWindowTarget) -> WorkspaceMarkOutcome {
         let panelId = unreadTargeting.preferredUnreadPanelIdForJump(workspaceId: workspaceId)
+        let hesHere = panelId.map { isFrontmostFocusedPane(.workspace(tabId: workspaceId, surfaceId: $0)) } ?? false
         let didOpen = openRouting.openInWindow(
             windowId: target.windowId,
             tabId: workspaceId,
@@ -209,7 +302,9 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
             signalDidFocusForJumpUnread(tabId: workspaceId, surfaceId: panelId)
             clearWorkspaceUnreadAfterJump(workspaceId: workspaceId, panelId: panelId)
         }
-        return didOpen
+        guard didOpen else { return .failed }
+        if hesHere { return .passedOwnPane }
+        return .stopped
     }
 
     private func clearWorkspaceUnreadAfterJump(workspaceId: UUID, panelId: UUID?) {

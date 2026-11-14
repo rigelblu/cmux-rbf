@@ -446,7 +446,7 @@ extension ControlCommandCoordinator {
         }
     }
 
-    /// `notification.jump_to_unread` — open the latest unread notification.
+    /// `notification.jump_to_unread` — open the unread pane that has waited longest (cm-128.11).
     func notificationJumpToUnread() -> ControlCallResult {
         guard let snapshot = context?.controlNotificationJumpToUnread() else {
             return .ok(.object(["opened": .bool(false)]))

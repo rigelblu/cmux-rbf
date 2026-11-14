@@ -42,7 +42,7 @@ Paneler får en blå ring, og faner lyser op, når kodningsagenter har brug for 
 <tr>
 <td width="40%" valign="middle">
 <h3>Notifikationspanel</h3>
-Se alle ventende notifikationer ét sted, hop til den seneste ulæste
+Se alle ventende notifikationer ét sted, hop til det ulæste panel, der har ventet længst
 </td>
 <td width="60%">
 <img src="./docs/assets/sidebar-notification-badge.png" alt="Notifikationsbadge i sidebjælken" width="100%" />
@@ -126,7 +126,7 @@ Jeg kører mange Claude Code- og Codex-sessioner parallelt. Jeg brugte Ghostty m
 
 Jeg prøvede et par kodningsorkestratore, men de fleste var Electron/Tauri-apps, og ydelsen irriterede mig. Jeg foretrækker også bare terminalen, da GUI-orkestratore låser dig ind i deres arbejdsgang. Så jeg byggede cmux som en nativ macOS-app i Swift/AppKit. Den bruger libghostty til terminal-rendering og læser din eksisterende Ghostty-konfiguration til temaer, skrifttyper og farver.
 
-De vigtigste tilføjelser er sidebjælken og notifikationssystemet. Sidebjælken har lodrette faner, der viser git-branch, tilknyttet PR-status/nummer, arbejdsmappe, lyttende porte og den seneste notifikationstekst for hvert workspace. Notifikationssystemet opfanger terminalsekvenser (OSC 9/99/777) og har en CLI (`cmux notify`), du kan koble til agent-hooks for Claude Code, OpenCode osv. Når en agent venter, får dens panel en blå ring, og fanen lyser op i sidebjælken, så jeg kan se, hvilken der har brug for mig på tværs af opdelinger og faner. Cmd+Shift+U hopper til den seneste ulæste.
+De vigtigste tilføjelser er sidebjælken og notifikationssystemet. Sidebjælken har lodrette faner, der viser git-branch, tilknyttet PR-status/nummer, arbejdsmappe, lyttende porte og den seneste notifikationstekst for hvert workspace. Notifikationssystemet opfanger terminalsekvenser (OSC 9/99/777) og har en CLI (`cmux notify`), du kan koble til agent-hooks for Claude Code, OpenCode osv. Når en agent venter, får dens panel en blå ring, og fanen lyser op i sidebjælken, så jeg kan se, hvilken der har brug for mig på tværs af opdelinger og faner. Cmd+Shift+U hopper til det ulæste panel, der har ventet længst.
 
 Den indbyggede browser har en scriptbar API porteret fra [agent-browser](https://github.com/vercel-labs/agent-browser). Agenter kan tage et snapshot af tilgængelighedstræet, få elementreferencer, klikke, udfylde formularer og evaluere JS. Du kan dele et browserpanel ved siden af din terminal og lade Claude Code interagere direkte med din udviklingsserver.
 
@@ -206,9 +206,9 @@ Navigationsgenveje til kommandopaletten, herunder ⌃ P, kan også tilpasses og 
 | Genvej | Handling |
 |----------|--------|
 | ⌘ I | Vis notifikationspanel |
-| ⌘ ⇧ U | Hop til seneste ulæste |
+| ⌘ ⇧ U | Hop til det ulæste panel, der har ventet længst |
 | ⌥ ⌘ U | Skift det aktuelle elements ulæst-status |
-| ⌃ ⌘ U | Markér det aktuelle element som ældste ulæste og hop til næste seneste ulæste |
+| ⌃ ⌘ U | Send det aktuelle element bagerst i køen af ulæste og hop til det næste |
 
 ### Søg
 
