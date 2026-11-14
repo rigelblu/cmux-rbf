@@ -26,6 +26,8 @@ final class AgentJournalLifecycleCenter: Sendable {
         case startupReplay
         // cm-128.1: accepted human input on a pane, resolved on this worker so the key path never touches the journal.
         case paneInput(workspaceId: UUID, surfaceId: UUID, isEscape: Bool, occurredAtMs: Int64)
+        // cm-128.2: Clear Agent State on one workspace, resolved here because the reconciler's open requests live on this worker.
+        case clearAgentState(workspaceId: UUID, surfaceIds: [UUID], occurredAtMs: Int64)
 
         var admissionID: UUID? {
             switch self {
@@ -51,7 +53,10 @@ final class AgentJournalLifecycleCenter: Sendable {
     }
 
     /// - Parameter usesVimEditor: Whether a session's editor mode is vim, asked on the journal worker (cm-128.1).
-    init(databaseURL: URL?, usesVimEditor: @escaping @Sendable (String, String) -> Bool = { _, _ in false }) {
+    /// - Parameter appDelegate: Projection host for isolated tests. Returning nil uses `AppDelegate.shared` at apply time;
+    ///   production leaves this default. Capture a test delegate weakly so the detached consumer cannot own its lifetime.
+    init(databaseURL: URL?, usesVimEditor: @escaping @Sendable (String, String) -> Bool = { _, _ in false },
+         appDelegate: @escaping @MainActor @Sendable () -> AppDelegate? = { nil }) {
         guard let databaseURL else {
             self.lazyStore = nil
             self.operations = nil
@@ -69,6 +74,7 @@ final class AgentJournalLifecycleCenter: Sendable {
             let reducer = AgentLifecycleReducer()
             // cm-128.1: pane input resolution and each Claude session's vim editor mode, kept on the worker.
             let inputResolver = AgentPaneInputResolver()
+            let clearResolver = AgentClearStateResolver() // cm-128.2
             var editorModes: [String: Bool] = [:]
             let replayPolicy = AgentJournalReplayPolicy()
             var state = AgentLifecycleReducerState()
@@ -120,7 +126,7 @@ final class AgentJournalLifecycleCenter: Sendable {
                     }
                     let selectedUsesVim = usesVim
                     await MainActor.run {
-                        Self.apply(application.assignment, workspaceHint: application.workspaceHint)
+                        Self.apply(application.assignment, workspaceHint: application.workspaceHint, appDelegate: appDelegate())
                         if let surfaceId = UUID(uuidString: application.assignment.surfaceId) {
                             GhosttyApp.terminalSurfaceRegistry.terminalSurface(id: surfaceId)?.agentInputState.usesVimEditor = selectedUsesVim
                         }
@@ -236,6 +242,10 @@ final class AgentJournalLifecycleCenter: Sendable {
                     let drafts = inputResolver.drafts(workspaceId: workspaceId, surfaceId: surfaceId,
                         isEscape: isEscape, state: state, notifications: notifications, occurredAtMs: occurredAtMs)
                     for draft in drafts { await submit(draft, id: nil, store: store) }
+                case .clearAgentState(let workspaceId, let surfaceIds, let occurredAtMs): // cm-128.2
+                    let drafts = clearResolver.drafts(workspaceId: workspaceId, surfaceIds: surfaceIds,
+                        state: state, notifications: notifications, occurredAtMs: occurredAtMs)
+                    for draft in drafts { await submit(draft, id: nil, store: store) }
                 case .startupReplay:
                     guard let replayAliases = resolver(store) else { continue }
                     let assignments = Self.reduceStartupReplay(
@@ -249,7 +259,7 @@ final class AgentJournalLifecycleCenter: Sendable {
                     if !assignments.isEmpty {
                         await MainActor.run {
                             for assignment in assignments {
-                                Self.apply(assignment, workspaceHint: nil)
+                                Self.apply(assignment, workspaceHint: nil, appDelegate: appDelegate())
                             }
                         }
                     }
@@ -286,6 +296,8 @@ final class AgentJournalLifecycleCenter: Sendable {
         let draft: AgentJournalEventDraft
         do {
             draft = try JSONDecoder().decode(AgentJournalEventDraft.self, from: data)
+            // cmux-rbf: only the reconciler may produce monitoring, after journal admission. (#cm-128.3)
+            guard draft.declaredPhase != .monitoring else { return "ERROR: invalid agent journal event" }
         } catch {
             // Stable product-level reply; implementation detail stays in the
             // debug log (the caller's dead-letter keeps the draft itself).
@@ -331,6 +343,12 @@ final class AgentJournalLifecycleCenter: Sendable {
     func resolvePaneInput(workspaceId: UUID, surfaceId: UUID, isEscape: Bool) {
         operations?.yield(.paneInput(workspaceId: workspaceId, surfaceId: surfaceId,
             isEscape: isEscape, occurredAtMs: Int64(Date().timeIntervalSince1970 * 1000)))
+    }
+
+    /// Writes Clear Agent State for one workspace's panels on the ordered journal worker. (cm-128.2)
+    func clearAgentState(workspaceId: UUID, surfaceIds: [UUID]) {
+        operations?.yield(.clearAgentState(workspaceId: workspaceId, surfaceIds: surfaceIds,
+            occurredAtMs: Int64(Date().timeIntervalSince1970 * 1000)))
     }
 
     /// Queues a diagnostic event for the owned journal consumer without

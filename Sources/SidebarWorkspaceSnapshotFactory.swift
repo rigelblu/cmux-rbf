@@ -167,7 +167,11 @@ struct SidebarWorkspaceSnapshotFactory {
             checklistTotalCount: checklistProgress.totalCount,
             checklistFirstUncheckedText: checklistProgress.firstUncheckedText,
             taskStatusInput: taskStatusInput,
-            showsRaisedHand: showsRaisedHand // (#cm-109.3)
+            showsRaisedHand: showsRaisedHand, // (#cm-109.3)
+            monitoringAgentCount: SidebarAgentActivitySummary.visibleMonitoringAgentCount(
+                showsAgentActivity: showsAgentActivity,
+                statesByPanelId: workspace.agentLifecycleStatesByPanelId
+            )
         )
     }
 

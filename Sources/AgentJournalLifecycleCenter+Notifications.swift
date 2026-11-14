@@ -21,6 +21,8 @@ extension AgentJournalLifecycleCenter {
     }
 
     static func clearInvalidatedNotifications(_ event: AgentJournalEvent, decision: AgentNotificationDecision) {
+        // cm-128.2: a clear closes the request but keeps its notification (marked read by the clear) and a waiting Feed card.
+        guard event.draft.nativeEvent != AgentClearStateResolver.nativeEvent else { return }
         guard let workspaceID = event.draft.workspaceId.flatMap(UUID.init(uuidString:)),
               let surfaceID = event.draft.surfaceId.flatMap(UUID.init(uuidString:)) else { return }
         for key in decision.invalidatedCorrelationKeys {

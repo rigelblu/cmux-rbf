@@ -7897,6 +7897,23 @@ struct CMUXCLI {
             )
             print(response)
 
+        case "clear-agent-state": // cm-128.2
+            let okText = String(localized: "common.ok", defaultValue: "OK")
+            let windowHandle = try normalizeWindowHandle(windowFromArgsOrOverride(commandArgs, windowOverride: windowId), client: client)
+            let workspaceId: String
+            if let workspaceArg = workspaceFromArgsOrEnv(commandArgs, windowOverride: windowId) {
+                workspaceId = try resolveWorkspaceId(workspaceArg, client: client, windowHandle: windowHandle)
+            } else if let windowHandle {
+                workspaceId = try requireCurrentWorkspaceId(windowHandle: windowHandle, client: client, command: "clear-agent-state")
+            } else {
+                throw CLIError(message: String(
+                    localized: "cli.error.clearAgentStateRequiresWorkspace",
+                    defaultValue: "clear-agent-state requires --workspace <id|ref|index> or a cmux terminal ($CMUX_WORKSPACE_ID)"
+                ))
+            }
+            let payload = try client.sendV2(method: "workspace.clear_agent_state", params: ["workspace_id": workspaceId])
+            printV2Payload(payload, jsonOutput: jsonOutput, idFormat: idFormat, fallbackText: okText)
+
         case "list-status":
             let response = try forwardSidebarMetadataCommand(
                 "list_status",
@@ -20227,6 +20244,21 @@ struct CMUXCLI {
             Example:
               cmux clear-status build
             """
+        case "clear-agent-state": // cm-128.2
+            return """
+            Usage: cmux clear-agent-state [flags]
+
+            Clear every agent mark on a workspace: close its agents' open requests, mark
+            its notifications read, and leave each waiting or working agent's state unknown
+            until it signals again. Idle agents and your own unread mark stay as they are.
+
+            Flags:
+              --workspace <id|ref|index>   Target workspace (default: $CMUX_WORKSPACE_ID)
+              --window <id|ref|index>      Window context for workspace refs and indexes
+
+            Example:
+              cmux clear-agent-state --workspace workspace:3
+            """
         case "list-status":
             return """
             Usage: cmux list-status [flags]
@@ -28061,8 +28093,6 @@ struct CMUXCLI {
                 // the ~60s-later idle_prompt Notification can consult it, and forwarded
                 // to the app so it can suppress the done-ping until work truly drains.
                 let hasPendingBackgroundWork = hasActiveClaudeBackgroundWork(parsedInput)
-                let hasUnsettledWork = hasPendingBackgroundWork
-                    || parsedInput.rawObject?["stop_hook_active"] as? Bool == true
 
                 // Update session with transcript summary and send completion notification.
                 let completion = summarizeClaudeHookStop(
@@ -28081,7 +28111,7 @@ struct CMUXCLI {
                         // Pending background work keeps the pane out of the
                         // hibernatable .idle state so the planner cannot SIGTERM
                         // a live task (mirrors the antigravity fullyIdle flip).
-                        agentLifecycle: hasUnsettledWork ? .running : .idle,
+                        agentLifecycle: hasPendingBackgroundWork ? .running : .idle,
                         hookEventName: reportedHookEventName(from: parsedInput) ?? "Stop",
                         lastSubtitle: completion?.subtitle,
                         lastBody: completion?.body,
@@ -28112,14 +28142,14 @@ struct CMUXCLI {
                     workspaceId: workspaceId,
                     surfaceId: surfaceId,
                     isSubagent: isNestedAgentSession,
-                    pendingWork: hasUnsettledWork,
+                    pendingWork: hasPendingBackgroundWork,
                     nativeEvent: reportedHookEventName(from: parsedInput) ?? "Stop",
                         attention: Self.semanticAttentionContext(parsedInput.rawObject),
                         occurredAtMs: Self.semanticOccurredAtMs(parsedInput.rawObject),
                     store: sessionStore,
                     telemetry: telemetry
                 )
-                if hasUnsettledWork {
+                if hasPendingBackgroundWork {
                     // The turn ended but a background task or scheduled wakeup is
                     // still live, so the pane is not idle — show it as still
                     // running rather than the misleading "Idle". Reuse the shared
@@ -28152,7 +28182,7 @@ struct CMUXCLI {
                         subtitle: completion.subtitle,
                         body: completion.body,
                         meta: AgentHookNotifyCategory.turnComplete.metaSegment(
-                            pending: hasUnsettledWork,
+                            pending: hasPendingBackgroundWork,
                             agentID: "claude",
                             isSubagent: isNestedAgentSession
                         )
@@ -28160,7 +28190,7 @@ struct CMUXCLI {
                     _ = try? sendV1Command(try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                         sessionId: parsedInput.sessionId, workspaceId: workspaceId, surfaceId: surfaceId,
                         kind: .turnCompleted, rawObject: parsedInput.rawObject, payload: payload,
-                        pendingWork: hasUnsettledWork), client: client)
+                        pendingWork: hasPendingBackgroundWork), client: client)
                 }
                 printClaudeHookAck()
             } catch {
@@ -28174,6 +28204,11 @@ struct CMUXCLI {
 
         case "prompt-submit":
             telemetry.breadcrumb("claude-hook.prompt-submit")
+            // cmux-rbf: each typed or automatic prompt starts its own completion identity. (#cm-128.3)
+            var promptAttention = Self.semanticAttentionContext(parsedInput.rawObject)
+            if let promptID = parsedInput.rawObject?["prompt_id"] as? String, !promptID.isEmpty {
+                promptAttention.eventIdentity = promptID
+            }
             let mappedSession = parsedInput.sessionId.flatMap { try? sessionStore.lookup(sessionId: $0) }
             guard let resolvedTarget = try resolveClaudeHookDeliveryTarget(
                 mappedSession: mappedSession,
@@ -28192,7 +28227,7 @@ struct CMUXCLI {
                     surfaceId: nil,
                     unattributedReason: "target-unresolved",
                     nativeEvent: reportedHookEventName(from: parsedInput) ?? "UserPromptSubmit",
-                        attention: Self.semanticAttentionContext(parsedInput.rawObject),
+                        attention: promptAttention,
                         occurredAtMs: Self.semanticOccurredAtMs(parsedInput.rawObject),
                     store: sessionStore,
                     telemetry: telemetry
@@ -28256,7 +28291,7 @@ struct CMUXCLI {
                     surfaceId: surfaceId,
                     isSubagent: true,
                     nativeEvent: reportedHookEventName(from: parsedInput) ?? "UserPromptSubmit",
-                        attention: Self.semanticAttentionContext(parsedInput.rawObject),
+                        attention: promptAttention,
                         occurredAtMs: Self.semanticOccurredAtMs(parsedInput.rawObject),
                     store: sessionStore,
                     telemetry: telemetry
@@ -28313,7 +28348,7 @@ struct CMUXCLI {
                 workspaceId: workspaceId,
                 surfaceId: surfaceId,
                 nativeEvent: reportedHookEventName(from: parsedInput) ?? "UserPromptSubmit",
-                        attention: Self.semanticAttentionContext(parsedInput.rawObject),
+                        attention: promptAttention,
                         occurredAtMs: Self.semanticOccurredAtMs(parsedInput.rawObject),
                 store: sessionStore,
                 telemetry: telemetry
@@ -35768,6 +35803,9 @@ export default CMUXSessionRestore;
                     case .idle?: correctedPhase = .idle
                     case .needsInput?: correctedPhase = .needsInput
                     case .unknown?: correctedPhase = .unknown
+                    // cmux-rbf: a producer cannot declare the derived monitoring phase. (#cm-128.3)
+                    case .monitoring?: correctedPhase = .running
+                    case .error?: correctedPhase = .error
                     case nil: correctedPhase = nil
                     }
                 }
@@ -41557,6 +41595,7 @@ export default CMUXSessionRestore;
           sidebar <validate|reload|select|open> [name]
           set-status <key> <value> [--workspace <id|ref|index>] [--window <id|ref|index>] [--icon <name>] [--color <#hex>] [--priority <n>]
           clear-status <key> [--workspace <id|ref|index>] [--window <id|ref|index>]
+          clear-agent-state [--workspace <id|ref|index>] [--window <id|ref|index>]
           list-status [--workspace <id|ref|index>] [--window <id|ref|index>]
           set-progress <0.0-1.0> [--label <text>] [--workspace <id|ref|index>] [--window <id|ref|index>]
           clear-progress [--workspace <id|ref|index>] [--window <id|ref|index>]

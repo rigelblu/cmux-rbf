@@ -33,8 +33,13 @@ struct AgentFeedSemanticInput: Sendable {
             default: kind = mapper.kind(source: event.source, nativeEvent: event.hookEventName.rawValue)
             }
         }
-        let nativeRequest = ["tool_use_id", "tool_call_id", "request_id", "agent_id"]
+        var nativeRequest = ["tool_use_id", "tool_call_id", "request_id", "agent_id"]
             .compactMap { extra[$0] as? String }.first
+        // cmux-rbf: Claude's helper ID is a child identity, never an approval request ID. (#cm-128.3)
+        if event.source == "claude", [.childSpawned, .childCompleted, .childFailed].contains(kind),
+           let helperID = extra["helper_agent_id"] as? String, !helperID.isEmpty {
+            nativeRequest = helperID
+        }
         let identity = nativeRequest ?? ((notification != nil || resolvesRequest) ? (requestID ?? event.requestId) : nil)
         if notification == nil, !resolved,
            ![.sessionStarted, .turnStarted, .sessionEnded, .childSpawned, .childCompleted, .childFailed].contains(kind) {

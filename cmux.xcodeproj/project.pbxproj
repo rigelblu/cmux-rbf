@@ -15,7 +15,20 @@
 		C12800070000000000000001 /* KeypressWaitResolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800070000000000000002 /* KeypressWaitResolutionTests.swift */; };
 		C128020990000000000000001 /* SidebarSectionNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020990000000000000002 /* SidebarSectionNameTests.swift */; };
 		C128020310000000000000001 /* SidebarGroupedPinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020310000000000000002 /* SidebarGroupedPinTests.swift */; };
+		C128020330000000000000001 /* SidebarAgentMonitoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020330000000000000002 /* SidebarAgentMonitoringTests.swift */; };
+		C128020320000000000000001 /* WorkspaceAgentSignalSamplerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020320000000000000002 /* WorkspaceAgentSignalSamplerTests.swift */; };
+		C128020340000000000000001 /* AgentHibernationLifecycleStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020340000000000000002 /* AgentHibernationLifecycleStateTests.swift */; };
+		C128020300000000000000001 /* SidebarAgentSpinnerFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020300000000000000002 /* SidebarAgentSpinnerFlagTests.swift */; };
+		C128020150000000000000001 /* ClearAgentStateEntranceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020150000000000000002 /* ClearAgentStateEntranceTests.swift */; };
+		C128020140000000000000001 /* ClearAgentStateAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020140000000000000002 /* ClearAgentStateAvailabilityTests.swift */; };
+		C128020130000000000000001 /* AgentClearNotificationEffectsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020130000000000000002 /* AgentClearNotificationEffectsTests.swift */; };
+		C128020120000000000000001 /* AgentClearHibernationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020120000000000000002 /* AgentClearHibernationTests.swift */; };
+		C128020110000000000000001 /* AgentClearStateResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020110000000000000002 /* AgentClearStateResolverTests.swift */; };
 		C12800060000000000000001 /* AgentPaneInputResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800060000000000000002 /* AgentPaneInputResolver.swift */; };
+		C12803040000000000000001 /* Sidebar/SidebarWorkspaceMonitoringWaveform.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12803040000000000000002 /* Sidebar/SidebarWorkspaceMonitoringWaveform.swift */; };
+		C128020030000000000000001 /* TerminalController+ClearAgentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020030000000000000002 /* TerminalController+ClearAgentState.swift */; };
+		C128020020000000000000001 /* Workspace+ClearAgentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020020000000000000002 /* Workspace+ClearAgentState.swift */; };
+		C128020010000000000000001 /* AgentClearStateResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020010000000000000002 /* AgentClearStateResolver.swift */; };
 		C12800050000000000000001 /* ClaudeStopHookPendingWorkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */; };
 		C12800040000000000000001 /* ClaudeHookAttentionTestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800040000000000000002 /* ClaudeHookAttentionTestFixture.swift */; };
 		C12800020000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800030000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift */; };
@@ -4255,7 +4268,20 @@
 		C12800070000000000000002 /* KeypressWaitResolutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeypressWaitResolutionTests.swift"; sourceTree = "<group>"; };
 		C128020990000000000000002 /* SidebarSectionNameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarSectionNameTests.swift"; sourceTree = "<group>"; };
 		C128020310000000000000002 /* SidebarGroupedPinTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarGroupedPinTests.swift"; sourceTree = "<group>"; };
+		C128020330000000000000002 /* SidebarAgentMonitoringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarAgentMonitoringTests.swift"; sourceTree = "<group>"; };
+		C128020320000000000000002 /* WorkspaceAgentSignalSamplerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceAgentSignalSamplerTests.swift"; sourceTree = "<group>"; };
+		C128020340000000000000002 /* AgentHibernationLifecycleStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentHibernationLifecycleStateTests.swift"; sourceTree = "<group>"; };
+		C128020300000000000000002 /* SidebarAgentSpinnerFlagTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarAgentSpinnerFlagTests.swift"; sourceTree = "<group>"; };
+		C128020150000000000000002 /* ClearAgentStateEntranceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClearAgentStateEntranceTests.swift"; sourceTree = "<group>"; };
+		C128020140000000000000002 /* ClearAgentStateAvailabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClearAgentStateAvailabilityTests.swift"; sourceTree = "<group>"; };
+		C128020130000000000000002 /* AgentClearNotificationEffectsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentClearNotificationEffectsTests.swift"; sourceTree = "<group>"; };
+		C128020120000000000000002 /* AgentClearHibernationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentClearHibernationTests.swift"; sourceTree = "<group>"; };
+		C128020110000000000000002 /* AgentClearStateResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentClearStateResolverTests.swift"; sourceTree = "<group>"; };
 		C12800060000000000000002 /* AgentPaneInputResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentPaneInputResolver.swift"; sourceTree = "<group>"; };
+		C12803040000000000000002 /* Sidebar/SidebarWorkspaceMonitoringWaveform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sidebar/SidebarWorkspaceMonitoringWaveform.swift"; sourceTree = "<group>"; };
+		C128020030000000000000002 /* TerminalController+ClearAgentState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+ClearAgentState.swift"; sourceTree = "<group>"; };
+		C128020020000000000000002 /* Workspace+ClearAgentState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+ClearAgentState.swift"; sourceTree = "<group>"; };
+		C128020010000000000000002 /* AgentClearStateResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentClearStateResolver.swift"; sourceTree = "<group>"; };
 		C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeStopHookPendingWorkTests.swift"; sourceTree = "<group>"; };
 		C12800040000000000000002 /* ClaudeHookAttentionTestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeHookAttentionTestFixture.swift"; sourceTree = "<group>"; };
 		C12800030000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+ClaudeAttentionResolution.swift"; sourceTree = "<group>"; };
@@ -10071,6 +10097,10 @@
 				C12800080000000000000002 /* TerminalSurface+AgentInput.swift */,
 				C128000A0000000000000002 /* AgentSessionLivenessResolver.swift */,
 				C12800060000000000000002 /* AgentPaneInputResolver.swift */,
+				C12803040000000000000002 /* Sidebar/SidebarWorkspaceMonitoringWaveform.swift */,
+				C128020030000000000000002 /* TerminalController+ClearAgentState.swift */,
+				C128020020000000000000002 /* Workspace+ClearAgentState.swift */,
+				C128020010000000000000002 /* AgentClearStateResolver.swift */,
 				A0F23A5D074809C236E5C607 /* AgentNotificationAdmissionWaiters.swift */,
 				2B17F904F7764F1CA16D27F3 /* AgentFeedSemanticInput.swift */,
 				E2C08BD36B31E50A48F5EFE9 /* TerminalNotificationPolicyAgentContext.swift */,
@@ -12215,6 +12245,15 @@
 				C12800070000000000000002 /* KeypressWaitResolutionTests.swift */,
 				C128020990000000000000002 /* SidebarSectionNameTests.swift */,
 				C128020310000000000000002 /* SidebarGroupedPinTests.swift */,
+				C128020330000000000000002 /* SidebarAgentMonitoringTests.swift */,
+				C128020320000000000000002 /* WorkspaceAgentSignalSamplerTests.swift */,
+				C128020340000000000000002 /* AgentHibernationLifecycleStateTests.swift */,
+				C128020300000000000000002 /* SidebarAgentSpinnerFlagTests.swift */,
+				C128020150000000000000002 /* ClearAgentStateEntranceTests.swift */,
+				C128020140000000000000002 /* ClearAgentStateAvailabilityTests.swift */,
+				C128020130000000000000002 /* AgentClearNotificationEffectsTests.swift */,
+				C128020120000000000000002 /* AgentClearHibernationTests.swift */,
+				C128020110000000000000002 /* AgentClearStateResolverTests.swift */,
 				C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */,
 				C12800040000000000000002 /* ClaudeHookAttentionTestFixture.swift */,
 				79390010AA11BB22CC33DD10 /* AgentNotificationMoveRaceTests.swift */,
@@ -13201,6 +13240,10 @@
 				C12800080000000000000001 /* TerminalSurface+AgentInput.swift in Sources */,
 				C128000A0000000000000001 /* AgentSessionLivenessResolver.swift in Sources */,
 				C12800060000000000000001 /* AgentPaneInputResolver.swift in Sources */,
+				C12803040000000000000001 /* Sidebar/SidebarWorkspaceMonitoringWaveform.swift in Sources */,
+				C128020030000000000000001 /* TerminalController+ClearAgentState.swift in Sources */,
+				C128020020000000000000001 /* Workspace+ClearAgentState.swift in Sources */,
+				C128020010000000000000001 /* AgentClearStateResolver.swift in Sources */,
 				E506942F7E8A3C80F94EA4EB /* AgentNotificationAdmissionWaiters.swift in Sources */,
 				0A1107110000000000000010 /* AgentNotificationDelivery.swift in Sources */,
 				A5D41234A1B2C3D4E5F60718 /* AgentNotificationGate.swift in Sources */,
@@ -16031,6 +16074,15 @@
 				C12800070000000000000001 /* KeypressWaitResolutionTests.swift in Sources */,
 				C128020990000000000000001 /* SidebarSectionNameTests.swift in Sources */,
 				C128020310000000000000001 /* SidebarGroupedPinTests.swift in Sources */,
+				C128020330000000000000001 /* SidebarAgentMonitoringTests.swift in Sources */,
+				C128020320000000000000001 /* WorkspaceAgentSignalSamplerTests.swift in Sources */,
+				C128020340000000000000001 /* AgentHibernationLifecycleStateTests.swift in Sources */,
+				C128020300000000000000001 /* SidebarAgentSpinnerFlagTests.swift in Sources */,
+				C128020150000000000000001 /* ClearAgentStateEntranceTests.swift in Sources */,
+				C128020140000000000000001 /* ClearAgentStateAvailabilityTests.swift in Sources */,
+				C128020130000000000000001 /* AgentClearNotificationEffectsTests.swift in Sources */,
+				C128020120000000000000001 /* AgentClearHibernationTests.swift in Sources */,
+				C128020110000000000000001 /* AgentClearStateResolverTests.swift in Sources */,
 				C12800050000000000000001 /* ClaudeStopHookPendingWorkTests.swift in Sources */,
 				C12800040000000000000001 /* ClaudeHookAttentionTestFixture.swift in Sources */,
 				D3610B010000000000000001 /* AgentSessionAutoResumeSettingsTests.swift in Sources */,

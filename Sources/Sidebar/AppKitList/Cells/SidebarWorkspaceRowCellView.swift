@@ -33,6 +33,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let leadingBadge = SidebarRowUnreadBadgeView()
     private var markSpinner: GPUSpinnerNSView?
     private var handImageView: NSImageView? // (#cm-109.3)
+    private var monitoringImageView: NSImageView? // (#cm-128.3)
     private var handOutlineView: WaitingHandOutlineView? // (#cm-109.7)
     private let pinImageView = NSImageView()
     private let muteImageView = NSImageView()
@@ -737,14 +738,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             trailingBadge.configure(count: model.unreadCount, fillColor: badgeFill, textColor: badgeText, font: badgeFont)
         }
 
-        let spinnerColor = palette.secondary(0.55)
+        let spinnerColor = palette.visual.agentActivityColor() // (#cm-128.3)
         markSpinner = Self.updateSpinner(
             existing: markSpinner,
             visible: markSpinnerVisible,
             color: spinnerColor,
             colorScheme: palette.colorScheme,
             presentationActive: isPresentationActive,
-            in: contentContainer
+            in: self // (#cm-128.3) outside the Done content dim; both hosts use the row's origin.
         )
         trailingSpinner = Self.updateSpinner(
             existing: trailingSpinner,
@@ -752,7 +753,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             color: spinnerColor,
             colorScheme: palette.colorScheme,
             presentationActive: isPresentationActive,
-            in: contentContainer
+            in: self // (#cm-128.3)
         )
         let agentCount = model.snapshot.activeCodingAgentCount
         let tooltip = agentCount == 1
@@ -764,12 +765,23 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         markSpinner?.toolTip = tooltip
         trailingSpinner?.toolTip = tooltip
 
+        monitoringImageView = Self.updateAgentMark(
+            existing: monitoringImageView,
+            visible: model.showsAgentActivity && model.snapshot.monitoringAgentCount > 0,
+            color: palette.semantic(spinnerColor),
+            tooltip: String(localized: "sidebar.agentMonitoring.tooltip", defaultValue: "Watching a background job"),
+            symbolName: "waveform.path.ecg",
+            pointSize: max(10, 12 * model.fontScale),
+            weight: SidebarWorkspaceMonitoringWaveform.symbolWeight,
+            in: self // (#cm-128.3)
+        )
+
         let handVisible = slotResolution.showsHand // (#cm-109.3)
         let waitingTooltip = handVisible ? String(localized: "sidebar.agentWaiting.tooltip", defaultValue: "An agent is waiting for your answer") : "" // (#cm-109.3)
         let handYellow = waitingHandYellow(for: palette.colorScheme) // (#cm-109.7)
         let handOutlined = Self.rowContrastBackground(model: model, palette: palette) // (#cm-109.7)
             .map { handNeedsOutline(yellow: handYellow, on: $0, drawnAt: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: model.snapshot.taskStatus)) } ?? false // (#cm-109.7)
-        let hand = Self.updateHand( // (#cm-109.3)
+        let hand = Self.updateAgentMark( // (#cm-109.3)
             existing: handImageView, // (#cm-109.3)
             visible: handVisible, // (#cm-109.3)
             color: handYellow, // (#cm-109.7)
@@ -793,11 +805,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         return palette.visual.contrastBackground(sidebarStandIn: sidebarStandIn) // (#cm-109.7)
     } // (#cm-109.7)
 
-    private static func updateHand( // (#cm-109.3)
+    private static func updateAgentMark( // (#cm-128.3) shared by the hand and static waveform.
         existing: NSImageView?, // (#cm-109.3)
         visible: Bool, // (#cm-109.3)
         color: NSColor, // (#cm-109.3)
         tooltip: String, // (#cm-109.3)
+        symbolName: String = "hand.raised.fill",
+        pointSize: CGFloat? = nil,
+        weight: NSFont.Weight = .semibold,
         in container: NSView // (#cm-109.3)
     ) -> NSImageView? { // (#cm-109.3)
         if !visible { // (#cm-109.3)
@@ -814,7 +829,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             view = iv // (#cm-109.3)
         } // (#cm-109.3)
         view.isHidden = false // (#cm-109.3)
-        view.image = NSImage(systemSymbolName: "hand.raised.fill", accessibilityDescription: tooltip) // (#cm-109.3)
+        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: tooltip)
+        if let pointSize {
+            view.image = image?.withSymbolConfiguration(.init(pointSize: pointSize, weight: weight))
+        } else {
+            view.image = image
+        }
         view.contentTintColor = color // (#cm-109.3)
         view.toolTip = tooltip // (#cm-109.3)
         view.setAccessibilityLabel(tooltip) // (#cm-109.3)
@@ -1322,6 +1342,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         // cm-128.1: the left spinner draws after the glyph and the hand, beside them.
         if let spinner = markSpinner, !spinner.isHidden {
             place(spinner, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
+            x += spinnerSide + titleRowSpacing
+        }
+
+        if let waveform = monitoringImageView, !waveform.isHidden { // (#cm-128.3)
+            place(waveform, size: NSSize(width: spinnerSide, height: spinnerSide), centerY: firstLineCenter)
             x += spinnerSide + titleRowSpacing
         }
 

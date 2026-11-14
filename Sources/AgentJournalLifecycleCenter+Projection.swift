@@ -224,14 +224,16 @@ extension AgentJournalLifecycleCenter {
 #endif
     }
 
+    /// - Parameter appDelegate: Where to look the panel up; `AppDelegate.shared` when nil. A center built for a test passes
+    ///   its own, so a suite that reassigns `AppDelegate.shared` meanwhile cannot redirect the projection. (cm-128.2)
     @MainActor
-    static func apply(_ assignment: AgentLifecycleAssignment, workspaceHint: String?) {
+    static func apply(_ assignment: AgentLifecycleAssignment, workspaceHint: String?, appDelegate: AppDelegate? = nil) {
         guard AgentHibernationLifecycleStatusKeys.isAllowed(assignment.agentKey) else { return }
         guard let panelId = UUID(uuidString: assignment.surfaceId) else { return }
         let owner: ControlSidebarPanelOwner?
         if let dock = DockSplitStore.liveStores.first(where: { $0.containsPanel(panelId) }) {
             owner = .dock(dock)
-        } else if let located = AppDelegate.shared?.workspaceContainingPanel(
+        } else if let located = (appDelegate ?? AppDelegate.shared)?.workspaceContainingPanel(
             panelId: panelId,
             preferredWorkspaceId: workspaceHint.flatMap(UUID.init(uuidString:))
         ) {
@@ -282,6 +284,7 @@ extension AgentJournalLifecycleCenter {
         switch phase {
         case .unknown: .unknown
         case .running: .running
+        case .monitoring: .monitoring
         case .needsInput: .needsInput
         case .idle: .idle
         case .error: .needsInput

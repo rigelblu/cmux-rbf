@@ -10,6 +10,62 @@ import Testing
 
 @Suite("Agent journal lifecycle center")
 struct AgentJournalLifecycleCenterTests {
+    @MainActor
+    @Test func aPreferenceFilteredMonitoringStopSpendsNoReceiptBeforeTheDrain() async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            _ = try #require(AppDelegate.shared)
+            let fixture = try AgentNotificationRegressionTests().makeFixture()
+            defer { fixture.restore() }
+            let defaults = UserDefaults.standard
+            let key = "notificationAgentTurnComplete"
+            let previous = defaults.object(forKey: key)
+            defaults.set("whenIdle", forKey: key)
+            defer {
+                if let previous { defaults.set(previous, forKey: key) } else { defaults.removeObject(forKey: key) }
+            }
+            fixture.source.surfaceResumeBindingsByPanelId[fixture.panelId] = SurfaceResumeBindingSnapshot(
+                kind: "claude", command: "claude --resume session", checkpointId: "session", source: "agent-hook")
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let center = AgentJournalLifecycleCenter(databaseURL: root.appendingPathComponent("journal.sqlite"))
+            let workspaceID = fixture.source.id.uuidString
+            let surfaceID = fixture.panelId.uuidString
+            var sequence: Int64 = 0
+            func draft(_ kind: AgentJournalEventKind, pending: Bool = false, prompt: String? = nil) -> AgentJournalEventDraft {
+                sequence += 1
+                return AgentJournalEventDraft(kind: kind, occurredAtMs: sequence, source: "claude", agentKey: "claude_code",
+                    sessionId: "session", workspaceId: workspaceID, surfaceId: surfaceID,
+                    pendingWork: pending, attention: AgentAttentionContext(eventIdentity: prompt,
+                        notification: kind == .turnCompleted ? AgentJournalNotification(title: "Claude", subtitle: "",
+                            body: "Finished", category: "turn-complete") : nil))
+            }
+            _ = await center.admitNotification(draft(.turnStarted, prompt: "typed"))
+            let watching = draft(.turnCompleted, pending: true)
+            #expect(AgentJournalLifecycleCenter.notificationTargetIsCurrent(watching))
+            #expect(!AgentNotificationDelivery().allows(category: .turnComplete, pending: true))
+            #expect(!(await center.admitNotification(watching)))
+            // Keep this completion on the same identity so an early claim would make it fail.
+            #expect(await center.admitNotification(draft(.turnCompleted)))
+            #expect(!(await center.admitNotification(draft(.turnCompleted))))
+            _ = await center.admitNotification(draft(.turnStarted, prompt: "drain"))
+            #expect(await center.admitNotification(draft(.turnCompleted)))
+        }
+    }
+
+    @Test func appendCommandRejectsDeclaredMonitoringAtDecode() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("journal.sqlite")
+        let center = AgentJournalLifecycleCenter(databaseURL: url)
+        let draft = AgentJournalEventDraft(kind: .stateChanged, occurredAtMs: 1, source: "claude", agentKey: "claude_code",
+            sessionId: "session", workspaceId: UUID().uuidString, surfaceId: UUID().uuidString, declaredPhase: .monitoring)
+        let json = try #require(String(data: JSONEncoder().encode(draft), encoding: .utf8))
+        #expect(center.handleAppendCommand(json) == "ERROR: invalid agent journal event")
+        let store = try AgentJournalStore(databaseURL: url)
+        defer { store.close() }
+        #expect(try store.headSequence() == 0)
+    }
+
     @Test func appendCommandCommitsDurablyAndReplaysIdempotently() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("agent-journal-center-\(UUID().uuidString)", isDirectory: true)
