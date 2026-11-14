@@ -287,7 +287,7 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
         for entry in numbered where !entry.quote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let note = entry.note.trimmingCharacters(in: .whitespacesAndNewlines)
             entries.append(
-                (["\(entry.number).", quoteBlock(entry.quote)] + (note.isEmpty ? [] : [note]))
+                (["\(entry.number).", Self.quoteBlock(entry.quote)] + (note.isEmpty ? [] : [note]))
                     .joined(separator: "\n")
             )
         }
@@ -309,9 +309,16 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
     /// and costs one line. Anything longer takes a fence: it carries no
     /// per-line mark at all, so there is nothing a wrap can strip, and it
     /// survives spans containing headings, lists and fences of their own.
-    private func quoteBlock(_ quote: String) -> String {
+    ///
+    /// `inlineBudget` is the longest quote, in characters, that may still take
+    /// `> "…"`. The default is the Reply panel's budget, so the panel's output
+    /// is unchanged. `nil` is no limit: a quote with no line break is always
+    /// one line, which is what reply inline (`cm-136.1`, Q10) asks for. The
+    /// panel's preview wraps at 276 pt and strips a wrapped line's `> `;
+    /// inline Reply has no such preview.
+    static func quoteBlock(_ quote: String, inlineBudget: Int? = inlineQuoteCharacterBudget) -> String {
         let trimmed = quote.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.contains("\n"), trimmed.count <= Self.inlineQuoteCharacterBudget {
+        if !trimmed.contains("\n"), inlineBudget.map({ trimmed.count <= $0 }) ?? true {
             return "> \"\(trimmed)\""
         }
         // Per CommonMark a fence must be longer than any backtick run inside
