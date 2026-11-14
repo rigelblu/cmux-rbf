@@ -364,11 +364,26 @@ public struct BrowserURLAllowlistPolicy: Equatable, Sendable {
     /// hostless (or use the `localhost` host); network-host and relative file
     /// URLs remain denied, and a forced `BrowserAllowLocalFiles=false` denies
     /// them all.
+    // cmux-rbf #cm-73.40: the Figma preview page is cmux's own document, loaded via loadSimulatedRequest
+    // on https://www.figma.com/cmux-preview/figma-embed.html. An allowlist must not block cmux's own load of it.
+    // One of three copies of this address: `CLI/FigmaPaneURL.swift` (`previewPageURL`, `isSamePage`) and the
+    // `/cmux-preview/` prefix in `Sources/FigmaMotion.swift` (`clockScript`). The package cannot import the CLI
+    // target, so the copy is inherent; keep its rule as strict as `isSamePage`'s (scheme, host, port, user, path).
+    private static func isFigmaPreviewPageURL(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https"
+            && url.host?.lowercased() == "www.figma.com"
+            && url.port == nil
+            && url.user == nil
+            && url.path == "/cmux-preview/figma-embed.html"
+    }
+
     public func allowsTrustedInternalURL(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return !isActive }
         if scheme == "file" { return allowsLocalFiles && isLocalFileURL(url) }
         guard isActive else { return true }
-        return Self.trustedInternalSchemes.contains(scheme) || allows(url)
+        return Self.trustedInternalSchemes.contains(scheme)
+            || Self.isFigmaPreviewPageURL(url)
+            || allows(url)
     }
 
     private static func patterns(from values: [String]) -> [BrowserURLAllowlistPattern] {

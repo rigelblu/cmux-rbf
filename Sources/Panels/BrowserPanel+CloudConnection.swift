@@ -12,7 +12,9 @@ extension BrowserPanel {
 
     func preferredURLStringForSessionSnapshot() -> String? {
         if let serviceURL = cloudAccess.sessionURL(currentURL: currentURL) { return serviceURL.absoluteString }
-        if let displayURL = restorableDisplayURLForCurrentErrorPage(liveURL: webView.url),
+        // cmux-rbf #cm-73.40 (code review 4, R1): never save a page address from `webView.url` in the redirect window.
+        // Reject a revert of this hunk on upstream sync.
+        if let displayURL = restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: webView)),
            let value = Self.serializableSessionHistoryURLString(displayURL) {
             return value
         }

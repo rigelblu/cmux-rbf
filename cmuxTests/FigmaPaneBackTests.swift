@@ -2,6 +2,7 @@ import AppKit
 import CmuxBrowser
 import CoreGraphics
 import Foundation
+import Network
 import Testing
 import WebKit
 
@@ -1331,6 +1332,493 @@ struct FigmaPaneBackTests {
             guard navigation === expectedNavigation else { return }
             completion?.resume(throwing: error)
             completion = nil
+        }
+    }
+
+    // MARK: - cm-73.40, Scenario 404: a Back or Forward that WebKit asks the server for
+
+    /// The address the web view shows when it shows cmux's page (its HTML carries `cmuxFramableAddress`), else "".
+    private func cmuxPageHref(_ view: WKWebView) async -> String {
+        let js = "document.documentElement.outerHTML.indexOf('cmuxFramableAddress') >= 0 ? location.href : ''"
+        return ((try? await view.evaluateJavaScript(js)) as? String) ?? ""
+    }
+
+    /// Waits until the web view shows cmux's page at `target` with nothing loading, and returns its href then.
+    private func settledOnCmuxPage(_ pane: BrowserPanel, _ target: URL, seconds: Double = 15) async -> String {
+        let deadline = Date().addingTimeInterval(seconds)
+        var href = ""
+        while Date() < deadline {
+            href = await cmuxPageHref(pane.webView)
+            if href == target.absoluteString, !pane.webView.isLoading,
+               pane.navigationDelegate?.pendingFigmaTraversalRepairURL == nil { return href }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return href
+    }
+
+    private func list(_ view: WKWebView) -> (back: [String], current: String?, forward: [String]) {
+        (view.backForwardList.backList.map(\.url.absoluteString),
+         view.backForwardList.currentItem?.url.absoluteString,
+         view.backForwardList.forwardList.map(\.url.absoluteString))
+    }
+
+    // cmux-rbf #cm-73.40 (Scenario 404, scope check 1 item 1): three previews, then WebKit's own Back, Back, Forward and
+    // `go(to:)`, each answered by a server standing in for Figma's (`Cache-Control: no-store`, page cache off, so every move
+    // asks it). The page address is the stand-in's, named on this web view only (`figmaPreviewPageAddressForTesting`).
+    @Test("WebKit's Back, Back, Forward and go(to:), each answered by the server, end on cmux's page with the lists unchanged")
+    func serverAnsweredTraversalsEndOnCmuxPageWithTheListsUnchanged() async throws {
+        let server = try StandInFigmaServer()
+        defer { server.stop() }
+        let page = server.url(path: "/cmux-preview/figma-embed.html")
+        let pane = BrowserPanel(workspaceId: UUID(), renderInitialNavigation: false, websiteDataStore: .nonPersistent())
+        defer { pane.close() }
+        let view = try #require(pane.webView as? CmuxWebView)
+        view.figmaPreviewPageAddressForTesting = page
+        view.configuration.preferences.setValue(false, forKey: "usesPageCache")
+        let previews = ["1-1", "2-2", "3-3"].map { node in
+            FigmaPaneURL.wrapperURL(page, embedding: URL(string: "https://embed.figma.com/design/KEY/screen?node-id=\(node)")!)
+        }
+        for preview in previews {
+            pane.navigate(to: preview)
+            let href = await settledOnCmuxPage(pane, preview)
+            try #require(href == preview.absoluteString, "fixture: \(preview) loaded \(href.isEmpty ? "no cmux page" : href)")
+        }
+        let p = previews.map(\.absoluteString)
+        try #require(list(view) == ([p[0], p[1]], p[2], []), "fixture: \(list(view))")
+        try #require(server.requests.isEmpty, "fixture: cmux's own loads asked the server: \(server.requests)")
+
+        let moves: [(name: String, move: () -> Void, target: URL, expected: (back: [String], current: String?, forward: [String]))] = [
+            ("Back", { view.applyBrowserUserAgentPolicy(for: previews[1]); view.goBack() }, previews[1], ([p[0]], p[1], [p[2]])),
+            ("Back", { view.applyBrowserUserAgentPolicy(for: previews[0]); view.goBack() }, previews[0], ([], p[0], [p[1], p[2]])),
+            ("Forward", { view.applyBrowserUserAgentPolicy(for: previews[1]); view.goForward() }, previews[1], ([p[0]], p[1], [p[2]])),
+            ("go(to:)", {
+                view.applyBrowserUserAgentPolicy(for: previews[2])
+                if let item = view.backForwardList.forwardList.last { view.go(to: item) }
+            }, previews[2], ([p[0], p[1]], p[2], []))
+        ]
+        for (index, step) in moves.enumerated() {
+            let askedBefore = server.requests.count
+            step.move()
+            let href = await settledOnCmuxPage(pane, step.target)
+            #expect(href == step.target.absoluteString, "\(index + 1) \(step.name): shows \(href.isEmpty ? "the server's answer, not cmux's page" : href)")
+            #expect(server.requests.count > askedBefore, "\(index + 1) \(step.name): WebKit did not ask the server, so the repair was not exercised")
+            let now = list(view)
+            #expect(now == step.expected, "\(index + 1) \(step.name): lists \(now), expected \(step.expected)")
+        }
+    }
+
+    /// The pane's frame address, if cmux's page framed one.
+    private func framedAddress(_ view: WKWebView) async -> String? {
+        let js = "(function(){ var f = document.querySelector('iframe'); return f ? f.src : ''; })()"
+        let value = ((try? await view.evaluateJavaScript(js)) as? String) ?? ""
+        return value.isEmpty ? nil : value
+    }
+
+    private func waitFor(_ seconds: Double = 10, _ condition: () async -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if await condition() { return true }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return await condition()
+    }
+
+    // cmux-rbf #cm-73.40 (Scenario 405's www.figma.com leg, `02_decisions.md` 2026-11-05 option (a); scope check 1 item 2):
+    // a document on the page's own origin mints the page address with the History API. That is accepted: the address moves
+    // with no navigation and no refusal, and cmux's Reload then makes the preview of exactly that `embed=`, which frames only
+    // an `embed.figma.com` address. No www.figma.com document is ours to load, so the stand-in server's origin plays it,
+    // with its page address named on this web view (`figmaPreviewPageAddressForTesting`).
+    @Test("A document on the page's origin that replaceStates to the page address is accepted, and cmux's Reload makes exactly that preview", arguments: [true, false])
+    func aPageOriginDocumentMintingThePageAddressIsAccepted(onEmbedHost: Bool) async throws {
+        let server = try StandInFigmaServer()
+        defer { server.stop() }
+        let page = server.url(path: "/cmux-preview/figma-embed.html")
+        let embed = onEmbedHost ? "https://embed.figma.com/design/OlnsbHBaQ6WeIU3lx8Qsnn/x?node-id=172-310" : "https://example.com/not-figma"
+        let minted = page.appending(queryItems: [URLQueryItem(name: "embed", value: embed)])
+        let pane = BrowserPanel(workspaceId: UUID(), renderInitialNavigation: false, websiteDataStore: .nonPersistent())
+        defer { pane.close() }
+        let view = try #require(pane.webView as? CmuxWebView)
+        view.figmaPreviewPageAddressForTesting = page
+        let delegate = try #require(pane.navigationDelegate)
+        let editorAddress = server.url(path: "/design/EDITOR/file")
+        pane.navigate(to: editorAddress)
+        let loaded = await waitFor { view.url == editorAddress && !view.isLoading && delegate.lastAttemptedURL == nil }
+        try #require(loaded, "fixture: \(String(describing: view.url)), attempted \(String(describing: delegate.lastAttemptedURL))")
+
+        // Another pane on the same page address, a preview with a Back entry: nothing the first pane does may change it
+        // (`17_verification.md` Scenario 405, "nothing else changes in any other pane").
+        let other = try await otherPreviewPane(server: server, page: page, editorAddress: editorAddress)
+        defer { if other !== pane { other.close() } }
+        let otherBefore = await paneState(other)
+        try #require(otherBefore.href == otherBefore.current?.absoluteString && otherBefore.back == [editorAddress.absoluteString],
+                     "fixture: the other pane is not a preview with a Back entry: \(otherBefore)")
+
+        _ = try await view.evaluateJavaScript("history.replaceState(null, '', \(String(reflecting: minted.absoluteString))); true")
+        let moved = await waitFor { pane.currentURL == minted }
+        #expect(moved, "the pane's address is \(String(describing: pane.currentURL)), not the minted page address")
+        #expect(delegate.refusedFigmaPreviewPageURLs.isEmpty, "a History API move was refused: \(delegate.refusedFigmaPreviewPageURLs)")
+        #expect(delegate.lastAttemptedURL == nil, "a History API move started a navigation to \(String(describing: delegate.lastAttemptedURL))")
+
+        // Only a request for the page address would be the Reload asking the server; a pane's favicon fetch is not.
+        let pageRequests = { server.requests.filter { $0.contains(" /cmux-preview/") } }
+        let askedBefore = pageRequests().count
+        pane.reload()
+        #expect(delegate.lastAttemptedURL == minted, "cmux's Reload did not go through the funnel: \(String(describing: delegate.lastAttemptedURL))")
+        let shown = await waitFor(15) { await self.cmuxPageHref(view) == minted.absoluteString && !view.isLoading }
+        #expect(shown, "cmux's page did not load at the minted address; web view at \(String(describing: view.url))")
+        #expect(pageRequests().count == askedBefore, "the Reload asked the server: \(server.requests)")
+        let framed = await framedAddress(view)
+        if onEmbedHost {
+            #expect(framed?.hasPrefix("https://embed.figma.com/design/OlnsbHBaQ6WeIU3lx8Qsnn/x") == true, "framed \(String(describing: framed))")
+        } else {
+            #expect(framed == nil, "an embed= off embed.figma.com was framed: \(String(describing: framed))")
+        }
+        #expect(delegate.refusedFigmaPreviewPageURLs.isEmpty, "\(delegate.refusedFigmaPreviewPageURLs)")
+        let otherAfter = await paneState(other)
+        #expect(otherAfter == otherBefore, "the other pane changed: before \(otherBefore), after \(otherAfter)")
+    }
+
+    /// What another pane shows: its address, its web view's address, its Back and Forward lists, the address of cmux's page
+    /// if it shows one, the address that page frames, and the guard's refusals.
+    private struct PaneState: Equatable {
+        var current: URL?
+        var webViewURL: URL?
+        var back: [String]
+        var forward: [String]
+        var href: String
+        var framed: String?
+        var refused: [URL]
+    }
+
+    private func paneState(_ pane: BrowserPanel) async -> PaneState {
+        let lists = list(pane.webView)
+        return PaneState(
+            current: pane.currentURL, webViewURL: pane.webView.url, back: lists.back, forward: lists.forward,
+            href: await cmuxPageHref(pane.webView), framed: await framedAddress(pane.webView),
+            refused: pane.navigationDelegate?.refusedFigmaPreviewPageURLs ?? []
+        )
+    }
+
+    /// A second preview pane on the stand-in page address: the stand-in editor, then a preview of node 1-1.
+    private func otherPreviewPane(server: StandInFigmaServer, page: URL, editorAddress: URL) async throws -> BrowserPanel {
+        let other = BrowserPanel(workspaceId: UUID(), renderInitialNavigation: false, websiteDataStore: .nonPersistent())
+        let view = try #require(other.webView as? CmuxWebView)
+        view.figmaPreviewPageAddressForTesting = page
+        other.navigate(to: editorAddress)
+        let onEditor = await waitFor { view.url == editorAddress && !view.isLoading && other.navigationDelegate?.lastAttemptedURL == nil }
+        try #require(onEditor, "fixture: the other pane is at \(String(describing: view.url))")
+        let preview = page.appending(queryItems: [URLQueryItem(name: "embed", value: "https://embed.figma.com/design/OTHERKEY/y?node-id=1-1")])
+        other.navigate(to: preview)
+        let onPreview = await waitFor(15) { await self.cmuxPageHref(view) == preview.absoluteString && !view.isLoading }
+        try #require(onPreview, "fixture: the other pane did not show its preview; at \(String(describing: view.url))")
+        return other
+    }
+
+
+    // cmux-rbf #cm-73.40 (round 5, item 2): web-content recovery in the real window. A site at `/x` reloads itself and its
+    // server answers the reload with a redirect to the page address; WebKit reports the target as `webView.url` while the
+    // guard refuses it (`fix3/probe/storm.log`). The test ends the web content at that moment, from inside the `url` change,
+    // and checks the address recovery chose: the site's, not the page's.
+    @Test("A web-content crash while a site's redirect to the page address is being refused recovers to the site, not the preview")
+    func webContentRecoveryInTheRedirectWindowRestoresTheSite() async throws {
+        let server = try StandInFigmaServer()
+        defer { server.stop() }
+        let page = server.url(path: "/cmux-preview/figma-embed.html")
+        let site = server.url(path: "/x")
+        let pane = BrowserPanel(workspaceId: UUID(), renderInitialNavigation: false, websiteDataStore: .nonPersistent())
+        defer { pane.close() }
+        let view = try #require(pane.webView as? CmuxWebView)
+        view.figmaPreviewPageAddressForTesting = page
+        let delegate = try #require(pane.navigationDelegate)
+
+        final class Window {
+            var observation: NSKeyValueObservation?
+            var seen = false
+            var lastAttempted: URL?
+            var provisional = false
+            var recoveryURL: URL?
+        }
+        let window = Window()
+        window.observation = view.observe(\.url, options: [.new]) { [weak pane, weak delegate] observed, _ in
+            MainActor.assumeIsolated {
+                guard !window.seen, let pane, let delegate, let url = observed.url,
+                      FigmaPaneURL.isSamePage(url, page) else { return }
+                window.seen = true
+                window.lastAttempted = delegate.lastAttemptedURL
+                window.provisional = pane.isMainFrameProvisionalNavigationActive
+                delegate.webViewWebContentProcessDidTerminate(observed)
+                window.recoveryURL = pane.pendingWebContentRecoveryURL
+            }
+        }
+        defer { window.observation?.invalidate() }
+
+        pane.navigate(to: site)
+        let reached = await waitFor(15) { window.seen }
+        try #require(reached, "fixture: webView.url never read the page address; requests \(server.requests)")
+        // What recovery read at the crash: the measurement the lead asked for.
+        #expect(window.provisional, "no provisional navigation was active at the crash")
+        #expect(window.lastAttempted == site, "lastAttemptedURL at the crash was \(String(describing: window.lastAttempted))")
+        #expect(window.recoveryURL == site, "recovery chose \(String(describing: window.recoveryURL)), not the site")
+        #expect(window.recoveryURL.map { !FigmaPaneURL.isSamePage($0, page) } ?? true, "recovery would load the preview")
+        // WebKit publishes the redirect's target before it asks the delegate about it: in `fix5/red-r5.log` the guard had
+        // refused nothing at the crash, and the crash detaches the delegate, so it never did. Recovery reads the attempted
+        // address, which a refused redirect never replaces.
+    }
+
+
+    // MARK: - Round 6 (code review 4, R2): the page-address window when the entry is a preview, and when there is no entry
+
+    enum WindowState: String, CaseIterable, Sendable { case previewEntry, noEntry }
+    enum WindowAction: String, CaseIterable, Sendable { case reload, hardReload, profileSwitch }
+
+    // cmux-rbf #cm-73.40 (round 6, code review 4 R2): a site's server redirects a navigation to the page address with its
+    // own `embed=`. While WebKit decides it, `webView.url` reads that address. Two states the round-5 helper got wrong:
+    // the pane was on preview A (its entry is a page address too), or the redirected load is the pane's first (no entry).
+    // Reload, hard Reload and a profile switch at that moment must not load the site's `embed=`.
+    @Test("In the redirect window, Reload, hard Reload and a profile switch never load the site's embed=", arguments: WindowState.allCases, WindowAction.allCases)
+    func theRedirectWindowNeverLoadsTheSitesEmbed(state: WindowState, action: WindowAction) async throws {
+        let server = try StandInFigmaServer()
+        defer { server.stop() }
+        let page = server.url(path: "/cmux-preview/figma-embed.html")
+        let siteRedirect = server.url(path: "/r")
+        // A profile switch needs a persistent store: two temporary profiles, never the built-in default (code review 4, C2).
+        let from = try #require(BrowserProfileStore.shared.createProfile(named: "cm-73.40 window from \(UUID().uuidString)"))
+        let to = try #require(BrowserProfileStore.shared.createProfile(named: "cm-73.40 window to \(UUID().uuidString)"))
+        defer { _ = BrowserProfileStore.shared.deleteProfile(id: from.id); _ = BrowserProfileStore.shared.deleteProfile(id: to.id) }
+        let pane = BrowserPanel(workspaceId: UUID(), profileID: from.id)
+        defer { pane.close() }
+        pane.shouldRenderWebView = true
+        let view = try #require(pane.webView as? CmuxWebView)
+        view.figmaPreviewPageAddressForTesting = page
+        let previewA = page.appending(queryItems: [URLQueryItem(name: "embed", value: "https://embed.figma.com/design/AAAA/a?node-id=1-1")])
+        if state == .previewEntry {
+            pane.navigate(to: previewA)
+            let onA = await waitFor(15) { await self.cmuxPageHref(view) == previewA.absoluteString && !view.isLoading }
+            try #require(onA, "fixture: preview A did not load; at \(String(describing: view.url))")
+        }
+
+        final class Seen { var observation: NSKeyValueObservation?; var evil: URL?; var attempted: URL?; var current: URL? }
+        let seen = Seen()
+        seen.observation = view.observe(\.url, options: [.new]) { [weak pane] observed, _ in
+            MainActor.assumeIsolated {
+                guard seen.evil == nil, let pane, let url = observed.url, FigmaPaneURL.isSamePage(url, page),
+                      url.absoluteString.contains("EVIL") else { return }
+                seen.evil = url
+                switch action {
+                case .reload: pane.reload()
+                case .hardReload: pane.hardReload()
+                case .profileSwitch: _ = pane.switchToProfile(to.id)
+                }
+                seen.attempted = pane.navigationDelegate?.lastAttemptedURL
+                seen.current = pane.currentURL
+            }
+        }
+        defer { seen.observation?.invalidate() }
+        pane.navigate(to: siteRedirect)
+        let reached = await waitFor(15) { seen.evil != nil }
+        try #require(reached, "fixture: webView.url never read the site's page address; requests \(server.requests)")
+        let evil = try #require(seen.evil)
+        #expect(seen.attempted != evil, "\(action.rawValue) from \(state.rawValue): it loaded the site's embed= \(evil)")
+        #expect(seen.current != evil, "\(action.rawValue) from \(state.rawValue): the pane's address became \(evil)")
+        if state == .previewEntry, action == .profileSwitch {
+            #expect(seen.current == previewA, "the profile switch restored \(String(describing: seen.current)), not preview A")
+        }
+    }
+
+
+    // MARK: - Round 7 (code review 5, C1 and C3)
+
+    /// Watches a web view's address and runs `body` once, the moment it reads the real page address with the site's
+    /// `embed=…EVIL` (a refused redirect's target, before the guard decides).
+    private final class EvilWindow {
+        var observation: NSKeyValueObservation?
+        var reached = false
+        init(_ view: WKWebView, _ body: @escaping @MainActor (WKWebView) -> Void) {
+            observation = view.observe(\.url, options: [.new]) { [weak self] observed, _ in
+                MainActor.assumeIsolated {
+                    guard let self, !self.reached, let url = observed.url,
+                          FigmaPaneURL.isSamePage(url, FigmaPaneURL.previewPageURL), url.absoluteString.contains("EVIL") else { return }
+                    self.reached = true
+                    body(observed)
+                }
+            }
+        }
+        deinit { observation?.invalidate() }
+    }
+
+    // cmux-rbf #cm-73.40 (round 7, code review 5 C1): a blank-born pane's first navigation, typed or from `cmux browser
+    // navigate`, to a site whose server redirects it to the page address with its own `embed=`. In the window, `cmux figma
+    // goto` (which loads a preview of the file it reads) and `browser.url.get` (which hands an agent the address) must not
+    // use the site's page address. Also measures what `currentURL` holds there: the site, in every run so far, so this test
+    // guards the window's behaviour but cannot fail on round 7's two `figmaCheckedLiveURL` fallbacks (2nd pass, cold review).
+    @Test("A blank-born pane's redirected first navigation: goto and browser.url.get in the window never use the site's page address")
+    func blankPaneFirstNavigationWindowGotoAndGetURL() async throws {
+        let server = try StandInFigmaServer()
+        defer { server.stop() }
+        let site = server.url(path: "/rc")
+        let previousAppDelegate = AppDelegate.shared
+        let app = previousAppDelegate ?? AppDelegate()
+        if previousAppDelegate == nil { AppDelegate.shared = app }
+        defer { if previousAppDelegate == nil { AppDelegate.shared = nil } }
+        let manager = TabManager()
+        let windowId = app.registerMainWindowContextForTesting(tabManager: manager)
+        defer { app.unregisterMainWindowContextForTesting(windowId: windowId) }
+        let workspace = try #require(manager.selectedWorkspace)
+        defer { workspace.teardownAllPanels() }
+        let terminal = try #require(workspace.focusedPanelId)
+        let pane = try #require(workspace.newBrowserSplit(from: terminal, orientation: .horizontal, url: nil, focus: false,
+                                                          allowsExternalBrowserFallback: false, chromeVisibility: .hidden))
+        try #require(pane.currentURL == nil, "fixture: the pane already has an address: \(String(describing: pane.currentURL))")
+
+        final class Seen { var current: URL?; var went = false; var attempted: URL?; var reply: String? }
+        let seen = Seen()
+        let window = EvilWindow(pane.webView) { _ in
+            seen.current = pane.currentURL
+            seen.went = pane.gotoFigmaNode("1-1")
+            seen.attempted = pane.navigationDelegate?.lastAttemptedURL
+            let request: [String: Any] = ["jsonrpc": "2.0", "id": 1, "method": "browser.url.get",
+                                          "params": ["workspace_id": workspace.id.uuidString, "surface_id": pane.id.uuidString]]
+            if let data = try? JSONSerialization.data(withJSONObject: request), let line = String(data: data, encoding: .utf8),
+               let object = try? JSONSerialization.jsonObject(with: Data(TerminalController.shared.handleSocketLine(line).utf8)) as? [String: Any] {
+                seen.reply = (object["result"] as? [String: Any])?["url"] as? String
+            }
+        }
+        pane.navigate(to: site)
+        let reached = await waitFor(15) { window.reached }
+        try #require(reached, "fixture: webView.url never read the page address; requests \(server.requests)")
+        try #require(seen.reply != nil, "fixture: browser.url.get gave no url")
+        #expect(!seen.went, "goto ran on the site's page address (pane address \(String(describing: seen.current)))")
+        #expect(seen.attempted.map { !$0.absoluteString.contains("EVIL") } ?? true, "goto loaded \(String(describing: seen.attempted))")
+        #expect(seen.reply.map { !$0.contains("EVIL") } ?? true, "browser.url.get returned \(seen.reply ?? "nil")")
+        // Recorded, not asserted: what the pane's own address held in the window (code review 5 read it as nil).
+        print("cm-73.40 round 7 measurement: currentURL in the window = \(seen.current?.absoluteString ?? "nil")")
+    }
+
+    // cmux-rbf #cm-73.40 (round 7, code review 5 C3): the saved Back/Forward snapshot realigns restored history to the live
+    // address (`resolvedLiveSessionHistoryURL`). A restored pane whose current entry is a site that redirects to the page
+    // address: read unrouted in the window, the page address is in neither list and the restored Forward list is cleared.
+    @Test("The saved Back/Forward snapshot taken in the redirect window keeps a restored pane's Forward list")
+    func savedHistoryInTheRedirectWindowKeepsTheRestoredForwardList() async throws {
+        let server = try StandInFigmaServer()
+        defer { server.stop() }
+        let site = server.url(path: "/rc")
+        let back = server.url(path: "/back").absoluteString
+        let forward = server.url(path: "/forward").absoluteString
+        let pane = BrowserPanel(workspaceId: UUID(), renderInitialNavigation: false, websiteDataStore: .nonPersistent())
+        defer { pane.close() }
+        pane.restoreSessionSnapshot(SessionBrowserPanelSnapshot(
+            urlString: site.absoluteString, profileID: nil, shouldRenderWebView: true, pageZoom: 1.0,
+            developerToolsVisible: false, chromeVisibility: .hidden, omnibarVisible: false,
+            backHistoryURLStrings: [back], forwardHistoryURLStrings: [forward], figmaPages: nil
+        ))
+        let before = pane.sessionNavigationHistorySnapshot()
+        try #require(before.backHistoryURLStrings == [back] && before.forwardHistoryURLStrings == [forward], "fixture: restored history \(before)")
+
+        final class Seen { var during: (back: [String], forward: [String])?; var current: URL? }
+        let seen = Seen()
+        var window: EvilWindow?
+        try #require(pane.restoreDiscardedWebViewIfNeeded(reason: "test.reveal"), "fixture: the restored pane did not load")
+        window = EvilWindow(pane.webView) { _ in
+            seen.current = pane.currentURL
+            let snapshot = pane.sessionNavigationHistorySnapshot()
+            seen.during = (snapshot.backHistoryURLStrings, snapshot.forwardHistoryURLStrings)
+        }
+        let reached = await waitFor(15) { window?.reached == true }
+        try #require(reached, "fixture: webView.url never read the page address; requests \(server.requests)")
+        let during = try #require(seen.during)
+        #expect(during.forward == [forward], "the snapshot in the window lost the restored Forward list: \(during) (address \(String(describing: seen.current)))")
+        #expect(during.back == [back], "\(during)")
+        _ = window
+    }
+
+}
+
+/// cmux-rbf #cm-73.40 (Scenario 404): stands in for Figma's server at `http://127.0.0.1:<port>`. Every request gets
+/// Figma's kind of answer, recorded: for the page address a 404 that may not be stored, for any other path a plain
+/// document standing in for one of www.figma.com's (Scenario 405's leg).
+private final class StandInFigmaServer: @unchecked Sendable {
+    private let listener: NWListener
+    private let queue = DispatchQueue(label: "cmux.test.stand-in-figma-server")
+    private let lock = NSLock()
+    private var recorded: [String] = []
+    private var reloadVisits = 0
+    private(set) var port: UInt16 = 0
+
+    init() throws {
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: NWEndpoint.Host("127.0.0.1"), port: .any)
+        listener = try NWListener(using: parameters)
+        let ready = DispatchSemaphore(value: 0)
+        listener.stateUpdateHandler = { state in if case .ready = state { ready.signal() } }
+        listener.newConnectionHandler = { [weak self] connection in self?.handle(connection) }
+        listener.start(queue: queue)
+        guard ready.wait(timeout: .now() + 2.0) == .success, let port = listener.port?.rawValue else {
+            throw NSError(domain: "StandInFigmaServer", code: 1)
+        }
+        self.port = port
+    }
+
+    var requests: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return recorded
+    }
+
+    func url(path: String) -> URL { URL(string: "http://127.0.0.1:\(port)\(path)")! }
+
+    func stop() { listener.cancel() }
+
+    private func handle(_ connection: NWConnection) {
+        connection.start(queue: queue)
+        receive(on: connection, buffer: Data())
+    }
+
+    private func receive(on connection: NWConnection, buffer: Data) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, error in
+            guard let self, error == nil else { connection.cancel(); return }
+            var next = buffer
+            if let data { next.append(data) }
+            guard let text = String(data: next, encoding: .utf8), text.contains("\r\n\r\n") else {
+                self.receive(on: connection, buffer: next)
+                return
+            }
+            let line = text.split(separator: "\r\n", maxSplits: 1).first.map(String.init) ?? ""
+            self.lock.lock(); self.recorded.append(line); self.lock.unlock()
+            if line.contains(" /rc ") {
+                // Round 7: the same redirect, to the real page address (no stand-in), so a replaced web view still knows it.
+                let location = "https://www.figma.com/cmux-preview/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FEVIL"
+                let redirect = "HTTP/1.1 302 Found\r\nLocation: \(location)\r\nCache-Control: no-store\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                connection.send(content: Data(redirect.utf8), completion: .contentProcessed { _ in connection.cancel() })
+                return
+            }
+            if line.contains(" /r ") {
+                // Round 6 (code review 4, R2): every visit is redirected to the page address with the site's own `embed=`.
+                let location = "/cmux-preview/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FEVIL"
+                let redirect = "HTTP/1.1 302 Found\r\nLocation: \(location)\r\nCache-Control: no-store\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                connection.send(content: Data(redirect.utf8), completion: .contentProcessed { _ in connection.cancel() })
+                return
+            }
+            if line.contains(" /x ") || line.contains(" /x?") {
+                // Scenario 405's redirect leg: the first visit is a page that reloads itself; every later one is
+                // answered with a redirect to the page address, as a site's server could.
+                self.lock.lock(); self.reloadVisits += 1; let visit = self.reloadVisits; self.lock.unlock()
+                if visit > 1 {
+                    let location = "/cmux-preview/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FATTACKER"
+                    let redirect = "HTTP/1.1 302 Found\r\nLocation: \(location)\r\nCache-Control: no-store\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    connection.send(content: Data(redirect.utf8), completion: .contentProcessed { _ in connection.cancel() })
+                    return
+                }
+                let page = "<!doctype html><title>site</title><p>site</p><script>setTimeout(function(){ location.reload() }, 300)</script>"
+                let ok = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nContent-Length: \(page.utf8.count)\r\nConnection: close\r\n\r\n\(page)"
+                connection.send(content: Data(ok.utf8), completion: .contentProcessed { _ in connection.cancel() })
+                return
+            }
+            let isPage = line.contains(" /cmux-preview/")
+            let body = isPage
+                ? "<!doctype html><title>404: This page could not be found</title><p>stand-in for Figma's 404</p>"
+                : "<!doctype html><title>editor</title><p>stand-in for a www.figma.com document</p>"
+            let status = isPage ? "404 Not Found" : "200 OK"
+            let response = "HTTP/1.1 \(status)\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+            connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
         }
     }
 }

@@ -46,6 +46,42 @@ import WebKit
     /// cmux-rbf #cm-73.39: Figma preview-page navigations the guard cancelled, newest last, the last 8 kept.
     /// A test reads it as the positive sign that the guard decided.
     private(set) var refusedFigmaPreviewPageURLs: [URL] = []
+    /// cmux-rbf #cm-73.40: where the URL allowlist is read. `.standard` in production; a test passes its own
+    /// suite-named defaults, because the test host runs suites side by side and writing `.standard` would
+    /// change every other suite's loads while it ran.
+    var urlAllowlistDefaults: UserDefaults = .standard
+    /// cmux-rbf #cm-73.40: pending traversal repair URL to reload via funnel on commit after Figma server responds.
+    private(set) var pendingFigmaTraversalRepairURL: URL?
+
+    /// cmux-rbf #cm-73.40: notes a main-frame answer at any of cmux's page addresses for the commit to repair. At the
+    /// `https` address it is a server's answer: cmux's own simulated load never reaches the response policy (code review 2,
+    /// F4), and a Back or Forward to a page entry WebKit does not serve from memory gets Figma's 404 this way. An answer
+    /// for the older `cmux-figma:` form is cmux's own scheme handler's (code review 3, N1), which the repair upgrades;
+    /// nothing loads that form now. A navigation a server redirects to the address is refused by the verdict before any
+    /// answer (code review 2, R4); the commit's check, which repairs only on an entry that started at the page, is the
+    /// second line behind it.
+    func notePageAddressAnswer(url: URL?, isMainFrame: Bool, page: URL = FigmaPaneURL.previewPageURL) {
+        if isMainFrame, let url, FigmaPaneURL.isWrapperPage(url, wrapper: page) {
+#if DEBUG
+            cmuxDebugLog("browser.nav.repair kind=traversal url=\(browserNavigationDebugURL(url))")
+#endif
+            pendingFigmaTraversalRepairURL = url
+        }
+    }
+
+    /// cmux-rbf #cm-73.40 (code review 1, R1): loads cmux's page again through the funnel, in the web view that asked.
+    /// Every web view keeps its own delegate and all of them have the panel as `owner`, and the Preview | Editor switch
+    /// keeps the hidden side's web view alive. `owner.navigate(to:)` loads into the panel's showing web view, so a held
+    /// preview's Reload or repair would turn the editor into the preview. A held web view loads the page itself, by the
+    /// same marked, simulated load the funnel uses.
+    private func loadPageAgain(_ url: URL, in webView: WKWebView) {
+        guard let owner else { return }
+        if webView === owner.webView {
+            owner.navigate(to: url)
+        } else {
+            browserLoadRequest(URLRequest(url: FigmaPaneURL.upgradingLegacyPage(url)), in: webView, trustedInternalNavigation: true)
+        }
+    }
     private let basicAuthPromptCoordinator = BrowserHTTPBasicAuthPromptCoordinator()
     private let clientCertificateAuthenticationController = BrowserClientCertificateAuthenticationController()
     weak var owner: BrowserPanel?
@@ -124,6 +160,7 @@ import WebKit
         (webView as? CmuxWebView)?.clearTrustedInternalNavigationGrants()
         lastAttemptedURL = lastAttemptedURL ?? webView.url ?? lastAttemptedRequest?.url
         shouldPrintAfterCurrentNavigationFinishes = false
+        pendingFigmaTraversalRepairURL = nil
         didClearPDFDocument?()
         didStartProvisionalNavigation?(webView, navigation)
     }
@@ -140,6 +177,20 @@ import WebKit
             // point so document trust survives WebView replacement.
             owner?.commitTrustedLocalFileNavigation(committedURL)
             owner?.clearTrustedLocalFileDocumentIfNeeded(for: committedURL)
+        }
+        if isCurrentNavigation, let repairURL = pendingFigmaTraversalRepairURL {
+            pendingFigmaTraversalRepairURL = nil
+            // cmux-rbf #cm-73.40 (code review 2, R4): checked at the commit, not at the answer. At a new navigation's
+            // answer `currentItem` is still the entry being left; at the commit it is the entry the answer committed
+            // into, the one the repair would load the page into. A site's reload redirected to the address commits
+            // into the site's entry, still started at the site (both measured in a throwaway WebKit app).
+            if FigmaPreviewPageGuard.entryStartedAtPage(webView.backForwardList.currentItem?.initialURL, page: FigmaPreviewPageGuard.pageAddress(for: webView)) {
+                loadPageAgain(repairURL, in: webView)
+            } else {
+#if DEBUG
+                cmuxDebugLog("browser.nav.repair kind=refused url=\(browserNavigationDebugURL(repairURL))")
+#endif
+            }
         }
         if isCurrentNavigation {
             trustedInternalNavigationURL = nil
@@ -416,21 +467,41 @@ import WebKit
             if !isTrustedInternal,
                !isTrustedDocument,
                url.scheme?.lowercased() != AuthEnvironment.callbackScheme.lowercased(),
-               !BrowserURLAllowlistPolicy(defaults: .standard).allows(url) {
+               !BrowserURLAllowlistPolicy(defaults: urlAllowlistDefaults).allows(url) {
                 decisionHandler(.cancel)
                 if isMainFrame {
                     blockURLAllowlistNavigation(url, in: webView)
                 }
                 return
             }
-            // cmux-rbf #cm-73.39: the Figma preview page loads only in the main frame, and only as
-            // cmux's own trusted load, Back/Forward or Reload; anything a page starts is cancelled.
-            if FigmaPreviewPageGuard.isPreviewScheme(url),
-               !FigmaPreviewPageGuard.allowsNavigation(
-                   targetFrameIsMain: navigationAction.targetFrame?.isMainFrame,
-                   isTrustedLoad: isTrustedInternal,
-                   navigationType: navigationAction.navigationType
-               ) {
+            // cmux-rbf #cm-73.40: cmux's page, by address (the https address under www.figma.com, or the
+            // older cmux-figma: / file: forms). FigmaPreviewPageGuard holds the one rule: cmux's own marked
+            // load goes on; on a history entry that started at the page, Back/Forward goes on and WebKit's
+            // Reload is cancelled and redone through the panel's funnel; anything else in the main frame,
+            // including a site's reload or Back its server redirects here (code review 2, R4), is cancelled
+            // and recorded; a subframe of the https address is not guarded. During a Reload or a Back/Forward,
+            // `currentItem` is the entry acted on, and a redirect does not change its start (measured).
+            switch FigmaPreviewPageGuard.verdict(
+                for: url,
+                targetFrameIsMain: navigationAction.targetFrame?.isMainFrame,
+                isTrustedLoad: isTrustedInternal,
+                navigationType: navigationAction.navigationType,
+                entryStartedAtPage: FigmaPreviewPageGuard.entryStartedAtPage(
+                    webView.backForwardList.currentItem?.initialURL,
+                    page: FigmaPreviewPageGuard.pageAddress(for: webView)
+                ),
+                page: FigmaPreviewPageGuard.pageAddress(for: webView)
+            ) {
+            case .notGuarded, .allow:
+                break
+            case .reloadThroughFunnel:
+#if DEBUG
+                cmuxDebugLog("browser.nav.repair kind=reload url=\(browserNavigationDebugURL(url))")
+#endif
+                decisionHandler(.cancel)
+                loadPageAgain(url, in: webView)
+                return
+            case .refuse:
 #if DEBUG
                 cmuxDebugLog("browser.nav.decidePolicy.action kind=refuseFigmaPreviewPage url=\(browserNavigationDebugURL(url))")
 #endif
@@ -835,7 +906,7 @@ import WebKit
                 && owner?.isTrustedLocalFileDocument(url) == true
             if !isTrustedInternal,
                !isTrustedDocument,
-               !BrowserURLAllowlistPolicy(defaults: .standard).allows(url) {
+               !BrowserURLAllowlistPolicy(defaults: urlAllowlistDefaults).allows(url) {
                 decisionHandler(.cancel)
                 if navigationResponse.isForMainFrame {
                     blockURLAllowlistNavigation(url, in: webView)
@@ -845,6 +916,8 @@ import WebKit
             if isTrustedInternal {
                 trustedInternalNavigationURL = nil
             }
+            // cmux-rbf #cm-73.40: a main-frame answer at a page address is a server's, not cmux's own load; note it for the repair
+            notePageAddressAnswer(url: url, isMainFrame: isMainFrame, page: FigmaPreviewPageGuard.pageAddress(for: webView))
         }
 
         let mime = navigationResponse.response.mimeType ?? "unknown"
@@ -943,7 +1016,7 @@ import WebKit
         } else {
             BrowserURLAllowlistBlockedPage(
                 blockedURL: url,
-                isManaged: BrowserURLAllowlistPolicy(defaults: .standard).isManaged
+                isManaged: BrowserURLAllowlistPolicy(defaults: urlAllowlistDefaults).isManaged
             ).load(in: webView)
         }
     }
@@ -973,7 +1046,7 @@ import WebKit
     /// Applies a newly changed policy to the currently displayed document.
     func enforceURLAllowlistPolicy(in webView: WKWebView, displayURL: URL? = nil) {
         guard let url = displayURL ?? webView.url else { return }
-        let policy = BrowserURLAllowlistPolicy(defaults: .standard)
+        let policy = BrowserURLAllowlistPolicy(defaults: urlAllowlistDefaults)
         if policy.allows(url) { return }
         if let owner,
            url.isFileURL,

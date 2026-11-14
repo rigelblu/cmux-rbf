@@ -60,6 +60,36 @@ struct BrowserURLAllowlistPolicyTests {
         #expect(policy.allows(page))
     }
 
+    // cmux-rbf #cm-73.40: cmux's own loads of the preview page are trusted even under a managed allowlist.
+    @Test func figmaPreviewPageIsAllowedAsTrustedInternalURLUnderManagedList() throws {
+        let policy = BrowserURLAllowlistPolicy(managedPatterns: ["internal.example.com"])
+        let page = try #require(URL(string: "https://www.figma.com/cmux-preview/figma-embed.html?embed=https%3A%2F%2Fembed.figma.com%2Fdesign%2FKEY"))
+        #expect(policy.allowsTrustedInternalURL(page))
+        #expect(!policy.allows(page))
+        // Controls: only that address is cmux's page. Another Figma path, another host, another scheme stay under the list.
+        for other in [
+            "https://www.figma.com/design/KEY/slug",
+            "https://www.figma.com/cmux-preview/other.html",
+            "https://example.com/cmux-preview/figma-embed.html",
+            "http://www.figma.com/cmux-preview/figma-embed.html"
+        ] {
+            #expect(!policy.allowsTrustedInternalURL(try #require(URL(string: other))), "\(other)")
+        }
+    }
+
+    // cmux-rbf #cm-73.40 (code review 1, C4): the pane's recogniser (`FigmaPaneURL.isSamePage`) also matches port and user,
+    // so an address with either is a different address, not cmux's page, and stays under the list.
+    @Test func figmaPreviewPageWithAPortOrUserIsNotTheTrustedPage() throws {
+        let policy = BrowserURLAllowlistPolicy(managedPatterns: ["internal.example.com"])
+        for other in [
+            "https://www.figma.com:443/cmux-preview/figma-embed.html",
+            "https://www.figma.com:8443/cmux-preview/figma-embed.html",
+            "https://user@www.figma.com/cmux-preview/figma-embed.html"
+        ] {
+            #expect(!policy.allowsTrustedInternalURL(try #require(URL(string: other))), "\(other)")
+        }
+    }
+
     @Test func anEmptyManagedArrayFailsClosedForRemoteOrigins() throws {
         let policy = BrowserURLAllowlistPolicy(managedPatterns: [])
         #expect(policy.isManaged)
