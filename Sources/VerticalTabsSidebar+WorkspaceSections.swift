@@ -9,6 +9,7 @@ extension VerticalTabsSidebar {
             memberCount: renderContext.workspacesSectionMemberIds.count,
             memberIds: renderContext.workspacesSectionMemberIds,
             folds: renderContext.statusGroupFolds, environment: renderContext.environment,
+            sidebarFontScale: renderContext.tabItemSettings.sidebarFontScale, // (cm-128.16)
             onToggle: { toggle(.workspacesArea) },
             isBeingDragged: dragState.draggedTabId == SidebarStatusHeaderIdentity.workspacesAreaUUID)
     }
@@ -30,6 +31,7 @@ extension VerticalTabsSidebar {
             memberCount: renderContext.pinnedSectionMemberIds.count,
             memberIds: renderContext.pinnedSectionMemberIds,
             folds: renderContext.statusGroupFolds, environment: renderContext.environment,
+            sidebarFontScale: renderContext.tabItemSettings.sidebarFontScale, // (cm-128.16)
             onToggle: { toggle(.pinnedArea) },
             isBeingDragged: false)
     }

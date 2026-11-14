@@ -151,7 +151,7 @@ struct SidebarSectionNameTests {
                 let action = collapsed ? "Expand" : "Collapse"
                 for (kind, name) in [(SidebarStatusHeaderKind.pinnedArea, "Favorites"), (.workspacesArea, "Loose"), (.statusesArea, "Board")] {
                     let model = VerticalTabsSidebar.statusHeaderModel(kind: kind, presentation: nil, memberCount: 3,
-                        unreadCount: 0, isCollapsed: collapsed, environment: environment)
+                        unreadCount: 0, isCollapsed: collapsed, environment: environment, sidebarFontScale: 1.0) // (cm-128.16)
                     #expect(model.name == name, "the native model reads its section's resolved title")
                     let cell = SidebarGroupHeaderTableCellView(frame: NSRect(x: 0, y: 0, width: 280, height: 28))
                     cell.configurePresentation(model: model)

@@ -475,7 +475,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                     status: snapshot.taskStatus ?? .todo, // (#cm-110.13)
                     hasOverride: !indicator.isNone, // (#cm-110.13)
                     usesMonochrome: model.isActive,
-                    fontScale: model.fontScale,
+                    fontScale: model.indicatorScale, // (cm-128.16)
                     colorScheme: palette.colorScheme,
                     name: indicator.isNone ? WorkspaceStatusPresentation.noneTitle : WorkspaceStatusPresentation.checkedName(in: menuModel?.picker), // (#cm-110.13)
                     icon: checkedEntry?.icon, // (#cm-109.3)
@@ -684,6 +684,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
     /// Where the row's title is laid out, in the cell's own coordinates: the content's indent shows as its x (#cm-106).
     var titleFrameForTesting: NSRect { titleView.frame }
+    var titleViewForTesting: NSTextField { titleView } // (cm-128.16)
     var statusGlyphButtonForTesting: NSView { statusGlyphButton } // (#cm-109.3)
     var statusGlyphModelForTesting: SidebarRowTaskStatusGlyphButton.Model? { statusGlyphButton.currentModelForTesting } // (#cm-109.7)
     var currentModelForTesting: SidebarWorkspaceRowModel? { model } // (#cm-110.13)
@@ -702,6 +703,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     var trailingSpinnerForTesting: GPUSpinnerNSView? { trailingSpinner } // (#cm-109.3)
     var leadingBadgeForTesting: SidebarRowUnreadBadgeView { leadingBadge } // (#cm-109.3)
     var trailingBadgeForTesting: SidebarRowUnreadBadgeView { trailingBadge } // (#cm-109.3)
+    var monitoringImageViewForTesting: NSImageView? { monitoringImageView } // (cm-128.16)
+    var closeButtonForTesting: SidebarHeaderGlyphButton { closeButton } // (cm-128.16)
+    var pinImageViewForTesting: NSImageView { pinImageView } // (cm-128.16)
+    var pullRequestLinesForTesting: [SidebarRowPullRequestLine] { pullRequestRows } // (cm-128.16)
+    var progressBarForTesting: SidebarRowProgressView { progressView } // (cm-128.16)
+    var contentAlphaForTesting: CGFloat { contentContainer.alphaValue } // (cm-128.16)
 #endif
 
     private func configureStatusSlot(
@@ -747,10 +754,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         leadingBadge.alphaValue = badgeAlpha
         trailingBadge.alphaValue = badgeAlpha
         if !leadingBadge.isHidden {
-            leadingBadge.configure(count: model.unreadCount, markedUnread: model.markedUnread, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.fontScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont)
+            leadingBadge.configure(count: model.unreadCount, markedUnread: model.markedUnread, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont) // (cm-128.16)
         }
         if !trailingBadge.isHidden {
-            trailingBadge.configure(count: model.unreadCount, markedUnread: model.markedUnread, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.fontScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont)
+            trailingBadge.configure(count: model.unreadCount, markedUnread: model.markedUnread, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont) // (cm-128.16)
         }
 
         let spinnerColor = palette.visual.agentActivityColor() // (#cm-128.3)
@@ -787,7 +794,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             color: palette.semantic(spinnerColor),
             tooltip: SidebarAgentMarkTooltip.text(.monitoring, in: model.snapshot.agentLists), // (cm-128.6)
             symbolName: "waveform.path.ecg",
-            pointSize: max(10, 12 * model.fontScale),
+            pointSize: max(10, 12 * model.indicatorScale), // (cm-128.16)
             weight: SidebarWorkspaceMonitoringWaveform.symbolWeight,
             in: self // (#cm-128.3)
         )
@@ -799,11 +806,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             .map { handNeedsOutline(yellow: handYellow, on: $0, drawnAt: 1) } ?? false // (#cm-109.7) cm-128.5: no agent mark dims, so full strength
         // cm-128.5 (Tom, grill Q34): the hand and the triangle sit in the cell itself, outside the Done dim, as the spinner and
         // the waveform do.
+        let spinnerSide = max(10, 12 * model.indicatorScale) // (cm-128.16)
         let hand = Self.updateAgentMark( // (#cm-109.3)
             existing: handImageView, // (#cm-109.3)
             visible: handVisible, // (#cm-109.3)
             color: handYellow, // (#cm-109.7)
             tooltip: waitingTooltip, // (#cm-109.3)
+            pointSize: 13 * spinnerSide / 12, // (cm-128.16)
+            weight: .regular, // (cm-128.16)
             in: self // (#cm-109.3)
         ) // (#cm-109.3)
         handImageView = hand // (#cm-109.7)
@@ -821,7 +831,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             color: handYellow,
             tooltip: errorTooltip,
             symbolName: "exclamationmark.triangle.fill",
-            pointSize: max(10, 12 * model.fontScale),
+            pointSize: max(10, 12 * model.indicatorScale), // (cm-128.16)
             in: self
         )
         errorTriangleView = triangle
@@ -1045,7 +1055,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             let labelFont = NSFont.systemFont(ofSize: model.scaled(9))
             progressView.configure(
                 fraction: CGFloat(progress.value),
-                barHeight: max(3, 3 * model.fontScale),
+                barHeight: max(3, 3 * model.indicatorScale), // (cm-128.16)
                 trackColor: palette.visual.progressTrackColor,
                 fillColor: palette.visual.progressFillColor,
                 labelText: progress.label,
@@ -1331,8 +1341,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         // Title line
         let titleRowSpacing: CGFloat = 8 // (#cm-128.1) no spinner leads any more, so no 6 pt case
         var x = leading
-        let badgeSide = 16 * model.fontScale
-        let spinnerSide = max(10, 12 * model.fontScale)
+        let badgeSide = 16 * model.indicatorScale // (cm-128.16)
+        let spinnerSide = max(10, 12 * model.indicatorScale) // (cm-128.16)
         let firstLineCenter = model.scaled(12.5) * 0.6 + y
 
         func place(_ view: NSView, size: NSSize, centerY: CGFloat) {
@@ -1364,7 +1374,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             x += side + titleRowSpacing
         }
         if !statusGlyphButton.isHidden {
-            let glyphSize = SidebarRowTaskStatusGlyphButton.occupiedSize(fontScale: model.fontScale)
+            let glyphSize = SidebarRowTaskStatusGlyphButton.occupiedSize(fontScale: model.indicatorScale) // (cm-128.16)
             place(statusGlyphButton, size: glyphSize, centerY: firstLineCenter)
             x += glyphSize.width + titleRowSpacing
         }
@@ -1397,7 +1407,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             minX: x, centerY: firstLineCenter, side: model.scaled(10) + 4, spacing: titleRowSpacing, apply: apply
         )
         // Trailing slot
-        let closeHit = max(16, 16 * model.fontScale)
+        let closeHit = max(16, 16 * model.indicatorScale) // (cm-128.16)
         let closeWidth = max(16, closeHit)
         let trailingSpinnerActive = trailingSpinner?.isHidden == false // (#cm-109.3)
         let trailingSlotActive = !trailingBadge.isHidden || trailingSpinnerActive || model.canCloseWorkspace // (#cm-109.3)
@@ -1515,7 +1525,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         if !progressView.isHidden {
             y += spacing
             let height = SidebarRowProgressView.height(
-                barHeight: max(3, 3 * model.fontScale),
+                barHeight: max(3, 3 * model.indicatorScale), // (cm-128.16)
                 labelText: model.snapshot.progress?.label,
                 labelFont: .systemFont(ofSize: model.scaled(9))
             )

@@ -91,6 +91,16 @@ struct SidebarWorkspaceRowModel: Equatable {
 
     var fontScale: CGFloat { settings.sidebarFontScale }
 
+    /// Scaling for fixed-point indicators (unread badge, agent activity marks,
+    /// task status glyph, close button, progress bar) that grow with Everything Zoom.
+    /// Combines fontScale (the row's font-size scale) with globalFontMagnificationPercent.
+    var indicatorScale: CGFloat {
+        SidebarWorkspaceSlotResolution.indicatorScale(
+            fontScale: fontScale,
+            magnificationPercent: globalFontMagnificationPercent
+        )
+    } // (cm-128.16)
+
     func scaled(_ base: CGFloat) -> CGFloat {
         GlobalFontMagnification.scaledSize(base * fontScale, percent: globalFontMagnificationPercent)
     }

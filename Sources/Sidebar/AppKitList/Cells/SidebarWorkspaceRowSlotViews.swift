@@ -75,6 +75,11 @@ final class SidebarRowUnreadBadgeView: NSView {
             withAttributes: textAttributes
         )
     }
+
+#if DEBUG
+    var markDiameterForTesting: CGFloat { markDiameter } // (cm-128.16)
+    var fontForTesting: NSFont? { textAttributes[.font] as? NSFont } // (cm-128.16)
+#endif
 }
 
 /// Pull-request status icon (custom vector open/merged glyphs, SF closed).
@@ -103,6 +108,10 @@ final class SidebarRowPullRequestIconView: NSView {
             return NSSize(width: 13 * fontScale, height: 13 * fontScale)
         }
     }
+
+#if DEBUG
+    var fontScaleForTesting: CGFloat { fontScale } // (cm-128.16)
+#endif
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
@@ -237,6 +246,10 @@ final class SidebarRowProgressView: NSView {
             label.frame = NSRect(x: 0, y: barHeight + 2, width: min(ceil(size.width), bounds.width), height: size.height)
         }
     }
+
+#if DEBUG
+    var barHeightForTesting: CGFloat { barHeight } // (cm-128.16)
+#endif
 }
 
 extension NSAttributedString.Key {

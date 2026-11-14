@@ -55,6 +55,7 @@ struct TerminalNotificationStoreBadgeTests {
             memberCount: 2, memberIds: [first, second],
             folds: .init(areaCollapsed: true, collapsedStatusIds: ["parked"], workspacesCollapsed: true, pinnedCollapsed: true),
             environment: .init(colorScheme: .light, globalFontMagnificationPercent: 100, lazyContractProbe: .init()),
+            sidebarFontScale: 1.0, // (cm-128.16)
             onToggle: {}, onFocusAnchor: { _ in }
         )
         let rebuild = try #require(config.appKitGroupHeaderUnreadRebuild)
@@ -108,6 +109,7 @@ struct TerminalNotificationStoreBadgeTests {
             memberCount: statusMembers.count, memberIds: statusMembers,
             folds: .init(collapsedStatusIds: ["parked"]),
             environment: .init(colorScheme: .light, globalFontMagnificationPercent: 100, lazyContractProbe: .init()),
+            sidebarFontScale: 1.0, // (cm-128.16)
             onToggle: {}, onFocusAnchor: { _ in })
         let rebuild = try #require(configuration.appKitGroupHeaderUnreadRebuild)
         #expect(rebuild(snapshot).anchorMarkedUnread)
