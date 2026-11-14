@@ -5198,6 +5198,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         }
     }
 
+#if DEBUG
+    /// Sets browser media activity directly for testing (cm-128.9).
+    func setBrowserMediaActivityForTesting(_ activity: BrowserMediaActivity) {
+        setBrowserMediaActivity(activity, invalidateSidebarObservation: true)
+    }
+#endif
+
     private func refreshBrowserMediaActivity(invalidateSidebarObservation: Bool = true) {
         setBrowserMediaActivity(
             currentBrowserMediaActivity(),
