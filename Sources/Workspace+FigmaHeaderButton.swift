@@ -46,17 +46,35 @@ extension Workspace {
             openExternally(address)
             return nil
         }
-        guard let panel = newBrowserSurface(
-            inPane: paneId,
-            url: address,
-            focus: focus,
-            insertAtEnd: insertAtEnd,
-            // The browser setting was asked above; the hand-off is `openExternally`'s.
-            allowsExternalBrowserFallback: false,
-            // The two flags that make a Figma pane, as the click on a Figma link sends them.
-            chromeVisibility: BrowserChromeVisibility(omnibarVisible: false),
-            transparentBackground: true
-        ) else { return nil }
+        let made: BrowserPanel?
+        // cmux-rbf #cm-126.3: the button's pane is split when it holds an Agent Pane.
+        if agentPaneFreePane(paneId) == nil {
+            guard let source = bonsplitController.tabs(inPane: paneId).first.flatMap({ panelIdFromSurfaceId($0.id) }) else {
+                return nil
+            }
+            made = newBrowserSplit(
+                from: source,
+                orientation: .horizontal,
+                url: address,
+                focus: focus ?? (bonsplitController.focusedPaneId == paneId),
+                allowsExternalBrowserFallback: false,
+                chromeVisibility: BrowserChromeVisibility(omnibarVisible: false),
+                transparentBackground: true
+            )
+        } else {
+            made = newBrowserSurface(
+                inPane: paneId,
+                url: address,
+                focus: focus,
+                insertAtEnd: insertAtEnd,
+                // The browser setting was asked above; the hand-off is `openExternally`'s.
+                allowsExternalBrowserFallback: false,
+                // The two flags that make a Figma pane, as the click on a Figma link sends them.
+                chromeVisibility: BrowserChromeVisibility(omnibarVisible: false),
+                transparentBackground: true
+            )
+        }
+        guard let panel = made else { return nil }
         panel.markFigmaFitOnOpen(for: address) // cmux-rbf #cm-73.22: a design file opened from the menu fits once
         // A tab added to an existing pane schedules no refresh of the saved
         // socket list. Publishing here lets `surface.list` hold the new tab at

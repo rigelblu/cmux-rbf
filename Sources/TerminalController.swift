@@ -3390,6 +3390,8 @@ class TerminalController {
             "file.open",
             "markdown.open",
             "browser.open_split",
+            "agent_pane.show",
+            "agent_pane.list",
             "figma.goto",
             "browser.navigate",
             "browser.back",

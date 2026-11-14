@@ -20,3 +20,6 @@ The pane holds two pages and shows one at a time. *"Canvas"* named the second un
 - **Preview** — cmux's own page framing Figma's embed of one node, with Figma's controls hidden. Where the agent's `cmux figma goto` takes you. *"the preview shows the agent's board"*
 - **Editor** — Figma's full editor on the file, where Tom works. Not *canvas* for this side: canvas is cmux's Canvas Layout, and inside Figma it is only the drawing area of the editor. *"switch to the editor", "the editor keeps your zoom and selection"*
 - **Switch** — moving the pane from one side to the other (`⌥⇧⌘C`, the palette, or the hover-row control). Never *flip*: that is Design Focus's flip of the pair. *"Figma: Switch Preview and Editor"*
+
+# 🔵⋯ The Agent Pane (`#cm-126.3`)
+- **Agent Pane** — the pane beside one agent that is its interface to Tom, showing its updates in any medium (a Figma board inside the agent's page, a Claude artifact, a web page); opened and steered by `cmux agent-pane show`, its tab captioned "Agent Pane"; it belongs to the agent's terminal. Not the agent's own terminal pane, not the Figma pane `cmux figma open` makes, and not upstream's Agent Chat (Tom's naming decision, 2026-11-01, which replaced "agent reader"). *"the agent's Agent Pane opened beside it", "show it in your Agent Pane"*

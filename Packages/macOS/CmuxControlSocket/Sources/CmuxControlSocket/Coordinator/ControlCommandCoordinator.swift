@@ -85,6 +85,7 @@ public final class ControlCommandCoordinator {
         if let result = handleCanvas(request) { return result }
         if let result = handleMobileHost(request) { return result }
         if let result = handleWorkspace(request) { return result }
+        if let result = handleAgentPane(request) { return result } // cmux-rbf #cm-126.3
         if let result = handleSurface(request) { return result }
         if let result = handleSystem(request) { return result }
         if let result = handleProject(request) { return result }
