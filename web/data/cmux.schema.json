@@ -1917,6 +1917,8 @@
               "toggleSplitZoom",
               "toggleDesignFocus",
               "switchFigmaPreviewAndEditor",
+              "toggleFigmaMotion",
+              "showFigmaStill",
               "flipDesignFocusLayout",
               "increaseWorkspaceTerminalFontSize",
               "decreaseWorkspaceTerminalFontSize",

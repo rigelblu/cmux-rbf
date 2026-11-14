@@ -43,11 +43,14 @@ extension AgentJournalLifecycleCenter {
         reducer: AgentLifecycleReducer,
         replayPolicy: AgentJournalReplayPolicy,
         state: inout AgentLifecycleReducerState,
-        notifications: inout AgentNotificationReconciler
+        notifications: inout AgentNotificationReconciler,
+        liveness: AgentSessionLivenessResolver = AgentSessionLivenessResolver() // cm-128.1: ends waits of agents that are gone
     ) -> [AgentLifecycleAssignment] {
         var cursor: Int64 = 0
         var folded = 0
         var skipped = 0
+        // cm-128.1: where each session last reported from, so a wait found dead below is ended on its own pane.
+        var origins: [SessionOrigin: (source: String, workspaceId: String)] = [:]
         while true {
             let page: AgentJournalReadPage
             do {
@@ -70,9 +73,12 @@ extension AgentJournalLifecycleCenter {
             if page.isEmpty { break }
             for event in page.events {
                 let canonical = canonicalized(event, aliases: aliases)
-                let decision = notifications.apply(canonical)
-                if decision.disposition != .stale, decision.projectsLifecycle {
-                    reducer.apply(notifications.lifecycleEvent(canonical), to: &state)
+                fold(canonical, reducer: reducer, state: &state, notifications: &notifications)
+                let draft = canonical.draft
+                if !draft.isSubagent, let surfaceId = draft.surfaceId, let workspaceId = draft.workspaceId,
+                   let sessionId = draft.sessionId {
+                    origins[SessionOrigin(surfaceId: surfaceId, agentKey: canonical.agentKey, sessionId: sessionId)] =
+                        (draft.source, workspaceId)
                 }
             }
             folded += page.events.count
@@ -81,6 +87,9 @@ extension AgentJournalLifecycleCenter {
             // never stall the fold or hide the events behind it.
             cursor = page.scannedThroughSequence
         }
+        // cm-128.1: a relaunch tore down the PTYs, so end the waits and errors whose agent is confirmed gone before painting.
+        endDeadSessions(store: store, origins: origins, liveness: liveness, reducer: reducer,
+                        state: &state, notifications: &notifications, aliases: aliases)
         let startup = replayPolicy.startupSnapshot(from: state.snapshot())
         var assignments: [AgentLifecycleAssignment] = []
         for (surfaceId, byAgent) in startup.phases {
@@ -97,6 +106,62 @@ extension AgentJournalLifecycleCenter {
         )
 #endif
         return assignments
+    }
+
+    // cm-128.1: the startup replay's liveness pass.
+    private struct SessionOrigin: Hashable {
+        let surfaceId: String
+        let agentKey: String
+        let sessionId: String
+    }
+
+    private static func fold(
+        _ canonical: AgentJournalEvent,
+        reducer: AgentLifecycleReducer,
+        state: inout AgentLifecycleReducerState,
+        notifications: inout AgentNotificationReconciler
+    ) {
+        let decision = notifications.apply(canonical)
+        if decision.disposition != .stale, decision.projectsLifecycle {
+            reducer.apply(notifications.lifecycleEvent(canonical), to: &state)
+        }
+    }
+
+    /// A relaunch tears down the local PTYs, so a wait or error the journal kept may belong to an agent that is gone.
+    /// Journals `sessionEnded` for each one whose process is confirmed gone, and folds it in so the next replay finds the
+    /// session already ended. Anything short of confirmation (no record, no PID, unreadable evidence) keeps the mark: a
+    /// missed answer costs more than a stale hand, which Clear Agent State removes.
+    private static func endDeadSessions(
+        store: AgentJournalStore,
+        origins: [SessionOrigin: (source: String, workspaceId: String)],
+        liveness: AgentSessionLivenessResolver,
+        reducer: AgentLifecycleReducer,
+        state: inout AgentLifecycleReducerState,
+        notifications: inout AgentNotificationReconciler,
+        aliases: AgentJournalAliasResolver
+    ) {
+        var ended: [AgentJournalEvent] = []
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        for (surfaceId, byAgent) in state.sessions {
+            for (agentKey, bySession) in byAgent {
+                for (sessionId, lifecycle) in bySession
+                where !lifecycle.ended && (lifecycle.phase == .needsInput || lifecycle.phase == .error) {
+                    guard let origin = origins[SessionOrigin(surfaceId: surfaceId, agentKey: agentKey, sessionId: sessionId)],
+                          liveness.liveness(source: origin.source, sessionId: sessionId) == .dead else { continue }
+                    let draft = AgentJournalEventDraft(kind: .sessionEnded,
+                        occurredAtMs: max(nowMs, lifecycle.lastOccurredAtMs), source: origin.source,
+                        agentKey: agentKey, sessionId: sessionId, workspaceId: origin.workspaceId,
+                        surfaceId: surfaceId, nativeEvent: "StartupProcessGone")
+                    // Unrecorded means unproven here: keep the wait rather than hide it.
+                    guard let outcome = try? store.append(draft) else { continue }
+                    ended.append(AgentJournalEvent(sequence: outcome.sequence,
+                        committedAtMs: outcome.committedAtMs, draft: draft))
+                }
+            }
+        }
+        for event in ended {
+            fold(canonicalized(event, aliases: aliases), reducer: reducer, state: &state, notifications: &notifications)
+        }
     }
 
     /// Rewrites the event's identity through the restore alias chains so

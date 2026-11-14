@@ -54,6 +54,8 @@ extension CMUXCLI {
             try runFigmaGoto(
                 node: parsed.word,
                 surfaceOverride: parsed.option,
+                motion: parsed.motion,
+                play: parsed.play,
                 client: client,
                 jsonOutput: jsonOutput,
                 idFormat: idFormat
@@ -251,6 +253,8 @@ extension CMUXCLI {
     private func runFigmaGoto(
         node: String?,
         surfaceOverride: String?,
+        motion: Bool,
+        play: Bool,
         client: SocketClient,
         jsonOutput: Bool,
         idFormat: CLIIDFormat
@@ -265,11 +269,27 @@ extension CMUXCLI {
             surfaceOverride: surfaceOverride,
             client: client
         )
+
+        if motion || play {
+            let flag = play ? "--play" : "--motion"
+            guard FigmaFit.isDesignFile(pane.document) else {
+                throw CLIError(
+                    message: "cmux figma goto \(flag) works on Figma design files only: surface \(pane.handle) shows a FigJam board or a slide deck"
+                )
+            }
+        }
+
         // Keep the existing wrapper installation/preflight contract; the app owns page selection.
-        _ = try figmaDestination(for: pane.document, node: node)
+        _ = try figmaDestination(for: pane.document, node: node, motion: motion)
+        var params: [String: Any] = [
+            "surface_id": pane.surfaceID,
+            "node": node
+        ]
+        if motion { params["motion"] = true }
+        if play { params["play"] = true }
         let payload = try client.sendV2(
             method: "figma.goto",
-            params: ["surface_id": pane.surfaceID, "node": node]
+            params: params
         )
         if jsonOutput {
             print(jsonString(formatIDs(payload, mode: idFormat)))
@@ -496,33 +516,17 @@ extension CMUXCLI {
         return try normalizeWorkspaceHandle(raw, client: client, allowCurrent: true)
     }
 
-    /// One destination call serves both verbs, and installing the wrapper is
-    /// part of it — an embed URL that names a page which is not on disk would
-    /// render an empty pane with nothing to explain it.
-    ///
-    /// **Every verb tries the write**, so the page on disk is this build's and
-    /// an old build's page cannot outlive the next `open` or `goto`. Only a
-    /// destination that loads the page needs the write to work: if it fails
-    /// for the editor, nothing there reads the page, and the command goes on.
+    /// One destination call serves both verbs. The read view's page is served
+    /// by the app from memory (`cm-73.39`), so nothing is written here.
     private func figmaDestination(
         for pasted: URL,
-        node: String?
+        node: String?,
+        motion: Bool = false
     ) throws -> FigmaPaneURL.Destination {
-        let destination: FigmaPaneURL.Destination
         do {
-            destination = try FigmaPaneURL.destination(for: pasted, node: node)
+            return try FigmaPaneURL.destination(for: pasted, node: node, motion: motion)
         } catch FigmaPaneURL.Failure.notAFigmaURL(let raw) {
             throw CLIError(message: "not a Figma file URL: \(raw)")
         }
-        do {
-            try FigmaWrapperPage.install()
-        } catch {
-            if case .embed = destination {
-                throw CLIError(message: "the read view cannot open without its page "
-                    + "\(FigmaPaneURL.wrapperFileURL().path), which cannot be written: "
-                    + error.localizedDescription)
-            }
-        }
-        return destination
     }
 }

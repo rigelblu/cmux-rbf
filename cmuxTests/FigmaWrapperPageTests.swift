@@ -103,7 +103,7 @@ struct FigmaWrapperPageTests {
 
     /// Runs the page's own loader in JavaScriptCore with just enough browser to
     /// load it, and returns the address it put on the frame, or nil if it framed nothing.
-    private func framedAddress(embed: String, darkPane: Bool) throws -> String? {
+    private func framedAddress(embed: String, darkPane: Bool, motion: Bool = false, expectedName: String? = nil) throws -> String? {
         // Both scripts come out of the page itself, so a page that lost the
         // address functions cannot pass on the strength of this file's copy.
         let scripts = FigmaWrapperPage.html.components(separatedBy: "<script>")
@@ -112,9 +112,10 @@ struct FigmaWrapperPageTests {
         let context = try #require(JSContext())
         context.setObject(embed, forKeyedSubscript: "EMBED" as NSString)
         context.setObject(darkPane, forKeyedSubscript: "DARK" as NSString)
+        context.setObject(motion, forKeyedSubscript: "MOTION" as NSString)
         context.evaluateScript(functions)
         context.evaluateScript("""
-        location = { search: '?embed=' + encodeURIComponent(EMBED) };
+        location = { search: '?embed=' + encodeURIComponent(EMBED) + (MOTION ? '&motion=1' : '') };
         URLSearchParams = function (search) {
           var map = {};
           search.replace(/^\\?/, '').split('&').forEach(function (pair) {
@@ -138,9 +139,21 @@ struct FigmaWrapperPageTests {
         };
         """)
         context.evaluateScript(loader)
+        if let expectedName {
+            #expect(context.evaluateScript("frames[0].name")?.toString() == expectedName, "marked frame must be named cmux-freeze before insertion")
+        }
         let framed = context.evaluateScript("frames.length ? frames[0].src : null")
         guard let framed, !framed.isNull, !framed.isUndefined else { return nil }
         return framed.toString()
+    }
+
+    // cmux-rbf (#cm-73.37)
+    @Test func markedFrameOpensDirectlyInNamedFrozenPlayer() throws {
+        let address = try #require(try framedAddress(
+            embed: "https://embed.figma.com/design/KEY/slug?node-id=12-2", darkPane: false,
+            motion: true, expectedName: "cmux-freeze"
+        ))
+        #expect(URL(string: address)?.path == "/proto/KEY/slug", "marked open must build the player without loading still first")
     }
 
     @Test("the page themes the frame from the pane's own scheme, whatever theme the address carries")
@@ -202,4 +215,65 @@ struct FigmaWrapperPageTests {
             #expect(try framedAddress(embed: address, darkPane: true) == nil, "\(address)")
         }
     }
+
+    // MARK: - Play / prototype URL transformation
+
+    @Test("cmuxProtoAddress transforms design embed URL to prototype embed URL with required parameters")
+    func transformsDesignToProtoAddress() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaPlayScript.script)
+        let fn = context.objectForKeyedSubscript("cmuxProtoAddress")
+        let src = "https://embed.figma.com/design/KEY/slug?embed-host=cmux&footer=0&page-selector=0&node-id=12-2&theme=light"
+        let result = fn?.call(withArguments: [src, "e5e5e5"])?.toString()
+        let proto = try #require(result)
+        let components = try #require(URLComponents(string: proto))
+        #expect(components.host == "embed.figma.com")
+        #expect(components.path == "/proto/KEY/slug")
+        let queryMap = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        #expect(queryMap["node-id"] == "12-2")
+        #expect(queryMap["starting-point-node-id"] == "12-2")
+        #expect(queryMap["page-selector"] == nil)
+        #expect(queryMap["hide-ui"] == "1")
+        #expect(queryMap["bg-color"] == "e5e5e5")
+        #expect(queryMap["scaling"] == "contain")
+        #expect(queryMap["embed-host"] == "cmux")
+        #expect(queryMap["footer"] == "0")
+        #expect(queryMap["theme"] == "light")
+    }
+
+    @Test("cmuxProtoAddress transforms /file/ embed URL to prototype embed URL")
+    func transformsFileToProtoAddress() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaPlayScript.script)
+        let fn = context.objectForKeyedSubscript("cmuxProtoAddress")
+        let src = "https://embed.figma.com/file/KEY/slug?embed-host=cmux&footer=0&page-selector=0&node-id=12-2&theme=light"
+        let result = fn?.call(withArguments: [src, "e5e5e5"])?.toString()
+        let proto = try #require(result)
+        let components = try #require(URLComponents(string: proto))
+        #expect(components.host == "embed.figma.com")
+        #expect(components.path == "/proto/KEY/slug")
+        let queryMap = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        #expect(queryMap["node-id"] == "12-2")
+        #expect(queryMap["starting-point-node-id"] == "12-2")
+        #expect(queryMap["page-selector"] == nil)
+        #expect(queryMap["hide-ui"] == "1")
+        #expect(queryMap["bg-color"] == "e5e5e5")
+        #expect(queryMap["scaling"] == "contain")
+        #expect(queryMap["embed-host"] == "cmux")
+        #expect(queryMap["footer"] == "0")
+        #expect(queryMap["theme"] == "light")
+    }
+
+    @Test("cmuxProtoAddress only rewrites first path segment")
+    func onlyRewritesFirstPathSegment() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(FigmaPlayScript.script)
+        let fn = context.objectForKeyedSubscript("cmuxProtoAddress")
+        let src = "https://embed.figma.com/design/KEY/design-file-slug?embed-host=cmux&node-id=12-2"
+        let result = fn?.call(withArguments: [src, "e5e5e5"])?.toString()
+        let proto = try #require(result)
+        let components = try #require(URLComponents(string: proto))
+        #expect(components.path == "/proto/KEY/design-file-slug")
+    }
+
 }

@@ -12,8 +12,9 @@ import Foundation
 /// **Why it reads its own query string** rather than being generated per open:
 /// the pane's URL is the file binding, so everything `goto` and a restart need
 /// has to be *in* that URL. Making the page static and the URL carry the
-/// payload gets both — one file on disk, no per-pane temp files to clean up,
-/// and a binding that survives a restart.
+/// payload gets both — one page, no per-pane temp files to clean up, and a
+/// binding that survives a restart. Since `cm-73.39` the app serves it from
+/// memory under `cmux-figma://cmux/figma-embed.html`; nothing writes it to disk.
 enum FigmaWrapperPage {
 
     /// The two decisions the page makes about the address it frames, as plain
@@ -40,7 +41,7 @@ enum FigmaWrapperPage {
     /// Figma's embed paints its own skeleton (grey placeholders, blue progress
     /// bar) and would only be hidden behind a second one.
     ///
-    /// **It frames Figma's read-view address and nothing else**, and it picks
+    /// **It frames Figma's read-view address (or prototype view when playing motion)**, and it picks
     /// light or dark from the pane each time it loads, so no flag and no
     /// address parameter carries the theme. The background is the one thing
     /// cmux must paint: it is the instant before the iframe starts drawing, and
@@ -56,6 +57,7 @@ enum FigmaWrapperPage {
     </style>
     <script>
     \(addressScript)
+    \(FigmaPlayScript.script) // cmux-rbf (#cm-73.37)
     </script>
     <script>
       (function () {
@@ -65,6 +67,11 @@ enum FigmaWrapperPage {
         if (!src) { return; }
         var frame = document.createElement('iframe');
         frame.setAttribute('allowfullscreen', '');
+        // cmux-rbf (#cm-73.37): a marked frame opens directly in the frozen player.
+        if (params.get('motion') === '1' && /^https:\\/\\/embed\\.figma\\.com\\/(design|file|proto)\\//i.test(src)) {
+          frame.name = 'cmux-freeze';
+          src = cmuxProtoAddress(src, 'e5e5e5');
+        }
         frame.src = cmuxThemedAddress(src, dark);
         var attach = function () { document.body.appendChild(frame); };
         if (document.readyState === 'loading') {
@@ -75,21 +82,4 @@ enum FigmaWrapperPage {
       })();
     </script>
     """
-
-    /// Write the page if it is missing or out of date, and return its URL.
-    ///
-    /// Rewritten whenever the contents differ so a stale copy cannot outlive a
-    /// change to the page — it is under a kilobyte, so comparing and rewriting
-    /// costs nothing worth optimising.
-    @discardableResult
-    static func install(at url: URL = FigmaPaneURL.wrapperFileURL()) throws -> URL {
-        let existing = try? String(contentsOf: url, encoding: .utf8)
-        guard existing != html else { return url }
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try html.write(to: url, atomically: true, encoding: .utf8)
-        return url
-    }
 }

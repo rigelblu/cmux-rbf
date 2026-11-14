@@ -7,6 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C128000C0000000000000001 /* WorkspaceAgentPIDSweepJournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128000C0000000000000002 /* WorkspaceAgentPIDSweepJournalTests.swift */; };
+		C128000B0000000000000001 /* AgentJournalReplayLivenessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128000B0000000000000002 /* AgentJournalReplayLivenessTests.swift */; };
+		C128000A0000000000000001 /* AgentSessionLivenessResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128000A0000000000000002 /* AgentSessionLivenessResolver.swift */; };
+		C12800090000000000000001 /* CMUXCLI+ClaudeEditorMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800090000000000000002 /* CMUXCLI+ClaudeEditorMode.swift */; };
+		C12800080000000000000001 /* TerminalSurface+AgentInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800080000000000000002 /* TerminalSurface+AgentInput.swift */; };
+		C12800070000000000000001 /* KeypressWaitResolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800070000000000000002 /* KeypressWaitResolutionTests.swift */; };
+		C12800060000000000000001 /* AgentPaneInputResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800060000000000000002 /* AgentPaneInputResolver.swift */; };
+		C12800050000000000000001 /* ClaudeStopHookPendingWorkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */; };
+		C12800040000000000000001 /* ClaudeHookAttentionTestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800040000000000000002 /* ClaudeHookAttentionTestFixture.swift */; };
+		C12800020000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800030000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift */; };
+		C12800020000000000000002 /* ClaudeHookSessionStore+ClaudePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800030000000000000002 /* ClaudeHookSessionStore+ClaudePermissions.swift */; };
+		C12800020000000000000001 /* ClaudePendingPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800030000000000000001 /* ClaudePendingPermission.swift */; };
+		C12800010000000000000001 /* ClaudeHookAttentionResolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12800010000000000000002 /* ClaudeHookAttentionResolutionTests.swift */; };
 		A11CE0040000000000000001 /* AboutLicenseContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0030000000000000001 /* AboutLicenseContent.swift */; };
 		A11CE0010000000000000001 /* AboutLicensesResourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */; };
 		A5C017000000000000000001 /* AccountSignInFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C017000000000000000002 /* AccountSignInFlow.swift */; };
@@ -1235,6 +1248,8 @@
 		CC0033E15A1B2C3D4E5F0012 /* CmuxDiffComments in Frameworks */ = {isa = PBXBuildFile; productRef = CC0033E15A1B2C3D4E5F0011 /* CmuxDiffComments */; };
 		CC0033E15A1B2C3D4E5F0013 /* CmuxDiffComments in Frameworks */ = {isa = PBXBuildFile; productRef = CC0033E15A1B2C3D4E5F0011 /* CmuxDiffComments */; };
 		9648F1A20000000000000002 /* CmuxDiffViewerURLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9648F1A10000000000000001 /* CmuxDiffViewerURLSchemeHandler.swift */; };
+		807339000000000000000004 /* FigmaPreviewPageSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807339000000000000000003 /* FigmaPreviewPageSchemeHandler.swift */; };
+		73B379000000000000000004 /* FigmaMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B379000000000000000003 /* FigmaMotion.swift */; };
 		D1320AA0D1320AA0D1320AA2 /* CmuxDockTilePlugin.plugin in Copy Dock Tile Plugin */ = {isa = PBXBuildFile; fileRef = D1320AA0D1320AA0D1320AA5 /* CmuxDockTilePlugin.plugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C54860040000000000000001 /* CmuxDurableDeepLinkRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54860040000000000000002 /* CmuxDurableDeepLinkRestoreTests.swift */; };
 		E7E000000000000000000005 /* CmuxEventBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E000000000000000000006 /* CmuxEventBus.swift */; };
@@ -1758,6 +1773,8 @@
 		807316000000000000000402 /* FigmaNewFileLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807316000000000000000401 /* FigmaNewFileLinkTests.swift */; };
 		807390000000000000000008 /* FigmaOutlineIcon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 807390000000000000000007 /* FigmaOutlineIcon.svg */; };
 		807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */; };
+		807339000000000000000002 /* FigmaPreviewPageSchemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807339000000000000000001 /* FigmaPreviewPageSchemeTests.swift */; };
+		73A379000000000000000002 /* FigmaMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A379000000000000000001 /* FigmaMotionTests.swift */; };
 		807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807333000000000000000001 /* FigmaPageSwitchTests.swift */; };
 		807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80739000000000000000000F /* FigmaPaletteCommandTests.swift */; };
 		807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807335000000000000000001 /* FigmaPaneBackTests.swift */; };
@@ -4207,6 +4224,19 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C128000C0000000000000002 /* WorkspaceAgentPIDSweepJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceAgentPIDSweepJournalTests.swift"; sourceTree = "<group>"; };
+		C128000B0000000000000002 /* AgentJournalReplayLivenessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentJournalReplayLivenessTests.swift"; sourceTree = "<group>"; };
+		C128000A0000000000000002 /* AgentSessionLivenessResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentSessionLivenessResolver.swift"; sourceTree = "<group>"; };
+		C12800090000000000000002 /* CMUXCLI+ClaudeEditorMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+ClaudeEditorMode.swift"; sourceTree = "<group>"; };
+		C12800080000000000000002 /* TerminalSurface+AgentInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalSurface+AgentInput.swift"; sourceTree = "<group>"; };
+		C12800070000000000000002 /* KeypressWaitResolutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeypressWaitResolutionTests.swift"; sourceTree = "<group>"; };
+		C12800060000000000000002 /* AgentPaneInputResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentPaneInputResolver.swift"; sourceTree = "<group>"; };
+		C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeStopHookPendingWorkTests.swift"; sourceTree = "<group>"; };
+		C12800040000000000000002 /* ClaudeHookAttentionTestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeHookAttentionTestFixture.swift"; sourceTree = "<group>"; };
+		C12800030000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+ClaudeAttentionResolution.swift"; sourceTree = "<group>"; };
+		C12800030000000000000002 /* ClaudeHookSessionStore+ClaudePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeHookSessionStore+ClaudePermissions.swift"; sourceTree = "<group>"; };
+		C12800030000000000000001 /* ClaudePendingPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudePendingPermission.swift"; sourceTree = "<group>"; };
+		C12800010000000000000002 /* ClaudeHookAttentionResolutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookAttentionResolutionTests.swift; sourceTree = "<group>"; };
 		A11CE0030000000000000001 /* AboutLicenseContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicenseContent.swift; sourceTree = "<group>"; };
 		A11CE0020000000000000001 /* AboutLicensesResourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutLicensesResourceTests.swift; sourceTree = "<group>"; };
 		A5C017000000000000000002 /* AccountSignInFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSignInFlow.swift; sourceTree = "<group>"; };
@@ -5383,6 +5413,8 @@
 		C0DEF0A10000000000000002 /* CmuxConfigUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxConfigUI.swift; sourceTree = "<group>"; };
 		A5FB1206 /* CmuxConfigWorkspaceActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxConfigWorkspaceActionTests.swift; sourceTree = "<group>"; };
 		9648F1A10000000000000001 /* CmuxDiffViewerURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/CmuxDiffViewerURLSchemeHandler.swift; sourceTree = "<group>"; };
+		807339000000000000000003 /* FigmaPreviewPageSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaPreviewPageSchemeHandler.swift; sourceTree = "<group>"; };
+		73B379000000000000000003 /* FigmaMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaMotion.swift; sourceTree = "<group>"; };
 		D1320AA0D1320AA0D1320AA5 /* CmuxDockTilePlugin.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CmuxDockTilePlugin.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
 		C54860040000000000000002 /* CmuxDurableDeepLinkRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxDurableDeepLinkRestoreTests.swift; sourceTree = "<group>"; };
 		E7E000000000000000000006 /* CmuxEventBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxEventBus.swift; sourceTree = "<group>"; };
@@ -5834,6 +5866,8 @@
 		807316000000000000000401 /* FigmaNewFileLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaNewFileLinkTests.swift; sourceTree = "<group>"; };
 		807390000000000000000007 /* FigmaOutlineIcon.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = FigmaOutlineIcon.svg; sourceTree = "<group>"; };
 		807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSessionRestoreTests.swift; sourceTree = "<group>"; };
+		807339000000000000000001 /* FigmaPreviewPageSchemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPreviewPageSchemeTests.swift; sourceTree = "<group>"; };
+		73A379000000000000000001 /* FigmaMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaMotionTests.swift; sourceTree = "<group>"; };
 		807333000000000000000001 /* FigmaPageSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPageSwitchTests.swift; sourceTree = "<group>"; };
 		80739000000000000000000F /* FigmaPaletteCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaletteCommandTests.swift; sourceTree = "<group>"; };
 		807335000000000000000001 /* FigmaPaneBackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaPaneBackTests.swift; sourceTree = "<group>"; };
@@ -9989,6 +10023,9 @@
 				6313A1A1 /* PaneMemoryGuardrail.swift */,
 				A5D41235A1B2C3D4E5F60718 /* AgentNotificationGate.swift */,
 				A77A0006A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift */,
+				C12800080000000000000002 /* TerminalSurface+AgentInput.swift */,
+				C128000A0000000000000002 /* AgentSessionLivenessResolver.swift */,
+				C12800060000000000000002 /* AgentPaneInputResolver.swift */,
 				A0F23A5D074809C236E5C607 /* AgentNotificationAdmissionWaiters.swift */,
 				2B17F904F7764F1CA16D27F3 /* AgentFeedSemanticInput.swift */,
 				E2C08BD36B31E50A48F5EFE9 /* TerminalNotificationPolicyAgentContext.swift */,
@@ -10403,6 +10440,8 @@
 				A9F100000000000000000012 /* AgentSessionWebHostGeometryState.swift */,
 				A9F100000000000000000013 /* AgentSessionWebRendererCoordinator.swift */,
 				9648F1A10000000000000001 /* CmuxDiffViewerURLSchemeHandler.swift */,
+				807339000000000000000003 /* FigmaPreviewPageSchemeHandler.swift */,
+				73B379000000000000000003 /* FigmaMotion.swift */,
 				D1FFC0DE000000000000B001 /* DiffCommentsBridge.swift */,
 				D1FFC0DE000000000000E001 /* DiffSidecarBridge.swift */,
 				A28B087F0000000000000002 /* DiffViewerEditableFocusMessageHandler.swift */,
@@ -11131,6 +11170,10 @@
 				C85350000000000000000204 /* CMUXCLI+AgentHookAdmission.swift */,
 				C0D3F1F00000000000000102 /* CMUXCLI+CodexFireAndForgetHooks.swift */,
 				C85350000000000000000202 /* CMUXCLI+ClaudeHookSettings.swift */,
+				C12800090000000000000002 /* CMUXCLI+ClaudeEditorMode.swift */,
+				C12800030000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift */,
+				C12800030000000000000002 /* ClaudeHookSessionStore+ClaudePermissions.swift */,
+				C12800030000000000000001 /* ClaudePendingPermission.swift */,
 				B9000073A1B2C3D4E5F60719 /* CMUXCLI+OmpExtension.swift */,
 				B9000075A1B2C3D4E5F60719 /* CMUXCLI+CampfireExtension.swift */,
 				B9000079A1B2C3D4E5F60719 /* CMUXCLI+CampfireExtensionInstall.swift */,
@@ -11679,6 +11722,8 @@
 				807311000000000000000003 /* FigmaLoadBarTests.swift */,
 				807311000000000000000005 /* FigmaLoadBarSignalTests.swift */,
 				807334000000000000000001 /* FigmaPageSessionRestoreTests.swift */,
+				807339000000000000000001 /* FigmaPreviewPageSchemeTests.swift */,
+				73A379000000000000000001 /* FigmaMotionTests.swift */,
 				807335000000000000000001 /* FigmaPaneBackTests.swift */,
 				807333000000000000000001 /* FigmaPageSwitchTests.swift */,
 				807314000000000000000003 /* FigmaHiddenUnloadTests.swift */,
@@ -12104,6 +12149,12 @@
 				7939000AAA11BB22CC33DD0A /* ClaudeHookLiveDeliveryTargetTestSupport.swift */,
 				79390004AA11BB22CC33DD04 /* AgentNotificationLiveRetargetTests.swift */,
 				2F2C0D107664F88CAE6E4E45 /* AgentSemanticNotificationDeliveryTests.swift */,
+				C12800010000000000000002 /* ClaudeHookAttentionResolutionTests.swift */,
+				C128000B0000000000000002 /* AgentJournalReplayLivenessTests.swift */,
+				C128000C0000000000000002 /* WorkspaceAgentPIDSweepJournalTests.swift */,
+				C12800070000000000000002 /* KeypressWaitResolutionTests.swift */,
+				C12800050000000000000002 /* ClaudeStopHookPendingWorkTests.swift */,
+				C12800040000000000000002 /* ClaudeHookAttentionTestFixture.swift */,
 				79390010AA11BB22CC33DD10 /* AgentNotificationMoveRaceTests.swift */,
 				79460002AA11BB22CC33EE02 /* AgentNotificationMutationBoundaryTests.swift */,
 				93800002AA11BB22CC33EE02 /* AgentDeliveryTTYBindingTests.swift */,
@@ -13082,6 +13133,9 @@
 				C3C8079F2C1B6648739BA1A6 /* AgentJournalLifecycleCenter+Notifications.swift in Sources */,
 				009E54A15EB3D846E02D2650 /* AgentJournalLifecycleCenter+Projection.swift in Sources */,
 				A77A0005A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift in Sources */,
+				C12800080000000000000001 /* TerminalSurface+AgentInput.swift in Sources */,
+				C128000A0000000000000001 /* AgentSessionLivenessResolver.swift in Sources */,
+				C12800060000000000000001 /* AgentPaneInputResolver.swift in Sources */,
 				E506942F7E8A3C80F94EA4EB /* AgentNotificationAdmissionWaiters.swift in Sources */,
 				0A1107110000000000000010 /* AgentNotificationDelivery.swift in Sources */,
 				A5D41234A1B2C3D4E5F60718 /* AgentNotificationGate.swift in Sources */,
@@ -13657,6 +13711,8 @@
 				C5D0DEC0CF00000000000A1 /* CmuxConfigStore+ConfigStoreReloading.swift in Sources */,
 				C0DEF0A10000000000000001 /* CmuxConfigUI.swift in Sources */,
 				9648F1A20000000000000002 /* CmuxDiffViewerURLSchemeHandler.swift in Sources */,
+				807339000000000000000004 /* FigmaPreviewPageSchemeHandler.swift in Sources */,
+				73B379000000000000000004 /* FigmaMotion.swift in Sources */,
 				E7E000000000000000000005 /* CmuxEventBus.swift in Sources */,
 				E7E00000000000000000000D /* CmuxEventLogWriter.swift in Sources */,
 				E7E000000000000000000007 /* CmuxEventPublishing.swift in Sources */,
@@ -15605,6 +15661,10 @@
 				C79630010000000000000002 /* CMUXCLI+ClaudeHookAck.swift in Sources */,
 				79390007AA11BB22CC33DD07 /* CMUXCLI+ClaudeHookDeliveryTarget.swift in Sources */,
 				C85350000000000000000201 /* CMUXCLI+ClaudeHookSettings.swift in Sources */,
+				C12800090000000000000001 /* CMUXCLI+ClaudeEditorMode.swift in Sources */,
+				C12800020000000000000003 /* CMUXCLI+ClaudeAttentionResolution.swift in Sources */,
+				C12800020000000000000002 /* ClaudeHookSessionStore+ClaudePermissions.swift in Sources */,
+				C12800020000000000000001 /* ClaudePendingPermission.swift in Sources */,
 				C72280000000000000000002 /* CMUXCLI+ClaudeHookWorkspaceRouting.swift in Sources */,
 				2DA8D48D99FB520EB179B015 /* CMUXCLI+ClaudePushNotificationHook.swift in Sources */,
 				C10D0A100000000000000001 /* CMUXCLI+CloudDomains.swift in Sources */,
@@ -15892,6 +15952,12 @@
 				B679CCBA4CF56982C8564009 /* AgentResumeLivenessTests.swift in Sources */,
 				8837A0010000000000000001 /* AgentResumeReturnShellStartupTests.swift in Sources */,
 				42A1CC63848CB4420F2F0FD7 /* AgentSemanticNotificationDeliveryTests.swift in Sources */,
+				C12800010000000000000001 /* ClaudeHookAttentionResolutionTests.swift in Sources */,
+				C128000B0000000000000001 /* AgentJournalReplayLivenessTests.swift in Sources */,
+				C128000C0000000000000001 /* WorkspaceAgentPIDSweepJournalTests.swift in Sources */,
+				C12800070000000000000001 /* KeypressWaitResolutionTests.swift in Sources */,
+				C12800050000000000000001 /* ClaudeStopHookPendingWorkTests.swift in Sources */,
+				C12800040000000000000001 /* ClaudeHookAttentionTestFixture.swift in Sources */,
 				D3610B010000000000000001 /* AgentSessionAutoResumeSettingsTests.swift in Sources */,
 				D3610B020000000000000001 /* AgentSessionAutoResumeSwiftTests.swift in Sources */,
 				A9E030000000000000000002 /* AgentSessionSocketSurfaceTests.swift in Sources */,
@@ -16312,6 +16378,8 @@
 				807310000000000000000008 /* FigmaMarkAssetTests.swift in Sources */,
 				807316000000000000000402 /* FigmaNewFileLinkTests.swift in Sources */,
 				807334000000000000000002 /* FigmaPageSessionRestoreTests.swift in Sources */,
+				807339000000000000000002 /* FigmaPreviewPageSchemeTests.swift in Sources */,
+				73A379000000000000000002 /* FigmaMotionTests.swift in Sources */,
 				807333000000000000000002 /* FigmaPageSwitchTests.swift in Sources */,
 				807390000000000000000010 /* FigmaPaletteCommandTests.swift in Sources */,
 				807335000000000000000002 /* FigmaPaneBackTests.swift in Sources */,

@@ -53,6 +53,9 @@ enum PairHeaderControls {
     static func orientation(forSegment index: Int) -> SplitOrientation {
         index == 0 ? .horizontal : .vertical
     }
+
+    // cmux-rbf (#cm-73.37): motion controls live on the preview canvas.
+
 }
 
 /// cmux-rbf #cm-73.16: arrangement, 50/50 and exit, drawn at the right of the hovered header.
@@ -107,6 +110,7 @@ struct PairHeaderControlsView: View {
 
     var body: some View {
         HStack(spacing: PairHeaderControls.segmentedSpacing) {
+            // cmux-rbf (#cm-73.37): playback is on the canvas, not this row.
             // cmux-rbf #cm-73.3: only this Design Focus hover row gets the clickable switch.
             PairFigmaPageSegmentedControl(
                 selected: figmaPage, tooltips: tooltips, symbolPointSize: 12 * iconScale,

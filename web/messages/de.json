@@ -1401,6 +1401,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Zwischen Vorschau und Editor wechseln",
+      "figmaShowStillDescription": "(nicht zugewiesen) — Figma: Standbild anzeigen",
+      "figmaMotionDescription": "(nicht zugewiesen) — Figma: Bewegung abspielen / pausieren",
       "title": "Tastaturkürzel",
       "description": "Alle in cmux verfügbaren Tastaturkürzel, nach Kategorie gruppiert.",
       "metaDescription": "Alle cmux-Tastaturkürzel für Workspaces, Oberflächen, geteilte Bereiche, Browser, Benachrichtigungen, Suche und Fensterverwaltung unter macOS.",

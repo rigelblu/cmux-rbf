@@ -271,14 +271,18 @@ extension CMUXCLI {
             processEnvironment: processEnvironment
         )
         let rawPayload = Self.readBoundedAgentHookInput() ?? "{}"
+        // cm-128.1: take the Claude editor mode and the tool-input fingerprint where the hook runs, before compaction and relay.
+        let editorModePayload = captureClaudeEditorMode(rawPayload, agent: agent, subcommand: subcommand,
+            environment: processEnvironment)
+        let fingerprintedPayload = captureClaudeToolInputFingerprint(editorModePayload, agent: agent, subcommand: subcommand)
         let admittedPayload = client.isRelayBacked
             ? relayEnrichedAgentHookPayload(
-                rawPayload,
+                fingerprintedPayload,
                 agent: agent,
                 subcommand: subcommand,
                 processEnvironment: processEnvironment
             )
-            : rawPayload
+            : fingerprintedPayload
         let payload = compactAgentHookPayload(
             admittedPayload,
             maximumBytes: client.isRelayBacked
@@ -596,6 +600,11 @@ extension CMUXCLI {
             ),
             maximumLength: 80
         )
+        // cm-128.1: the two fields captured above survive compaction.
+        setBoundedString(Self.claudeEditorModePayloadKey,
+            value: firstString(in: rawObject, keys: [Self.claudeEditorModePayloadKey]), maximumLength: 32)
+        setBoundedString(Self.claudeToolInputFingerprintPayloadKey,
+            value: firstString(in: rawObject, keys: [Self.claudeToolInputFingerprintPayloadKey]), maximumLength: 64)
         // cmux-rbf #cm-73.24: the registry reads a helper's `agent_id` to keep a waiting session waiting.
         setBoundedString("agent_id", value: firstString(in: rawObject, keys: ["agent_id", "agentId"]), maximumLength: 80)
         for key in ["agent_state", "turn_outcome"] {

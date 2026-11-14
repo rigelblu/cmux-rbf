@@ -14,6 +14,56 @@ extension ContentView {
         }
     }
 
+    // cmux-rbf (#cm-73.37): the same producer feeds the live palette and focused tests.
+    static func populateFigmaMotionContext(_ snapshot: inout CommandPaletteContextSnapshot, target: BrowserPanel?) {
+        snapshot.setBool(CommandPaletteContextKeys.workspaceHasFigmaMotion, target != nil)
+        snapshot.setBool(CommandPaletteContextKeys.workspaceFigmaMotionHasPlayer, target.map { $0.figmaMotionState != .still } ?? false)
+        snapshot.setBool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion, target?.figmaMotionState.canToggle == true)
+        snapshot.setBool(CommandPaletteContextKeys.workspaceFigmaMotionIsPlaying, target?.figmaMotionState == .playing)
+    }
+
+    // cmux-rbf (#cm-73.32): the palette's motion toggle command registration.
+    static func registerFigmaMotionPaletteHandler(
+        _ registry: inout CommandPaletteHandlerRegistry,
+        tabManager: TabManager
+    ) {
+        // cmux-rbf (#cm-73.37)
+        registry.register(commandId: "palette.showFigmaStill") { _ = tabManager.showFigmaStill() }
+        registry.register(commandId: "palette.toggleFigmaMotion") {
+            _ = tabManager.toggleFigmaMotion()
+        }
+    }
+
+    // cmux-rbf (#cm-73.32): command palette contribution for Figma motion toggle. Reject a revert of this hunk on upstream sync.
+    static func figmaMotionCommandContribution() -> CommandPaletteCommandContribution {
+        CommandPaletteCommandContribution(
+            commandId: "palette.toggleFigmaMotion",
+            title: { context in
+                if context.bool(CommandPaletteContextKeys.workspaceFigmaMotionIsPlaying) {
+                    return String(localized: "command.figmaPauseMotion.title", defaultValue: "Figma: Pause Motion")
+                } else {
+                    return String(localized: "command.figmaPlayMotion.title", defaultValue: "Figma: Play Motion")
+                }
+            },
+            subtitle: { _ in String(localized: "figma.menu.tooltip", defaultValue: "Figma") },
+            keywords: ["play", "still", "motion", "figma", "prototype"],
+            when: { $0.bool(CommandPaletteContextKeys.workspaceHasFigmaMotion) },
+            enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion) }
+        )
+    }
+
+    // cmux-rbf (#cm-73.37)
+    static func figmaShowStillCommandContribution() -> CommandPaletteCommandContribution {
+        CommandPaletteCommandContribution(
+            commandId: "palette.showFigmaStill",
+            title: { _ in String(localized: "command.figmaShowStill.title", defaultValue: "Figma: Show Still") },
+            subtitle: { _ in String(localized: "figma.menu.tooltip", defaultValue: "Figma") },
+            keywords: ["still", "zoom", "figma"],
+            when: { $0.bool(CommandPaletteContextKeys.workspaceFigmaMotionHasPlayer) },
+            enablement: { $0.bool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion) }
+        )
+    }
+
     static func commandPaletteShortcutAction(forCommandID commandId: String) -> KeyboardShortcutSettings.Action? {
         if let movement = SurfacePaneMovement(commandID: commandId) {
             return movement.shortcutAction
@@ -118,6 +168,10 @@ extension ContentView {
         // cmux-rbf #cm-73.3: show the configured switch key in the palette.
         case "palette.switchFigmaPreviewAndEditor":
             return .switchFigmaPreviewAndEditor
+        // cmux-rbf (#cm-73.32): show the configured motion key in the palette if any.
+        case "palette.showFigmaStill": return .showFigmaStill // cmux-rbf (#cm-73.37)
+        case "palette.toggleFigmaMotion":
+            return .toggleFigmaMotion
         // cmux-rbf #cm-73.2a
         case "palette.toggleDesignFocus":
             return .toggleDesignFocus

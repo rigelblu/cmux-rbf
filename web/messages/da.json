@@ -1401,6 +1401,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Skift mellem forhåndsvisning og editor",
+      "figmaShowStillDescription": "(ubundet) — Figma: Vis stillbillede",
+      "figmaMotionDescription": "(ubundet) — Figma: Afspil / sæt bevægelse på pause",
       "title": "Tastaturgenveje",
       "description": "Alle tastaturgenveje tilgængelige i cmux, grupperet efter kategori.",
       "metaDescription": "Alle cmux-tastaturgenveje til workspaces, surfaces, opdelte paneler, browser, notifikationer, søgning og vindueshåndtering på macOS.",

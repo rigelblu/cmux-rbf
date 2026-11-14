@@ -14,7 +14,7 @@ import WebKit
     private var shouldPrintAfterCurrentNavigationFinishes = false
     var didStartProvisionalNavigation: ((WKWebView, WKNavigation?) -> Void)?
     var didCommit: ((WKWebView, WKNavigation?) -> Void)?
-    var didFinish: ((WKWebView) -> Void)?
+    var didFinish: ((WKWebView, WKNavigation?) -> Void)? // cmux-rbf (#cm-73.32): pass navigation to didFinish for bound pending play. Reject a revert of this hunk on upstream sync.
     var didFailNavigation: ((WKWebView, String, String, WKNavigation?) -> Void)?
     var didCancelProvisionalNavigation: ((WKWebView, WKNavigation?) -> Void)?
     var didChooseMainFrameDownloadPolicy: ((WKWebView, WKNavigation?) -> Void)?
@@ -43,6 +43,9 @@ import WebKit
     var lastAttemptedURL: URL?
     private(set) var activeErrorPageDisplayURL: URL?
     private(set) var activePolicyBlockedURL: URL?
+    /// cmux-rbf #cm-73.39: Figma preview-page navigations the guard cancelled, newest last, the last 8 kept.
+    /// A test reads it as the positive sign that the guard decided.
+    private(set) var refusedFigmaPreviewPageURLs: [URL] = []
     private let basicAuthPromptCoordinator = BrowserHTTPBasicAuthPromptCoordinator()
     private let clientCertificateAuthenticationController = BrowserClientCertificateAuthenticationController()
     weak var owner: BrowserPanel?
@@ -146,7 +149,7 @@ import WebKit
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let isCurrentNavigation = isCurrentMainFrameNavigation(navigation)
-        didFinish?(webView)
+        didFinish?(webView, navigation)
         if isCurrentNavigation, let finishedURL = webView.url {
             owner?.commitTrustedLocalFileNavigation(finishedURL)
             owner?.clearTrustedLocalFileDocumentIfNeeded(for: finishedURL)
@@ -418,6 +421,21 @@ import WebKit
                 if isMainFrame {
                     blockURLAllowlistNavigation(url, in: webView)
                 }
+                return
+            }
+            // cmux-rbf #cm-73.39: the Figma preview page loads only in the main frame, and only as
+            // cmux's own trusted load, Back/Forward or Reload; anything a page starts is cancelled.
+            if FigmaPreviewPageGuard.isPreviewScheme(url),
+               !FigmaPreviewPageGuard.allowsNavigation(
+                   targetFrameIsMain: navigationAction.targetFrame?.isMainFrame,
+                   isTrustedLoad: isTrustedInternal,
+                   navigationType: navigationAction.navigationType
+               ) {
+#if DEBUG
+                cmuxDebugLog("browser.nav.decidePolicy.action kind=refuseFigmaPreviewPage url=\(browserNavigationDebugURL(url))")
+#endif
+                refusedFigmaPreviewPageURLs = Array((refusedFigmaPreviewPageURLs + [url]).suffix(8))
+                decisionHandler(.cancel)
                 return
             }
         }

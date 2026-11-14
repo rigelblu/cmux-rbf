@@ -1401,6 +1401,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Cambiar entre vista previa y editor",
+      "figmaShowStillDescription": "(sin asignar) — Figma: Mostrar estático",
+      "figmaMotionDescription": "(sin asignar) — Figma: Reproducir / pausar movimiento",
       "title": "Atajos de teclado",
       "description": "Todos los atajos de teclado disponibles en cmux, agrupados por categoría.",
       "metaDescription": "Todos los atajos de teclado de cmux para workspaces, superficies, paneles divididos, navegador, notificaciones, búsqueda y gestión de ventanas en macOS.",

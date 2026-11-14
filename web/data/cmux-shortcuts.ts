@@ -382,6 +382,36 @@ export const shortcutCategories: ShortcutCategory[] = [
       { id: "flipDesignFocusLayout", combos: [["⌥", "⌘", "⇧", "\\"]], description: { en: "Flip design focus layout", ja: "デザインフォーカスのレイアウトを変更" } },
       // cmux-rbf #cm-73.3: retained Figma pages.
       { id: "switchFigmaPreviewAndEditor", combos: [["⌥", "⇧", "⌘", "C"]], description: {"en": "Figma: Switch Preview and Editor", "ar": "Figma: التبديل بين المعاينة والمحرّر", "bs": "Figma: Prebaci pregled i uređivač", "da": "Figma: Skift mellem forhåndsvisning og editor", "de": "Figma: Zwischen Vorschau und Editor wechseln", "es": "Figma: Cambiar entre vista previa y editor", "fr": "Figma : Basculer entre aperçu et éditeur", "it": "Figma: Passa tra anteprima ed editor", "ja": "Figma: プレビューとエディターを切り替え", "km": "Figma៖ ប្ដូររវាងការមើលជាមុន និងកន្លែងកែសម្រួល", "ko": "Figma: 미리보기와 편집기 전환", "no": "Figma: Bytt mellom forhåndsvisning og redigering", "pl": "Figma: Przełącz podgląd i edytor", "pt-BR": "Figma: Alternar entre prévia e editor", "ru": "Figma: Переключить предпросмотр и редактор", "th": "Figma: สลับระหว่างตัวอย่างและตัวแก้ไข", "tr": "Figma: Önizleme ve Düzenleyici Arasında Geçiş Yap", "uk": "Figma: Перемкнути попередній перегляд і редактор", "zh-CN": "Figma：切换预览和编辑器", "zh-TW": "Figma：切換預覽與編輯器"} },
+      // cmux-rbf (#cm-73.32): Figma motion toggle (unbound by default).
+      // cmux-rbf (#cm-73.37): still view has its own unbound action.
+      { id: "showFigmaStill", combos: [], description: {"ar": "Figma: إظهار صورة ثابتة", "bs": "Figma: Prikaži mirno", "da": "Figma: Vis stillbillede", "de": "Figma: Standbild anzeigen", "en": "Figma: Show Still", "es": "Figma: Mostrar estático", "fr": "Figma : Afficher l'image fixe", "it": "Figma: Mostra immagine fissa", "ja": "Figma: 静止画を表示", "km": "Figma: បង្ហាញរូបភាពនៅនឹង", "ko": "Figma: 정지 화면 표시", "no": "Figma: Vis stillbilde", "pl": "Figma: Pokaż klatkę", "pt-BR": "Figma: Mostrar estático", "ru": "Figma: Показать стоп-кадр", "th": "Figma: แสดงภาพนิ่ง", "tr": "Figma: Hareketsiz Göster", "uk": "Figma: Показати статичний вигляд", "zh-CN": "Figma：显示静态", "zh-TW": "Figma：顯示靜態"}, note: { en: "unbound by default", ja: "デフォルトでは未割り当て" } },
+      {
+        id: "toggleFigmaMotion",
+        combos: [],
+        description: {
+          "en": "Figma: Play / Pause Motion",
+          "ar": "Figma: تشغيل / إيقاف الحركة مؤقتًا",
+          "bs": "Figma: Pusti / pauziraj kretanje",
+          "da": "Figma: Afspil / sæt bevægelse på pause",
+          "de": "Figma: Bewegung abspielen / pausieren",
+          "es": "Figma: Reproducir / pausar movimiento",
+          "fr": "Figma : Lire / mettre le mouvement en pause",
+          "it": "Figma: Riproduci / metti in pausa il movimento",
+          "ja": "Figma: モーションを再生 / 一時停止",
+          "km": "Figma៖ ចាក់ / ផ្អាកចលនា",
+          "ko": "Figma: 모션 재생 / 일시 정지",
+          "no": "Figma: Spill av / sett bevegelse på pause",
+          "pl": "Figma: Odtwórz / wstrzymaj ruch",
+          "pt-BR": "Figma: Reproduzir / pausar movimento",
+          "ru": "Figma: Воспроизвести / приостановить движение",
+          "th": "Figma: เล่น / หยุดการเคลื่อนไหวชั่วคราว",
+          "tr": "Figma: Hareketi oynat / duraklat",
+          "uk": "Figma: Відтворити / призупинити рух",
+          "zh-CN": "Figma：播放 / 暂停动态",
+          "zh-TW": "Figma：播放 / 暫停動態"
+        },
+        note: { en: "unbound by default", ja: "デフォルトでは未割り当て" },
+      },
       { id: "increaseWorkspaceTerminalFontSize", combos: [["⌃", "⌘", "="]], description: { en: "Increase font size for every terminal in the selected workspace", ja: "選択中のワークスペース内の全ターミナルのフォントサイズを大きくする" } },
       { id: "decreaseWorkspaceTerminalFontSize", combos: [["⌃", "⌘", "-"]], description: { en: "Decrease font size for every terminal in the selected workspace", ja: "選択中のワークスペース内の全ターミナルのフォントサイズを小さくする" } },
       { id: "resetWorkspaceTerminalFontSize", combos: [["⌃", "⌘", "0"]], description: { en: "Reset font size for every terminal in the selected workspace", ja: "選択中のワークスペース内の全ターミナルのフォントサイズをリセットする" } },

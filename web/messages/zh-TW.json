@@ -1401,6 +1401,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma：切換預覽與編輯器",
+      "figmaShowStillDescription": "(未綁定) — Figma：顯示靜態",
+      "figmaMotionDescription": "(未綁定) — Figma：播放 / 暫停動態",
       "title": "鍵盤快捷鍵",
       "description": "cmux 中所有可用的鍵盤快捷鍵，依類別分組。",
       "metaDescription": "cmux 所有鍵盤快捷鍵，涵蓋工作區、surface、分割窗格、瀏覽器、通知、搜尋和 macOS 視窗管理。",

@@ -390,16 +390,35 @@ pointing released opens it again at its last address, so Figma's zoom and
 selection are not kept. Figma's *Open in Figma* mark opens Editor with Preview kept
 behind it. A trackpad swipe is not part of this history: it moves within the page
 showing, and Back and Forward carry on from wherever the swipe left it. Moving
-to a board the Preview still holds uses its own history and reloads nothing; a
-board it no longer holds, such as one restored after a restart, loads again from
-its address.
+to a board the Preview still holds uses its own history and reloads nothing, except
+that a frame left playing comes back still; a board it no longer holds, such as one
+restored after a restart, loads again from its address.
 The history is not saved, so after a restart Back starts from the side that shows.
+
+A frame marked with `cmux figma goto <node> --motion` opens in Figma's player,
+frozen on its first state. The pill at the bottom centre of Preview shows ▶ and ■.
+Both cells are disabled until the player draws. ▶ plays without reloading; ❚❚ pauses;
+▶ resumes from that point. ■ shows the still read view with Figma's zoom. ▶ there
+loads the player again. The pill shows on marked frames and whenever the player
+shows, including an unmarked frame played from the palette. Design Focus's hover
+row has no motion button. FigJam boards, slide decks and Editor have no pill.
+
+The palette offers Figma: Play Motion / Figma: Pause Motion and Figma: Show Still.
+Show Still is hidden in the still view; both entries are disabled while loading.
+Leaving for Editor, another frame, workspace or tab pauses the player; a cached
+return stays paused there. A reload, restart or `cmux figma fit` opens a marked
+frame frozen at the start, and an unmarked frame still. Neither action adds history.
+
+The actions `toggleFigmaMotion` (play/pause) and `showFigmaStill` have no default
+keys. Bind them in Settings › Keyboard Shortcuts or `cmux.json`:
 
 ```json
 {
   "shortcuts": {
     "bindings": {
-      "switchFigmaPreviewAndEditor": "opt+shift+cmd+c"
+      "switchFigmaPreviewAndEditor": "opt+shift+cmd+c",
+      "toggleFigmaMotion": "opt+shift+cmd+m",
+      "showFigmaStill": "opt+shift+cmd+s"
     }
   }
 }

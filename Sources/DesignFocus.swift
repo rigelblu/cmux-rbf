@@ -226,7 +226,7 @@ enum DesignFocusRouting {
         asker: Asker,
         wantsFocus: Bool = false,
         modeEnabled: Bool = true,
-        wrapper: URL = FigmaPaneURL.wrapperFileURL()
+        wrapper: URL = FigmaPaneURL.previewPageURL
     ) -> Outcome {
         guard modeEnabled else {
             return .asToday

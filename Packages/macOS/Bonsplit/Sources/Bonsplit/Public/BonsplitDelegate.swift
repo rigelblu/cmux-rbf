@@ -77,8 +77,10 @@ public protocol BonsplitDelegate: AnyObject {
     /// cmux-rbf #cm-73.3: supplies the showing side of the pair's Figma pane, or nil without a target.
     func pairFigmaPage(for controller: BonsplitController) -> PairFigmaPage?
 
+
     /// cmux-rbf #cm-73.3: requests the selected side of the pair's Figma pane and focuses that pane.
     func splitTabBar(_ controller: BonsplitController, didChooseFigmaPage page: PairFigmaPage)
+
 
     /// Requests a board arrangement from the host; the host rechecks its target.
     func splitTabBar(_ controller: BonsplitController, didChooseBoardLayout orientation: BoardLayoutOrientation)

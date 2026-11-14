@@ -57,14 +57,21 @@ enum FigmaPaneURL {
 
     // MARK: - Where the wrapper lives
 
-    /// Application Support, not the app bundle.
+    /// The read view's page (`cm-73.39`): served from memory by
+    /// `FigmaPreviewPageSchemeHandler`, under a scheme cmux owns. Under the old
+    /// `file://` page, macOS 27.2's WebKit gave Figma's frame no cookies after a
+    /// granted storage-access request, so a file that needs sign-in looped on
+    /// Log in. The host is what WebKit's storage-access prompt names.
+    static let previewPageScheme = "cmux-figma"
+    static let previewPageHost = "cmux"
+    static let previewPagePath = "/figma-embed.html"
+    static let previewPageURL = URL(string: "\(previewPageScheme)://\(previewPageHost)\(previewPagePath)")!
+
+    /// The legacy page: the file older builds wrote in Application Support.
     ///
-    /// The wrapper's URL is what `SessionBrowserPanelSnapshot` persists for the
-    /// pane, so the path has to outlive both a restart and `make clean-builds`.
-    /// A bundle path fails the second: a dev build's Resources live in
-    /// DerivedData, which that command deletes by design, and the restored pane
-    /// would then point at nothing. This directory is shared by every build for
-    /// the same reason `~/.config/cmux/cmux.json` is.
+    /// Read only to recognise an address an older build saved and to move it to
+    /// ``previewPageURL``; nothing writes it any more, and the file stays where
+    /// those builds left it.
     static func wrapperFileURL(
         applicationSupport: URL = FileManager.default
             .homeDirectoryForCurrentUser
@@ -83,7 +90,8 @@ enum FigmaPaneURL {
     static func destination(
         for pasted: URL,
         node explicitNode: String? = nil,
-        wrapper: URL = wrapperFileURL()
+        motion: Bool = false,
+        wrapper: URL = previewPageURL
     ) throws -> Destination {
         guard isFigmaDocumentURL(pasted) else {
             throw Failure.notAFigmaURL(pasted.absoluteString)
@@ -103,7 +111,7 @@ enum FigmaPaneURL {
         if normalizedNode(explicitNode) == nil, firstPageIDs.contains(node) { return .editor(pasted) }
 
         let embedded = embedURL(for: pasted, node: node)
-        return .embed(wrapper: wrapperURL(wrapper, embedding: embedded), embedded: embedded)
+        return .embed(wrapper: wrapperURL(wrapper, embedding: embedded, motion: motion), embedded: embedded)
     }
 
     /// The embed URL: host swapped, **path kept verbatim**, parameters appended.
@@ -137,12 +145,24 @@ enum FigmaPaneURL {
     /// resolve and a restart could not return to the steered node. Measured
     /// 2026-09-08: a query string on a `file://` URL survives, and is what the
     /// pane reports back through `browser get url`.
-    static func wrapperURL(_ wrapper: URL, embedding embedded: URL) -> URL {
+    static func wrapperURL(_ wrapper: URL, embedding embedded: URL, motion: Bool = false) -> URL {
         var components = URLComponents(url: wrapper, resolvingAgainstBaseURL: false)
             ?? URLComponents()
         // No theme: the page picks light or dark from the pane each time it loads.
-        components.queryItems = [URLQueryItem(name: "embed", value: embedded.absoluteString)]
+        var items = [URLQueryItem(name: "embed", value: embedded.absoluteString)]
+        if motion {
+            items.append(URLQueryItem(name: "motion", value: "1"))
+        }
+        components.queryItems = items
         return components.url ?? wrapper
+    }
+
+    /// Whether cmux's wrapper page URL carries the `motion=1` mark in its query.
+    static func hasMotionMark(inWrapper paneURL: URL, wrapper: URL = previewPageURL) -> Bool {
+        guard isWrapperPage(paneURL, wrapper: wrapper),
+              let components = URLComponents(url: paneURL, resolvingAgainstBaseURL: false)
+        else { return false }
+        return components.queryItems?.contains(where: { $0.name == "motion" && $0.value == "1" }) ?? false
     }
 
     // MARK: - Reverse: what the pane is bound to
@@ -152,7 +172,7 @@ enum FigmaPaneURL {
     /// `goto` needs this: the pane's URL *is* the binding (no new persisted
     /// field), but in embed mode that URL is cmux's wrapper, so the document
     /// has to be read back out of the query string it carries.
-    static func documentURL(fromPaneURL paneURL: URL, wrapper: URL = wrapperFileURL()) -> URL? {
+    static func documentURL(fromPaneURL paneURL: URL, wrapper: URL = previewPageURL) -> URL? {
         if isFigmaDocumentURL(paneURL) {
             return canonicalized(paneURL)
         }
@@ -160,9 +180,48 @@ enum FigmaPaneURL {
         return isFigmaDocumentURL(embedded) ? canonicalized(embedded) : nil
     }
 
-    /// Whether an address is cmux's own page.
-    static func isWrapperPage(_ paneURL: URL, wrapper: URL = wrapperFileURL()) -> Bool {
-        paneURL.isFileURL && paneURL.standardizedFileURL.path == wrapper.standardizedFileURL.path
+    /// Whether an address is cmux's own page: the page passed in, matched by
+    /// scheme, host and path whatever the query, or the legacy Application
+    /// Support file, which an address an older build saved still names.
+    static func isWrapperPage(_ paneURL: URL, wrapper: URL = previewPageURL) -> Bool {
+        isSamePage(paneURL, wrapper) || isSamePage(paneURL, wrapperFileURL())
+    }
+
+    /// One page check, shared with `FigmaPreviewPageSchemeHandler`: a file page by its path; any
+    /// other by scheme, host, port, user and path, whatever the query.
+    static func isSamePage(_ address: URL, _ page: URL) -> Bool {
+        if address.isFileURL || page.isFileURL {
+            return address.isFileURL && page.isFileURL
+                && address.standardizedFileURL.path == page.standardizedFileURL.path
+        }
+        return address.scheme?.lowercased() == page.scheme?.lowercased()
+            && address.host?.lowercased() == page.host?.lowercased()
+            && address.port == page.port
+            && address.user == page.user
+            && address.path == page.path
+    }
+
+    /// An address on the legacy file page, moved to ``previewPageURL`` with the
+    /// same query; any other address as given.
+    ///
+    /// Applied where an address comes in — a restored pane, and the panel's load
+    /// funnel — so restored history and WebKit agree on one address.
+    static func upgradingLegacyPage(_ address: URL) -> URL {
+        guard address.isFileURL, isSamePage(address, wrapperFileURL()),
+              let legacy = URLComponents(url: address, resolvingAgainstBaseURL: false),
+              var upgraded = URLComponents(url: previewPageURL, resolvingAgainstBaseURL: false)
+        else { return address }
+        upgraded.percentEncodedQuery = legacy.percentEncodedQuery
+        upgraded.percentEncodedFragment = legacy.percentEncodedFragment
+        return upgraded.url ?? address
+    }
+
+    /// ``upgradingLegacyPage(_:)`` for a saved address string; a string that is
+    /// not the legacy page comes back unchanged.
+    static func upgradingLegacyPage(string: String) -> String {
+        guard let address = URL(string: string) else { return string }
+        let upgraded = upgradingLegacyPage(address)
+        return upgraded == address ? string : upgraded.absoluteString
     }
 
     /// The embed URL a wrapper URL carries, if it is one of ours.
@@ -170,7 +229,7 @@ enum FigmaPaneURL {
     /// **Read only from cmux's own page.** A page on any site can carry
     /// `?embed=<a Figma link>` in its address, and reading it would make that
     /// pane look like a Figma pane `goto` can navigate.
-    static func embeddedURL(inWrapper paneURL: URL, wrapper: URL = wrapperFileURL()) -> URL? {
+    static func embeddedURL(inWrapper paneURL: URL, wrapper: URL = previewPageURL) -> URL? {
         guard isWrapperPage(paneURL, wrapper: wrapper),
               let components = URLComponents(url: paneURL, resolvingAgainstBaseURL: false),
               let raw = components.queryItems?.first(where: { $0.name == "embed" })?.value
@@ -188,7 +247,7 @@ enum FigmaPaneURL {
     /// keeps the path as given and cannot serve here.
     ///
     /// Reads a pane in either surface, as ``documentURL(fromPaneURL:wrapper:)`` does.
-    static func fileKey(fromPaneURL paneURL: URL, wrapper: URL = wrapperFileURL()) -> String? {
+    static func fileKey(fromPaneURL paneURL: URL, wrapper: URL = previewPageURL) -> String? {
         guard let document = documentURL(fromPaneURL: paneURL, wrapper: wrapper) else { return nil }
         // `[kind, KEY, ...]`: `isFileLink` has already held the first segment to one of the four.
         let segments = document.path.split(separator: "/").map(String.init)
@@ -198,7 +257,7 @@ enum FigmaPaneURL {
     }
 
     /// The node a pane is currently steered to, if any.
-    static func node(fromPaneURL paneURL: URL, wrapper: URL = wrapperFileURL()) -> String? {
+    static func node(fromPaneURL paneURL: URL, wrapper: URL = previewPageURL) -> String? {
         if let embedded = embeddedURL(inWrapper: paneURL, wrapper: wrapper) { return nodeID(in: embedded) }
         return nodeID(in: paneURL)
     }
@@ -227,4 +286,54 @@ enum FigmaPaneURL {
         }
         return trimmed
     }
+}
+
+/// Scripts evaluated in the Figma wrapper page for Play and Still.
+enum FigmaPlayScript {
+    /// Pure function for transforming a design or file embed URL into a prototype embed URL.
+    static let script = #"""
+    function cmuxProtoAddress(src, canvasBg) {
+      if (!src) return null;
+      var mark = src.indexOf('?');
+      var base = mark >= 0 ? src.slice(0, mark) : src;
+      base = base.replace(/^([a-z]+:\/\/[^\/]+)?\/(?:design|file)\//i, function (match, host) {
+        return (host || '') + '/proto/';
+      });
+      var query = mark >= 0 ? src.slice(mark + 1) : '';
+      var params = {};
+      query.split('&').forEach(function (pair) {
+        if (!pair) return;
+        var at = pair.indexOf('=');
+        var k = at >= 0 ? pair.slice(0, at) : pair;
+        var v = at >= 0 ? pair.slice(at + 1) : '';
+        params[k] = v;
+      });
+      var nodeId = params['node-id'];
+      delete params['page-selector'];
+      params['hide-ui'] = '1';
+      if (canvasBg) { params['bg-color'] = canvasBg; }
+      params['scaling'] = 'contain';
+      if (nodeId) { params['starting-point-node-id'] = nodeId; }
+      var pairs = [];
+      for (var k in params) {
+        if (Object.prototype.hasOwnProperty.call(params, k)) {
+          pairs.push(k + '=' + params[k]);
+        }
+      }
+      return base + '?' + pairs.join('&');
+    }
+    """#
+
+    // cmux-rbf (#cm-73.37): inverse of cmuxProtoAddress; callers set www.figma.com.
+    static let stillAddressScript = #"""
+    function cmuxStillAddress(src) {
+      var mark = src.indexOf('?');
+      var base = (mark >= 0 ? src.slice(0, mark) : src).replace('/proto/', '/design/');
+      var kept = (mark >= 0 ? src.slice(mark + 1) : '').split('&').filter(function (p) {
+        return p && ['hide-ui', 'scaling', 'starting-point-node-id', 'bg-color', 'page-selector'].indexOf(p.split('=')[0]) < 0;
+      });
+      kept.push('page-selector=0');
+      return base + '?' + kept.join('&');
+    }
+    """#
 }

@@ -1025,6 +1025,7 @@ private let browserEmbeddedNavigationSchemes: Set<String> = [
     "applewebdata",
     "blob",
     "cmux-diff-viewer",
+    "cmux-figma", // cmux-rbf #cm-73.39: the Figma preview page; FigmaPreviewPageGuard keeps web pages off it
     "data",
     "file",
     "http",
@@ -2025,8 +2026,20 @@ final class BrowserPanel: Panel, ObservableObject {
     private var retainedFigmaPage: RetainedFigmaPage?
     // Memory pressure releases the document, but the next switch still knows its address.
     private var discardedFigmaPageAddress: URL?
-    var figmaPageWrapper = FigmaPaneURL.wrapperFileURL()
+    var figmaPageWrapper = FigmaPaneURL.previewPageURL // cmux-rbf #cm-73.39: the served page, not the legacy file
     var retainedFigmaPageAddress: URL? { retainedFigmaPage?.address ?? discardedFigmaPageAddress }
+    // cmux-rbf (#cm-73.32): Play state for this panel (reset to still on every exchange), and whether a goto --play is waiting for load. Reject a revert of this hunk on upstream sync.
+    // cmux-rbf (#cm-73.37): the served page owns motion; native surfaces mirror its reports.
+    var figmaMotionState: FigmaMotionState = .still
+    var isFigmaMotionPlaying: Bool {
+        get { figmaMotionState == .playing }
+        set { figmaMotionState = newValue ? .playing : .still }
+    }
+    private(set) var isFigmaMotionToggleInFlight: Bool = false
+    /// Counts Play requests that reached a wrapper page; tests read it because the page's answer is asynchronous.
+    private(set) var figmaPlayRequestCount = 0
+    var onFigmaMotionStateChange: (() -> Void)?
+    var pendingFigmaPlayNavigation: WKNavigation?
     // cmux-rbf (#cm-73.3): one Back and Forward history across the two pages, for ⌘[ and the mouse buttons. Not saved. Reject a revert of this hunk on upstream sync.
     private var figmaHistory = FigmaPaneHistory<WKBackForwardListItem>()
     /// While the history itself swaps or loads pages, the address changes it causes are not news to it.
@@ -2698,6 +2711,8 @@ final class BrowserPanel: Panel, ObservableObject {
         now: Date = Date(),
         recordIfUnchanged: Bool = false
     ) {
+        // cmux-rbf (#cm-73.37): leaving a workspace or tab pauses its retained preview.
+        if !visible { pauseFigmaMotionOnLeave() }
         let changed = isWebViewVisibleInUI != visible
         let isFirstVisibilityRecord = webViewLastVisibilityChangeReason == nil
         let shouldRecordVisibleHeartbeat = visible && recordIfUnchanged
@@ -3135,6 +3150,13 @@ final class BrowserPanel: Panel, ObservableObject {
                 forURLScheme: CmuxDiffViewerURLSchemeHandler.scheme
             )
         }
+        // cmux-rbf #cm-73.39: the Figma preview page, served from memory.
+        if configuration.urlSchemeHandler(forURLScheme: FigmaPaneURL.previewPageScheme) == nil {
+            configuration.setURLSchemeHandler(
+                FigmaPreviewPageSchemeHandler.shared,
+                forURLScheme: FigmaPaneURL.previewPageScheme
+            )
+        }
         // Review-comment persistence + TextBox attach for diff viewer pages.
         // The handler itself rejects every frame that is not a registered diff
         // viewer session, so installing it on all browser webviews is safe.
@@ -3221,6 +3243,8 @@ final class BrowserPanel: Panel, ObservableObject {
     }
 
     func bindWebView(_ webView: CmuxWebView) {
+        // cmux-rbf (#cm-73.37): retained and replacement preview views get the same bridge.
+        installFigmaMotionBridge(on: webView, address: currentURL ?? webView.url)
         webViewObservationGeneration &+= 1
         browserViewportHostRestorationTask?.cancel()
         browserViewportHostRestorationTask = nil
@@ -3593,13 +3617,17 @@ final class BrowserPanel: Panel, ObservableObject {
                 self.resetMediaPlaybackTracking()
                 self.publishCommittedURL(from: webView)
                 self.figmaHistoryFollowShowing() // cmux-rbf #cm-73.3: a commit can leave the address as it was
+                // cmux-rbf (#cm-73.37): --play sets run before Figma asks; ordinary marked opens freeze.
+                let run = self.pendingFigmaPlayNavigation != nil && self.pendingFigmaPlayNavigation === navigation
+                if run { self.pendingFigmaPlayNavigation = nil }
+                self.refreshFigmaPlayState(run: run)
                 self.applyMuteState(to: webView, reason: "navigationCommit")
                 if self.shouldTreatCommitAsDiscardedRestoreCommit(from: webView) {
                     self.noteDiscardedWebViewRestoreNavigationCommitted()
                 }
             }
         }
-        navigationDelegate.didFinish = { [weak self] webView in
+        navigationDelegate.didFinish = { [weak self] webView, navigation in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 // cmux-rbf (#cm-73.3): the held editor finishes its own chrome work without touching presentation state. Reject a revert of this hunk on upstream sync.
@@ -3635,6 +3663,8 @@ final class BrowserPanel: Panel, ObservableObject {
                 // collapsed state is page state and dies with the document, so
                 // this runs on every load rather than once at open.
                 self.collapseFigmaEditorChromeIfNeeded(in: webView)
+                // cmux-rbf (#cm-73.37): read the page's state, never infer it from an iframe URL.
+                self.refreshFigmaPlayState()
             }
         }
         navigationDelegate.didFailNavigation = { [weak self] failedWebView, failedURL, failureMessage, failedNavigation in
@@ -3648,6 +3678,10 @@ final class BrowserPanel: Panel, ObservableObject {
                 )
                 self.isMainFrameProvisionalNavigationActive = false
                 self.figmaLoadBar.failed() // cmux-rbf (#cm-73.11): the load failed; cmux's error page must not draw the line again. Reject a revert of this hunk on upstream sync.
+                // cmux-rbf (#cm-73.32): clear armed play on failed navigation only if matching. Reject a revert of this hunk on upstream sync.
+                if let pending = self.pendingFigmaPlayNavigation, let failedNavigation, pending === failedNavigation {
+                    self.pendingFigmaPlayNavigation = nil
+                }
                 if let url = URL(string: failedURL) {
                     self.currentURL = Self.remoteProxyDisplayURL(for: url) ?? url
                 }
@@ -3710,6 +3744,10 @@ final class BrowserPanel: Panel, ObservableObject {
                 let isRestoreBookkeepingNavigation = self.isDiscardRestoreBookkeepingNavigation(cancelledNavigation)
                 self.isMainFrameProvisionalNavigationActive = false
                 self.figmaLoadBar.cancelled() // cmux-rbf (#cm-73.11): the load was cancelled. Reject a revert of this hunk on upstream sync.
+                // cmux-rbf (#cm-73.32): clear armed play on cancelled navigation only if matching. Reject a revert of this hunk on upstream sync.
+                if let pending = self.pendingFigmaPlayNavigation, let cancelledNavigation, pending === cancelledNavigation {
+                    self.pendingFigmaPlayNavigation = nil
+                }
                 if isRestoreBookkeepingNavigation {
                     self.navigationDelegate?.clearAttemptedRequest()
                 }
@@ -4674,6 +4712,9 @@ final class BrowserPanel: Panel, ObservableObject {
     }
 
     func restoreSessionSnapshot(_ snapshot: SessionBrowserPanelSnapshot) {
+        // cmux-rbf #cm-73.39: an older build's `file://` preview addresses become the served page here,
+        // before restored history records them, so it and WebKit agree on one address.
+        let snapshot = snapshot.upgradingLegacyFigmaPreviewPage()
         releaseRetainedFigmaPage()
         figmaHistory.reset() // cmux-rbf #cm-73.3: cross-side history is not saved; a restart starts it again.
         keepLoaded = snapshot.keepLoaded
@@ -4812,9 +4853,11 @@ final class BrowserPanel: Panel, ObservableObject {
     // cmux-rbf #cm-73.16: document observations publish through the same seam in KVO and integration tests.
     func publishObservedDocumentURL(_ observedURL: URL?) {
         // cmux-rbf #cm-73.3: WebKit may clear its URL while the requested Preview is still loading. Keep that pending address available to the shared switch. Reject a revert of this hunk on upstream sync.
+        // cmux-rbf #cm-73.39: the served page is not a local file, so its pending load is the attempted one.
+        let pendingServedPage = navigationDelegate?.lastAttemptedURL.flatMap { FigmaPreviewPageGuard.isPreviewScheme($0) ? $0 : nil }
         if observedURL == nil,
-           let pending = pendingTrustedLocalFileURL,
-           currentURL == pending,
+           let pending = currentURL,
+           pending == pendingTrustedLocalFileURL || pending == pendingServedPage,
            FigmaPaneURL.isWrapperPage(pending, wrapper: figmaPageWrapper) {
             return
         }
@@ -5263,6 +5306,8 @@ final class BrowserPanel: Panel, ObservableObject {
 
     func close() {
         releaseRetainedFigmaPage() // cmux-rbf #cm-73.3
+        // cmux-rbf (#cm-73.32): detach motion callback on close
+        onFigmaMotionStateChange = nil
         cloudAccess.leave()
         cancelHiddenWebViewDiscard()
         isClosingWebViewLifecycle = true
@@ -5691,7 +5736,7 @@ final class BrowserPanel: Panel, ObservableObject {
 
     // cmux-rbf (#cm-73.3): one owner for switching and every goto entrance. Reject a revert of this hunk on upstream sync.
     @discardableResult
-    func switchFigmaPreviewAndEditor(wrapper: URL = FigmaPaneURL.wrapperFileURL()) -> Bool {
+    func switchFigmaPreviewAndEditor(wrapper: URL = FigmaPaneURL.previewPageURL) -> Bool {
         guard let address = currentURL ?? webView.url,
               FigmaTabMark.applies(address: address, showsAddressBar: isOmnibarVisible, wrapper: wrapper),
               let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper) else { return false }
@@ -5719,13 +5764,23 @@ final class BrowserPanel: Panel, ObservableObject {
         case fit
     }
 
-    /// Pointing replaces the held Editor; a fit reload preserves the current pair.
+    // cmux-rbf (#cm-73.32): motion and play flags, with optional navigation start callback
     @discardableResult
-    func gotoFigmaNode(_ node: String, wrapper: URL = FigmaPaneURL.wrapperFileURL(), defaults: UserDefaults = .standard, purpose: FigmaGotoPurpose = .point) -> Bool {
+    func gotoFigmaNode(
+        _ node: String,
+        wrapper: URL = FigmaPaneURL.previewPageURL,
+        defaults: UserDefaults = .standard,
+        purpose: FigmaGotoPurpose = .point,
+        motion: Bool = false,
+        play: Bool = false,
+        onNavigationStarted: ((WKNavigation?) -> Void)? = nil
+    ) -> Bool {
         let node = node.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !node.isEmpty, let address = currentURL ?? webView.url,
-              let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper),
-              let destination = try? FigmaPaneURL.destination(for: document, node: node, wrapper: wrapper),
+              let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper)
+        else { return false }
+        let shouldMarkMotion = motion || play || (purpose == .fit && FigmaPaneURL.hasMotionMark(inWrapper: address, wrapper: wrapper))
+        guard let destination = try? FigmaPaneURL.destination(for: document, node: node, motion: shouldMarkMotion, wrapper: wrapper),
               BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination.url)
         else { return false }
         // Preview fit reloads only Preview; editor fitting is handled by the CLI's key path.
@@ -5734,10 +5789,14 @@ final class BrowserPanel: Panel, ObservableObject {
         }
         // Explicit --surface accepts ordinary panes; they keep WebKit's own Back.
         if isOmnibarVisible {
-            do { try FigmaWrapperPage.install(at: wrapper) } catch { return false }
             figmaPageWrapper = wrapper
             currentURL = destination.url
-            navigate(to: destination.url)
+            let nav = navigate(to: destination.url)
+            onNavigationStarted?(nav)
+            // cmux-rbf (#cm-73.32): bind pending play navigation
+            if play && purpose != .fit {
+                pendingFigmaPlayNavigation = nav
+            }
             if purpose == .point { releaseRetainedFigmaPage() }
             figmaHistory.reset()
             scheduleFigmaReadSnapshotRefresh()
@@ -5746,13 +5805,126 @@ final class BrowserPanel: Panel, ObservableObject {
         // An editor opened alone gets a preview page beside it, so Back can reopen the editor.
         figmaPageWrapper = wrapper
         if purpose == .point { figmaHistoryWillLeave() }
-        guard let shown = showFigmaPage(preview: true, destination: destination.url, reload: true, wrapper: wrapper, defaults: defaults) else { return false }
+        var startedNav: WKNavigation?
+        guard let shown = showFigmaPage(
+            preview: true,
+            destination: destination.url,
+            reload: true,
+            wrapper: wrapper,
+            defaults: defaults,
+            onNavigationStarted: { nav in
+                startedNav = nav
+                onNavigationStarted?(nav)
+            }
+        ) else {
+            return false
+        }
+        // cmux-rbf (#cm-73.32): bind pending play navigation
+        if play && purpose != .fit {
+            pendingFigmaPlayNavigation = startedNav
+        }
         if purpose == .point {
             releaseRetainedFigmaPage()
             figmaHistoryDidArrive(shown)
         }
         // A fit loads the same board again into the same slot: still the same place.
         return true
+    }
+
+    // MARK: - Figma Motion (cmux-rbf (#cm-73.37))
+
+    func installFigmaMotionBridge(on view: WKWebView, address: URL?) {
+        guard let address, FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) else { return }
+        let controller = view.configuration.userContentController
+        if !controller.userScripts.contains(where: { $0.source == FigmaMotion.clockScript }) {
+            controller.addUserScript(WKUserScript(source: FigmaMotion.clockScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        }
+        controller.removeScriptMessageHandler(forName: FigmaMotion.handlerName)
+        controller.add(FigmaMotionMessageHandler { [weak self] view, mainFrame, address, body in
+            self?.receiveFigmaMotionMessage(from: view, mainFrame: mainFrame, address: address, body: body)
+        }, name: FigmaMotion.handlerName)
+    }
+
+    func receiveFigmaMotionMessage(from view: WKWebView?, mainFrame: Bool, address: URL?, body: Any) {
+        guard mainFrame, let view, view === webView, let address,
+              FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper),
+              let actual = view.url ?? currentURL,
+              FigmaPaneURL.isWrapperPage(actual, wrapper: figmaPageWrapper),
+              let body = body as? [String: Any] else { return }
+        if let action = body["action"] as? String {
+            if action == "toggle" { _ = toggleFigmaMotion() }
+            if action == "still" { showFigmaStill() }
+        } else { applyFigmaMotionSnapshot(body) }
+    }
+
+    private func applyFigmaMotionSnapshot(_ result: Any?) {
+        guard let body = result as? [String: Any], let raw = body["state"] as? String,
+              let state = FigmaMotionState(rawValue: raw) else { return }
+        let changed = figmaMotionState != state
+        figmaMotionState = state
+        if changed { onFigmaMotionStateChange?() }
+    }
+
+    private func sendFigmaMotionCommand(_ action: String, completion: ((Bool) -> Void)? = nil) {
+        let target = webView
+        let address = currentURL ?? target.url
+        target.evaluateJavaScript(FigmaMotion.commandScript(action)) { [weak self] result, error in
+            MainActor.assumeIsolated {
+                guard let self, self.webView === target,
+                      (self.currentURL ?? target.url) == address else { completion?(false); return }
+                self.applyFigmaMotionSnapshot(result)
+                completion?(error == nil && result is [String: Any])
+            }
+        }
+    }
+
+    func pauseFigmaMotionOnLeave() {
+        guard let address = currentURL ?? webView.url,
+              FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) else { return }
+        sendFigmaMotionCommand("freeze")
+    }
+
+    func playFigmaMotion(canvasBg: String = "e5e5e5", completion: ((Bool) -> Void)? = nil) {
+        guard figmaMotionState.canToggle else { completion?(false); return }
+        figmaPlayRequestCount += 1
+        sendFigmaMotionCommand("play", completion: completion)
+    }
+
+    func showFigmaStill(completion: ((Bool) -> Void)? = nil) {
+        guard figmaMotionState.canShowStill else { completion?(false); return }
+        sendFigmaMotionCommand("still", completion: completion)
+    }
+
+    @discardableResult
+    func toggleFigmaMotion(completion: ((Bool) -> Void)? = nil) -> Bool {
+        guard !isFigmaMotionToggleInFlight, figmaMotionState.canToggle,
+              let address = currentURL ?? webView.url,
+              FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) else { return false }
+        isFigmaMotionToggleInFlight = true
+        if figmaMotionState != .playing { figmaPlayRequestCount += 1 }
+        sendFigmaMotionCommand("toggle") { [weak self] success in
+            self?.isFigmaMotionToggleInFlight = false
+            completion?(success)
+        }
+        return true
+    }
+
+    func refreshFigmaPlayState(run: Bool = false, completion: ((Bool) -> Void)? = nil) {
+        guard let address = currentURL ?? webView.url,
+              FigmaPaneURL.isWrapperPage(address, wrapper: figmaPageWrapper) else {
+            applyFigmaMotionSnapshot(["state": "still"])
+            completion?(false)
+            return
+        }
+        if run { figmaPlayRequestCount += 1 }
+        let target = webView
+        target.evaluateJavaScript(FigmaMotion.pageScript(run: run)) { [weak self] result, _ in
+            MainActor.assumeIsolated {
+                guard let self, self.webView === target else { completion?(false); return }
+                self.applyFigmaMotionSnapshot(result)
+                completion?(self.figmaMotionState == .playing)
+            }
+        }
     }
 
     /// Figma's *Open in Figma* mark on the preview is Tom's own move to the editor: the
@@ -5982,9 +6154,6 @@ final class BrowserPanel: Panel, ObservableObject {
         guard BrowserURLAllowlistPolicy(defaults: defaults).allowsTrustedInternalURL(destination),
               let outgoingView = webView as? CmuxWebView,
               let address = currentURL ?? webView.url else { return nil }
-        if preview {
-            do { try FigmaWrapperPage.install(at: wrapper) } catch { return nil }
-        }
         let wasBusy = figmaHistoryBusy
         figmaHistoryBusy = true
         defer { figmaHistoryBusy = wasBusy }
@@ -6013,6 +6182,10 @@ final class BrowserPanel: Panel, ObservableObject {
             hasCommitted: hasCommittedDocumentSinceWebViewReplacement, stopped: userStoppedLoadSinceWebViewReplacement,
             provisional: isMainFrameProvisionalNavigationActive
         )
+        // cmux-rbf (#cm-73.37): freeze the retained preview at the exchange. Reject a revert of this hunk on upstream sync.
+        if isPreview {
+            outgoingView.evaluateJavaScript(FigmaMotion.commandScript("freeze"), completionHandler: nil) // cmux-rbf (#cm-73.37)
+        }
         let incoming = retainedFigmaPage
         // Cancel per-presentation work without stopping or navigating the outgoing document.
         loadingGeneration &+= 1
@@ -6026,6 +6199,10 @@ final class BrowserPanel: Panel, ObservableObject {
         BrowserWindowPortalRegistry.detach(webView: outgoingView)
         webAuthnCoordinator.uninstall(from: outgoingView)
         retainedFigmaPage = outgoing
+        // cmux-rbf (#cm-73.37): editor has no motion; returning reads the retained page’s paused state. Reject a revert of this hunk on upstream sync.
+        let motionChanged = isFigmaMotionPlaying
+        isFigmaMotionPlaying = false
+        if motionChanged { onFigmaMotionStateChange?() }
         figmaFitMark.navigationFinishedWithoutMinimize()
         hiddenWebViewDiscardManager.resetMetadata()
         pendingDiscardRestoreNavigation = nil
@@ -6066,6 +6243,9 @@ final class BrowserPanel: Panel, ObservableObject {
             pageTitle = ""
             configurePageDelegates()
             bindWebView(next)
+        }
+        if preview {
+            refreshFigmaPlayState()
         }
         shouldRenderWebView = true
         isLoading = webView.isLoading
@@ -6119,6 +6299,15 @@ final class BrowserPanel: Panel, ObservableObject {
         recordTypedNavigation: Bool = false,
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> WKNavigation? {
+        // cmux-rbf #cm-73.39: an older build's `file://` preview address becomes the served page before
+        // any check, so a local-file ban or allowlist judges the address that will load.
+        let url = FigmaPaneURL.upgradingLegacyPage(url)
+        // cmux-rbf (#cm-73.37): install before the first frame document, including a restored pane.
+        installFigmaMotionBridge(on: webView, address: url)
+        if FigmaPaneURL.isWrapperPage(url, wrapper: figmaPageWrapper) {
+            let loading = FigmaPaneURL.hasMotionMark(inWrapper: url, wrapper: figmaPageWrapper)
+            applyFigmaMotionSnapshot(["state": loading ? "loading" : "still"])
+        }
         // cmux-rbf (#cm-73.3): a different file cannot keep the old file behind its switch. Reject a revert of this hunk on upstream sync.
         if (retainedFigmaPage != nil || discardedFigmaPageAddress != nil || figmaHistory.isActive),
            FigmaPaneURL.fileKey(fromPaneURL: url, wrapper: figmaPageWrapper) != currentURL.flatMap({ FigmaPaneURL.fileKey(fromPaneURL: $0, wrapper: figmaPageWrapper) }) {
@@ -6219,10 +6408,18 @@ final class BrowserPanel: Panel, ObservableObject {
         trustedInternalNavigation: Bool = false,
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) -> WKNavigation? {
+        // cmux-rbf #cm-73.39: an older build's `file://` preview address loads the served page, same query.
+        var request = request
+        if let legacy = request.url {
+            let upgraded = FigmaPaneURL.upgradingLegacyPage(legacy)
+            if upgraded != legacy { request.url = upgraded }
+        }
         guard let url = request.url else {
             onNavigationStarted?(nil)
             return nil
         }
+        // cmux-rbf (#cm-73.37): initial requests and restored/recovery loads use this funnel too.
+        installFigmaMotionBridge(on: webView, address: url)
         cancelHiddenWebViewDiscard()
         let policy = BrowserURLAllowlistPolicy(defaults: .standard)
         let policyAllowsURL = trustedInternalNavigation
@@ -6444,6 +6641,14 @@ final class BrowserPanel: Panel, ObservableObject {
         onNavigationStarted: ((WKNavigation?) -> Void)? = nil
     ) {
         guard let url = request.url else {
+            onNavigationStarted?(nil)
+            return
+        }
+        // cmux-rbf #cm-73.39: a web page's request never reaches the Figma preview page, old or new address.
+        if FigmaPreviewPageGuard.refusesPageRoute(to: url) {
+            #if DEBUG
+            cmuxDebugLog("browser.nav.requestNavigation.refused kind=figmaPreviewPage url=\(browserNavigationDebugURL(url))")
+            #endif
             onNavigationStarted?(nil)
             return
         }
@@ -7043,6 +7248,14 @@ extension BrowserPanel {
         bypassInsecureHTTPHostOnce: String? = nil,
         designFocusAsker: DesignFocusRouting.Asker = .page // cmux-rbf #cm-73.2a
     ) {
+        // cmux-rbf #cm-73.39: no new tab opens on the Figma preview page, old or new address;
+        // the new tab's first load would be marked trusted.
+        if FigmaPreviewPageGuard.refusesPageRoute(to: request.url) {
+            #if DEBUG
+            cmuxDebugLog("browser.newTab.open.refused kind=figmaPreviewPage url=\(browserNavigationDebugURL(request.url))")
+            #endif
+            return
+        }
         guard let seed = browserNewTabNavigationSeed(
             from: request,
             bypassInsecureHTTPHostOnce: bypassInsecureHTTPHostOnce
@@ -9396,6 +9609,13 @@ final class BrowserUIDelegate: BrowserPDFPreviewActionUIDelegate {
             "windowFeatures={\(windowFeaturesSummary)}"
         )
 #endif
+        // cmux-rbf #cm-73.39: a page's window.open or new-window link never opens the Figma preview page.
+        if FigmaPreviewPageGuard.refusesPageRoute(to: navigationAction.request.url) {
+#if DEBUG
+            cmuxDebugLog("browser.nav.createWebView.action kind=refuseFigmaPreviewPage")
+#endif
+            return nil
+        }
         if let url = navigationAction.request.url {
             if navigationAction.navigationType == .linkActivated,
                navigationAction.targetFrame?.isMainFrame != false,

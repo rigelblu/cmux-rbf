@@ -3718,6 +3718,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
 
     // MARK: - Initialization
 
+    // cmux-rbf (#cm-73.32): the motion action ships with no key, so its tooltip names a shortcut
     static func currentSplitButtonTooltips() -> BonsplitConfiguration.SplitButtonTooltips {
         BonsplitConfiguration.SplitButtonTooltips(
             newTerminal: KeyboardShortcutSettings.Action.newSurface.tooltip("New Terminal"),
@@ -3737,6 +3738,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             // cmux-rbf #cm-73.3
             figmaPreview: String(localized: "figma.page.preview", defaultValue: "Preview"),
             figmaEditor: String(localized: "figma.page.editor", defaultValue: "Editor"),
+            // cmux-rbf (#cm-73.32)
             boardColumn: String(localized: "figma.board.column", defaultValue: "Lay Boards in a Column"),
             boardRow: String(localized: "figma.board.row", defaultValue: "Lay Boards in a Row"),
             boardPin: String(localized: "figma.board.keepLayoutOnFlip", defaultValue: "Keep Board Layout on Flip"),
@@ -4967,7 +4969,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             }
             self.lastTerminalConfigInheritanceFontSizeLineage = lineage
         }
-        installTerminalVisualBellRouting(for: terminalPanel)
+        installTerminalOwnerRouting(for: terminalPanel)
         terminalPanel.onRequestWorkspacePaneFlash = { [weak self, weak terminalPanel] reason in
             guard let self, let terminalPanel else { return }
             let panelID = self.surfaceOwnershipTarget(for: terminalPanel.id)?.containerPanelID
@@ -5270,6 +5272,10 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             )
         }
         panelSubscriptions[browserPanel.id] = subscription
+        // cmux-rbf (#cm-73.37): the live palette must re-read Loading/play/pause after a page report.
+        browserPanel.onFigmaMotionStateChange = { [weak self] in
+            self?.owningTabManager?.objectWillChange.send()
+        }
         browserPanel.onMediaActivityChanged = { [weak self, weak browserPanel] _ in
             guard let self, let browserPanel else { return }
             self.handleBrowserMediaActivityChanged(browserPanel)
@@ -5408,6 +5414,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         // cmux-rbf #cm-73.16: close, teardown and detach all discard the tab's showing state.
         figmaFileObservations.removeValue(forKey: panelId)
         guard let browserPanel = panel as? BrowserPanel else { return }
+        // cmux-rbf (#cm-73.32): detach motion callback
+        browserPanel.onFigmaMotionStateChange = nil
         browserPanel.onMediaActivityChanged = nil
     }
 
@@ -12150,6 +12158,37 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         guard let current = pairFigmaPage(for: controller), current != page,
               let panel = figmaPageSwitchTarget() else { return }
         if switchFigmaPreviewAndEditor() { focusPanel(panel.id) }
+    }
+
+    // cmux-rbf (#cm-73.32): available on any design file preview, in or out of Design Focus, marked or unmarked.
+    func figmaMotionTarget() -> BrowserPanel? {
+        guard let panel = figmaPageSwitchTarget(),
+              let address = panel.currentURL ?? panel.webView.url,
+              FigmaPaneURL.isWrapperPage(address, wrapper: panel.figmaPageWrapper),
+              let docURL = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: panel.figmaPageWrapper),
+              FigmaFit.isDesignFile(docURL) else {
+            return nil
+        }
+        return panel
+    }
+
+    // cmux-rbf (#cm-73.32): one shared action toggles prototype motion and still read view.
+    @discardableResult
+    func toggleFigmaMotion() -> Bool {
+        guard let panel = figmaMotionTarget() else { return false }
+        guard panel.toggleFigmaMotion() else { return false }
+        noteFigmaPageUse(panel.id)
+        bonsplitController.refreshPairFigmaPage()
+        return true
+    }
+
+    // cmux-rbf (#cm-73.37): the second shared motion action.
+    @discardableResult
+    func showFigmaStill() -> Bool {
+        guard let panel = figmaMotionTarget(), panel.figmaMotionState.canShowStill else { return false }
+        panel.showFigmaStill()
+        noteFigmaPageUse(panel.id)
+        return true
     }
 
     // cmux-rbf #cm-73.2a

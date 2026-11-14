@@ -83,6 +83,10 @@ extension CMUXCLI {
             "event", "event_name", "hook_event_name", "hookEventName", "type", "kind", "notification_type", "matcher", "reason", "source", "terminationReason",
             "title", "summary", "message", "body", "text", "prompt", "error", "codex_error_info", "codexErrorInfo",
             "agent_state", "turn_outcome",
+            // cm-128.1: a helper's completion pairs with its own permission by `agent_id`, so compaction must keep it.
+            "agent_id", "agentId",
+            Self.claudeEditorModePayloadKey,
+            Self.claudeToolInputFingerprintPayloadKey,
             "additional_details", "additionalDetails", "description",
             "campfire_event_type", "campfireEventType", "display_name", "displayName", "capability",
         ] {

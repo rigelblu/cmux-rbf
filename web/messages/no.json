@@ -1401,6 +1401,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma: Bytt mellom forhåndsvisning og redigering",
+      "figmaShowStillDescription": "(ikke tilordnet) — Figma: Vis stillbilde",
+      "figmaMotionDescription": "(ikke tilordnet) — Figma: Spill av / sett bevegelse på pause",
       "title": "Tastatursnarveier",
       "description": "Alle tastatursnarveier tilgjengelige i cmux, gruppert etter kategori.",
       "metaDescription": "Alle cmux-tastatursnarveier for arbeidsområder, overflater, delte paneler, nettleser, varsler, søk og vindusbehandling på macOS.",

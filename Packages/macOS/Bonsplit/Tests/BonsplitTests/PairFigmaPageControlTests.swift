@@ -160,6 +160,21 @@ struct PairFigmaPageControlTests {
         }
     }
 
+    // cmux-rbf (#cm-73.37): inspect the rendered native row, not a presentation copy.
+    @Test func hoverRowHasNoMotionButton() throws {
+        let view = PairHeaderControlsView(
+            orientation: .horizontal, appearance: .init(), tooltips: .init(),
+            barHeight: 28, iconScale: 1, liveOrientation: { .horizontal },
+            onChoose: { _ in }, onEqualize: {}, onExit: {}, figmaPage: .preview
+        )
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(x: 0, y: 0, width: 360, height: 28)
+        host.layoutSubtreeIfNeeded()
+        let controls = descendants(host)
+        #expect(controls.compactMap { $0 as? NSSegmentedControl }.contains { $0.accessibilityIdentifier() == "paneTabBarControl.figmaPage" })
+        #expect(!controls.compactMap { $0 as? NSButton }.contains { $0.identifier?.rawValue == "paneTabBarControl.figmaMotion" }, "hover row must have no motion button")
+    }
+
     private final class Host: BonsplitDelegate {
         var page: PairFigmaPage? = .preview
         var choices: [PairFigmaPage] = []

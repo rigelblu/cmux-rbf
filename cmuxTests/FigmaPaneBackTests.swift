@@ -35,11 +35,16 @@ struct FigmaPaneBackTests {
         return panel
     }
 
+    /// cmux-rbf #cm-73.39: the page production loads, served from memory, not a temporary file.
     private func wrapper() throws -> URL {
+        FigmaPaneURL.previewPageURL
+    }
+
+    private func fixtureFolder() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("cm73-back-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("figma-embed.html")
+        return directory
     }
 
     private func node(_ pane: BrowserPanel, _ page: URL) -> String? {
@@ -60,7 +65,6 @@ struct FigmaPaneBackTests {
     @Test("Back on an editor Tom switched to shows the preview live; Forward brings the editor back live")
     func backAndForwardAcrossOneSwitch() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -101,7 +105,6 @@ struct FigmaPaneBackTests {
     @Test("Within the editor, Back walks the editor's own pages before it crosses to the preview")
     func backWalksEditorOwnPagesFirst() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -110,8 +113,11 @@ struct FigmaPaneBackTests {
         let editorView = pane.webView
         editorView.stopLoading()
         // Two pages the editor loads itself, as Figma does when Tom moves inside it.
+        // cmux-rbf #cm-73.39: the page is served from memory now, so the editor's own pages get a folder of their own.
+        let folder = try fixtureFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
         for name in ["first", "second"] {
-            let file = page.deletingLastPathComponent().appendingPathComponent("\(name).html")
+            let file = folder.appendingPathComponent("\(name).html")
             try "<html><body>\(name)</body></html>".write(to: file, atomically: true, encoding: .utf8)
             editorView.loadFileURL(file, allowingReadAccessTo: file.deletingLastPathComponent())
             for _ in 0..<200 {
@@ -137,7 +143,6 @@ struct FigmaPaneBackTests {
     @Test("Back after a pointing goes to where Tom was before it, not to the place he had gone back from")
     func pointingAfterBackDropsForwardPlaces() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -157,7 +162,6 @@ struct FigmaPaneBackTests {
     @Test("Scenario 205: Back walks the agent's boards on the preview, in order, then Forward reverses to the same editor")
     func backWalksPreviewBoardsThenForwardReturnsToEditor() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -184,7 +188,6 @@ struct FigmaPaneBackTests {
     @Test("Across a pointing: Back reaches the preview, then reopens the dropped editor at its address; Forward reverses")
     func backAcrossPointingReopensDroppedEditor() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -238,7 +241,6 @@ struct FigmaPaneBackTests {
     @Test("Open in Figma on a node, then a switch, shows the preview on that node, not the first page")
     func openInFigmaThenSwitchShowsThatNode() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -253,7 +255,6 @@ struct FigmaPaneBackTests {
     @Test("Open in Figma with an editor already kept moves that editor to the board and keeps the preview behind")
     func openInFigmaMovesKeptEditor() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -271,7 +272,6 @@ struct FigmaPaneBackTests {
     @Test("A goto on an editor opened alone drops it; Back reopens it at its address")
     func gotoFromLoneEditorThenBackReopensEditor() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let pane = panel(on: document, wrapper: page)
         defer { pane.close() }
         let editorView = pane.webView
@@ -292,7 +292,6 @@ struct FigmaPaneBackTests {
     @Test("The mouse's back and forward buttons cross sides through the same path")
     func mouseButtonsCrossSides() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -311,7 +310,6 @@ struct FigmaPaneBackTests {
     @Test("Trackpad swipe stays WebKit's own on both pages")
     func swipeStaysPerPage() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -345,7 +343,6 @@ struct FigmaPaneBackTests {
 
     /// Preview A, then the agent's goto B, both committed in the preview's own list.
     private func committedPreviewAB(_ page: URL) async throws -> (pane: BrowserPanel, preview: WKWebView) {
-        try FigmaWrapperPage.install(at: page)
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         let previewView = pane.webView
@@ -361,7 +358,6 @@ struct FigmaPaneBackTests {
     @Test("Back at the first place, after Back returned to it, stays on it")
     func backPastFirstPlaceStays() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -383,7 +379,6 @@ struct FigmaPaneBackTests {
     @Test("After the editor's own pages and a switch to the preview, Back, Back, Forward, Forward returns to the preview")
     func forwardAfterEditorOwnPagesReturnsToPreview() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -391,8 +386,11 @@ struct FigmaPaneBackTests {
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
         let editorView = pane.webView
         editorView.stopLoading()
+        // cmux-rbf #cm-73.39: the page is served from memory now, so the editor's own pages get a folder of their own.
+        let folder = try fixtureFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
         for name in ["first", "second"] {
-            let file = page.deletingLastPathComponent().appendingPathComponent("\(name).html")
+            let file = folder.appendingPathComponent("\(name).html")
             try "<html><body>\(name)</body></html>".write(to: file, atomically: true, encoding: .utf8)
             editorView.loadFileURL(file, allowingReadAccessTo: file.deletingLastPathComponent())
             _ = await waitUntil(5) { editorView.url == file && !editorView.isLoading }
@@ -414,7 +412,6 @@ struct FigmaPaneBackTests {
     @Test("After WebKit's own Back on the preview (a swipe), ⌘[ stays without a load and ⌘] goes forward again")
     func keysFollowWebKitsOwnBack() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         previewView.goBack() // what a trackpad swipe does: WebKit's own list
@@ -440,7 +437,6 @@ struct FigmaPaneBackTests {
     @Test("Back and Forward between the agent's boards use WebKit's own list, with no duplicate pages")
     func boardsUseWebKitsOwnList() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -460,8 +456,6 @@ struct FigmaPaneBackTests {
     @Test("Back at the first place, after the history loaded it again on top of another board, stays on it")
     func backAtReloadedFirstPlaceStays() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
-        try FigmaWrapperPage.install(at: page)
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         // Preview A is never loaded, so the agent's goto B takes WebKit's first slot.
         let pane = panel(on: previewA, wrapper: page)
@@ -485,8 +479,6 @@ struct FigmaPaneBackTests {
     @Test("After a swipe back into an earlier board, ⌘[ goes on from that board, to the editor before it")
     func backAfterSwipeGoesOnFromThere() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
-        try FigmaWrapperPage.install(at: page)
         let pane = panel(on: document, wrapper: page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("12-2", wrapper: page))
@@ -503,7 +495,6 @@ struct FigmaPaneBackTests {
     @Test("The page moving to another file resets the history, with no page held behind it")
     func fileChangeWithoutHeldPageResets() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let pane = panel(on: document, wrapper: page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("47-9", wrapper: page))
@@ -518,7 +509,6 @@ struct FigmaPaneBackTests {
     @Test("A reopened editor uses its last Figma editor address, not a page it passed through")
     func reopenUsesLastEditorAddress() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -556,7 +546,6 @@ struct FigmaPaneBackTests {
     /// Scenario 205's pointing sequence with every load committed, stopped at preview A after Back x3.
     /// Editor A's saved address is 12-5; editor B is a separate page; the reopen of A goes into editor B's page.
     private func backThreeTimesCommitted(_ page: URL) async throws -> (pane: BrowserPanel, preview: WKWebView, editor: WKWebView) {
-        try FigmaWrapperPage.install(at: page)
         let previewA = try previewURL("12-2", page)
         let pane = panel(on: previewA, wrapper: page)
         let previewView = pane.webView
@@ -589,7 +578,6 @@ struct FigmaPaneBackTests {
     @Test("P1: after there and back, editor B moving itself does not take editor A's place: Back x3 reaches editor A at its address")
     func editorBOwnPageDoesNotReplaceEditorA() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, editorB) = try await backThreeTimesCommitted(page)
         defer { pane.close() }
         pane.goBack()
@@ -618,7 +606,6 @@ struct FigmaPaneBackTests {
     @Test("P2: Back to preview A, a swipe forward to B, then ⌘] goes on to the editor")
     func forwardAfterSwipeForwardGoesOn() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -637,7 +624,6 @@ struct FigmaPaneBackTests {
 
     /// A preview restored after a restart on C, with a restored history A, B behind it.
     private func restoredPreviewABC(_ page: URL) async throws -> (pane: BrowserPanel, preview: WKWebView, a: URL, b: URL, c: URL) {
-        try FigmaWrapperPage.install(at: page)
         let a = try previewURL("12-2", page), b = try previewURL("47-9", page), c = try previewURL("55-6", page)
         let pane = panel(on: c, wrapper: page)
         let previewView = pane.webView
@@ -650,7 +636,6 @@ struct FigmaPaneBackTests {
     @Test("P8: after a restart, a switch, Back to the preview and Back into its restored history, Forward reverses")
     func restoredHistoryAfterCrossingForwardReverses() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -671,7 +656,6 @@ struct FigmaPaneBackTests {
     @Test("P8b: after a restart and a crossing, ⌘[ from restored B goes on to A, not to C")
     func restoredHistoryAfterCrossingBackGoesOn() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -689,7 +673,6 @@ struct FigmaPaneBackTests {
     @Test("P8c control: with no crossing, a restored preview's Back then Forward stay upstream's")
     func restoredHistoryWithoutCrossingIsUpstreams() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         pane.goBack()
@@ -702,7 +685,6 @@ struct FigmaPaneBackTests {
     @Test("Once a restored preview's history has become places, the page does not replay it again after the history ends")
     func restoredHistoryIsNotReplayedTwice() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -724,7 +706,6 @@ struct FigmaPaneBackTests {
     @Test("A repeat goto of the board showing adds no Back step and no load, even with a quick switch after it")
     func repeatGotoOfShownBoardIsOnePlace() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("47-9", wrapper: page))
@@ -751,8 +732,6 @@ struct FigmaPaneBackTests {
     @Test("A switch made before the agent's board loads still comes Back to that board")
     func switchBeforeGotoCommitsComesBackToIt() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
-        try FigmaWrapperPage.install(at: page)
         let previewA = try previewURL("12-2", page)
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -773,7 +752,6 @@ struct FigmaPaneBackTests {
     @Test("Back from an editor on Figma's sign-in page keeps that editor; Forward brings the same page back")
     func backFromSignInEditorKeepsIt() throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let previewA = try previewURL("12-2", page)
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -790,7 +768,6 @@ struct FigmaPaneBackTests {
     @Test("Forward at the newest place does not follow a page WebKit still holds from a dropped place")
     func forwardAtNewestPlaceIgnoresStaleWebKitPage() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -810,7 +787,6 @@ struct FigmaPaneBackTests {
     @Test("A fit on a board, then Back from the editor and Back again, reaches the earlier board in one press")
     func fitKeepsBoardAsOnePlace() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("47-9", wrapper: page, purpose: .fit))
@@ -837,7 +813,6 @@ struct FigmaPaneBackTests {
     @Test("A swipe between two editor places on one page, then a pointing: Back reopens the editor where Tom was")
     func swipeBetweenEditorPlacesThenPointingReopensWhereTomWas() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, _, editorB) = try await backThreeTimesCommitted(page)
         defer { pane.close() }
         pane.goForward()
@@ -856,7 +831,6 @@ struct FigmaPaneBackTests {
     @Test("Review 3 P9: restart on C, one restored ⌘[ to B, a switch, ⌘[ to preview B, then ⌘[ reaches A, not C")
     func review3RestoredWalkThenCrossing() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         pane.goBack() // restored history, before any crossing: upstream's replay loads B
@@ -878,7 +852,6 @@ struct FigmaPaneBackTests {
     @Test("Review 3 P9d: restart on C, two restored ⌘[ to A, a switch, ⌘[ to preview A, one more ⌘[ stays on A")
     func review3RestoredWalkToOldestThenCrossing() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         pane.goBack()
@@ -898,7 +871,6 @@ struct FigmaPaneBackTests {
     @Test("Review 3 P9p: restart on C, one restored ⌘[ to B, the agent points at D, ⌘[ to B, then ⌘[ reaches A, not C")
     func review3RestoredWalkThenPointing() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         pane.goBack()
@@ -916,7 +888,6 @@ struct FigmaPaneBackTests {
     @Test("Review 3 P11: Tom's sequence, ⌘] x3, editor B moves itself, a swipe back in editor B, then ⌘[ x2 reaches editor A at its address")
     func review3EditorOwnNavigationThenSwipeBack() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, editorB) = try await backThreeTimesCommitted(page)
         defer { pane.close() }
         pane.goForward()
@@ -942,7 +913,6 @@ struct FigmaPaneBackTests {
     @Test("After review 3's P11, editor A's reload commits as editor A's place: ⌘] then reaches preview B")
     func reopenedEditorCommitIsItsPlace() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, editorB) = try await backThreeTimesCommitted(page)
         defer { pane.close() }
         pane.goForward()
@@ -971,7 +941,6 @@ struct FigmaPaneBackTests {
     @Test("Review 3 P14: a Back the history loads (restored B), stopped before it commits, then ⌘] goes on to the editor")
     func review3StoppedHistoryLoadThenForward() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -1001,7 +970,6 @@ struct FigmaPaneBackTests {
     @Test("Review 4 V1: restart on C, a switch, ⌘[ to preview C, ⌘[ starts restored B's load, ⌘] before it commits ends on C")
     func review4BackThenForwardBeforeRestoredLoadCommits() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -1024,7 +992,6 @@ struct FigmaPaneBackTests {
     @Test("Review 4 V3: the agent's goto C on the preview, then one ⌘[ before C commits, ends on B")
     func review4BackDuringPointingLoad() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("61-3", wrapper: page))
@@ -1039,7 +1006,6 @@ struct FigmaPaneBackTests {
     @Test("Review 4 V2: goto C, two ⌘[ before C commits, then ⌘] ⌘] shows C, not A")
     func review4TwoBacksDuringPointingLoadThenForward() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("61-3", wrapper: page))
@@ -1063,8 +1029,6 @@ struct FigmaPaneBackTests {
     @Test("Review 4 V2e: editor's own pages, a switch, Open in Figma moves the kept editor to 33-3; ⌘[ x3 before it commits, ⌘] x3 ends on 33-3")
     func review4OpenInFigmaThenThreeQuickBacks() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
-        try FigmaWrapperPage.install(at: page)
         let previewA = try previewURL("12-2", page)
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -1102,7 +1066,6 @@ struct FigmaPaneBackTests {
     @Test("Review 4 V2s: goto C, a swipe back before C commits lands on A, then ⌘] goes on to B")
     func review4SwipeDuringPointingLoadThenForward() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("61-3", wrapper: page))
@@ -1121,7 +1084,6 @@ struct FigmaPaneBackTests {
     @Test("A pointing cancelled by a swipe stays cancelled: the page's next own load is a new place after the swipe's board")
     func swipeCancelledPointingDoesNotTakeALaterLoad() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("61-3", wrapper: page))
@@ -1142,7 +1104,6 @@ struct FigmaPaneBackTests {
     @Test("Review 5 W3: goto C, then ⌘[ and ⌘] before C commits, ends on C")
     func review5BackThenForwardDuringPointingLoad() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.gotoFigmaNode("61-3", wrapper: page))
@@ -1158,8 +1119,6 @@ struct FigmaPaneBackTests {
     @Test("Tom's sequence fast: ⌘[ ⌘[ reopens editor A, then ⌘] ⌘] before it commits ends on editor B")
     func tomsSequenceFastForwardDuringReopen() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
-        try FigmaWrapperPage.install(at: page)
         let previewA = try previewURL("12-2", page)
         let pane = panel(on: previewA, wrapper: page)
         defer { pane.close() }
@@ -1191,7 +1150,6 @@ struct FigmaPaneBackTests {
     @Test("At the newest place, Forward is not offered even when WebKit still holds a page forward")
     func canGoForwardMatchesTheHistoryAtTheNewestPlace() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView) = try await committedPreviewAB(page)
         defer { pane.close() }
         try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
@@ -1210,7 +1168,6 @@ struct FigmaPaneBackTests {
     @Test("At the first place after a restart, Back is not offered even when WebKit holds the restored pages behind it")
     func canGoBackMatchesTheHistoryAtTheFirstPlace() async throws {
         let page = try wrapper()
-        defer { try? FileManager.default.removeItem(at: page.deletingLastPathComponent()) }
         let (pane, previewView, _, _, _) = try await restoredPreviewABC(page)
         defer { pane.close() }
         pane.goBack()
@@ -1235,6 +1192,101 @@ struct FigmaPaneBackTests {
         ))
         cgEvent.setIntegerValueField(.mouseEventButtonNumber, value: Int64(button))
         return try #require(NSEvent(cgEvent: cgEvent))
+    }
+
+    // MARK: - Motion Play / Still (cm-73.32)
+
+    @Test("fit keeps motion=1 mark and a plain goto drops it")
+    func fitKeepsMotionMarkAndPlainGotoDropsIt() throws {
+        let page = try wrapper()
+        let destinationWithMotion = try FigmaPaneURL.destination(for: document, node: "12-2", motion: true, wrapper: page).url
+        let pane = panel(on: destinationWithMotion, wrapper: page)
+        defer { pane.close() }
+        #expect(FigmaPaneURL.hasMotionMark(inWrapper: try #require(pane.currentURL), wrapper: page))
+
+        // fit to another node keeps motion=1
+        _ = pane.gotoFigmaNode("12-3", wrapper: page, purpose: .fit)
+        #expect(FigmaPaneURL.hasMotionMark(inWrapper: try #require(pane.currentURL), wrapper: page))
+
+        // plain goto (purpose: .point) drops motion=1
+        _ = pane.gotoFigmaNode("12-4", wrapper: page, purpose: .point)
+        #expect(!FigmaPaneURL.hasMotionMark(inWrapper: try #require(pane.currentURL), wrapper: page))
+    }
+
+    @Test("the exchange to editor freezes the retained player without replacing its iframe")
+    func exchangeToEditorFreezesRetainedPlayer() async throws {
+        let page = try wrapper()
+        let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
+        let pane = panel(on: previewA, wrapper: page)
+        defer { pane.close() }
+
+        let previewView = pane.webView
+        let loader = DocumentLoader()
+        try await loader.seed(previewView, value: "preview", baseURL: previewA)
+        pane.publishObservedDocumentURL(previewA)
+
+        // Insert /proto/ iframe into the preview document
+        _ = try await previewView.evaluateJavaScript(#"""
+        (function() {
+          var frame = document.createElement('iframe');
+          frame.src = 'https://www.figma.com/proto/testfile?node-id=12-2';
+          document.body.appendChild(frame);
+          return frame.src;
+        })()
+        """#)
+        _ = try await previewView.evaluateJavaScript("window.__cmuxMotion = { command: function(action) { window.leaveCommand = action; return {state: 'paused'}; } };")
+        pane.isFigmaMotionPlaying = true
+
+        let initialSrc = try await previewView.evaluateJavaScript("document.querySelector('iframe')?.src") as? String
+        #expect(initialSrc?.contains("/proto/") == true)
+
+        // Switch to editor
+        try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
+        #expect(!showsPreview(pane, page))
+        #expect(!pane.isFigmaMotionPlaying)
+
+        // Outgoing previewView had stillScript run: iframe is no longer /proto/
+        let outgoingSrc = try await previewView.evaluateJavaScript("document.querySelector('iframe')?.src") as? String
+        #expect(outgoingSrc?.contains("/proto/") == true)
+        #expect(try await previewView.evaluateJavaScript("window.leaveCommand") as? String == "freeze")
+
+        // Switch back to preview
+        try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
+        #expect(showsPreview(pane, page))
+        #expect(!pane.isFigmaMotionPlaying)
+    }
+
+    @Test("goto --play during in-flight load binds run to the matching commit")
+    func gotoPlayDuringInFlightLoadBindsToTargetNavigation() throws {
+        let page = try wrapper()
+        let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
+        let pane = panel(on: previewA, wrapper: page)
+        defer { pane.close() }
+
+        // Start initial navigation and capture its navigation handle
+        var firstNav: WKNavigation?
+        _ = pane.gotoFigmaNode("12-2", wrapper: page, onNavigationStarted: { firstNav = $0 })
+        let supersededNav = try #require(firstNav)
+
+        // Trigger goto with play: true
+        _ = pane.gotoFigmaNode("12-3", wrapper: page, play: true)
+        let targetNav = try #require(pane.pendingFigmaPlayNavigation)
+        #expect(targetNav !== supersededNav)
+
+        // An unrelated cancelled navigation (-999 from previous load) must NOT clear pending play
+        pane.navigationDelegate?.didCancelProvisionalNavigation?(pane.webView, supersededNav)
+        #expect(pane.pendingFigmaPlayNavigation === targetNav)
+
+        // Another non-matching navigation completion must NOT clear pending play, nor play
+        let requestsBefore = pane.figmaPlayRequestCount
+        pane.navigationDelegate?.didFinish?(pane.webView, supersededNav)
+        #expect(pane.pendingFigmaPlayNavigation === targetNav)
+        #expect(pane.figmaPlayRequestCount == requestsBefore)
+
+        // cmux-rbf (#cm-73.37): run is set at the matching commit, before the frame asks.
+        pane.navigationDelegate?.didCommit?(pane.webView, targetNav)
+        #expect(pane.pendingFigmaPlayNavigation == nil)
+        #expect(pane.figmaPlayRequestCount == requestsBefore + 1)
     }
 
     private final class NavigationStarts: @unchecked Sendable {

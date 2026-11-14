@@ -1401,6 +1401,8 @@
     },
     "keyboardShortcuts": {
       "figmaSwitchDescription": "⌥⇧⌘C — Figma៖ ប្ដូររវាងការមើលជាមុន និងកន្លែងកែសម្រួល",
+      "figmaShowStillDescription": "(មិនបានភ្ជាប់) — Figma: បង្ហាញរូបភាពនៅនឹង",
+      "figmaMotionDescription": "(មិនបានភ្ជាប់) — Figma៖ ចាក់ / ផ្អាកចលនា",
       "title": "ផ្លូវកាត់ក្ដារចុច",
       "description": "ផ្លូវកាត់ក្ដារចុចទាំងអស់ដែលមានក្នុង cmux, ដាក់ជាក្រុមតាមប្រភេទ។",
       "metaDescription": "ផ្លូវកាត់ក្ដារចុច cmux ទាំងអស់សម្រាប់ workspace, surface, បន្ទះបំបែក, កម្មវិធីរុករក, ជូនដំណឹង, ស្វែងរក និងការគ្រប់គ្រងបង្អួចនៅលើ macOS។",
