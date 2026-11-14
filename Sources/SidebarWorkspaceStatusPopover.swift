@@ -166,12 +166,80 @@ struct SidebarWorkspaceStatusPopoverModel: Equatable {
 
 // MARK: - Popover content
 
+/// Item-row frames in ``SidebarWorkspaceStatusPopover``'s pointer
+/// coordinate space, keyed by lane id.
+struct StatusPopoverRowFramesKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] { [:] }
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
+private struct StatusLaneButtonStyle: PrimitiveButtonStyle {
+    let laneId: String
+    let isHighlighted: Bool
+    let isChoosable: Bool
+    let onPress: @MainActor () -> Void
+
+    func makeBody(configuration: Configuration) -> some View {
+        ButtonRow(
+            laneId: laneId,
+            configuration: configuration,
+            isHighlighted: isHighlighted,
+            isChoosable: isChoosable,
+            onPress: onPress
+        )
+    }
+
+    private struct ButtonRow: View {
+        let laneId: String
+        let configuration: PrimitiveButtonStyleConfiguration
+        let isHighlighted: Bool
+        let isChoosable: Bool
+        let onPress: @MainActor () -> Void
+        @State private var isPressed = false
+
+        var body: some View {
+            PlainButtonStyle().makeBody(configuration: configuration)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isHighlighted ? Color.primary.opacity(0.08) : Color.clear)
+                )
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in isPressed = true }
+                        .onEnded { _ in isPressed = false }
+                )
+                .onChange(of: isPressed) { _, pressed in
+                    if pressed, isChoosable {
+                        onPress()
+                    }
+                }
+        }
+    }
+}
+
 /// The status popover opened from the todo pane's header glyph: the Auto row,
 /// a divider, the five status lanes (each drawing the real glyph), and —
 /// while a lane is pinned — a footnote explaining the pin auto-clears. Arrow
 /// keys move the highlight, Return or click applies and closes, Esc closes,
 /// and a lane's first letter jumps.
 struct SidebarWorkspaceStatusPopover: View {
+    static let uncappedMaxHeight: CGFloat = 10_000
+    private static let pointerSpaceName = "SidebarWorkspaceStatusPopoverSpace"
+
+#if DEBUG
+    static var seedLocationProvider: @MainActor () -> NSPoint {
+        get { PopoverPointerTracker.seedLocationProvider }
+        set { PopoverPointerTracker.seedLocationProvider = newValue }
+    }
+    static var highlightedLaneForTesting: String? = nil
+    static var isScrollViewActiveForTesting: Bool = false
+    static var rowFramesForTesting: [String: CGRect] = [:]
+#else
+    static var seedLocationProvider: @MainActor () -> NSPoint { { NSEvent.mouseLocation } }
+#endif
+
     let model: SidebarWorkspaceStatusPopoverModel
     /// Applies a row's action through the shared status action path. (#cm-109)
     let onSelectLane: @MainActor (WorkspaceStatusPickAction) -> Void
@@ -179,7 +247,15 @@ struct SidebarWorkspaceStatusPopover: View {
     let onSelectNone: @MainActor () -> Void
     let onClose: @MainActor () -> Void
 
+    private final class PointerLocationBox {
+        var location: CGPoint?
+    }
+
     @State private var highlightedIndex: Int
+    @State private var rowFrames: [String: CGRect] = [:]
+    @State private var pointerLocation = PointerLocationBox()
+    @State private var scrollTargetSeq: Int = 0
+    @State private var scrollTargetId: String? = nil
     @FocusState private var isFocused: Bool
     @Environment(\.colorScheme) private var colorScheme // (#cm-109.7)
 
@@ -198,7 +274,8 @@ struct SidebarWorkspaceStatusPopover: View {
         self.onClose = onClose
         let lanes = model.lanesOverride ?? WorkspaceTodoStatusLane.lanes(picker: model.picker, colorHexes: model.colorHexes) // (#cm-109) (#cm-110.2)
         // The highlight starts on the first checked row that can be chosen, and on Auto when there is none.
-        _highlightedIndex = State(initialValue: lanes.firstIndex(where: { $0.isSelected && $0.action != nil }) ?? 0)
+        let initialIndex = lanes.firstIndex(where: { $0.isSelected && $0.action != nil }) ?? 0
+        _highlightedIndex = State(initialValue: initialIndex)
     }
 
     var lanes: [WorkspaceTodoStatusLane] { // (#cm-110.13)
@@ -207,31 +284,56 @@ struct SidebarWorkspaceStatusPopover: View {
 
     var body: some View {
         let lanes = self.lanes
-        VStack(alignment: .leading, spacing: 1) {
-            laneRow(lanes[0], index: 0)
-            Divider()
-                .padding(.vertical, 3)
-            ForEach(Array(lanes.dropFirst().enumerated()), id: \.element.id) { offset, lane in
-                laneRow(lane, index: offset + 1)
+        ViewThatFits(in: .vertical) {
+            laneList(lanes: lanes)
+#if DEBUG
+                .onAppear { Self.isScrollViewActiveForTesting = false }
+#endif
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    laneList(lanes: lanes)
+                }
+                .onChange(of: scrollTargetSeq) { _, _ in
+                    if let targetId = scrollTargetId {
+                        proxy.scrollTo(targetId)
+                    }
+                }
             }
-            if model.activeOverride != nil {
-                Text(String(
-                    localized: "sidebar.statusPopover.pinFootnote",
-                    defaultValue: "Pinned status clears when activity changes"
-                ))
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
-            }
+#if DEBUG
+            .onAppear { Self.isScrollViewActiveForTesting = true }
+#endif
         }
         .padding(6)
         .frame(width: 200, alignment: .leading)
+        .coordinateSpace(name: Self.pointerSpaceName)
+        .background(PopoverPointerTracker(
+            seedLocationProvider: Self.seedLocationProvider,
+            onPointerChange: { location in
+                handlePointerChange(location, lanes: lanes)
+            }
+        ))
+        .onPreferenceChange(StatusPopoverRowFramesKey.self) { frames in
+            self.rowFrames = frames
+#if DEBUG
+            Self.rowFramesForTesting = frames
+#endif
+            recomputeHighlightFromRestingPointer(lanes: lanes, frames: frames)
+        }
         .background(PopoverKeyWindowElevator())
         .focusable()
         .focusEffectDisabled()
         .focused($isFocused)
-        .task { isFocused = true }
+        .task {
+            isFocused = true
+#if DEBUG
+            Self.highlightedLaneForTesting = lanes.indices.contains(highlightedIndex) ? lanes[highlightedIndex].id : nil
+#endif
+        }
+#if DEBUG
+        .onChange(of: highlightedIndex) { _, newIndex in
+            Self.highlightedLaneForTesting = lanes.indices.contains(newIndex) ? lanes[newIndex].id : nil
+        }
+#endif
         .onKeyPress(.upArrow) {
             moveHighlight(-1, laneCount: lanes.count)
             return .handled
@@ -253,6 +355,27 @@ struct SidebarWorkspaceStatusPopover: View {
         }
         .onExitCommand { onClose() }
         .accessibilityIdentifier("SidebarWorkspaceStatusPopover")
+    }
+
+    private func laneList(lanes: [WorkspaceTodoStatusLane]) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            laneRow(lanes[0], index: 0)
+            Divider()
+                .padding(.vertical, 3)
+            ForEach(Array(lanes.dropFirst().enumerated()), id: \.element.id) { offset, lane in
+                laneRow(lane, index: offset + 1)
+            }
+            if model.activeOverride != nil {
+                Text(String(
+                    localized: "sidebar.statusPopover.pinFootnote",
+                    defaultValue: "Pinned status clears when activity changes"
+                ))
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.top, 4)
+            }
+        }
     }
 
     private func laneRow(_ lane: WorkspaceTodoStatusLane, index: Int) -> some View {
@@ -289,17 +412,55 @@ struct SidebarWorkspaceStatusPopover: View {
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(index == highlightedIndex ? Color.primary.opacity(0.08) : Color.clear)
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: StatusPopoverRowFramesKey.self,
+                        value: [lane.id: proxy.frame(in: .named(Self.pointerSpaceName))]
+                    )
+                }
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(StatusLaneButtonStyle(
+            laneId: lane.id,
+            isHighlighted: index == highlightedIndex,
+            isChoosable: lane.action != nil,
+            onPress: {
+                highlightedIndex = index
+            }
+        ))
         .disabled(lane.action == nil) // (#cm-109) the greyed row cannot be chosen
-        .onHover { hovering in
-            if hovering, lane.action != nil { highlightedIndex = index } // (#cm-109)
-        }
         .accessibilityIdentifier("SidebarWorkspaceStatusPopoverLane.\(lane.id)")
+        .id(lane.id)
+    }
+
+    private func handlePointerChange(_ location: CGPoint?, lanes: [WorkspaceTodoStatusLane]) {
+        pointerLocation.location = location
+        if let location {
+            if let targetLane = lanes.first(where: { lane in
+                guard lane.action != nil else { return false }
+                guard let frame = rowFrames[lane.id] else { return false }
+                return frame.contains(location)
+            }), let newIndex = lanes.firstIndex(where: { $0.id == targetLane.id }) {
+                if highlightedIndex != newIndex {
+                    highlightedIndex = newIndex
+                }
+            }
+        }
+    }
+
+    private func recomputeHighlightFromRestingPointer(lanes: [WorkspaceTodoStatusLane], frames: [String: CGRect]) {
+        guard let location = pointerLocation.location else { return }
+        guard let targetLane = lanes.first(where: { lane in
+            guard lane.action != nil else { return false }
+            guard let frame = frames[lane.id] else { return false }
+            return frame.contains(location)
+        }) else { return }
+        if let newIndex = lanes.firstIndex(where: { $0.id == targetLane.id }) {
+            if highlightedIndex != newIndex {
+                highlightedIndex = newIndex
+            }
+        }
     }
 
     /// Applies a lane through the shared status path, then dismisses like a
@@ -327,6 +488,8 @@ struct SidebarWorkspaceStatusPopover: View {
             next = (next + delta + laneCount) % laneCount
             if lanes[next].action != nil {
                 highlightedIndex = next
+                scrollTargetSeq += 1
+                scrollTargetId = lanes[next].id
                 return
             }
         }
@@ -341,6 +504,8 @@ struct SidebarWorkspaceStatusPopover: View {
             return false
         }
         highlightedIndex = index
+        scrollTargetSeq += 1
+        scrollTargetId = lanes[index].id
         return true
     }
 }

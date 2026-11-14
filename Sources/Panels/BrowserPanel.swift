@@ -5862,6 +5862,23 @@ final class BrowserPanel: Panel, ObservableObject {
               let actual = view.url ?? currentURL,
               FigmaPaneURL.isWrapperPage(actual, wrapper: figmaPageWrapper),
               let body = body as? [String: Any] else { return }
+        // cmux-rbf (#cm-73.41): a pan report never updates motion or re-fit state, in any build.
+        if body["panReport"] is [String: Any] {
+            #if DEBUG
+            if let report = body["panReport"] as? [String: Any] {
+                if report["phase"] as? String == "start" {
+                    let axis = report["axis"] as? String ?? "free"
+                    let dx = (report["dx"] as? NSNumber)?.doubleValue ?? 0
+                    let dy = (report["dy"] as? NSNumber)?.doubleValue ?? 0
+                    cmuxDebugLog("figma.pan surface=\(id) start axis=\(axis) dx=\(dx) dy=\(dy)")
+                } else if report["phase"] as? String == "end" {
+                    let steps = (report["steps"] as? NSNumber)?.intValue ?? 0
+                    cmuxDebugLog("figma.pan surface=\(id) end steps=\(steps)")
+                }
+            }
+            #endif
+            return
+        }
         if let action = body["action"] as? String {
             if action == "toggle" { _ = toggleFigmaMotion() }
             if action == "still" { showFigmaStill() }
@@ -5878,13 +5895,21 @@ final class BrowserPanel: Panel, ObservableObject {
         if changed { onFigmaMotionStateChange?() }
     }
 
-    func sendFigmaMotionCommand(_ action: FigmaMotion.Command, completion: ((Bool) -> Void)? = nil) {
+    func sendFigmaMotionCommand(_ action: FigmaMotion.Command, node: String? = nil, completion: ((Bool) -> Void)? = nil) {
         let target = webView
         let address = currentURL ?? target.url
-        target.evaluateJavaScript(FigmaMotion.commandScript(action)) { [weak self] result, error in
+        let expectedNode = node.flatMap { FigmaFit.normalizedNode($0) }
+        target.evaluateJavaScript(FigmaMotion.commandScript(action, node: node)) { [weak self] result, error in
             MainActor.assumeIsolated {
-                guard let self, self.webView === target,
-                      (self.currentURL ?? target.url) == address else { completion?(false); return }
+                guard let self, self.webView === target else { completion?(false); return }
+                let actual = self.currentURL ?? target.url
+                // cmux-rbf (#cm-73.46): replaceState changes the expected node, while unrelated navigation still fences the reply.
+                let isPreview = actual.map { FigmaPaneURL.isWrapperPage($0, wrapper: self.figmaPageWrapper) } == true
+                let actualNode = actual.flatMap { FigmaPaneURL.node(fromPaneURL: $0) }.flatMap { FigmaFit.normalizedNode($0) }
+                let actualDocument = actual.flatMap { FigmaPaneURL.documentURL(fromPaneURL: $0) }
+                let expectedDocument = address.flatMap { FigmaPaneURL.documentURL(fromPaneURL: $0) }
+                let expectedMove = expectedNode != nil && isPreview && actualNode == expectedNode && actualDocument == expectedDocument
+                guard actual == address || expectedMove else { completion?(false); return }
                 self.applyFigmaMotionSnapshot(result)
                 completion?(error == nil && result is [String: Any])
             }

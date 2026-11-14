@@ -29,10 +29,21 @@ struct ChecklistPopoverRowFramesKey: PreferenceKey {
 /// a popover that (re)presents underneath an already-resting pointer knows
 /// where it is before any mouse-moved arrives.
 struct PopoverPointerTracker: NSViewRepresentable {
+    static var seedLocationProvider: @MainActor () -> NSPoint = { NSEvent.mouseLocation }
+    var seedLocationProvider: @MainActor () -> NSPoint = PopoverPointerTracker.seedLocationProvider
     let onPointerChange: @MainActor (CGPoint?) -> Void
+
+    init(
+        seedLocationProvider: @escaping @MainActor () -> NSPoint = PopoverPointerTracker.seedLocationProvider,
+        onPointerChange: @escaping @MainActor (CGPoint?) -> Void
+    ) {
+        self.seedLocationProvider = seedLocationProvider
+        self.onPointerChange = onPointerChange
+    }
 
     final class TrackerView: NSView {
         var onPointerChange: (@MainActor (CGPoint?) -> Void)?
+        var seedLocationProvider: (@MainActor () -> NSPoint)?
 
         // SwiftUI's named coordinate space is top-left origin; matching that
         // here keeps reported points directly comparable to the row frames
@@ -85,7 +96,8 @@ struct PopoverPointerTracker: NSViewRepresentable {
         /// seed hover state when the popover attaches under a resting pointer.
         private func reportCurrentPointerLocation() {
             guard let window else { return }
-            let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+            let screenPoint = seedLocationProvider?() ?? NSEvent.mouseLocation
+            let windowPoint = window.convertPoint(fromScreen: screenPoint)
             let local = convert(windowPoint, from: nil)
             onPointerChange?(bounds.contains(local) ? local : nil)
         }
@@ -93,11 +105,14 @@ struct PopoverPointerTracker: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let view = TrackerView()
+        view.seedLocationProvider = seedLocationProvider
         view.onPointerChange = onPointerChange
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? TrackerView)?.onPointerChange = onPointerChange
+        guard let tracker = nsView as? TrackerView else { return }
+        tracker.seedLocationProvider = seedLocationProvider
+        tracker.onPointerChange = onPointerChange
     }
 }
