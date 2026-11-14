@@ -101,13 +101,13 @@ struct FigmaDefaultFolderRow: View {
         case .notSet:
             return String(
                 localized: "settings.automation.figma.defaultFolder.subtitle.notSet",
-                defaultValue: "Not set. New designs your agent creates go to your Figma Drafts."
+                defaultValue: "Not set. New designs your agent creates go to your Figma Drafts, unless their directory has a folder."
             )
         case .set(let folderId):
             return String(
                 format: String(
                     localized: "settings.automation.figma.defaultFolder.subtitle.set",
-                    defaultValue: "New designs your agent creates go to Figma folder %@."
+                    defaultValue: "New designs your agent creates go to Figma folder %@, unless their directory has its own."
                 ),
                 folderId
             )

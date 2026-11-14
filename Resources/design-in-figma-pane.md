@@ -1,6 +1,6 @@
 ---
 name: design-in-figma-pane
-description: Put a design from this conversation into a new Figma file in the person's cmux Figma folder, start a new design there, or re-lay the boards of the Figma file you opened, and show it in a cmux Figma pane. Run only when the person types /design-in-figma-pane or $design-in-figma-pane, picks "Put Design into Figma" or "New Design in Figma" in cmux's Figma button menu, or cmux types it after the person flips Figma or picks a board layout in Design Focus.
+description: Put a design from this conversation into a new Figma file in the person's cmux Figma folder, start a new design there, or re-lay the boards of the Figma file you opened, and show it in a cmux Figma pane. Run only when the person types /design-in-figma-pane or $design-in-figma-pane, picks "Put Design into Figma" or "Ask Agent to Design in Figma" in cmux's Figma button menu, or cmux types it after the person flips Figma or picks a board layout in Design Focus.
 disable-model-invocation: true
 ---
 <!-- cmux-managed-skill: design-in-figma-pane. cmux rewrites this file at every launch. Delete this line to keep your own copy. -->
@@ -20,7 +20,7 @@ With no word, or any other word, ask "new or put?" and do nothing else until the
 
 ## 2. Find the folder
 Run `cmux figma folder`.
-- It prints `projectId` and `planKey`: go on.
+- It prints `projectId` and `planKey`: before you make the file, tell the person in one line which Figma folder it goes to, from the `directory` line, then go on without waiting. For a path, say "New file goes to the Figma folder set for <path>." For `default`, or when there is no `directory` line, say "New file goes to your default Figma folder."
 - It prints "No default Figma folder": make no file, in Drafts or anywhere. Ask the person to choose a folder from cmux's Figma button menu, "Choose Figma Folder…", or with `cmux figma folder set '<folder-url>'`. Then stop.
 - It exits with an error: show its message and stop.
 

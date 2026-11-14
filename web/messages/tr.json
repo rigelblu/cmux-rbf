@@ -1267,7 +1267,8 @@
         },
         "figma": {
           "description": "Figma ayarları.",
-          "defaultFolder": "Aracınızın oluşturduğu yeni tasarımların gideceği Figma klasörünün bağlantısı. Klasörün sayfasında Figma'nın adres çubuğundaki bağlantıyı kullanın. Araçlar bunu \"cmux figma folder\" ile okur."
+          "defaultFolder": "figma.folders içinde dizinleri için bir girdi olmadığında yeni tasarımların gideceği Figma klasörünün bağlantısı. Klasörün sayfasında Figma'nın adres çubuğundaki bağlantıyı kullanın. Ajanlar bunu \"cmux figma folder\" ile okur.",
+          "folders": "Dizinler için Figma klasörleri: her anahtar bir dizindir, her değer de o dizinde veya içinde oluşturulan yeni tasarımların gideceği Figma klasörünün bağlantısıdır. Eşleşen en yakın dizin geçerli olur; başka yerlerde figma.defaultFolder uygulanır. Ajanlar bunu \"cmux figma folder\" ile okur."
         },
         "reply": {
           "description": "Yanıt paneli",

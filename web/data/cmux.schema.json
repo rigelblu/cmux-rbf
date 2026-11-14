@@ -1799,8 +1799,17 @@
         "defaultFolder": {
           "type": "string",
           "default": "",
-          "description": "Link to the Figma folder where new designs your agent creates should go. Use the link from Figma's address bar on the folder's page. Agents read it with \"cmux figma folder\".",
+          "description": "Link to the Figma folder where new designs go when figma.folders has no entry for their directory. Use the link from Figma's address bar on the folder's page. Agents read it with \"cmux figma folder\".",
           "descriptionKey": "schemaDescriptions.figma.defaultFolder"
+        },
+        "folders": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Figma folders for directories: each key is a directory, each value the link to the Figma folder where new designs made in that directory, or inside it, should go. The nearest matching directory wins; elsewhere figma.defaultFolder applies. Agents read it with \"cmux figma folder\".",
+          "descriptionKey": "schemaDescriptions.figma.folders"
         }
       }
     },
