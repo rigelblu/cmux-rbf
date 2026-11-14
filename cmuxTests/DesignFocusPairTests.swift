@@ -16,13 +16,17 @@ struct DesignFocusPairTests {
         id: UUID = UUID(),
         paneId: UUID,
         isTerminal: Bool,
-        isFigma: Bool
+        isFigma: Bool,
+        stableSurfaceId: UUID? = nil,
+        owner: UUID? = nil
     ) -> DesignFocusPair.Tab {
         DesignFocusPair.Tab(
             id: id,
             paneId: paneId,
             isTerminal: isTerminal,
-            isFigma: isFigma
+            isFigma: isFigma,
+            stableSurfaceId: stableSurfaceId,
+            ownerTerminalSurfaceId: owner
         )
     }
 
@@ -301,5 +305,153 @@ struct DesignFocusPairTests {
         #expect(selection.figmaTab.id == fTab.id)
         #expect(selection.terminalTab.id == sTab.id)
         #expect(selection.terminalTab.paneId == mixedPaneId)
+    }
+
+    // MARK: - cm-73.45: the owner, then the terminal Tom was last in (Scenario 273)
+
+    /// Three panes left to right: agent A, free terminal B (the nearest to F), Figma F.
+    /// `owner` is what F's tab names; `aBehind` puts A behind another tab in its pane.
+    private struct Row {
+        let panes: [DesignFocusPair.Pane]
+        let a: DesignFocusPair.Tab
+        let b: DesignFocusPair.Tab
+        let f: DesignFocusPair.Tab
+        let aPane: UUID
+        let bPane: UUID
+        let fPane: UUID
+        let aStable: UUID
+    }
+
+    private func row(owner: UUID?, aBehind: Bool = false, withTerminals: Bool = true, ownerIsA: Bool = false) -> Row {
+        let aPane = UUID(), bPane = UUID(), fPane = UUID()
+        let aStable = UUID(), bStable = UUID()
+        let a = makeTab(paneId: aPane, isTerminal: true, isFigma: false, stableSurfaceId: aStable)
+        let b = makeTab(paneId: bPane, isTerminal: true, isFigma: false, stableSurfaceId: bStable)
+        let f = makeTab(paneId: fPane, isTerminal: false, isFigma: true, owner: ownerIsA ? aStable : owner)
+        var aTabs = [a]
+        var aSelected = a.id
+        if aBehind {
+            let front = makeTab(paneId: aPane, isTerminal: true, isFigma: false, stableSurfaceId: UUID())
+            aTabs = [a, front]
+            aSelected = front.id
+        }
+        let panes = [
+            makePane(id: aPane, frame: CGRect(x: 0, y: 0, width: 300, height: 600), tabs: aTabs, selectedTabId: aSelected),
+            makePane(id: bPane, frame: CGRect(x: 300, y: 0, width: 300, height: 600), tabs: [b]),
+            makePane(id: fPane, frame: CGRect(x: 600, y: 0, width: 300, height: 600), tabs: [f])
+        ]
+        return Row(panes: panes, a: a, b: b, f: f, aPane: aPane, bPane: bPane, fPane: fPane, aStable: aStable)
+    }
+
+    private func picked(
+        _ r: Row, focused: UUID, last: UUID? = nil
+    ) -> (terminal: UUID, rule: DesignFocusPair.TerminalRule)? {
+        guard case .success(let picked) = DesignFocusPair.pickWithRule(
+            isCanvasLayout: false, focusedPaneId: focused, panes: r.panes, lastTerminalTabId: last
+        ) else { return nil }
+        return (picked.selection.terminalTab.id, picked.rule)
+    }
+
+    @Test("273 (1) keyboard in F, F owned by A: A's tab, though B is nearer")
+    func ownerBeatsNearest() {
+        let r = row(owner: nil, ownerIsA: true)
+        let result = picked(r, focused: r.fPane)
+        #expect(result?.terminal == r.a.id)
+        #expect(result?.rule == .owner)
+    }
+
+    @Test("273 (2) keyboard in B, F owned by A: B, as today")
+    func focusedTerminalBeatsOwner() {
+        let r = row(owner: nil, ownerIsA: true)
+        let result = picked(r, focused: r.bPane)
+        #expect(result?.terminal == r.b.id)
+        #expect(result?.rule == .focused)
+    }
+
+    @Test("273 (3) F owned by A, A a background tab behind another tab in its pane: A's tab, not that pane's selected tab")
+    func ownerInABackgroundTab() {
+        let r = row(owner: nil, aBehind: true, ownerIsA: true)
+        let result = picked(r, focused: r.fPane)
+        #expect(result?.terminal == r.a.id)
+        #expect(result?.rule == .owner)
+    }
+
+    @Test("273 (4) F's owner matches no tab, last terminal A: A")
+    func staleOwnerFallsToLast() {
+        let r = row(owner: UUID())
+        let result = picked(r, focused: r.fPane, last: r.a.id)
+        #expect(result?.terminal == r.a.id)
+        #expect(result?.rule == .last)
+    }
+
+    @Test("273 (5) no owner, last A, which is not the nearest: A")
+    func lastBeatsNearest() {
+        let r = row(owner: nil)
+        let result = picked(r, focused: r.fPane, last: r.a.id)
+        #expect(result?.terminal == r.a.id)
+        #expect(result?.rule == .last)
+    }
+
+    @Test("273 (6) no owner, no last: B, the nearest, as today")
+    func nothingNamedPairsTheNearest() {
+        let r = row(owner: nil)
+        let result = picked(r, focused: r.fPane)
+        #expect(result?.terminal == r.b.id)
+        #expect(result?.rule == .nearest)
+    }
+
+    @Test("273 (7) owner and last both stale: the nearest")
+    func staleOwnerAndLastFallToNearest() {
+        let r = row(owner: UUID())
+        let result = picked(r, focused: r.fPane, last: UUID())
+        #expect(result?.terminal == r.b.id)
+        #expect(result?.rule == .nearest)
+    }
+
+    @Test("273 (8) A and F in one pane, F owned by A: A")
+    func ownerInTheFigmaPanesOwnPane() {
+        let shared = UUID(), bPane = UUID()
+        let aStable = UUID()
+        let a = makeTab(paneId: shared, isTerminal: true, isFigma: false, stableSurfaceId: aStable)
+        let f = makeTab(paneId: shared, isTerminal: false, isFigma: true, owner: aStable)
+        let b = makeTab(paneId: bPane, isTerminal: true, isFigma: false, stableSurfaceId: UUID())
+        let panes = [
+            makePane(id: shared, frame: CGRect(x: 0, y: 0, width: 400, height: 600), tabs: [a, f], selectedTabId: f.id),
+            makePane(id: bPane, frame: CGRect(x: 400, y: 0, width: 400, height: 600), tabs: [b])
+        ]
+        guard case .success(let picked) = DesignFocusPair.pickWithRule(
+            isCanvasLayout: false, focusedPaneId: shared, panes: panes
+        ) else {
+            Issue.record("Expected successful selection")
+            return
+        }
+        #expect(picked.selection.terminalTab.id == a.id)
+        #expect(picked.selection.terminalTab.paneId == shared)
+        #expect(picked.rule == .owner)
+    }
+
+    @Test("273 (9) canvas layout, and no terminal, still refuse, owner and last or not")
+    func refusalsAreUnchanged() {
+        let r = row(owner: nil, ownerIsA: true)
+        #expect(DesignFocusPair.pick(isCanvasLayout: true, focusedPaneId: r.fPane, panes: r.panes, lastTerminalTabId: r.a.id)
+            == .failure(.canvasLayout))
+        let onlyFigma = [r.panes[2]]
+        #expect(DesignFocusPair.pick(isCanvasLayout: false, focusedPaneId: r.fPane, panes: onlyFigma, lastTerminalTabId: r.a.id)
+            == .failure(.noTerminalTab))
+    }
+
+    @Test("a terminal tab that is not a terminal never matches an owner, even with the same stable id")
+    func ownerMustBeATerminalTab() {
+        let r = row(owner: nil, ownerIsA: true)
+        // F's own stable id equal to the owner must not make the Figma tab the terminal side.
+        let fPane = r.panes[2]
+        let f2 = makeTab(id: r.f.id, paneId: r.fPane, isTerminal: false, isFigma: true, stableSurfaceId: r.aStable, owner: r.aStable)
+        let panes = [r.panes[0], r.panes[1], makePane(id: fPane.id, frame: fPane.frame, tabs: [f2])]
+        guard case .success(let picked) = DesignFocusPair.pickWithRule(isCanvasLayout: false, focusedPaneId: r.fPane, panes: panes) else {
+            Issue.record("Expected successful selection")
+            return
+        }
+        #expect(picked.selection.terminalTab.isTerminal)
+        #expect(picked.selection.terminalTab.id == r.a.id)
     }
 }

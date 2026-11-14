@@ -55,10 +55,12 @@ extension Workspace {
                 bypassRemoteProxy: false,
                 designFocusAsker: .user // cmux-rbf #cm-73.2a
             )
-            guard BrowserSplitContainer.workspace(self).openBrowserToRight(
+            guard let placement = BrowserSplitContainer.workspace(self).openBrowserToRight(
                 of: sourcePanelId,
                 request: request
-            ) != nil else { return false }
+            ) else { return false }
+            // cmux-rbf #cm-73.45: a link Tom clicks makes that terminal the pane's owner, unlike the board layout's rule.
+            setFigmaPaneOwner(figmaPanelId: placement.panel.id, callerPanelId: sourcePanelId, via: .click)
             publishSocketReadSnapshotForClick()
             return true
 
@@ -76,7 +78,9 @@ extension Workspace {
             focusPanel(paneId)
             guard let panel = panels[paneId] as? BrowserPanel else { return false }
             // The URL policy above gates the shared goto action.
-            return panel.gotoFigmaNode(node, wrapper: page, defaults: defaults) // cmux-rbf #cm-73.3
+            let moved = panel.gotoFigmaNode(node, wrapper: page, defaults: defaults) // cmux-rbf #cm-73.3
+            if moved { setFigmaPaneOwner(figmaPanelId: paneId, callerPanelId: sourcePanelId, via: .click) } // cmux-rbf #cm-73.45
+            return moved
 
         case .bringForward(let paneId):
             // cmux-rbf #cm-73.2a
@@ -84,6 +88,7 @@ extension Workspace {
                 makeDesignFocusFigmaSide(paneId: targetPane)
             }
             focusPanel(paneId)
+            setFigmaPaneOwner(figmaPanelId: paneId, callerPanelId: sourcePanelId, via: .click) // cmux-rbf #cm-73.45
             return true
         }
     }

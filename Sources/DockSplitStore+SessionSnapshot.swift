@@ -420,7 +420,8 @@ extension DockSplitStore {
                     forwardHistoryURLStrings: history.forwardHistoryURLStrings,
                     transparentBackground: browser.sessionSnapshotTransparentBackground,
                     diffViewerToken: diffViewer?.token,
-                    diffViewerRequestPath: diffViewer?.requestPath
+                    diffViewerRequestPath: diffViewer?.requestPath,
+                    ownerTerminalSurfaceId: browser.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
                 )
             } else if let deferred = panel as? DeferredBrowserPanel {
                 browserSnapshot = deferred.sessionPanelSnapshot.browser
