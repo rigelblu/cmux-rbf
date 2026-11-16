@@ -20,6 +20,7 @@
 		C128020430000000000000001 /* AgentNudgeManualClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020430000000000000002 /* AgentNudgeManualClock.swift */; };
 		C128020410000000000000001 /* AgentNotificationSourceLineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020410000000000000002 /* AgentNotificationSourceLineTests.swift */; };
 		C12811E8D38DBC7539416C97 /* TerminalNotificationUnreadSinceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1281119EC72B7BEF73D9ADB /* TerminalNotificationUnreadSinceTests.swift */; };
+		C12813A8BBA3549529F7EB1E /* SendToBackAndMarkUnreadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128131C623C7D3E4E8A911A /* SendToBackAndMarkUnreadTests.swift */; };
 		C128116F4E429D5E6869D8FA /* NotificationJumpOldestFirstTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128114DC1DD9908C056AD10 /* NotificationJumpOldestFirstTests.swift */; };
 		C128020400000000000000001 /* TerminalNotificationStoreBadgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020400000000000000002 /* TerminalNotificationStoreBadgeTests.swift */; };
 		C128020330000000000000001 /* SidebarAgentMonitoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C128020330000000000000002 /* SidebarAgentMonitoringTests.swift */; };
@@ -4344,6 +4345,7 @@
 		C128020430000000000000002 /* AgentNudgeManualClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentNudgeManualClock.swift"; sourceTree = "<group>"; };
 		C128020410000000000000002 /* AgentNotificationSourceLineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentNotificationSourceLineTests.swift"; sourceTree = "<group>"; };
 		C1281119EC72B7BEF73D9ADB /* TerminalNotificationUnreadSinceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalNotificationUnreadSinceTests.swift"; sourceTree = "<group>"; };
+		C128131C623C7D3E4E8A911A /* SendToBackAndMarkUnreadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SendToBackAndMarkUnreadTests.swift"; sourceTree = "<group>"; };
 		C128114DC1DD9908C056AD10 /* NotificationJumpOldestFirstTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NotificationJumpOldestFirstTests.swift"; sourceTree = "<group>"; };
 		C128020400000000000000002 /* TerminalNotificationStoreBadgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalNotificationStoreBadgeTests.swift"; sourceTree = "<group>"; };
 		C128020330000000000000002 /* SidebarAgentMonitoringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarAgentMonitoringTests.swift"; sourceTree = "<group>"; };
@@ -12443,6 +12445,7 @@
 				C128020430000000000000002 /* AgentNudgeManualClock.swift */,
 				C128020410000000000000002 /* AgentNotificationSourceLineTests.swift */,
 				C1281119EC72B7BEF73D9ADB /* TerminalNotificationUnreadSinceTests.swift */,
+				C128131C623C7D3E4E8A911A /* SendToBackAndMarkUnreadTests.swift */,
 				C128114DC1DD9908C056AD10 /* NotificationJumpOldestFirstTests.swift */,
 				C128020400000000000000002 /* TerminalNotificationStoreBadgeTests.swift */,
 				C128020330000000000000002 /* SidebarAgentMonitoringTests.swift */,
@@ -16325,6 +16328,7 @@
 				C128020430000000000000001 /* AgentNudgeManualClock.swift in Sources */,
 				C128020410000000000000001 /* AgentNotificationSourceLineTests.swift in Sources */,
 				C12811E8D38DBC7539416C97 /* TerminalNotificationUnreadSinceTests.swift in Sources */,
+				C12813A8BBA3549529F7EB1E /* SendToBackAndMarkUnreadTests.swift in Sources */,
 				C128116F4E429D5E6869D8FA /* NotificationJumpOldestFirstTests.swift in Sources */,
 				C128020400000000000000001 /* TerminalNotificationStoreBadgeTests.swift in Sources */,
 				C128020330000000000000001 /* SidebarAgentMonitoringTests.swift in Sources */,

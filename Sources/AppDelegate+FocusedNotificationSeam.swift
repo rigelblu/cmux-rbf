@@ -107,4 +107,16 @@ extension AppDelegate {
     func sendToBack(_ target: UnreadQueueTarget) -> Bool {
         notificationStore?.sendToBack(target) ?? false
     }
+
+    /// (cm-128.13) Puts the newest notification back at its old place, or leaves a mark if none. A pane goes through
+    /// `Workspace.markPanelUnreadAtFormerPlace`, the one copy of the pane rule the tab menu, the palette's Mark Tab as Unread and the
+    /// socket's `tab.action` use too (step 4b R6); a Dock surface and a workspace-level target go to the store, which leaves their marks.
+    @discardableResult
+    func storeMarkUnreadAtFormerPlace(_ target: UnreadQueueTarget) -> Bool {
+        if case .workspace(let tabId, let surfaceId?) = target {
+            return workspaceFor(tabId: tabId)?.markPanelUnreadAtFormerPlace(surfaceId) ?? false
+        }
+        guard let notificationStore else { return false }
+        return notificationStore.markUnreadAtFormerPlace([target]).first ?? false
+    }
 }

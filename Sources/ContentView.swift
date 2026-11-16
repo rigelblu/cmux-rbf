@@ -839,6 +839,23 @@ struct SidebarUnreadSnapshotObserver: View {
 }
 
 struct ContentView: View {
+    /// (cm-128.13) The palette's Mark Workspace as Unread handler, registered here so a test registers and runs the real one
+    /// (the way `WorkspaceTodoPaletteCommands.registerHandlers` is driven). It puts the selected workspace's newest notification
+    /// back where it was (step 4b R2).
+    @MainActor
+    static func registerMarkWorkspaceUnreadPaletteHandler(
+        in registry: inout CommandPaletteHandlerRegistry,
+        tabManager: TabManager,
+        notificationStore: TerminalNotificationStore
+    ) {
+        registry.register(commandId: "palette.markWorkspaceUnread") {
+            guard let workspaceId = tabManager.selectedWorkspace?.id else {
+                NSSound.beep()
+                return
+            }
+            _ = notificationStore.markUnreadAtFormerPlace([.workspace(tabId: workspaceId, surfaceId: nil)]) // (cm-128.13)
+        }
+    }
     private enum CommandPaletteTaskKey: Hashable, Sendable {
         case searchIndexBuild
         case search
@@ -9252,13 +9269,7 @@ struct ContentView: View {
             }
             notificationStore.markRead(forTabId: workspaceId)
         }
-        registry.register(commandId: "palette.markWorkspaceUnread") {
-            guard let workspaceId = tabManager.selectedWorkspace?.id else {
-                NSSound.beep()
-                return
-            }
-            notificationStore.markUnread(forTabId: workspaceId)
-        }
+        Self.registerMarkWorkspaceUnreadPaletteHandler(in: &registry, tabManager: tabManager, notificationStore: notificationStore) // (cm-128.13)
         registry.register(commandId: "palette.clearAgentState") { // cm-128.2
             guard let workspaceId = tabManager.selectedWorkspace?.id else {
                 NSSound.beep()
@@ -15639,11 +15650,43 @@ struct VerticalTabsSidebar: View, Equatable {
         return result
     }
 
+    /// (cm-128.13) Closure factories for the SwiftUI workspace row's Send to Back of Unread Queue item and its enabled check.
+    @MainActor
+    static func makeWorkspaceRowSendToBackAction(
+        notificationStore: TerminalNotificationStore
+    ) -> ([UUID]) -> Void {
+        { workspaceIds in
+            notificationStore.sendRowsToBack(forWorkspaceIds: workspaceIds)
+        }
+    }
+
+    @MainActor
+    static func makeWorkspaceRowCanSendToBack(
+        notificationStore: TerminalNotificationStore
+    ) -> ([UUID]) -> Bool {
+        { workspaceIds in
+            notificationStore.canSendToBack(forWorkspaceIds: workspaceIds)
+        }
+    }
+
+    /// (cm-128.13) Closure factory for the SwiftUI workspace row's Mark Workspace as Unread action.
+    @MainActor
+    static func makeWorkspaceRowMarkUnreadAction(
+        notificationStore: TerminalNotificationStore
+    ) -> ([UUID]) -> Void {
+        { workspaceIds in
+            let validIds = workspaceIds.filter { notificationStore.canMarkWorkspaceUnread(forTabIds: [$0]) }
+            _ = notificationStore.markUnreadAtFormerPlace(validIds.map { .workspace(tabId: $0, surfaceId: nil) }) // (cm-128.13)
+        }
+    }
+
     /// Captures the parent action surface once per list evaluation. Invoking
     /// this factory below `LazyVStack` only binds immutable ids/values into
     /// closures; live models are resolved later when the user performs an
     /// action, never while SwiftUI realizes or lays out a row.
-    private func makeWorkspaceRowActionFactory() -> SidebarWorkspaceRowActionFactory {
+    /// (cm-128.13) Not private: a test builds a sidebar, runs this factory and invokes the row's own actions, so the bindings
+    /// (`markUnread:` here, `sendToBack:` and `canSendToBack:` later) are driven, not assumed.
+    func makeWorkspaceRowActionFactory() -> SidebarWorkspaceRowActionFactory {
         let pointerInteractionMonitor = pointerInteractionMonitor
         return { input in
         let tabId = input.workspaceId
@@ -15844,12 +15887,7 @@ struct VerticalTabsSidebar: View, Equatable {
                     notificationStore.markRead(forTabId: workspaceId)
                 }
             },
-            markUnread: { workspaceIds in
-                for workspaceId in workspaceIds where
-                    notificationStore.canMarkWorkspaceUnread(forTabIds: [workspaceId]) {
-                    notificationStore.markUnread(forTabId: workspaceId)
-                }
-            },
+            markUnread: Self.makeWorkspaceRowMarkUnreadAction(notificationStore: notificationStore), // (cm-128.13)
             clearLatestNotifications: { workspaceIds in
                 for workspaceId in workspaceIds {
                     notificationStore.clearLatestNotification(forTabId: workspaceId)
@@ -15861,6 +15899,8 @@ struct VerticalTabsSidebar: View, Equatable {
             canClearAgentState: { workspaceIds in // cm-128.2
                 tabManager.canClearAgentState(workspaceIds: workspaceIds)
             },
+            sendToBack: Self.makeWorkspaceRowSendToBackAction(notificationStore: notificationStore), // (cm-128.13)
+            canSendToBack: Self.makeWorkspaceRowCanSendToBack(notificationStore: notificationStore), // (cm-128.13)
             currentNotificationsMuted: { workspaceIds in
                 notificationStore.allWorkspaceNotificationsMuted(forTabIds: workspaceIds)
             },

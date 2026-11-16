@@ -1486,9 +1486,16 @@ struct cmuxApp: App {
         notificationStore.markRead(forTabId: workspaceId)
     }
 
-    private func markSelectedWorkspaceUnread(in manager: TabManager) {
+    /// (cm-128.13) The menu bar's Mark Workspace as Unread, static so a test runs the real body (step 4b R2): the selected
+    /// workspace's newest notification goes back where it was.
+    @MainActor
+    static func markSelectedWorkspaceUnreadAtFormerPlace(in manager: TabManager, store: TerminalNotificationStore) {
         guard let workspaceId = manager.selectedWorkspace?.id else { return }
-        notificationStore.markUnread(forTabId: workspaceId)
+        _ = store.markUnreadAtFormerPlace([.workspace(tabId: workspaceId, surfaceId: nil)]) // (cm-128.13)
+    }
+
+    private func markSelectedWorkspaceUnread(in manager: TabManager) { // (cm-128.13)
+        Self.markSelectedWorkspaceUnreadAtFormerPlace(in: manager, store: notificationStore)
     }
 
     @ViewBuilder

@@ -27,6 +27,8 @@
 "tabContext.pinTab" = "タブをピン留め";
 "tabContext.markTabAsRead" = "タブを既読にする";
 "tabContext.markTabAsUnread" = "タブを未読にする";
+// cmux-rbf #cm-128.13
+"tabContext.sendToBackOfUnreadQueue" = "未読キューの最後に送る";
 "tabContext.forkConversation" = "会話をフォーク";
 "tabContext.forkConversation.default.right" = "会話を右にフォーク";
 "tabContext.forkConversation.default.left" = "会話を左にフォーク";

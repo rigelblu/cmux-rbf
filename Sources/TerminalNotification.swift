@@ -18,6 +18,10 @@ struct TerminalNotification: Identifiable, Hashable, Sendable {
     /// unread ones it replaces. Reading and Mark as Unread leave it; only Send to Back sets it to now.
     var queuedAt: Date
     var isRead: Bool
+    /// (cm-128.13) Set when Mark as Unread turned this notification unread: his own mark, with a place in the queue.
+    /// It looks like his dot and no displayed number counts it, and it survives what his dot survives. Cleared by
+    /// every read that does not keep it, and by Send to Back; a removal takes it with the notification.
+    var isPutBack: Bool = false
     var paneFlash: Bool = true
     var scrollPosition: TerminalNotificationScrollPosition?
     var clickAction: TerminalNotificationClickAction?
@@ -40,6 +44,7 @@ struct TerminalNotification: Identifiable, Hashable, Sendable {
         createdAt: Date,
         queuedAt: Date? = nil,
         isRead: Bool,
+        isPutBack: Bool = false, // (cm-128.13)
         paneFlash: Bool = true,
         scrollPosition: TerminalNotificationScrollPosition? = nil,
         clickAction: TerminalNotificationClickAction? = nil,
@@ -59,6 +64,7 @@ struct TerminalNotification: Identifiable, Hashable, Sendable {
         self.createdAt = createdAt
         self.queuedAt = queuedAt ?? createdAt
         self.isRead = isRead
+        self.isPutBack = isPutBack // (cm-128.13)
         self.paneFlash = paneFlash
         self.scrollPosition = scrollPosition
         self.clickAction = clickAction

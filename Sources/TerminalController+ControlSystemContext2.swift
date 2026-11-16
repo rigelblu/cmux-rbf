@@ -158,7 +158,7 @@ extension TerminalController {
             return finish(.none)
 
         case "mark_unread", "mark_as_unread":
-            workspace.markPanelUnread(panelId)
+            workspace.markPanelUnreadAtFormerPlace(panelId) // (cm-128.13)
             return finish(.none)
 
         case "toggle_full_width_tab", "toggle_full_width", "toggle_full_width_tab_mode":

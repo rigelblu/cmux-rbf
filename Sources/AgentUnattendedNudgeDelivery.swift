@@ -47,6 +47,15 @@ final class AgentUnattendedNudgeDelivery {
         }
     }
 
+    /// (cm-128.13, F7, Tom 2026-11-09) Send to Back keeps the notification unread, so `reconcile` never sees it leave: the
+    /// reminder of each notification sent back is cancelled here instead.
+    func cancel(notificationIDs: Set<UUID>) {
+        for id in notificationIDs {
+            contexts.removeValue(forKey: id)
+            scheduler?.cancel(notificationID: id)
+        }
+    }
+
     func settingsDidChange() {
         guard !NotificationsCatalogSection().agentIdleReminder.value(in: .standard) else { return }
         contexts.removeAll()

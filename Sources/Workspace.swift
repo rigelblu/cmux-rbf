@@ -4456,6 +4456,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         bonsplitController.tabContextMoveDestinationsProvider = { [weak self] tabId, _ in
             self?.bonsplitTabMoveDestinations(for: tabId) ?? []
         }
+        // (cm-128.13) Send to Back of Unread Queue is enabled when the tab's pane holds a notification, unread or read.
+        bonsplitController.tabContextSendToBackAvailabilityProvider = { [weak self] tabId, _ in
+            guard let self,
+                  let panelId = self.panelIdFromSurfaceId(tabId),
+                  let notificationStore = AppDelegate.shared?.notificationStore else { return false }
+            return notificationStore.canSendToBack([.workspace(tabId: self.id, surfaceId: panelId)])
+        }
         configureForkAgentConversationContextMenuAvailability()
         bonsplitController.tabContextForkConversationDefaultActionProvider = { _, _ in
             AgentConversationForkDefaultSettings.current().tabContextAction
@@ -5979,9 +5986,35 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         if panelIsUnread(panelId) {
             markPanelRead(panelId)
         } else {
-            markPanelUnread(panelId)
+            markPanelUnreadAtFormerPlace(panelId) // (cm-128.13)
         }
         return true
+    }
+
+    /// (cm-128.13) Routes a panel's user Mark as Unread through the store's markUnreadAtFormerPlace
+    @discardableResult
+    func markPanelUnreadAtFormerPlace(_ panelId: UUID) -> Bool {
+        guard let notificationStore = AppDelegate.shared?.notificationStore else {
+            markPanelUnread(panelId)
+            return false
+        }
+        let hadNotification = notificationStore.markUnreadAtFormerPlace([.workspace(tabId: id, surfaceId: panelId)]).first ?? false
+        if !hadNotification {
+            markPanelUnread(panelId)
+        }
+        return hadNotification
+    }
+
+    /// (cm-128.13) Send to Back from the tab's menu: the pane's waiting notifications go to the back of the unread queue.
+    /// A pane with no notification has nothing to move, so nothing is marked (the lead, 2026-11-17: Send to Back has no
+    /// mark fallback, unlike Mark as Unread). Moves nothing on screen and opens nothing.
+    /// - Returns: whether the pane's notifications were sent back.
+    @discardableResult
+    func sendPanelToBack(_ panelId: UUID) -> Bool {
+        guard let notificationStore = AppDelegate.shared?.notificationStore else { return false }
+        let target = UnreadQueueTarget.workspace(tabId: id, surfaceId: panelId)
+        guard notificationStore.canSendToBack([target]) else { return false }
+        return notificationStore.sendToBack([target]).first ?? false
     }
 
     func markPanelUnread(_ panelId: UUID) {
@@ -15976,7 +16009,10 @@ extension Workspace: BonsplitDelegate {
             markPanelRead(panelId)
         case .markAsUnread:
             guard let panelId = panelIdFromSurfaceId(tab.id) else { return }
-            markPanelUnread(panelId)
+            markPanelUnreadAtFormerPlace(panelId) // (cm-128.13)
+        case .sendToBack:
+            guard let panelId = panelIdFromSurfaceId(tab.id) else { return }
+            sendPanelToBack(panelId) // (cm-128.13)
         case .toggleZoom:
             guard let panelId = panelIdFromSurfaceId(tab.id) else { return }
             toggleSplitZoom(panelId: panelId)

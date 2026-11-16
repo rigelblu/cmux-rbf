@@ -48,7 +48,7 @@ public final class FocusedNotificationMarker {
             if resolver.windowDockSurfaceIsUnread(dockTarget) {
                 resolver.clearWindowDockSurfaceUnread(dockTarget)
             } else {
-                resolver.markWindowDockSurfaceUnread(dockTarget)
+                resolver.storeMarkUnreadAtFormerPlace(.windowDock(dockTarget)) // (cm-128.13)
             }
             return true
         case .workspace(let tabId, let surfaceId):
@@ -83,14 +83,14 @@ public final class FocusedNotificationMarker {
                 }
                 return true
             }
-            resolver.markPanelUnread(panel)
+            resolver.storeMarkUnreadAtFormerPlace(.workspace(tabId: tabId, surfaceId: panel.panelId)) // (cm-128.13)
             return true
         }
         if resolver.workspaceIsUnread(forTabId: tabId) {
             resolver.storeMarkRead(forTabId: tabId)
             return true
         }
-        resolver.storeMarkUnread(forTabId: tabId)
+        resolver.storeMarkUnreadAtFormerPlace(.workspace(tabId: tabId, surfaceId: nil)) // (cm-128.13)
         return true
     }
 

@@ -62,13 +62,13 @@ struct FocusedNotificationMarkerTests {
         #expect(marker.toggleFocusedNotificationUnread())
         #expect(resolver.unreadWindowDockTargets == [target])
         #expect(resolver.mutations == [
-            "markWindowDockSurfaceUnread(\(short(target.surfaceId)))",
+            "storeMarkUnreadAtFormerPlace(dock \(short(target.surfaceId)))", // cmux-rbf: changed on purpose (#cm-128.13)
         ])
 
         #expect(marker.toggleFocusedNotificationUnread())
         #expect(resolver.unreadWindowDockTargets.isEmpty)
         #expect(resolver.mutations == [
-            "markWindowDockSurfaceUnread(\(short(target.surfaceId)))",
+            "storeMarkUnreadAtFormerPlace(dock \(short(target.surfaceId)))", // cmux-rbf: changed on purpose (#cm-128.13)
             "clearWindowDockSurfaceUnread(\(short(target.surfaceId)))",
         ])
     }
@@ -117,7 +117,7 @@ struct FocusedNotificationMarkerTests {
         let (marker, _) = makeMarker(resolver: resolver)
 
         #expect(marker.toggleFocusedNotificationUnread())
-        #expect(resolver.mutations == ["markPanelUnread(\(short(surface)))"])
+        #expect(resolver.mutations == ["storeMarkUnreadAtFormerPlace(\(short(tab)),\(short(surface)))"]) // cmux-rbf: changed on purpose (#cm-128.13)
     }
 
     // MARK: toggle, workspace (no panel) path
@@ -143,7 +143,24 @@ struct FocusedNotificationMarkerTests {
         let (marker, _) = makeMarker(resolver: resolver)
 
         #expect(marker.toggleFocusedNotificationUnread())
-        #expect(resolver.mutations == ["storeMarkUnread(\(short(tab)))"])
+        #expect(resolver.mutations == ["storeMarkUnreadAtFormerPlace(\(short(tab)),nil)"]) // cmux-rbf: changed on purpose (#cm-128.13)
+    }
+
+    // cmux-rbf: renamed and given its own fixture (cm-128.13, step 4b R11): it had the same fixture as `togglePanelMarksUnread` and set no notification.
+    @Test("toggle makes the one former-place call for a panel that has a notification, and no pane mark of its own")
+    func togglePanelWithNotificationMakesOneFormerPlaceCall() {
+        let tab = UUID(), surface = UUID()
+        let panel = FocusedPanel(tabId: tab, panelId: surface)
+        let resolver = FakeFocusedResolving()
+        resolver.focusedTargetValue = .workspace(tabId: tab, surfaceId: surface)
+        resolver.panelByTabSurface[.init(tabId: tab, surfaceId: surface)] = panel
+        resolver.targetsWithNotifications = [.workspace(tabId: tab, surfaceId: surface)]
+        let (marker, _) = makeMarker(resolver: resolver)
+
+        #expect(marker.toggleFocusedNotificationUnread())
+        #expect(resolver.mutations == [
+            "storeMarkUnreadAtFormerPlace(\(short(tab)),\(short(surface)))",
+        ])
     }
 
     // MARK: markOldest + jump

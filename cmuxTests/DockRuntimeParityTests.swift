@@ -432,14 +432,26 @@ struct DockRuntimeParityTests {
             ))
 
             #expect(appDelegate.toggleFocusedNotificationUnread(preferredWindow: window))
-            #expect(notificationStore.hasManualUnread(
+            let putBack = try #require(notificationStore.notifications.first { $0.surfaceId == panel.id }) // cmux-rbf: changed on purpose (#cm-128.13)
+            #expect(!putBack.isRead && putBack.isPutBack) // cmux-rbf: changed on purpose (#cm-128.13)
+            #expect(!notificationStore.hasManualUnread( // cmux-rbf: changed on purpose (#cm-128.13)
                 forTabId: windowID,
                 surfaceId: panel.id
+            ))
+            #expect(notificationStore.hasUnreadNotification( // cmux-rbf: changed on purpose (#cm-128.13)
+                forTabId: windowID,
+                surfaceId: otherPanel.id
             ))
             #expect(workspace.manualUnreadPanelIds.isEmpty)
 
             #expect(appDelegate.toggleFocusedNotificationUnread(preferredWindow: window))
+            let cleared = try #require(notificationStore.notifications.first { $0.surfaceId == panel.id }) // cmux-rbf: changed on purpose (#cm-128.13)
+            #expect(cleared.isRead && !cleared.isPutBack) // cmux-rbf: changed on purpose (#cm-128.13)
             #expect(!notificationStore.hasManualUnread(
+                forTabId: windowID,
+                surfaceId: panel.id
+            ))
+            #expect(!notificationStore.hasVisibleNotificationIndicator( // cmux-rbf: changed on purpose (#cm-128.13)
                 forTabId: windowID,
                 surfaceId: panel.id
             ))
@@ -1261,7 +1273,8 @@ struct DockRuntimeParityTests {
             notificationStore.markUnread(id: notificationID)
 
             #expect(observer.publicationCount == 1)
-            #expect(observer.totalUnreadCounts == [1])
+            // cmux-rbf: changed on purpose (#cm-128.13) The popover's Mark as Unread now leaves a put-back notification: his own mark, which no displayed number counts (Q114), so the Dock total reads 0, not 1.
+            #expect(observer.totalUnreadCounts == [0])
             #expect(unreadProjection.unreadPanelIDs == [panel.id])
             #expect(!notificationStore.hasManualUnread(
                 forTabId: windowID,

@@ -19138,6 +19138,9 @@ struct CMUXCLI {
               mark-read | mark-unread
               set-color | clear-color
 
+            mark-unread puts the target's newest notification back where it was in the Cmd+Shift+U queue;
+            with no notification it leaves your unread mark.
+
             Flags:
               --action <name>              Action name (required if not positional)
               --workspace <id|ref|index>   Target workspace (default: current/$CMUX_WORKSPACE_ID)
@@ -19177,6 +19180,9 @@ struct CMUXCLI {
               move-to-new-workspace
               reload | duplicate
               pin | unpin | mark-unread | toggle-full-width-tab
+
+            mark-unread puts the target's newest notification back where it was in the Cmd+Shift+U queue;
+            with no notification it leaves your unread mark.
 
             Flags:
               --action <name>              Action name (required if not positional)

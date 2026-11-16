@@ -118,5 +118,20 @@ final class FakeFocusedResolving: FocusedNotificationResolving {
         return targetsWithNotifications.contains(target)
     }
 
+    @discardableResult
+    func storeMarkUnreadAtFormerPlace(_ target: UnreadQueueTarget) -> Bool { // (cm-128.13)
+        switch target {
+        case .windowDock(let dock):
+            unreadWindowDockTargets.insert(dock)
+            mutations.append("storeMarkUnreadAtFormerPlace(dock \(short(dock.surfaceId)))")
+        case .workspace(let tabId, let surfaceId):
+            if surfaceId == nil {
+                workspaceUnreadTabs.insert(tabId)
+            }
+            mutations.append("storeMarkUnreadAtFormerPlace(\(short(tabId)),\(surfaceId.map(short) ?? "nil"))")
+        }
+        return targetsWithNotifications.contains(target)
+    }
+
     private func short(_ id: UUID) -> String { String(id.uuidString.prefix(4)) }
 }
