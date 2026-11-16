@@ -704,6 +704,64 @@ struct AgentUnattendedNudgeDeliveryTests {
         }
     }
 
+    // (cm-128.13, F7, Tom 2026-11-09) Send to Back puts a finished turn behind the others: its pending "left unread"
+    // reminder goes with it. Each test watches the reminders arm before it sends anything back.
+    @Test func sendToBackOfSeveralTargetsCancelsTheReminderOfEachNotificationItSendsBack() async throws {
+        try await withFixture { fixture, clock, probe in
+            try await enqueue(fixture)
+            let destinationPanel = try #require(fixture.destination.focusedPanelId)
+            try await enqueueSecond(fixture, panelId: destinationPanel)
+            await spin { clock.sleeperCount == 2 }
+            #expect(clock.sleeperCount == 2, "both reminders armed before anything is sent back")
+            let delivered = probe.delivered.count
+
+            fixture.store.sendToBack([
+                .workspace(tabId: fixture.source.id, surfaceId: fixture.panelId),
+                .workspace(tabId: fixture.destination.id, surfaceId: destinationPanel)
+            ])
+
+            await spin { clock.sleeperCount == 0 }
+            #expect(clock.sleeperCount == 0, "each notification it sent back lost its pending reminder")
+            clock.advance(by: .seconds(60))
+            await spin { false }
+            #expect(probe.delivered.count == delivered, "no still-unread banner follows a send to the back")
+        }
+    }
+
+    @Test func sendToBackOfOneTargetKeepsTheReminderOfANotificationItDidNotSendBack() async throws {
+        try await withFixture { fixture, clock, probe in
+            try await enqueue(fixture)
+            let destinationPanel = try #require(fixture.destination.focusedPanelId)
+            try await enqueueSecond(fixture, panelId: destinationPanel)
+            await spin { clock.sleeperCount == 2 }
+            #expect(clock.sleeperCount == 2, "both reminders armed before anything is sent back")
+            let kept = try #require(fixture.store.notifications.first { $0.tabId == fixture.destination.id })
+            let delivered = probe.delivered.count
+
+            // ⌘⌃U's call: one target, through the single-target entry.
+            fixture.store.sendToBack(.workspace(tabId: fixture.source.id, surfaceId: fixture.panelId))
+
+            await spin { clock.sleeperCount == 1 }
+            #expect(clock.sleeperCount == 1, "only the pane that was not sent back keeps its reminder")
+            clock.advance(by: .seconds(60))
+            await spin { probe.delivered.count == delivered + 1 }
+            #expect(probe.delivered.count == delivered + 1)
+            #expect(probe.delivered.last?.notification.id == kept.id, "the surviving reminder is the one that was not sent back")
+        }
+    }
+
+    private func enqueueSecond(_ fixture: AgentNotificationRegressionTests.Fixture, panelId: UUID) async throws {
+        #expect(AgentNotificationDelivery().enqueue(workspaceID: fixture.destination.id, surfaceID: panelId,
+            title: "Claude Code · Finished", subtitle: "cm-128", body: "The agent's result",
+            category: .turnComplete, pending: false,
+            soundContext: NotificationSoundOverrideContext(agentID: "claude", alertType: .turnDone),
+            agentKind: "claude", correlationKey: UUID().uuidString,
+            sourceTitle: "Claude Code", isPromptTurn: false))
+        TerminalMutationBus.shared.drainForTesting()
+        await spin { fixture.store.notifications.count == 2 }
+        #expect(fixture.store.notifications.count == 2)
+    }
+
     private func withFixture(present: Bool = false, policyHookCommand: String? = nil,
         _ body: @MainActor (AgentNotificationRegressionTests.Fixture, AgentNudgeManualClock, AgentNudgeDeliveryProbe) async throws -> Void
     ) async throws {

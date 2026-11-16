@@ -22,6 +22,17 @@ public enum NotificationDismissalContext: Sendable {
         }
     }
 
+    /// Whether this context leaves a notification he put back unread (cm-128.13): it is his mark, which every
+    /// dismissal but typing in the pane leaves, as it leaves his dot. Exhaustive, so a future context must decide.
+    public var leavesPutBackNotification: Bool {
+        switch self {
+        case .activeFocus, .explicitWorkspaceResume, .directInteraction:
+            return true
+        case .terminalInteraction:
+            return false
+        }
+    }
+
     /// Whether this context may clear a manually-set unread indicator.
     public var canDismissManualUnreadIndicator: Bool {
         self == .terminalInteraction

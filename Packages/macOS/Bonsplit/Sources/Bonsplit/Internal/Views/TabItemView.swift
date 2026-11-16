@@ -289,6 +289,7 @@ struct TabItemView: View {
     let contextMenuState: TabContextMenuState
     let moveDestinationsProvider: () -> [TabContextMoveDestination]
     let forkConversationAvailabilityProvider: () -> TabContextForkConversationAvailability
+    let sendToBackAvailabilityProvider: () -> Bool // (cm-128.13)
     let forkConversationAvailabilityRefreshHandler: @MainActor () async -> Void
     let onSelect: () -> Void
     let onClose: (TabCloseRequestSource) -> Void
@@ -356,7 +357,8 @@ struct TabItemView: View {
                         state: contextMenuState,
                         moveDestinationsProvider: moveDestinationsProvider,
                         forkConversationAvailabilityProvider: forkConversationAvailabilityProvider,
-                        forkConversationAvailabilityRefreshHandler: forkConversationAvailabilityRefreshHandler
+                        forkConversationAvailabilityRefreshHandler: forkConversationAvailabilityRefreshHandler,
+                        sendToBackAvailabilityProvider: sendToBackAvailabilityProvider // (cm-128.13)
                     ),
                     onContextAction: onContextAction,
                     onMoveDestination: onMoveDestination
@@ -1356,6 +1358,12 @@ enum TabContextMenuBuilder {
     private static let forkConversationSubmenuIdentifier = NSUserInterfaceItemIdentifier(
         "Bonsplit.TabContextMenu.ForkConversationSubmenu"
     )
+    private static let sendToBackItemIdentifier = NSUserInterfaceItemIdentifier("Bonsplit.TabContextMenu.SendToBack") // (cm-128.13)
+
+    /// (cm-128.13) Re-asks the host whether Send to Back is on, as the menu opens (step 7, R1).
+    static func updateSendToBackAvailability(_ isAvailable: Bool, in menu: NSMenu) {
+        menu.items.first { $0.identifier == sendToBackItemIdentifier }?.isEnabled = isAvailable
+    }
 
     static func makeMenu(
         snapshot: TabContextMenuSnapshot,
@@ -1575,6 +1583,16 @@ enum TabContextMenuBuilder {
             )
         }
 
+        // (cm-128.13) Send to Back of Unread Queue: right after the Read/Unread item, listed always, greyed by the host's check.
+        addAction(
+            title: localized("tabContext.sendToBackOfUnreadQueue", defaultValue: "Send to Back of Unread Queue"),
+            action: .sendToBack,
+            enabled: snapshot.sendToBackAvailabilityProvider(),
+            state: state,
+            target: target,
+            to: menu
+        ).identifier = sendToBackItemIdentifier
+
         menu.addItem(.separator())
 
         addAction(
@@ -1777,6 +1795,7 @@ enum TabContextMenuBuilder {
              .togglePin,
              .markAsRead,
              .markAsUnread,
+             .sendToBack, // (cm-128.13)
              .toggleZoom,
              .toggleFullWidthTab,
              .disconnectRemote:

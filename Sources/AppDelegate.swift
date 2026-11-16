@@ -2187,23 +2187,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard let notificationStore else { return }
         notificationStore.handleApplicationDidBecomeActive()
         guard let tabManager else { return }
-        guard let target = notificationAttentionTargetOnActivation(tabManager: tabManager) else { return }
-        guard notificationStore.hasUnreadNotification(
-            forTabId: target.workspaceID,
-            surfaceId: target.surfaceID
-        ) else { return }
+        readNotificationOnActivation(tabManager: tabManager) // (cm-128.13) the one call; its body is below
+    }
 
-        if notificationStore.hasUnreadNotificationRequiringPaneFlash(
+    /// The handler's read of the activation target's unread notification (cm-128.13): resolves the target, then reads it by the
+    /// put-back rule below. The handler calls only this, so a test can drive the handler and an upstream sync that rewrites the handler
+    /// is caught by it.
+    func readNotificationOnActivation(tabManager: TabManager) {
+        guard let notificationStore,
+              let target = notificationAttentionTargetOnActivation(tabManager: tabManager) else { return }
+        readNotificationOnActivation(store: notificationStore, target: target) { [self] workspaceID, panelID in
+            routeNotificationAttentionFlash(workspaceID: workspaceID, panelID: panelID, reason: .notificationArrival)
+        }
+    }
+
+    /// App activation's read of the target's unread notification (cm-128.13: moved out of the handler so a test drives it). A notification
+    /// he put back is his mark: the check counts it as absent and sits before the flash, so with only put-back ones unread there the pane
+    /// neither flashes nor reads; with another unread beside it, the read keeps the put-back one.
+    func readNotificationOnActivation(
+        store: TerminalNotificationStore,
+        target: (workspaceID: UUID, surfaceID: UUID),
+        routeFlash: (_ workspaceID: UUID, _ panelID: UUID) -> Void
+    ) {
+        guard store.hasUnreadNewsNotification(forTabId: target.workspaceID, surfaceId: target.surfaceID) else { return }
+        if store.hasUnreadNotificationRequiringPaneFlash(
             forTabId: target.workspaceID,
             surfaceId: target.surfaceID
         ) {
-            routeNotificationAttentionFlash(
-                workspaceID: target.workspaceID,
-                panelID: target.surfaceID,
-                reason: .notificationArrival
-            )
+            routeFlash(target.workspaceID, target.surfaceID)
         }
-        notificationStore.markRead(forTabId: target.workspaceID, surfaceId: target.surfaceID)
+        store.markRead(forTabId: target.workspaceID, surfaceId: target.surfaceID, keepingPutBack: true)
     }
 
     /// Sole caller of `NSApp.reply(toApplicationShouldTerminate:)`.
@@ -14513,6 +14526,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         excludingPane excludedPane: UnreadQueueTarget? = nil
     ) -> TerminalNotification? {
         guard let notificationStore else { return nil }
+        // (cm-128.13) The pane he's on, when it holds a notification he put back, is the one pane exclusion in place of nil, so the press
+        // passes it by without reading it (as ⌘⌃U's exclusion does); ⌘⌃U's own sent-back pane wins.
+        let derivedPutBackExclusion = excludedPane == nil // (cm-128.13, step 7 R3) only this exclusion maps through the owning panel
+        let excludedPane = excludedPane ?? frontmostFocusedPane().flatMap {
+            notificationStore.holdsUnreadPutBackNotification(on: $0, owningPanelId: { owningPanelId(workspaceId: $0, surfaceId: $1) }) ? $0 : nil
+        }
 #if DEBUG
         if ProcessInfo.processInfo.environment["CMUX_UI_TEST_JUMP_UNREAD_SETUP"] == "1" {
             writeJumpUnreadTestData([
@@ -14523,6 +14542,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 #endif
         guard let openedId = notificationNavigation.jumpToOldestUnread(
             excludingPane: excludedPane,
+            mapsExclusionThroughOwningPanel: derivedPutBackExclusion, // (cm-128.13, step 7 R3)
             openRestartSummary: { [weak self] before in
                 self?.openOldestUnreadRestartSummary(notOlderThan: before) ?? false
             }

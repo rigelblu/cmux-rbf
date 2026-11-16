@@ -279,6 +279,10 @@ final class NotificationNavSeamAdapter:
     func sendToBack(_ target: UnreadQueueTarget) -> Bool {
         owner?.sendToBack(target) ?? false
     }
+
+    func storeMarkUnreadAtFormerPlace(_ target: UnreadQueueTarget) -> Bool { // (cm-128.13)
+        owner?.storeMarkUnreadAtFormerPlace(target) ?? false
+    }
 }
 
 /// Internal helpers the `NotificationNavSeamAdapter` forwards to. These are the

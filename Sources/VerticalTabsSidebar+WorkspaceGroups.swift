@@ -416,7 +416,7 @@ extension VerticalTabsSidebar {
     /// group-header renderers. The stable group id is captured; mutable anchor
     /// and member ids are resolved only when an action is invoked.
     @MainActor
-    private func makeWorkspaceGroupHeaderActions(
+    private func makeWorkspaceGroupHeaderActions( // (cm-128.13) now forwards to the static below
         groupId: UUID,
         fallbackGroupName: String,
         fallbackAnchorWorkspaceId: UUID,
@@ -424,8 +424,29 @@ extension VerticalTabsSidebar {
         selectedTabIds: Binding<Set<UUID>>,
         lastSidebarSelectionIndex: Binding<Int?>
     ) -> SidebarGroupHeaderRowActions {
-        let tabManager = self.tabManager
-        let notificationStore = self.notificationStore
+        Self.makeWorkspaceGroupHeaderActions(
+            groupId: groupId,
+            fallbackGroupName: fallbackGroupName,
+            fallbackAnchorWorkspaceId: fallbackAnchorWorkspaceId,
+            placement: placement,
+            tabManager: tabManager,
+            notificationStore: notificationStore,
+            selectedTabIds: selectedTabIds,
+            lastSidebarSelectionIndex: lastSidebarSelectionIndex
+        )
+    }
+
+    @MainActor
+    static func makeWorkspaceGroupHeaderActions( // (cm-128.13) upstream's body, static so a test drives the group header's real closures
+        groupId: UUID,
+        fallbackGroupName: String,
+        fallbackAnchorWorkspaceId: UUID,
+        placement: WorkspaceGroupNewPlacement?,
+        tabManager: TabManager,
+        notificationStore: TerminalNotificationStore,
+        selectedTabIds: Binding<Set<UUID>>,
+        lastSidebarSelectionIndex: Binding<Int?>
+    ) -> SidebarGroupHeaderRowActions {
         let resolveLiveAnchor: () -> (TabManager, UUID)? = { [weak tabManager] in
             guard let tabManager,
                   let anchorId = tabManager.workspaceGroupAnchor(for: groupId)?.id else {
@@ -531,7 +552,7 @@ extension VerticalTabsSidebar {
                       notificationStore.canMarkWorkspaceUnread(forTabIds: [anchorId]) else {
                     return
                 }
-                notificationStore.markUnread(forTabId: anchorId)
+                _ = notificationStore.markUnreadAtFormerPlace([.workspace(tabId: anchorId, surfaceId: nil)]) // (cm-128.13)
             },
             onClearLatestNotifications: { [resolveLiveAnchor, weak notificationStore] in
                 guard let (_, anchorId) = resolveLiveAnchor(),
@@ -559,9 +580,8 @@ extension VerticalTabsSidebar {
                 let ids = tabManager.tabs.compactMap { tab in
                     tab.groupId == groupId && tab.id != anchorId ? tab.id : nil
                 }
-                for id in ids where notificationStore.canMarkWorkspaceUnread(forTabIds: [id]) {
-                    notificationStore.markUnread(forTabId: id)
-                }
+                let validIds = ids.filter { notificationStore.canMarkWorkspaceUnread(forTabIds: [$0]) }
+                _ = notificationStore.markUnreadAtFormerPlace(validIds.map { .workspace(tabId: $0, surfaceId: nil) }) // (cm-128.13)
             },
             onUngroup: { [weak tabManager] in
                 tabManager?.ungroupWorkspaceGroup(groupId: groupId)

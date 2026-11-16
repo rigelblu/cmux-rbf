@@ -21,7 +21,7 @@ import Observation
 /// the ``FocusedNotificationResolving`` seam; the coordinator exposes the two
 /// public focused-mark entry points and forwards to the marker, which delegates
 /// its jump step back to
-/// ``jumpToOldestUnread(excludingPane:openRestartSummary:)``.
+/// ``jumpToOldestUnread(excludingPane:mapsExclusionThroughOwningPanel:openRestartSummary:)`` (cm-128.13: the middle parameter).
 @MainActor
 @Observable
 public final class NotificationNavigationCoordinator: NotificationDeliveryTerminalNavigating {
@@ -60,7 +60,7 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
     ///   can route it through its own recorder-wrapped, summary-aware
     ///   `jumpToOldestUnread` (which fires the `#if DEBUG` `jumpUnreadInvoked`
     ///   UI-test recorder and applies the nil-store guard). Defaults to this
-    ///   coordinator's plain ``jumpToOldestUnread(excludingPane:openRestartSummary:)``.
+    ///   coordinator's plain ``jumpToOldestUnread(excludingPane:mapsExclusionThroughOwningPanel:openRestartSummary:)`` (cm-128.13: the middle parameter).
     public init(
         store: any NotificationNavigationStoreReading,
         windows: any MainWindowContextResolving,
@@ -104,50 +104,20 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
 
     // MARK: Jump
 
-    /// One pane in the unread queue: its place and the notification the press opens (cm-128.11).
-    private struct QueueStop {
-        let target: UnreadQueueTarget
-        let queuedAt: Date
-        /// The id of the earliest member, the tie-break between two panes queued at the same time.
-        let tieBreakId: UUID
-        /// The pane's newest unread notification: store order is newest first.
-        let newest: NotificationNavSnapshot
-    }
-
-    /// The queue: unread, openable notifications grouped by pane, oldest `queuedAt` first, ties by
-    /// notification id (cm-128.11). The stop is the pane, not the workspace (Tom, grill Q92). A
-    /// notification with no surface groups by its workspace.
-    private func unreadQueue(excludingPane excludedPane: UnreadQueueTarget?) -> [QueueStop] {
-        struct Key: Hashable { let tabId: UUID; let surfaceId: UUID? }
-        var order: [Key] = []
-        var members: [Key: [NotificationNavSnapshot]] = [:]
-        for notification in store.orderedNotifications
-        where notification.isOpenableForJump(excludingNotificationId: nil, excludingWorkspaceId: nil)
-            && !notification.isOnPane(excludedPane) {
-            let key = Key(tabId: notification.tabId, surfaceId: notification.surfaceId)
-            if members[key] == nil { order.append(key) }
-            members[key, default: []].append(notification)
-        }
-        return order.compactMap { key -> QueueStop? in
-            guard let group = members[key],
-                  let newest = group.first,
-                  let earliest = group.min(by: { lhs, rhs in
-                      lhs.queuedAt != rhs.queuedAt
-                          ? lhs.queuedAt < rhs.queuedAt
-                          : lhs.id.uuidString < rhs.id.uuidString
-                  }) else { return nil }
-            return QueueStop(
-                target: .workspace(tabId: key.tabId, surfaceId: key.surfaceId),
-                queuedAt: earliest.queuedAt,
-                tieBreakId: earliest.id,
-                newest: newest
+    /// The queue (cm-128.11); its grouping and order are ``UnreadQueue/stops(in:excludingPane:owningPanelId:)`` (cm-128.13, F2),
+    /// the one copy the store's Send to Back shares.
+    private func unreadQueue(excludingPane excludedPane: UnreadQueueTarget?, mapsExclusionThroughOwningPanel: Bool) -> [UnreadQueueStop] {
+        // (cm-128.13, step 4b R1 and step 7 R3) Only the exclusion the app derives for a put-back notification on the pane he's on maps
+        // through the owning panel. ⌘⌃U's sent-back pane stays as `.11` had it: the store's Send to Back matches without the map, so a
+        // mapped exclusion would skip a notification it never sent back.
+        if mapsExclusionThroughOwningPanel {
+            return UnreadQueue.stops(
+                in: store.orderedNotifications,
+                excludingPane: excludedPane,
+                owningPanelId: { unreadTargeting.owningPanelId(workspaceId: $0, surfaceId: $1) }
             )
         }
-        .sorted { lhs, rhs in
-            lhs.queuedAt != rhs.queuedAt
-                ? lhs.queuedAt < rhs.queuedAt
-                : lhs.tieBreakId.uuidString < rhs.tieBreakId.uuidString
-        }
+        return UnreadQueue.stops(in: store.orderedNotifications, excludingPane: excludedPane)
     }
 
     /// Opens the pane that has been unread longest, returning the opened notification's id, or `nil`
@@ -163,10 +133,11 @@ public final class NotificationNavigationCoordinator: NotificationDeliveryTermin
     @discardableResult
     public func jumpToOldestUnread(
         excludingPane excludedPane: UnreadQueueTarget? = nil,
+        mapsExclusionThroughOwningPanel: Bool = false, // (cm-128.13, step 7 R3) true only for the put-back exclusion the app derives
         openRestartSummary: ((_ before: Date?) -> Bool)? = nil
     ) -> UUID? {
         var staying: UUID?
-        for stop in unreadQueue(excludingPane: excludedPane) {
+        for stop in unreadQueue(excludingPane: excludedPane, mapsExclusionThroughOwningPanel: mapsExclusionThroughOwningPanel) {
             if openRestartSummary?(stop.queuedAt) == true { return nil }
             // Asked before the open: opening moves focus, and the pane he lands on is not the one he was on.
             let hesHere = isFrontmostFocusedPane(stop.target)

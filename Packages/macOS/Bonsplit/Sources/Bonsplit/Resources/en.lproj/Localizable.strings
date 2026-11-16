@@ -27,6 +27,8 @@
 "tabContext.pinTab" = "Pin Tab";
 "tabContext.markTabAsRead" = "Mark Tab as Read";
 "tabContext.markTabAsUnread" = "Mark Tab as Unread";
+// cmux-rbf #cm-128.13
+"tabContext.sendToBackOfUnreadQueue" = "Send to Back of Unread Queue";
 "tabContext.forkConversation" = "Fork Conversation";
 "tabContext.forkConversation.default.right" = "Fork Conversation to the Right";
 "tabContext.forkConversation.default.left" = "Fork Conversation to the Left";

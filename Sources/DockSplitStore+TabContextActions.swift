@@ -1,6 +1,7 @@
 import AppKit
 import Bonsplit
 import CmuxBrowser // cmux-rbf #cm-73.15
+import CmuxNotifications // (cm-128.13)
 import CmuxSettings
 import Foundation
 
@@ -112,7 +113,9 @@ extension DockSplitStore {
         case .markAsRead:
             setDockTabUnread(panelId: panelId, tabId: tab.id, unread: false)
         case .markAsUnread:
-            setDockTabUnread(panelId: panelId, tabId: tab.id, unread: true)
+            putDockTabBackUnread(panelId: panelId, tabId: tab.id) // (cm-128.13)
+        case .sendToBack:
+            sendDockTabToBack(panelId: panelId, tabId: tab.id) // (cm-128.13)
         case .toggleZoom:
             _ = toggleDockPaneZoom(inPane: pane)
         case .toggleFullWidthTab:
@@ -420,10 +423,75 @@ extension DockSplitStore {
 
     @discardableResult
     func togglePanelUnread(_ panelId: UUID) -> Bool {
-        setDockPanelUnread(
-            panelId: panelId,
-            unread: !panelIsUnread(panelId)
-        )
+        // (cm-128.13) The palette's Mark Tab as Unread puts the notification back where it was (an entrance, with the tab menu's
+        // item); Mark Tab as Read stays as it was.
+        if !panelIsUnread(panelId) {
+            guard let tabId = surfaceId(forPanelId: panelId) else { return false }
+            putDockTabBackUnread(panelId: panelId, tabId: tabId)
+            return true
+        }
+        return setDockPanelUnread(panelId: panelId, unread: false)
+    }
+
+    /// (cm-128.13) A user Mark as Unread on a Dock tab, the one path for its two entrances, the tab menu's item and the palette's
+    /// Dock toggle: the Dock surface's newest notification goes back where it was, as his mark, else a Dock mark (MISS1: the tab's
+    /// badge is set whichever happened). A Dock with no window-Dock target (a non-global scope) keeps today's local mark. The system
+    /// paths stay plain marks and don't come through here: the Dock's bell calls `markWindowDockSurfaceUnread` and its restore calls
+    /// `adoptManualUnreadState`. `setDockTabUnread` is as upstream wrote it (the design's own rule, `14_technical-system.md:478`; step 4b R5).
+    func putDockTabBackUnread(panelId: UUID, tabId: TabID) {
+        guard scope == .global, let notificationStore = resolvedNotificationStore() else {
+            setDockTabUnread(panelId: panelId, tabId: tabId, unread: true)
+            return
+        }
+        manualUnreadPanelIds.remove(panelId)
+        _ = notificationStore.markUnreadAtFormerPlace([.windowDock(WindowDockUnreadTarget(windowId: workspaceId, surfaceId: panelId))])
+        bonsplitController.updateTab(tabId, showsNotificationBadge: true)
+    }
+
+    /// (cm-128.13) Send to Back from a window-Dock tab's menu (MISS1): the Dock surface's notifications go to the back of the
+    /// unread queue. The tab's badge is set only when the send turned a READ notification unread (MISS1's case): a tab already
+    /// unread looks as it should (Q111: nothing new on screen), so the send adds no dot there (step 9 R2). A Dock with no
+    /// window-Dock target (a non-global scope) sends nothing, and a surface with no notification has nothing to move: nothing is
+    /// marked (the lead, 2026-11-17).
+    private func sendDockTabToBack(panelId: UUID, tabId: TabID) {
+        guard scope == .global, let notificationStore = resolvedNotificationStore() else { return }
+        let target = UnreadQueueTarget.windowDock(WindowDockUnreadTarget(windowId: workspaceId, surfaceId: panelId))
+        guard notificationStore.canSendToBack([target]) else { return }
+        let wasUnread = notificationStore.notifications.contains { !$0.isRead && $0.matches(tabId: workspaceId, surfaceId: panelId) }
+        manualUnreadPanelIds.remove(panelId)
+        notificationStore.sendToBack([target])
+        if !wasUnread { // (cm-128.13, step 9 R2) a read notification came back unread: the tab shows it now
+            bonsplitController.updateTab(tabId, showsNotificationBadge: true)
+        }
+    }
+
+    /// (cm-128.13) A window Dock's tab dots clear-only follow the notification store (Tom, 2026-11-18): when this Dock's surfaces
+    /// change in the store, a tab whose dot is on, and whose surface holds neither an unread notification nor a Dock mark, loses it.
+    /// Nothing here ever turns a dot on: news doesn't add one, and the sites that do are unchanged (`putDockTabBackUnread`,
+    /// `sendDockTabToBack`, `setDockTabUnread`, and the tab's creation by session restore, `DockSplitStore+SessionRestore.swift`,
+    /// and by surface transfer, `DockSplitStore+SurfaceTransfer.swift`, which both put the Dock mark in the store too). A local Dock (a non-global scope) has no window-Dock target
+    /// and is left alone. The store's per-owner surface channel fires only for this window's changes, never per keystroke.
+    func installUnreadBadgeClearing() {
+        unreadBadgeClearingObservation?.cancel()
+        unreadBadgeClearingObservation = nil
+        guard scope == .global, let notificationStore else { return }
+        unreadBadgeClearingObservation = notificationStore.sidebarUnread.observeSurfaceChanges(
+            forOwnerId: workspaceId,
+            owner: self
+        ) { dock, _ in
+            dock.clearDockTabBadgesWithNothingUnread()
+        }
+    }
+
+    private func clearDockTabBadgesWithNothingUnread() { // only `installUnreadBadgeClearing`, which subscribes global Docks only, calls this
+        guard let notificationStore = resolvedNotificationStore() else { return }
+        for tabId in bonsplitController.allTabIds {
+            guard bonsplitController.tab(tabId)?.showsNotificationBadge == true,
+                  let panelId = surfaceIdToPanelId[tabId],
+                  !notificationStore.hasUnreadNotification(forTabId: workspaceId, surfaceId: panelId),
+                  !notificationStore.hasManualUnread(forTabId: workspaceId, surfaceId: panelId) else { continue }
+            bonsplitController.updateTab(tabId, showsNotificationBadge: false)
+        }
     }
 
     private func setDockTabUnread(

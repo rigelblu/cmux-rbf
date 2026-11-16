@@ -114,4 +114,8 @@ public protocol FocusedNotificationResolving: AnyObject {
     /// - Returns: whether the pane had notifications. `false` means the caller leaves its own mark
     ///   (a workspace pane's mark lives outside the store); a Dock surface's mark the store sets itself.
     func sendToBack(_ target: UnreadQueueTarget) -> Bool
+
+    /// (cm-128.13) Puts the newest notification back at its old place, or leaves a mark if none.
+    @discardableResult
+    func storeMarkUnreadAtFormerPlace(_ target: UnreadQueueTarget) -> Bool
 }

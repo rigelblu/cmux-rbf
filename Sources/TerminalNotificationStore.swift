@@ -141,6 +141,8 @@ final class TerminalNotificationStore: ObservableObject {
         var unreadCount = 0
         var unreadCountByTabId: [UUID: Int] = [:]
         var unreadByTabSurface = Set<TabSurfaceKey>()
+        var unreadNewsByTabSurface = Set<TabSurfaceKey>() // (cm-128.13) the same, without put-back notifications
+        var putBackTabIds = Set<UUID>() // (cm-128.13) workspaces holding an unread put-back notification: his mark, in no number
         var latestUnreadByTabId: [UUID: TerminalNotification] = [:]
         var latestByTabId: [UUID: TerminalNotification] = [:]
     }
@@ -1097,10 +1099,7 @@ final class TerminalNotificationStore: ObservableObject {
     func hasDismissibleState(forTabId tabId: UUID) -> Bool {
         (indexes.unreadCountByTabId[tabId] ?? 0) > 0 ||
             focusedReadIndicatorByTabId[tabId] != nil ||
-            manualUnreadWorkspaceIds.contains(tabId) ||
-            manualUnreadSurfaceIdsByOwnerId[tabId]?.isEmpty == false ||
-            panelDerivedUnreadWorkspaceIds.contains(tabId) ||
-            restoredUnreadWorkspaceIds.contains(tabId) ||
+            hasUnreadMark(forTabId: tabId) || // (cm-128.13) the four mark sets and a put-back notification, one list
             inFlightPolicyRequests.hasPendingRequest(forTabId: tabId)
     }
 
@@ -1144,7 +1143,8 @@ final class TerminalNotificationStore: ObservableObject {
         manualUnreadWorkspaceIds.contains(tabId) ||
             manualUnreadSurfaceIdsByOwnerId[tabId]?.isEmpty == false ||
             panelDerivedUnreadWorkspaceIds.contains(tabId) ||
-            restoredUnreadWorkspaceIds.contains(tabId)
+            restoredUnreadWorkspaceIds.contains(tabId) ||
+            indexes.putBackTabIds.contains(tabId) // (cm-128.13)
     }
 
     // Legacy unread meaning for actions, autosave, and the iPhone.
@@ -1168,12 +1168,38 @@ final class TerminalNotificationStore: ObservableObject {
         indexes.unreadByTabSurface.contains(TabSurfaceKey(tabId: tabId, surfaceId: surfaceId))
     }
 
+    /// News only (cm-128.13): a notification he put back is his mark, not news.
+    func hasUnreadNewsNotification(forTabId tabId: UUID, surfaceId: UUID?) -> Bool {
+        indexes.unreadNewsByTabSurface.contains(TabSurfaceKey(tabId: tabId, surfaceId: surfaceId))
+    }
+
+    /// A flash is for news: a notification he put back is his mark and never asks for one (cm-128.13).
     func hasUnreadNotificationRequiringPaneFlash(forTabId tabId: UUID, surfaceId: UUID?) -> Bool {
         notifications.contains { notification in
             notification.matches(tabId: tabId, surfaceId: surfaceId) &&
                 !notification.isRead &&
+                !notification.isPutBack && // (cm-128.13)
                 notification.paneFlash
         }
+    }
+
+    /// Whether the pane he's on holds an unread notification he put back (cm-128.13): when it does, the walk gets that pane as its
+    /// exclusion and passes it by. The match is `NotificationNavSnapshot.isOnPane(_:owningPanelId:)`, the one function the walk's
+    /// exclusion (`UnreadQueue.stops`) asks too, so the check and the exclusion agree: the notification's surface or panel against the
+    /// focused surface, one side at a time mapped through `owningPanelId`, so a remote tmux pane keyed by its inner surface still counts
+    /// as the container he's on. A workspace-level notification counts as on every pane of its workspace. A target with no surface
+    /// names no pane, so it derives no exclusion (the lead's call, 2026-11-16).
+    func holdsUnreadPutBackNotification(on pane: UnreadQueueTarget, owningPanelId: (UUID, UUID) -> UUID) -> Bool {
+        if case .workspace(_, nil) = pane { return false }
+        return notifications.contains { notification in
+            notification.isPutBack && !notification.isRead
+                && notification.notificationNavigationSnapshot.isOnPane(pane, owningPanelId: owningPanelId) // (cm-128.13, step 4b R1)
+        }
+    }
+
+    func hasVisibleNewsIndicator(forTabId tabId: UUID, surfaceId: UUID?) -> Bool { // (cm-128.13)
+        hasUnreadNewsNotification(forTabId: tabId, surfaceId: surfaceId) ||
+            (focusedReadIndicatorByTabId[tabId].map { $0 == surfaceId } ?? false)
     }
 
     func hasVisibleNotificationIndicator(forTabId tabId: UUID, surfaceId: UUID?) -> Bool {
@@ -1930,6 +1956,7 @@ final class TerminalNotificationStore: ObservableObject {
         var drainedSuperseded: [String] = []
         for index in updated.indices where ids.contains(updated[index].id) && !updated[index].isRead {
             updated[index].isRead = true
+            updated[index].isPutBack = false // (cm-128.13) an explicit read ends his mark
             activeIDs.append(updated[index].id.uuidString)
             drainedSuperseded.append(contentsOf: supersededPhoneDismissBuffer.flush(
                 forKey: SupersededPhoneDismissBuffer.key(
@@ -1960,30 +1987,56 @@ final class TerminalNotificationStore: ObservableObject {
         let marked = notificationFeedHistory.markUnread(ids: ids)
         guard !ids.isEmpty else { return marked }
         var updated = notifications
+        let flipped = turnUnread(ids: ids, in: &updated) // (cm-128.13)
+        clearMarksBehindUnread(tabIDs: flipped.tabIDs, surfaceKeys: flipped.surfaceKeys)
+        if !flipped.tabIDs.isEmpty {
+            notifications = updated
+        }
+        clearFocusedReadIndicators(forSurfaceKeys: flipped.surfaceKeys) // (cm-128.13) after `notifications` is assigned
+        return marked
+    }
+
+    /// Flips the read notifications among `ids` unread in `updated`, as his own mark (cm-128.13): the one place that sets
+    /// `isPutBack`, so every Mark as Unread through the unread path leaves it. `queuedAt` is left alone: the old place.
+    /// The caller assigns `updated` to `notifications`, once.
+    private func turnUnread(
+        ids: Set<UUID>,
+        in updated: inout [TerminalNotification]
+    ) -> (tabIDs: Set<UUID>, surfaceKeys: Set<SidebarSurfaceUnreadKey>) {
         var tabIDs = Set<UUID>()
         var surfaceKeys = Set<SidebarSurfaceUnreadKey>()
         for index in updated.indices where ids.contains(updated[index].id) && updated[index].isRead {
             updated[index].isRead = false
+            updated[index].isPutBack = true // (cm-128.13) every Mark as Unread through this path is his own mark
             tabIDs.insert(updated[index].tabId)
             surfaceKeys.insert(SidebarSurfaceUnreadKey(
                 workspaceId: updated[index].tabId,
                 surfaceId: updated[index].surfaceId
             ))
         }
-        // The notification itself now provides the workspace unread indicator. Clear any
-        // existing manual or restored workspace unread state for the same tab so we don't
-        // double-count it. (`sendToBack` (cm-128.11) calls this and
-        // then clears his marks too. Restored hints are a one-time signal from a previous session and
-        // should also defer to the concrete unread notification.)
+        return (tabIDs, surfaceKeys)
+    }
+
+    /// The notification itself now provides the workspace unread indicator. Clear any existing manual or restored
+    /// workspace unread state for the same tab so we don't double-count it. (`sendToBack` (cm-128.11) goes through here
+    /// and then clears his marks too. Restored hints are a one-time signal from a previous session and should also
+    /// defer to the concrete unread notification.)
+    private func clearMarksBehindUnread(tabIDs: Set<UUID>, surfaceKeys: Set<SidebarSurfaceUnreadKey>) {
         for tabID in tabIDs {
             mutateWorkspaceManualUnread(false, forTabId: tabID)
             mutateWorkspaceRestoredUnread(false, forTabId: tabID)
         }
         mutateSurfaceManualUnread(false, for: surfaceKeys)
-        if !tabIDs.isEmpty {
-            notifications = updated
+    }
+
+    /// (cm-128.13) The notification now provides the unread state: the pane's focused-read indicator, left by a notification that was
+    /// recorded while the pane was focused, gives way to it, so a click into the pane flashes nothing. Callers run this AFTER they assign
+    /// `notifications`: the clear publishes on its own, and published while the notification was still read it would show the surface as
+    /// not unread for a moment, when a window Dock's tab dot would go (step 11, the cold read's "Unproven").
+    private func clearFocusedReadIndicators(forSurfaceKeys surfaceKeys: Set<SidebarSurfaceUnreadKey>) {
+        for key in surfaceKeys {
+            if let surfaceId = key.surfaceId { clearFocusedReadIndicator(forTabId: key.workspaceId, surfaceId: surfaceId) }
         }
-        return marked
     }
 
     /// Marks the workspace's notifications read and dismisses their banners.
@@ -1992,12 +2045,17 @@ final class TerminalNotificationStore: ObservableObject {
     ///   requests still in flight, which discarding would delete rather than mark read.
     func markRead(forTabId tabId: UUID, keepingOwnUnreadMarks: Bool = false) {
         if !keepingOwnUnreadMarks { inFlightPolicyRequests.discard(forTabId: tabId, surfaceId: nil) }
-        notificationFeedHistory.markRead(inWorkspace: tabId)
+        // (cm-128.13) His put-back notifications are his own unread marks: the clear leaves them unread, here and in the feed history.
+        let keptPutBack: Set<UUID> = keepingOwnUnreadMarks
+            ? Set(notifications.lazy.filter { $0.tabId == tabId && $0.isPutBack && !$0.isRead }.map(\.id))
+            : []
+        notificationFeedHistory.markRead(inWorkspace: tabId, skipping: keptPutBack)
         var updated = notifications
         var idsToClear: [String] = []
         for index in updated.indices {
-            if updated[index].tabId == tabId && !updated[index].isRead {
+            if updated[index].tabId == tabId && !updated[index].isRead && !keptPutBack.contains(updated[index].id) {
                 updated[index].isRead = true
+                updated[index].isPutBack = false // (cm-128.13)
                 idsToClear.append(updated[index].id.uuidString)
             }
         }
@@ -2021,9 +2079,14 @@ final class TerminalNotificationStore: ObservableObject {
         }
     }
 
-    func markRead(forTabId tabId: UUID, surfaceId: UUID?) {
+    /// - Parameter keepingPutBack: (cm-128.13) `true` from the dismissal host and app activation: his put-back notifications
+    ///   on the pane stay unread, as his dot does, here and in the feed history. Every explicit read passes `false`.
+    func markRead(forTabId tabId: UUID, surfaceId: UUID?, keepingPutBack: Bool = false) {
         inFlightPolicyRequests.discard(forTabId: tabId, surfaceId: surfaceId)
-        notificationFeedHistory.markRead(inWorkspace: tabId, surfaceId: surfaceId)
+        let keptPutBack: Set<UUID> = keepingPutBack
+            ? Set(notifications.lazy.filter { $0.matches(tabId: tabId, surfaceId: surfaceId) && $0.isPutBack && !$0.isRead }.map(\.id))
+            : []
+        notificationFeedHistory.markRead(inWorkspace: tabId, surfaceId: surfaceId, skipping: keptPutBack)
         var updated = notifications
         var idsToClear: [String] = []
         var supersededDrained = supersededPhoneDismissBuffer.flush(
@@ -2031,8 +2094,9 @@ final class TerminalNotificationStore: ObservableObject {
         )
         for index in updated.indices {
             if updated[index].matches(tabId: tabId, surfaceId: surfaceId),
-               !updated[index].isRead {
+               !updated[index].isRead, !keptPutBack.contains(updated[index].id) {
                 updated[index].isRead = true
+                updated[index].isPutBack = false // (cm-128.13)
                 idsToClear.append(updated[index].id.uuidString)
                 supersededDrained.append(contentsOf: supersededPhoneDismissBuffer.flush(
                     forKey: SupersededPhoneDismissBuffer.key(
@@ -2087,80 +2151,213 @@ final class TerminalNotificationStore: ObservableObject {
         setSurfaceManualUnread(false, forTabId: windowId, surfaceId: surfaceId)
     }
 
-    /// Send to Back (cm-128.11, Tom grill Q74, Q93, Q96): puts one pane at the back of ⌘⇧U's queue, unread.
-    /// The one place that sets "unread since" to now; Mark as Unread keeps the old place. For a pane with
-    /// notifications: its newest one is marked unread through the store's unread path (which keeps its
-    /// time), then every unread notification of the pane takes `now`. A Dock surface takes the same rule;
-    /// with no notification it gets a Dock mark at the end of the recency list, and a surface already
-    /// marked moves there, where it used to keep its place (the lead's reading of Q96).
-    /// On a workspace pane, with or without notifications of its own, the workspace's unread workspace-level
-    /// notifications take `now` too: opening one reads the pane (the lead's call, step-2 review finding 1).
-    /// Nothing moves in `notifications`, so the Notifications list stays sorted by time.
-    /// - Returns: whether the pane had notifications. `false` means the caller leaves its own mark:
-    ///   a workspace pane's mark lives in `Workspace`, outside the store, so only the workspace-level
-    ///   mark of the old guard is set here.
+    /// Several targets at once (cm-128.13, F1): Send to Back from a menu, and ⌘⌃U with one target.
+    /// Works out the stops it sends back: each target's pane, plus, for a target with a surface, the unread
+    /// workspace-level notifications of its workspace (no surface), a stop of their own. The stops are put in
+    /// the queue's own order (`UnreadQueue.stops`, the function the walk uses; the targets come in any order),
+    /// and stop *i* of *n* takes `now − (n − 1 − i) × 1 ms`: they land at the back in the order they had, the
+    /// last one exactly at `now`, so a later arrival goes behind all of them. A read target first turns its
+    /// newest notification unread through the store's unread path, which keeps its old place, and sorts by that
+    /// place. Each notification sent back loses its pending "left unread" reminder (F7, Tom 2026-11-09).
+    /// - Returns: per target, in the order given, whether it had a notification. `false`: it had none, so nothing was sent; a Dock
+    ///   target got its Dock mark here and a target with no surface got the workspace mark here, but for a workspace pane the caller
+    ///   leaves its own mark (a workspace pane's mark lives in `Workspace`).
     @discardableResult
-    func sendToBack(_ target: UnreadQueueTarget, now: Date = Date()) -> Bool {
-        switch target {
-        case .windowDock(let dockTarget):
-            if sendNotificationsToBack(now: now, matching: {
-                $0.matches(tabId: dockTarget.windowId, surfaceId: dockTarget.surfaceId)
-            }) {
-                return true
+    func sendToBack(_ targets: [UnreadQueueTarget], now: Date = Date()) -> [Bool] {
+        var answers: [Bool] = []
+        var matchers: [(TerminalNotification) -> Bool] = []
+        var newestOfTargets: [TerminalNotification] = []
+        for target in targets {
+            let matches: (TerminalNotification) -> Bool
+            switch target {
+            case .windowDock(let dockTarget):
+                matches = { $0.matches(tabId: dockTarget.windowId, surfaceId: dockTarget.surfaceId) }
+            case .workspace(let tabId, let surfaceId):
+                matches = { $0.matches(tabId: tabId, surfaceId: surfaceId) }
             }
-            if manualUnreadSurfaceTargetsByRecency.contains(dockTarget) {
-                manualUnreadSurfaceTargetsByRecency.removeAll { $0 == dockTarget }
-                manualUnreadSurfaceTargetsByRecency.append(dockTarget)
+            matchers.append(matches)
+            if let newest = notifications.first(where: matches) {
+                newestOfTargets.append(newest)
+                answers.append(true)
+                continue
+            }
+            answers.append(false)
+            switch target {
+            case .windowDock(let dockTarget):
+                if manualUnreadSurfaceTargetsByRecency.contains(dockTarget) {
+                    manualUnreadSurfaceTargetsByRecency.removeAll { $0 == dockTarget }
+                    manualUnreadSurfaceTargetsByRecency.append(dockTarget)
+                } else {
+                    markWindowDockSurfaceUnread(windowId: dockTarget.windowId, surfaceId: dockTarget.surfaceId)
+                }
+            case .workspace(let tabId, let surfaceId):
+                // `.4` pinned this guard: with no notification and no pane, the workspace itself is marked.
+                if surfaceId == nil, !workspaceIsUnread(forTabId: tabId) {
+                    setWorkspaceManualUnread(true, forTabId: tabId)
+                }
+            }
+        }
+        // A read target's newest notification turns unread through the unread path (its old place, as his mark for a
+        // moment), and the stamps below take that mark off again, all on one copy: `notifications` is assigned once,
+        // so nothing ever publishes a sent-back notification as put back (a Dock badge would flicker to 0).
+        var working = notifications
+        var flippedSurfaceKeys = Set<SidebarSurfaceUnreadKey>() // (cm-128.13) their focused-read clears run after `notifications` is assigned
+        if !newestOfTargets.isEmpty {
+            let newestIds = Set(newestOfTargets.map(\.id))
+            notificationFeedHistory.markUnread(ids: newestIds)
+            let flipped = turnUnread(ids: newestIds, in: &working)
+            flippedSurfaceKeys = flipped.surfaceKeys
+            clearMarksBehindUnread(tabIDs: flipped.tabIDs, surfaceKeys: flipped.surfaceKeys)
+            // His marks on the pane go too, also beside an already unread newest notification.
+            for newest in newestOfTargets {
+                mutateWorkspaceManualUnread(false, forTabId: newest.tabId)
+                if let surfaceId = newest.surfaceId {
+                    mutateSurfaceManualUnread(false, forTabId: newest.tabId, surfaceId: surfaceId)
+                }
+            }
+        }
+        // The unread notifications each target sends back: its pane's, and on a workspace pane the workspace-level
+        // ones too (cm-128.11, the lead's call: opening one reads the pane).
+        var sent = Set<UUID>()
+        for (target, matches) in zip(targets, matchers) {
+            for notification in working where !notification.isRead {
+                var goesBack = matches(notification)
+                if !goesBack, case .workspace(let tabId, let surfaceId) = target, surfaceId != nil {
+                    goesBack = notification.matches(tabId: tabId, surfaceId: nil)
+                }
+                if goesBack { sent.insert(notification.id) }
+            }
+        }
+        guard !sent.isEmpty else {
+            clearFocusedReadIndicators(forSurfaceKeys: flippedSurfaceKeys)
+            return answers
+        }
+        let stops = UnreadQueue.stops(in: working.map(\.notificationNavigationSnapshot))
+            .filter { stop in stop.memberIds.contains(where: sent.contains) }
+        var stamps: [UUID: Date] = [:]
+        for (index, stop) in stops.enumerated() {
+            let place = now.addingTimeInterval(-Double(stops.count - 1 - index) / 1000)
+            for id in stop.memberIds { stamps[id] = place }
+        }
+        // Notifications the walk never opens (a click action) have no stop and no place to keep: they take `now`.
+        for id in sent where stamps[id] == nil { stamps[id] = now }
+        for index in working.indices {
+            if let place = stamps[working[index].id], !working[index].isRead {
+                working[index].queuedAt = place
+                working[index].isPutBack = false // (cm-128.13, MISS2) Send to Back is not his mark: a skipped pane is read like any other
+            }
+        }
+        notifications = working
+        clearFocusedReadIndicators(forSurfaceKeys: flippedSurfaceKeys) // (cm-128.13) after `notifications` is assigned
+        unattendedNudges.cancel(notificationIDs: Set(stamps.keys))
+        return answers
+    }
+
+    /// Mark as Unread that puts it back where it was (cm-128.13, Tom 2026-11-05 "two meanings"): every user entrance's one path.
+    /// For a pane: its newest notification turns unread at its old place, as his own mark (`isPutBack`). For a workspace
+    /// (no surface): the pane of its newest notification (Tom, grill Q112). For a Dock surface: its newest Dock notification.
+    /// With no notification: a workspace gets its mark and a Dock surface its Dock mark, as today; a workspace pane's mark
+    /// lives in `Workspace`, so the caller leaves it. The system paths (bells, restores, Dock transfers) keep their own mark calls.
+    /// - Returns: per target, in the order given, whether the target held a notification: it was turned unread at its old place,
+    ///   or was already unread and left as it was (`false`: it held none; the target got its mark here, or, for a pane, the caller
+    ///   leaves it).
+    @discardableResult
+    func markUnreadAtFormerPlace(_ targets: [UnreadQueueTarget]) -> [Bool] {
+        var answers: [Bool] = []
+        var newestIds = Set<UUID>()
+        var withoutNotification: [UnreadQueueTarget] = []
+        for target in targets {
+            let newest: TerminalNotification?
+            switch target {
+            case .windowDock(let dockTarget):
+                newest = notifications.first(where: { $0.matches(tabId: dockTarget.windowId, surfaceId: dockTarget.surfaceId) })
+            case .workspace(let tabId, let surfaceId):
+                newest = surfaceId == nil
+                    ? latestNotification(forTabId: tabId)
+                    : notifications.first(where: { $0.matches(tabId: tabId, surfaceId: surfaceId) })
+            }
+            if let newest {
+                newestIds.insert(newest.id)
+                answers.append(true)
             } else {
-                markWindowDockSurfaceUnread(windowId: dockTarget.windowId, surfaceId: dockTarget.surfaceId)
+                withoutNotification.append(target)
+                answers.append(false)
             }
-            return false
-        case .workspace(let tabId, let surfaceId):
-            // (cm-128.11, the lead's call) Opening a workspace-level notification focuses the workspace's focused
-            // pane and reads it, so on a pane the workspace's unread workspace-level notifications go back with it.
-            let sentBackWithIt: ((TerminalNotification) -> Bool)? = surfaceId == nil
-                ? nil
-                : { $0.matches(tabId: tabId, surfaceId: nil) }
-            if sendNotificationsToBack(
-                now: now,
-                matching: { $0.matches(tabId: tabId, surfaceId: surfaceId) },
-                alsoSendingBack: sentBackWithIt
-            ) {
-                return true
+        }
+        // One call, one publication of `notifications`, whatever the number of targets. A target whose newest notification is
+        // already unread changes nothing, and so does his mark on it: only a notification turned unread provides the state that
+        // replaces his marks, and the unread path clears them then.
+        if !newestIds.isEmpty { markNotificationFeedUnread(ids: newestIds) }
+        for target in withoutNotification {
+            switch target {
+            case .windowDock(let dockTarget):
+                _ = markWindowDockSurfaceUnread(windowId: dockTarget.windowId, surfaceId: dockTarget.surfaceId)
+            case .workspace(let tabId, let surfaceId):
+                if surfaceId == nil { markUnread(forTabId: tabId) }
             }
-            // `.4` pinned this guard: with no notification and no pane, the workspace itself is marked.
-            if surfaceId == nil, !workspaceIsUnread(forTabId: tabId) {
-                setWorkspaceManualUnread(true, forTabId: tabId)
+        }
+        return answers
+    }
+
+    /// What a row's Send to Back sends (cm-128.13, Tom grill Q106): every pane of each workspace that holds an
+    /// unread notification, a workspace-level notification (no surface) as its own pane; for a workspace with no
+    /// unread one, the pane of its newest notification. A target with no notification is never passed.
+    func rowTargetsToSendBack(forWorkspaceIds workspaceIds: [UUID]) -> [UnreadQueueTarget] {
+        var targets: [UnreadQueueTarget] = []
+        var seen = Set<UnreadQueueTarget>()
+        for tabId in workspaceIds {
+            let unread = notifications.filter { $0.tabId == tabId && !$0.isRead }
+            let sources = unread.isEmpty ? (latestNotification(forTabId: tabId).map { [$0] } ?? []) : unread
+            for notification in sources {
+                let target = UnreadQueueTarget.workspace(tabId: tabId, surfaceId: notification.surfaceId ?? notification.panelId)
+                if seen.insert(target).inserted { targets.append(target) }
             }
-            return false
+        }
+        return targets
+    }
+
+    /// Whether a row's Send to Back is on (cm-128.13, Tom grill Q109): any of the workspaces holds a notification,
+    /// unread or read. His own mark alone is neither.
+    func canSendToBack(forWorkspaceIds workspaceIds: [UUID]) -> Bool {
+        workspaceIds.contains { latestNotification(forTabId: $0) != nil }
+    }
+
+    /// Whether Send to Back is on for explicit targets (cm-128.13, Tom grill Q109): any target holds a notification, unread
+    /// or read, on its own pane (a Dock target: its Dock surface). His mark alone is neither. The tab menu's rule, per pane.
+    func canSendToBack(_ targets: [UnreadQueueTarget]) -> Bool {
+        targets.contains { target in
+            switch target {
+            case .windowDock(let dockTarget):
+                return notifications.contains { $0.matches(tabId: dockTarget.windowId, surfaceId: dockTarget.surfaceId) }
+            case .workspace(let tabId, let surfaceId):
+                return notifications.contains { $0.matches(tabId: tabId, surfaceId: surfaceId) }
+            }
         }
     }
 
-    /// - Returns: whether the pane had a notification. Unread notifications that `alsoSendingBack` accepts
-    ///   take `now` too, whether or not the pane has one.
-    private func sendNotificationsToBack(
-        now: Date,
-        matching isOnPane: (TerminalNotification) -> Bool,
-        alsoSendingBack: ((TerminalNotification) -> Bool)? = nil
-    ) -> Bool {
-        let newest = notifications.first(where: isOnPane)
-        if let newest {
-            markNotificationFeedUnread(ids: [newest.id])
-            // The notification now provides the unread state: drop his marks on it, as the unread path does.
-            mutateWorkspaceManualUnread(false, forTabId: newest.tabId)
-            if let surfaceId = newest.surfaceId {
-                mutateSurfaceManualUnread(false, forTabId: newest.tabId, surfaceId: surfaceId)
-            }
-        }
-        var updated = notifications
-        var didSendBack = false
-        for index in updated.indices where !updated[index].isRead
-            && (isOnPane(updated[index]) || alsoSendingBack?(updated[index]) == true) {
-            updated[index].queuedAt = now
-            didSendBack = true
-        }
-        if didSendBack { notifications = updated }
-        return newest != nil
+    /// What both row menus' Send to Back does (cm-128.13): the rows' targets (`rowTargetsToSendBack`), sent in one call so
+    /// their panes keep the order they had. Moves nothing on screen and opens nothing.
+    /// - Returns: whether anything was sent.
+    @discardableResult
+    func sendRowsToBack(forWorkspaceIds workspaceIds: [UUID]) -> Bool {
+        let targets = rowTargetsToSendBack(forWorkspaceIds: workspaceIds)
+        guard !targets.isEmpty else { return false }
+        sendToBack(targets)
+        return true
+    }
+
+    /// Send to Back for one target (cm-128.11, Tom grill Q74, Q93, Q96): ⌘⌃U's call, the one-target form of the several-target
+    /// `sendToBack(_:now:)` above (cm-128.13, F1), which is the one step. The pane's unread notifications and, for a workspace pane,
+    /// the workspace's unread workspace-level ones (opening one reads the pane: the lead's call, step-2 review finding 1) go to the
+    /// back in the queue order they had, the last stop exactly at `now`, so a later arrival goes behind them. A read target's newest
+    /// notification first turns unread through the store's unread path, which keeps its old place. A Dock surface with no
+    /// notification gets a Dock mark at the end of the recency list, and a surface already marked moves there, where it used to keep
+    /// its place (the lead's reading of Q96). Nothing moves in `notifications`, so the Notifications list stays sorted by time.
+    /// - Returns: whether the target had a notification. `false` means a workspace pane's caller leaves its own mark: that mark
+    ///   lives in `Workspace`, outside the store, so only a Dock target's mark and a no-surface target's workspace mark are set here.
+    @discardableResult
+    func sendToBack(_ target: UnreadQueueTarget, now: Date = Date()) -> Bool {
+        sendToBack([target], now: now).first ?? false
     }
 
     func setFocusedReadIndicator(forTabId tabId: UUID, surfaceId: UUID?) {
@@ -2190,6 +2387,7 @@ final class TerminalNotificationStore: ObservableObject {
             if !updated[index].isRead {
                 tabIdsToClearPanelUnread.insert(updated[index].tabId)
                 updated[index].isRead = true
+                updated[index].isPutBack = false // (cm-128.13)
                 idsToClear.append(updated[index].id.uuidString)
             }
         }
@@ -2329,6 +2527,7 @@ final class TerminalNotificationStore: ObservableObject {
             createdAt: notification.createdAt,
             queuedAt: notification.queuedAt, // (cm-128.11) the copy keeps its place in the queue
             isRead: notification.isRead,
+            isPutBack: notification.isPutBack, // (cm-128.13) and his mark
             paneFlash: notification.paneFlash,
             scrollPosition: notification.scrollPosition,
             clickAction: notification.clickAction,
@@ -2454,6 +2653,7 @@ final class TerminalNotificationStore: ObservableObject {
                 createdAt: notification.createdAt,
                 queuedAt: notification.queuedAt, // (cm-128.11) a moved pane keeps its place in the queue
                 isRead: notification.isRead,
+                isPutBack: notification.isPutBack, // (cm-128.13) and his mark
                 paneFlash: notification.paneFlash,
                 scrollPosition: notification.scrollPosition,
                 clickAction: notification.clickAction,
@@ -3030,15 +3230,26 @@ final class TerminalNotificationStore: ObservableObject {
                 indexes.latestByTabId[notification.tabId] = notification
             }
             guard !notification.isRead else { continue }
-            indexes.unreadCount += 1
-            indexes.unreadCountByTabId[notification.tabId, default: 0] += 1
+            // (cm-128.13) A put-back notification is his mark: it is in `.4`'s mark side and out of every number.
+            if notification.isPutBack {
+                indexes.putBackTabIds.insert(notification.tabId)
+            } else {
+                indexes.unreadCount += 1
+                indexes.unreadCountByTabId[notification.tabId, default: 0] += 1
+            }
             indexes.unreadByTabSurface.insert(
                 TabSurfaceKey(tabId: notification.tabId, surfaceId: notification.surfaceId)
             )
+            if !notification.isPutBack {
+                indexes.unreadNewsByTabSurface.insert(TabSurfaceKey(tabId: notification.tabId, surfaceId: notification.surfaceId)) // (cm-128.13)
+            }
             if let panelId = notification.panelId, panelId != notification.surfaceId {
                 indexes.unreadByTabSurface.insert(
                     TabSurfaceKey(tabId: notification.tabId, surfaceId: panelId)
                 )
+                if !notification.isPutBack {
+                    indexes.unreadNewsByTabSurface.insert(TabSurfaceKey(tabId: notification.tabId, surfaceId: panelId)) // (cm-128.13)
+                }
             }
             if indexes.latestUnreadByTabId[notification.tabId] == nil {
                 indexes.latestUnreadByTabId[notification.tabId] = notification

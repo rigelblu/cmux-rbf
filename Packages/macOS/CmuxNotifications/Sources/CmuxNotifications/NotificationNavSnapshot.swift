@@ -103,7 +103,7 @@ extension NotificationNavSnapshot {
     /// Whether the notification sits on `pane` (cm-128.11): the same workspace and surface (a
     /// surface id may name the notification's surface or its panel), or, for a target with no
     /// surface, anywhere in the workspace; a workspace-level notification counts as on every pane of its workspace. A Dock target matches the Dock surface's notifications.
-    func isOnPane(_ pane: UnreadQueueTarget?) -> Bool {
+    public func isOnPane(_ pane: UnreadQueueTarget?) -> Bool { // (cm-128.13) public: the app asks it for put-back notifications
         switch pane {
         case nil:
             return false
@@ -117,5 +117,17 @@ extension NotificationNavSnapshot {
         case .windowDock(let target)?:
             return tabId == target.windowId && (surfaceId == target.surfaceId || panelId == target.surfaceId)
         }
+    }
+
+    /// Whether the notification sits on `pane`, one side at a time mapped through its owning panel (cm-128.13, step 4b R1): a
+    /// notification keyed by the inner surface of a remote tmux pane is on the container pane he's on, and one keyed by the
+    /// container is on the inner surface he's on. Never both sides at once: two panes in one container keep their own notifications,
+    /// so they stay two panes (as the coordinator's `isFrontmostFocusedPane` reads it). The walk's exclusion and the app's
+    /// "the pane he's on holds a put-back notification" check both ask this one function.
+    public func isOnPane(_ pane: UnreadQueueTarget?, owningPanelId: (_ workspaceId: UUID, _ surfaceId: UUID) -> UUID) -> Bool {
+        if isOnPane(pane) { return true }
+        guard case .workspace(let paneTabId, let paneSurfaceId)? = pane, let paneSurfaceId,
+              tabId == paneTabId, let own = surfaceId else { return false }
+        return owningPanelId(tabId, own) == paneSurfaceId || own == owningPanelId(tabId, paneSurfaceId)
     }
 }

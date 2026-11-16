@@ -95,13 +95,13 @@ final class NotificationFeedHistoryStore {
     }
 
     @discardableResult
-    func markRead(inWorkspace tabId: UUID) -> Int {
-        commit(.markReadWorkspace(tabId)).marked
+    func markRead(inWorkspace tabId: UUID, skipping skipped: Set<UUID> = []) -> Int { // (cm-128.13)
+        commit(.markReadWorkspace(tabId, skipping: skipped)).marked
     }
 
     @discardableResult
-    func markRead(inWorkspace tabId: UUID, surfaceId: UUID?) -> Int {
-        commit(.markReadSurface(tabId: tabId, surfaceId: surfaceId)).marked
+    func markRead(inWorkspace tabId: UUID, surfaceId: UUID?, skipping skipped: Set<UUID> = []) -> Int { // (cm-128.13)
+        commit(.markReadSurface(tabId: tabId, surfaceId: surfaceId, skipping: skipped)).marked
     }
 
     @discardableResult
@@ -316,8 +316,9 @@ final class NotificationFeedHistoryStore {
             result.changed = result.marked > 0
             changedExistingState = result.changed
 
-        case .markReadWorkspace(let tabId):
-            for index in records.indices where records[index].tabId == tabId && !records[index].isRead {
+        case .markReadWorkspace(let tabId, let skipped):
+            for index in records.indices where records[index].tabId == tabId && !records[index].isRead
+                && !skipped.contains(records[index].id) { // (cm-128.13)
                 records[index].isRead = true
                 readRecordCount += 1
                 result.marked += 1
@@ -325,9 +326,10 @@ final class NotificationFeedHistoryStore {
             result.changed = result.marked > 0
             changedExistingState = result.changed
 
-        case .markReadSurface(let tabId, let surfaceId):
+        case .markReadSurface(let tabId, let surfaceId, let skipped):
             for index in records.indices
-            where records[index].matches(tabId: tabId, surfaceId: surfaceId) && !records[index].isRead {
+            where records[index].matches(tabId: tabId, surfaceId: surfaceId) && !records[index].isRead
+                && !skipped.contains(records[index].id) { // (cm-128.13)
                 records[index].isRead = true
                 readRecordCount += 1
                 result.marked += 1

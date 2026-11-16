@@ -79,7 +79,7 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
     }
 
     @MainActor
-    static func rowSnapshot(workspaceId: UUID = UUID()) throws -> SidebarWorkspaceRowSnapshot {
+    static func rowSnapshot(workspaceId: UUID = UUID(), targetWorkspaceIds: [UUID] = []) throws -> SidebarWorkspaceRowSnapshot { // cmux-rbf: changed on purpose (#cm-128.13): one defaulted parameter, no assertion changed
         let suiteName = "SidebarWorkspaceContextMenuWindowTargetsTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -113,7 +113,7 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
             checklistAddFieldActivationToken: 0,
             isChecklistPopoverPresented: false,
             contextMenu: SidebarWorkspaceContextMenuSnapshot(
-                targetWorkspaceIds: [],
+                targetWorkspaceIds: targetWorkspaceIds, // cmux-rbf: changed on purpose (#cm-128.13)
                 remoteTargetWorkspaceIds: [],
                 allRemoteTargetsConnecting: false,
                 allRemoteTargetsDisconnected: false,
@@ -138,7 +138,10 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
     static func actions( // (#cm-110.13)
         currentWindowMoveTargets: @escaping () -> [SidebarWorkspaceWindowMoveTarget] = { [] },
         clearAgentState: @escaping ([UUID]) -> Void = { _ in }, // cm-128.2
-        canClearAgentState: @escaping ([UUID]) -> Bool = { _ in false } // cm-128.2
+        canClearAgentState: @escaping ([UUID]) -> Bool = { _ in false }, // cm-128.2
+        markUnread: @escaping ([UUID]) -> Void = { _ in }, // cm-128.13
+        sendToBack: @escaping ([UUID]) -> Void = { _ in }, // cmux-rbf: changed on purpose (#cm-128.13): three defaulted parameters here (`markUnread` above, `sendToBack`, `canSendToBack`), no assertion changed
+        canSendToBack: @escaping ([UUID]) -> Bool = { _ in false } // cmux-rbf: changed on purpose (#cm-128.13)
     ) -> SidebarWorkspaceRowActions {
         SidebarWorkspaceRowActions(
             select: { _ in },
@@ -168,10 +171,12 @@ struct SidebarWorkspaceContextMenuWindowTargetsTests {
             hideTodoStatus: { _ in },
             requestChecklistAdd: {},
             markRead: { _ in },
-            markUnread: { _ in },
+            markUnread: markUnread, // cmux-rbf: changed on purpose (#cm-128.13)
             clearLatestNotifications: { _ in },
             clearAgentState: clearAgentState,
             canClearAgentState: canClearAgentState,
+            sendToBack: sendToBack, // cmux-rbf: changed on purpose (#cm-128.13)
+            canSendToBack: canSendToBack, // cmux-rbf: changed on purpose (#cm-128.13)
             currentNotificationsMuted: { _ in false },
             setNotificationsMuted: { _, _ in },
             openNotification: { _ in },

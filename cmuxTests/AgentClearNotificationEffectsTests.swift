@@ -51,6 +51,29 @@ struct AgentClearNotificationEffectsTests {
         }
     }
 
+    /// (cm-128.13, Scenario 193) A notification he put back is his own mark: a clear leaves it unread, as it leaves his dot.
+    @Test func aClearLeavesAPutBackNotificationUnread() async throws {
+        try await ClearAgentStateHarness.run { cleared in
+            let waiting = notification(cleared, key: "wait-put-back")
+            var mine = notification(cleared, key: "put-back-mine")
+            mine.isPutBack = true
+            let store = withStore(cleared, [waiting, mine])
+            defer { release(store) }
+            store.notificationFeedHistory.reconcileActiveNotifications(store.notifications)
+            cleared.observe(.approvalRequested, correlationKey: "wait-put-back")
+            await cleared.settle()
+            #expect(cleared.workspace.clearAgentState(journal: cleared.center, notifications: store))
+            await cleared.settle()
+            TerminalMutationBus.shared.drainForTesting()
+            let kept = try #require(store.notifications.first { $0.id == mine.id }, "the clear deleted his notification")
+            #expect(!kept.isRead, "the clear leaves his mark unread")
+            #expect(kept.isPutBack)
+            #expect(store.notifications.first { $0.id == waiting.id }?.isRead == true)
+            let history = store.notificationFeedHistory.snapshot.notifications
+            #expect(history.first { $0.id == mine.id }?.isRead == false, "the phone's list agrees")
+        }
+    }
+
     /// Control for the test above: the same wait answered by a key press loses its notification.
     @Test func aKeyPressOnTheSameWaitDeletesItsNotification() async throws {
         try await ClearAgentStateHarness.run { keyed in
