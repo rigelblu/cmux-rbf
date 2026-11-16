@@ -30,12 +30,14 @@ struct SidebarNestedGroupNotifications {
     func markAll(read: Bool) -> Bool {
         guard let tabManager, tabManager.workspaces.hasNestedWorkspaceGroup, let notificationStore else { return false }
         let anchorId = tabManager.workspaceGroupAnchor(for: groupId)?.id
-        for id in tabManager.workspaces.workspaceIdsInside(groupId) where id != anchorId {
-            if read {
-                if notificationStore.canMarkWorkspaceRead(forTabIds: [id]) { notificationStore.markRead(forTabId: id) }
-            } else {
-                if notificationStore.canMarkWorkspaceUnread(forTabIds: [id]) { notificationStore.markUnread(forTabId: id) }
+        let ids = tabManager.workspaces.workspaceIdsInside(groupId).filter { $0 != anchorId }
+        if read {
+            for id in ids where notificationStore.canMarkWorkspaceRead(forTabIds: [id]) {
+                notificationStore.markRead(forTabId: id)
             }
+        } else {
+            let validIds = ids.filter { notificationStore.canMarkWorkspaceUnread(forTabIds: [$0]) }
+            _ = notificationStore.markUnreadAtFormerPlace(validIds.map { .workspace(tabId: $0, surfaceId: nil) }) // (cm-128.13)
         }
         return true
     }

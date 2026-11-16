@@ -12,6 +12,9 @@ struct SessionNotificationSnapshot: Codable, Sendable {
     /// ignores the key.
     var queuedAt: TimeInterval?
     var isRead: Bool
+    /// (cm-128.13) A notification he put back with Mark as Unread (`TerminalNotification.isPutBack`). Optional keeps
+    /// snapshots written before it compatible: a file without it restores plain unread, and an older build ignores the key.
+    var isPutBack: Bool?
     var paneFlash: Bool?
     var retargetsToLiveSurfaceOwner: Bool?
     var correlationKey: String?
@@ -29,6 +32,7 @@ struct SessionNotificationSnapshot: Codable, Sendable {
         createdAt: TimeInterval,
         queuedAt: TimeInterval? = nil, // (cm-128.11)
         isRead: Bool,
+        isPutBack: Bool? = nil, // (cm-128.13)
         paneFlash: Bool? = nil,
         retargetsToLiveSurfaceOwner: Bool? = nil,
         correlationKey: String? = nil,
@@ -43,6 +47,7 @@ struct SessionNotificationSnapshot: Codable, Sendable {
         self.createdAt = createdAt
         self.queuedAt = queuedAt // (cm-128.11)
         self.isRead = isRead
+        self.isPutBack = isPutBack // (cm-128.13)
         self.paneFlash = paneFlash
         self.retargetsToLiveSurfaceOwner = retargetsToLiveSurfaceOwner
         self.correlationKey = correlationKey
@@ -63,6 +68,7 @@ struct SessionNotificationSnapshot: Codable, Sendable {
             createdAt: notification.createdAt.timeIntervalSince1970,
             queuedAt: notification.queuedAt.timeIntervalSince1970, // (cm-128.11)
             isRead: notification.isRead,
+            isPutBack: notification.isPutBack ? true : nil, // (cm-128.13) no key for a plain notification
             paneFlash: notification.paneFlash,
             retargetsToLiveSurfaceOwner: notification.retargetsToLiveSurfaceOwner,
             correlationKey: notification.correlationKey,
@@ -90,6 +96,7 @@ struct SessionNotificationSnapshot: Codable, Sendable {
             // (cm-128.11) A file saved before `queuedAt` restores at `createdAt`, the init's default for nil.
             queuedAt: queuedAt.map { Date(timeIntervalSince1970: $0) },
             isRead: isRead,
+            isPutBack: isPutBack ?? false, // (cm-128.13) a file saved without the key restores plain unread
             paneFlash: paneFlash ?? true,
             scrollPosition: restoredScrollPosition,
             clickAction: clickAction,

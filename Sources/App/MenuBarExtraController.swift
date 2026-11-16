@@ -378,7 +378,7 @@ enum NotificationMenuSnapshotBuilder {
         maxInlineNotificationItems: Int = defaultInlineNotificationLimit
     ) -> NotificationMenuSnapshot {
         let unreadCount = notifications.reduce(into: 0) { count, notification in
-            if !notification.isRead {
+            if !notification.isRead && !notification.isPutBack { // (cm-128.13) his mark is in no number
                 count += 1
             }
         }

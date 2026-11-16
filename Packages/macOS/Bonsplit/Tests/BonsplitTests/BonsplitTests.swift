@@ -1988,7 +1988,8 @@ final class BonsplitTests: XCTestCase {
                     TabContextMoveDestination(id: "workspace:abc", title: "Workspace A", isEnabled: false)
                 ]
             },
-            forkConversationAvailabilityProvider: { .hidden }
+            forkConversationAvailabilityProvider: { .hidden },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
 
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
@@ -2035,7 +2036,8 @@ final class BonsplitTests: XCTestCase {
                 shortcuts: [:]
             ),
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { .hidden }
+            forkConversationAvailabilityProvider: { .hidden },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
 
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
@@ -2069,7 +2071,8 @@ final class BonsplitTests: XCTestCase {
                 shortcuts: [:]
             ),
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { .hidden }
+            forkConversationAvailabilityProvider: { .hidden },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
 
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
@@ -2105,7 +2108,8 @@ final class BonsplitTests: XCTestCase {
                 shortcuts: [:]
             ),
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { .hidden }
+            forkConversationAvailabilityProvider: { .hidden },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
 
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
@@ -2141,7 +2145,8 @@ final class BonsplitTests: XCTestCase {
                 shortcuts: [:]
             ),
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { .hidden }
+            forkConversationAvailabilityProvider: { .hidden },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
 
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
@@ -2177,7 +2182,8 @@ final class BonsplitTests: XCTestCase {
             tabId: UUID(),
             state: state,
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { .available }
+            forkConversationAvailabilityProvider: { .available },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
 
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
@@ -2223,7 +2229,8 @@ final class BonsplitTests: XCTestCase {
             tabId: UUID(),
             state: state,
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { .refreshing }
+            forkConversationAvailabilityProvider: { .refreshing },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
 
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
@@ -2262,7 +2269,8 @@ final class BonsplitTests: XCTestCase {
             tabId: UUID(),
             state: state,
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { availability }
+            forkConversationAvailabilityProvider: { availability },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
         let forkItem = try XCTUnwrap(menu.items.first { $0.title == "Fork Conversation to the Right" })
@@ -2323,7 +2331,8 @@ final class BonsplitTests: XCTestCase {
                 refreshCount += 1
                 availability = .available
                 refreshStarted.fulfill()
-            }
+            },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
         let menu = TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
         let forkItem = try XCTUnwrap(menu.items.first { $0.title == "Fork Conversation to the Right" })
@@ -2372,7 +2381,8 @@ final class BonsplitTests: XCTestCase {
                 tabId: UUID(),
                 state: makeState(canDisconnectRemote: false),
                 moveDestinationsProvider: { [] },
-                forkConversationAvailabilityProvider: { .available }
+                forkConversationAvailabilityProvider: { .available },
+                sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
             ),
             target: target
         )
@@ -2383,7 +2393,8 @@ final class BonsplitTests: XCTestCase {
                 tabId: UUID(),
                 state: makeState(canDisconnectRemote: true),
                 moveDestinationsProvider: { [] },
-                forkConversationAvailabilityProvider: { .available }
+                forkConversationAvailabilityProvider: { .available },
+                sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
             ),
             target: target
         )

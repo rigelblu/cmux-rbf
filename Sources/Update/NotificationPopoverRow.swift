@@ -16,6 +16,27 @@ struct NotificationPopoverRow: View, Equatable {
     @State private var isHovering: Bool = false
 
     private static let rowHeight: CGFloat = 56
+    private static let barWidth: CGFloat = 2.5 // (cm-128.13) was a literal in `rowContent`
+    private static let putBackDotDiameter: CGFloat = 6 // (cm-128.13) `.4`'s mark dot
+    private static let contentLeadingPadding: CGFloat = 10 // (cm-128.13) was a literal in `rowContent`
+
+    /// (cm-128.13) An unread notification he put back (Mark as Unread) is his mark, not news: it draws `.4`'s 6-pt dot in the accent
+    /// colour where the bar would be, and no bar (Tom, form 2026-11-07 ~20:15 EST: "Your dot"). The header's count and every number
+    /// already leave it out; this is only its look.
+    private var showsPutBackDot: Bool { notification.isPutBack && !notification.isRead }
+
+    /// The dot, drawn over the bar's slot as an overlay of the first text line, so nothing in the layout moves: its centre sits on the
+    /// slot's centre (half the bar and the content padding to the left of the line) and on the line's vertical centre.
+    @ViewBuilder
+    private var putBackDot: some View {
+        if showsPutBackDot {
+            Circle()
+                .fill(cmuxAccentColor())
+                .frame(width: Self.putBackDotDiameter, height: Self.putBackDotDiameter)
+                .offset(x: -(Self.barWidth / 2 + Self.contentLeadingPadding + Self.putBackDotDiameter / 2))
+                .accessibilityHidden(true)
+        }
+    }
 
     var body: some View {
         // Row uses a ZStack so the hover-only clear button is a *sibling* of the row's
@@ -96,8 +117,8 @@ struct NotificationPopoverRow: View, Equatable {
     private var rowContent: some View {
         HStack(spacing: 0) {
             Rectangle()
-                .fill(notification.isRead ? Color.clear : cmuxAccentColor())
-                .frame(width: 2.5)
+                .fill(notification.isRead || showsPutBackDot ? Color.clear : cmuxAccentColor()) // (cm-128.13) his dot replaces the bar
+                .frame(width: Self.barWidth)
                 .padding(.vertical, 6)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -124,6 +145,7 @@ struct NotificationPopoverRow: View, Equatable {
                         .padding(.trailing, 34)
                         .layoutPriority(2)
                 }
+                .overlay(alignment: .leading) { putBackDot } // (cm-128.13)
 
                 if let workspaceTitle, !workspaceTitle.isEmpty {
                     Text(notification.title)
@@ -140,7 +162,7 @@ struct NotificationPopoverRow: View, Equatable {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.leading, 10)
+            .padding(.leading, Self.contentLeadingPadding) // (cm-128.13)
             .padding(.vertical, 8)
 
             Spacer(minLength: 0)

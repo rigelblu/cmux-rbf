@@ -21,7 +21,9 @@ struct TabContextMenuFigmaItemTests {
         )
         let menu = TabContextMenuBuilder.makeMenu(
             snapshot: TabContextMenuSnapshot(tabId: UUID(), state: state,
-                moveDestinationsProvider: { [] }, forkConversationAvailabilityProvider: { .hidden }),
+                moveDestinationsProvider: { [] }, forkConversationAvailabilityProvider: { .hidden },
+                sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
+            ),
             target: target
         )
         let browser = try #require(menu.items.firstIndex { ($0.representedObject as? String) == "newBrowserToRight" })

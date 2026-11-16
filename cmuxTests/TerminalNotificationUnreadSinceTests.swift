@@ -211,7 +211,9 @@ final class TerminalNotificationUnreadSinceTests: XCTestCase {
 
         XCTAssertTrue(store.sendToBack(.workspace(tabId: tab, surfaceId: surface), now: sentAt))
 
-        XCTAssertEqual(queuedAt(w.id), sentAt)
+        // cmux-rbf: changed on purpose (#cm-128.13) W was queued (5) before the pane's own notification (10), so under the queue order it takes sentAt - 1 ms and the pane's own sentAt; before, both took sentAt.
+        XCTAssertEqual(queuedAt(w.id), sentAt.addingTimeInterval(-0.001))
+        XCTAssertEqual(queuedAt(own.id), sentAt)
         XCTAssertEqual(queuedAt(readW.id), Date(timeIntervalSince1970: 6), "a read one stays read, in place")
         XCTAssertEqual(store.notifications.first(where: { $0.id == readW.id })?.isRead, true)
         XCTAssertEqual(queuedAt(sibling.id), Date(timeIntervalSince1970: 7), "a sibling pane keeps its place")

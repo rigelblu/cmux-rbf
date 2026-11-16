@@ -77,6 +77,10 @@ public protocol NotificationDismissalHosting: AnyObject {
     func storeHasRestoredUnreadIndicator(workspaceId: UUID) -> Bool
     /// Whether an unread notification exists for the workspace (or surface).
     func storeHasUnreadNotification(workspaceId: UUID, surfaceId: UUID?) -> Bool
+    /// Whether a notification that is not a put-back one is unread for the workspace (or surface) (cm-128.13): news only.
+    func storeHasUnreadNewsNotification(workspaceId: UUID, surfaceId: UUID?) -> Bool
+    /// Whether a visible notification indicator exists for the workspace (or surface), not counting a put-back notification (cm-128.13).
+    func storeHasVisibleNewsIndicator(workspaceId: UUID, surfaceId: UUID?) -> Bool
     /// Whether policy evaluation is still pending for the workspace (or surface).
     func storeHasPendingNotification(workspaceId: UUID, surfaceId: UUID?) -> Bool
     /// Whether a visible notification indicator exists for the workspace
@@ -87,6 +91,8 @@ public protocol NotificationDismissalHosting: AnyObject {
 
     /// Marks the workspace's (or surface's) notifications read.
     func storeMarkRead(workspaceId: UUID, surfaceId: UUID?)
+    /// Marks the workspace's (or surface's) notifications read, leaving his put-back ones unread when `keepingPutBack` (cm-128.13).
+    func storeMarkRead(workspaceId: UUID, surfaceId: UUID?, keepingPutBack: Bool)
     /// Clears the workspace-level manual unread indicator; returns whether
     /// anything was cleared.
     @discardableResult

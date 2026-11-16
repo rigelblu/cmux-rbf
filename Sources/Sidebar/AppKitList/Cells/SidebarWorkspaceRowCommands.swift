@@ -722,10 +722,19 @@ struct SidebarWorkspaceRowMenuBuilder {
             enabled: notificationStore.canMarkWorkspaceUnread(forTabIds: targetIds)
         ) { [weak notificationStore, commands] in
             guard let notificationStore else { return }
-            for id in commands.contextMenuWorkspaceIds where
-                notificationStore.canMarkWorkspaceUnread(forTabIds: [id]) {
-                notificationStore.markUnread(forTabId: id)
+            let validIds = commands.contextMenuWorkspaceIds.filter {
+                notificationStore.canMarkWorkspaceUnread(forTabIds: [$0])
             }
+            _ = notificationStore.markUnreadAtFormerPlace(validIds.map { .workspace(tabId: $0, surfaceId: nil) }) // (cm-128.13)
+        })
+        // (cm-128.13) One label for one or many rows, like Clear Agent State. It moves nothing on screen and opens nothing.
+        menu.addItem(item(
+            String(localized: "contextMenu.sendToBackOfUnreadQueue", defaultValue: "Send to Back of Unread Queue"),
+            enabled: notificationStore.canSendToBack(forWorkspaceIds: targetIds)
+        ) { [weak notificationStore, commands] in
+            guard let notificationStore else { return }
+            notificationStore.sendRowsToBack(forWorkspaceIds: commands.contextMenuWorkspaceIds)
+            commands.refreshSnapshot()
         })
         let clearLatestLabel = label(
             multi: String(localized: "contextMenu.clearLatestNotifications", defaultValue: "Clear Latest Notifications"),

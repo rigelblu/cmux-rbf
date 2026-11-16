@@ -16,6 +16,7 @@ struct SurfaceCaptionView: View {
     let contextMenuState: TabContextMenuState
     let moveDestinationsProvider: () -> [TabContextMoveDestination]
     let forkConversationAvailabilityProvider: () -> TabContextForkConversationAvailability
+    let sendToBackAvailabilityProvider: () -> Bool // (cm-128.13)
     let onFocus: () -> Void
     let onClose: (TabCloseRequestSource) -> Void
     let onZoomToggle: () -> Void
@@ -57,7 +58,8 @@ struct SurfaceCaptionView: View {
                             tabId: tab.id,
                             state: contextMenuState,
                             moveDestinationsProvider: moveDestinationsProvider,
-                            forkConversationAvailabilityProvider: forkConversationAvailabilityProvider
+                            forkConversationAvailabilityProvider: forkConversationAvailabilityProvider,
+                            sendToBackAvailabilityProvider: sendToBackAvailabilityProvider // (cm-128.13)
                         ),
                         onContextAction: onContextAction,
                         onMoveDestination: onMoveDestination

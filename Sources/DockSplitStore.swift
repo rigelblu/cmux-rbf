@@ -57,7 +57,14 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     private let remoteBrowserSettingsProvider: () -> DockRemoteBrowserSettings
     private let browserAvailabilityProvider: () -> Bool
     let fileContentChangeCoordinator: FileContentChangeCoordinator
-    @ObservationIgnored weak var notificationStore: TerminalNotificationStore?
+    @ObservationIgnored weak var notificationStore: TerminalNotificationStore? {
+        didSet { // (cm-128.13) the window Dock's tab dots follow the store: they clear once nothing unread is left
+            guard notificationStore !== oldValue else { return }
+            installUnreadBadgeClearing()
+        }
+    }
+    /// (cm-128.13) Delivers this window Dock's surface changes from the store; held for the Dock's lifetime.
+    @ObservationIgnored var unreadBadgeClearingObservation: SidebarUnreadObservation?
     var panels: [UUID: any Panel] = [:]
     var surfaceIdToPanelId: [TabID: UUID] = [:]
     /// Dock-owned manual unread state. Unlike notification-derived unread state,
@@ -384,6 +391,15 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         // context menu, not only by dragging.
         self.bonsplitController.tabContextMoveDestinationsProvider = { [weak self] tabId, _ in
             self?.dockTabMoveDestinations(for: tabId) ?? []
+        }
+        // (cm-128.13, MISS1) Send to Back of Unread Queue: enabled when the Dock surface holds a notification; a Dock with no
+        // window-Dock target (a non-global scope) is greyed.
+        self.bonsplitController.tabContextSendToBackAvailabilityProvider = { [weak self] tabId, _ in
+            guard let self,
+                  self.scope == .global,
+                  let panelId = self.surfaceIdToPanelId[tabId],
+                  let notificationStore = self.resolvedNotificationStore() else { return false }
+            return notificationStore.canSendToBack([.windowDock(WindowDockUnreadTarget(windowId: self.workspaceId, surfaceId: panelId))])
         }
         // Drop the controller's default welcome tab so the root pane starts
         // empty and renders the in-app create affordance until config seeds it.

@@ -7,19 +7,23 @@ struct TabContextMenuSnapshot {
     let moveDestinationsProvider: () -> [TabContextMoveDestination]
     let forkConversationAvailabilityProvider: () -> TabContextForkConversationAvailability
     let forkConversationAvailabilityRefreshHandler: @MainActor () async -> Void
+    /// (cm-128.13) Whether "Send to Back of Unread Queue" is enabled, asked when the menu is built and opened, never when the tab bar renders.
+    let sendToBackAvailabilityProvider: () -> Bool
 
     init(
         tabId: UUID,
         state: TabContextMenuState,
         moveDestinationsProvider: @escaping () -> [TabContextMoveDestination],
         forkConversationAvailabilityProvider: @escaping () -> TabContextForkConversationAvailability,
-        forkConversationAvailabilityRefreshHandler: @escaping @MainActor () async -> Void = {}
+        forkConversationAvailabilityRefreshHandler: @escaping @MainActor () async -> Void = {},
+        sendToBackAvailabilityProvider: @escaping () -> Bool // (cm-128.13) required, so a dropped forward fails to compile
     ) {
         self.tabId = tabId
         self.state = state
         self.moveDestinationsProvider = moveDestinationsProvider
         self.forkConversationAvailabilityProvider = forkConversationAvailabilityProvider
         self.forkConversationAvailabilityRefreshHandler = forkConversationAvailabilityRefreshHandler
+        self.sendToBackAvailabilityProvider = sendToBackAvailabilityProvider // (cm-128.13)
     }
 }
 
@@ -65,10 +69,12 @@ final class TabContextMenu: NSMenu, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         reevaluateForkConversationAvailability()
+        TabContextMenuBuilder.updateSendToBackAvailability(snapshot.sendToBackAvailabilityProvider(), in: self) // (cm-128.13)
     }
 
     func menuWillOpen(_ menu: NSMenu) {
         reevaluateForkConversationAvailability()
+        TabContextMenuBuilder.updateSendToBackAvailability(snapshot.sendToBackAvailabilityProvider(), in: self) // (cm-128.13)
         guard forkConversationAvailability == .refreshing,
               refreshTask == nil else { return }
         refreshTask = Task { @MainActor [weak self] in

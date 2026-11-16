@@ -847,6 +847,39 @@ struct UnreadQueueWalkTests {
         #expect(coordinator.jumpToOldestUnread(excludingPane: .workspace(tabId: tabA, surfaceId: surfaceA)) == b.id)
     }
 
+    // (cm-128.13, Scenario 191) The pane he's on holds a notification he put back, so the app passes it as the one exclusion. The
+    // coordinator's part is that the exclusion beats the pane-he's-on read: the pane is never opened, and so never read.
+    @Test("with his pane excluded while he is on it, and another stop waiting, the press opens the other and never opens his pane")
+    func excludedPaneWithAnotherStopWaiting() {
+        let store = FakeStore()
+        let unread = FakeUnreadTargeting()
+        let openRouting = FakeOpenRouting()
+        let tabA = UUID(), surfaceA = UUID()
+        let a = queued(tabA, surfaceA, at: 1)
+        let b = queued(UUID(), UUID(), at: 2)
+        store.orderedNotifications = [b, a]
+        unread.frontmostFocusedPanes = [.workspace(tabId: tabA, surfaceId: surfaceA)]
+        let coordinator = makeCoordinator(store: store, unreadTargeting: unread, openRouting: openRouting)
+
+        #expect(coordinator.jumpToOldestUnread(excludingPane: .workspace(tabId: tabA, surfaceId: surfaceA)) == b.id)
+        #expect(openRouting.log.count == 1, "only B was opened: \(openRouting.log)")
+        #expect(!openRouting.log.contains { $0.contains("tab=\(String(tabA.uuidString.prefix(4)))") }, "his pane was never opened")
+    }
+
+    @Test("with his pane excluded while he is on it and nothing else waiting, the press opens nothing")
+    func excludedOnlyPaneStaysUnread() {
+        let store = FakeStore()
+        let unread = FakeUnreadTargeting()
+        let openRouting = FakeOpenRouting()
+        let tabA = UUID(), surfaceA = UUID()
+        store.orderedNotifications = [queued(tabA, surfaceA, at: 1)]
+        unread.frontmostFocusedPanes = [.workspace(tabId: tabA, surfaceId: surfaceA)]
+        let coordinator = makeCoordinator(store: store, unreadTargeting: unread, openRouting: openRouting)
+
+        #expect(coordinator.jumpToOldestUnread(excludingPane: .workspace(tabId: tabA, surfaceId: surfaceA)) == nil)
+        #expect(openRouting.log.isEmpty, "nothing was opened: \(openRouting.log)")
+    }
+
     // Review R1 (cm-128.11): the tie-break
     @Test("two panes queued at the same time: the lower notification id goes first")
     func tieIsBrokenByNotificationId() {
@@ -1040,5 +1073,94 @@ struct UnreadQueueWalkTests {
         let coordinator = makeCoordinator(store: store, unreadTargeting: unread, openRouting: openRouting)
 
         #expect(coordinator.jumpToOldestUnread() == elsewhere.id, "his own pane is read and passed; the next stop opens")
+    }
+
+    // cmux-rbf: (cm-128.13, step 4b R1) The exclusion the app derives for a put-back notification on the pane he's on maps one side
+    // at a time, as `isFrontmostFocusedPane` does (02_decisions.md, 2026-11-16): a remote tmux pane keyed by its inner surface is the
+    // container pane he's on, and the walk must pass it by, never open it (an open reads it).
+    @Test("the exclusion reaches a put-back notification keyed by the inner surface of the container he is on")
+    func exclusionMapsTheStopsSideThroughItsOwningPanel() {
+        let store = FakeStore()
+        let openRouting = FakeOpenRouting()
+        let unread = FakeUnreadTargeting()
+        let tab = UUID(), innerSurface = UUID(), containerPanel = UUID()
+        let putBack = queued(tab, innerSurface, at: 1)
+        let elsewhere = queued(UUID(), UUID(), at: 2)
+        store.orderedNotifications = [elsewhere, putBack]
+        unread.owningPanels[innerSurface] = containerPanel
+        unread.frontmostFocusedPanes = [.workspace(tabId: tab, surfaceId: containerPanel)]
+        let coordinator = makeCoordinator(store: store, unreadTargeting: unread, openRouting: openRouting)
+
+        let opened = coordinator.jumpToOldestUnread(excludingPane: .workspace(tabId: tab, surfaceId: containerPanel), mapsExclusionThroughOwningPanel: true)
+
+        #expect(opened == elsewhere.id, "the press opened the next stop")
+        #expect(!openRouting.log.contains { $0.contains("tab=\(String(tab.uuidString.prefix(4)))") }, "his put-back pane was opened, so the app reads it: \(openRouting.log)")
+    }
+
+    @Test("the exclusion reaches a put-back notification keyed by the container while he is on its inner surface")
+    func exclusionMapsTheFocusedSideThroughItsOwningPanel() {
+        let store = FakeStore()
+        let openRouting = FakeOpenRouting()
+        let unread = FakeUnreadTargeting()
+        let tab = UUID(), innerSurface = UUID(), containerPanel = UUID()
+        let putBack = queued(tab, containerPanel, at: 1)
+        let elsewhere = queued(UUID(), UUID(), at: 2)
+        store.orderedNotifications = [elsewhere, putBack]
+        unread.owningPanels[innerSurface] = containerPanel
+        unread.frontmostFocusedPanes = [.workspace(tabId: tab, surfaceId: innerSurface)]
+        let coordinator = makeCoordinator(store: store, unreadTargeting: unread, openRouting: openRouting)
+
+        let opened = coordinator.jumpToOldestUnread(excludingPane: .workspace(tabId: tab, surfaceId: innerSurface), mapsExclusionThroughOwningPanel: true)
+
+        #expect(opened == elsewhere.id, "the press opened the next stop")
+        #expect(!openRouting.log.contains { $0.contains("tab=\(String(tab.uuidString.prefix(4)))") }, "his put-back pane was opened, so the app reads it: \(openRouting.log)")
+    }
+
+    // cmux-rbf: (cm-128.13, step 7 R3) ⌘⌃U's own exclusion, the pane it just sent back, stays UNMAPPED, as `.11` had it: the store's Send to
+    // Back matches a target without the owning-panel map, so mapping the follow-on walk's exclusion would skip a notification ⌘⌃U never
+    // sent back. On an inner remote-tmux surface I, N1 keyed by I is sent back; N2, keyed by the container C, is not, and the walk reaches it
+    // (it is the pane he's on, so `.11`'s "read it and go on" applies, as before 4b).
+    @Test("the exclusion of the pane ⌘⌃U sent back is not mapped: a notification keyed by the container is still a stop")
+    func sentBackExclusionDoesNotMapThroughTheOwningPanel() {
+        let store = FakeStore()
+        let openRouting = FakeOpenRouting()
+        let unread = FakeUnreadTargeting()
+        let focusedResolving = FakeFocusedResolving()
+        let tab = UUID(), innerSurface = UUID(), containerPanel = UUID()
+        let sentBack = queued(tab, innerSurface, at: 1)
+        let notSentBack = queued(tab, containerPanel, at: 2)
+        let elsewhere = queued(UUID(), UUID(), at: 3)
+        store.orderedNotifications = [elsewhere, notSentBack, sentBack]
+        unread.owningPanels[innerSurface] = containerPanel
+        unread.frontmostFocusedPanes = [.workspace(tabId: tab, surfaceId: innerSurface)]
+        focusedResolving.focusedTargetValue = .workspace(tabId: tab, surfaceId: innerSurface)
+        focusedResolving.targetsWithNotifications = [.workspace(tabId: tab, surfaceId: innerSurface)]
+        let coordinator = makeCoordinator(store: store, unreadTargeting: unread, openRouting: openRouting, focusedResolving: focusedResolving)
+
+        let opened = coordinator.markFocusedNotificationAsOldestUnreadAndJumpToNextLatestUnread()
+
+        #expect(opened == elsewhere.id, "the press opened the next stop after reading the pane he is on")
+        #expect(openRouting.log.contains { $0.contains("notif=\(String(notSentBack.id.uuidString.prefix(4)))") },
+                "the notification keyed by the container was skipped, though ⌘⌃U never sent it back: \(openRouting.log)")
+        #expect(!openRouting.log.contains { $0.contains("notif=\(String(sentBack.id.uuidString.prefix(4)))") },
+                "the notification ⌘⌃U sent back was opened: \(openRouting.log)")
+    }
+
+    @Test("control: the same keys on both sides, the exclusion passes his pane by")
+    func exclusionWithTheSameKeysPassesHisPaneBy() {
+        let store = FakeStore()
+        let openRouting = FakeOpenRouting()
+        let unread = FakeUnreadTargeting()
+        let tab = UUID(), surface = UUID()
+        let putBack = queued(tab, surface, at: 1)
+        let elsewhere = queued(UUID(), UUID(), at: 2)
+        store.orderedNotifications = [elsewhere, putBack]
+        unread.frontmostFocusedPanes = [.workspace(tabId: tab, surfaceId: surface)]
+        let coordinator = makeCoordinator(store: store, unreadTargeting: unread, openRouting: openRouting)
+
+        let opened = coordinator.jumpToOldestUnread(excludingPane: .workspace(tabId: tab, surfaceId: surface), mapsExclusionThroughOwningPanel: true)
+
+        #expect(opened == elsewhere.id)
+        #expect(!openRouting.log.contains { $0.contains("tab=\(String(tab.uuidString.prefix(4)))") }, "control: his pane is never opened")
     }
 }

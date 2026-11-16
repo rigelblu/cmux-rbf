@@ -381,6 +381,12 @@ extension TabItemView {
         }
         .disabled(!context.canMarkUnread)
 
+        // (cm-128.13) One label for one or many rows; the state is read live, as the menu opens.
+        Button(String(localized: "contextMenu.sendToBackOfUnreadQueue", defaultValue: "Send to Back of Unread Queue")) {
+            actions.sendToBack(targetIds)
+        }
+        .disabled(!actions.canSendToBack(targetIds))
+
         Button(clearLatestNotificationLabel) {
             actions.clearLatestNotifications(targetIds)
         }

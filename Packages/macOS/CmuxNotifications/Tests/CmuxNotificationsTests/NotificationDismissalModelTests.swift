@@ -25,6 +25,12 @@ private final class FakeHost: NotificationDismissalHosting {
     var pendingNotificationSurfaces: Set<UUID> = []
     var workspacesWithPendingNotifications: Set<UUID> = []
     var hasDismissibleState = true
+    // (cm-128.13) Surfaces whose unread notifications include one he put back, and, of those, the ones that also hold ordinary news.
+    var putBackSurfaces: Set<UUID> = []
+    var newsBesidePutBackSurfaces: Set<UUID> = []
+    var putBackWorkspaces: Set<UUID> = [] // (cm-128.13) workspaces whose workspace-wide unread is a put-back notification
+    var newsBesidePutBackWorkspaces: Set<UUID> = []
+    var markReadKeepFlags: [Bool] = []
     var hasDismissiblePanelState = false
     var selectionLookupCount = 0
     var detailedLookupCount = 0
@@ -84,6 +90,31 @@ private final class FakeHost: NotificationDismissalHosting {
     func storeHasUnreadNotification(workspaceId: UUID, surfaceId: UUID?) -> Bool {
         guard let surfaceId else { return workspaceWideUnread.contains(workspaceId) }
         return unreadNotificationSurfaces.contains(surfaceId)
+    }
+
+    // (cm-128.13) News only: a surface that holds only a put-back notification has none.
+    private func holdsNews(_ surfaceId: UUID) -> Bool {
+        unreadNotificationSurfaces.contains(surfaceId)
+            && (!putBackSurfaces.contains(surfaceId) || newsBesidePutBackSurfaces.contains(surfaceId))
+    }
+
+    func storeHasUnreadNewsNotification(workspaceId: UUID, surfaceId: UUID?) -> Bool {
+        guard let surfaceId else {
+            return workspaceWideUnread.contains(workspaceId)
+                && (!putBackWorkspaces.contains(workspaceId) || newsBesidePutBackWorkspaces.contains(workspaceId))
+        }
+        return holdsNews(surfaceId)
+    }
+
+    func storeHasVisibleNewsIndicator(workspaceId: UUID, surfaceId: UUID?) -> Bool {
+        guard let surfaceId else { return false }
+        return visibleIndicatorSurfaces.contains(surfaceId)
+            && (!putBackSurfaces.contains(surfaceId) || newsBesidePutBackSurfaces.contains(surfaceId))
+    }
+
+    func storeMarkRead(workspaceId: UUID, surfaceId: UUID?, keepingPutBack: Bool) {
+        markReadKeepFlags.append(keepingPutBack)
+        storeMarkRead(workspaceId: workspaceId, surfaceId: surfaceId) // the same log line as before: the existing assertions stand
     }
 
     func storeHasPendingNotification(workspaceId: UUID, surfaceId: UUID?) -> Bool {
@@ -418,5 +449,120 @@ struct NotificationDismissalModelTests {
             workspaceId: workspaceId, surfaceId: nil, context: .activeFocus
         ))
         #expect(host.log.contains("markRead:nil"))
+    }
+}
+
+/// (cm-128.13) A notification he put back is his mark: every context but typing leaves it unread, as it leaves his dot.
+@Suite("Dismissal model: a notification he put back (cm-128.13)")
+@MainActor
+struct PutBackDismissalTests {
+    private func setUp(newsBeside: Bool = false) -> (NotificationDismissalModel, FakeHost, UUID, UUID) {
+        let (model, host, workspaceId, panelId) = makeModel()
+        host.unreadNotificationSurfaces = [panelId]
+        host.visibleIndicatorSurfaces = [panelId] // the plain read counts the put-back notification, as the store does
+        host.putBackSurfaces = [panelId]
+        if newsBeside { host.newsBesidePutBackSurfaces = [panelId] }
+        return (model, host, workspaceId, panelId)
+    }
+
+    @Test("every context but typing leaves a put-back notification unread, with no read and no flash",
+          arguments: [NotificationDismissalContext.activeFocus, .explicitWorkspaceResume, .directInteraction])
+    func putBackAloneIsLeftUnread(_ context: NotificationDismissalContext) {
+        let (model, host, workspaceId, pane) = setUp()
+
+        let dismissed = model.dismissNotification(workspaceId: workspaceId, surfaceId: pane, context: context)
+
+        #expect(!dismissed)
+        #expect(host.log.isEmpty, "no markRead and no flash: \(host.log)")
+    }
+
+    @Test("typing reads it, as typing reads his dot")
+    func typingReadsIt() {
+        let (model, host, workspaceId, pane) = setUp()
+
+        #expect(model.dismissNotificationOnTerminalInteraction(workspaceId: workspaceId, surfaceId: pane))
+
+        #expect(host.log.contains { $0.hasPrefix("markRead") })
+        #expect(host.markReadKeepFlags.allSatisfy { !$0 } && !host.markReadKeepFlags.isEmpty, "typing passes no keep")
+    }
+
+    @Test("an ordinary notification beside it is read and flashes, and the read keeps the put-back one",
+          arguments: [NotificationDismissalContext.activeFocus, .explicitWorkspaceResume, .directInteraction])
+    func newsBesideIsReadAndPutBackKept(_ context: NotificationDismissalContext) {
+        let (model, host, workspaceId, pane) = setUp(newsBeside: true)
+
+        #expect(model.dismissNotification(workspaceId: workspaceId, surfaceId: pane, context: context))
+
+        #expect(!host.markReadKeepFlags.isEmpty)
+        #expect(host.markReadKeepFlags.allSatisfy { $0 }, "the read keeps the put-back one")
+        #expect(host.log.contains("notificationFlash"))
+    }
+
+    @Test("a put-back notification on a pane he is not on is left unread too")
+    func putBackOnAnotherPaneIsLeftUnread() {
+        let (model, host, workspaceId, _) = makeModel()
+        let paneB = UUID()
+        host.unreadNotificationSurfaces = [paneB]
+        host.visibleIndicatorSurfaces = [paneB]
+        host.putBackSurfaces = [paneB]
+
+        #expect(!model.dismissNotification(workspaceId: workspaceId, surfaceId: paneB, context: .explicitWorkspaceResume))
+        #expect(!model.dismissNotification(workspaceId: workspaceId, surfaceId: paneB, context: .activeFocus))
+        #expect(host.log.isEmpty)
+    }
+
+    @Test("re-selecting his workspace leaves it unread")
+    func resumeThroughTheFocusedPanelEntry() {
+        let (model, host, workspaceId, _) = setUp()
+
+        model.dismissFocusedPanelNotificationIfActive(workspaceId: workspaceId, context: .explicitWorkspaceResume)
+
+        #expect(host.log.isEmpty)
+    }
+
+    @Test("a pending notification beside a put-back one reads, without a dismiss flash")
+    func putBackPlusPendingDoesNotFlash() {
+        let (model, host, workspaceId, pane) = setUp()
+        host.pendingNotificationSurfaces = [pane]
+
+        _ = model.dismissNotification(workspaceId: workspaceId, surfaceId: pane, context: .directInteraction)
+
+        #expect(host.log.contains { $0.hasPrefix("markRead") })
+        #expect(!host.log.contains("notificationFlash"))
+    }
+
+    // R6: the workspace-level branch (no surface): the model reads the workspace-wide state.
+    @Test("workspace-level: a put-back-only workspace is left unread by every context but typing, with no read and no flash",
+          arguments: [NotificationDismissalContext.activeFocus, .explicitWorkspaceResume, .directInteraction])
+    func workspaceLevelPutBackAloneIsLeftUnread(_ context: NotificationDismissalContext) {
+        let (model, host, workspaceId, _) = makeModel()
+        host.workspaceWideUnread = [workspaceId]
+        host.putBackWorkspaces = [workspaceId]
+
+        #expect(!model.dismissNotification(workspaceId: workspaceId, surfaceId: nil, context: context))
+        #expect(host.log.isEmpty, "no markRead and no flash: \(host.log)")
+    }
+
+    @Test("workspace-level: news beside a put-back notification is read with the keep")
+    func workspaceLevelNewsBesideIsReadAndPutBackKept() {
+        let (model, host, workspaceId, _) = makeModel()
+        host.workspaceWideUnread = [workspaceId]
+        host.putBackWorkspaces = [workspaceId]
+        host.newsBesidePutBackWorkspaces = [workspaceId]
+
+        #expect(model.dismissNotification(workspaceId: workspaceId, surfaceId: nil, context: .directInteraction))
+
+        #expect(host.markReadKeepFlags == [true], "the surface-less read keeps it too")
+    }
+
+    @Test("workspace-level: typing reads it")
+    func workspaceLevelTypingReadsIt() {
+        let (model, host, workspaceId, _) = makeModel()
+        host.workspaceWideUnread = [workspaceId]
+        host.putBackWorkspaces = [workspaceId]
+
+        #expect(model.dismissNotification(workspaceId: workspaceId, surfaceId: nil, context: .terminalInteraction))
+
+        #expect(host.markReadKeepFlags == [false])
     }
 }

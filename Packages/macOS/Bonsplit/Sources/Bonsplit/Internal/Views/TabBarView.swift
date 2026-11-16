@@ -1395,6 +1395,9 @@ struct TabBarView: View {
             forkConversationAvailabilityProvider: {
                 controller.tabContextForkConversationAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? .hidden
             },
+            sendToBackAvailabilityProvider: { // (cm-128.13) asked when the menu opens, not when the bar renders
+                controller.isSendToBackAvailable(for: TabID(id: tab.id), inPane: pane.id)
+            },
             onFocus: {
                 withTransaction(Transaction(animation: nil)) {
                     pane.selectTab(tab.id)
@@ -1473,6 +1476,9 @@ struct TabBarView: View {
             },
             forkConversationAvailabilityProvider: {
                 controller.tabContextForkConversationAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? .hidden
+            },
+            sendToBackAvailabilityProvider: { // (cm-128.13) asked when the menu opens, not when the bar renders
+                controller.isSendToBackAvailable(for: TabID(id: tab.id), inPane: pane.id)
             },
             forkConversationAvailabilityRefreshHandler: {
                 await controller.tabContextForkConversationAvailabilityRefreshHandler?(

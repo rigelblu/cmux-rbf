@@ -29,6 +29,7 @@ public enum TabContextAction: String, CaseIterable, Sendable {
     case togglePin
     case markAsRead
     case markAsUnread
+    case sendToBack // (cm-128.13)
     case toggleZoom
     case toggleFullWidthTab
     case disconnectRemote

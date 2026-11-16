@@ -5503,7 +5503,7 @@ class TerminalController {
                 finish()
 
             case "mark_unread":
-                AppDelegate.shared?.notificationStore?.markUnread(forTabId: workspace.id)
+                _ = AppDelegate.shared?.notificationStore?.markUnreadAtFormerPlace([.workspace(tabId: workspace.id, surfaceId: nil)]) // (cm-128.13)
                 finish()
 
             case "set_color":

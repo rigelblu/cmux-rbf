@@ -99,6 +99,8 @@ Inside a machine:
 
 Use `Cmd+Shift+U` to jump to the unread pane that has waited longest; a pane that notifies again keeps its place. Use `Ctrl+Cmd+U` to send the current pane to the back, as the newest unread, and jump to the next oldest. Mark as Unread puts a notification back where it was in the queue. Both shortcuts are configurable in Settings > Keyboard Shortcuts and in `~/.config/cmux/cmux.json`.
 
+To send a workspace or pane you aren't on to the back without leaving where you are, right-click its row and choose **Send to Back of Unread Queue**, or right-click its tab and choose **Send to Back of Unread Queue**. **Mark as Unread** (`Cmd+Option+U`, or the row's or tab's menu) undoes reading one: it goes back where it was in the queue.
+
 ## Suppress only the focused surface
 
 By default cmux withdraws a delivered banner when its workspace becomes visible/active, which can retract a banner for a non-focused surface (e.g. a second agent in the same visible workspace) before you notice it. Set the opt-in flag below to `true` so the auto-withdraw fires **only** for the exact focused surface — matching the delivery gate. A banner for a non-focused surface then stays up until you focus that surface (or click/dismiss it). Workspace-visible-but-not-focused surfaces and surfaces in non-visible workspaces keep their banners; explicit "mark workspace read" and clicking/typing still clear notifications as before.

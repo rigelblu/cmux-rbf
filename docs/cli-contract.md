@@ -400,6 +400,8 @@ Workspace and tab action names:
 | `workspace-color` | `list` |
 | `tab-action` | `rename`, `clear-name`, `close-left`, `close-right`, `close-others`, `new-terminal-right`, `new-browser-right`, `reload`, `duplicate`, `pin`, `unpin`, `mark-unread` |
 
+`workspace-action mark-unread` and `tab-action mark-unread` follow the menus' Mark as Unread: they put the workspace's (or tab's) newest notification back where it was in the `Cmd+Shift+U` queue, as an unread mark of your own; with no notification they leave your unread mark, as before. The verbs and the socket's `mark_unread` keep their names.
+
 ### Workspace colors
 
 `workspace-action set-color` accepts any of three spellings of the same colour,

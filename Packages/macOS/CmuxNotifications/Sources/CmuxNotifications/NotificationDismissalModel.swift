@@ -145,22 +145,33 @@ public final class NotificationDismissalModel: NotificationDismissing {
         } ?? false
         let hasManualWorkspaceUnread = host.storeHasManualUnread(workspaceId: workspaceId)
         let hasRestoredWorkspaceUnread = host.storeHasRestoredUnreadIndicator(workspaceId: workspaceId)
+        // (cm-128.13) A notification he put back is his mark: in every context but typing it counts as his dot, not as an
+        // unread notification, so it neither passes the guard below, nor reads, nor flashes. Typing reads it as it reads his dot.
+        let putBackIsHisDot = context.leavesPutBackNotification
         let hasUnreadNotification: Bool
         let hasPendingNotification: Bool
         let hasFocusedIndicator: Bool
         if notificationSurfaceIds.isEmpty {
-            hasUnreadNotification = host.storeHasUnreadNotification(workspaceId: workspaceId, surfaceId: nil)
+            hasUnreadNotification = putBackIsHisDot
+                ? host.storeHasUnreadNewsNotification(workspaceId: workspaceId, surfaceId: nil)
+                : host.storeHasUnreadNotification(workspaceId: workspaceId, surfaceId: nil)
             hasPendingNotification = host.storeHasPendingNotification(workspaceId: workspaceId, surfaceId: nil)
-            hasFocusedIndicator = host.storeHasVisibleNotificationIndicator(workspaceId: workspaceId, surfaceId: nil)
+            hasFocusedIndicator = putBackIsHisDot
+                ? host.storeHasVisibleNewsIndicator(workspaceId: workspaceId, surfaceId: nil)
+                : host.storeHasVisibleNotificationIndicator(workspaceId: workspaceId, surfaceId: nil)
         } else {
             hasUnreadNotification = notificationSurfaceIds.contains {
-                host.storeHasUnreadNotification(workspaceId: workspaceId, surfaceId: $0)
+                putBackIsHisDot
+                    ? host.storeHasUnreadNewsNotification(workspaceId: workspaceId, surfaceId: $0)
+                    : host.storeHasUnreadNotification(workspaceId: workspaceId, surfaceId: $0)
             }
             hasPendingNotification = notificationSurfaceIds.contains {
                 host.storeHasPendingNotification(workspaceId: workspaceId, surfaceId: $0)
             }
             hasFocusedIndicator = notificationSurfaceIds.contains {
-                host.storeHasVisibleNotificationIndicator(workspaceId: workspaceId, surfaceId: $0)
+                putBackIsHisDot
+                    ? host.storeHasVisibleNewsIndicator(workspaceId: workspaceId, surfaceId: $0)
+                    : host.storeHasVisibleNotificationIndicator(workspaceId: workspaceId, surfaceId: $0)
             }
         }
         let manualStoreSurfaceIds = notificationSurfaceIds.filter {
@@ -176,10 +187,10 @@ public final class NotificationDismissalModel: NotificationDismissing {
         }
         if hasUnreadNotification || hasPendingNotification {
             if notificationSurfaceIds.isEmpty {
-                host.storeMarkRead(workspaceId: workspaceId, surfaceId: nil)
+                host.storeMarkRead(workspaceId: workspaceId, surfaceId: nil, keepingPutBack: putBackIsHisDot) // (cm-128.13)
             } else {
                 for surfaceId in notificationSurfaceIds {
-                    host.storeMarkRead(workspaceId: workspaceId, surfaceId: surfaceId)
+                    host.storeMarkRead(workspaceId: workspaceId, surfaceId: surfaceId, keepingPutBack: putBackIsHisDot) // (cm-128.13)
                 }
             }
         }
