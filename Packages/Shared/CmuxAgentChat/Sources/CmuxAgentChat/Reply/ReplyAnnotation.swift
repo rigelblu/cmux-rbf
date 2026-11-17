@@ -18,6 +18,9 @@ import Foundation
 /// No context words are ever added around the span. If a quote is ambiguous
 /// on its own, the answer is for the user to select more, not for cmux to
 /// widen it on their behalf — a widened quote is one the user never read.
+/// The one widening is `Add to reply` (`cm-136.7`, Q22): it grows one mark to
+/// the union of the passage the user clicked and the mark it overlaps, and the
+/// quote becomes the page's markdown for that union, which the user did read.
 public struct ReplyAnnotation: Identifiable, Sendable, Equatable {
     /// Identity within one message's annotation set.
     ///
@@ -121,13 +124,14 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
 
     /// Adds a marked span, refusing one that overlaps a mark already there.
     ///
-    /// **Overlaps are refused at selection time, never merged or widened.**
+    /// **A selection made in the panel is refused where it overlaps, never merged or widened.**
     /// Two washes stacked over one phrase cannot be read as two marks, so
     /// allowing it would produce a highlight that lies about how many notes
     /// it carries. It also follows the rule the type already states: an
     /// ambiguous quote is fixed by the user selecting more, never by cmux
     /// widening on their behalf — so the annotation holding a phrase keeps
-    /// it.
+    /// it. `Add to reply` is the one exception, through ``grow(_:quote:range:)``,
+    /// which widens one mark in place (`cm-136.7`, Q22).
     ///
     /// - Returns: whether the mark was taken. `false` is the refusal the
     ///   selection handler reports; nothing in the set changes.
@@ -137,6 +141,26 @@ public struct ReplyAnnotationSet: Sendable, Equatable {
             return false
         }
         annotations.append(annotation)
+        return true
+    }
+
+    /// Replaces one mark's span in place: same id, same index, note kept.
+    ///
+    /// Lives in this type body, not in an extension, because `annotations` is
+    /// `private(set)` and only code in this file can write it.
+    ///
+    /// - Returns: whether the mark was grown. `false` changes nothing: the id
+    ///   is unknown, `range` does not contain the mark's old range, or `range`
+    ///   overlaps another mark.
+    public mutating func grow(_ id: UUID, quote: String, range: Range<Int>) -> Bool {
+        guard let index = annotations.firstIndex(where: { $0.id == id }) else { return false }
+        let old = annotations[index]
+        guard range.lowerBound <= old.range.lowerBound,
+              old.range.upperBound <= range.upperBound
+        else { return false }
+        guard !annotations.indices.contains(where: { $0 != index && annotations[$0].range.overlaps(range) })
+        else { return false }
+        annotations[index] = ReplyAnnotation(id: old.id, quote: quote, note: old.note, range: range)
         return true
     }
 

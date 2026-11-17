@@ -22,10 +22,10 @@ struct ReplyInlineDismissTests {
 
     private func reason(
         _ event: ReplyInlineEvent,
-        sidebarShowingReplyAtShow: Bool = false
+        destinationAtShow: ReplyInlineDestination = .prompt
     ) -> ReplyInlineDismissReason? {
         ReplyInlineDismissal.reason(
-            for: event, passage: Self.passage, sidebarShowingReplyAtShow: sidebarShowingReplyAtShow
+            for: event, passage: Self.passage, destinationAtShow: destinationAtShow
         )
     }
 
@@ -87,16 +87,19 @@ struct ReplyInlineDismissTests {
         #expect(reason(.selectionChecked(current(distanceToBottomRight: 250))) == .selectionChanged)
     }
 
-    @Test("A sidebar change that flips what the label named dismisses, in either direction")
-    func sidebarFlipDismisses() {
-        #expect(reason(.sidebarChanged(showingReply: true), sidebarShowingReplyAtShow: false) == .sidebar)
-        #expect(reason(.sidebarChanged(showingReply: false), sidebarShowingReplyAtShow: true) == .sidebar)
+    /// `cm-136.7`: the button's destination is what the toolbar was read for,
+    /// so a flip in either direction takes it away. Replaces the sidebar-only
+    /// check, which had the same two directions.
+    @Test("A destination change that flips what the label named dismisses, in either direction")
+    func destinationChangeDismisses() {
+        #expect(reason(.destinationChanged(.replyPanel), destinationAtShow: .prompt) == .destination)
+        #expect(reason(.destinationChanged(.prompt), destinationAtShow: .replyPanel) == .destination)
     }
 
-    @Test("A sidebar change that leaves the label true does not (width, focus, Files to Notes)")
-    func sidebarNoOpStays() {
-        #expect(reason(.sidebarChanged(showingReply: false), sidebarShowingReplyAtShow: false) == nil)
-        #expect(reason(.sidebarChanged(showingReply: true), sidebarShowingReplyAtShow: true) == nil)
+    @Test("A destination that is still what it was at show leaves it (width, focus, Files to Notes)")
+    func sameDestinationKeepsToolbar() {
+        #expect(reason(.destinationChanged(.prompt), destinationAtShow: .prompt) == nil)
+        #expect(reason(.destinationChanged(.replyPanel), destinationAtShow: .replyPanel) == nil)
     }
 
     @Test("The pane closing dismisses")

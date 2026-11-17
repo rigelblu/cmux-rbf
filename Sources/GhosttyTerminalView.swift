@@ -4199,7 +4199,6 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     /// `cm-136.1` — the press's `clickCount`, so the release can tell a
     /// double- or triple-click from a single click that left a selection as it was.
     private var pendingLeftMouseClickCount = 0
-    private static var terminalReplySeq = 0
 #if DEBUG
     private var lastSizeSkipSignature: String?
 #endif
@@ -8041,8 +8040,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             sidebarShowingReply: sidebar.isVisible && sidebar.mode == .reply,
             sourcePanelID: panelID
         )
-        Self.terminalReplySeq += 1
-        let decision = TerminalReplyStart.decide(input, seq: Self.terminalReplySeq)
+        let decision = TerminalReplyStart.decide(input, seq: TerminalReplyOpener.nextSeq())
         #if DEBUG
         switch decision {
         case .ignore(let reason):
@@ -8052,36 +8050,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         }
         #endif
         guard case .open(let request) = decision else { return }
-        sidebar.terminalReplyRequest = request
-        // A request the panel cannot take soon is dropped, never kept: left in
-        // place it fires whenever Reply next appears — minutes later, on a
-        // highlight nobody asked for (cold code review 2026-09-13, Required
-        // 1). A cold open took 430 ms in dogfood; 5 s leaves room for a long
-        // transcript to load.
-        let expiringSeq = request.seq
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak sidebar] in
-            guard let sidebar, sidebar.terminalReplyRequest?.seq == expiringSeq else { return }
-            #if DEBUG
-            cmuxDebugLog("reply.terminalStart expired seq=\(expiringSeq)")
-            #endif
-            sidebar.terminalReplyRequest = nil
-        }
-        _ = AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
-            mode: .reply,
-            focusFirstItem: false,
-            preferredWindow: window
-        )
-        // The call returns `true` while focus is merely *requested*
-        // (`MainWindowFocusController.focusRightSidebar`), so test where the
-        // keyboard actually is. On a cold open neither the page nor the
-        // sidebar host may be able to take it yet; keys typed before the note
-        // field has the caret must go nowhere, never to the agent.
-        if window.firstResponder === self {
-            window.makeFirstResponder(nil)
-        }
-        #if DEBUG
-        cmuxDebugLog("reply.terminalStart focus fr=\(window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")")
-        #endif
+        TerminalReplyOpener.open(request, sidebar: sidebar, window: window, from: self)
     }
 
     /// Attempt to open the word under the mouse cursor as a file path, resolved

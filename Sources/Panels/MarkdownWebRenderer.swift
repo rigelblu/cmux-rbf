@@ -679,6 +679,36 @@ struct MarkdownWebRenderer: NSViewRepresentable {
             last = null;
             return publish() ? "published" : "notFound";
           };
+          // `cm-136.7`: select the characters between two offsets, in the offset
+          // space `textNodes` defines, so an `Add to reply` that grows a mark gets
+          // the union range selected and published the way a drag would be. Like
+          // `__cmuxReplyFind`, this constructs no mark: `publish` does, and only
+          // the Swift side decides what to do with it.
+          window.__cmuxReplySelectOffsets = (start, end) => {
+            const entries = textNodes();
+            let from = null;
+            let to = null;
+            for (const entry of entries) {
+              const length = entry.node.nodeValue.length;
+              if (from === null && start >= entry.start && start < entry.start + length) {
+                from = { node: entry.node, offset: start - entry.start };
+              }
+              if (end > entry.start && end <= entry.start + length) {
+                to = { node: entry.node, offset: end - entry.start };
+              }
+            }
+            if (!from || !to) return "notFound";
+            const range = document.createRange();
+            range.setStart(from.node, from.offset);
+            range.setEnd(to.node, to.offset);
+            const selection = window.getSelection();
+            if (!selection) return "notFound";
+            selection.removeAllRanges();
+            selection.addRange(range);
+            // A request is a new intent even for a span published before.
+            last = null;
+            return publish() ? "published" : "notFound";
+          };
           // **A mark is committed when the selection settles, never while it
           // is moving.** `selectionchange` fires on every frame of a drag,
           // and painting a mark rewraps the text nodes *under the live
@@ -1045,11 +1075,15 @@ struct MarkdownWebRenderer: NSViewRepresentable {
         private func runPendingFindIfLoaded() {
             guard isLoaded, let webView, let request = pendingFind else { return }
             pendingFind = nil
-            let data = (try? JSONSerialization.data(withJSONObject: [request.text])) ?? Data("[\"\"]".utf8)
-            let literal = String(data: data, encoding: .utf8) ?? "[\"\"]"
-            webView.evaluateJavaScript(
-                "window.__cmuxReplyFind ? window.__cmuxReplyFind(\(literal)[0]) : \"notFound\";"
-            ) { [weak self] result, _ in
+            let script: String
+            if let offsets = request.offsets {
+                script = "window.__cmuxReplySelectOffsets ? window.__cmuxReplySelectOffsets(\(offsets.lowerBound), \(offsets.upperBound)) : \"notFound\";"
+            } else {
+                let data = (try? JSONSerialization.data(withJSONObject: [request.text])) ?? Data("[\"\"]".utf8)
+                let literal = String(data: data, encoding: .utf8) ?? "[\"\"]"
+                script = "window.__cmuxReplyFind ? window.__cmuxReplyFind(\(literal)[0]) : \"notFound\";"
+            }
+            webView.evaluateJavaScript(script) { [weak self] result, _ in
                 self?.onFindResult?(request.seq, (result as? String) == "published")
             }
         }
