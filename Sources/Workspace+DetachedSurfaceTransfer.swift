@@ -47,6 +47,8 @@ extension Workspace {
         let customTitle: String?
         let customTitleSource: Workspace.CustomTitleSource?
         let manuallyUnread: Bool
+        /// cmux-rbf #cm-126.14: an Agent Pane's answer state, so "You wrote <time>" survives a move to another workspace.
+        var agentPaneAnswerState: AgentPaneAnswerState? = nil
         let restoredUnreadIndicator: RestoredPanelUnreadIndicator?
         let restorableAgent: SessionRestorableAgentSnapshot?
         let restorableAgentResumeState: RestoredAgentResumeState?
@@ -110,6 +112,7 @@ extension Workspace {
                 customTitle: customTitle,
                 customTitleSource: customTitleSource,
                 manuallyUnread: manuallyUnread,
+                agentPaneAnswerState: agentPaneAnswerState,
                 restoredUnreadIndicator: restoredUnreadIndicator,
                 restorableAgent: restorableAgent,
                 restorableAgentResumeState: restorableAgentResumeState,

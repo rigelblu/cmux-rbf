@@ -3,7 +3,9 @@ import Bonsplit
 import CmuxBrowser
 import CmuxControlSocket
 import CmuxSettings
+import CmuxTerminal
 import Foundation
+import GhosttyKit
 import Testing
 
 #if canImport(cmux_DEV)
@@ -90,6 +92,9 @@ struct AgentPaneWorkspaceTests {
         private var scratchFiles: [URL] = []
         private var scratchDefaultsNames: [String] = []
         var externallyOpened: [URL] = []
+        /// cm-126.14: where this rig's workspace writes cleared pages, never Tom's Application Support.
+        let clearedFolder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cm-126.14-cleared-\(UUID().uuidString)", isDirectory: true)
 
         init() throws {
             _ = NSApplication.shared
@@ -102,6 +107,7 @@ struct AgentPaneWorkspaceTests {
             let id = try #require(workspace.focusedPanelId)
             terminalA = try #require(workspace.panels[id] as? TerminalPanel)
             terminalA.adoptStableSurfaceId(UUID())
+            workspace.agentPaneClearedFolderOverride = clearedFolder
             TerminalController.shared.setActiveTabManager(manager)
             Workspace.designFocusExternalOpen = DefaultBrowserOpenAction { [weak self] url in
                 self?.externallyOpened.append(url)
@@ -122,6 +128,27 @@ struct AgentPaneWorkspaceTests {
             UserDefaults.standard.removePersistentDomain(forName: suiteName)
             scratchDefaultsNames.forEach { UserDefaults.standard.removePersistentDomain(forName: $0) }
             scratchFiles.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: clearedFolder)
+        }
+
+        /// `clear`'s check and apply, as the socket runs them.
+        func clear(from terminal: TerminalPanel) -> ControlAgentPaneApplied? {
+            guard case .ready(let plan) = TerminalController.shared.controlAgentPaneClearCheck(
+                surfaceID: terminal.id, defaults: defaults
+            ) else { return nil }
+            return TerminalController.shared.controlAgentPaneApply(plan)
+        }
+
+        func clearCheck(from surfaceID: UUID, defaults: UserDefaults? = nil) -> ControlAgentPaneCheck {
+            TerminalController.shared.controlAgentPaneClearCheck(surfaceID: surfaceID, defaults: defaults ?? self.defaults)
+        }
+
+        func clearedPage(of panelID: UUID) -> URL {
+            AgentPaneMark.clearedPageURL(panelID: panelID, in: clearedFolder)
+        }
+
+        func clearedPageText(of panelID: UUID) -> String? {
+            try? String(contentsOf: clearedPage(of: panelID), encoding: .utf8)
         }
 
         func addTerminal(beside panel: UUID? = nil) throws -> TerminalPanel {
@@ -396,6 +423,16 @@ struct AgentPaneWorkspaceTests {
         await oneMainQueueTurn()
         #expect(rig.workspace.bonsplitController.tab(tabId)?.iconImageData == AgentPaneMark.shippedPicture,
                 "the subscription replaced the mark")
+    }
+
+    // Cold review, 2026-11-18: only a show into an open pane recorded its post, so a pane opened by its first post had no
+    // record, and a clear on a page that then failed to load (about:blank) linked nothing.
+    @Test("the first show, which opens the Agent Pane, records its post as the clear's last post")
+    func theShowThatOpensThePaneRecordsItsPost() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            #expect(agentPane.agentPaneLastPostURL == Self.page1, "the opening show recorded no post")
+        }
     }
 
     @Test("8. a snapshot keeps the owner and kind, through the workspace and the Dock; an unknown kind restores as a plain pane")
@@ -1070,6 +1107,7 @@ struct AgentPaneWorkspaceTests {
             let methods = try #require(result["methods"] as? [String])
             #expect(methods.contains("agent_pane.show"))
             #expect(methods.contains("agent_pane.list"))
+            #expect(methods.contains("agent_pane.clear"))
         }
     }
 
@@ -1093,4 +1131,776 @@ struct AgentPaneWorkspaceTests {
             #expect(rig.paneCount == 2)
         }
     }
+
+    // MARK: - cmux-rbf #cm-126.14: Answer state, Return flag, and caption refresh
+
+    @Test("Tom wrote note marks owner's first Agent Pane, sets caption, and clears terminal flag; another terminal marks nothing")
+    func tomWroteMarksFirstAgentPaneAndSetsCaption() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
+
+            let otherPaneID = try #require(rig.workspace.bonsplitController.allPaneIds.first)
+            let otherTerminal = try #require(rig.workspace.newTerminalSurface(inPane: otherPaneID, focus: false))
+            #expect(otherTerminal.surface.awaitsAgentPaneAnswer == false)
+
+            // Note to another terminal marks nothing
+            let otherResult = rig.workspace.noteTomWroteToTerminal(stableID: otherTerminal.stableSurfaceId)
+            #expect(otherResult == nil)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+
+            // Note to owner terminal marks its first Agent Pane and updates caption & flag
+            let wroteAt = Date(timeIntervalSince1970: 1731815520)
+            let marked = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
+            #expect(marked == .wroteSince(wroteAt))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+
+            let expectedTitle = AgentPaneMark.title(isAgentPaneKind: true, own: agentPane.displayTitle, wroteAt: wroteAt)
+            #expect(rig.workspace.panelTitles[agentPane.id] == expectedTitle)
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == expectedTitle)
+        }
+    }
+
+    @Test("show resets answer state to .post, restores terminal flag, and resets caption to Agent Pane")
+    func showResetsAnswerStateAndCaption() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
+            let wroteAt = Date(timeIntervalSince1970: 1731815520)
+            rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title != "Agent Pane")
+
+            // Navigate via show resets state to .post
+            _ = rig.show(from: rig.terminalA, Self.page2)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
+        }
+    }
+
+    @Test("clear sets .cleared, clears terminal flag, and a later Tom wrote note marks nothing")
+    func clearSetsClearedAndIgnoresLaterTomWrote() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+
+            rig.workspace.transitionAgentPaneState(panelId: agentPane.id, event: .clear)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
+
+            let wroteAt = Date(timeIntervalSince1970: 1731815520)
+            let afterClear = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
+            #expect(afterClear == .cleared)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
+        }
+    }
+
+    @Test("a renamed tab keeps its custom name across Tom wrote and refreshAgentPaneCaption")
+    func renamedTabKeepsCustomNameOnTomWrote() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
+            #expect(rig.workspace.setPanelCustomTitle(
+                panelId: agentPane.id, title: "Tom's custom tab", propagateToRemoteTmux: false, propagateToCloud: false
+            ))
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Tom's custom tab")
+
+            let wroteAt = Date(timeIntervalSince1970: 1731815520)
+            rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
+            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Tom's custom tab")
+        }
+    }
+
+    @Test("onAgentPaneReturn callback wired on TerminalSurface marks the workspace's Agent Pane")
+    func onAgentPaneReturnCallbackMarksWorkspace() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+            rig.terminalA.surface.onAgentPaneReturn?()
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+        }
+    }
+
+    @Test("restored terminal arriving after deferred Agent Pane reads its .post vs .cleared state into terminal flag")
+    func terminalArrivingAfterRestoredAgentPaneSyncsFlag() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let snapshot = rig.workspace.sessionSnapshot(includeScrollback: false)
+
+            // Restore into a fresh workspace with deferred browser panels
+            let restored = Workspace()
+            defer { restored.teardownAllPanels() }
+            let remap = restored.restoreSessionSnapshot(snapshot, deferBrowserPanels: true)
+            let restoredTerminalID = try #require(remap[rig.terminalA.id])
+            let restoredAgentPaneID = try #require(remap[agentPane.id])
+            let restoredTerminal = try #require(restored.panels[restoredTerminalID] as? TerminalPanel)
+
+            #expect(restored.agentPaneAnswerState(for: restoredAgentPaneID) == .post)
+            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == true)
+
+            // Also verify cleared URL restore sets .cleared and flag false
+            let clearedFolder = try #require(Workspace.agentPaneClearedFolderURL())
+            let clearedURL = clearedFolder.appendingPathComponent("\(agentPane.id.uuidString).html")
+            var clearedSnapshot = snapshot
+            for panelIdx in clearedSnapshot.panels.indices {
+                if clearedSnapshot.panels[panelIdx].id == agentPane.id {
+                    clearedSnapshot.panels[panelIdx].browser?.urlString = clearedURL.absoluteString
+                }
+            }
+            let restoredCleared = Workspace()
+            defer { restoredCleared.teardownAllPanels() }
+            let clearedRemap = restoredCleared.restoreSessionSnapshot(clearedSnapshot, deferBrowserPanels: true)
+            let clearedTerminalID = try #require(clearedRemap[rig.terminalA.id])
+            let clearedPaneID = try #require(clearedRemap[agentPane.id])
+            let clearedTerminal = try #require(restoredCleared.panels[clearedTerminalID] as? TerminalPanel)
+
+            #expect(restoredCleared.agentPaneAnswerState(for: clearedPaneID) == .cleared)
+            #expect(clearedTerminal.surface.awaitsAgentPaneAnswer == false)
+        }
+    }
+
+    @Test("Ghostty key-event overload maps GHOSTTY_MODS_CAPS and GHOSTTY_MODS_NUM to plain-value masks")
+    func ghosttyKeyEventOverloadMapsRealMods() {
+        var key = ghostty_input_key_s()
+        key.action = GHOSTTY_ACTION_PRESS
+        key.keycode = 0x24
+        key.mods = GHOSTTY_MODS_NONE
+        key.composing = false
+        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
+
+        key.mods = GHOSTTY_MODS_CAPS
+        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
+
+        key.mods = GHOSTTY_MODS_NUM
+        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
+
+        key.mods = ghostty_input_mods_e(rawValue: GHOSTTY_MODS_CAPS.rawValue | GHOSTTY_MODS_NUM.rawValue)
+        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
+
+        key.mods = GHOSTTY_MODS_SHIFT
+        #expect(!AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
+
+        key.mods = GHOSTTY_MODS_NONE
+        key.composing = true
+        #expect(!AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
+
+        key.composing = false
+        key.action = GHOSTTY_ACTION_RELEASE
+        #expect(!AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
+    }
+
+    // MARK: - cmux-rbf #cm-126.14: Step 2 cold-review fixes (red-first)
+
+    @Test("live non-deferred restore sets terminal flag true and Agent Pane caption when terminal restores before pane")
+    func liveNonDeferredRestoreSetsTerminalFlagAndCaption() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let snapshot = rig.workspace.sessionSnapshot(includeScrollback: false)
+
+            let restored = Workspace()
+            defer { restored.teardownAllPanels() }
+            let remap = restored.restoreSessionSnapshot(snapshot, deferBrowserPanels: false)
+            let restoredTerminalID = try #require(remap[rig.terminalA.id])
+            let restoredAgentPaneID = try #require(remap[agentPane.id])
+            let restoredTerminal = try #require(restored.panels[restoredTerminalID] as? TerminalPanel)
+            let tabID = try #require(restored.surfaceIdFromPanelId(restoredAgentPaneID))
+
+            #expect(restored.agentPaneAnswerState(for: restoredAgentPaneID) == .post)
+            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == true)
+            #expect(restored.bonsplitController.tab(tabID)?.title == "Agent Pane")
+        }
+    }
+
+    @Test("materializing a restored placeholder preserves 'You wrote' state, caption, and false terminal flag")
+    func materializingPlaceholderPreservesWroteSinceState() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let snapshot = rig.workspace.sessionSnapshot(includeScrollback: false)
+
+            let restored = Workspace()
+            defer { restored.teardownAllPanels() }
+            let remap = restored.restoreSessionSnapshot(snapshot, deferBrowserPanels: true)
+            let restoredTerminalID = try #require(remap[rig.terminalA.id])
+            let restoredAgentPaneID = try #require(remap[agentPane.id])
+            let restoredTerminal = try #require(restored.panels[restoredTerminalID] as? TerminalPanel)
+            let deferred = try #require(restored.panels[restoredAgentPaneID] as? DeferredBrowserPanel)
+            let tabID = try #require(restored.surfaceIdFromPanelId(restoredAgentPaneID))
+
+            let wroteAt = Date(timeIntervalSince1970: 1731815520)
+            restored.noteTomWroteToTerminal(stableID: restoredTerminal.stableSurfaceId, at: wroteAt)
+            let expectedTitle = AgentPaneMark.title(isAgentPaneKind: true, own: "", wroteAt: wroteAt)
+            #expect(restored.bonsplitController.tab(tabID)?.title == expectedTitle)
+            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == false)
+
+            _ = try #require(restored.materializeDeferredBrowserPanel(deferred))
+            #expect(restored.agentPaneAnswerState(for: restoredAgentPaneID) == .wroteSince(wroteAt))
+            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == false)
+            #expect(restored.bonsplitController.tab(tabID)?.title == expectedTitle)
+        }
+    }
+
+    @Test("closing the Agent Pane clears its answer state and sets owning terminal flag to false")
+    func closingAgentPaneClearsStateAndTerminalFlag() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+            #expect(rig.workspace.agentPaneAnswerStates[agentPane.id] == .post)
+
+            #expect(rig.workspace.closePanel(agentPane.id, force: true))
+            #expect(rig.workspace.agentPaneAnswerStates[agentPane.id] == nil)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+        }
+    }
+
+    @Test("GhosttyNSView dispatchGhosttyKey marks on normal key and manual key branches, and skips IME accumulatedText")
+    func ghosttyViewDispatchKeyMarksBothBranchesAndSkipsIME() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let view = GhosttyNSView(frame: .zero)
+            view.terminalSurface = rig.terminalA.surface
+
+            var returnKey = ghostty_input_key_s()
+            returnKey.action = GHOSTTY_ACTION_PRESS
+            returnKey.keycode = 0x24
+            returnKey.mods = GHOSTTY_MODS_NONE
+            returnKey.composing = false
+
+            // 1. IME accumulatedText must NOT mark even with composing == false
+            #expect(view.dispatchGhosttyKey(returnKey, hasAccumulatedText: true, sendToGhostty: { true }))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+
+            // 2. Normal Ghostty-handled Return marks the pane
+            #expect(view.dispatchGhosttyKey(returnKey, hasAccumulatedText: false, sendToGhostty: { true }))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+
+            // 3. Reset with show, then test manual-key branch
+            _ = rig.show(from: rig.terminalA, Self.page2)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+
+            #expect(view.dispatchGhosttyKey(
+                returnKey,
+                manualKeyName: "enter",
+                isBindingForManualKey: { false },
+                enqueueManualKey: { _ in true },
+                sendToGhostty: { false }
+            ))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+        }
+    }
+
+    @Test("TextBoxInputContainer.completeNormalSubmitAgentPane marks only when didSubmit is true")
+    func textBoxNormalSubmitMarksOnlyOnDidSubmit() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+
+            TextBoxInputContainer.completeNormalSubmitAgentPane(didSubmit: false, surface: rig.terminalA.surface)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+
+            TextBoxInputContainer.completeNormalSubmitAgentPane(didSubmit: true, surface: rig.terminalA.surface)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+        }
+    }
+
+    @Test("TextBoxSubmit.sendNormalSubmitEvents marks the owner's Agent Pane once the terminal accepted the send, and not when it rejected it")
+    func textBoxNormalSubmitSendMarksOnAcceptedSendOnly() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let fake = AgentPaneFakeTextBoxSubmitSurface(terminal: rig.terminalA.surface)
+
+            fake.sendKeyTextResult = false
+            var rejectedContext: TextBoxSubmit.CompletionContext?
+            TextBoxSubmit.sendNormalSubmitEvents([.keyText("hello")], via: fake) { rejectedContext = $0 }
+            #expect(rejectedContext?.didSubmit == false)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+
+            fake.sendKeyTextResult = true
+            var acceptedContext: TextBoxSubmit.CompletionContext?
+            TextBoxSubmit.sendNormalSubmitEvents([.keyText("hello")], via: fake) { acceptedContext = $0 }
+            #expect(acceptedContext?.didSubmit == true)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+        }
+    }
+
+    // MARK: - clear (cm-126.14, step 3)
+
+    private func fileURLsMatch(_ a: URL?, _ b: URL) -> Bool {
+        a?.resolvingSymlinksInPath().path == b.resolvingSymlinksInPath().path
+    }
+
+    @Test("clear writes the pane's own page with a link to the last post, steers the pane to it, and marks it cleared")
+    func clearShowsTheClearedPage() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let paneCount = rig.paneCount
+            let applied = try #require(rig.clear(from: rig.terminalA))
+            #expect(applied.action == .cleared)
+            #expect(applied.surfaceID == agentPane.id)
+            #expect(rig.paneCount == paneCount, "a clear opens no pane")
+            #expect(rig.agentPaneCount == 1)
+            #expect(fileURLsMatch(agentPane.currentURL, rig.clearedPage(of: agentPane.id)))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+            let text = try #require(rig.clearedPageText(of: agentPane.id))
+            #expect(text == AgentPaneMark.clearedPageHTML(
+                title: "Nothing to answer right now", linkText: "The last post", previousURL: Self.page1
+            ))
+            #expect(text.contains("href=\"\(Self.page1.absoluteString)\""))
+        }
+    }
+
+    @Test("a clear on a pane already cleared succeeds and changes nothing, so the link still points at the post")
+    func repeatClearChangesNothing() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let before = try #require(rig.clearedPageText(of: agentPane.id))
+            let shown = agentPane.currentURL
+            let again = try #require(rig.clear(from: rig.terminalA))
+            #expect(again.action == .alreadyCleared)
+            #expect(again.surfaceID == agentPane.id)
+            #expect(rig.clearedPageText(of: agentPane.id) == before)
+            #expect(agentPane.currentURL == shown)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+        }
+    }
+
+    @Test("a show after a clear is a post again; the next clear rewrites the same file with the new link")
+    func showThenClearOverwritesThePage() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            _ = try #require(rig.show(from: rig.terminalA, Self.page2))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+            #expect(agentPane.currentURL == Self.page2)
+            let applied = try #require(rig.clear(from: rig.terminalA))
+            #expect(applied.action == .cleared)
+            let text = try #require(rig.clearedPageText(of: agentPane.id))
+            #expect(text.contains("href=\"\(Self.page2.absoluteString)\""))
+            #expect(!text.contains(Self.page1.absoluteString))
+            #expect(try FileManager.default.contentsOfDirectory(atPath: rig.clearedFolder.path).count == 1)
+        }
+    }
+
+    @Test("Tom writing after a clear marks nothing")
+    func writingAfterAClearMarksNothing() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            _ = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(agentPane.currentURL.map { fileURLsMatch($0, rig.clearedPage(of: agentPane.id)) } == true)
+        }
+    }
+
+    @Test("clear is refused for a terminal with no Agent Pane, a plain browser pane, a non-terminal and an unknown surface, and opens nothing")
+    func clearRefusals() throws {
+        try withRig { rig in
+            let plain = try rig.addPlainBrowser()
+            let paneCount = rig.paneCount
+            #expect(rig.clearCheck(from: rig.terminalA.id) == .refused(.noAgentPane))
+            #expect(rig.clearCheck(from: plain.id) == .refused(.notTerminal(surfaceID: plain.id, type: "browser")))
+            let ghost = UUID()
+            #expect(rig.clearCheck(from: ghost) == .refused(.notFound(surfaceID: ghost)))
+            #expect(rig.paneCount == paneCount)
+            #expect(rig.agentPaneCount == 0)
+            #expect(!FileManager.default.fileExists(atPath: rig.clearedFolder.path), "a refused clear wrote a page")
+        }
+    }
+
+    @Test("clear is refused when local files are off, and when the browser is off, writing nothing")
+    func clearRefusedBySettings() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let suite = "cm-126.14-nofiles-\(UUID().uuidString)"
+            let noFiles = try #require(AgentPaneForcedNoLocalFilesDefaults(suiteName: suite))
+            defer { noFiles.removePersistentDomain(forName: suite) }
+            noFiles.set(false, forKey: ManagedDevicePolicyKey.browserAllowLocalFiles.rawValue)
+            try #require(!BrowserURLAllowlistPolicy(defaults: noFiles).allowsLocalFiles)
+            if case .refused(.urlBlocked) = rig.clearCheck(from: rig.terminalA.id, defaults: noFiles) {} else {
+                Issue.record("local files off answered \(rig.clearCheck(from: rig.terminalA.id, defaults: noFiles))")
+            }
+            let browserOff = try rig.isolatedDefaults("browseroff")
+            browserOff.set(true, forKey: BrowserAvailabilitySettings.disabledKey)
+            #expect(rig.clearCheck(from: rig.terminalA.id, defaults: browserOff) == .refused(.browserOff))
+            #expect(rig.clearedPageText(of: agentPane.id) == nil)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+        }
+    }
+
+    @Test("two Agent Panes get two page files, each with its own link")
+    func eachPaneHasItsOwnPage() throws {
+        try withRig { rig in
+            let terminalB = try rig.addTerminal()
+            let paneA = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let paneB = try rig.browser(rig.show(from: terminalB, Self.page2)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let aText = try #require(rig.clearedPageText(of: paneA.id))
+            _ = try #require(rig.clear(from: terminalB))
+            #expect(rig.clearedPageText(of: paneA.id) == aText, "clearing B changed A's page")
+            #expect(try #require(rig.clearedPageText(of: paneB.id)).contains(Self.page2.absoluteString))
+            #expect(rig.clearedPage(of: paneA.id) != rig.clearedPage(of: paneB.id))
+        }
+    }
+
+    @Test("with Design Focus on, a clear is held: nothing changes until it ends, then it applies with the link computed then")
+    func designFocusHoldsAClear() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            try enterDesignFocus(rig)
+            let held = try #require(rig.clear(from: rig.terminalA))
+            #expect(held.action == .heldDesignFocus)
+            #expect(held.surfaceID == agentPane.id)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(agentPane.currentURL == Self.page1)
+            #expect(rig.clearedPageText(of: agentPane.id) == nil)
+            agentPane.navigate(to: Self.page2)
+            rig.workspace.exitDesignFocus(reason: "test")
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(fileURLsMatch(agentPane.currentURL, rig.clearedPage(of: agentPane.id)))
+            let text = try #require(rig.clearedPageText(of: agentPane.id))
+            #expect(text.contains(Self.page2.absoluteString), "the link is not the page the pane showed when the clear applied")
+            #expect(rig.agentPaneCount == 1)
+        }
+    }
+
+    @Test("a held clear whose pane closed meanwhile opens no Agent Pane and writes no page")
+    func heldClearForAClosedPaneIsDropped() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            try enterDesignFocus(rig)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let paneCount = rig.paneCount
+            #expect(rig.workspace.closePanel(agentPane.id, force: true))
+            rig.workspace.exitDesignFocus(reason: "test")
+            #expect(rig.agentPaneCount == 0, "a held clear opened an Agent Pane")
+            #expect(rig.paneCount <= paneCount)
+            #expect(rig.clearedPageText(of: agentPane.id) == nil)
+        }
+    }
+
+    @Test("a held clear on a pane that is already cleared leaves its page and link as they were")
+    func heldClearOnAClearedPaneChangesNothing() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let before = try #require(rig.clearedPageText(of: agentPane.id))
+            try enterDesignFocus(rig)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            rig.workspace.exitDesignFocus(reason: "test")
+            #expect(rig.clearedPageText(of: agentPane.id) == before, "the link now points at the cleared page itself")
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+        }
+    }
+
+    @Test("a restored pane whose page is in its workspace's cleared folder comes back cleared")
+    func restoreDerivesClearedFromTheWorkspacesFolder() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let snapshot = rig.workspace.sessionSnapshot(includeScrollback: false)
+            let restored = Workspace()
+            defer { restored.teardownAllPanels() }
+            restored.agentPaneClearedFolderOverride = rig.clearedFolder
+            let remap = restored.restoreSessionSnapshot(snapshot, deferBrowserPanels: true)
+            let restoredPane = try #require(remap[agentPane.id])
+            #expect(restored.agentPaneAnswerState(for: restoredPane) == .cleared)
+        }
+    }
+
+    @Test("held clear and held show: the later one wins, either way round")
+    func latestHeldUpdateWinsBetweenShowAndClear() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            try enterDesignFocus(rig)
+            _ = try #require(rig.show(from: rig.terminalA, Self.page2))
+            _ = try #require(rig.clear(from: rig.terminalA))
+            rig.workspace.exitDesignFocus(reason: "test")
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+        }
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            try enterDesignFocus(rig)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            _ = try #require(rig.show(from: rig.terminalA, Self.page2))
+            rig.workspace.exitDesignFocus(reason: "test")
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(agentPane.currentURL == Self.page2)
+        }
+    }
+
+    @Test("Tom closing the Agent Pane deletes its page; a workspace teardown, a quit and a move keep it")
+    func closingThePaneDeletesItsPageOnlyWhenTomCloses() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let page = rig.clearedPage(of: agentPane.id)
+            #expect(FileManager.default.fileExists(atPath: page.path))
+            #expect(rig.workspace.closePanel(agentPane.id, force: true))
+            #expect(!FileManager.default.fileExists(atPath: page.path), "Tom closed the pane and its page stayed")
+        }
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let page = rig.clearedPage(of: agentPane.id)
+            rig.workspace.removeClearedPageIfClosedByTom(
+                panelId: agentPane.id, origin: "tab_close", closePanel: true, appIsTerminating: true
+            )
+            rig.workspace.removeClearedPageIfClosedByTom(
+                panelId: agentPane.id, origin: "tab_close", closePanel: false, appIsTerminating: false
+            )
+            #expect(FileManager.default.fileExists(atPath: page.path), "a quit or a move deleted the page")
+            rig.workspace.teardownAllPanels()
+            #expect(FileManager.default.fileExists(atPath: page.path), "a workspace teardown deleted the page")
+        }
+    }
+
+    @Test("agent_pane.clear over the socket clears the caller's pane and answers with the action and the page")
+    func clearOverTheSocket() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let reply = try rig.call("agent_pane.clear", ["surface_id": rig.terminalA.id.uuidString])
+            #expect(reply["ok"] as? Bool == true, "\(reply)")
+            let result = try #require(reply["result"] as? [String: Any])
+            #expect(result["action"] as? String == "cleared")
+            #expect(result["surface_id"] as? String == agentPane.id.uuidString)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            let again = try rig.call("agent_pane.clear", ["surface_id": rig.terminalA.id.uuidString])
+            let againResult = try #require(again["result"] as? [String: Any])
+            #expect(againResult["action"] as? String == "already-cleared")
+        }
+    }
+
+    // MARK: - step 3d (cold review)
+
+    @Test("a clear after the pane went back to its cleared page links the last post, never the cleared page itself")
+    func clearAfterBackToTheClearedPageKeepsTheLastPost() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let cleared = rig.clearedPage(of: agentPane.id)
+            _ = try #require(rig.show(from: rig.terminalA, Self.page2))
+            // Tom swipes back: the pane shows the cleared page again, the state is still a post, and he writes.
+            agentPane.navigate(to: cleared)
+            #expect(fileURLsMatch(agentPane.currentURL, cleared))
+            _ = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId)
+            let applied = try #require(rig.clear(from: rig.terminalA))
+            #expect(applied.action == .cleared)
+            let text = try #require(rig.clearedPageText(of: agentPane.id))
+            #expect(text.contains("href=\"\(Self.page2.absoluteString)\""), "the link is not the last post: \(text)")
+            #expect(!text.contains("href=\"file:"), "the cleared page links to a cleared page")
+        }
+    }
+
+    @Test("a cleared pane moved to another workspace is still cleared there; a post stays a post")
+    func movedPaneKeepsItsAnswerStateAcrossWorkspaces() throws {
+        for clearFirst in [true, false] {
+            try withRig { rig in
+                let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+                if clearFirst { _ = try #require(rig.clear(from: rig.terminalA)) }
+                let other = Workspace()
+                defer { other.teardownAllPanels() }
+                other.agentPaneClearedFolderOverride = rig.clearedFolder
+                let detached = try #require(rig.workspace.detachSurface(panelId: agentPane.id))
+                let otherPane = try #require(other.bonsplitController.allPaneIds.first)
+                #expect(other.attachDetachedSurface(detached, inPane: otherPane, focus: false) == agentPane.id)
+                #expect(
+                    other.agentPaneAnswerState(for: agentPane.id) == (clearFirst ? .cleared : .post),
+                    "cleared first: \(clearFirst)"
+                )
+            }
+        }
+    }
+
+    @Test("an agent that shows the cleared page itself and then clears gets the cleared page's own link, never the page")
+    func clearAfterShowingTheClearedPageItselfKeepsItsOwnLink() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            let cleared = rig.clearedPage(of: agentPane.id)
+            // The record of the last post now names a cleared page, so the clear falls back to the link the page has.
+            _ = try #require(rig.show(from: rig.terminalA, cleared))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            let applied = try #require(rig.clear(from: rig.terminalA))
+            #expect(applied.action == .cleared)
+            let text = try #require(rig.clearedPageText(of: agentPane.id))
+            #expect(text.contains("href=\"\(Self.page1.absoluteString)\""), "the link is not the page's own link: \(text)")
+        }
+    }
+
+    @Test("a plain browser pane moved to another workspace gains no Agent Pane answer state")
+    func movedPlainBrowserPaneGainsNoAnswerState() throws {
+        try withRig { rig in
+            let plain = try rig.addPlainBrowser()
+            let other = Workspace()
+            defer { other.teardownAllPanels() }
+            let detached = try #require(rig.workspace.detachSurface(panelId: plain.id))
+            let otherPane = try #require(other.bonsplitController.allPaneIds.first)
+            #expect(other.attachDetachedSurface(detached, inPane: otherPane, focus: false) == plain.id)
+            #expect(other.agentPaneAnswerStates[plain.id] == nil, "a plain browser pane got an answer state")
+            #expect(other.agentPaneAnswerStates.isEmpty)
+        }
+    }
+
+    @Test("a held clear with no pane answers a null url over the socket, not the cleared folder")
+    func heldClearWithNoPaneAnswersNullURL() throws {
+        try withRig { rig in
+            try enterDesignFocus(rig)
+            _ = try #require(rig.show(from: rig.terminalA, Self.page1))
+            let reply = try rig.call("agent_pane.clear", ["surface_id": rig.terminalA.id.uuidString])
+            #expect(reply["ok"] as? Bool == true, "\(reply)")
+            let result = try #require(reply["result"] as? [String: Any])
+            #expect(result["action"] as? String == "held-design-focus")
+            #expect(result["url"] is NSNull, "url was \(String(describing: result["url"]))")
+            #expect(result["surface_id"] is NSNull)
+        }
+    }
+
+    @Test("a pane moved to another workspace keeps You wrote, its time and its caption")
+    func movedPaneKeepsYouWrote() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let wroteAt = Date(timeIntervalSince1970: 1731815520)
+            _ = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
+            let other = Workspace()
+            defer { other.teardownAllPanels() }
+            let detached = try #require(rig.workspace.detachSurface(panelId: agentPane.id))
+            let otherPane = try #require(other.bonsplitController.allPaneIds.first)
+            #expect(other.attachDetachedSurface(detached, inPane: otherPane, focus: false) == agentPane.id)
+            #expect(other.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
+            let tabID = try #require(other.surfaceIdFromPanelId(agentPane.id))
+            #expect(other.bonsplitController.tab(tabID)?.title == AgentPaneMark.title(isAgentPaneKind: true, own: "", wroteAt: wroteAt))
+        }
+    }
+
+    @Test("a post moved to another pane is still a post")
+    func movedPostPaneStaysAPost() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            let tomsPane = try #require(rig.workspace.newTerminalSplit(
+                from: rig.terminalA.id, orientation: .horizontal, insertFirst: true, focus: false
+            ))
+            tomsPane.adoptStableSurfaceId(UUID())
+            #expect(rig.workspace.moveSurface(panelId: agentPane.id, toPane: try rig.pane(of: tomsPane.id), focus: false))
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+        }
+    }
+
+    @Test("under Design Focus a clear on an already-cleared pane answers already-cleared and holds nothing")
+    func clearedPaneUnderDesignFocusHoldsNothing() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            try enterDesignFocus(rig)
+            let applied = try #require(rig.clear(from: rig.terminalA))
+            #expect(applied.action == .alreadyCleared, "answered \(applied.action)")
+            #expect(applied.surfaceID == agentPane.id)
+            #expect(rig.workspace.heldAgentPaneUpdates.isEmpty)
+        }
+    }
+
+    @Test("a held show for a cleared pane makes the clear a real change, so it is held and replaces the show")
+    func clearReplacesAHeldShowOnAClearedPane() throws {
+        try withRig { rig in
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            _ = try #require(rig.clear(from: rig.terminalA))
+            try enterDesignFocus(rig)
+            _ = try #require(rig.show(from: rig.terminalA, Self.page2))
+            let applied = try #require(rig.clear(from: rig.terminalA))
+            #expect(applied.action == .heldDesignFocus, "answered \(applied.action)")
+            rig.workspace.exitDesignFocus(reason: "test")
+            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(fileURLsMatch(agentPane.currentURL, rig.clearedPage(of: agentPane.id)), "the held show still opened its post")
+        }
+    }
+
+    @Test("a clear while a show is held for a pane not yet open replaces the show, and nothing opens when Design Focus ends")
+    func clearRetiresAHeldShowBeforeAnyPaneOpened() throws {
+        try withRig { rig in
+            try enterDesignFocus(rig)
+            #expect(try #require(rig.show(from: rig.terminalA, Self.page1)).action == .heldDesignFocus)
+            #expect(rig.agentPaneCount == 0)
+            let applied = try #require(rig.clear(from: rig.terminalA), "a clear with a held show was refused")
+            #expect(applied.action == .heldDesignFocus)
+            #expect(applied.surfaceID == nil)
+            #expect(applied.url == nil, "a clear held with no pane has no page: \(String(describing: applied.url))")
+            rig.workspace.exitDesignFocus(reason: "test")
+            #expect(rig.agentPaneCount == 0, "the retired post opened an Agent Pane")
+            #expect(!FileManager.default.fileExists(atPath: rig.clearedFolder.path), "a held clear with no pane wrote a page")
+        }
+    }
+
+    @Test("with no pane and no held show, a clear is still refused, Design Focus or not")
+    func clearWithNothingToClearIsRefusedUnderDesignFocus() throws {
+        try withRig { rig in
+            try enterDesignFocus(rig)
+            #expect(rig.clearCheck(from: rig.terminalA.id) == .refused(.noAgentPane))
+        }
+    }
+
+    // (the refusal over the socket)
+
+    @Test("clear on a terminal with no Agent Pane is refused over the socket and opens nothing")
+    func clearWithoutAnAgentPaneRefusesAndOpensNothing() throws {
+        try withRig { rig in
+            let paneCountBefore = rig.paneCount
+            let reply = try rig.call("agent_pane.clear", ["surface_id": rig.terminalA.id.uuidString])
+            #expect(reply["ok"] as? Bool == false, "\(reply)")
+            let error = try #require(reply["error"] as? [String: Any])
+            #expect(error["code"] as? String == "invalid_params")
+            let data = try #require(error["data"] as? [String: Any])
+            #expect(data["reason"] as? String == "no_agent_pane")
+            #expect(rig.paneCount == paneCountBefore)
+            #expect(rig.agentPaneCount == 0)
+        }
+    }
+}
+
+/// cmux-rbf #cm-126.14: Settings' "local files off", which only counts when the profile forces it (as in FigmaPageSwitchTests).
+private final class AgentPaneForcedNoLocalFilesDefaults: UserDefaults, @unchecked Sendable {
+    override func objectIsForced(forKey defaultName: String) -> Bool {
+        defaultName == ManagedDevicePolicyKey.browserAllowLocalFiles.rawValue
+    }
+}
+
+/// cmux-rbf #cm-126.14: a text-box send target that accepts or rejects writes, and names a real terminal surface.
+@MainActor
+private final class AgentPaneFakeTextBoxSubmitSurface: TextBoxSubmitSurfaceControlling {
+    let terminal: TerminalSurface
+    var sendKeyTextResult = true
+    var clipboardReadGeneration = 0
+    var textBoxSubmitObservationWindow: NSWindow?
+    var textBoxSubmitTerminalSurface: TerminalSurface? { terminal }
+
+    init(terminal: TerminalSurface) { self.terminal = terminal }
+
+    func visibleText() -> String? { nil }
+    @discardableResult func sendKeyText(_ text: String) -> Bool { sendKeyTextResult }
+    @discardableResult func sendText(_ text: String) -> Bool { true }
+    @discardableResult func sendNamedKey(_ keyName: String) -> TerminalSurface.NamedKeySendResult { .sent }
+    @discardableResult func performBindingAction(_ action: String) -> Bool { true }
 }

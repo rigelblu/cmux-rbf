@@ -2594,6 +2594,33 @@ extension Workspace {
                 _ = browserPanel.hideDeveloperTools()
             }
         }
+
+        // cmux-rbf #cm-126.14: restore Agent Pane answer state after `browserPanel.restoreSessionSnapshot`
+        // sets `ownerTerminalSurfaceId`/`ownedKind`, preserving any existing state on materialization.
+        if let terminal = panels[panelId] as? TerminalPanel {
+            syncTerminalAgentPaneAnswerFlag(for: terminal)
+        } else if let browserSnapshot = snapshot.browser,
+                  AgentPaneMark.isAgentPaneKind(
+                    owner: browserSnapshot.ownerTerminalSurfaceId,
+                    kind: browserSnapshot.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
+                  ) {
+            if agentPaneAnswerStates[panelId] == nil {
+                let restoredURL = browserSnapshot.urlString.flatMap(URL.init(string:))
+                let isCleared: Bool
+                if let clearedFolder = agentPaneClearedFolder {
+                    isCleared = AgentPaneMark.restoredState(url: restoredURL, clearedFolderURL: clearedFolder) == .cleared
+                } else {
+                    isCleared = false
+                }
+                transitionAgentPaneState(panelId: panelId, event: isCleared ? .clear : .show)
+            } else {
+                if let owner = browserSnapshot.ownerTerminalSurfaceId,
+                   let terminal = agentPaneOwnerTerminal(stableID: owner) {
+                    syncTerminalAgentPaneAnswerFlag(for: terminal)
+                }
+                refreshAgentPaneCaption(panelId: panelId)
+            }
+        }
     }
 
     private func restoreWorkspaceManualUnread(_ isManuallyUnread: Bool) {
@@ -3371,8 +3398,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     }()
     // cmux-rbf #cm-73.2a
     static var designFocusExternalOpen = DefaultBrowserOpenAction()
-    /// cmux-rbf #cm-126.3: latest page per owner, held only until Design Focus ends.
-    var heldAgentPaneUpdates: [UUID: URL] = [:]
+    /// cmux-rbf #cm-126.3, #cm-126.14: the latest update per owner, a page or a clear, held only until Design Focus ends.
+    var heldAgentPaneUpdates: [UUID: HeldAgentPaneUpdate] = [:]
+    /// cmux-rbf #cm-126.14: where cleared pages go; a test points it at its own folder, nil means the app's.
+    var agentPaneClearedFolderOverride: URL?
+    /// cmux-rbf #cm-126.14: per-Agent-Pane answer state, in memory only (not persisted in session snapshot).
+    var agentPaneAnswerStates: [UUID: AgentPaneAnswerState] = [:]
 #if DEBUG
     /// XCTest seam: assign before `configureRemoteConnection` to script the
     /// session coordinator's subprocess results. Instance-scoped injection of
@@ -5011,6 +5042,11 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             guard let self, let terminalPanel else { return false }
             return self.resumeAgentHibernation(panelId: terminalPanel.id, focus: focus)
         }
+        terminalPanel.surface.onAgentPaneReturn = { [weak self, weak terminalPanel] in
+            guard let self, let terminalPanel else { return }
+            self.noteTomWroteToTerminal(stableID: terminalPanel.stableSurfaceId)
+        }
+        syncTerminalAgentPaneAnswerFlag(for: terminalPanel)
     }
 
     private func configureBrowserPanel(_ browserPanel: BrowserPanel) {
@@ -5300,7 +5336,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             guard let existing = self.bonsplitController.tab(tabId) else { return }
             let nextTitle = AgentPaneMark.title(
                 isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
-                own: browserPanel.displayTitle
+                own: browserPanel.displayTitle,
+                wroteAt: self.agentPaneAnswerState(for: browserPanel.id).wroteAt
             )
             if self.panelTitles[browserPanel.id] != nextTitle {
                 self.panelTitles[browserPanel.id] = nextTitle
@@ -6770,7 +6807,11 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             browserPanel.resetForWorkspaceContextChange(reason: reason)
             // cmux-rbf #cm-126.3: reset does not change the owned pane's identity.
             let isAgentPaneKind = AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind)
-            let nextTitle = AgentPaneMark.title(isAgentPaneKind: isAgentPaneKind, own: browserPanel.displayTitle)
+            let nextTitle = AgentPaneMark.title(
+                isAgentPaneKind: isAgentPaneKind,
+                own: browserPanel.displayTitle,
+                wroteAt: agentPaneAnswerState(for: browserPanel.id).wroteAt
+            )
             _ = updatePanelTitle(panelId: browserPanel.id, title: nextTitle)
 
             guard let tabId = surfaceIdFromPanelId(browserPanel.id),
@@ -11673,6 +11714,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         } else if let customSidebarPanel = detached.panel as? CustomSidebarPanel {
             customSidebarPanel.reattach(to: self)
         }
+        // cmux-rbf #cm-126.14: the workspace this Agent Pane came from dropped its answer state; take the one it carried,
+        // else derive it from the page.
+        adoptDetachedAgentPaneAnswerState(panelId: detached.panelId, carried: detached.agentPaneAnswerState)
         AgentHibernationController.shared.transferTrackingStateForMovedPanel(
             panelId: detached.panelId,
             from: detached.sourceWorkspaceId,
@@ -15143,6 +15187,7 @@ extension Workspace: BonsplitDelegate {
                     ? (panelCustomTitleSources[panelId] ?? .user)
                     : nil,
                 manuallyUnread: manualUnreadPanelIds.contains(panelId),
+                agentPaneAnswerState: agentPaneAnswerStates[panelId],
                 restoredUnreadIndicator: restoredUnreadPanelIndicators[panelId],
                 restorableAgent: restorableAgent,
                 restorableAgentResumeState: restorableAgentResumeState,

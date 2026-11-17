@@ -570,6 +570,27 @@ extension Workspace {
         panelGitBranches.removeValue(forKey: panelId)
         panelPullRequests.removeValue(forKey: panelId)
         panelTitles.removeValue(forKey: panelId)
+        agentPaneAnswerStates.removeValue(forKey: panelId)
+        if let closedPanel = removedPanel ?? panel {
+            let closedOwner: UUID?
+            if let browser = closedPanel as? BrowserPanel,
+               AgentPaneMark.isAgentPaneKind(owner: browser.ownerTerminalSurfaceId, kind: browser.ownedKind) {
+                closedOwner = browser.ownerTerminalSurfaceId
+            } else if let deferred = closedPanel as? DeferredBrowserPanel,
+                      let b = deferred.sessionPanelSnapshot.browser,
+                      AgentPaneMark.isAgentPaneKind(owner: b.ownerTerminalSurfaceId, kind: b.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))) {
+                closedOwner = b.ownerTerminalSurfaceId
+            } else {
+                closedOwner = nil
+            }
+            if let owner = closedOwner, let ownerTerminal = agentPaneOwnerTerminal(stableID: owner) {
+                syncTerminalAgentPaneAnswerFlag(for: ownerTerminal)
+            }
+            if closedOwner != nil {
+                // cmux-rbf #cm-126.14: Tom closing the pane removes its cleared page; a teardown or quit does not.
+                removeClearedPageIfClosedByTom(panelId: panelId, origin: origin, closePanel: closePanel)
+            }
+        }
         panelCustomTitles.removeValue(forKey: panelId)
         panelCustomTitleSources.removeValue(forKey: panelId)
         pinnedPanelIds.remove(panelId)
