@@ -1268,7 +1268,8 @@
         "figma": {
           "description": "Configurações do Figma.",
           "defaultFolder": "Link para a pasta do Figma para onde vão os novos designs quando figma.folders não tem uma entrada para o diretório deles. Use o link da barra de endereços do Figma na página da pasta. Os agentes leem com \"cmux figma folder\".",
-          "folders": "Pastas do Figma por diretório: cada chave é um diretório e cada valor é o link da pasta do Figma para onde devem ir os novos designs criados nesse diretório ou dentro dele. Vence o diretório correspondente mais próximo; nos demais casos vale figma.defaultFolder. Os agentes leem com \"cmux figma folder\"."
+          "folders": "Pastas do Figma por diretório: cada chave é um diretório e cada valor é o link da pasta do Figma para onde devem ir os novos designs criados nesse diretório ou dentro dele. Vence o diretório correspondente mais próximo; nos demais casos vale figma.defaultFolder. Os agentes leem com \"cmux figma folder\".",
+          "showFileNameInHeader": "Mostra o nome do arquivo exibido em um painel do Figma em seu cabeçalho, como Figma (name). Desativado, o cabeçalho exibe Figma."
         },
         "reply": {
           "description": "Painel de respostas",

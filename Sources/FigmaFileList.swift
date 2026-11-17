@@ -54,7 +54,7 @@ struct FigmaFileList: Equatable {
         }
         guard let link = components.url else { return }
         let previous = entries.first { $0.key == key }
-        let titleName = title.flatMap(Self.fileName(fromTitle:))
+        let titleName = title.flatMap(Self.titleName)
         let name = titleName ?? (previous?.nameFromTitle == true ? previous?.name : nil)
             ?? Self.fileName(fromLink: document)
         let entry = Entry(
@@ -70,29 +70,43 @@ struct FigmaFileList: Equatable {
 
     /// A late title updates the row where it stands, never its recency.
     mutating func rename(key: String, title: String) {
-        guard let name = Self.fileName(fromTitle: title),
+        guard let name = Self.titleName(title),
               let index = entries.firstIndex(where: { $0.key == key }) else { return }
         entries[index].name = name
         entries[index].nameFromTitle = true
     }
 
-    private static func fileName(fromTitle title: String) -> String? {
+    /// The name Figma's own page title gives a file, or `nil` when the title names none.
+    ///
+    /// cmux-rbf #cm-73.43: `cm-73.16`'s private rule, shared and strict. A title counts
+    /// only when it ends in ` – Figma`, ` – FigJam` or ` – Figma Slides`, so a failed
+    /// load (whose title is the address it failed on) and a bare `Figma` name no file.
+    /// The menu's list and the header's rule (`FigmaTabTitle`) both ask it.
+    static func titleName(_ title: String) -> String? {
         var name = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, !["Figma", "FigJam", "Figma Slides"].contains(name) else { return nil }
-        for suffix in [" – Figma Slides", " – FigJam", " – Figma"] where name.hasSuffix(suffix) {
-            name.removeLast(suffix.count)
-            break
+        guard let suffix = [" – Figma Slides", " – FigJam", " – Figma"].first(where: { name.hasSuffix($0) }) else {
+            return nil
         }
+        name.removeLast(suffix.count)
         name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? nil : name
     }
 
-    private static func fileName(fromLink link: URL) -> String {
-        // URL.path has already percent-decoded the link's name part once.
+    /// The name a file's link gives it, or `nil` when the link has no name part.
+    ///
+    /// cmux-rbf #cm-73.43: `cm-73.16`'s private rule, shared. The path's name part
+    /// (`URL.path` has already percent-decoded it once), dashes read as spaces, a
+    /// branch link's name after `/branch/<key>/`. The menu keeps "Untitled" for the
+    /// `nil` at its own call site, ``fileName(fromLink:)``.
+    static func linkName(_ link: URL) -> String? {
         let parts = link.path.split(separator: "/").map(String.init)
         let nameIndex = parts.count >= 4 && parts[2] == "branch" ? 4 : 2
-        guard parts.count > nameIndex else { return String(localized: "figma.menu.untitled", defaultValue: "Untitled") }
+        guard parts.count > nameIndex else { return nil }
         let name = parts[nameIndex].replacingOccurrences(of: "-", with: " ")
-        return name.isEmpty ? String(localized: "figma.menu.untitled", defaultValue: "Untitled") : name
+        return name.isEmpty ? nil : name
+    }
+
+    private static func fileName(fromLink link: URL) -> String {
+        linkName(link) ?? String(localized: "figma.menu.untitled", defaultValue: "Untitled")
     }
 }

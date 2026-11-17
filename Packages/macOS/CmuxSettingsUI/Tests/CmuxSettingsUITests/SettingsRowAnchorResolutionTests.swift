@@ -85,6 +85,7 @@ struct SettingsRowAnchorResolutionTests {
         "cloud.beta.machines.enabled",
         "customSidebars.renderer",
         "figma.defaultFolder",
+        "figma.showFileNameInHeader",
         "fileEditor.currentLineHighlight",
         "fileEditor.indentGuides",
         "fileEditor.lineNumbers",

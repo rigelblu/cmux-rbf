@@ -2251,6 +2251,15 @@ final class BrowserPanel: Panel, ObservableObject {
     /// Published page title
     @Published private(set) var pageTitle: String = "" {
         didSet {
+            // cmux-rbf #cm-73.43: keep the last title that named a Figma file, with the file key
+            // the address had when it arrived. Before the same-value guard, so a second file whose
+            // title reads the same still gets its own key. Any other title (the preview's `Figma`,
+            // a failed load's address, a cleared title) leaves it as it was.
+            if let address = currentURL,
+               FigmaFileList.titleName(pageTitle) != nil,
+               let key = FigmaPaneURL.fileKey(fromPaneURL: address) {
+                figmaPageTitle = (key: key, title: pageTitle)
+            }
             guard oldValue != pageTitle else { return }
             mobileBrowserStreamStateDidChange(markDirty: true)
         }
@@ -2679,7 +2688,40 @@ final class BrowserPanel: Panel, ObservableObject {
     var developerToolsPreservedVisibleIntentForNextAttach: Bool = false
     private var browserThemeMode: BrowserThemeMode
 
+    /// cmux-rbf #cm-73.43: the last page title that named a Figma file (one ending in a Figma
+    /// suffix), and the file key `currentURL` had when it was set. The editor's name for the file.
+    /// The panel's own, so it goes with the panel to another workspace or the Dock.
+    private(set) var figmaPageTitle: (key: String, title: String)?
+
+    /// cmux-rbf #cm-73.43: the name the panel's workspace knows for a file, set by the workspace.
+    /// Read only when its key is the current address's key, so a name for another file is ignored.
+    var figmaKnownFileName: (key: String, name: String)?
+
+    /// cmux-rbf #cm-73.43: `Figma (<name>)` for a Figma pane on a file; `nil` keeps today's title.
+    private var figmaTabTitle: String? {
+        // The cheap gate first: every browser tab asks, and few are Figma panes (the rule asks it again).
+        guard FigmaTabMark.applies(address: currentURL, showsAddressBar: isOmnibarVisible) else { return nil }
+        let key = currentURL.flatMap { FigmaPaneURL.fileKey(fromPaneURL: $0) }
+        // Figma's own name, from the editor's page, for this file only. Never read in the preview,
+        // whose page is cmux's own.
+        let isEditorPage = currentURL.map { !FigmaPaneURL.isWrapperPage($0) } ?? false
+        let pageName = isEditorPage && key != nil && figmaPageTitle?.key == key
+            ? figmaPageTitle.flatMap { FigmaFileList.titleName($0.title) }
+            : nil
+        let knownName = key != nil && figmaKnownFileName?.key == key ? figmaKnownFileName?.name : nil
+        return FigmaTabTitle.title(
+            address: currentURL,
+            showsAddressBar: isOmnibarVisible,
+            isAgentPane: AgentPaneMark.isAgentPaneKind(owner: ownerTerminalSurfaceId, kind: ownedKind),
+            pageName: pageName,
+            knownName: knownName,
+            showsFileName: FigmaTabTitleSetting.current.showsFileName
+        )
+    }
+
     var displayTitle: String {
+        // cmux-rbf #cm-73.43: the rule first; its body below is the fallback.
+        if let figma = figmaTabTitle { return figma }
         if !pageTitle.isEmpty {
             return pageTitle
         }

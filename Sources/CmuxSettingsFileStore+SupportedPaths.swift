@@ -161,6 +161,7 @@ extension CmuxSettingsFileStore {
         "reply.inline.enabled",
         "figma.defaultFolder",
         "figma.folders",
+        "figma.showFileNameInHeader",
         "shortcuts.bindings",
     ]
 }

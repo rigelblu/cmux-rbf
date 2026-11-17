@@ -24,6 +24,7 @@ public struct AutomationSection: View {
     @State private var kiroModel: DefaultsValueModel<Bool>
     @State private var kiroLevelModel: DefaultsValueModel<String>
     @State private var figmaFolderModel: JSONValueModel<String>
+    @State private var figmaShowFileNameModel: JSONValueModel<Bool>
     @State private var portBaseModel: DefaultsValueModel<Int>
     @State private var portRangeModel: DefaultsValueModel<Int>
     @State private var socketPasswordDraft: String = ""
@@ -76,6 +77,11 @@ public struct AutomationSection: View {
         _figmaFolderModel = State(initialValue: JSONValueModel(
             store: jsonStore,
             key: catalog.figma.defaultFolder,
+            errorLog: errorLog
+        ))
+        _figmaShowFileNameModel = State(initialValue: JSONValueModel(
+            store: jsonStore,
+            key: catalog.figma.showFileNameInHeader,
             errorLog: errorLog
         ))
         _portBaseModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.automation.portBase))
@@ -131,7 +137,7 @@ public struct AutomationSection: View {
                 localized: "settings.automation.openAccess.dialog.message",
                 defaultValue: "This disables ancestry and password checks and opens the socket to all local users. Only enable when you understand the risk."
             ))
-        }.task { startSettingsObservation([socketPasswordModel, modeModel, claudeCodeModel, codexModel, claudePathModel, autoNamingModel, autoNamingAgentModel, autoNamingStatusModel, ripgrepPathModel, suppressSubagentModel, ampModel, cursorModel, geminiModel, kiroModel, kiroLevelModel, figmaFolderModel, portBaseModel, portRangeModel]) }
+        }.task { startSettingsObservation([socketPasswordModel, modeModel, claudeCodeModel, codexModel, claudePathModel, autoNamingModel, autoNamingAgentModel, autoNamingStatusModel, ripgrepPathModel, suppressSubagentModel, ampModel, cursorModel, geminiModel, kiroModel, kiroLevelModel, figmaFolderModel, figmaShowFileNameModel, portBaseModel, portRangeModel]) }
     }
 
     @ViewBuilder
@@ -501,6 +507,17 @@ public struct AutomationSection: View {
     private var figmaCard: some View {
         SettingsCard {
             FigmaDefaultFolderRow(model: figmaFolderModel, controlWidth: Self.columnWidth)
+            SettingsCardDivider()
+            SettingsCardRow(
+                configurationReview: .json("figma.showFileNameInHeader"),
+                String(localized: "settings.automation.figma.showFileNameInHeader", defaultValue: "Figma File Name in Header"),
+                subtitle: String(localized: "settings.automation.figma.showFileNameInHeader.subtitle", defaultValue: "Show the file's name in a Figma pane's header, as Figma (name).")
+            ) {
+                Toggle("", isOn: Binding(get: { figmaShowFileNameModel.current }, set: { figmaShowFileNameModel.set($0) }))
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .accessibilityIdentifier("SettingsFigmaShowFileNameInHeaderToggle")
+            }
         }
     }
 

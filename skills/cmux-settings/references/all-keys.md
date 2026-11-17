@@ -174,6 +174,7 @@ Figma settings — the default folder new designs go to, and a folder per direct
 |---|---|---|---|
 | `figma.defaultFolder` | string | `""` | Link to the Figma folder where new designs go when figma.folders has no entry for their directory. Use the link from Figma's address bar on the folder's page. Agents read it with "cmux figma folder". |
 | `figma.folders` | object | `{}` | Figma folders for directories: each key is a directory, each value the link to the Figma folder where new designs made in that directory, or inside it, should go. The nearest matching directory wins; elsewhere figma.defaultFolder applies. Agents read it with "cmux figma folder". A single entry cannot be set by dotted path, because a directory path holds dots: set the whole object, or use `cmux figma folder set <folder-url> --dir <path>`. |
+| `figma.showFileNameInHeader` | boolean | `true` | Show the name of the file a Figma pane shows in its header, as Figma (name). Off, the header reads Figma. |
 
 ## shortcuts
 

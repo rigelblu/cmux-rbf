@@ -1268,7 +1268,8 @@
         "figma": {
           "description": "Figma-Einstellungen.",
           "defaultFolder": "Link zum Figma-Ordner, in dem neue Designs landen, wenn figma.folders keinen Eintrag für ihr Verzeichnis hat. Verwende den Link aus der Adressleiste von Figma auf der Seite des Ordners. Agenten lesen ihn mit \"cmux figma folder\".",
-          "folders": "Figma-Ordner für Verzeichnisse: Jeder Schlüssel ist ein Verzeichnis, jeder Wert der Link zum Figma-Ordner, in dem neue Designs aus diesem Verzeichnis oder darin landen sollen. Das nächstgelegene passende Verzeichnis gewinnt; sonst gilt figma.defaultFolder. Agenten lesen ihn mit \"cmux figma folder\"."
+          "folders": "Figma-Ordner für Verzeichnisse: Jeder Schlüssel ist ein Verzeichnis, jeder Wert der Link zum Figma-Ordner, in dem neue Designs aus diesem Verzeichnis oder darin landen sollen. Das nächstgelegene passende Verzeichnis gewinnt; sonst gilt figma.defaultFolder. Agenten lesen ihn mit \"cmux figma folder\".",
+          "showFileNameInHeader": "Zeigt den Namen der Datei, die ein Figma-Bereich anzeigt, in der Kopfzeile als Figma (name) an. Ausgeschaltet steht dort nur Figma."
         },
         "reply": {
           "description": "Antwortpanel",

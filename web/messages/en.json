@@ -2505,7 +2505,8 @@
         "figma": {
           "description": "Figma settings.",
           "defaultFolder": "Link to the Figma folder where new designs go when figma.folders has no entry for their directory. Use the link from Figma's address bar on the folder's page. Agents read it with \"cmux figma folder\".",
-          "folders": "Figma folders for directories: each key is a directory, each value the link to the Figma folder where new designs made in that directory, or inside it, should go. The nearest matching directory wins; elsewhere figma.defaultFolder applies. Agents read it with \"cmux figma folder\"."
+          "folders": "Figma folders for directories: each key is a directory, each value the link to the Figma folder where new designs made in that directory, or inside it, should go. The nearest matching directory wins; elsewhere figma.defaultFolder applies. Agents read it with \"cmux figma folder\".",
+          "showFileNameInHeader": "Show the name of the file a Figma pane shows in its header, as Figma (name). Off, the header reads Figma."
         },
         "reply": {
           "description": "Reply panel",

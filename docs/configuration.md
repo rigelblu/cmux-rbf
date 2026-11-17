@@ -200,6 +200,14 @@ Every pane's header shows a Figma button, third in the default list, after the b
 
 `cmux.newFigma` can also be named by an `actions` entry or a shortcut. With no pane clicked, it adds the Figma tab last in the focused pane and focuses it. The command palette has the same command, **New Tab (Figma)**.
 
+A Figma pane showing a file reads `Figma (<name>)` in its header, in the preview and the editor. In the preview, `<name>` is the name the Figma button's menu shows — Figma's own once Figma's editor has named the file in that workspace, else the name in the file's link. In the editor, it is Figma's own name from its page. In a workspace, the menu shows the same name as the header; in the Dock, a preview shows its link's name. Pages that are not files keep Figma's own titles. `figma.showFileNameInHeader` (default `true`) turns file names in headers off, in Settings › Automation or in `cmux.json`:
+
+```json
+{
+  "figma": { "showFileNameInHeader": false }
+}
+```
+
 <!-- cmux-rbf (#cm-73.9): the section above, on the Figma button, is the fork's. Reject this hunk on upstream sync. -->
 
 ## `terminal.textBoxSubmitActions`

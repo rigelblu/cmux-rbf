@@ -1268,7 +1268,8 @@
         "figma": {
           "description": "Figma 设置。",
           "defaultFolder": "当 figma.folders 中没有其目录的条目时，新设计应保存到的 Figma 文件夹的链接。请使用文件夹页面上 Figma 地址栏中的链接。智能体通过 \"cmux figma folder\" 读取。",
-          "folders": "按目录设置的 Figma 文件夹：每个键是一个目录，每个值是在该目录或其内创建的新设计应保存到的 Figma 文件夹的链接。最近的匹配目录优先；其他情况使用 figma.defaultFolder。智能体通过 \"cmux figma folder\" 读取。"
+          "folders": "按目录设置的 Figma 文件夹：每个键是一个目录，每个值是在该目录或其内创建的新设计应保存到的 Figma 文件夹的链接。最近的匹配目录优先；其他情况使用 figma.defaultFolder。智能体通过 \"cmux figma folder\" 读取。",
+          "showFileNameInHeader": "在 Figma 窗格的标题栏中显示当前文件名称，格式为 Figma (name)。关闭后标题栏仅显示 Figma。"
         },
         "reply": {
           "description": "回复面板",
