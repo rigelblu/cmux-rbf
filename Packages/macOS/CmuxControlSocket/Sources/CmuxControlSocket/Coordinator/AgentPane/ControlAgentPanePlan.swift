@@ -12,6 +12,13 @@ public struct ControlAgentPanePlan: Sendable, Equatable {
         case navigate(panelID: UUID, others: Int)
         /// Hold the latest page during Design Focus, naming an existing pane if any.
         case hold(panelID: UUID?, others: Int)
+        /// Show the cleared page in this existing owned pane (cmux-rbf #cm-126.14).
+        case clear(panelID: UUID, others: Int)
+        /// The pane is already cleared: change nothing (cmux-rbf #cm-126.14).
+        case alreadyCleared(panelID: UUID, others: Int)
+        /// Hold a clear until Design Focus ends, replacing any held page; the pane is `nil` when only a held page exists
+        /// and no pane is open yet (cmux-rbf #cm-126.14).
+        case holdClear(panelID: UUID?, others: Int)
     }
 
     /// The action selected by the check.
@@ -22,7 +29,8 @@ public struct ControlAgentPanePlan: Sendable, Equatable {
     public let terminalID: UUID
     /// The terminal's restart-stable ownership key.
     public let ownerStableID: UUID
-    /// The validated page.
+    /// The validated page. For a clear, the pane's cleared page; for a clear held with no pane open yet, the
+    /// cleared-pages folder, which the socket answers as a null url.
     public let url: URL
 
     /// Creates a validated action description.

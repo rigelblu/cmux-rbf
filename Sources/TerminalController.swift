@@ -3392,6 +3392,7 @@ class TerminalController {
             "browser.open_split",
             "agent_pane.show",
             "agent_pane.list",
+            "agent_pane.clear",
             "figma.goto",
             "browser.navigate",
             "browser.back",

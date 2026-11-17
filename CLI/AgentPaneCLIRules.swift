@@ -103,8 +103,12 @@ enum AgentPaneCLIRules {
         return !port.isEmpty && port.allSatisfy { $0.isASCII && $0 >= "0" && $0 <= "9" }
     }
 
-    static let noCallerMessage =
-        "cmux agent-pane show needs the agent's terminal: run it in a cmux terminal or pass --surface"
+    static let noCallerMessage = noCallerMessage(for: "show")
+
+    /// The same words for each subcommand that names the agent's terminal (`show`, `clear`).
+    static func noCallerMessage(for subcommand: String) -> String {
+        "cmux agent-pane \(subcommand) needs the agent's terminal: run it in a cmux terminal or pass --surface"
+    }
 
     static func message(for refusal: PageRefusal) -> String {
         switch refusal {
@@ -136,10 +140,12 @@ enum AgentPaneCLIRules {
 
     /// The message the CLI prints for a socket error; the socket's own message
     /// is an English diagnostic, used only where this has nothing better.
-    static func message(for failure: SocketFailure) -> String {
+    static func message(for failure: SocketFailure, clearing: Bool = false) -> String {
         switch (failure.code, failure.reason) {
         case ("not_found", _):
             return "that terminal is gone: \(failure.surface ?? "unknown")"
+        case ("invalid_params", "no_agent_pane"):
+            return "nothing to clear: this terminal has no Agent Pane"
         case ("invalid_params", "not_terminal"):
             return "the Agent Pane belongs to a terminal, and \(failure.surface ?? "that surface") is a \(failure.type ?? "surface")"
         case ("unsupported", "in_dock"):
@@ -156,7 +162,9 @@ enum AgentPaneCLIRules {
         case ("browser_url_blocked", _):
             return "the embedded browser's URL policy blocks \(failure.url ?? "that page"): \(failure.message)"
         case ("internal_error", _):
-            return "the Agent Pane couldn't open, and nothing was changed: \(failure.message)"
+            return clearing
+                ? "the Agent Pane couldn't be cleared, and nothing was changed: \(failure.message)"
+                : "the Agent Pane couldn't open, and nothing was changed: \(failure.message)"
         default:
             return "\(failure.code): \(failure.message)"
         }

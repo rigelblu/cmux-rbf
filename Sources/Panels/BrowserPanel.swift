@@ -1898,6 +1898,9 @@ final class BrowserPanel: Panel, ObservableObject {
     /// cmux-rbf #cm-73.45: the `stableSurfaceId` of the terminal that last opened or pointed this pane. Saved; never a runtime `id`.
     var ownerTerminalSurfaceId: UUID?
     var ownedKind: BrowserOwnedKind? // cmux-rbf #cm-126.3: independent of the page's address.
+    /// cmux-rbf #cm-126.14: the page an Agent Pane last showed (a `show`, not a cleared page). A clear links to it when the pane
+    /// went back to a cleared page, so a cleared page never links to a cleared page. In memory only.
+    var agentPaneLastPostURL: URL?
 
     /// Popup windows owned by this panel (for lifecycle cleanup)
     private var popupControllers: [BrowserPopupWindowController] = []

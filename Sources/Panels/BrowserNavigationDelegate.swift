@@ -458,6 +458,22 @@ import WebKit
 
         if let url = navigationAction.request.url {
             let isMainFrame = navigationAction.targetFrame?.isMainFrame != false
+            // cmux-rbf #cm-126.14: the one click on a cleared page's own link goes through the app's `navigate(to:)`, which grants
+            // the post's folder and is neither WebKit's file read limit nor the URL allowlist. Nothing else is handed over.
+            if let owner,
+               AgentPaneMark.handsLinkToApp(
+                   isLinkActivation: navigationAction.navigationType == .linkActivated,
+                   isMainFrame: isMainFrame,
+                   isAgentPane: AgentPaneMark.isAgentPaneKind(owner: owner.ownerTerminalSurfaceId, kind: owner.ownedKind),
+                   source: webView.url,
+                   target: url,
+                   clearedFolderURL: Workspace.agentPaneClearedFolderURL(),
+                   pageLink: { AgentPaneMark.clearedPageLink(at: webView.url) }
+               ) {
+                decisionHandler(.cancel)
+                owner.navigate(to: url)
+                return
+            }
             let isTrustedInternal = trustedInternalNavigation(for: url, in: webView)
             if isMainFrame, !isTrustedInternal {
                 (webView as? CmuxWebView)?.clearTrustedInternalNavigationGrants()

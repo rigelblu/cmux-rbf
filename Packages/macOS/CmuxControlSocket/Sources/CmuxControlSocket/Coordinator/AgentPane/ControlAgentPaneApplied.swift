@@ -12,6 +12,10 @@ public struct ControlAgentPaneApplied: Sendable, Equatable {
         case navigated
         /// The page waits until Design Focus ends.
         case heldDesignFocus = "held-design-focus"
+        /// The pane now shows its cleared page (cmux-rbf #cm-126.14).
+        case cleared
+        /// The pane was already cleared; nothing changed (cmux-rbf #cm-126.14).
+        case alreadyCleared = "already-cleared"
     }
 
     /// What the app did.
@@ -26,8 +30,8 @@ public struct ControlAgentPaneApplied: Sendable, Equatable {
     public let ownerSurfaceID: UUID?
     /// The ownership key persisted in the session.
     public let ownerStableID: UUID
-    /// The requested page, including a page held for later.
-    public let url: URL
+    /// The requested page, including a page held for later; `nil` for a clear held with no pane open yet, which has no page.
+    public let url: URL?
     /// Additional Agent Panes owned by this terminal in the workspace.
     public let others: Int
 
@@ -43,7 +47,7 @@ public struct ControlAgentPaneApplied: Sendable, Equatable {
     ///   - others: The count of additional owned panes.
     public init(
         action: Action, surfaceID: UUID?, paneID: UUID?, workspaceID: UUID,
-        ownerSurfaceID: UUID?, ownerStableID: UUID, url: URL, others: Int
+        ownerSurfaceID: UUID?, ownerStableID: UUID, url: URL?, others: Int
     ) {
         self.action = action
         self.surfaceID = surfaceID

@@ -23,14 +23,11 @@ extension TerminalController: ControlAgentPaneContext {
     /// The same, with the defaults the browser settings are read from, so a test
     /// never reads or flips Tom's own.
     func controlAgentPaneCheck(surfaceID: UUID, url: URL, defaults: UserDefaults) -> ControlAgentPaneCheck {
-        guard let workspace = agentPaneWorkspace(containing: surfaceID) else {
-            return .refused(DockSplitStore.liveStores.contains { $0.containsPanel(surfaceID) }
-                ? .inDock
-                : .notFound(surfaceID: surfaceID))
-        }
-        guard let terminal = workspace.panels[surfaceID] as? TerminalPanel else {
-            let type = workspace.panels[surfaceID]?.panelType.rawValue ?? "surface"
-            return .refused(.notTerminal(surfaceID: surfaceID, type: type))
+        let workspace: Workspace
+        let terminal: TerminalPanel
+        switch agentPaneCaller(surfaceID: surfaceID) {
+        case .refused(let refusal): return .refused(refusal)
+        case .found(let foundWorkspace, let foundTerminal): (workspace, terminal) = (foundWorkspace, foundTerminal)
         }
         switch AgentPaneMark.refusal(for: url) {
         case .badScheme: return .refused(.badScheme)
@@ -75,12 +72,92 @@ extension TerminalController: ControlAgentPaneContext {
         ))
     }
 
+    /// The caller's workspace and terminal, or why neither can own an Agent Pane.
+    private enum AgentPaneCaller {
+        case found(Workspace, TerminalPanel)
+        case refused(ControlAgentPaneRefusal)
+    }
+
+    private func agentPaneCaller(surfaceID: UUID) -> AgentPaneCaller {
+        guard let workspace = agentPaneWorkspace(containing: surfaceID) else {
+            return .refused(DockSplitStore.liveStores.contains { $0.containsPanel(surfaceID) }
+                ? .inDock
+                : .notFound(surfaceID: surfaceID))
+        }
+        guard let terminal = workspace.panels[surfaceID] as? TerminalPanel else {
+            let type = workspace.panels[surfaceID]?.panelType.rawValue ?? "surface"
+            return .refused(.notTerminal(surfaceID: surfaceID, type: type))
+        }
+        return .found(workspace, terminal)
+    }
+
+    // MARK: - clear (cm-126.14)
+
+    func controlAgentPaneClearCheck(surfaceID: UUID) -> ControlAgentPaneCheck {
+        controlAgentPaneClearCheck(surfaceID: surfaceID, defaults: .standard)
+    }
+
+    /// The same, with the defaults the browser settings are read from, so a test never reads or flips Tom's own.
+    /// In order: the caller, its first Agent Pane (none: nothing to clear), the same local-file and browser
+    /// settings `show` applies to a `file://` page, then Design Focus (hold) or an already-cleared pane (no change).
+    func controlAgentPaneClearCheck(surfaceID: UUID, defaults: UserDefaults) -> ControlAgentPaneCheck {
+        let workspace: Workspace
+        let terminal: TerminalPanel
+        switch agentPaneCaller(surfaceID: surfaceID) {
+        case .refused(let refusal): return .refused(refusal)
+        case .found(let foundWorkspace, let foundTerminal): (workspace, terminal) = (foundWorkspace, foundTerminal)
+        }
+        let owner = terminal.stableSurfaceId
+        let panes = workspace.agentPanes(ownedBy: owner)
+        let agentPane = panes.first
+        let others = max(panes.count - 1, 0)
+        var heldShow = false
+        if case .show? = workspace.heldAgentPaneUpdates[owner] { heldShow = true }
+        // Nothing to clear without a pane, except a post held for a pane not yet open: the clear retires it (latest wins).
+        if agentPane == nil, !heldShow { return .refused(.noAgentPane) }
+        guard let folder = workspace.agentPaneClearedFolder else {
+            return .refused(.urlBlocked(message: "cmux has no folder to keep the cleared page in"))
+        }
+        let page = agentPane.map { AgentPaneMark.clearedPageURL(panelID: $0, in: folder) } ?? folder
+        let policy = BrowserURLAllowlistPolicy(defaults: defaults)
+        guard policy.allowsTrustedInternalURL(page) else {
+            return .refused(.urlBlocked(message: String(
+                localized: policy.isManaged
+                    ? "cli.browser.error.urlBlockedByPolicy"
+                    : "cli.browser.error.urlBlockedByUserPolicy",
+                defaultValue: policy.isManaged
+                    ? "Blocked by your organization's browser policy"
+                    : "Blocked by the embedded-browser URL policy"
+            )))
+        }
+        guard BrowserAvailabilitySettings.isEnabled(defaults: defaults) else { return .refused(.browserOff) }
+        let action: ControlAgentPanePlan.Action
+        if let agentPane, workspace.agentPaneAnswerState(for: agentPane).isCleared, !heldShow {
+            // Already cleared, and no held page to retire: a no-op, even under Design Focus.
+            action = .alreadyCleared(panelID: agentPane, others: others)
+        } else if workspace.isDesignFocusActive {
+            action = .holdClear(panelID: agentPane, others: others)
+        } else if let agentPane {
+            action = .clear(panelID: agentPane, others: others)
+        } else {
+            return .refused(.noAgentPane)
+        }
+        return .ready(ControlAgentPanePlan(
+            action: action,
+            workspaceID: workspace.id,
+            terminalID: terminal.id,
+            ownerStableID: owner,
+            url: page
+        ))
+    }
+
     /// The one call that changes anything.
     func controlAgentPaneApply(_ plan: ControlAgentPanePlan) -> ControlAgentPaneApplied? {
         guard let workspace = agentPaneWorkspace(containing: plan.terminalID) else { return nil }
         let agentPane: UUID?
         let others: Int
         let action: ControlAgentPaneApplied.Action
+        var appliedURL: URL? = plan.url
         switch plan.action {
         case .open:
             guard let panel = workspace.openAgentPane(
@@ -99,6 +176,21 @@ extension TerminalController: ControlAgentPaneContext {
             agentPane = agentPaneID
             others = count
             action = .heldDesignFocus
+        case .clear(let agentPaneID, let count):
+            guard workspace.clearAgentPane(agentPaneID) != nil else { return nil }
+            agentPane = agentPaneID
+            others = count
+            action = .cleared
+        case .alreadyCleared(let agentPaneID, let count):
+            agentPane = agentPaneID
+            others = count
+            action = .alreadyCleared
+        case .holdClear(let agentPaneID, let count):
+            workspace.holdAgentPaneClear(owner: plan.ownerStableID)
+            if agentPaneID == nil { appliedURL = nil } // no pane yet, so no cleared page to name
+            agentPane = agentPaneID
+            others = count
+            action = .heldDesignFocus
         }
         return ControlAgentPaneApplied(
             action: action,
@@ -107,7 +199,7 @@ extension TerminalController: ControlAgentPaneContext {
             workspaceID: workspace.id,
             ownerSurfaceID: workspace.agentPaneOwnerTerminal(stableID: plan.ownerStableID)?.id,
             ownerStableID: plan.ownerStableID,
-            url: plan.url,
+            url: appliedURL,
             others: others
         )
     }
