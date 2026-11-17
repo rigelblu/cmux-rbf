@@ -1,7 +1,7 @@
 import AppKit
 
-/// The Reply toolbar over a selection in an agent's pane (`cm-136.1`): a pill
-/// holding one button.
+/// The Reply toolbar over a selection in an agent's pane (`cm-136.1`, `cm-136.8`):
+/// a rounded rectangle holding one button.
 ///
 /// **It never takes the keyboard (Q2, Tom 2026-11-05).** The view refuses
 /// first responder and its clicks never call `makeFirstResponder`, so the
@@ -10,10 +10,10 @@ import AppKit
 /// `NSHostingView`: a SwiftUI control may claim focus on click, and this one
 /// must not.
 ///
-/// A mouse-down on the pill reaches this view, not the terminal under it, so
+/// A mouse-down on the toolbar reaches this view, not the terminal under it, so
 /// pressing Reply never starts a selection. The press follows a native
 /// button: the pressed look holds until mouse-up, and releasing outside the
-/// pill cancels.
+/// toolbar cancels.
 final class ReplyInlineToolbarView: NSView {
     /// Called once per completed click.
     var onReply: (() -> Void)?
@@ -21,20 +21,21 @@ final class ReplyInlineToolbarView: NSView {
     var onDetach: (() -> Void)?
 
     private let title: String
-    private var isHovered = false
-    private var isPressed = false
+    var state: ReplyInlineToolbarStyle.State = .rest
     private var trackingArea: NSTrackingArea?
+    private var isObservingContrast = false
 
-    private static let font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-    private static let horizontalPadding: CGFloat = 16
+    static let font = NSFont.systemFont(ofSize: 12, weight: .bold)
+    private static let horizontalPadding: CGFloat = 14
 
-    /// The toolbar's size for a label: at least the fixed 28 pt pill, wide
-    /// enough for the translated word. It never follows the pane or the
-    /// terminal's font size (Q3).
+    /// The toolbar's size for a label: at least `ReplyInlinePlacement.toolbarSize`
+    /// (62×28 pt), widening with `2 * horizontalPadding` when the translated
+    /// word needs more room (`max(toolbarSize.width, ceil(w) + 28)`).
+    /// It never follows the pane or the terminal's font size (Q3).
     static func size(for title: String) -> CGSize {
-        let text = ceil((title as NSString).size(withAttributes: [.font: font]).width)
+        let labelWidth = ceil((title as NSString).size(withAttributes: [.font: font]).width)
         return CGSize(
-            width: max(ReplyInlinePlacement.toolbarSize.width, text + 2 * horizontalPadding),
+            width: max(ReplyInlinePlacement.toolbarSize.width, labelWidth + 2 * horizontalPadding),
             height: ReplyInlinePlacement.toolbarSize.height
         )
     }
@@ -45,9 +46,15 @@ final class ReplyInlineToolbarView: NSView {
         wantsLayer = true
         layer?.masksToBounds = false
         layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.3
-        layer?.shadowRadius = 5
+        layer?.shadowOpacity = 0.28
+        layer?.shadowRadius = 3
         layer?.shadowOffset = CGSize(width: 0, height: -2)
+        layer?.shadowPath = CGPath(
+            roundedRect: bounds,
+            cornerWidth: 8,
+            cornerHeight: 8,
+            transform: nil
+        )
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
         setAccessibilityLabel(accessibilityLabel)
@@ -65,36 +72,80 @@ final class ReplyInlineToolbarView: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
+    // MARK: Appearance & Contrast
+
+    private var currentAppearance: ReplyInlineToolbarStyle.Appearance {
+        effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
+    private func startObservingContrastIfNeeded() {
+        guard !isObservingContrast else { return }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(accessibilityDisplayOptionsDidChange),
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil
+        )
+        isObservingContrast = true
+    }
+
+    private func stopObservingContrast() {
+        guard isObservingContrast else { return }
+        NSWorkspace.shared.notificationCenter.removeObserver(
+            self,
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil
+        )
+        isObservingContrast = false
+    }
+
+    @objc private func accessibilityDisplayOptionsDidChange() {
+        needsDisplay = true
+    }
+
     // MARK: Drawing
 
     override func layout() {
         super.layout()
         layer?.shadowPath = CGPath(
             roundedRect: bounds,
-            cornerWidth: bounds.height / 2,
-            cornerHeight: bounds.height / 2,
+            cornerWidth: 8,
+            cornerHeight: 8,
             transform: nil
         )
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let pill = NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2)
-        var fill = NSColor.controlAccentColor
-        if isPressed {
-            fill = fill.blended(withFraction: 0.30, of: .black) ?? fill
-        } else if isHovered {
-            fill = fill.blended(withFraction: 0.15, of: .black) ?? fill
-        }
-        fill.setFill()
-        pill.fill()
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 8, yRadius: 8)
+        path.lineWidth = 1.0
 
+        let appearance = currentAppearance
+        let increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+
+        let fill = ReplyInlineToolbarStyle.fillColor(for: appearance, state: state)
+        fill.setFill()
+        path.fill()
+
+        let edge = ReplyInlineToolbarStyle.edgeColor(for: appearance, increaseContrast: increaseContrast)
+        edge.setStroke()
+        path.stroke()
+
+        let labelColor = ReplyInlineToolbarStyle.labelColor(for: appearance)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: Self.font,
-            .foregroundColor: NSColor.alternateSelectedControlTextColor,
+            .foregroundColor: labelColor,
         ]
         let size = (title as NSString).size(withAttributes: attributes)
         (title as NSString).draw(
-            at: NSPoint(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2),
+            at: NSPoint(
+                x: round(bounds.midX - size.width / 2),
+                y: round(bounds.midY - size.height / 2)
+            ),
             withAttributes: attributes
         )
     }
@@ -114,24 +165,34 @@ final class ReplyInlineToolbarView: NSView {
         trackingArea = area
     }
 
-    override func mouseEntered(with event: NSEvent) { setHovered(true) }
-    override func mouseExited(with event: NSEvent) { setHovered(false) }
+    override func mouseEntered(with event: NSEvent) {
+        state = .hover
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        state = .rest
+        needsDisplay = true
+    }
 
     override func mouseDown(with event: NSEvent) {
-        isPressed = true
+        state = .pressed
         needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
         let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        guard inside != isPressed else { return }
-        isPressed = inside
-        needsDisplay = true
+        let newState: ReplyInlineToolbarStyle.State = inside ? .pressed : .rest
+        if state != newState {
+            state = newState
+            needsDisplay = true
+        }
     }
 
     override func mouseUp(with event: NSEvent) {
-        let completed = isPressed && bounds.contains(convert(event.locationInWindow, from: nil))
-        isPressed = false
+        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
+        let completed = state == .pressed && inside
+        state = inside ? .hover : .rest
         needsDisplay = true
         if completed { onReply?() }
     }
@@ -143,12 +204,11 @@ final class ReplyInlineToolbarView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window == nil { onDetach?() }
-    }
-
-    private func setHovered(_ hovered: Bool) {
-        guard isHovered != hovered else { return }
-        isHovered = hovered
-        needsDisplay = true
+        if window != nil {
+            startObservingContrastIfNeeded()
+        } else {
+            stopObservingContrast()
+            onDetach?()
+        }
     }
 }

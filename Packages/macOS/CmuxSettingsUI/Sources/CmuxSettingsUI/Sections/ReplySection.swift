@@ -45,7 +45,8 @@ public struct ReplySection: View {
                     configurationReview: .json("reply.inline.enabled"),
                     searchAnchorID: "setting:reply:inline-reply",
                     String(localized: "settings.reply.inline.title", defaultValue: "Show Reply on selections"),
-                    subtitle: String(localized: "settings.reply.inline.subtitle", defaultValue: "Selecting text in an agent's pane shows a button over it: Reply, or Add to reply when the Reply panel is open. ⌘⇧-drag still starts a reply in the panel.")
+                    subtitle: String(localized: "settings.reply.inline.subtitle", defaultValue: "Selecting text in an agent's pane shows a button over it: Reply, or Add to reply when the Reply panel is open.\n⌘⇧-drag still starts a reply in the panel."),
+                    subtitleLineLimit: 3
                 ) {
                     Toggle("", isOn: Binding(get: { inlineEnabled.current }, set: { inlineEnabled.set($0) }))
                         .labelsHidden()

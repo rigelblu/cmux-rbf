@@ -2787,6 +2787,7 @@
 		C136B0000000000000000007 /* ReplyInlineGridGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000007 /* ReplyInlineGridGeometry.swift */; };
 		C136B0000000000000000006 /* ReplyInlineSelectionGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000006 /* ReplyInlineSelectionGeometry.swift */; };
 		C136B0000000000000000004 /* ReplyInlineToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000004 /* ReplyInlineToolbarView.swift */; };
+		C136B0000000000000000012 /* ReplyInlineToolbarStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000012 /* ReplyInlineToolbarStyle.swift */; };
 		69321CEE24F94B66B7ACFF00 /* ReplyAnnotationManifestRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */; };
 		D8850002D8850002D8850002 /* ReplyLabelMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */; };
 		285BDB0B65854F8EA581E4A7 /* ReplyLabelsFileParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */; };
@@ -3705,6 +3706,7 @@
 		D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */; };
 		C136D0000000000000000004 /* ReplyInlineDismissTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000004 /* ReplyInlineDismissTests.swift */; };
 		C136D0000000000000000005 /* ReplyInlineShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000005 /* ReplyInlineShellTests.swift */; };
+		C136D0000000000000000006 /* ReplyInlineToolbarLookTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000006 /* ReplyInlineToolbarLookTests.swift */; };
 		C136D0000000000000000003 /* ReplyInlinePasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000003 /* ReplyInlinePasteTests.swift */; };
 		C136D0000000000000000002 /* ReplyInlinePlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */; };
 		C136D0000000000000000001 /* ReplyInlineTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */; };
@@ -6954,6 +6956,7 @@
 		C136A0000000000000000007 /* ReplyInlineGridGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineGridGeometry.swift; sourceTree = "<group>"; };
 		C136A0000000000000000006 /* ReplyInlineSelectionGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineSelectionGeometry.swift; sourceTree = "<group>"; };
 		C136A0000000000000000004 /* ReplyInlineToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineToolbarView.swift; sourceTree = "<group>"; };
+		C136A0000000000000000012 /* ReplyInlineToolbarStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineToolbarStyle.swift; sourceTree = "<group>"; };
 		A80AAC9AD8364556A7D2FF00 /* ReplyAnnotationManifestRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyAnnotationManifestRenderTests.swift; sourceTree = "<group>"; };
 		D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelMenuTests.swift; sourceTree = "<group>"; };
 		D6C056339BDE46B294FED492 /* ReplyLabelsFileParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLabelsFileParserTests.swift; sourceTree = "<group>"; };
@@ -7863,6 +7866,7 @@
 		D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalReplyStartTests.swift; sourceTree = "<group>"; };
 		C136C0000000000000000004 /* ReplyInlineDismissTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineDismissTests.swift; sourceTree = "<group>"; };
 		C136C0000000000000000005 /* ReplyInlineShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineShellTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000006 /* ReplyInlineToolbarLookTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineToolbarLookTests.swift; sourceTree = "<group>"; };
 		C136C0000000000000000003 /* ReplyInlinePasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlinePasteTests.swift; sourceTree = "<group>"; };
 		C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlinePlacementTests.swift; sourceTree = "<group>"; };
 		C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineTriggerTests.swift; sourceTree = "<group>"; };
@@ -10740,6 +10744,7 @@
 				C136A0000000000000000007 /* ReplyInlineGridGeometry.swift */,
 				C136A0000000000000000006 /* ReplyInlineSelectionGeometry.swift */,
 				C136A0000000000000000004 /* ReplyInlineToolbarView.swift */,
+				C136A0000000000000000012 /* ReplyInlineToolbarStyle.swift */,
 				A50014F8 /* MarkdownWebSupport.swift */,
 				A50014F1 /* MarkdownViewerAssets.swift */,
 				C0DE86520000000000000010 /* FilePreviewFileState.swift */,
@@ -12050,6 +12055,7 @@
 				D8890001D8890001D8890001 /* TerminalReplyStartTests.swift */,
 				C136C0000000000000000004 /* ReplyInlineDismissTests.swift */,
 				C136C0000000000000000005 /* ReplyInlineShellTests.swift */,
+				C136C0000000000000000006 /* ReplyInlineToolbarLookTests.swift */,
 				C136C0000000000000000003 /* ReplyInlinePasteTests.swift */,
 				C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */,
 				C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */,
@@ -14921,6 +14927,7 @@
 				C136B0000000000000000007 /* ReplyInlineGridGeometry.swift in Sources */,
 				C136B0000000000000000006 /* ReplyInlineSelectionGeometry.swift in Sources */,
 				C136B0000000000000000004 /* ReplyInlineToolbarView.swift in Sources */,
+				C136B0000000000000000012 /* ReplyInlineToolbarStyle.swift in Sources */,
 				CM69000000000000REPLY02 /* ReplyPanelStore.swift in Sources */,
 				CM69000000000000REPLY04 /* ReplyPanelView.swift in Sources */,
 				B7F100070000000000000001 /* ResolvedNotificationSoundPlaybackSelection.swift in Sources */,
@@ -17256,6 +17263,7 @@
 				D8890002D8890002D8890002 /* TerminalReplyStartTests.swift in Sources */,
 				C136D0000000000000000004 /* ReplyInlineDismissTests.swift in Sources */,
 				C136D0000000000000000005 /* ReplyInlineShellTests.swift in Sources */,
+				C136D0000000000000000006 /* ReplyInlineToolbarLookTests.swift in Sources */,
 				C136D0000000000000000003 /* ReplyInlinePasteTests.swift in Sources */,
 				C136D0000000000000000002 /* ReplyInlinePlacementTests.swift in Sources */,
 				C136D0000000000000000001 /* ReplyInlineTriggerTests.swift in Sources */,
