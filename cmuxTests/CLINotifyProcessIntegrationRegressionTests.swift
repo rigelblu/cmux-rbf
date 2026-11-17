@@ -9687,6 +9687,13 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
             return v2Response(id: id, ok: true, result: ["resume_binding": [:]])
         case "surface.resume.clear":
             return v2Response(id: id, ok: true, result: ["cleared": true])
+        case "agent_events.rows": // cmux-rbf (#cm-124.5)
+            let answer = context.state.agentEventRowsAnswer()
+            guard let rows = answer.rows else {
+                return v2Response(id: id, ok: false, error: ["code": "unrecognized_method", "message": "unexpected method: \(method)"])
+            }
+            if answer.delay > 0 { Thread.sleep(forTimeInterval: answer.delay) }
+            return v2Response(id: id, ok: true, result: ["rows": rows])
         default:
             return v2Response(id: id, ok: false, error: ["code": "unrecognized_method", "message": "unexpected method: \(method)"])
         }

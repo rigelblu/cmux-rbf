@@ -16,6 +16,20 @@ struct AgentNotificationPresentationTests {
         #expect(value.subtitle == "cm-128")
     }
 
+    // cm-124.5: the first-ever banner for a type no row maps names the type on its title line.
+    @Test func aNewNotificationTypeIsNamedOnTheTitleLine() {
+        let value = AgentNotificationPresentation(agentTitle: "Claude Code",
+            kind: .newNotificationType("worker_permission_prompt"), cwd: "/work/cm-124.5")
+        #expect(value.title == "Claude Code · New notification type: worker_permission_prompt")
+        #expect(value.subtitle == "cm-124.5")
+    }
+
+    @Test(arguments: ["a%@b", "100%", "%d%s", "plugin_notification"])
+    func theTypeIsInsertedAsIsNeverReadAsAFormat(_ type: String) {
+        let value = AgentNotificationPresentation(agentTitle: "Kimi", kind: .newNotificationType(type), cwd: nil)
+        #expect(value.title == "Kimi · New notification type: \(type)")
+    }
+
     @Test func piKeepsItsSessionTitleAndPushKeepsItsBareName() {
         #expect(AgentNotificationPresentation(agentTitle: "Pi · fix login bug", kind: .finished,
             cwd: nil).title == "Pi · fix login bug · Finished")

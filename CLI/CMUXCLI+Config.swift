@@ -1,3 +1,4 @@
+import CmuxAgentJournal
 import Foundation
 import CmuxFoundation
 
@@ -63,7 +64,12 @@ extension CMUXCLI {
             try runDocsCommand(commandArgs: ["settings"], jsonOutput: wantsJSON)
         case "doctor", "check", "validate":
             let doctorArgs = Array(args.dropFirst())
-            let report = try runConfigDoctor(arguments: doctorArgs, jsonOutput: wantsJSON)
+            let report = try runConfigDoctor(
+                arguments: doctorArgs,
+                jsonOutput: wantsJSON,
+                socketPath: socketPath,
+                explicitPassword: explicitPassword
+            )
             if report.errorCount > 0 {
                 throw CLIError(message: "cmux config doctor found \(report.errorCount) error(s)")
             }
@@ -100,8 +106,17 @@ extension CMUXCLI {
             || subcommand == CmuxGhosttyConfigSettingEditor.surfaceTabBarFontSizeKey {
             return parsedArgs.arguments.count == 1
         }
+        // (#cm-124.5) `doctor`, `check` and `validate` are not here: they take the resolved-socket path so they can ask the
+        // running app for the notification types it saw with no row. They still run with no app (see
+        // `configDoctorCanProceedWithoutLiveSocket`), and then say that list isn't available.
         return hasHelpRequest(beforeSeparator: parsedArgs.head) ||
-            ["help", "path", "paths", "docs", "documentation", "doctor", "check", "validate"].contains(subcommand)
+            ["help", "path", "paths", "docs", "documentation"].contains(subcommand)
+    }
+
+    /// `cmux config doctor` checks files and needs no app; the app only adds the list of unmapped types. (#cm-124.5)
+    func configDoctorCanProceedWithoutLiveSocket(_ commandArgs: [String]) -> Bool {
+        let subcommand = docsSettingsArguments(commandArgs).arguments.first?.lowercased()
+        return subcommand == "doctor" || subcommand == "check" || subcommand == "validate"
     }
 
     func configUsage() -> String {
@@ -385,6 +400,10 @@ extension CMUXCLI {
         let message: String?
         let keys: [String]
         let byteCount: Int?
+        /// The verdict on the `agentEvents` rows of the global file or a `--path` file. (#cm-124.5)
+        var agentEvents: ConfigDoctorAgentEvents?
+        /// A repo's own file holding `agentEvents`: cmux never reads rows from it. (#cm-124.5)
+        var agentEventsIgnored = false
 
         var isError: Bool { status == "error" }
 
@@ -403,19 +422,64 @@ extension CMUXCLI {
             if let byteCount {
                 result["bytes"] = byteCount
             }
+            if let agentEvents {
+                result["agent_events"] = agentEvents.payload // (#cm-124.5)
+            }
+            if agentEventsIgnored {
+                result["agent_events_ignored"] = true // (#cm-124.5)
+            }
             return result
+        }
+
+        /// The lines printed under the JSONC verdict, in order. (#cm-124.5)
+        var agentEventsLines: [String] {
+            if agentEventsIgnored {
+                return ["agentEvents here is ignored; cmux reads rows only from ~/.config/cmux/cmux.json"]
+            }
+            guard let agentEvents else { return [] }
+            if !agentEvents.issues.isEmpty {
+                return agentEvents.issues.map(\.englishMessage)
+                    + ["agentEvents: this edit isn't applied; cmux keeps the last valid rows"]
+            }
+            let summary = agentEvents.rows == 0
+                ? "agentEvents: none; built-in rows only"
+                : "agentEvents: \(agentEvents.rows) \(agentEvents.rows == 1 ? "row" : "rows"), valid"
+            return [summary] + agentEvents.warnings.map { "warning: " + $0.englishMessage }
+        }
+    }
+
+    /// What reading `agentEvents` gave, shared with the app's store through `AgentEventTable`. (#cm-124.5)
+    private struct ConfigDoctorAgentEvents {
+        let rows: Int
+        let issues: [AgentEventRowIssue]
+        let warnings: [AgentEventRowWarning]
+
+        var payload: [String: Any] {
+            [
+                "rows": rows,
+                "valid": issues.isEmpty,
+                "issues": issues.map { issue -> [String: Any] in
+                    var item: [String: Any] = ["rule": issue.ruleName, "message": issue.englishMessage]
+                    item["index"] = issue.index ?? NSNull()
+                    item["value"] = issue.value ?? NSNull()
+                    return item
+                },
+                "warnings": warnings.map { ["index": $0.index, "agent": $0.agent, "message": $0.englishMessage] },
+            ]
         }
     }
 
     private struct ConfigDoctorReport {
         let findings: [ConfigDoctorFinding]
+        /// Types the running app recorded with no row; nil when it did not answer. (#cm-124.5)
+        let unmappedTypes: [AgentUnmappedNotificationType]?
 
         var errorCount: Int {
             findings.filter(\.isError).count
         }
 
         var payload: [String: Any] {
-            [
+            var result: [String: Any] = [
                 "ok": errorCount == 0,
                 "error_count": errorCount,
                 "findings": findings.map(\.payload),
@@ -423,10 +487,24 @@ extension CMUXCLI {
                 "docs_url": CMUXCLI.settingsDocsURL,
                 "schema_url": CMUXCLI.settingsSchemaURL,
             ]
+            // (#cm-124.5) null when no app answered
+            if let unmappedTypes {
+                result["unmapped_types"] = unmappedTypes.map {
+                    ["agent": $0.agent, "type": $0.type, "count": $0.count, "last_seen_ms": $0.lastSeenMs]
+                }
+            } else {
+                result["unmapped_types"] = NSNull()
+            }
+            return result
         }
     }
 
-    private func runConfigDoctor(arguments: [String], jsonOutput: Bool) throws -> ConfigDoctorReport {
+    private func runConfigDoctor(
+        arguments: [String],
+        jsonOutput: Bool,
+        socketPath: String?,
+        explicitPassword: String?
+    ) throws -> ConfigDoctorReport {
         let options = try parseConfigDoctorOptions(arguments)
         let targets = options.paths.isEmpty
             ? defaultConfigDoctorTargets()
@@ -440,7 +518,10 @@ extension CMUXCLI {
                 )
             }
         let findings = targets.map(configDoctorFinding(for:))
-        let report = ConfigDoctorReport(findings: findings)
+        let report = ConfigDoctorReport(
+            findings: findings,
+            unmappedTypes: fetchUnmappedNotificationTypes(socketPath: socketPath, password: explicitPassword) // (#cm-124.5)
+        )
 
         if jsonOutput {
             print(jsonString(report.payload))
@@ -610,14 +691,25 @@ extension CMUXCLI {
                     byteCount: data.count
                 )
             }
+            var agentEvents: ConfigDoctorAgentEvents?
+            var agentEventsIgnored = false
+            if target.label == "primary" || target.label.hasPrefix("custom") {
+                // (#cm-124.5) The same validator the app's store uses; a bad row makes the finding an error.
+                let parsed = AgentEventTable.parse(dictionary["agentEvents"])
+                agentEvents = ConfigDoctorAgentEvents(rows: parsed.rows.count, issues: parsed.issues, warnings: parsed.warnings)
+            } else if target.label == "project", dictionary["agentEvents"] != nil {
+                agentEventsIgnored = true
+            }
             return ConfigDoctorFinding(
                 label: target.label,
                 displayPath: target.displayPath,
                 path: target.path,
-                status: "ok",
+                status: agentEvents?.issues.isEmpty == false ? "error" : "ok",
                 message: "JSONC syntax is valid",
                 keys: dictionary.keys.sorted(),
-                byteCount: data.count
+                byteCount: data.count,
+                agentEvents: agentEvents,
+                agentEventsIgnored: agentEventsIgnored
             )
         } catch {
             return ConfigDoctorFinding(
@@ -646,11 +738,68 @@ extension CMUXCLI {
             if let message = finding.message {
                 print("  \(message)")
             }
+            for line in finding.agentEventsLines { // (#cm-124.5)
+                print("  \(line)")
+            }
+        }
+        print()
+        for line in unmappedTypesLines(report.unmappedTypes) { // (#cm-124.5)
+            print(line)
         }
         print()
         print("Docs: \(Self.settingsDocsURL)")
         print("Schema: \(Self.settingsSchemaURL)")
         print("Reload: cmux reload-config")
+    }
+
+    /// Asks the running app for the types it recorded with no row. One connection of its own, bounded at 2 s; nil when the app
+    /// is not running, does not answer in time, or does not know the method. Doctor needs no socket without it. (#cm-124.5)
+    private func fetchUnmappedNotificationTypes(socketPath: String?, password: String?) -> [AgentUnmappedNotificationType]? {
+        guard let socketPath else { return nil }
+        let bound: TimeInterval = 2
+        let deadline = Date().addingTimeInterval(bound)
+        let client = SocketClient(path: socketPath)
+        defer { client.close() }
+        guard (try? client.connect(deadline: deadline)) != nil,
+              (try? authenticateClientIfNeeded(
+                  client, explicitPassword: password, socketPath: socketPath, responseTimeout: bound, deadline: deadline
+              )) != nil,
+              let payload = try? client.sendV2(
+                  method: "agent_events.unmapped_types", responseTimeout: bound, deadline: deadline
+              ),
+              let types = payload["types"] as? [[String: Any]] else {
+            return nil
+        }
+        return types.compactMap { item in
+            guard let agent = item["agent"] as? String, let type = item["type"] as? String,
+                  let count = (item["count"] as? NSNumber)?.intValue,
+                  let lastSeenMs = (item["last_seen_ms"] as? NSNumber)?.int64Value else { return nil }
+            return AgentUnmappedNotificationType(agent: agent, type: type, count: count, lastSeenMs: lastSeenMs)
+        }
+    }
+
+    /// The doctor's block for the unmapped types: a padded list, newest first, then a row to paste. (#cm-124.5)
+    private func unmappedTypesLines(_ types: [AgentUnmappedNotificationType]?) -> [String] {
+        let heading = "Notification types with no row"
+        guard let types else { return ["\(heading): cmux didn't answer, so this list isn't available"] }
+        guard !types.isEmpty else { return ["\(heading): none seen"] }
+        let sorted = types.sorted { $0.lastSeenMs > $1.lastSeenMs }
+        let agentWidth = sorted.map(\.agent.count).max() ?? 0
+        let typeWidth = sorted.map(\.type.count).max() ?? 0
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        var lines = ["\(heading):"]
+        for item in sorted {
+            let agent = item.agent.padding(toLength: agentWidth, withPad: " ", startingAt: 0)
+            let type = item.type.padding(toLength: typeWidth, withPad: " ", startingAt: 0)
+            let seen = formatter.string(from: Date(timeIntervalSince1970: Double(item.lastSeenMs) / 1000))
+            lines.append("  \(agent)  \(type)  \(item.count) \(item.count == 1 ? "time" : "times"), last seen \(seen)")
+        }
+        lines.append("To map one, add this under agentEvents in ~/.config/cmux/cmux.json:")
+        let first = sorted[0]
+        lines.append("{ \"agent\": \"\(first.agent)\", \"notification\": \"\(first.type)\", \"means\": \"question\" }")
+        return lines
     }
 
     private static func absoluteConfigPath(_ rawPath: String) -> String {

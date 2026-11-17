@@ -56,7 +56,9 @@ struct ClaudeHookNotificationClassificationTests {
         expectNothingRaised(try notify(fixture, type: nil, message: cue.1), fixture, cue.0)
     }
 
-    @Test(arguments: ["auth_success", "agent_completed", "plugin_notification"])
+    // cmux-rbf: changed on purpose (#cm-124.5): `plugin_notification` has no built-in row, so it pings once; it is covered by
+    // `unmappedTypesRaiseNoHandAndPingOnce` below. The two types here have a built-in `ignore` row.
+    @Test(arguments: ["auth_success", "agent_completed"])
     func untypedKindsWithWordsRaiseNothing(_ type: String) throws {
         let fixture = try Fixture()
         for message in ["Claude needs your permission", "Task completed", "Build failed: exit 1", "Waiting for your input"] {
@@ -82,7 +84,8 @@ struct ClaudeHookNotificationClassificationTests {
         #expect(drafts.contains { $0.kind == .questionRequested }, "kinds: \(drafts.map(\.kind))")
         #expect(drafts.allSatisfy { $0.attention?.requestIdentity == nil })
         let raising = drafts.filter { $0.kind == .questionRequested }
-        #expect(raising.allSatisfy { $0.detail == type }, "the raising event must carry its notification_type in detail")
+        // cmux-rbf: changed on purpose (#cm-124.5): the raising event carries the `notification-type:` marker, not the bare type.
+        #expect(raising.allSatisfy { $0.detail == "notification-type:" + type }, "the raising event must carry its notification_type in detail")
         for draft in drafts { fixture.append(draft) }
         #expect(fixture.reconciler.openRequests(source: "claude", sessionId: "session").count == 1)
         let notifications = raising.compactMap { $0.attention?.notification }
@@ -101,7 +104,7 @@ struct ClaudeHookNotificationClassificationTests {
         let answer = try notify(fixture, type: pair.1, message: "Answered")
         let resolves = answer.filter { $0.kind == .attentionResolved }
         #expect(resolves.count >= 1, "kinds: \(answer.map(\.kind))")
-        #expect(resolves.allSatisfy { $0.attention?.requestIdentity == nil && !$0.pendingWork && $0.detail == pair.1 })
+        #expect(resolves.allSatisfy { $0.attention?.requestIdentity == nil && !$0.pendingWork && $0.detail == "notification-type:" + pair.1 }) // cmux-rbf: changed on purpose (#cm-124.5): the marker, not the bare type
         #expect(answer.allSatisfy { $0.kind == .attentionResolved })
         for draft in answer { fixture.append(draft) }
         #expect(fixture.reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
@@ -151,12 +154,32 @@ struct ClaudeHookNotificationClassificationTests {
         #expect(candidates.allSatisfy { $0.category == pair.1 }, "\(pair.0): categories \(candidates.map(\.category))")
     }
 
-    @Test(arguments: [
-        "agent_needs_input", "auth_success", "agent_completed", "plugin_notification",
-        "quota_auto_resume_scheduled", "quota_auto_resume_started", "quota_auto_resume_failed",
-    ])
+    // cmux-rbf: changed on purpose (#cm-124.5): the types with a built-in `ignore` row still raise nothing and give no banner.
+    @Test(arguments: ["auth_success", "agent_completed", "quota_auto_resume_scheduled", "quota_auto_resume_started"])
     func otherTypesAndNoTypeRaiseNoHand(_ type: String) throws {
         let fixture = try Fixture()
         expectNothingRaised(try notify(fixture, type: type, message: "Claude needs your input"), fixture, type)
+    }
+
+    // cmux-rbf: changed on purpose (#cm-124.5): a type no row maps raises no hand, and its one banner is accepted once (cm-124.5).
+    @Test(arguments: [
+        "agent_needs_input", "plugin_notification", "quota_auto_resume_failed", "worker_permission_prompt",
+    ])
+    func unmappedTypesRaiseNoHandAndPingOnce(_ type: String) throws {
+        let fixture = try Fixture()
+        let drafts = try notify(fixture, type: type, message: "Claude needs your input")
+        #expect(!drafts.isEmpty, "\(type): the hook journaled nothing")
+        var accepted = 0
+        for draft in drafts {
+            #expect(draft.kind == .stateChanged && draft.declaredPhase == nil, "\(type): journaled \(draft.kind)")
+            #expect(draft.detail == "notification-type:" + type, "\(type): detail \(draft.detail ?? "nil")")
+            let decision = fixture.append(draft)
+            if decision.disposition == .accepted {
+                accepted += 1
+                #expect(!decision.projectsLifecycle, "\(type): the ping projected a lifecycle")
+            }
+        }
+        #expect(accepted == 1, "\(type): \(accepted) banners accepted")
+        #expect(fixture.reconciler.openRequests(source: "claude", sessionId: "session").count == 0, "\(type): a wait opened")
     }
 }

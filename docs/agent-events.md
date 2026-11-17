@@ -112,3 +112,122 @@ Two cases send nothing:
   only a build with this feature prints. A pi still running another build's copy of the extension (the
   file is rewritten at each `hooks pi session-start`, after pi has loaded it) sends nothing until `/reload`.
 - A form that opens before pi's first reply from cmux has come back is not sent, and is not asked again.
+
+## Map a notification type
+
+An agent sends cmux a typed notification (Claude's `Notification` hook carries a `notification_type`).
+cmux knows what some types mean; for the rest you write one line in your global `~/.config/cmux/cmux.json`,
+no rebuild, no restart of cmux or of the agent.
+
+### Find a type cmux doesn't know
+
+The first time ever an agent sends a type no row maps, cmux shows one banner:
+
+- **Title:** `Claude Code · New notification type: worker_permission_prompt`: the agent's name, then the type. If
+  macOS cuts the type off a long title, the label becomes `New type:`
+- **Subtitle:** the working folder's name, as for every cmux banner
+- **Body:** the agent's own message, never words cmux makes up
+
+"Once" means once per agent and type **per cmux app**, remembered across restarts: the dogfood app and each tagged dev
+build keep their own record. No hand rises for it. The ping is used up only when its banner can show: one that comes to
+the pane you're focused on while cmux is the frontmost app, or to a muted workspace, shows nothing and doesn't count, so
+the first one of that type that can show pings. A notification with no type stays silent, and one with a type but no
+message of its own gives no banner and doesn't use up the ping either: the first one of that type that has a message
+pings. `cmux config doctor` lists the type either way.
+
+`cmux config doctor` lists every such type, newest first, with how many times it came and when it last did, and
+prints a row to paste:
+
+```text
+Notification types with no row:
+  claude  agent_needs_input    2 times, last seen 2026-11-20 14:02
+  kimi    plugin_notification  1 time, last seen 2026-11-19 09:15
+To map one, add this under agentEvents in ~/.config/cmux/cmux.json:
+{ "agent": "claude", "notification": "agent_needs_input", "means": "question" }
+```
+
+The list comes from the running app. With no app answering, doctor says so and still checks your rows. It counts one
+per notification, and covers the journal cmux still holds (the newest 100,000 events, roughly the last two weeks).
+
+### Write the row
+
+A row is one object in the top-level `agentEvents` list of the **global** file. A repo's own `.cmux/cmux.json` is never
+read for rows.
+
+```jsonc
+{
+  "agentEvents": [
+    { "agent": "claude",
+      "notification": "worker_permission_prompt",
+      "means": "approval" }
+  ]
+}
+```
+
+Save. It applies to the next notification of that type. In a row:
+
+- `agent` is an agent's slug, or `"*"` for every agent
+- `notification` is the type exactly as the agent sends it
+- `means` is one of four words:
+
+| `means` | The next notification of that type |
+| --- | --- |
+| `question` | Raises the agent's hand. Banner gated as Claude's question forms are |
+| `approval` | Raises the hand, with the approval banner |
+| `resolved` | Retires a lone id-less wait that a typed question raised. Gives no banner |
+| `ignore` | Gives no banner and no hand, and the type never shows in doctor's list |
+
+**Which row wins:** your row for that exact agent, then your `"*"` row, then the built-in row.
+
+**Deleting a row:** the built-in row comes back. For a type with no built-in row, the type is unmapped again and doctor lists
+it. A type that already pinged doesn't ping a second time. A type your row mapped before it ever arrived never pinged, so
+its next notification pings once.
+
+**Whole or nothing:** one bad row rejects the whole edit. cmux keeps the last valid rows (or the built-in ones, if it
+started with a bad file), shows one `cmux.json Configuration Warning` per bad row at the bottom left of the window and
+in the command palette (type `cmux.json`), and `cmux config doctor` prints each one and exits non-zero. A row has exactly `agent`, `notification` and `means`: any other
+key, a `tool` key included, is a bad row. No two rows share an `agent` and `notification`.
+
+### Which agents a row reaches
+
+`claude`, `antigravity`, `kimi` and `grok`. A row for `pi`, `copilot`, `codebuddy`, `factory` or `hermes-agent` is valid
+and does nothing, because their notifications never reach the table. Doctor says so with a line that starts `warning:`
+(for example `warning: agentEvents[0] does nothing: pi's notifications never reach it`); it is not an error and doctor still
+exits 0. A declared event such as `QuestionAsked` (above) is not a row and needs none.
+
+### Built-in rows
+
+These apply with no file. Copy one into your file to change it; the `idle` row cannot be written in a file.
+
+```jsonc
+{ "agent": "*", "notification": "permission_prompt", "means": "approval" }
+{ "agent": "*", "notification": "idle_prompt", "means": "idle" }
+{ "agent": "*", "notification": "elicitation_dialog", "means": "question" }
+{ "agent": "*", "notification": "elicitation_url_dialog", "means": "question" }
+{ "agent": "*", "notification": "elicitation_response", "means": "resolved" }
+{ "agent": "*", "notification": "elicitation_complete", "means": "resolved" }
+```
+
+and these ten types are informational, so they give no banner and no hand:
+
+```jsonc
+{ "agent": "*", "notification": "push_notification", "means": "ignore" }
+{ "agent": "*", "notification": "auth_success", "means": "ignore" }
+{ "agent": "*", "notification": "agent_completed", "means": "ignore" }
+{ "agent": "*", "notification": "quota_auto_resume_fired", "means": "ignore" }
+{ "agent": "*", "notification": "quota_auto_resume_scheduled", "means": "ignore" }
+{ "agent": "*", "notification": "quota_auto_resume_started", "means": "ignore" }
+{ "agent": "*", "notification": "quota_auto_resume_stale", "means": "ignore" }
+{ "agent": "*", "notification": "quota_auto_resume_disabled", "means": "ignore" }
+{ "agent": "*", "notification": "computer_use_enter", "means": "ignore" }
+{ "agent": "*", "notification": "computer_use_exit", "means": "ignore" }
+```
+
+Every other type pings once: for now `auth_storage_failure`, `plugin_notification`, `agent_needs_input`,
+`worker_permission_prompt` and `quota_auto_resume_failed`.
+
+### Three cautions
+
+- A row for `agent_needs_input` may raise the hand on the wrong pane: the type doesn't say which session it names yet.
+- A session reached through `cmux ssh` uses the built-in rows only: the table is read from the local app.
+- An `ignore` row on `permission_prompt` does not stop Claude's approval hand, which also arrives as a `PermissionRequest`.

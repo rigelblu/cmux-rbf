@@ -44,6 +44,8 @@ struct ControlCommandExecutionPolicyTests {
             "system.ping", "system.capabilities", "auth.status", "auth.sign_in_url",
             "feed.jump", "feed.push", "agent.hook.enqueue", "agent.hook.barrier",
             "agent.restore.admit", "agent.restore.release",
+            // cmux-rbf (#cm-124.5): the reads of the agent event table run on the worker, never the main actor.
+            "agent_events.rows", "agent_events.unmapped_types",
             "browser.download.list", "browser.download.wait", "system.top", "system.memory",
             "workspace.remote.pty_bridge", "workspace.env", "sidebar.custom.reload",
             "sidebar.custom.open",
