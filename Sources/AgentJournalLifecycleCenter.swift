@@ -143,7 +143,11 @@ final class AgentJournalLifecycleCenter: Sendable {
                     return false
                 }
                 guard !Task.isCancelled,
-                      let delivery = await MainActor.run(body: { Self.notificationAdmission(notificationEvent.draft) }) else { return false }
+                      let delivery = await MainActor.run(body: { () -> AgentNotificationDelivery? in
+                          // cmux-rbf: a new type's one ping that can't show yet stops here, before its claim (#cm-124.5)
+                          guard !Self.holdsBackNewTypePing(notificationEvent.draft) else { return nil }
+                          return Self.notificationAdmission(notificationEvent.draft)
+                      }) else { return false }
                 guard Self.claimNotification(notificationEvent, decision: decision, store: store) else { return false }
                 if deliver {
                     await MainActor.run { Self.deliverNotification(notificationEvent, identity: identity, admission: delivery) }
@@ -284,6 +288,13 @@ final class AgentJournalLifecycleCenter: Sendable {
     /// Inspect only from an off-main test worker: opening the journal can perform SQLite migration.
     func journalStoreForTesting() -> AgentJournalStore? { lazyStore?.store() }
 #endif
+
+    /// The notification types the journal recorded with no row (cm-124.5), for `agent_events.unmapped_types`.
+    /// Runs on the socket worker: one journal scan under the store's own lock. Nil when the journal is unavailable.
+    nonisolated func recordedUnmappedNotificationTypes() -> [AgentUnmappedNotificationType]? { // (#cm-124.5)
+        guard let store = lazyStore?.store() else { return nil }
+        return try? store.unmappedNotificationTypes()
+    }
 
     /// Full body of the `agent_journal_append` socket verb: decode, commit
     /// durably, enqueue reduction, and reply with the committed sequence.

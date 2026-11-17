@@ -16,6 +16,8 @@ public struct AgentNotificationPresentation: Equatable, Sendable {
         case unreadReminder
         /// An agent error turn remains unread after one minute.
         case errorUnreadReminder
+        /// The first time an agent sent a notification type no row maps; the type itself is never translated. (cm-124.5)
+        case newNotificationType(String)
     }
 
     /// The agent's display name, optional session title, and localized kind.
@@ -43,6 +45,12 @@ public struct AgentNotificationPresentation: Equatable, Sendable {
             label = String(localized: "agent.notification.kind.unreadReminder", defaultValue: "Finished 1 min ago, still unread")
         case .errorUnreadReminder:
             label = String(localized: "agent.notification.kind.errorUnreadReminder", defaultValue: "Stopped on an error 1 min ago, still unread")
+        case .newNotificationType(let type):
+            // The type is the agent's own word, inserted as is and never translated. (#cm-124.5)
+            label = String(
+                format: String(localized: "agent.notification.kind.newNotificationType", defaultValue: "New notification type: %@"),
+                type
+            )
         case nil:
             label = nil
         }

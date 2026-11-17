@@ -16,6 +16,15 @@ public struct AgentNotificationReconciler: Sendable {
     private static let formTypes: Set<String> = ["elicitation_dialog", "elicitation_url_dialog"]
     private static let answeredFormTypes: Set<String> = ["elicitation_response", "elicitation_complete"]
 
+    /// Whether a `detail` is on the typed path: it carries the `notification-type:` marker the CLI writes for a typed
+    /// notification, or it is one of the four bare elicitation names cmux journaled before the marker, so a replayed
+    /// older journal keeps cm-128.5's guard. No native-event condition: grok's payloads are camelCase. (#cm-124.5)
+    private static func isTypedPath(detail: String?) -> Bool {
+        guard let detail else { return false }
+        return AgentNotificationTypeMarker.type(inDetail: detail) != nil
+            || formTypes.contains(detail) || answeredFormTypes.contains(detail)
+    }
+
     private struct Session: Sendable {
         var occurredAtMs: Int64 = -1
         var sequence: Int64 = 0
@@ -105,7 +114,16 @@ public struct AgentNotificationReconciler: Sendable {
         let sessionKey = Self.key([draft.source, sessionID])
         var session = sessions[sessionKey] ?? Session()
         let context = draft.attention
-        if draft.kind == .stateChanged, draft.declaredPhase == nil { return .init(.observation) }
+        if draft.kind == .stateChanged, draft.declaredPhase == nil {
+            // cmux-rbf: the first time ever an agent sends a type no row maps, its banner is accepted once. The CLI
+            // marks such an observation `notification-type:<type>`; the marker alone decides, and the receipt
+            // (`claimNotification`) makes it once per agent and type across restarts. No hand rises. (#cm-124.5)
+            if context?.notification != nil, let type = AgentNotificationTypeMarker.type(inDetail: draft.detail) {
+                return .init(.accepted, identity: Self.key(["unmapped-notification", draft.source, type]),
+                             projectsLifecycle: false)
+            }
+            return .init(.observation)
+        }
         let incomingTurn = context?.turnIdentity
         if [.approvalRequested, .questionRequested, .planReviewRequested].contains(draft.kind),
            let request = context?.requestIdentity, session.resolvedRequests.contains(request) {
@@ -115,11 +133,13 @@ public struct AgentNotificationReconciler: Sendable {
             || draft.kind == .childCompleted || draft.kind == .childFailed
         var requestInvalidations: [String] = []
         if draft.kind == .attentionResolved, context?.requestIdentity == nil,
-           let answered = draft.detail, Self.answeredFormTypes.contains(answered) {
+           Self.isTypedPath(detail: draft.detail) {
             // cm-128.5: an id-less resolve retires the session's one open wait whatever raised it, so a form's answer
             // could retire a permission waiting behind it. It retires only a wait a form raised; any other is an observation.
+            // cm-124.5: "a form raised" is now "a typed question raised": any wait raised on the typed path. Every other
+            // id-less resolve (Hermes's `approval-response`, Amp's `running`) keeps today's rule. (#cm-124.5)
             guard session.attentionIdentities.count == 1, let identity = session.attentionIdentities.first,
-                  let raised = session.attentionTypes[identity], Self.formTypes.contains(raised) else {
+                  session.attentionTypes[identity] != nil else {
                 return .init(.observation, projectsLifecycle: false)
             }
         }
@@ -354,7 +374,8 @@ public struct AgentNotificationReconciler: Sendable {
         if [.approvalRequested, .questionRequested, .planReviewRequested].contains(draft.kind) {
             session.attentionIdentities.insert(identity)
             if let request = context?.requestIdentity { session.attentionRequestIDs[identity] = request }
-            if let detail = draft.detail { session.attentionTypes[identity] = detail }
+            // cm-124.5: an entry only for a wait raised on the typed path, so the guard above can tell it. (#cm-124.5)
+            if let detail = draft.detail, Self.isTypedPath(detail: detail) { session.attentionTypes[identity] = detail }
             // cm-128.1: remember the newest Feed-backed wait, so its late reminder is not mistaken for a new one.
             if draft.source == "claude",
                draft.nativeEvent.map(Self.feedAttentionNativeEvents.contains) == true,

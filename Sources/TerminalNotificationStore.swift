@@ -1798,7 +1798,9 @@ final class TerminalNotificationStore: ObservableObject {
         )
     }
 
-    private func shouldSuppressExternalDelivery(tabId: UUID, surfaceId: UUID?) -> Bool {
+    // cmux-rbf: internal, not private, so a new type's one ping asks this same focus rule before its receipt is
+    // claimed (`AgentJournalLifecycleCenter.holdsBackNewTypePing`). Reject this hunk only with that caller (#cm-124.5).
+    func shouldSuppressExternalDelivery(tabId: UUID, surfaceId: UUID?) -> Bool {
         let focusState = notificationFocusState(tabId: tabId, surfaceId: surfaceId)
         return focusState.isAppFocused
             && focusState.isActiveTab

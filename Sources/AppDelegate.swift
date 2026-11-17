@@ -1605,6 +1605,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // (cmux's five stay in use there), as the feature-flag fetch below is not. Runs before any window is restored.
         if !isRunningUnderXCTest {
             workspaceStatusListStore.start()
+            // cmux-rbf (#cm-124.5): the one agent event table reads the global `cmux.json` (rows he wrote) for every window.
+            AgentEventTableStore.shared.start()
         }
         StartupBreadcrumbLog.append(
             "appDelegate.didFinish.begin",

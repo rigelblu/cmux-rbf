@@ -52,6 +52,92 @@ struct AgentJournalLifecycleCenterTests {
         }
     }
 
+    /// (#cm-124.5) A new type's one ping is spent only when its banner can show. In a muted workspace, or in the pane
+    /// focused in the frontmost cmux, it is held back unspent, and the next notification of that type is the one ping.
+    @MainActor
+    @Test(arguments: ["muted", "focused"])
+    func aNewTypePingThatCannotShowSpendsNoReceipt(_ reason: String) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            _ = try #require(AppDelegate.shared)
+            let fixture = try AgentNotificationRegressionTests().makeFixture()
+            defer { fixture.restore() }
+            fixture.source.surfaceResumeBindingsByPanelId[fixture.panelId] = SurfaceResumeBindingSnapshot(
+                kind: "claude", command: "claude --resume session", checkpointId: "session", source: "agent-hook")
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let center = AgentJournalLifecycleCenter(databaseURL: root.appendingPathComponent("journal.sqlite"))
+            let workspaceID = fixture.source.id.uuidString
+            let surfaceID = fixture.panelId.uuidString
+            var sequence: Int64 = 0
+            func ping() -> AgentJournalEventDraft {
+                sequence += 1
+                return AgentJournalEventDraft(kind: .stateChanged, occurredAtMs: sequence, source: "claude",
+                    agentKey: "claude_code", sessionId: "session", workspaceId: workspaceID,
+                    surfaceId: surfaceID, detail: AgentNotificationTypeMarker.detail(forType: "cm124_held"),
+                    attention: AgentAttentionContext(notification: AgentJournalNotification(
+                        title: "Claude Code · New notification type: cm124_held", subtitle: "",
+                        body: "A worker wants to run Bash", category: "other")))
+            }
+            @MainActor func holdBack(_ on: Bool) {
+                if reason == "muted" { fixture.source.isMuted = on } else { AppFocusState.overrideIsFocused = on }
+            }
+            #expect(AgentJournalLifecycleCenter.notificationTargetIsCurrent(ping()))
+            #expect(fixture.manager.selectedTabId == fixture.source.id)
+            #expect(fixture.manager.focusedSurfaceId(for: fixture.source.id) == fixture.panelId)
+            holdBack(true)
+            defer { holdBack(false) }
+            #expect(!(await center.admitNotification(ping())), "\(reason): a ping that cannot show spent the receipt")
+            holdBack(false)
+            #expect(await center.admitNotification(ping()), "\(reason): the first ping that can show was refused")
+            #expect(!(await center.admitNotification(ping())), "\(reason): the type pinged twice")
+        }
+    }
+
+    /// (#cm-124.5) Only a new type's ping is held back. Any other notification in the focused pane is still claimed,
+    /// and the store's own focus rule keeps it inside cmux, as before. A typed question carries the same type marker
+    /// as the new-type ping (`AgentEventTable.decide`), so it is the case that tells the two apart.
+    @MainActor
+    @Test(arguments: ["turn-complete", "typed-question"])
+    func aFocusedPaneStillClaimsEveryOtherNotification(_ kind: String) async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            _ = try #require(AppDelegate.shared)
+            let fixture = try AgentNotificationRegressionTests().makeFixture()
+            defer { fixture.restore() }
+            let defaults = UserDefaults.standard
+            let key = "notificationAgentTurnComplete"
+            let previous = defaults.object(forKey: key)
+            defaults.set("whenIdle", forKey: key)
+            defer {
+                if let previous { defaults.set(previous, forKey: key) } else { defaults.removeObject(forKey: key) }
+            }
+            fixture.source.surfaceResumeBindingsByPanelId[fixture.panelId] = SurfaceResumeBindingSnapshot(
+                kind: "claude", command: "claude --resume session", checkpointId: "session", source: "agent-hook")
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let center = AgentJournalLifecycleCenter(databaseURL: root.appendingPathComponent("journal.sqlite"))
+            let workspaceID = fixture.source.id.uuidString
+            let surfaceID = fixture.panelId.uuidString
+            var sequence: Int64 = 0
+            func draft(_ kind: AgentJournalEventKind, prompt: String? = nil, detail: String? = nil,
+                       notification: AgentJournalNotification? = nil) -> AgentJournalEventDraft {
+                sequence += 1
+                return AgentJournalEventDraft(kind: kind, occurredAtMs: sequence, source: "claude", agentKey: "claude_code",
+                    sessionId: "session", workspaceId: workspaceID, surfaceId: surfaceID, detail: detail,
+                    attention: AgentAttentionContext(eventIdentity: prompt, notification: notification))
+            }
+            AppFocusState.overrideIsFocused = true
+            #expect(fixture.manager.selectedTabId == fixture.source.id)
+            #expect(fixture.manager.focusedSurfaceId(for: fixture.source.id) == fixture.panelId)
+            _ = await center.admitNotification(draft(.turnStarted, prompt: "typed"))
+            let other = kind == "turn-complete"
+                ? draft(.turnCompleted, notification: AgentJournalNotification(title: "Claude", subtitle: "",
+                    body: "Finished", category: "turn-complete"))
+                : draft(.questionRequested, detail: AgentNotificationTypeMarker.detail(forType: "elicitation_dialog"),
+                    notification: AgentJournalNotification(title: "Claude", subtitle: "", body: "Pick one", category: "other"))
+            #expect(await center.admitNotification(other), "\(kind): the focused pane's notification was held back")
+        }
+    }
+
     @Test func appendCommandRejectsDeclaredMonitoringAtDecode() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

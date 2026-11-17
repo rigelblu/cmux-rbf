@@ -1593,6 +1593,16 @@ class TerminalController {
             return v2Result(id: request.id, v2FeedQuestionReply(params: request.params))
         case "feed.exit_plan.reply":
             return v2Result(id: request.id, v2FeedExitPlanReply(params: request.params))
+        // cmux-rbf (#cm-124.5): the two reads of the agent event table. Local only: both stay off the `cmux ssh` relay's
+        // allowlist, which denies every method it does not list. Worker lane, no main hop: the table is an immutable value
+        // behind a lock, and the journal query runs under the store's own lock.
+        case "agent_events.rows":
+            return v2Ok(id: request.id, result: AgentEventTableStore.shared.rowsPayload())
+        case "agent_events.unmapped_types":
+            guard let payload = AgentEventTableStore.shared.unmappedTypesPayload() else {
+                return v2Error(id: request.id, code: "unavailable", message: "agent journal unavailable")
+            }
+            return v2Ok(id: request.id, result: payload)
         case "agent.hook.enqueue":
             let hookParams: [String: Any]
             if request.params["relay_backed"] as? Bool == true,

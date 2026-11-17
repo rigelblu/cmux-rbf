@@ -98,6 +98,10 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         // all downstream process/socket work happens after the reply.
         "agent.hook.enqueue",
         "agent.hook.barrier",
+        // cmux-rbf (#cm-124.5): reads of the agent event table: an immutable value behind a lock, and one journal
+        // scan. Neither touches the main actor.
+        "agent_events.rows",
+        "agent_events.unmapped_types",
         // Performs a fresh off-main process scan before one agent exec. Only
         // the final target revalidation and launch claim hop to MainActor.
         "agent.restore.admit",

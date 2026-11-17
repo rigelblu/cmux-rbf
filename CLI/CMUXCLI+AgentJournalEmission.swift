@@ -121,6 +121,13 @@ extension CMUXCLI {
         }
     }
 
+    /// What the generic route decided for a `notification` action: the journal kind and, when the table decided it, that
+    /// decision. `typed` is nil for every kind something earlier fixed, so those events never read the table. (#cm-124.5)
+    struct AgentNotificationJournalResolution {
+        let kind: AgentJournalEventKind
+        let typed: AgentTypedNotificationDecision?
+    }
+
     /// Resolves the semantic kind for a generic agent hook's `notification`
     /// action. Only a fact picks it (cm-128.5, Tom, grill Q32 and Q39): cmux's
     /// own decision (Cursor's approval), the mapper's verdict from the native
@@ -128,59 +135,67 @@ extension CMUXCLI {
     /// field (Amp's `agent_state`, Campfire's `campfire_event_type`, a
     /// `notification_type`). A message's words never choose a kind: what none
     /// of those names is `stateChanged`, an observation that raises and pings
-    /// nothing.
-    func agentJournalNotificationKind(
+    /// nothing. A `notification_type` is decided by the table, and only that last step
+    /// asks for it: `table` runs for a typed notification nothing earlier decided. (#cm-124.5)
+    func agentJournalNotificationResolution(
         def: AgentHookDef,
         nativeEvent: String?,
         toolName: String?,
         rawObject: [String: Any]?,
         cursorShellNeedsApproval: Bool,
-        lifecycleRoute: AgentHookLifecycleReconciler.Route?
-    ) -> AgentJournalEventKind {
-        if cursorShellNeedsApproval { return .approvalRequested }
+        lifecycleRoute: AgentHookLifecycleReconciler.Route?,
+        table: () -> AgentEventTable
+    ) -> AgentNotificationJournalResolution {
+        if cursorShellNeedsApproval { return .init(kind: .approvalRequested, typed: nil) }
         if let nativeEvent, !nativeEvent.isEmpty {
             let mapped = AgentSemanticEventMapper().kind(source: def.name, nativeEvent: nativeEvent, toolName: toolName)
             if mapped != .stateChanged {
-                return mapped
+                return .init(kind: mapped, typed: nil)
             }
         }
-        if let kind = ampLifecycleJournalKind(route: lifecycleRoute, rawObject: rawObject) { return kind }
-        if def.name == "campfire", let kind = campfireJournalKind(rawObject: rawObject) { return kind }
-        return typedNotificationJournalKind(forNotificationType: typedNotificationType(in: rawObject))
+        if let kind = ampLifecycleJournalKind(route: lifecycleRoute, rawObject: rawObject) { return .init(kind: kind, typed: nil) }
+        if def.name == "campfire", let kind = campfireJournalKind(rawObject: rawObject) { return .init(kind: kind, typed: nil) }
+        guard let type = typedNotificationType(in: rawObject) else { return .init(kind: .stateChanged, typed: nil) }
+        let decided = table().decide(agent: def.name, type: type)
+        return .init(kind: decided.kind, typed: decided)
+    }
+
+    /// How long a hook waits for the app's rows before it uses the built-in ones. About five times the 46-50 ms a socket
+    /// call measured; A10k records the real figure. (#cm-124.5)
+    static let agentEventRowsFetchBoundSeconds: TimeInterval = 0.25
+
+    /// The table a typed notification is decided by: the app's rows (built-in plus his), asked for once over a connection of
+    /// its own, bounded, closed after the answer, so a late reply can never reach a later call. Any failure, a bad
+    /// answer and an app that doesn't know the method give the built-in rows: the table never makes a hook fail or wait
+    /// past the bound. (#cm-124.5)
+    func fetchAgentEventTable(socketPath: String, socketPassword: String?) -> AgentEventTable {
+        let bound = Self.agentEventRowsFetchBoundSeconds
+        let deadline = Date().addingTimeInterval(bound)
+        let rowsClient = SocketClient(path: socketPath)
+        defer { rowsClient.close() }
+        guard (try? rowsClient.connect(deadline: deadline)) != nil,
+              (try? authenticateClientIfNeeded(
+                  rowsClient,
+                  explicitPassword: socketPassword,
+                  socketPath: socketPath,
+                  responseTimeout: bound,
+                  deadline: deadline
+              )) != nil,
+              let payload = try? rowsClient.sendV2(
+                  method: "agent_events.rows",
+                  responseTimeout: bound,
+                  deadline: deadline
+              ),
+              let rows = payload["rows"] else {
+            return .builtIn
+        }
+        let parsed = AgentEventTable.parse(rows)
+        return parsed.issues.isEmpty ? AgentEventTable(userRows: parsed.rows) : .builtIn
     }
 
     /// An agent's typed `notification_type`; grok's permission prompt spells it `notificationType`. (cm-128.5)
     func typedNotificationType(in rawObject: [String: Any]?) -> String? {
         rawObject.flatMap { firstString(in: $0, keys: ["notification_type", "notificationType"]) }
-    }
-
-    /// The one typed table every agent's `Notification` goes through, Claude's own handler included. (cm-128.5)
-    /// `agent_needs_input` stays unmapped until a live record shows which session it names (Tom, grill Q35), and a
-    /// needs-you type Claude adds later stays silent until it is mapped here (Tom, grill Q32: "Drop it").
-    func typedNotificationJournalKind(forNotificationType type: String?) -> AgentJournalEventKind {
-        switch type {
-        case "permission_prompt":
-            return .approvalRequested
-        case "idle_prompt":
-            return .idleObserved
-        case "elicitation_dialog", "elicitation_url_dialog":
-            return .questionRequested
-        case "elicitation_response", "elicitation_complete":
-            return .attentionResolved
-        default:
-            return .stateChanged
-        }
-    }
-
-    /// The types whose `detail` the reconciler needs: a form's raising event and the answer that may retire it. (cm-128.5)
-    func notificationTypeDetail(_ type: String?, kind: AgentJournalEventKind) -> String? {
-        guard let type, kind == .questionRequested || kind == .attentionResolved else { return nil }
-        switch type {
-        case "elicitation_dialog", "elicitation_url_dialog", "elicitation_response", "elicitation_complete":
-            return type
-        default:
-            return nil
-        }
     }
 
     /// Amp's lifecycle protocol, from its typed `agent_state` and `turn_outcome` (cm-128.5). The route already holds

@@ -70,6 +70,19 @@ struct RemoteCLIRelayPolicyTests {
             == .deny(reason: "method 'agent_pane.show' is not permitted through a remote relay"))
     }
 
+    // cmux-rbf #cm-124.5: both reads of the agent event table stay local. A relay-backed hook gets no rows and uses the
+    // built-in ones; the journal's list of unmapped types never leaves Tom's Mac.
+    @Test("agent_events.rows and agent_events.unmapped_types are denied through a remote relay", arguments: [
+        "agent_events.rows", "agent_events.unmapped_types",
+    ])
+    func deniesAgentEventTableReads(method: String) {
+        let line = Data("""
+        {"id":"r","method":"\(method)","params":{}}
+        """.utf8)
+        #expect(RemoteRelayCommandPolicy().evaluate(commandLine: line, workspaceAliases: [:], surfaceAliases: [:])
+            == .deny(reason: "method '\(method)' is not permitted through a remote relay"))
+    }
+
     // cmux-rbf #cm-126.3
     @Test("agent_pane.list is denied through a remote relay")
     func deniesAgentPaneList() {

@@ -164,13 +164,15 @@ extension CLINotifyProcessIntegrationRegressionTests {
             ["hook_event_name": "Notification", "notification_type": "elicitation_dialog", "message": "Pick one"])
         let questions = journalDrafts(commands).filter { $0.kind == "agent.question.requested" }
         XCTAssertFalse(questions.isEmpty, "saw \(commands)")
-        XCTAssertTrue(questions.allSatisfy { $0.draft["detail"] as? String == "elicitation_dialog" }, "saw \(commands)")
+        // cmux-rbf: changed on purpose (#cm-124.5): the typed path's `detail` now carries the `notification-type:` marker.
+        XCTAssertTrue(questions.allSatisfy { $0.draft["detail"] as? String == "notification-type:elicitation_dialog" }, "saw \(commands)")
         let answer = try runStructuredKindHook(
             context, agent: "kimi", "notification",
             ["hook_event_name": "Notification", "notification_type": "elicitation_response", "message": "Answered"])
         let resolves = journalDrafts(answer)
         XCTAssertFalse(resolves.isEmpty)
-        XCTAssertTrue(resolves.allSatisfy { $0.kind == "agent.attention.resolved" && $0.draft["detail"] as? String == "elicitation_response" },
+        // cmux-rbf: changed on purpose (#cm-124.5): as above.
+        XCTAssertTrue(resolves.allSatisfy { $0.kind == "agent.attention.resolved" && $0.draft["detail"] as? String == "notification-type:elicitation_response" },
                       "saw \(answer)")
     }
 

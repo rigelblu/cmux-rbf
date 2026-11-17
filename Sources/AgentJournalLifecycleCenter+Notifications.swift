@@ -71,6 +71,23 @@ extension AgentJournalLifecycleCenter {
         return (live.tabId, panelID)
     }
 
+    /// cmux-rbf: a new type's one ping is spent only when its banner can show (#cm-124.5). In a muted workspace the
+    /// store drops it, and in the pane focused in the frontmost cmux it keeps it inside cmux; either way the type's
+    /// name never reaches him, so it is held back before its receipt is claimed and the first one that can show pings.
+    /// Every other notification keeps claiming first and lets the store's own mute and focus rules act after. The test
+    /// is the reconciler's unmapped branch, not the marker alone: a typed question carries the marker too.
+    @MainActor
+    static func holdsBackNewTypePing(_ draft: AgentJournalEventDraft) -> Bool {
+        guard draft.kind == .stateChanged, draft.declaredPhase == nil,
+              AgentNotificationTypeMarker.type(inDetail: draft.detail) != nil,
+              let live = notificationTarget(draft) else { return false }
+        let store = TerminalNotificationStore.shared
+        guard store.isWorkspaceNotificationsMuted(forTabId: live.tabId)
+            || store.shouldSuppressExternalDelivery(tabId: live.tabId, surfaceId: live.surfaceId) else { return false }
+        notificationDiagnostic(draft, reason: "new-type-held-back")
+        return true
+    }
+
     @MainActor
     static func notificationAdmission(_ draft: AgentJournalEventDraft) -> AgentNotificationDelivery? {
         guard let notification = draft.attention?.notification,

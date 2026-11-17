@@ -173,6 +173,7 @@
 		A77A0010A1B2C3D4E5F60001 /* AgentJournalLazyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A77A000FA1B2C3D4E5F60001 /* AgentJournalLazyStore.swift */; };
 		110438021104380211043802 /* AgentJournalLifecycleCenter+Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110438011104380111043801 /* AgentJournalLifecycleCenter+Database.swift */; };
 		C3C8079F2C1B6648739BA1A6 /* AgentJournalLifecycleCenter+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49FD681C026A6B0C83211C6 /* AgentJournalLifecycleCenter+Notifications.swift */; };
+		C124A5B0A1B2C3D4E5F60002 /* AgentEventTableStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C124A5F0A1B2C3D4E5F60002 /* AgentEventTableStore.swift */; };
 		009E54A15EB3D846E02D2650 /* AgentJournalLifecycleCenter+Projection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DDAD1AC31A52ED5D308536B /* AgentJournalLifecycleCenter+Projection.swift */; };
 		A77A0005A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A77A0006A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift */; };
 		A77A000EA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A77A000DA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift */; };
@@ -696,6 +697,8 @@
 		C1285B94D311B5B4B060FBAF /* CLICursorShellFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1285FBAC0E6CF9B94D311B5 /* CLICursorShellFailureTests.swift */; };
 		C1285BD0F39AA1E7E36F357C /* ClaudeStopFailureHookTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1285F4815C2BEA4D0F39AA1 /* ClaudeStopFailureHookTests.swift */; };
 		C1285B73E6D4112F63D02706 /* CLIStructuredNotificationKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1285F4FACBC3D5F73E6D411 /* CLIStructuredNotificationKindTests.swift */; };
+		C124A5B0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C124A5F0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift */; };
+		C124A5B0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C124A5F0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift */; };
 		C1285BFA269D52E13C15447B /* ClaudeHookNotificationClassificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1285FC1DC010279FA269D52 /* ClaudeHookNotificationClassificationTests.swift */; };
 		C1242001A1B2C3D4E5F60001 /* CLIDeclaredWaitsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1242001A1B2C3D4E5F60002 /* CLIDeclaredWaitsTests.swift */; };
 		A5D41211A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D41212A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift */; };
@@ -4483,6 +4486,7 @@
 		A77A000FA1B2C3D4E5F60001 /* AgentJournalLazyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentJournalLazyStore.swift; sourceTree = "<group>"; };
 		110438011104380111043801 /* AgentJournalLifecycleCenter+Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentJournalLifecycleCenter+Database.swift"; sourceTree = "<group>"; };
 		F49FD681C026A6B0C83211C6 /* AgentJournalLifecycleCenter+Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentJournalLifecycleCenter+Notifications.swift"; sourceTree = "<group>"; };
+		C124A5F0A1B2C3D4E5F60002 /* AgentEventTableStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEventTableStore.swift; sourceTree = "<group>"; };
 		2DDAD1AC31A52ED5D308536B /* AgentJournalLifecycleCenter+Projection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentJournalLifecycleCenter+Projection.swift"; sourceTree = "<group>"; };
 		A77A0006A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentJournalLifecycleCenter.swift; sourceTree = "<group>"; };
 		A77A000DA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentJournalLifecycleCenterTests.swift; sourceTree = "<group>"; };
@@ -4994,6 +4998,8 @@
 		C1285FBAC0E6CF9B94D311B5 /* CLICursorShellFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLICursorShellFailureTests.swift; sourceTree = "<group>"; };
 		C1285F4815C2BEA4D0F39AA1 /* ClaudeStopFailureHookTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStopFailureHookTests.swift; sourceTree = "<group>"; };
 		C1285F4FACBC3D5F73E6D411 /* CLIStructuredNotificationKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIStructuredNotificationKindTests.swift; sourceTree = "<group>"; };
+		C124A5F0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationTypeLookupTests.swift; sourceTree = "<group>"; };
+		C124A5F0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEventTableStoreTests.swift; sourceTree = "<group>"; };
 		C1285FC1DC010279FA269D52 /* ClaudeHookNotificationClassificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNotificationClassificationTests.swift; sourceTree = "<group>"; };
 		C1242001A1B2C3D4E5F60002 /* CLIDeclaredWaitsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIDeclaredWaitsTests.swift; sourceTree = "<group>"; };
 		A5D41212A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIHookNoResponseTests.swift; sourceTree = "<group>"; };
@@ -10228,6 +10234,7 @@
 				E2C08BD36B31E50A48F5EFE9 /* TerminalNotificationPolicyAgentContext.swift */,
 				0F58EB2DE58F4E5EF8752CF2 /* TerminalNotificationStore+FocusState.swift */,
 				F49FD681C026A6B0C83211C6 /* AgentJournalLifecycleCenter+Notifications.swift */,
+				C124A5F0A1B2C3D4E5F60002 /* AgentEventTableStore.swift */,
 				2DDAD1AC31A52ED5D308536B /* AgentJournalLifecycleCenter+Projection.swift */,
 				110438011104380111043801 /* AgentJournalLifecycleCenter+Database.swift */,
 				A77A000FA1B2C3D4E5F60001 /* AgentJournalLazyStore.swift */,
@@ -12455,6 +12462,8 @@
 				C1285FBAC0E6CF9B94D311B5 /* CLICursorShellFailureTests.swift */,
 				C1285F4815C2BEA4D0F39AA1 /* ClaudeStopFailureHookTests.swift */,
 				C1285F4FACBC3D5F73E6D411 /* CLIStructuredNotificationKindTests.swift */,
+				C124A5F0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift */,
+				C124A5F0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift */,
 				C1285FC1DC010279FA269D52 /* ClaudeHookNotificationClassificationTests.swift */,
 				C1242001A1B2C3D4E5F60002 /* CLIDeclaredWaitsTests.swift */,
 				6379A0026379A0026379A002 /* CLISSHPTYResizeInputTests.swift */,
@@ -13410,6 +13419,7 @@
 				A77A0010A1B2C3D4E5F60001 /* AgentJournalLazyStore.swift in Sources */,
 				110438021104380211043802 /* AgentJournalLifecycleCenter+Database.swift in Sources */,
 				C3C8079F2C1B6648739BA1A6 /* AgentJournalLifecycleCenter+Notifications.swift in Sources */,
+				C124A5B0A1B2C3D4E5F60002 /* AgentEventTableStore.swift in Sources */,
 				009E54A15EB3D846E02D2650 /* AgentJournalLifecycleCenter+Projection.swift in Sources */,
 				A77A0005A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift in Sources */,
 				C12800080000000000000001 /* TerminalSurface+AgentInput.swift in Sources */,
@@ -16436,6 +16446,8 @@
 				C1285B94D311B5B4B060FBAF /* CLICursorShellFailureTests.swift in Sources */,
 				C1285BD0F39AA1E7E36F357C /* ClaudeStopFailureHookTests.swift in Sources */,
 				C1285B73E6D4112F63D02706 /* CLIStructuredNotificationKindTests.swift in Sources */,
+				C124A5B0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift in Sources */,
+				C124A5B0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift in Sources */,
 				C1285BFA269D52E13C15447B /* ClaudeHookNotificationClassificationTests.swift in Sources */,
 				C1242001A1B2C3D4E5F60001 /* CLIDeclaredWaitsTests.swift in Sources */,
 				A5D41211A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift in Sources */,

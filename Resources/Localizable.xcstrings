@@ -36978,6 +36978,131 @@
         }
       }
     },
+    "agent.notification.kind.newNotificationType": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New notification type: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい通知タイプ: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新通知类型：%@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neuer Benachrichtigungstyp: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau type de notification : %@"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "نوع إشعار جديد: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuevo tipo de notificación: %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新通知類型：%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 알림 유형: %@"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novi tip obavještenja: %@"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ny notifikationstype: %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuovo tipo di notifica: %@"
+          }
+        },
+        "km": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ប្រភេទការជូនដំណឹងថ្មី៖ %@"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ny varslingstype: %@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nowy typ powiadomienia: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novo tipo de notificação: %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Новый тип уведомления: %@"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ประเภทการแจ้งเตือนใหม่: %@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni bildirim türü: %@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Новий тип сповіщення: %@"
+          }
+        }
+      }
+    },
     "agent.generic.notification.subtitle.attention": {
       "extractionState": "manual",
       "localizations": {
@@ -147091,6 +147216,537 @@
           "stringUnit": {
             "state": "translated",
             "value": "오픈코드"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.badMeaning.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means \"%@\": use question, approval, resolved or ignore"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means「%@」: question、approval、resolved、ignore のいずれかを使用してください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：means「%@」：请使用 question、approval、resolved 或 ignore"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means „%@“: verwende question, approval, resolved oder ignore"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : means « %@ » : utilisez question, approval, resolved ou ignore"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: ‏means \"%@\": استخدم question أو approval أو resolved أو ignore"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means «%@»: usa question, approval, resolved o ignore"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：means「%@」：請使用 question、approval、resolved 或 ignore"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means \"%@\": question, approval, resolved 또는 ignore 중 하나를 사용하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.duplicateRow.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: same agent and notification as agentEvents[%@]; keep one"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: agentEvents[%@] と同じ agent と notification です。どちらか一つにしてください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：agent 和 notification 与 agentEvents[%@] 相同；请只保留一个"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: gleicher agent und gleiche notification wie agentEvents[%@]; behalte nur eine"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : mêmes agent et notification que agentEvents[%@] ; n'en gardez qu'une"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: نفس agent وnotification الموجودين في agentEvents[%@]؛ احتفظ بواحد فقط"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: mismos agent y notification que agentEvents[%@]; conserva solo uno"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：agent 與 notification 與 agentEvents[%@] 相同；請只保留一個"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: agent와 notification이 agentEvents[%@]와 같습니다. 하나만 남겨 주세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.missingAgent.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"agent\" is missing; name one, such as \"claude\", or \"*\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"agent\" がありません。\"claude\" などの名前か \"*\" を指定してください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"agent\"；请指定一个，如 \"claude\"，或 \"*\""
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"agent\" fehlt; nenne einen, etwa \"claude\", oder \"*\""
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : \"agent\" est manquant ; indiquez-en un, comme \"claude\", ou \"*\""
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"agent\" مفقود؛ سمِّ واحدًا، مثل \"claude\"، أو \"*\""
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: falta \"agent\"; indica uno, como \"claude\", o \"*\""
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"agent\"；請指定一個，例如 \"claude\"，或 \"*\""
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"agent\"가 없습니다. \"claude\" 같은 이름이나 \"*\"를 지정하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.missingMeans.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" is missing; use question, approval, resolved or ignore"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" がありません。question、approval、resolved、ignore のいずれかを使用してください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"means\"；请使用 question、approval、resolved 或 ignore"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" fehlt; verwende question, approval, resolved oder ignore"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : \"means\" est manquant ; utilisez question, approval, resolved ou ignore"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" مفقود؛ استخدم question أو approval أو resolved أو ignore"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: falta \"means\"; usa question, approval, resolved o ignore"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"means\"；請使用 question、approval、resolved 或 ignore"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\"가 없습니다. question, approval, resolved 또는 ignore 중 하나를 사용하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.missingNotification.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"notification\" is missing; name a type, such as \"idle_prompt\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"notification\" がありません。\"idle_prompt\" などの種類を指定してください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"notification\"；请指定一个类型，如 \"idle_prompt\""
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"notification\" fehlt; nenne einen Typ, etwa \"idle_prompt\""
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : \"notification\" est manquant ; indiquez un type, comme \"idle_prompt\""
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"notification\" مفقود؛ سمِّ نوعًا، مثل \"idle_prompt\""
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: falta \"notification\"; indica un tipo, como \"idle_prompt\""
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"notification\"；請指定一個類型，例如 \"idle_prompt\""
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"notification\"이 없습니다. \"idle_prompt\" 같은 유형을 지정하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.notList.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: must be a list of rows"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 行のリストである必要があります"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：必须是行列表"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: muss eine Liste von Zeilen sein"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : doit être une liste de lignes"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: يجب أن يكون قائمة من الصفوف"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: debe ser una lista de filas"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：必須是列的清單"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 행 목록이어야 합니다"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.notText.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" must be text, such as \"%@\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" はテキストである必要があります（例: \"%@\"）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：\"%@\" 必须是文本，如 \"%@\""
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" muss Text sein, etwa \"%@\""
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : \"%@\" doit être du texte, comme \"%@\""
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: يجب أن يكون \"%@\" نصًا، مثل \"%@\""
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" debe ser texto, como \"%@\""
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：\"%@\" 必須是文字，例如 \"%@\""
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\"은(는) 텍스트여야 합니다. 예: \"%@\""
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.rowNotObject.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: a row must be an object"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 行はオブジェクトである必要があります"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：每一行必须是对象"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: eine Zeile muss ein Objekt sein"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : une ligne doit être un objet"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: يجب أن يكون الصف كائنًا"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: una fila debe ser un objeto"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：每一列必須是物件"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 행은 객체여야 합니다"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.unknownKey.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" isn't a row key; a row has agent, notification, means"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" は行のキーではありません。行には agent、notification、means を指定します"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：\"%@\" 不是行的键；行包含 agent、notification、means"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" ist kein Zeilenschlüssel; eine Zeile hat agent, notification, means"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : « %@ » n'est pas une clé de ligne ; une ligne contient agent, notification, means"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" ليس مفتاح صف؛ يحتوي الصف على agent وnotification وmeans"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\" no es una clave de fila; una fila tiene agent, notification, means"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：\"%@\" 不是列的鍵；列包含 agent、notification、means"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"%@\"은(는) 행 키가 아닙니다. 행에는 agent, notification, means가 있습니다"
           }
         }
       }

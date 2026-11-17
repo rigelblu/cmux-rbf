@@ -8849,6 +8849,8 @@ struct ContentView: View {
                 defaultValue: "%@ '%@' must reference a workspace command"
             )
             return String(format: format, issue.settingName, issue.commandName ?? "")
+        case .agentEventsRow:
+            return AgentEventTableStore.paletteDetail(issue) // (#cm-124.5)
         }
     }
 
