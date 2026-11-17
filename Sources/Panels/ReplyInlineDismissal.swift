@@ -10,7 +10,7 @@ enum ReplyInlineDismissal {
     static func reason(
         for event: ReplyInlineEvent,
         passage: ReplyInlinePassage,
-        sidebarShowingReplyAtShow: Bool
+        destinationAtShow: ReplyInlineDestination
     ) -> ReplyInlineDismissReason? {
         switch event {
         case .mouseDown(let onToolbar):
@@ -25,8 +25,8 @@ enum ReplyInlineDismissal {
                   current.text == passage.rawText
             else { return .selectionChanged }
             return nil
-        case .sidebarChanged(let showingReply):
-            return showingReply == sidebarShowingReplyAtShow ? nil : .sidebar
+        case .destinationChanged(let destination):
+            return destination == destinationAtShow ? nil : .destination
         case .settingChanged(let enabled):
             return enabled ? nil : .setting
         case .paneClosed:
