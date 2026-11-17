@@ -80,6 +80,23 @@ struct RemoteCLIRelayPolicyTests {
             == .deny(reason: "method 'agent_pane.list' is not permitted through a remote relay"))
     }
 
+    // cmux-rbf #cm-126.14: a clear writes a page file and steers a local pane, so it stays off the allowlist
+    // (default deny), for an unmapped surface and for one the remote session owns.
+    @Test("agent_pane.clear is denied through a remote relay, even for an owned surface")
+    func deniesAgentPaneClear() {
+        let remote = UUID()
+        let line = Data("""
+        {"id":"r","method":"agent_pane.clear","params":{"surface_id":"\(remote.uuidString)"}}
+        """.utf8)
+        let denial = RemoteRelayCommandPolicy.Verdict.deny(
+            reason: "method 'agent_pane.clear' is not permitted through a remote relay"
+        )
+        #expect(RemoteRelayCommandPolicy().evaluate(commandLine: line, workspaceAliases: [:], surfaceAliases: [:]) == denial)
+        #expect(RemoteRelayCommandPolicy().evaluate(
+            commandLine: line, workspaceAliases: [:], surfaceAliases: [remote: UUID()]
+        ) == denial)
+    }
+
     private func withServer(
         workspaceAliases: [UUID: UUID] = [:],
         surfaceAliases: [UUID: UUID] = [:],

@@ -13,6 +13,13 @@ public protocol ControlAgentPaneContext: AnyObject {
     /// - Returns: A refusal or an applicable plan.
     func controlAgentPaneCheck(surfaceID: UUID, url: URL) -> ControlAgentPaneCheck
 
+    /// Validates a caller for `clear` without changing state (cmux-rbf #cm-126.14): the same
+    /// caller lookup as ``controlAgentPaneCheck(surfaceID:url:)``, then its first Agent Pane,
+    /// its cleared page, and the same browser and local-file settings.
+    /// - Parameter surfaceID: The caller terminal's live surface identifier.
+    /// - Returns: A refusal, or a plan whose `url` is the pane's cleared page.
+    func controlAgentPaneClearCheck(surfaceID: UUID) -> ControlAgentPaneCheck
+
     /// Applies a validated plan through the app's shared action path.
     /// - Parameter plan: The plan returned by the check.
     /// - Returns: The applied result, or nil if the target disappeared or creation failed.

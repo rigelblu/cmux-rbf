@@ -26,6 +26,8 @@ struct ControlCommandCoordinatorAgentPaneTests {
         case .opened: planned = .open
         case .navigated: planned = .navigate(panelID: surfaceID, others: 2)
         case .heldDesignFocus: planned = .hold(panelID: hasPane ? surfaceID : nil, others: 2)
+        case .cleared: planned = .clear(panelID: surfaceID, others: 2)
+        case .alreadyCleared: planned = .alreadyCleared(panelID: surfaceID, others: 2)
         }
         context.checkResult = .ready(ControlAgentPanePlan(
             action: planned, workspaceID: workspaceID, terminalID: terminalID,
@@ -111,7 +113,8 @@ struct ControlCommandCoordinatorAgentPaneTests {
         .init(refusal: .figmaAddress, code: "invalid_params", reason: "figma_address"),
         .init(refusal: .urlBlocked(message: "Policy refusal"), code: "browser_url_blocked", reason: "url_blocked"),
         .init(refusal: .insecureHTTP(host: "example.org"), code: "invalid_params", reason: "insecure_http"),
-        .init(refusal: .browserOff, code: "unavailable", reason: "browser_off")
+        .init(refusal: .browserOff, code: "unavailable", reason: "browser_off"),
+        .init(refusal: .noAgentPane, code: "invalid_params", reason: "no_agent_pane")
     ]
 
     @Test("each refusal keeps its code and reason and never calls apply", arguments: refusals)
@@ -214,7 +217,7 @@ struct ControlCommandCoordinatorAgentPaneTests {
         #expect(context.listCalls.count == 1)
     }
 
-    @Test("both methods reject even otherwise valid relay provenance", arguments: ["agent_pane.show", "agent_pane.list"])
+    @Test("every method rejects even otherwise valid relay provenance", arguments: ["agent_pane.show", "agent_pane.list", "agent_pane.clear"])
     func localOnlyAgentPaneRejectsRelay(_ method: String) {
         let context = context()
         var params = request().params
@@ -233,5 +236,109 @@ struct ControlCommandCoordinatorAgentPaneTests {
         guard case .err(let code, _, _) = result else { Issue.record("expected internal_error"); return }
         #expect(code == "internal_error")
         #expect(context.applyCalls.count == 1)
+    }
+
+    // MARK: - clear (cmux-rbf #cm-126.14)
+
+    private var clearRequest: ControlRequest {
+        request("agent_pane.clear", ["surface_id": .string(terminalID.uuidString)])
+    }
+
+    private let clearedPage = URL(string: "file:///cleared/pane.html")!
+
+    private func clearContext(_ action: ControlAgentPaneApplied.Action, planned: ControlAgentPanePlan.Action) -> FakeAgentPaneControlCommandContext {
+        let context = FakeAgentPaneControlCommandContext()
+        context.clearCheckResult = .ready(ControlAgentPanePlan(
+            action: planned, workspaceID: workspaceID, terminalID: terminalID,
+            ownerStableID: ownerStableID, url: clearedPage
+        ))
+        context.applied = ControlAgentPaneApplied(
+            action: action, surfaceID: surfaceID, paneID: paneID, workspaceID: workspaceID,
+            ownerSurfaceID: terminalID, ownerStableID: ownerStableID, url: clearedPage, others: 2
+        )
+        return context
+    }
+
+    @Test("clear checks the caller once, applies the plan it got, and maps the result with refs and the action")
+    func clearMapsTheAppliedResult() throws {
+        let cases: [(ControlAgentPaneApplied.Action, ControlAgentPanePlan.Action)] = [
+            (.cleared, .clear(panelID: surfaceID, others: 2)),
+            (.alreadyCleared, .alreadyCleared(panelID: surfaceID, others: 2)),
+            (.heldDesignFocus, .holdClear(panelID: surfaceID, others: 2))
+        ]
+        for (action, planned) in cases {
+            let context = clearContext(action, planned: planned)
+            let coordinator = ControlCommandCoordinator(context: context)
+            let result = try payload(coordinator.handle(clearRequest))
+            #expect(result["action"] == .string(action.rawValue))
+            #expect(result["surface_id"] == .string(surfaceID.uuidString))
+            #expect(result["surface_ref"] == coordinator.ref(.surface, surfaceID))
+            #expect(result["pane_ref"] == coordinator.ref(.pane, paneID))
+            #expect(result["workspace_ref"] == coordinator.ref(.workspace, workspaceID))
+            #expect(result["owner_surface_id"] == .string(terminalID.uuidString))
+            #expect(result["url"] == .string(clearedPage.absoluteString))
+            #expect(result["others"] == .int(2))
+            #expect(context.clearCheckCalls == [terminalID])
+            #expect(context.checkCalls.isEmpty, "clear must not run show's page check")
+            guard case .ready(let plan) = context.clearCheckResult else { continue }
+            #expect(context.applyCalls == [plan])
+        }
+    }
+
+    @Test("a clear refusal keeps its code and reason, names no page, and never applies", arguments: refusals)
+    private func clearRefusalsNeverApply(_ testCase: RefusalCase) {
+        let context = FakeAgentPaneControlCommandContext()
+        context.clearCheckResult = .refused(testCase.refusal)
+        let result = ControlCommandCoordinator(context: context).handle(clearRequest)
+        guard case .err(let code, _, .object(let data)) = result else {
+            Issue.record("expected refusal \(testCase.reason), got \(String(describing: result))")
+            return
+        }
+        #expect(code == testCase.code)
+        #expect(data["reason"] == .string(testCase.reason))
+        #expect(data["url"] == nil, "a clear has no requested page to name")
+        #expect(context.clearCheckCalls.count == 1)
+        #expect(context.applyCalls.isEmpty)
+    }
+
+    @Test("a missing or malformed clear surface_id reaches no witness", arguments: [
+        [String: JSONValue](), ["surface_id": .string("no-surface")], ["surface_id": .int(7)]
+    ])
+    func clearInvalidParamsNeverCallWitness(_ params: [String: JSONValue]) {
+        let context = FakeAgentPaneControlCommandContext()
+        let result = ControlCommandCoordinator(context: context).handle(request("agent_pane.clear", params))
+        guard case .err(let code, _, .object(let data)) = result else {
+            Issue.record("expected invalid_params, got \(String(describing: result))")
+            return
+        }
+        #expect(code == "invalid_params")
+        #expect(data["reason"] == .string("invalid_show_params"))
+        #expect(context.clearCheckCalls.isEmpty && context.checkCalls.isEmpty && context.applyCalls.isEmpty)
+    }
+
+    @Test("a failed clear apply returns internal_error")
+    func failedClearApplyIsAnInternalError() {
+        let context = clearContext(.cleared, planned: .clear(panelID: surfaceID, others: 0))
+        context.applied = nil
+        let result = ControlCommandCoordinator(context: context).handle(clearRequest)
+        guard case .err(let code, let message, _) = result else { Issue.record("expected internal_error"); return }
+        #expect(code == "internal_error")
+        #expect(message == "Agent Pane could not be cleared")
+        #expect(context.applyCalls.count == 1)
+    }
+
+    @Test("a clear held with no pane open yet answers null for the surface, the pane and the url")
+    func heldClearBeforeAnyPaneHasNullHandlesAndUrl() throws {
+        let context = clearContext(.heldDesignFocus, planned: .holdClear(panelID: nil, others: 0))
+        context.applied = ControlAgentPaneApplied(
+            action: .heldDesignFocus, surfaceID: nil, paneID: nil, workspaceID: workspaceID,
+            ownerSurfaceID: terminalID, ownerStableID: ownerStableID, url: nil, others: 0
+        )
+        let result = try payload(ControlCommandCoordinator(context: context).handle(clearRequest))
+        #expect(result["action"] == .string("held-design-focus"))
+        for key in ["surface_id", "surface_ref", "pane_id", "pane_ref", "url"] {
+            #expect(result[key] == .null, "\(key) was \(String(describing: result[key]))")
+        }
+        #expect(result["owner_surface_id"] == .string(terminalID.uuidString))
     }
 }

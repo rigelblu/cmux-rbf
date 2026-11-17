@@ -234,4 +234,27 @@ struct AgentPaneCLIRulesTests {
             == "the Agent Pane couldn't open, and nothing was changed: split failed")
         #expect(failure("invalid_params", message: "Missing or invalid url") == "invalid_params: Missing or invalid url")
     }
+
+    // MARK: - clear (cm-126.14)
+
+    @Test("no_agent_pane says there is nothing to clear, whichever subcommand reads it")
+    func noAgentPaneMessage() {
+        #expect(failure("invalid_params", reason: "no_agent_pane") == "nothing to clear: this terminal has no Agent Pane")
+    }
+
+    @Test("a failed clear says it could not be cleared; a failed show still says it could not open")
+    func internalErrorNamesTheSubcommand() {
+        let socket = AgentPaneCLIRules.SocketFailure(code: "internal_error", message: "write failed")
+        #expect(AgentPaneCLIRules.message(for: socket, clearing: true)
+            == "the Agent Pane couldn't be cleared, and nothing was changed: write failed")
+        #expect(AgentPaneCLIRules.message(for: socket)
+            == "the Agent Pane couldn't open, and nothing was changed: write failed")
+    }
+
+    @Test("the no-caller message names the subcommand, and show's is unchanged")
+    func noCallerNamesTheSubcommand() {
+        #expect(AgentPaneCLIRules.noCallerMessage == AgentPaneCLIRules.noCallerMessage(for: "show"))
+        #expect(AgentPaneCLIRules.noCallerMessage(for: "clear")
+            == "cmux agent-pane clear needs the agent's terminal: run it in a cmux terminal or pass --surface")
+    }
 }

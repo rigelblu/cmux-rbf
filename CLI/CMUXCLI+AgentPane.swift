@@ -7,6 +7,7 @@ extension CMUXCLI {
     var agentPaneUsage: String {
         """
         Usage: cmux [--json] [--id-format refs|uuids|both] agent-pane show <page> [--surface <id|ref>]
+               cmux [--json] [--id-format refs|uuids|both] agent-pane clear [--surface <id|ref>]
                cmux [--json] [--id-format refs|uuids|both] agent-pane list [--workspace <id|ref>]
 
         Show a page beside the agent, in its own pane: the Agent Pane.
@@ -27,6 +28,17 @@ extension CMUXCLI {
           While Design Focus is on, the update is held (action=held-design-focus, exit 0)
           and the Agent Pane shows it when the mode ends: send one `cmux notify` with the
           update's "But:" line.
+
+        clear
+          Shows that nothing is waiting on the person: the terminal's Agent Pane changes to
+          cmux's own page, "Nothing to answer right now", with a link back to the last post.
+          Run it when their reply answered the post, or it no longer matters. It finds the
+          Agent Pane the way show does, takes no page, and never takes focus.
+          --surface  as for show.
+          Prints: OK surface=<ref> pane=<ref> workspace=<ref> action=cleared|already-cleared|held-design-focus
+          A pane that is already cleared is left as it is (action=already-cleared, exit 0).
+          While Design Focus is on, the clear is held (action=held-design-focus, exit 0) and
+          applies when the mode ends; a pane closed meanwhile is left closed.
 
         list
           Every Agent Pane: <surface> pane=<pane> workspace=<ws> owner=<terminal|none> url=<url>
@@ -51,6 +63,9 @@ extension CMUXCLI {
           http:// opens only for localhost or a host on cmux's insecure-HTTP list (Settings): <host>. Use https:// or a local file
           the embedded browser's URL policy blocks <url>: <reason>
           the Agent Pane couldn't open, and nothing was changed: <diagnostic>
+          clear only:
+          nothing to clear: this terminal has no Agent Pane
+          the Agent Pane couldn't be cleared, and nothing was changed: <diagnostic>
         """
     }
 
@@ -62,7 +77,7 @@ extension CMUXCLI {
     ) throws {
         var args = commandArgs
         guard !args.isEmpty else {
-            throw CLIError(message: "cmux agent-pane requires a subcommand: show, list")
+            throw CLIError(message: "cmux agent-pane requires a subcommand: show, list, clear")
         }
         let subcommand = args.removeFirst().lowercased()
         if ["help", "--help", "-h"].contains(subcommand) {
@@ -82,6 +97,20 @@ extension CMUXCLI {
                 jsonOutput: jsonOutput,
                 idFormat: idFormat
             )
+        case "clear":
+            let (surface, rest) = parseOption(args, name: "--surface")
+            guard rest.isEmpty else {
+                throw CLIError(message: "usage: cmux agent-pane clear [--surface <id|ref>]")
+            }
+            try runAgentPaneCaller(
+                method: "agent_pane.clear",
+                params: [:],
+                subcommand: "clear",
+                surfaceOverride: surface,
+                client: client,
+                jsonOutput: jsonOutput,
+                idFormat: idFormat
+            )
         case "list":
             let (workspace, rest) = parseOption(args, name: "--workspace")
             guard rest.isEmpty else {
@@ -89,7 +118,7 @@ extension CMUXCLI {
             }
             try runAgentPaneList(workspace: workspace, client: client, jsonOutput: jsonOutput, idFormat: idFormat)
         default:
-            throw CLIError(message: "unknown cmux agent-pane subcommand '\(subcommand)' (expected show, list)")
+            throw CLIError(message: "unknown cmux agent-pane subcommand '\(subcommand)' (expected show, list, clear)")
         }
     }
 
@@ -119,7 +148,28 @@ extension CMUXCLI {
                 jsonOutput: jsonOutput
             )
         }
+        try runAgentPaneCaller(
+            method: "agent_pane.show",
+            params: ["url": url.absoluteString],
+            subcommand: "show",
+            surfaceOverride: surfaceOverride,
+            client: client,
+            jsonOutput: jsonOutput,
+            idFormat: idFormat
+        )
+    }
 
+    /// Finds the caller and sends one `method` for it, as `show` and `clear` both do (cmux-rbf #cm-126.14
+    /// moved this out of `show` so `clear` shares it): `params` plus the caller's `surface_id`.
+    private func runAgentPaneCaller(
+        method: String,
+        params: [String: Any],
+        subcommand: String,
+        surfaceOverride: String?,
+        client: SocketClient,
+        jsonOutput: Bool,
+        idFormat: CLIIDFormat
+    ) throws {
         // `--surface` names the one caller. Without it, cm-73.45's shared lookup:
         // the live herdr-agent note, then `CMUX_SURFACE_ID`; never `identify`, which
         // answers from focus. `strict`, as for `figma open`: an Agent Pane opens beside a
@@ -148,7 +198,8 @@ extension CMUXCLI {
         }
         guard !callers.isEmpty else {
             throw agentPaneFailure(
-                code: "invalid_params", reason: "no_caller", message: AgentPaneCLIRules.noCallerMessage,
+                code: "invalid_params", reason: "no_caller",
+                message: AgentPaneCLIRules.noCallerMessage(for: subcommand),
                 jsonOutput: jsonOutput
             )
         }
@@ -157,8 +208,8 @@ extension CMUXCLI {
         var lastNotFound: AgentPaneCLIRules.SocketFailure?
         for caller in callers {
             switch try agentPaneCall(
-                "agent_pane.show",
-                ["url": url.absoluteString, "surface_id": caller],
+                method,
+                params.merging(["surface_id": caller]) { _, new in new },
                 client: client
             ) {
             case .success(let payload):
@@ -189,7 +240,7 @@ extension CMUXCLI {
                 failure.surface = failure.surface ?? caller
                 lastNotFound = failure
             case .failure(let failure):
-                throw agentPaneFailure(failure, jsonOutput: jsonOutput)
+                throw agentPaneFailure(failure, jsonOutput: jsonOutput, clearing: subcommand == "clear")
             }
         }
         if let lastNotFound {
@@ -276,11 +327,15 @@ extension CMUXCLI {
         ))
     }
 
-    private func agentPaneFailure(_ failure: AgentPaneCLIRules.SocketFailure, jsonOutput: Bool) -> CLIError {
+    private func agentPaneFailure(
+        _ failure: AgentPaneCLIRules.SocketFailure,
+        jsonOutput: Bool,
+        clearing: Bool = false
+    ) -> CLIError {
         agentPaneFailure(
             code: failure.code,
             reason: failure.reason,
-            message: AgentPaneCLIRules.message(for: failure),
+            message: AgentPaneCLIRules.message(for: failure, clearing: clearing),
             jsonOutput: jsonOutput
         )
     }

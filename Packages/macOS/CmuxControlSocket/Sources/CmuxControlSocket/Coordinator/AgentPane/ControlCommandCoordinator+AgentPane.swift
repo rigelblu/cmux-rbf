@@ -5,7 +5,8 @@ internal import Foundation
 extension ControlCommandCoordinator {
     /// Parses this local-only domain before calling its read-only check and single apply.
     func handleAgentPane(_ request: ControlRequest) -> ControlCallResult? {
-        guard request.method == "agent_pane.show" || request.method == "agent_pane.list" else { return nil }
+        guard request.method == "agent_pane.show" || request.method == "agent_pane.list"
+                || request.method == "agent_pane.clear" else { return nil }
         guard request.params["_cmux_remote_workspace_id"] == nil else {
             return .err(code: "remote_relay_authentication_failed", message: "Agent Panes are local-only", data: nil)
         }
@@ -33,6 +34,24 @@ extension ControlCommandCoordinator {
                 ))
             })]))
         }
+        if request.method == "agent_pane.clear" {
+            // cmux-rbf #cm-126.14: finds the caller and its Agent Pane as `show` does; the page is the app's own.
+            guard let surfaceID = uuid(request.params, "surface_id") else {
+                return .err(
+                    code: "invalid_params", message: "Missing or invalid surface_id",
+                    data: .object(["reason": .string("invalid_show_params")])
+                )
+            }
+            switch context.controlAgentPaneClearCheck(surfaceID: surfaceID) {
+            case .refused(let refusal):
+                return agentPaneRefusalResult(refusal, url: nil)
+            case .ready(let plan):
+                guard let applied = context.controlAgentPaneApply(plan) else {
+                    return .err(code: "internal_error", message: "Agent Pane could not be cleared", data: nil)
+                }
+                return .ok(.object(appliedPayload(applied)))
+            }
+        }
         guard let surfaceID = uuid(request.params, "surface_id"),
               let rawURL = string(request.params, "url"), let url = URL(string: rawURL) else {
             return .err(
@@ -47,14 +66,18 @@ extension ControlCommandCoordinator {
             guard let applied = context.controlAgentPaneApply(plan) else {
                 return .err(code: "internal_error", message: "Agent Pane could not be opened or navigated", data: nil)
             }
-            var payload = agentPanePayload(
-                surfaceID: applied.surfaceID, paneID: applied.paneID, workspaceID: applied.workspaceID,
-                ownerSurfaceID: applied.ownerSurfaceID, ownerStableID: applied.ownerStableID,
-                url: applied.url.absoluteString, others: applied.others
-            )
-            payload["action"] = .string(applied.action.rawValue)
-            return .ok(.object(payload))
+            return .ok(.object(appliedPayload(applied)))
         }
+    }
+
+    private func appliedPayload(_ applied: ControlAgentPaneApplied) -> [String: JSONValue] {
+        var payload = agentPanePayload(
+            surfaceID: applied.surfaceID, paneID: applied.paneID, workspaceID: applied.workspaceID,
+            ownerSurfaceID: applied.ownerSurfaceID, ownerStableID: applied.ownerStableID,
+            url: applied.url?.absoluteString, others: applied.others
+        )
+        payload["action"] = .string(applied.action.rawValue)
+        return payload
     }
 
     /// Mints refs only from live identifiers; the stable owner never becomes a live handle.
@@ -72,11 +95,12 @@ extension ControlCommandCoordinator {
     }
 
     /// Keeps the code, diagnostic, and reason together for the CLI's English message mapping.
-    private func agentPaneRefusalResult(_ refusal: ControlAgentPaneRefusal, url: URL) -> ControlCallResult {
+    private func agentPaneRefusalResult(_ refusal: ControlAgentPaneRefusal, url: URL?) -> ControlCallResult {
         let code: String
         let reason: String
         let message: String
-        var data: [String: JSONValue] = ["url": .string(url.absoluteString)]
+        var data: [String: JSONValue] = [:]
+        if let url { data["url"] = .string(url.absoluteString) }
         switch refusal {
         case .notFound(let surfaceID):
             code = "not_found"; reason = "not_found"; message = "Surface not found"
@@ -98,6 +122,8 @@ extension ControlCommandCoordinator {
             data["host"] = .string(host)
         case .browserOff:
             code = "unavailable"; reason = "browser_off"; message = "Embedded browser is disabled"
+        case .noAgentPane:
+            code = "invalid_params"; reason = "no_agent_pane"; message = "This terminal has no Agent Pane"
         }
         data["reason"] = .string(reason)
         return .err(code: code, message: message, data: .object(data))

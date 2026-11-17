@@ -2,6 +2,65 @@ import Foundation
 
 // cmux-rbf #cm-126.3: the Agent Pane, a browser pane one agent's terminal owns.
 
+/// The answered state of an Agent Pane (cmux-rbf #cm-126.14).
+///
+/// An Agent Pane begins in `.post` when opened or steered with a new post.
+/// When Tom writes back (pressing Return in the owning terminal or submitting
+/// via cmux's text box), it moves to `.wroteSince(Date)`.
+/// When cleared, it moves to `.cleared`.
+enum AgentPaneAnswerState: Equatable, Sendable {
+    case post
+    case wroteSince(Date)
+    case cleared
+
+    enum Event: Equatable, Sendable {
+        case show
+        case clear
+        case tomWrote(at: Date)
+    }
+
+    /// Pure transition function for AgentPaneAnswerState.
+    ///
+    /// Table:
+    /// - any + show -> .post
+    /// - any + clear -> .cleared
+    /// - .post + tomWrote(t) -> .wroteSince(t)
+    /// - .wroteSince + tomWrote -> unchanged (first time kept)
+    /// - .cleared + tomWrote -> .cleared
+    static func next(state: AgentPaneAnswerState, event: Event) -> AgentPaneAnswerState {
+        switch event {
+        case .show:
+            return .post
+        case .clear:
+            return .cleared
+        case .tomWrote(let date):
+            switch state {
+            case .post:
+                return .wroteSince(date)
+            case .wroteSince:
+                return state
+            case .cleared:
+                return .cleared
+            }
+        }
+    }
+
+    var wroteAt: Date? {
+        if case .wroteSince(let date) = self {
+            return date
+        }
+        return nil
+    }
+
+    var isPost: Bool {
+        self == .post
+    }
+
+    var isCleared: Bool {
+        self == .cleared
+    }
+}
+
 /// The Agent Pane's rules, all over plain values so each tests without the app.
 ///
 /// An Agent Pane is a browser pane with an owner (the terminal's
@@ -60,8 +119,188 @@ enum AgentPaneMark {
     }
 
     /// A page cannot replace the Agent Pane's caption with its own title.
-    static func title(isAgentPaneKind: Bool, own: String) -> String {
-        isAgentPaneKind ? String(localized: "agentPane.tab.title", defaultValue: "Agent Pane") : own
+    ///
+    /// When `wroteAt` is set, the caption reads "You wrote <time>" in place of "Agent Pane"
+    /// (cmux-rbf #cm-126.14). A plain browser pane keeps `own` unchanged.
+    static func title(
+        isAgentPaneKind: Bool,
+        own: String,
+        wroteAt: Date? = nil,
+        locale: Locale? = nil,
+        timeZone: TimeZone? = nil
+    ) -> String {
+        guard isAgentPaneKind else { return own }
+        if let wroteAt {
+            let timeString: String
+            if locale == nil && timeZone == nil {
+                timeString = wroteAt.formatted(date: .omitted, time: .shortened)
+            } else {
+                let style = Date.FormatStyle(
+                    date: .omitted,
+                    time: .shortened,
+                    locale: locale ?? .autoupdatingCurrent,
+                    timeZone: timeZone ?? .current
+                )
+                timeString = wroteAt.formatted(style)
+            }
+            return String(localized: "agentPane.tab.title.wrote", defaultValue: "You wrote \(timeString)")
+        }
+        return String(localized: "agentPane.tab.title", defaultValue: "Agent Pane")
+    }
+
+    /// Caps Lock and Num Lock modifier masks matching `ghostty.h:136-137` (`GHOSTTY_MODS_CAPS`, `GHOSTTY_MODS_NUM`).
+    static let capsLockModMask: UInt32 = 1 << 4
+    static let numLockModMask: UInt32 = 1 << 5
+
+    /// Whether an input event represents Tom's pressed Return or keypad Enter in the terminal,
+    /// counting only real physical key presses (not release, not committed text, not IME composition commit,
+    /// no modifiers except Caps/Num lock).
+    ///
+    /// (cmux-rbf #cm-126.14)
+    static func isCountedReturn(
+        isPress: Bool,
+        keycode: UInt32,
+        modsRaw: UInt32,
+        isCommittedText: Bool,
+        isComposing: Bool,
+        hasAccumulatedText: Bool = false
+    ) -> Bool {
+        guard isPress else { return false }
+        guard !isCommittedText else { return false }
+        guard !isComposing else { return false }
+        guard !hasAccumulatedText else { return false }
+        guard keycode == 0x24 || keycode == 0x4C else { return false }
+        let allowedMods = capsLockModMask | numLockModMask
+        guard (modsRaw & ~allowedMods) == 0 else { return false }
+        return true
+    }
+
+    /// Subfolder under Application Support for cleared Agent Pane placeholder pages.
+    static let clearedPagesSubfolder = "cleared"
+
+    /// Derives an Agent Pane's state upon workspace/session restore (cmux-rbf #cm-126.14).
+    ///
+    /// A restored Agent Pane's URL inside cmux's cleared-pages folder -> `.cleared`, else `.post`.
+    static func restoredState(url: URL?, clearedFolderURL: URL) -> AgentPaneAnswerState {
+        guard let url, isClearedPageURL(url, in: clearedFolderURL) else {
+            return .post
+        }
+        return .cleared
+    }
+
+    /// The cleared page of one Agent Pane: one file named by the pane's id, so a page shared
+    /// between panes can never change another pane's link (cmux-rbf #cm-126.14).
+    static func clearedPageURL(panelID: UUID, in clearedFolderURL: URL) -> URL {
+        clearedFolderURL.appendingPathComponent("\(panelID.uuidString).html", isDirectory: false)
+    }
+
+    /// Whether closing a panel removes its cleared page: only when Tom closes the pane (a tab or
+    /// pane close that really closes it), never in a workspace teardown or an app quit's, because
+    /// a restored cleared pane reloads its file, and not when the pane only moves
+    /// (`closePanel` false). cmux-rbf #cm-126.14.
+    static func removesClearedPage(origin: String, closePanel: Bool, appIsTerminating: Bool) -> Bool {
+        closePanel && !appIsTerminating && (origin == "tab_close" || origin == "pane_close")
+    }
+
+    /// The cleared page's markup: its text, in light or dark by `prefers-color-scheme`, and a link
+    /// to the page the pane showed before, left out when it showed none (cmux-rbf #cm-126.14).
+    /// `title` and `linkText` arrive already localized; both and the address are escaped here.
+    static func clearedPageHTML(title: String, linkText: String, previousURL: URL?) -> String {
+        let link = previousURL.map {
+            "<p><a href=\"\(escapedForHTML($0.absoluteString))\">\(escapedForHTML(linkText))</a></p>"
+        } ?? ""
+        return """
+        <!doctype html>
+        <html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>\(escapedForHTML(title))</title>
+        <style>
+          html, body { height: 100%; margin: 0; }
+          body { display: flex; flex-direction: column; align-items: center; justify-content: center;
+                 font: 13px -apple-system, system-ui, sans-serif; color: -apple-system-secondary-label; background: Canvas; }
+          p { margin: 0; }
+          p + p { margin-top: 1.4em; }
+          a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+        </style></head>
+        <body><p>\(escapedForHTML(title))</p>\(link)</body></html>
+
+        """
+    }
+
+    /// The page a clear links to (cmux-rbf #cm-126.14): the page the pane shows; when that isn't a file, https or http page,
+    /// the last page a `show` put there; when it is a cleared page (Tom went back to it), that last page, else the link the
+    /// cleared page already has. Never a cleared page: `nil` instead. `pageLink` reads the page's file, so it runs only when
+    /// nothing else gives a page.
+    static func linkTarget(shown: URL?, recordedPost: URL?, pageLink: () -> URL?, clearedFolderURL: URL) -> URL? {
+        guard let shown else { return nil }
+        // A post's link that WebKit refuses (a file in another folder) leaves the pane on about:blank, "Can't open this
+        // page". Link the post instead; nil only when no `show` is recorded (a restored pane has none, it's in memory).
+        guard refusal(for: shown) != .badScheme else {
+            guard let recordedPost, !isClearedPageURL(recordedPost, in: clearedFolderURL) else { return nil }
+            return recordedPost
+        }
+        guard isClearedPageURL(shown, in: clearedFolderURL) else { return shown }
+        if let recordedPost, !isClearedPageURL(recordedPost, in: clearedFolderURL) { return recordedPost }
+        if let link = pageLink(), !isClearedPageURL(link, in: clearedFolderURL) { return link }
+        return nil
+    }
+
+    /// The address on a cleared page's link, or `nil` for a page with none (cmux-rbf #cm-126.14).
+    static func clearedPageLink(inHTML html: String) -> URL? {
+        guard let open = html.range(of: "<a href=\""),
+              let close = html[open.upperBound...].range(of: "\"") else { return nil }
+        return URL(string: unescapedFromHTML(String(html[open.upperBound..<close.lowerBound])))
+    }
+
+    /// The link on the cleared page file at `page`, or `nil` when it isn't a readable file or has none.
+    static func clearedPageLink(at page: URL?) -> URL? {
+        guard let page, page.isFileURL, let html = try? String(contentsOf: page, encoding: .utf8) else { return nil }
+        return clearedPageLink(inHTML: html)
+    }
+
+    /// Whether a navigation is handed to the app's own `navigate(to:)`, which grants the post's folder (cmux-rbf #cm-126.14).
+    /// The whole decision, so the browser's delegate only calls it and acts. Only the click on a cleared page's own link
+    /// qualifies: a link activation in the main frame of an Agent Pane, from a cleared page (in the cleared folder), to the
+    /// file URL that page links to. Any other navigation goes through the browser's usual checks. `pageLink` reads the page's
+    /// file, so it runs only once every other guard has passed.
+    static func handsLinkToApp(
+        isLinkActivation: Bool,
+        isMainFrame: Bool,
+        isAgentPane: Bool,
+        source: URL?,
+        target: URL,
+        clearedFolderURL: URL?,
+        pageLink: () -> URL?
+    ) -> Bool {
+        guard isLinkActivation, isMainFrame, isAgentPane,
+              let source, let clearedFolderURL,
+              target.isFileURL, isClearedPageURL(source, in: clearedFolderURL),
+              !isClearedPageURL(target, in: clearedFolderURL),
+              let link = pageLink() else { return false }
+        return target.absoluteString == link.absoluteString
+    }
+
+    static func unescapedFromHTML(_ text: String) -> String {
+        text.replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&amp;", with: "&")
+    }
+
+    static func escapedForHTML(_ text: String) -> String {
+        text.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
+    }
+
+    /// Whether `url` points to a file within `clearedFolderURL`.
+    static func isClearedPageURL(_ url: URL, in clearedFolderURL: URL) -> Bool {
+        guard url.isFileURL else { return false }
+        let resolvedTarget = url.resolvingSymlinksInPath().path
+        let resolvedFolder = clearedFolderURL.resolvingSymlinksInPath().path
+        let prefix = resolvedFolder.hasSuffix("/") ? resolvedFolder : resolvedFolder + "/"
+        return resolvedTarget.hasPrefix(prefix)
     }
 
     /// Tom's window (`cm-126.13`): a white frame, four panes and one sunset sky behind

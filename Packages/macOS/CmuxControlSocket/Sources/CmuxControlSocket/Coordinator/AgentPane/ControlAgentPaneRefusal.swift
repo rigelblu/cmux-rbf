@@ -20,4 +20,6 @@ public enum ControlAgentPaneRefusal: Sendable, Equatable {
     case insecureHTTP(host: String)
     /// The embedded browser is disabled.
     case browserOff
+    /// `clear` found no Agent Pane owned by the caller's terminal (cmux-rbf #cm-126.14).
+    case noAgentPane
 }

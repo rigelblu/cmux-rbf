@@ -640,4 +640,183 @@ struct AgentPaneCLIOutputTests {
         #expect(row["owner_surface_ref"] as? String == "surface:1")
         #expect(row["owner_stable_id"] as? String == "99999999-8888-7777-6666-555555555555")
     }
+
+    // MARK: - clear (cmux-rbf #cm-126.14)
+
+    private static let cleared: [String: Any] = {
+        var answer = opened
+        answer["action"] = "cleared"
+        answer["url"] = "file:///cleared/agent-pane-id.html"
+        return answer
+    }()
+
+    private static func clearReply(
+        _ answer: [String: Any] = cleared,
+        notFound: Set<String> = []
+    ) -> @Sendable (String, String?) -> String {
+        let text = ok(answer)
+        return { method, surfaceID in
+            guard method == "agent_pane.clear" else { return unexpected(method, surfaceID) }
+            if let surfaceID, notFound.contains(surfaceID) {
+                return failure("not_found", "Surface not found", data: ["surface": surfaceID])
+            }
+            return text
+        }
+    }
+
+    @Test("clear sends one agent_pane.clear carrying --surface and no page, and prints the action")
+    func clearSendsOneRequestAndPrintsTheAction() throws {
+        let run = try drive(
+            ["agent-pane", "clear", "--surface", "surface:7"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.clearReply()
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.requests.map(\.method) == ["agent_pane.clear"], "\(run.requests.map(\.method))")
+        #expect(run.requests.first?.params["surface_id"] as? String == "surface:7")
+        #expect(run.requests.first?.params["url"] == nil)
+        #expect(run.stdout == "OK surface=surface:3 pane=pane:2 workspace=workspace:1 action=cleared\n", "\(run.stdout)")
+    }
+
+    @Test("clear with no --surface names the caller from CMUX_SURFACE_ID, as show does")
+    func clearUsesTheEnvironmentCaller() throws {
+        let run = try drive(
+            ["agent-pane", "clear"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.clearReply()
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        #expect(run.requests.first?.method == "agent_pane.clear")
+        #expect(run.requests.first?.params["surface_id"] as? String == Self.callerSurface)
+    }
+
+    @Test("clear prints already-cleared and held-design-focus as the app answered them")
+    func clearPrintsEveryAction() throws {
+        for action in ["already-cleared", "held-design-focus"] {
+            var answer = Self.cleared
+            answer["action"] = action
+            let run = try drive(
+                ["agent-pane", "clear"],
+                environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+                reply: Self.clearReply(answer)
+            )
+            #expect(run.status == 0, "\(run.stderr)")
+            #expect(
+                run.stdout == "OK surface=surface:3 pane=pane:2 workspace=workspace:1 action=\(action)\n",
+                "\(run.stdout)"
+            )
+        }
+    }
+
+    @Test("a terminal with no Agent Pane exits 1 saying there is nothing to clear, with its JSON code and reason")
+    func clearWithNoAgentPaneSaysSo() throws {
+        let reply: @Sendable (String, String?) -> String = { method, _ in
+            guard method == "agent_pane.clear" else { return Self.unexpected(method, nil) }
+            return Self.failure(
+                "invalid_params", "This terminal has no Agent Pane", data: ["reason": "no_agent_pane"]
+            )
+        }
+        let plain = try drive(
+            ["agent-pane", "clear"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: reply
+        )
+        #expect(plain.status == 1)
+        #expect(plain.stderr == "Error: nothing to clear: this terminal has no Agent Pane\n", "\(plain.stderr)")
+        let json = try drive(
+            ["--json", "agent-pane", "clear"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: reply
+        )
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(json.stdout.utf8)) as? [String: Any])
+        let error = try #require(object["error"] as? [String: Any])
+        #expect(error["code"] as? String == "invalid_params")
+        #expect(error["reason"] as? String == "no_agent_pane")
+        #expect(error["message"] as? String == "nothing to clear: this terminal has no Agent Pane")
+    }
+
+    @Test("clear refused by local-files-off names the policy, as the app words it (no page: clear has none)")
+    func clearRefusedByThePolicy() throws {
+        let run = try drive(
+            ["agent-pane", "clear"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: { method, _ in
+                guard method == "agent_pane.clear" else { return Self.unexpected(method, nil) }
+                return Self.failure(
+                    "browser_url_blocked", "Blocked by the embedded-browser URL policy",
+                    data: ["reason": "url_blocked"]
+                )
+            }
+        )
+        #expect(run.status == 1)
+        #expect(
+            run.stderr == "Error: the embedded browser's URL policy blocks that page: Blocked by the embedded-browser URL policy\n",
+            "\(run.stderr)"
+        )
+    }
+
+    @Test("a clear the app could not finish says it could not be cleared, not that it could not open")
+    func clearInternalErrorSaysCleared() throws {
+        let run = try drive(
+            ["agent-pane", "clear"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: { method, _ in
+                guard method == "agent_pane.clear" else { return Self.unexpected(method, nil) }
+                return Self.failure("internal_error", "Agent Pane could not be cleared")
+            }
+        )
+        #expect(run.status == 1)
+        #expect(
+            run.stderr == "Error: the Agent Pane couldn't be cleared, and nothing was changed: Agent Pane could not be cleared\n",
+            "\(run.stderr)"
+        )
+    }
+
+    @Test("an unknown explicit surface reports no such surface for clear too, and tries no other caller")
+    func clearUnknownSurfaceOverride() throws {
+        let run = try drive(
+            ["agent-pane", "clear", "--surface", "surface:404"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.clearReply(notFound: ["surface:404"])
+        )
+        #expect(run.status == 1)
+        #expect(run.stderr == "Error: no such surface: surface:404\n", "\(run.stderr)")
+        #expect(run.requests.count == 1)
+    }
+
+    @Test("clear takes no page: an extra argument is a usage error and sends nothing")
+    func clearRejectsAPage() throws {
+        let run = try drive(
+            ["agent-pane", "clear", Self.page],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.clearReply()
+        )
+        #expect(run.status == 1)
+        #expect(run.stderr == "Error: usage: cmux agent-pane clear [--surface <id|ref>]\n", "\(run.stderr)")
+        #expect(run.requests.isEmpty)
+    }
+
+    @Test("clear under --json forwards the app's payload, action included")
+    func clearJSONForwardsThePayload() throws {
+        let run = try drive(
+            ["--json", "agent-pane", "clear"],
+            environment: ["CMUX_SURFACE_ID": Self.callerSurface],
+            reply: Self.clearReply()
+        )
+        #expect(run.status == 0, "\(run.stderr)")
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(run.stdout.utf8)) as? [String: Any])
+        #expect(object["action"] as? String == "cleared")
+        #expect(object["surface_ref"] as? String == "surface:3")
+    }
+
+    @Test("with no caller at all, clear fails naming clear, and sends nothing")
+    func clearWithNoCaller() throws {
+        let run = try drive(["agent-pane", "clear"], reply: Self.clearReply())
+        #expect(run.status == 1)
+        #expect(
+            run.stderr == "Error: cmux agent-pane clear needs the agent's terminal: run it in a cmux terminal or pass --surface\n",
+            "\(run.stderr)"
+        )
+        #expect(run.requests.isEmpty)
+    }
 }

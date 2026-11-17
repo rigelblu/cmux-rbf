@@ -8,12 +8,19 @@ final class FakeAgentPaneControlCommandContext: ControlCommandContext {
     var applied: ControlAgentPaneApplied?
     var summaries: [ControlAgentPaneSummary]? = []
     var checkCalls: [(UUID, URL)] = []
+    var clearCheckResult: ControlAgentPaneCheck = .refused(.noAgentPane)
+    var clearCheckCalls: [UUID] = []
     var applyCalls: [ControlAgentPanePlan] = []
     var listCalls: [UUID?] = []
 
     func controlAgentPaneCheck(surfaceID: UUID, url: URL) -> ControlAgentPaneCheck {
         checkCalls.append((surfaceID, url))
         return checkResult
+    }
+
+    func controlAgentPaneClearCheck(surfaceID: UUID) -> ControlAgentPaneCheck {
+        clearCheckCalls.append(surfaceID)
+        return clearCheckResult
     }
 
     func controlAgentPaneApply(_ plan: ControlAgentPanePlan) -> ControlAgentPaneApplied? {
