@@ -7,9 +7,9 @@ import Foundation
 /// same space `ReplyInlinePassage.rowTop` and `rowBottom` are in. The caller
 /// converts to AppKit's flipped or unflipped space.
 enum ReplyInlinePlacement {
-    /// The toolbar's minimum size, 76 by 28 points. A longer label widens it;
+    /// The toolbar's minimum size, 62 by 28 points. A longer label widens it;
     /// the pane's width does not (Q3).
-    static let toolbarSize = CGSize(width: 76, height: 28)
+    static let toolbarSize = CGSize(width: 62, height: 28)
     /// Space between the toolbar and the row it keeps clear of.
     static let gap: CGFloat = 3
 

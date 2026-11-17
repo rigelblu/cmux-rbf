@@ -26,6 +26,7 @@ public struct SettingsCardRow<Trailing: View>: View {
     let configurationReview: SettingsConfigurationReview
     let title: String
     let subtitle: String?
+    let subtitleLineLimit: Int?
     let controlWidth: CGFloat?
     let verticalAlignment: VerticalAlignment
     let trailingFillsWidth: Bool
@@ -58,6 +59,7 @@ public struct SettingsCardRow<Trailing: View>: View {
         searchAnchorID: String? = nil,
         _ title: String,
         subtitle: String? = nil,
+        subtitleLineLimit: Int? = 2,
         controlWidth: CGFloat? = nil,
         verticalAlignment: VerticalAlignment = .center,
         trailingFillsWidth: Bool = false,
@@ -67,6 +69,7 @@ public struct SettingsCardRow<Trailing: View>: View {
         self.searchAnchorID = searchAnchorID
         self.title = title
         self.subtitle = subtitle
+        self.subtitleLineLimit = subtitleLineLimit
         self.controlWidth = controlWidth
         self.verticalAlignment = verticalAlignment
         self.trailingFillsWidth = trailingFillsWidth
@@ -82,7 +85,7 @@ public struct SettingsCardRow<Trailing: View>: View {
                     Text(subtitle)
                         .cmuxFont(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(subtitleLineLimit)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
