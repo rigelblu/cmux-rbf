@@ -176,6 +176,7 @@
 		009E54A15EB3D846E02D2650 /* AgentJournalLifecycleCenter+Projection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DDAD1AC31A52ED5D308536B /* AgentJournalLifecycleCenter+Projection.swift */; };
 		A77A0005A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A77A0006A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift */; };
 		A77A000EA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A77A000DA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift */; };
+		CA128190A1B2C3D4E5F60001 /* RestoreAliasLiveFirstTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA128191A1B2C3D4E5F60001 /* RestoreAliasLiveFirstTests.swift */; };
 		A77A000CA1B2C3D4E5F60001 /* AgentJournalTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A77A000BA1B2C3D4E5F60001 /* AgentJournalTestSupport.swift */; };
 		E506942F7E8A3C80F94EA4EB /* AgentNotificationAdmissionWaiters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F23A5D074809C236E5C607 /* AgentNotificationAdmissionWaiters.swift */; };
 		0A1107110000000000000010 /* AgentNotificationDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1107110000000000000011 /* AgentNotificationDelivery.swift */; };
@@ -4484,6 +4485,7 @@
 		2DDAD1AC31A52ED5D308536B /* AgentJournalLifecycleCenter+Projection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentJournalLifecycleCenter+Projection.swift"; sourceTree = "<group>"; };
 		A77A0006A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentJournalLifecycleCenter.swift; sourceTree = "<group>"; };
 		A77A000DA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentJournalLifecycleCenterTests.swift; sourceTree = "<group>"; };
+		CA128191A1B2C3D4E5F60001 /* RestoreAliasLiveFirstTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreAliasLiveFirstTests.swift; sourceTree = "<group>"; };
 		A77A000BA1B2C3D4E5F60001 /* AgentJournalTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentJournalTestSupport.swift; sourceTree = "<group>"; };
 		A0F23A5D074809C236E5C607 /* AgentNotificationAdmissionWaiters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationAdmissionWaiters.swift; sourceTree = "<group>"; };
 		0A1107110000000000000011 /* AgentNotificationDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationDelivery.swift; sourceTree = "<group>"; };
@@ -12430,6 +12432,7 @@
 				A76110020000000000000002 /* AgentHookNotificationPolicyTests.swift */,
 				A77A000BA1B2C3D4E5F60001 /* AgentJournalTestSupport.swift */,
 				A77A000DA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift */,
+				CA128191A1B2C3D4E5F60001 /* RestoreAliasLiveFirstTests.swift */,
 				7B74E6D94323FE9C5804E0B4 /* FeedWaiterRegistryTests.swift */,
 				D1893BDBF86104694F22BC3C /* CodexHookCapturedSocketCommands.swift */,
 				3B508AD047EB519F849B4F21 /* ClaudeHookLiveDeliverySocketState.swift */,
@@ -16252,6 +16255,7 @@
 				A76110020000000000000001 /* AgentHookNotificationPolicyTests.swift in Sources */,
 				751AA9D65BBB1979C7957BAE /* AgentHookTestNotificationPipeline.swift in Sources */,
 				A77A000EA1B2C3D4E5F60001 /* AgentJournalLifecycleCenterTests.swift in Sources */,
+				CA128190A1B2C3D4E5F60001 /* RestoreAliasLiveFirstTests.swift in Sources */,
 				A77A000CA1B2C3D4E5F60001 /* AgentJournalTestSupport.swift in Sources */,
 				A5D41230A1B2C3D4E5F60718 /* AgentNotificationGateTests.swift in Sources */,
 				79390003AA11BB22CC33DD03 /* AgentNotificationLiveRetargetTests.swift in Sources */,

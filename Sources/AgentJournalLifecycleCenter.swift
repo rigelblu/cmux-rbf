@@ -364,6 +364,9 @@ final class AgentJournalLifecycleCenter: Sendable {
 
     /// Records the workspace/panel identity remaps produced by one restored
     /// workspace, so journaled history re-attaches to the restored panels.
+    /// (cm-128.19) A restored terminal re-attaches by reusing its id, so the
+    /// aliases recorded here are workspace pairs and non-terminal panel pairs,
+    /// never one whose old terminal is still open.
     func noteRestoredIdentityAliases(
         oldWorkspaceId: UUID?,
         newWorkspaceId: UUID,
@@ -375,7 +378,9 @@ final class AgentJournalLifecycleCenter: Sendable {
             workspaces[oldWorkspaceId.uuidString] = newWorkspaceId.uuidString
         }
         var surfaces: [String: String] = [:]
-        for (old, new) in oldToNewPanelIds where old != new {
+        // (cm-128.19) Skip an old id an open terminal still holds: the copy got a fresh id because of that collision,
+        // and an alias from the open pane would send its events to the copy.
+        for (old, new) in oldToNewPanelIds where old != new && GhosttyApp.terminalSurfaceRegistry.surface(id: old) == nil {
             surfaces[old.uuidString] = new.uuidString
         }
 #if DEBUG

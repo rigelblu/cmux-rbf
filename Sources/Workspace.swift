@@ -507,6 +507,9 @@ extension Workspace {
         // Record the identity remap for the agent journal: events journaled
         // against the previous run's runtime workspace/panel UUIDs re-attach
         // to the restored panels during replay through these aliases.
+        // (cm-128.19) A restored terminal re-attaches by reusing its id, not
+        // through an alias: no pair is recorded for a terminal whose old id an
+        // open surface still holds.
         AgentJournalLifecycleCenter.shared.noteRestoredIdentityAliases(
             oldWorkspaceId: snapshot.workspaceId,
             newWorkspaceId: id,
@@ -2127,8 +2130,10 @@ extension Workspace {
             // id), which keeps agent-session terminal bindings valid across
             // relaunch/restore. Only reuse when no live surface already holds
             // that id (duplicate-workspace / restore-into-live can collide);
-            // otherwise fall back to a fresh id and let the old->new remap
-            // handle it, exactly as before.
+            // otherwise fall back to a fresh id. (cm-128.19) That collision
+            // records no journal alias: the live surface still owns the old
+            // id, and an alias from it would send its events to this copy
+            // (`noteRestoredIdentityAliases`).
             let reusableSurfaceId: UUID? =
                 GhosttyApp.terminalSurfaceRegistry.surface(id: snapshot.id) == nil ? snapshot.id : nil
             guard let terminalPanel = newTerminalSurface(
