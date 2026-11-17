@@ -47,6 +47,9 @@ public struct AgentSemanticEventMapper: Sendable {
         if event == "questionasked" {
             return .questionRequested
         }
+        if event == "questionanswered" { return .attentionResolved } // (#cm-124.2)
+        if event == "approvalasked" { return .approvalRequested } // (#cm-124.2)
+        if event == "approvalresolved" { return .attentionResolved } // (#cm-124.2)
         // Source-specific arms first (mirrors the Rust table's ordering).
         switch (source, event) {
         case ("antigravity", "sessionend"), ("antigravity", "onsessionend"),

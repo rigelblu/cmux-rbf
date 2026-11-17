@@ -3311,6 +3311,7 @@ def test_pi_hook_rehomes_restored_surface_alias(cli_path: str, root: Path) -> No
     if hook_result != {
         "workspace_id": moved_workspace_id,
         "surface_id": restored_surface_id,
+        "cmux_declared_waits": 1,  # cmux-rbf: changed on purpose (#cm-124.2): every `hooks pi` reply carries the key
     }:
         raise AssertionError(f"Pi hook reported the wrong resolved live target: {hook_result!r}")
 
@@ -3384,6 +3385,7 @@ def test_pi_hook_explicit_workspace_ignores_ambient_surface(cli_path: str, root:
     if hook_result != {
         "workspace_id": explicit_workspace_id,
         "surface_id": explicit_workspace_surface_id,
+        "cmux_declared_waits": 1,  # cmux-rbf: changed on purpose (#cm-124.2): every `hooks pi` reply carries the key
     }:
         raise AssertionError(f"Pi hook reported the wrong workspace-scoped target: {hook_result!r}")
 

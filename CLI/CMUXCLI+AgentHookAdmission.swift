@@ -309,7 +309,7 @@ extension CMUXCLI {
             params: params,
             responseTimeout: TimeInterval(Self.agentHookAdmissionResponseTimeoutSeconds)
         )
-        print("{}")
+        print(agent == "pi" ? piHookReplyOutput(nil) : "{}") // (#cm-124.2)
     }
 
     /// Converts remote filesystem/process evidence into bounded, portable

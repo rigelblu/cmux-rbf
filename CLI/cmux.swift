@@ -5369,7 +5369,7 @@ struct CMUXCLI {
                processEnv["CMUX_SURFACE_ID"]?.isEmpty != false,
                processEnv["CMUX_WORKSPACE_ID"]?.isEmpty != false,
                !commandArgs.contains(where: { $0 == "--workspace" || $0 == "--surface" || $0.hasPrefix("--workspace=") || $0.hasPrefix("--surface=") }) {
-                print("{}")
+                print(commandArgs.first?.lowercased() == "pi" ? piHookReplyOutput(nil) : "{}") // (#cm-124.2)
                 return
             }
             if commandArgs.first?.lowercased() == "feed" {
@@ -28412,7 +28412,30 @@ struct CMUXCLI {
 
         case "notification", "notify":
             telemetry.breadcrumb("claude-hook.notification")
-            var summary = summarizeClaudeHookNotification(parsedInput: parsedInput)
+            let declaredWait = DeclaredWaitEvent(nativeEvent: reportedHookEventName(from: parsedInput)) // (#cm-124.2)
+            if let declaredWait { // (#cm-124.2) a declared ask or answer needs a string request_id, or it is dropped
+                let attention = Self.semanticAttentionContext(parsedInput.rawObject ?? parsedInput.object)
+                if attention.requestIdentity?.isEmpty != false {
+#if DEBUG
+                    agentHookDebugLog(
+                        "declared \(declaredWait.isAnswer ? "answer" : "ask") without request_id dropped agent=claude event=\(reportedHookEventName(from: parsedInput) ?? "Notification") session=\(agentHookDebugShort(parsedInput.sessionId))",
+                        socketPath: client.socketPath,
+                        env: ProcessInfo.processInfo.environment
+                    )
+#endif
+                    didSendFeedTelemetry = true
+                    printClaudeHookAck()
+                    return
+                }
+            }
+            var summary: (subtitle: String, body: String) // (#cm-124.2)
+            if let declaredWait, declaredWait.isAsk { // (#cm-124.2)
+                let body = declaredWaitExplicitMessage(in: parsedInput.rawObject ?? parsedInput.object)
+                    ?? declaredWait.askFallbackBody
+                summary = (subtitle: declaredWait.askSubtitle, body: body)
+            } else {
+                summary = summarizeClaudeHookNotification(parsedInput: parsedInput)
+            }
             // The classifier's subtitle is a stable internal literal ("Permission",
             // "Waiting", "Error", "Completed", "Attention" — see
             // classifyClaudeNotification). Capture it before the saved-body swap
@@ -28421,7 +28444,20 @@ struct CMUXCLI {
             let classifiedSubtitle = summary.subtitle
 
             let mappedSession = parsedInput.sessionId.flatMap { try? sessionStore.lookup(sessionId: $0) }
-            guard let resolvedTarget = try resolveClaudeHookDeliveryTarget(
+            let declaredAnswerTarget: AgentHookDeliveryTarget? = { // (#cm-124.2)
+                guard declaredWait?.isAnswer == true,
+                      let mappedSession,
+                      !mappedSession.workspaceId.isEmpty,
+                      !mappedSession.surfaceId.isEmpty else {
+                    return nil
+                }
+                return AgentHookDeliveryTarget(
+                    workspaceId: mappedSession.workspaceId,
+                    surfaceId: mappedSession.surfaceId,
+                    isAuthoritative: true
+                )
+            }()
+            guard let resolvedTarget = try declaredAnswerTarget ?? resolveClaudeHookDeliveryTarget( // (#cm-124.2)
                 mappedSession: mappedSession,
                 routing: hookRouting,
                 client: client
@@ -28529,8 +28565,8 @@ struct CMUXCLI {
             // background task runs — its payload lacks `background_tasks`, so read
             // the pending flag cached by the most recent Stop.
             let notificationType = typedNotificationType(in: parsedInput.rawObject)
-            let notifyCategory: AgentHookNotifyCategory
-            let notifyPending: Bool
+            var notifyCategory: AgentHookNotifyCategory // (#cm-124.2) var: a declared wait overrides both below
+            var notifyPending: Bool // (#cm-124.2)
             switch notificationType {
             case "permission_prompt":
                 notifyCategory = .needsPermission
@@ -28569,6 +28605,10 @@ struct CMUXCLI {
                     notifyPending = false
                 }
             }
+            if let declaredWait { // (#cm-124.2)
+                notifyCategory = declaredWait.notifyCategory
+                notifyPending = false
+            }
 
             // `.other` remains ungated. Error alerts carry a contextual
             // `errorStalled` sound type; other uncategorized alerts omit the
@@ -28581,7 +28621,7 @@ struct CMUXCLI {
             // decides, and nothing else does (cm-128.5, Tom, grill Q32). Words, a
             // missing type and an unmapped type journal an observation that raises
             // and pings nothing. The payload's error flag follows it too, never the words.
-            let journalKind = typedNotificationJournalKind(forNotificationType: notificationType)
+            let journalKind = declaredWait?.journalKind ?? typedNotificationJournalKind(forNotificationType: notificationType) // (#cm-124.2)
             let journalDetail = notificationTypeDetail(notificationType, kind: journalKind)
             let payload = notificationPayload(
                 title: title,
@@ -34588,6 +34628,10 @@ export default CMUXSessionRestore;
         let hookResponse = cursorShellNeedsApproval
             ? AgentHookNotificationPolicy.cursorNativeApprovalResponse
             : "{}"
+        func printHookReply(_ raw: String = "{}") { // (#cm-124.2)
+            print(genericHookReply(isPi: def.name == "pi", body: raw))
+        }
+        let declaredWait = DeclaredWaitEvent(nativeEvent: reportedHookEventName(from: input)) // (#cm-124.2)
         let lifecycleRoute = AgentHookLifecycleReconciler().route(
             subcommand: subcommand,
             payload: input.rawObject,
@@ -34623,7 +34667,7 @@ export default CMUXSessionRestore;
             action = .noop
             notificationCompletesTurn = false
         case .rejectStaleProcess?:
-            print("{}")
+            printHookReply() // (#cm-124.2)
             return
         case nil:
             notificationCompletesTurn = false
@@ -34643,7 +34687,7 @@ export default CMUXSessionRestore;
                 env: env
             )
 #endif
-            print("{}")
+            printHookReply() // (#cm-124.2)
             return
         }
         let pidKey = "\(def.statusKey).\(sessionId.isEmpty ? "default" : sessionId)"
@@ -35569,7 +35613,7 @@ export default CMUXSessionRestore;
                 reportTargetResolutionFailure()
                 emitJournal(.sessionStarted, workspaceId: nil, surfaceId: nil, unattributedReason: "target-unresolved")
                 didSendFeedTelemetry = true
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             let workspaceId = target.workspaceId
@@ -35590,7 +35634,7 @@ export default CMUXSessionRestore;
                         isSubagent: true,
                         detail: "nested-session-start"
                     )
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -35653,14 +35697,14 @@ export default CMUXSessionRestore;
                 if !acceptedSessionStart {
                     telemetry.breadcrumb("\(def.name)-hook.session-start.stale-after-turn")
                     didSendFeedTelemetry = true
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
             if codexSessionStartWentStaleAfterAccept() {
                 telemetry.breadcrumb("\(def.name)-hook.session-start.stale-after-turn")
                 didSendFeedTelemetry = true
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             sendAgentFeedTelemetryUnlessSuppressed(workspaceId: workspaceId, surfaceId: surfaceId)
@@ -35668,7 +35712,7 @@ export default CMUXSessionRestore;
                 if codexSessionStartWentStaleAfterAccept() {
                     telemetry.breadcrumb("\(def.name)-hook.session-start.stale-after-turn")
                     didSendFeedTelemetry = true
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
                 try? recordAgentTurnDiffBaseline(
@@ -35689,7 +35733,7 @@ export default CMUXSessionRestore;
                     if codexSessionStartWentStaleAfterAccept() {
                         telemetry.breadcrumb("\(def.name)-hook.session-start.stale-after-turn")
                         didSendFeedTelemetry = true
-                        print("{}")
+                        printHookReply() // (#cm-124.2)
                         return
                     }
                     if !AgentHookNotificationPolicy.preservesDedupeAcrossSessionStart(agentName: def.name) {
@@ -35712,7 +35756,7 @@ export default CMUXSessionRestore;
             if codexSessionStartWentStaleAfterAccept() {
                 telemetry.breadcrumb("\(def.name)-hook.session-start.stale-after-turn")
                 didSendFeedTelemetry = true
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             if !relayOrigin, let pid, !suppressVisibleMutations {
@@ -35754,7 +35798,7 @@ export default CMUXSessionRestore;
                 reportTargetResolutionFailure()
                 emitJournal(.turnStarted, workspaceId: nil, surfaceId: nil, unattributedReason: "target-unresolved")
                 didSendFeedTelemetry = true
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             let workspaceId = target.workspaceId
@@ -35775,7 +35819,7 @@ export default CMUXSessionRestore;
                         isSubagent: true,
                         detail: "nested-prompt-submit"
                     )
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -35783,7 +35827,7 @@ export default CMUXSessionRestore;
             var cursorPromptShouldPreservePendingState = false
             if def.name == "cursor", !sessionId.isEmpty {
                 guard acquireCursorLifecycleLease(surfaceId: surfaceId) else {
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
                 if let clearResult = try? store.clearCursorShellApprovals(
@@ -35914,7 +35958,7 @@ export default CMUXSessionRestore;
                 }
                 telemetry.breadcrumb("\(def.name)-hook.prompt-submit.stale-terminal-turn")
                 didSendFeedTelemetry = true
-                print("{}")
+                printHookReply() // (#cm-124.2)
             }
             let terminalActivePromptTurnIds: Set<String>
             let previousActivePromptTurnIsTerminal: Bool
@@ -36202,7 +36246,7 @@ export default CMUXSessionRestore;
                resolvedTarget != nil || codexStopOwnership?.ownership == .foreground {
                 guard codexStopDecision?.ownership == .foreground else {
                     telemetry.breadcrumb("codex-hook.stop.nested-or-unknown")
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -36246,7 +36290,7 @@ export default CMUXSessionRestore;
                 reportTargetResolutionFailure()
                 emitJournal(.turnCompleted, workspaceId: nil, surfaceId: nil, unattributedReason: "target-unresolved")
                 didSendFeedTelemetry = true
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             let workspaceId = target.workspaceId
@@ -36450,12 +36494,12 @@ export default CMUXSessionRestore;
                !nestedPromptStop,
                codexStopDecision?.ownership != .foreground {
                 telemetry.breadcrumb("codex-hook.stop.settlement-unavailable")
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             if def.name == "codex", codexStopDecision?.settlement == .duplicate {
                 telemetry.breadcrumb("codex-hook.stop.duplicate-settled")
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             // A native child callback may win the ledger lock between the
@@ -36493,7 +36537,7 @@ export default CMUXSessionRestore;
             }
             if def.name == "cursor", !sessionId.isEmpty {
                 guard acquireCursorLifecycleLease(surfaceId: surfaceId) else {
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -36793,7 +36837,7 @@ export default CMUXSessionRestore;
                     detail: "approval-response"
                 )
                 didSendFeedTelemetry = true
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
             let workspaceId = target.workspaceId
@@ -36875,18 +36919,42 @@ export default CMUXSessionRestore;
                 )
                 guard ownership.ownership == .foreground else {
                     telemetry.breadcrumb("codex-hook.notification.nested-or-unknown")
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
+                    return
+                }
+            }
+            if let declaredWait { // (#cm-124.2) a declared ask or answer needs a string request_id, or it is dropped
+                let attention = Self.semanticAttentionContext(input.rawObject ?? input.object)
+                if attention.requestIdentity?.isEmpty != false {
+#if DEBUG
+                    agentHookDebugLog(
+                        "declared \(declaredWait.isAnswer ? "answer" : "ask") without request_id dropped agent=\(def.name) event=\(reportedHookEventName(from: input) ?? subcommand) session=\(agentHookDebugShort(sessionId))",
+                        socketPath: client.socketPath,
+                        env: env
+                    )
+#endif
+                    didSendFeedTelemetry = true
+                    printHookReply()
                     return
                 }
             }
             let mapped = sessionId.isEmpty
                 ? nil
                 : (try? store.lookup(sessionId: sessionId, deadline: cursorShellDeadline))
-            guard let target = resolveAgentHookTarget(mapped: mapped) else {
+            let declaredAnswerTarget: (workspaceId: String, surfaceId: String)? = { // (#cm-124.2)
+                guard declaredWait?.isAnswer == true,
+                      let mapped,
+                      !mapped.workspaceId.isEmpty,
+                      !mapped.surfaceId.isEmpty else {
+                    return nil
+                }
+                return (workspaceId: mapped.workspaceId, surfaceId: mapped.surfaceId)
+            }()
+            guard let target = declaredAnswerTarget ?? resolveAgentHookTarget(mapped: mapped) else { // (#cm-124.2)
                 reportTargetResolutionFailure()
                 emitJournal(.stateChanged, workspaceId: nil, surfaceId: nil, unattributedReason: "target-unresolved")
                 didSendFeedTelemetry = true
-                print(def.name == "cursor" && cursorShellNeedsApproval ? hookResponse : "{}")
+                printHookReply(def.name == "cursor" && cursorShellNeedsApproval ? hookResponse : "{}") // (#cm-124.2)
                 return
             }
             let workspaceId = target.workspaceId
@@ -36916,7 +36984,7 @@ export default CMUXSessionRestore;
                         surfaceId: surfaceId,
                         detail: "grok-internal-notification"
                     )
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -36924,7 +36992,7 @@ export default CMUXSessionRestore;
             var cursorApprovalNotificationCorrelationKey: String?
             if cursorShellNeedsApproval {
                 guard acquireCursorLifecycleLease(surfaceId: surfaceId) else {
-                    print(hookResponse)
+                    printHookReply(hookResponse) // (#cm-124.2)
                     return
                 }
                 let rememberResult: ClaudeHookSessionStore.CursorShellApprovalRememberResult?
@@ -36961,7 +37029,7 @@ export default CMUXSessionRestore;
                         workspaceId: workspaceId,
                         surfaceId: surfaceId
                     )
-                    print(hookResponse)
+                    printHookReply(hookResponse) // (#cm-124.2)
                     return
                 }
                 if !rememberResult.inserted {
@@ -36971,20 +37039,33 @@ export default CMUXSessionRestore;
                         workspaceId: workspaceId,
                         surfaceId: surfaceId
                     )
-                    print(hookResponse)
+                    printHookReply(hookResponse) // (#cm-124.2)
                     return
                 }
                 cursorApprovalNotificationCorrelationKey = rememberResult.notificationCorrelationKey
             }
 
-            var summary = summarizeAgentHookNotification(
-                def: def,
-                parsedInput: input,
-                cwd: notificationCwd,
-                env: env,
-                sessionId: input.sessionId ?? sessionId,
-                cursorApprovalRequested: cursorShellNeedsApproval
-            )
+            var summary: AgentHookNotificationSummary // (#cm-124.2)
+            if let declaredWait, declaredWait.isAsk { // (#cm-124.2)
+                let body = declaredWaitExplicitMessage(in: input.rawObject ?? input.object)
+                    ?? declaredWait.askFallbackBody
+                summary = AgentHookNotificationSummary(
+                    subtitle: declaredWait.askSubtitle,
+                    body: body,
+                    status: .needsInput,
+                    isFallback: false,
+                    notifyCategory: declaredWait.notifyCategory
+                )
+            } else {
+                summary = summarizeAgentHookNotification(
+                    def: def,
+                    parsedInput: input,
+                    cwd: notificationCwd,
+                    env: env,
+                    sessionId: input.sessionId ?? sessionId,
+                    cursorApprovalRequested: cursorShellNeedsApproval
+                )
+            }
             var rebuiltFromStoredSummary = false
             if summary.body.isEmpty, let savedBody = mapped?.lastBody, !savedBody.isEmpty {
                 // A notification with no usable message reuses the stored
@@ -37011,7 +37092,9 @@ export default CMUXSessionRestore;
             // "needs input" state (same invariant as the Claude pending idle_prompt):
             // the banner is gated app-side (p=1) and the pane must stay Running
             // rather than flipping to "needs input".
-            let suppressPendingWaitingState = summary.notifyCategory == .idleReminder
+            // (#cm-124.2) A declared ask is exempt: its category and pending flag come from the declared kind.
+            let suppressPendingWaitingState = declaredWait?.isAsk != true
+                && summary.notifyCategory == .idleReminder
                 && hasActiveAntigravityBackgroundWork()
 
             // cm-128.5: only a fact picks the journal kind (cmux's own decision, the mapper's verdict, a typed field).
@@ -37065,7 +37148,7 @@ export default CMUXSessionRestore;
                     env: env
                 )
 #endif
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
 
@@ -37084,7 +37167,7 @@ export default CMUXSessionRestore;
                     pendingWork: true
                 )
                 sendAgentFeedTelemetryUnlessSuppressed(workspaceId: workspaceId, surfaceId: surfaceId)
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
 
@@ -37108,7 +37191,7 @@ export default CMUXSessionRestore;
                     pendingWork: true
                 )
                 sendAgentFeedTelemetryUnlessSuppressed(workspaceId: workspaceId, surfaceId: surfaceId)
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
 
@@ -37131,7 +37214,7 @@ export default CMUXSessionRestore;
                     surfaceId: surfaceId
                 )
                 sendAgentFeedTelemetryUnlessSuppressed(workspaceId: workspaceId, surfaceId: surfaceId)
-                print("{}")
+                printHookReply() // (#cm-124.2)
                 return
             }
 
@@ -37358,7 +37441,7 @@ export default CMUXSessionRestore;
                 )
                 guard ownership.ownership == .foreground else {
                     telemetry.breadcrumb("codex-hook.session-end.nested-or-unknown")
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -37410,7 +37493,7 @@ export default CMUXSessionRestore;
                 : (try? store.lookup(sessionId: sessionId, deadline: cursorShellDeadline))
             if def.name == "cursor", !sessionId.isEmpty {
                 guard acquireCursorLifecycleLease(surfaceId: endingSession?.surfaceId) else {
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -37439,7 +37522,7 @@ export default CMUXSessionRestore;
                 )
                 guard ownership.ownership == .foreground else {
                     telemetry.breadcrumb("codex-hook.session-finalize.nested-or-unknown")
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -37448,7 +37531,7 @@ export default CMUXSessionRestore;
                 : (try? store.lookup(sessionId: sessionId, deadline: cursorShellDeadline))
             if def.name == "cursor", !sessionId.isEmpty {
                 guard acquireCursorLifecycleLease(surfaceId: endingSession?.surfaceId) else {
-                    print("{}")
+                    printHookReply() // (#cm-124.2)
                     return
                 }
             }
@@ -37472,7 +37555,7 @@ export default CMUXSessionRestore;
             break
         }
 
-        print(def.name == "pi" ? piHookResolvedTargetOutput(strictPiTarget) : hookResponse)
+        print(def.name == "pi" ? piHookReplyOutput(strictPiTarget) : hookResponse) // (#cm-124.2)
     }
 
     // MARK: - Feed telemetry helper
