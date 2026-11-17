@@ -94,3 +94,5 @@ ship with `{{executable}} --fork {{sessionId}}`.
 
 `iconAssetName` is optional. When omitted, Vault uses a neutral system icon for
 registered agents instead of reusing another agent's brand mark.
+
+To tell cmux that an agent's question or approval is waiting, see [Declared agent events](agent-events.md) (cmux-rbf).

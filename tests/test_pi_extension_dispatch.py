@@ -3356,6 +3356,661 @@ if (failures.length) throw new Error(failures.join("\n"));
     return 0
 
 
+# --- Declared waits: Pi forms (#cm-124.2) -----------------------------------------------------------------
+# The fake cmux logs every call as "<argv>|<stdin payload>" and answers by mode (a file the script can rewrite):
+#   key      ok reply carrying "cmux_declared_waits": 1
+#   nokey    ok reply without the key (a pre-cm-124.2 cmux)
+#   failkey  exit 42 with the key printed on stdout (a non-ok reply never turns the latch on)
+#   junk     exit 0 with unparsable stdout
+DECLARED_FAKE_CMUX = r"""#!/usr/bin/env bash
+set -euo pipefail
+payload="$(cat)"
+printf '%s|%s\n' "$*" "$payload" >> "$CMUX_TEST_PI_DECL_LOG"
+if [[ "$*" == *"hooks pi notification"* ]]; then
+  if [ -n "${CMUX_TEST_PI_DECL_NOTIFY_DELAY:-}" ]; then sleep "$CMUX_TEST_PI_DECL_NOTIFY_DELAY"; fi
+  if [ -n "${CMUX_TEST_PI_DECL_BLOCK_RELEASE:-}" ]; then
+    for _ in {1..250}; do
+      if [ -f "$CMUX_TEST_PI_DECL_BLOCK_RELEASE" ]; then break; fi
+      sleep 0.02
+    done
+  fi
+fi
+mode=key
+if [ -f "${CMUX_TEST_PI_DECL_MODE:-/nonexistent}" ]; then mode="$(cat "$CMUX_TEST_PI_DECL_MODE")"; fi
+ids='"workspace_id":"00000000-0000-0000-0000-000000008673","surface_id":"00000000-0000-0000-0000-000000008672"'
+case "$mode" in
+  key) printf '{"cmux_declared_waits":1,%s}\n' "$ids" ;;
+  nokey) printf '{%s}\n' "$ids" ;;
+  failkey) printf '{"cmux_declared_waits":1,%s}\n' "$ids"; exit 42 ;;
+  junk) printf 'not json\n' ;;
+esac
+"""
+
+DECLARED_JS_PRELUDE = r"""
+import { readFileSync, writeFileSync } from "node:fs";
+import assert from "node:assert";
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+const extensionPath = process.env.CMUX_TEST_PI_EXTENSION_PATH;
+const logPath = process.env.CMUX_TEST_PI_DECL_LOG;
+// The extension uses agent_settled only when it detects a pi that has it, from the package.json beside the
+// script in argv[1]. Fake that package here so these checks drive the settled path, not the legacy agent_end one.
+{
+  const packageDir = join(dirname(logPath), "declared-fake-pi", "node_modules", "@earendil-works", "pi-coding-agent");
+  mkdirSync(packageDir, { recursive: true });
+  writeFileSync(join(packageDir, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", version: "1.5.0" }));
+  writeFileSync(join(packageDir, "cli.js"), "");
+  process.argv[1] = join(packageDir, "cli.js");
+}
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let importCounter = 0;
+async function load({ fresh = false } = {}) {
+  const mod = await import(fresh ? `${extensionPath}?v=${++importCounter}` : extensionPath);
+  const handlers = new Map();
+  mod.default({ on(name, handler) { handlers.set(name, handler); } });
+  return handlers;
+}
+function makeCtx(id) {
+  return {
+    idle: true,
+    cwd: "/tmp/pi-declared-project",
+    isIdle() { return this.idle; },
+    sessionManager: { getSessionId() { return id; } },
+  };
+}
+function calls() {
+  let text = "";
+  try { text = readFileSync(logPath, "utf8"); } catch (_) {}
+  return text.split("\n").filter(Boolean).map((line) => {
+    const cut = line.indexOf("|");
+    const args = line.slice(0, cut);
+    let payload = {};
+    try { payload = JSON.parse(line.slice(cut + 1)); } catch (_) {}
+    const words = args.split(" ");
+    const sub = words[0] === "hooks" && words[1] === "pi" ? words[2] : args.includes("resume clear") ? "resume-clear" : args;
+    return { sub, event: payload.hook_event_name, id: payload.request_id, sid: payload.session_id, payload };
+  });
+}
+const forSession = (sid) => calls().filter((call) => call.sid === sid);
+const asks = (sid) => forSession(sid).filter((call) => call.sub === "notification" && call.event === "QuestionAsked");
+const answers = (sid) => forSession(sid).filter((call) => call.sub === "notification" && call.event === "QuestionAnswered");
+const sequence = (sid) => forSession(sid).map((call) => {
+  if (call.sub !== "notification") return call.sub;
+  if (call.event === "QuestionAsked") return "ask";
+  if (call.event === "QuestionAnswered") return "answer";
+  return "turn-notification";
+});
+async function waitFor(predicate, ms = 8000) {
+  const deadline = performance.now() + ms;
+  while (performance.now() < deadline) {
+    if (predicate()) return;
+    await sleep(10);
+  }
+  throw new Error("timed out waiting; calls=" + JSON.stringify(calls().map((call) => [call.sub, call.event, call.id])));
+}
+async function fire(handlers, name, event, ctx) {
+  const handler = handlers.get(name);
+  if (!handler) throw new Error("missing handler " + name);
+  return await Promise.resolve(handler(event, ctx));
+}
+const countOf = (sid, sub) => forSession(sid).filter((call) => call.sub === sub).length;
+const startsLogged = (sid) => countOf(sid, "session-start");
+// Two session-starts: the second is queued behind the first, so once it is logged the first reply has been
+// read and the latch has its answer. Then, optionally, a run starts (which opens the window). Counts are taken
+// from now, so a second instance on the same session id waits for its own calls.
+async function boot(handlers, ctx, sid, { run = true } = {}) {
+  const starts = startsLogged(sid);
+  const submits = countOf(sid, "prompt-submit");
+  await fire(handlers, "session_start", {}, ctx);
+  await waitFor(() => startsLogged(sid) >= starts + 1);
+  await fire(handlers, "session_start", {}, ctx);
+  await waitFor(() => startsLogged(sid) >= starts + 2);
+  if (run) {
+    await fire(handlers, "before_agent_start", { prompt: "hello" }, ctx);
+    await waitFor(() => countOf(sid, "prompt-submit") >= submits + 1);
+  }
+}
+// A sentinel: the queue is FIFO per session, so once the next session-start is logged every earlier send is logged.
+async function flushed(handlers, ctx, sid) {
+  const before = startsLogged(sid);
+  await fire(handlers, "session_start", {}, ctx);
+  await waitFor(() => startsLogged(sid) >= before + 1);
+}
+const endOfRun = { messages: [{ role: "assistant", content: "done" }], stopReason: "completed" };
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const idPattern = (sid, n) => new RegExp(`^pi-form-${sid}-${UUID}-${n}$`);
+"""
+
+
+def run_declared_check(
+    bun: str,
+    root: Path,
+    extension_path: Path,
+    name: str,
+    body: str,
+    *,
+    mode: str = "key",
+    extra_env: dict[str, str] | None = None,
+) -> int:
+    fake = root / f"declared-{name}-cmux"
+    make_executable(fake, DECLARED_FAKE_CMUX)
+    log = root / f"declared-{name}.log"
+    mode_file = root / f"declared-{name}.mode"
+    mode_file.write_text(mode, encoding="utf-8")
+    env = {
+        "CMUX_TEST_PI_DECL_LOG": str(log),
+        "CMUX_TEST_PI_DECL_MODE": str(mode_file),
+    }
+    env.update(extra_env or {})
+    result = run_extension(
+        bun=bun,
+        root=root,
+        extension_path=extension_path,
+        fake_cmux=fake,
+        source=DECLARED_JS_PRELUDE + body + '\nconsole.log("DECL_OK");\n',
+        extra_env=env,
+    )
+    if result.returncode != 0 or "DECL_OK" not in result.stdout:
+        print(f"FAIL: {name}")
+        print(f"exit={result.returncode}")
+        print(f"stdout={result.stdout.strip()}")
+        print(f"stderr={result.stderr.strip()[:1500]}")
+        return 1
+    return 0
+
+
+# A5i (a): cmux loads first. The settled handler queues the turn's notification and stop, his form opens from the
+# next handler, and its ask goes behind them (the fake delays every notification, so an ask that overtook the
+# queue would show up first). One wait per form.
+def check_pi_form_cmux_loaded_first_sends_one_question_after_turn_end(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "a-cmux-first",
+        r"""
+const h = await load();
+const sid = "s-a";
+const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+await fire(h, "agent_end", endOfRun, ctx);
+await fire(h, "agent_settled", {}, ctx);
+await fire(h, "ui_prompt_start", { kind: "custom" }, ctx);
+await waitFor(() => asks(sid).length >= 1);
+await fire(h, "ui_prompt_end", { kind: "custom" }, ctx);
+await waitFor(() => answers(sid).length >= 1);
+assert.deepStrictEqual(sequence(sid),
+  ["session-start", "session-start", "prompt-submit", "turn-notification", "stop", "ask", "answer"]);
+assert.strictEqual(asks(sid).length, 1);
+const ask = asks(sid)[0];
+assert.match(ask.id, idPattern(sid, 1));
+assert.strictEqual(ask.payload.message, undefined, "a custom() form has no title, so no message");
+assert.strictEqual(answers(sid)[0].id, ask.id);
+""",
+        extra_env={"CMUX_TEST_PI_DECL_NOTIFY_DELAY": "0.3"},
+    )
+
+
+# A5i (a2): his form's extension loads first and awaits the form: the ask and his answer go out before cmux's
+# settled handler queues the turn's end. No re-ask.
+def check_pi_form_form_loaded_first_awaiting_sends_before_turn_end(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "a2-form-first-awaiting",
+        r"""
+const h = await load();
+const sid = "s-a2";
+const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+await fire(h, "agent_end", endOfRun, ctx);
+await fire(h, "ui_prompt_start", { kind: "select", title: "Pick one" }, ctx);
+await waitFor(() => asks(sid).length >= 1);
+await fire(h, "ui_prompt_end", { kind: "select", title: "Pick one" }, ctx);
+await waitFor(() => answers(sid).length >= 1);
+await fire(h, "agent_settled", {}, ctx);
+await waitFor(() => forSession(sid).some((call) => call.sub === "stop"));
+await flushed(h, ctx, sid);
+assert.deepStrictEqual(sequence(sid).slice(0, 7),
+  ["session-start", "session-start", "prompt-submit", "ask", "answer", "turn-notification", "stop"]);
+assert.strictEqual(asks(sid).length, 1, "no re-ask: the form was answered before the turn ended");
+assert.strictEqual(asks(sid)[0].payload.message, "Pick one");
+assert.match(asks(sid)[0].id, idPattern(sid, 1));
+assert.strictEqual(answers(sid)[0].id, asks(sid)[0].id);
+""",
+    )
+
+
+# A5i (a3), E31: his form's extension loads first and does not await it, so the form is still open when the turn
+# ends. The ask is queued before the turn's end; after the stop it is asked again with a fresh id, and the answer
+# carries that fresh id.
+def check_pi_form_form_loaded_first_not_awaiting_reasks_after_stop(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "a3-form-first-not-awaiting",
+        r"""
+const h = await load();
+const sid = "s-a3";
+const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+await fire(h, "agent_end", endOfRun, ctx);
+await fire(h, "ui_prompt_start", { kind: "custom" }, ctx);
+await fire(h, "agent_settled", {}, ctx);
+await waitFor(() => asks(sid).length >= 2);
+await fire(h, "ui_prompt_end", { kind: "custom" }, ctx);
+await waitFor(() => answers(sid).length >= 1);
+assert.deepStrictEqual(sequence(sid),
+  ["session-start", "session-start", "prompt-submit", "ask", "turn-notification", "stop", "ask", "answer"]);
+const [first, second] = asks(sid);
+assert.match(first.id, idPattern(sid, 1));
+assert.match(second.id, idPattern(sid, 2));
+assert.notStrictEqual(first.id, second.id);
+assert.strictEqual(answers(sid)[0].id, second.id, "the answer carries the re-ask's id");
+""",
+    )
+
+
+# A5i (b): the window rule. Each scenario is its own session.
+def check_pi_form_window_rule_midrun_settlement_idle_formless_and_no_run(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "b-window-rule",
+        r"""
+const h = await load();
+const form = { kind: "custom" };
+
+// Mid-run: a form that ends while pi works leaves the window open; one that ends while idle closes it.
+{
+  const sid = "s-b1"; const ctx = makeCtx(sid);
+  await boot(h, ctx, sid);
+  ctx.idle = false;
+  await fire(h, "ui_prompt_start", form, ctx);
+  await fire(h, "ui_prompt_end", form, ctx);
+  await fire(h, "ui_prompt_start", form, ctx);
+  ctx.idle = true;
+  await fire(h, "ui_prompt_end", form, ctx);
+  await fire(h, "ui_prompt_start", form, ctx);
+  await fire(h, "ui_prompt_end", form, ctx);
+  await flushed(h, ctx, sid);
+  assert.strictEqual(asks(sid).length, 2, "two forms counted mid-run, the third came after the window closed");
+  assert.match(asks(sid)[0].id, idPattern(sid, 1));
+  assert.match(asks(sid)[1].id, idPattern(sid, 2));
+  assert.strictEqual(answers(sid).length, 2);
+}
+
+// A run with no form settles; a form he opens afterwards still counts (his chosen cost), then the window closes.
+{
+  const sid = "s-b2"; const ctx = makeCtx(sid);
+  await boot(h, ctx, sid);
+  await fire(h, "agent_end", endOfRun, ctx);
+  await fire(h, "agent_settled", {}, ctx);
+  await fire(h, "ui_prompt_start", form, ctx);
+  await fire(h, "ui_prompt_end", form, ctx);
+  await fire(h, "ui_prompt_start", form, ctx);
+  await fire(h, "ui_prompt_end", form, ctx);
+  await flushed(h, ctx, sid);
+  assert.strictEqual(asks(sid).length, 1, "the form after a form-less run counts once; the next one does not");
+}
+
+// No run ever started: the window never opened.
+{
+  const sid = "s-b3"; const ctx = makeCtx(sid);
+  await boot(h, ctx, sid, { run: false });
+  await fire(h, "ui_prompt_start", form, ctx);
+  await fire(h, "ui_prompt_end", form, ctx);
+  await flushed(h, ctx, sid);
+  assert.strictEqual(asks(sid).length, 0, "no run, no window, no ask");
+}
+
+// A prompt he types while pi is idle closes the window.
+{
+  const sid = "s-b4"; const ctx = makeCtx(sid);
+  await boot(h, ctx, sid);
+  await fire(h, "input", { text: "next", source: "interactive" }, ctx);
+  await fire(h, "ui_prompt_start", form, ctx);
+  await fire(h, "ui_prompt_end", form, ctx);
+  await flushed(h, ctx, sid);
+  assert.strictEqual(asks(sid).length, 0, "a typed prompt while idle closed the window");
+}
+
+// A steer he types while pi works leaves it open.
+{
+  const sid = "s-b5"; const ctx = makeCtx(sid);
+  await boot(h, ctx, sid);
+  ctx.idle = false;
+  await fire(h, "input", { text: "steer", source: "interactive", streamingBehavior: "steer" }, ctx);
+  await fire(h, "ui_prompt_start", form, ctx);
+  await fire(h, "ui_prompt_end", form, ctx);
+  await flushed(h, ctx, sid);
+  assert.strictEqual(asks(sid).length, 1, "a steer while pi works leaves the window open");
+}
+""",
+    )
+
+
+def declared_form_ids_body(fresh_module: bool) -> str:
+    # Two extension instances for one session id. fresh_module=True imports the module twice (pi's cache means
+    # that does not happen on /resume); False calls the default export twice on one module, as /resume does.
+    return (
+        "const fresh = " + ("true" if fresh_module else "false") + ";\n"
+        + r"""
+const sid = "s-c";
+const first = await load({ fresh });
+const second = await load({ fresh });
+const ctxA = makeCtx(sid);
+const ctxB = makeCtx(sid);
+await boot(first, ctxA, sid);
+await fire(first, "ui_prompt_start", { kind: "custom" }, ctxA);
+await waitFor(() => asks(sid).length >= 1);
+await boot(second, ctxB, sid);
+await fire(second, "ui_prompt_start", { kind: "custom" }, ctxB);
+await waitFor(() => asks(sid).length >= 2);
+const [a, b] = asks(sid);
+assert.match(a.id, idPattern(sid, 1));
+assert.match(b.id, idPattern(sid, 1), "each instance counts its own forms from 1");
+assert.notStrictEqual(a.id, b.id, "a repeated id would be ignored as stale by the reconciler");
+
+// /reload: a fresh import starts with the latch off. A form that opens before the new instance's first ok reply
+// sends nothing; one that opens after it does.
+if (fresh) {
+  const reloadSid = "s-c-reload";
+  const third = await load({ fresh: true });
+  const ctx = makeCtx(reloadSid);
+  await fire(third, "session_start", {}, ctx);
+  await fire(third, "before_agent_start", { prompt: "hi" }, ctx);
+  await fire(third, "ui_prompt_start", { kind: "custom" }, ctx);
+  await fire(third, "ui_prompt_end", { kind: "custom" }, ctx);
+  await waitFor(() => startsLogged(reloadSid) >= 1);
+  await flushed(third, ctx, reloadSid);
+  assert.strictEqual(asks(reloadSid).length, 0, "no reply had come back, so the latch was still off");
+  await fire(third, "before_agent_start", { prompt: "again" }, ctx);
+  await fire(third, "ui_prompt_start", { kind: "custom" }, ctx);
+  await fire(third, "ui_prompt_end", { kind: "custom" }, ctx);
+  await flushed(third, ctx, reloadSid);
+  assert.strictEqual(asks(reloadSid).length, 1, "after the new instance's first ok reply the form sends");
+  assert.match(asks(reloadSid)[0].id, idPattern(reloadSid, 1));
+}
+"""
+    )
+
+
+# A5i (c): the module is evaluated again (a new import), the id still differs.
+def check_pi_form_request_id_differs_after_module_reimport(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(bun, root, extension_path, "c-reimport", declared_form_ids_body(True))
+
+
+# A5i (c2): the module is NOT evaluated again, only the default export runs again (what /resume, /new and fork do
+# under pi's extension cache), and the id still differs: the UUID is minted per default-export call.
+def check_pi_form_request_id_instance_uuid_differs_per_default_export_call(
+    bun: str, root: Path, extension_path: Path
+) -> int:
+    return run_declared_check(bun, root, extension_path, "c2-default-export", declared_form_ids_body(False))
+
+
+# A5i (d), E30: the latch. Only an ok, parsed reply with the key turns it on, and then it stays on.
+def check_pi_form_capability_latch_requires_cmux_declared_waits(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "d-latch",
+        r"""
+async function formAsks(label, mode) {
+  writeFileSync(process.env.CMUX_TEST_PI_DECL_MODE, mode);
+  const h = await load();
+  const sid = "s-d-" + label; const ctx = makeCtx(sid);
+  await boot(h, ctx, sid);
+  await fire(h, "ui_prompt_start", { kind: "custom" }, ctx);
+  await fire(h, "ui_prompt_end", { kind: "custom" }, ctx);
+  await flushed(h, ctx, sid);
+  return asks(sid).length;
+}
+assert.strictEqual(await formAsks("nokey", "nokey"), 0, "a reply without the key never turns it on");
+assert.strictEqual(await formAsks("failkey", "failkey"), 0, "a non-ok reply with the key never turns it on");
+assert.strictEqual(await formAsks("junk", "junk"), 0, "an unparsable reply never turns it on");
+assert.strictEqual(await formAsks("key", "key"), 1, "an ok reply with the key turns it on");
+
+// Sticky: after one keyed reply, later replies without the key do not turn it off.
+writeFileSync(process.env.CMUX_TEST_PI_DECL_MODE, "key");
+const h = await load();
+const sid = "s-d-sticky"; const ctx = makeCtx(sid);
+await fire(h, "session_start", {}, ctx);
+await waitFor(() => startsLogged(sid) >= 1);
+await flushed(h, ctx, sid);
+writeFileSync(process.env.CMUX_TEST_PI_DECL_MODE, "nokey");
+await fire(h, "before_agent_start", { prompt: "again" }, ctx);
+await waitFor(() => forSession(sid).some((call) => call.sub === "prompt-submit"));
+await flushed(h, ctx, sid);
+await fire(h, "before_agent_start", { prompt: "again" }, ctx);
+await fire(h, "ui_prompt_start", { kind: "custom" }, ctx);
+await fire(h, "ui_prompt_end", { kind: "custom" }, ctx);
+await flushed(h, ctx, sid);
+assert.strictEqual(asks(sid).length, 1, "the latch stays on after replies without the key");
+""",
+    )
+
+
+# A5i (e): the ui_prompt_* handlers return at once while cmux is blocked, and the sends wait their turn in the queue.
+def check_pi_form_ui_lifecycle_handlers_return_immediately(bun: str, root: Path, extension_path: Path) -> int:
+    release = root / "declared-e-release"
+    return run_declared_check(
+        bun, root, extension_path, "e-immediate",
+        r"""
+const h = await load();
+const sid = "s-e"; const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+const timed = async (name, event) => {
+  const started = performance.now();
+  const returned = h.get(name)(event, ctx);
+  const elapsed = performance.now() - started;
+  await Promise.resolve(returned);
+  return elapsed;
+};
+const startElapsed = await timed("ui_prompt_start", { kind: "custom" });
+await waitFor(() => asks(sid).length >= 1);
+const endElapsed = await timed("ui_prompt_end", { kind: "custom" });
+assert.ok(startElapsed < 200 && endElapsed < 200, `handlers took ${startElapsed}ms and ${endElapsed}ms while cmux was blocked`);
+assert.strictEqual(answers(sid).length, 0, "the answer waits behind the blocked ask");
+writeFileSync(process.env.CMUX_TEST_PI_DECL_BLOCK_RELEASE, "go");
+await waitFor(() => answers(sid).length >= 1);
+""",
+        extra_env={"CMUX_TEST_PI_DECL_BLOCK_RELEASE": str(release)},
+    )
+
+
+# E30, A5h: a cmux that answers without the key (a pre-cm-124.2 CLI) never gets a declared event, and everything
+# else still goes out.
+def check_pi_extension_sends_nothing_declared_to_pre_cm124_2_cmux(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "h-pre-cm124-2",
+        r"""
+const h = await load();
+const sid = "s-h"; const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+await fire(h, "ui_prompt_start", { kind: "select", title: "Pick" }, ctx);
+await fire(h, "agent_end", endOfRun, ctx);
+await fire(h, "agent_settled", {}, ctx);
+await fire(h, "ui_prompt_end", { kind: "select", title: "Pick" }, ctx);
+await waitFor(() => forSession(sid).some((call) => call.sub === "stop"));
+await fire(h, "session_shutdown", { reason: "quit" }, ctx);
+assert.strictEqual(asks(sid).length + answers(sid).length, 0, "no declared event reaches a pre-cm-124.2 cmux");
+const subs = sequence(sid);
+for (const expected of ["session-start", "prompt-submit", "turn-notification", "stop"]) {
+  assert.ok(subs.includes(expected), `${expected} still goes out: ${subs}`);
+}
+""",
+        mode="nokey",
+    )
+
+
+# Review R2: shutdown with a form open (cmux first). settleTurn has already marked the session stopped, so the
+# shutdown's QuestionAnswered is the only way the extension retires the wait. It goes out once, with the ask's id,
+# before `resume-clear`, and a late ui_prompt_end sends nothing more.
+def check_pi_form_shutdown_with_form_open_answers_once_before_resume_clear(
+    bun: str, root: Path, extension_path: Path
+) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "r2a-shutdown-open-form",
+        r"""
+const h = await load();
+const sid = "s-r2a"; const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+await fire(h, "agent_end", endOfRun, ctx);
+await fire(h, "agent_settled", {}, ctx);
+await fire(h, "ui_prompt_start", { kind: "custom" }, ctx);
+await waitFor(() => asks(sid).length >= 1);
+await fire(h, "session_shutdown", { reason: "quit" }, ctx);
+await fire(h, "ui_prompt_end", { kind: "custom" }, ctx);
+await sleep(300);
+assert.strictEqual(asks(sid).length, 1);
+assert.strictEqual(answers(sid).length, 1, "the shutdown answers the open form once, and a late end adds nothing");
+assert.strictEqual(answers(sid)[0].id, asks(sid)[0].id);
+const all = calls();
+const answerAt = all.findIndex((call) => call.event === "QuestionAnswered");
+const clearAt = all.findIndex((call) => call.sub === "resume-clear");
+assert.ok(answerAt >= 0 && clearAt > answerAt, `the answer goes before resume-clear: ${all.map((call) => call.sub + ":" + (call.event || ""))}`);
+""",
+        extra_env={"CMUX_TEST_PI_DECL_NOTIFY_DELAY": "0.1"},
+    )
+
+
+# Review R2: his form's extension loads first and does not await the form, and the form ends while the turn's
+# notification is still being delivered. The re-ask queued behind the stop must see the form is gone: one ask in total,
+# one answer with the first id.
+def check_pi_form_ended_before_the_reask_runs_is_not_asked_again(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "r2b-end-before-reask",
+        r"""
+const h = await load();
+const sid = "s-r2b"; const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+await fire(h, "agent_end", endOfRun, ctx);
+await fire(h, "ui_prompt_start", { kind: "custom" }, ctx);
+await fire(h, "agent_settled", {}, ctx);
+await fire(h, "ui_prompt_end", { kind: "custom" }, ctx);
+await waitFor(() => forSession(sid).some((call) => call.sub === "stop"));
+await flushed(h, ctx, sid);
+assert.strictEqual(asks(sid).length, 1, "a form that ended before the re-ask ran is not asked again");
+assert.strictEqual(answers(sid).length, 1);
+assert.match(asks(sid)[0].id, idPattern(sid, 1));
+assert.strictEqual(answers(sid)[0].id, asks(sid)[0].id);
+""",
+        extra_env={"CMUX_TEST_PI_DECL_NOTIFY_DELAY": "0.3"},
+    )
+
+
+# Review R2: the same form-first, not-awaited form, but the session shuts down while the turn's notification is still
+# being delivered. The shutdown clears the span, so the queued re-ask is skipped: one ask, one answer with its id.
+def check_pi_form_shutdown_before_the_reask_runs_is_not_asked_again(bun: str, root: Path, extension_path: Path) -> int:
+    return run_declared_check(
+        bun, root, extension_path, "r2c-shutdown-before-reask",
+        r"""
+const h = await load();
+const sid = "s-r2c"; const ctx = makeCtx(sid);
+await boot(h, ctx, sid);
+await fire(h, "agent_end", endOfRun, ctx);
+await fire(h, "ui_prompt_start", { kind: "custom" }, ctx);
+await fire(h, "agent_settled", {}, ctx);
+await fire(h, "session_shutdown", { reason: "quit" }, ctx);
+await sleep(300);
+assert.strictEqual(asks(sid).length, 1, "the shutdown cleared the span, so the queued re-ask is skipped");
+assert.strictEqual(answers(sid).length, 1);
+assert.match(asks(sid)[0].id, idPattern(sid, 1));
+assert.strictEqual(answers(sid)[0].id, asks(sid)[0].id);
+""",
+        extra_env={"CMUX_TEST_PI_DECL_NOTIFY_DELAY": "0.3"},
+    )
+
+
+# A5i (f): the real CLI's reply carries the key on the pre-socket early exit; omp's stays "{}".
+def check_pi_cli_reply_carries_declared_waits_key(bun: str, root: Path, extension_path: Path) -> int:
+    del bun, extension_path
+    try:
+        cli = resolve_cmux_cli()
+    except RuntimeError as exc:
+        print(f"FAIL: {exc}")
+        return 1
+    env = {key: value for key, value in os.environ.items() if not key.startswith("CMUX_")}
+    env["HOME"] = str(root)
+    env["CMUX_CLI_SENTRY_DISABLED"] = "1"
+
+    def reply(agent: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [cli, "hooks", agent, "notification"],
+            input="{}",
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+            timeout=20,
+        )
+
+    pi = reply("pi")
+    try:
+        parsed = json.loads(pi.stdout)
+    except json.JSONDecodeError:
+        parsed = None
+    if pi.returncode != 0 or not isinstance(parsed, dict) or parsed.get("cmux_declared_waits") != 1:
+        print(f"FAIL: pi's pre-socket early exit lacks the declared-waits key: exit={pi.returncode} stdout={pi.stdout!r}")
+        return 1
+    omp = reply("omp")
+    if omp.returncode != 0 or omp.stdout != "{}\n":
+        print(f"FAIL: omp's reply must stay exactly {{}}: exit={omp.returncode} stdout={omp.stdout!r}")
+        return 1
+    return 0
+
+
+# The marker text is the same in every version of the file, so both the explicit install and the refresh at
+# `hooks pi session-start` must replace an already-installed marked copy whose text differs, and the new text must
+# be the `.2` one. (#cm-124.2)
+def stale_marked_copy(fresh: str) -> str:
+    head = fresh.split("export default function")[0]
+    return head + "export default function cmuxPiSessionExtension(pi) {}\n"
+
+
+def check_pi_install_replaces_stale_marked_copy_with_declared_waits_text(
+    bun: str, root: Path, extension_path: Path
+) -> int:
+    del bun, extension_path
+    try:
+        cli = resolve_cmux_cli()
+    except RuntimeError as exc:
+        print(f"FAIL: {exc}")
+        return 1
+    env = {key: value for key, value in os.environ.items() if not key.startswith("CMUX_")}
+    env["CMUX_CLI_SENTRY_DISABLED"] = "1"
+
+    def installed(config_dir: Path) -> Path:
+        return config_dir / "extensions" / "cmux-session.ts"
+
+    # Explicit install over a stale marked copy.
+    explicit_dir = root / "stale-install"
+    fresh_path = install_pi_extension(explicit_dir / "fresh", cli)
+    fresh = fresh_path.read_text(encoding="utf-8")
+    stale = stale_marked_copy(fresh)
+    if stale == fresh or "cmux-pi-session-extension-marker" not in stale:
+        print("FAIL: the stale fixture must differ from the fresh text and keep the marker")
+        return 1
+    target = installed(explicit_dir / "stale")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(stale, encoding="utf-8")
+    env["PI_CODING_AGENT_DIR"] = str(explicit_dir / "stale")
+    result = subprocess.run(
+        [cli, "hooks", "pi", "install", "--yes"], capture_output=True, text=True, check=False, env=env, timeout=20
+    )
+    if result.returncode != 0 or target.read_text(encoding="utf-8") != fresh:
+        print(f"FAIL: `hooks pi install --yes` did not replace a stale marked copy: exit={result.returncode} {result.stderr!r}")
+        return 1
+    if "QuestionAsked" not in fresh or "cmux_declared_waits" not in fresh:
+        print("FAIL: the installed extension lacks the declared-waits text")
+        return 1
+
+    # The refresh at `hooks pi session-start` (a no-socket step that runs before the hook resolves any target).
+    refresh_dir = root / "stale-refresh"
+    target = installed(refresh_dir)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(stale, encoding="utf-8")
+    env["PI_CODING_AGENT_DIR"] = str(refresh_dir)
+    result = subprocess.run(
+        [cli, "hooks", "pi", "session-start"],
+        input="{}", capture_output=True, text=True, check=False, env=env, timeout=20,
+    )
+    if target.read_text(encoding="utf-8") != fresh:
+        print(f"FAIL: `hooks pi session-start` did not refresh a stale marked copy: exit={result.returncode} {result.stderr!r}")
+        return 1
+    return 0
+
+
 def run_checks(bun: str, root: Path, extension_path: Path) -> int:
     checks = (
         check_responsiveness,
@@ -3391,10 +4046,37 @@ def run_checks(bun: str, root: Path, extension_path: Path) -> int:
         check_concurrent_stale_surface_logs_once,
         check_timeout_configuration_and_failure_telemetry,
         check_diagnostic_log_safety_and_routing,
+        # (#cm-124.2) declared waits: Pi forms
+        check_pi_form_cmux_loaded_first_sends_one_question_after_turn_end,
+        check_pi_form_form_loaded_first_awaiting_sends_before_turn_end,
+        check_pi_form_form_loaded_first_not_awaiting_reasks_after_stop,
+        check_pi_form_window_rule_midrun_settlement_idle_formless_and_no_run,
+        check_pi_form_request_id_differs_after_module_reimport,
+        check_pi_form_request_id_instance_uuid_differs_per_default_export_call,
+        check_pi_form_capability_latch_requires_cmux_declared_waits,
+        check_pi_form_ui_lifecycle_handlers_return_immediately,
+        check_pi_extension_sends_nothing_declared_to_pre_cm124_2_cmux,
+        check_pi_form_shutdown_with_form_open_answers_once_before_resume_clear,
+        check_pi_form_ended_before_the_reask_runs_is_not_asked_again,
+        check_pi_form_shutdown_before_the_reask_runs_is_not_asked_again,
+        check_pi_cli_reply_carries_declared_waits_key,
+        check_pi_install_replaces_stale_marked_copy_with_declared_waits_text,
     )
+    # CMUX_TEST_PI_KEEP_GOING=1 runs every check and prints a tally, for red and mutation runs (#cm-124.2).
+    keep_going = os.environ.get("CMUX_TEST_PI_KEEP_GOING") == "1"
+    failed: list[str] = []
     for check in checks:
         if check(bun, root, extension_path) != 0:
-            return 1
+            if not keep_going:
+                return 1
+            failed.append(check.__name__)
+        elif keep_going:
+            print(f"PASS-CHECK: {check.__name__}")
+    if keep_going:
+        for name in failed:
+            print(f"FAIL-CHECK: {name}")
+        print(f"TALLY: {len(checks) - len(failed)} passed, {len(failed)} failed, {len(checks)} total")
+        return 1 if failed else 0
     print("PASS: Pi dispatch stays responsive, serialized, and fails stale surfaces once")
     return 0
 

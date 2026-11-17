@@ -7,6 +7,7 @@ extension CMUXCLI {
 
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto"; // (#cm-124.2)
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -20,12 +21,22 @@ interface PendingCompletion {
   suppressNotification: boolean;
 }
 
+// (#cm-124.2) One open form (Pi coalesces nested prompts into one span) that was counted by the window rule.
+interface FormSpan {
+  requestId: string;
+  title?: string;
+  asked: boolean;
+}
+
 interface SessionState {
   nextTurn: number;
   activeTurnId?: string;
   pendingCompletion?: PendingCompletion;
   feedDeliveryFailed: boolean;
   stopped: boolean;
+  formWindowOpen: boolean; // (#cm-124.2)
+  nextFormIndex: number; // (#cm-124.2)
+  activeFormSpan?: FormSpan; // (#cm-124.2)
 }
 
 interface CommandResult {
@@ -476,6 +487,8 @@ function stateFor(sessionStates: Map<string, SessionState>, sessionId: string): 
       nextTurn: 0,
       feedDeliveryFailed: false,
       stopped: false,
+      formWindowOpen: false, // (#cm-124.2)
+      nextFormIndex: 0, // (#cm-124.2)
     };
     sessionStates.set(sessionId, state);
   }

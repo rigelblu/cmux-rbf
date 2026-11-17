@@ -352,6 +352,26 @@ extension CMUXCLI {
         return output
     }
 
+    /// (#cm-124.2) A `cmux hooks pi <subcommand>` reply: the resolved target, if any, plus the capability key the
+    /// extension latches on. The Feed route's acknowledgement (`hooks feed --source pi`) keeps the plain
+    /// `piHookResolvedTargetOutput`, which existing tests compare exactly.
+    func piHookReplyOutput(
+        _ target: (workspaceId: String, surfaceId: String)?
+    ) -> String {
+        genericHookReply(isPi: true, body: piHookResolvedTargetOutput(target))
+    }
+
+    func genericHookReply(isPi: Bool, body: String) -> String { // (#cm-124.2)
+        guard isPi else { return body }
+        let data = body.data(using: .utf8) ?? Data()
+        var object = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        object["cmux_declared_waits"] = 1
+        guard let encoded = try? JSONSerialization.data(withJSONObject: object),
+              let output = String(data: encoded, encoding: .utf8)
+        else { return "{\"cmux_declared_waits\":1}" }
+        return output
+    }
+
     /// Rejects a Pi feed response unless the server confirms ingestion.
     func validatePiFeedAcknowledgment(
         _ response: String,
