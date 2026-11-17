@@ -179,7 +179,10 @@ extension AgentJournalLifecycleCenter {
         // instead of applying state under a possibly stale identity.
         var cycled = false
         if let surfaceId = draft.surfaceId {
-            if let resolved = aliases.resolvedSurfaceId(surfaceId) {
+            // (cm-128.19) Stop at an open pane: a restore that met it recorded an alias to its copy, and the pane's own events must stay on it.
+            if let resolved = aliases.resolvedSurfaceId(surfaceId, isLive: {
+                UUID(uuidString: $0).map { GhosttyApp.terminalSurfaceRegistry.surface(id: $0) != nil } ?? false
+            }) {
                 draft.surfaceId = resolved
             } else {
                 cycled = true
