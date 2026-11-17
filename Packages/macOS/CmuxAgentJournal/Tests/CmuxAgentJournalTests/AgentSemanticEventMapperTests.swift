@@ -50,8 +50,15 @@ struct AgentSemanticEventMapperTests {
         ("claude", "PreToolUse", "AskUserQuestion", .questionRequested),
         ("claude", "PreToolUse", "ExitPlanMode", .planReviewRequested),
         ("codex", "PreToolUse", "exit_plan_mode", .planReviewRequested),
-        // questionAsked shortcut.
+        // questionAsked shortcut and declared waits. (#cm-124.2)
         ("pi", "questionAsked", nil, .questionRequested),
+        ("any-agent", "QuestionAsked", nil, .questionRequested),
+        ("any-agent", "QuestionAnswered", nil, .attentionResolved),
+        ("any-agent", "ApprovalAsked", nil, .approvalRequested),
+        ("any-agent", "ApprovalResolved", nil, .attentionResolved),
+        ("claude", "QuestionAnswered", nil, .attentionResolved),
+        ("claude", "ApprovalAsked", nil, .approvalRequested),
+        ("claude", "ApprovalResolved", nil, .attentionResolved),
         // Unknown events observe, never fabricate needs-input.
         ("claude", "SomethingBrandNew", nil, .stateChanged),
         ("qoder", "", nil, .stateChanged),

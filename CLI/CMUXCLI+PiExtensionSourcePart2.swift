@@ -26,9 +26,18 @@ async function sendHook(
     JSON.stringify(payload),
     context,
   );
-  if (result.ok) rememberSurfaceTarget(dispatcher, sessionId, result);
+  if (result.ok) {
+    rememberSurfaceTarget(dispatcher, sessionId, result);
+    // (#cm-124.2) The latch turns on at the first parsed ok reply that carries the key and never turns off:
+    // a non-ok or unparsable reply is ignored, and one pi process can't switch to another CLI.
+    if (parseJSONOutput(result)?.cmux_declared_waits === 1) declaredWaitsSupportedBy.add(dispatcher);
+  }
   return result.ok;
 }
+
+// (#cm-124.2) Dispatchers whose cmux CLI has answered with `"cmux_declared_waits": 1`. One dispatcher per
+// default-export call, so a reloaded extension latches again from its own first reply.
+const declaredWaitsSupportedBy = new WeakSet<PiCmuxCommandDispatcher>();
 
 const resolvedSurfaceTargets = new WeakMap<PiCmuxCommandDispatcher, Map<string, string[]>>();
 
@@ -299,12 +308,44 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
   const dispatcher = new PiCmuxCommandDispatcher();
   const sessionStates = new Map<string, SessionState>();
   const lifecycleTasks = createPiLifecycleQueue();
+  // (#cm-124.2) A full UUID minted in each call of this default export. A module-level id would repeat across
+  // /resume, /new and fork, which build a new factory call but keep pi's module cache.
+  const extensionInstanceId = randomUUID();
 
   const enqueueLifecycleTask = (
     sessionId: string,
     context: PiExtensionContextSnapshot,
     operation: () => Promise<unknown> | unknown,
   ): Promise<void> => lifecycleTasks.enqueue(sessionId, context, operation);
+
+  // (#cm-124.2) Declared form waits. Both sends go through the lifecycle queue, never `tryEnqueue`.
+  const sendFormAsk = async (
+    context: PiExtensionContextSnapshot,
+    span: FormSpan,
+  ): Promise<void> => {
+    await sendHook(dispatcher, "notification", context, {
+      hook_event_name: "QuestionAsked",
+      event: "QuestionAsked",
+      request_id: span.requestId,
+      ...(span.title ? { message: span.title } : {}),
+    });
+  };
+
+  const sendFormAnswer = async (
+    context: PiExtensionContextSnapshot,
+    requestId: string,
+  ): Promise<void> => {
+    await sendHook(dispatcher, "notification", context, {
+      hook_event_name: "QuestionAnswered",
+      event: "QuestionAnswered",
+      request_id: requestId,
+    });
+  };
+
+  const mintFormRequestId = (state: SessionState, sessionId: string): string => {
+    state.nextFormIndex += 1;
+    return `pi-form-${sessionId}-${extensionInstanceId}-${state.nextFormIndex}`;
+  };
 
   pi.on("session_start", (_event, ctx) => {
     const context = snapshotContext(ctx);
@@ -314,6 +355,8 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
       state.pendingCompletion = undefined;
       state.feedDeliveryFailed = false;
       state.stopped = false;
+      state.formWindowOpen = false; // (#cm-124.2)
+      state.activeFormSpan = undefined; // (#cm-124.2)
     }
     if (!sessionId) return;
     enqueueLifecycleTask(sessionId, context, async () => {
@@ -326,9 +369,49 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
     const sessionId = context.sessionId;
     if (!sessionId) return;
     const turnId = beginTurn(sessionStates, sessionId, event);
+    stateFor(sessionStates, sessionId).formWindowOpen = true; // (#cm-124.2) the window opens with the run
     enqueueLifecycleTask(sessionId, context, () => (
       sendHook(dispatcher, "prompt-submit", context, { prompt: event.prompt, turn_id: turnId })
     ));
+  });
+
+  // (#cm-124.2) A prompt he types while pi is idle closes the window; a steer while pi works leaves it open.
+  pi.on("input", (event, ctx) => {
+    const sessionId = sessionIdFrom(ctx);
+    if (!sessionId) return;
+    if (event.streamingBehavior === undefined && ctx.isIdle()) {
+      stateFor(sessionStates, sessionId).formWindowOpen = false;
+    }
+  });
+
+  // (#cm-124.2) Pi doesn't await ui_prompt_* handlers, so these only record state and enqueue.
+  pi.on("ui_prompt_start", (event, ctx) => {
+    const context = snapshotContext(ctx);
+    const sessionId = context.sessionId;
+    if (!sessionId) return;
+    const state = stateFor(sessionStates, sessionId);
+    if (!state.formWindowOpen || state.activeFormSpan) return;
+    const title = firstString(event.title);
+    const span: FormSpan = { requestId: "", asked: false, ...(title ? { title } : {}) };
+    state.activeFormSpan = span;
+    if (!declaredWaitsSupportedBy.has(dispatcher)) return;
+    span.requestId = mintFormRequestId(state, sessionId);
+    span.asked = true;
+    enqueueLifecycleTask(sessionId, context, () => sendFormAsk(context, span));
+  });
+
+  pi.on("ui_prompt_end", (_event, ctx) => {
+    const context = snapshotContext(ctx);
+    const sessionId = context.sessionId;
+    if (!sessionId) return;
+    const state = stateFor(sessionStates, sessionId);
+    const span = state.activeFormSpan;
+    if (!span) return;
+    state.activeFormSpan = undefined;
+    // The id is read when the task runs: a re-ask queued before this end may have replaced it.
+    if (span.asked) enqueueLifecycleTask(sessionId, context, () => sendFormAnswer(context, span.requestId));
+    // A counted form that ends while pi is idle closes the window.
+    if (ctx.isIdle()) state.formWindowOpen = false;
   });
 
   const enqueueFeed = (
@@ -377,6 +460,8 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
       suppressNotification: assistantCompletion.suppressNotification,
     };
     // Older Pi versions do not emit agent_settled, so retain their established completion behavior.
+    // (#cm-124.2) No form re-ask on this path, and no pi that reaches it has forms: ui_prompt_* came after
+    // agent_settled (pi CHANGELOG.md:875 vs :1600).
     if (!supportsAgentSettled()) {
       const completion = settleTurn(sessionStates, sessionId);
       if (completion) {
@@ -395,9 +480,16 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
     // Consume pending completion before subprocess calls so duplicate settlement cannot notify twice.
     const completion = settleTurn(sessionStates, sessionId);
     if (completion) {
-      enqueueLifecycleTask(sessionId, context, () => (
-        publishPendingCompletion(dispatcher, sessionStates, context, sessionId, completion)
-      ));
+      // (#cm-124.2) Snapshot the form whose ask is already queued: the turn's end below closes its wait, so it
+      // gets a fresh ask after the stop. A form that opens after this handler is not re-asked.
+      const state = stateFor(sessionStates, sessionId);
+      const snapshottedSpan = state.activeFormSpan?.asked ? state.activeFormSpan : undefined;
+      enqueueLifecycleTask(sessionId, context, async () => {
+        await publishPendingCompletion(dispatcher, sessionStates, context, sessionId, completion);
+        if (!snapshottedSpan || state.activeFormSpan !== snapshottedSpan) return;
+        snapshottedSpan.requestId = mintFormRequestId(state, sessionId);
+        await sendFormAsk(context, snapshottedSpan);
+      });
     }
   });
 
@@ -406,6 +498,10 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
     const sessionId = context.sessionId;
     if (!sessionId) return;
     const state = stateFor(sessionStates, sessionId);
+    // (#cm-124.2) A form still open at shutdown gets its one QuestionAnswered, with the span's current id.
+    const openSpan = state.activeFormSpan;
+    state.activeFormSpan = undefined;
+    state.formWindowOpen = false;
     let stopPayload: HookExtra | undefined;
     if (!state.stopped) {
       const turnId = finishTurn(sessionStates, sessionId, event);
@@ -415,6 +511,7 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
       };
     }
     await enqueueLifecycleTask(sessionId, context, async () => {
+      if (openSpan?.asked) await sendFormAnswer(context, openSpan.requestId); // (#cm-124.2)
       await dispatcher.finishFeedForSession(sessionId);
       const feedDelivered = !state.feedDeliveryFailed;
       state.feedDeliveryFailed = false;

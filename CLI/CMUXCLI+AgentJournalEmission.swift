@@ -292,4 +292,89 @@ extension CMUXCLI {
             // stderr warning above already made the failure visible.
         }
     }
+
+    // (#cm-124.2) Declared question/approval wait & answer events emitted by hooks and Pi forms.
+    enum DeclaredWaitEvent: Equatable {
+        case questionAsked
+        case questionAnswered
+        case approvalAsked
+        case approvalResolved
+
+        init?(nativeEvent: String?) {
+            // The mapper's own normalization (case, spaces and punctuation ignored), so every spelling it maps
+            // to a declared kind (`question_answered`, `Approval.Asked`, …) gets the declared guards too.
+            guard let nativeEvent else { return nil }
+            switch AgentSemanticEventMapper.semanticKey(nativeEvent) {
+            case "questionasked": self = .questionAsked
+            case "questionanswered": self = .questionAnswered
+            case "approvalasked": self = .approvalAsked
+            case "approvalresolved": self = .approvalResolved
+            default: return nil
+            }
+        }
+
+        var journalKind: AgentJournalEventKind {
+            switch self {
+            case .questionAsked: return .questionRequested
+            case .questionAnswered, .approvalResolved: return .attentionResolved
+            case .approvalAsked: return .approvalRequested
+            }
+        }
+
+        var isAsk: Bool {
+            self == .questionAsked || self == .approvalAsked
+        }
+
+        var isAnswer: Bool {
+            self == .questionAnswered || self == .approvalResolved
+        }
+
+        var askFallbackBody: String {
+            switch self {
+            case .questionAsked:
+                return String(
+                    localized: "feed.notification.question.body",
+                    defaultValue: "Agent is asking a question"
+                )
+            case .approvalAsked:
+                return String(
+                    localized: "agent.generic.notification.body.approvalNeeded",
+                    defaultValue: "Approval needed"
+                )
+            case .questionAnswered, .approvalResolved:
+                return ""
+            }
+        }
+
+        var askSubtitle: String {
+            switch self {
+            case .questionAsked:
+                return String(
+                    localized: "agent.generic.notification.subtitle.waiting",
+                    defaultValue: "Waiting"
+                )
+            case .approvalAsked:
+                return String(
+                    localized: "agent.generic.notification.subtitle.permission",
+                    defaultValue: "Permission"
+                )
+            case .questionAnswered, .approvalResolved:
+                return ""
+            }
+        }
+
+        var notifyCategory: AgentHookNotifyCategory {
+            switch self {
+            case .questionAsked, .questionAnswered: return .idleReminder
+            case .approvalAsked, .approvalResolved: return .needsPermission
+            }
+        }
+    }
+
+    func declaredWaitExplicitMessage(in object: [String: Any]?) -> String? { // (#cm-124.2)
+        // The body is the event's top-level `message` and nothing else; any other key gives the fixed text.
+        guard let object, let candidate = firstString(in: object, keys: ["message"]) else { return nil }
+        let normalized = truncate(normalizedSingleLine(candidate), maxLength: 180)
+        return normalized.isEmpty ? nil : normalized
+    }
 }
