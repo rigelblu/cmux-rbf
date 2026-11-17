@@ -22,8 +22,15 @@ extension Workspace {
             return
         }
         let view: FigmaFileList.View = FigmaPaneURL.isWrapperPage(address) ? .read : .editor
+        // cmux-rbf #cm-73.43: the name the list holds for this file before and after, so every other
+        // tab on the file catches up when it changes.
+        let nameBefore = figmaFiles.entries.first { $0.key == key }?.name
         if previous.key != key || previous.view != view {
-            figmaFiles.show(address)
+            // cmux-rbf #cm-73.43: a showing hands the list the title Figma's editor gave this file in a
+            // tab of this workspace, read from the panel and not from this emission (the sink runs a
+            // turn later, when a switch has already written the preview's `Figma`). A panel this
+            // workspace doesn't hold gives none, which is today's behaviour.
+            figmaFiles.show(address, title: keptFigmaTitle(forPanel: panelID, key: key))
         } else if previous.lastAddress == address, previous.title != title {
             // Titles paired with an address change belong to the previous page until a later emission.
             figmaFiles.rename(key: key, title: title)
@@ -33,6 +40,9 @@ extension Workspace {
         previous.lastAddress = address
         previous.title = title
         figmaFileObservations[panelID] = previous
+        if figmaFiles.entries.first(where: { $0.key == key })?.name != nameBefore {
+            refreshFigmaTabTitles(key: key)
+        }
     }
 
     /// Seed only the saved file/view. The first address sets the title baseline without a new showing.

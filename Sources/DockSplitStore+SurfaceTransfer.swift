@@ -437,6 +437,9 @@ extension DockSplitStore {
             focus: focus,
             reconcileReason: "dock.attachDetachedSurface"
         )
+        // cmux-rbf #cm-73.43: a placeholder has no subscription to re-title it, and the tab above
+        // carries the title the source workspace cached; the Dock holds no file list.
+        if panel is DeferredBrowserPanel { refreshFigmaTabTitles() }
         if let terminalPanel = panel as? TerminalPanel {
             if let owningWorkspace =
                     terminalFontSizeOwningWorkspace {
@@ -535,6 +538,8 @@ extension DockSplitStore {
             focus: focus,
             reconcileReason: "dock.attachDetachedSurface.split"
         )
+        // cmux-rbf #cm-73.43: as in `attachDetachedSurface(_:inPane:atIndex:focus:)`.
+        if panel is DeferredBrowserPanel { refreshFigmaTabTitles() }
         if let terminalPanel = panel as? TerminalPanel {
             if let owningWorkspace =
                     terminalFontSizeOwningWorkspace {

@@ -24,6 +24,13 @@ public struct FigmaCatalogSection: SettingCatalogSection {
         defaultValue: .empty
     )
 
+    /// Whether a Figma pane's header names the file it shows (`Figma (<name>)`).
+    /// Off reads just `Figma`.
+    public let showFileNameInHeader = JSONKey<Bool>(
+        id: "figma.showFileNameInHeader",
+        defaultValue: true
+    )
+
     /// Creates the section with the shipped default (not set).
     public init() {}
 }
