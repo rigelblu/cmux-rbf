@@ -81,19 +81,29 @@ struct AgentPaneMarkTests {
         #expect(AgentPaneMark.title(isAgentPaneKind: false, own: "Page title") == "Page title")
     }
 
-    @Test("the mark is a 32 by 32 pixel PNG that draws something")
-    func theMarkIsA32PixelPNG() throws {
-        let data = AgentPaneMark.shippedPicture
-        let bitmap = try #require(NSBitmapImageRep(data: data))
-        #expect(bitmap.pixelsWide == 32)
-        #expect(bitmap.pixelsHigh == 32)
-        var opaque = 0
-        for x in 0..<32 {
-            for y in 0..<32 where (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 {
-                opaque += 1
-            }
+    // cmux-rbf: changed on purpose (#cm-126.13). Was `theMarkIsA32PixelPNG`, for `.3`'s SF Symbol `eyeglasses` at 32 px.
+    // The mark is now Tom's window, a 64 px PNG: 64 so it stays sharp when the tab font scales the 14 pt slot.
+    @Test("the mark is the window, a 64 by 64 pixel PNG")
+    func theMarkIsTheWindowAt64Pixels() throws {
+        let bitmap = try #require(NSBitmapImageRep(data: AgentPaneMark.shippedPicture))
+        // Require, don't expect: the pixel reads below assume 64 × 64 and would run past a smaller picture's buffer.
+        try #require(bitmap.pixelsWide == 64 && bitmap.pixelsHigh == 64)
+        // Read bytes, not `colorAt`, which converts colour spaces. Check the layout `rgba` assumes before reading.
+        try #require(bitmap.bitsPerSample == 8 && bitmap.samplesPerPixel == 4 && !bitmap.isPlanar
+            && !bitmap.bitmapFormat.contains(.alphaFirst))
+        let bytes = try #require(bitmap.bitmapData)
+        func rgba(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int, a: Int) {
+            let p = bytes + y * bitmap.bytesPerRow + x * 4
+            return (Int(p[0]), Int(p[1]), Int(p[2]), Int(p[3]))
         }
-        #expect(opaque > 20, "only \(opaque) opaque pixels")
+        #expect(rgba(0, 0).a == 0, "the corner outside the frame is clear")
+        let sash = rgba(9, 20), cross = rgba(32, 32)
+        #expect(sash.r > 240 && sash.g > 240 && sash.b > 240 && sash.a == 255, "the frame is white: \(sash)")
+        #expect(cross.r > 240 && cross.g > 240 && cross.b > 240 && cross.a == 255, "the cross is white: \(cross)")
+        let sky = rgba(20, 21), sunset = rgba(44, 43)
+        // 40 above both: `.3`'s grey mark (122, 122, 135) leans blue by 13, so a bare `>` passed on it.
+        #expect(sky.b > sky.r + 40 && sky.b > sky.g + 40, "the top-left pane is the blue-purple sky: \(sky)")
+        #expect(sunset.r > 200 && sunset.g < 120 && sunset.b < 100, "the bottom-right pane is red-orange: \(sunset)")
     }
 
     @Test("paneHoldsAgentPane is true only for a pane with an Agent Pane among its tabs")
