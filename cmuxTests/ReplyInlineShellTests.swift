@@ -31,18 +31,22 @@ struct ReplyInlineShellTests {
         )
         var columns = 80
         var pollInterval: TimeInterval = 3600
-        var sidebarShowingReply = false
+        /// Where the button sends the passage (`cm-136.7`); a test sets it.
+        var destination: ReplyInlineDestination = .prompt
 
         var monitorsInstalled = 0
         var monitorsRemoved = 0
         var monitorHandler: ((NSEvent) -> NSEvent?)?
-        var sidebarObservers = 0
-        var sidebarCancelled = 0
-        var sidebarOnChange: (() -> Void)?
+        var destinationObservers = 0
+        var destinationCancelled = 0
+        var destinationOnChange: (() -> Void)?
         var settingObservers = 0
         var settingCancelled = 0
         var settingOnChange: (() -> Void)?
         var pastes: [(events: [TextBoxSubmit.DispatchEvent], panel: UUID)] = []
+        /// Requests the fake Reply panel was handed, in order.
+        var openedReplies: [(request: TerminalReplyRequest, window: NSWindow, pane: NSView?)] = []
+        var replySeq = 0
         var logs: [String] = []
 
         nonisolated func send(_ events: [TextBoxSubmit.DispatchEvent], toPanel id: UUID) -> Bool {
@@ -59,11 +63,11 @@ struct ReplyInlineShellTests {
                 hasSelection: { _ in self.hasSelection },
                 readSelection: { _, _ in self.hasSelection ? self.selection : nil },
                 grid: { _ in ReplyInlineGridGeometry(columns: self.columns, cellHeight: 17, paddingTop: 4) },
-                sidebarShowingReply: { _ in self.sidebarShowingReply },
-                observeSidebar: { _, onChange in
-                    self.sidebarObservers += 1
-                    self.sidebarOnChange = onChange
-                    return AnyCancellable { self.sidebarCancelled += 1 }
+                destination: { _, _ in self.destination },
+                observeDestination: { _, _, onChange in
+                    self.destinationObservers += 1
+                    self.destinationOnChange = onChange
+                    return AnyCancellable { self.destinationCancelled += 1 }
                 },
                 observeSetting: { onChange in
                     self.settingObservers += 1
@@ -80,6 +84,13 @@ struct ReplyInlineShellTests {
                     self.monitorHandler = nil
                 },
                 pasteTarget: self,
+                openReply: { request, window, pane in
+                    self.openedReplies.append((request, window, pane))
+                },
+                nextReplySeq: {
+                    self.replySeq += 1
+                    return self.replySeq
+                },
                 log: { self.logs.append($0) },
                 selectionPollInterval: self.pollInterval
             )
@@ -474,7 +485,7 @@ struct ReplyInlineShellTests {
 
     // MARK: dismissal: the monitor, the observers, and "only while shown"
 
-    @Test("The monitor, the sidebar observer and the compare exist only while shown")
+    @Test("The monitor, the destination observer and the compare exist only while shown")
     func watchingOnlyWhileShown() async throws {
         let rig = try await makeRig()
         defer { finish(rig) }
@@ -482,12 +493,12 @@ struct ReplyInlineShellTests {
         #expect(rig.world.monitorsInstalled == 0)
         release(rig)
         #expect(rig.controller.isWatching)
-        #expect(rig.world.monitorsInstalled == 1 && rig.world.sidebarObservers == 1)
+        #expect(rig.world.monitorsInstalled == 1 && rig.world.destinationObservers == 1)
         let timer = try #require(rig.controller.selectionTimerForTesting)
         #expect(timer.isValid)
         rig.controller.hide(reason: .click)
         #expect(!rig.controller.isWatching)
-        #expect(rig.world.monitorsRemoved == 1 && rig.world.sidebarCancelled == 1)
+        #expect(rig.world.monitorsRemoved == 1 && rig.world.destinationCancelled == 1)
         #expect(!timer.isValid, "the selection compare's timer must not outlive the toolbar")
     }
 
@@ -539,30 +550,30 @@ struct ReplyInlineShellTests {
         #expect(rig.controller.shown != nil)
     }
 
-    @Test("A sidebar change that flips the label's destination hides it; one that doesn't, leaves it")
-    func sidebarObserver() async throws {
+    @Test("A destination change that flips the label hides it; one that doesn't, leaves it")
+    func destinationObserver() async throws {
         let rig = try await makeRig()
         defer { finish(rig) }
         release(rig)
-        let onChange = try #require(rig.world.sidebarOnChange)
+        let onChange = try #require(rig.world.destinationOnChange)
         onChange()
         #expect(rig.controller.shown != nil, "width or focus changes leave the answer as it was")
-        rig.world.sidebarShowingReply = true
+        rig.world.destination = .replyPanel
         onChange()
         #expect(rig.controller.shown == nil)
-        #expect(rig.world.logs.contains("dismissed reason=sidebar"))
+        #expect(rig.world.logs.contains("dismissed reason=destination"))
         #expect(rig.world.pastes.isEmpty)
     }
 
-    @Test("Once hidden, a sidebar change or a new selection text records nothing more")
+    @Test("Once hidden, a destination change or a new selection text records nothing more")
     func nothingHappensAfterHide() async throws {
         let rig = try await makeRig()
         defer { finish(rig) }
         release(rig)
-        let onChange = try #require(rig.world.sidebarOnChange)
+        let onChange = try #require(rig.world.destinationOnChange)
         rig.controller.hide(reason: .click)
         let logsAfterHide = rig.world.logs
-        rig.world.sidebarShowingReply = true
+        rig.world.destination = .replyPanel
         onChange()
         rig.world.selection = ReplyInlineSelectionGeometry(
             text: "different words", topLeftX: 100, baselineY: 100, offsetStart: 400, distanceToBottomRight: 20
@@ -572,19 +583,19 @@ struct ReplyInlineShellTests {
         #expect(rig.controller.shown == nil)
     }
 
-    @Test("A toolbar shown while the sidebar already shows Reply stays until that answer flips")
-    func sidebarAlreadyShowingReply() async throws {
+    @Test("A toolbar shown with Add to reply stays until that answer flips")
+    func destinationAlreadyReplyPanel() async throws {
         let rig = try await makeRig()
         defer { finish(rig) }
-        rig.world.sidebarShowingReply = true
+        rig.world.destination = .replyPanel
         release(rig)
-        let onChange = try #require(rig.world.sidebarOnChange)
+        let onChange = try #require(rig.world.destinationOnChange)
         onChange()
-        #expect(rig.controller.shown != nil, "the label was read with the sidebar on Reply; nothing changed")
-        rig.world.sidebarShowingReply = false
+        #expect(rig.controller.shown != nil, "the label was read with the destination Reply panel; nothing changed")
+        rig.world.destination = .prompt
         onChange()
         #expect(rig.controller.shown == nil)
-        #expect(rig.world.logs.contains("dismissed reason=sidebar"))
+        #expect(rig.world.logs.contains("dismissed reason=destination"))
     }
 
     @Test("The selection compare hides it when the selection is cleared, moved or changed")
@@ -706,5 +717,103 @@ struct ReplyInlineShellTests {
         release(rig)
         #expect(rig.controller.shown != nil)
         #expect(rig.hosted.subviews.contains { $0 is ReplyInlineToolbarView }, "the next release mounts it")
+    }
+
+    // MARK: Add to reply (cm-136.7): the label, the click, and the destination
+
+    @Test("With the panel on this agent's newest reply, the button reads Add to reply")
+    func addToReplyLabelWhenPanelOnThisAgent() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        rig.world.destination = .replyPanel
+        release(rig)
+        let toolbar = try #require(rig.controller.shown?.view)
+        #expect(toolbar.accessibilityTitle() == "Add to reply")
+        #expect(toolbar.accessibilityLabel() == "Add the selected text to the reply in the Reply panel")
+    }
+
+    @Test("Otherwise the button reads Reply")
+    func replyLabelOtherwise() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        release(rig)
+        let toolbar = try #require(rig.controller.shown?.view)
+        #expect(toolbar.accessibilityTitle() == "Reply")
+        #expect(toolbar.accessibilityLabel() == "Reply to the selected text")
+    }
+
+    /// The wiring rule: this test must fail when the `openReply` call in
+    /// `replyClicked` is cut, which is what the cut proof checks.
+    @Test("Add to reply hands the cleaned passage to the panel once, as an add, and pastes nothing")
+    func addClickOpensReplyWithAddIntent() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        rig.world.destination = .replyPanel
+        rig.world.selection = ReplyInlineSelectionGeometry(
+            text: "⏺ first line\n\n  second paragraph", topLeftX: 100, baselineY: 100, offsetStart: 400, distanceToBottomRight: 40
+        )
+        release(rig)
+        let toolbar = try #require(rig.controller.shown?.view)
+        click(toolbar, window: rig.window)
+        #expect(rig.world.openedReplies.count == 1)
+        let opened = try #require(rig.world.openedReplies.first)
+        #expect(opened.request == TerminalReplyRequest(
+            seq: 1, text: "first line\n\nsecond paragraph", isMultiRow: true, sourcePanelID: rig.surface.id, intent: .add
+        ))
+        #expect(opened.window === rig.window)
+        // The view handed over is the one the keyboard comes off: the terminal
+        // the user selected in sits inside it (`TerminalReplyOpener.holdsKeyboard`).
+        #expect(TerminalReplyOpener.holdsKeyboard(rig.terminal, pane: opened.pane))
+        #expect(rig.world.pastes.isEmpty)
+        #expect(rig.controller.shown == nil)
+    }
+
+    @Test("Add to reply sends nothing when the destination changed before the click")
+    func addClickSendsNothingWhenDestinationChanged() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        rig.world.destination = .replyPanel
+        release(rig)
+        let toolbar = try #require(rig.controller.shown?.view)
+        // The change lands without its observer firing, so the click must re-read it.
+        rig.world.destination = .prompt
+        click(toolbar, window: rig.window)
+        #expect(rig.world.openedReplies.isEmpty)
+        #expect(rig.world.pastes.isEmpty)
+        #expect(rig.world.logs.contains("dismissed reason=destination"))
+        #expect(rig.controller.shown == nil)
+    }
+
+    @Test("Reply, with the destination on the prompt, pastes as it always did and opens no panel")
+    func replyClickUnchangedForPrompt() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        release(rig)
+        let toolbar = try #require(rig.controller.shown?.view)
+        click(toolbar, window: rig.window)
+        #expect(rig.world.pastes.count == 1)
+        #expect(rig.world.openedReplies.isEmpty)
+    }
+
+    @Test("A destination change while shown takes the toolbar away, in both directions")
+    func destinationChangeWhileShownDismisses() async throws {
+        let rig = try await makeRig()
+        defer { finish(rig) }
+        release(rig)
+        let onChange = try #require(rig.world.destinationOnChange)
+        rig.world.destination = .replyPanel
+        onChange()
+        #expect(rig.controller.shown == nil)
+        #expect(rig.world.logs.contains("dismissed reason=destination"))
+
+        // Back the other way: shown on Add to reply, then the destination goes to the prompt.
+        rig.world.destination = .replyPanel
+        release(rig)
+        let changedBack = try #require(rig.world.destinationOnChange)
+        #expect(rig.controller.shown != nil)
+        rig.world.destination = .prompt
+        changedBack()
+        #expect(rig.controller.shown == nil)
+        #expect(rig.world.logs.contains("dismissed reason=destination"))
     }
 }

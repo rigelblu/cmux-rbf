@@ -8,7 +8,7 @@ import Foundation
 ///
 /// **Two states, `hidden | shown(passage)`**, kept as one optional so "shown
 /// without a passage" cannot be represented. Everything that costs anything
-/// per event (the window monitor, the sidebar observer, the selection
+/// per event (the window monitor, the destination observer, the selection
 /// compare) exists only while a toolbar shows, so a pane without one pays
 /// nothing on the keystroke path.
 @MainActor
@@ -16,7 +16,11 @@ final class ReplyInlineToolbarController {
     struct Shown {
         let passage: ReplyInlinePassage
         let view: ReplyInlineToolbarView
-        let sidebarShowingReplyAtShow: Bool
+        /// The window the toolbar shows in: the destination and the reply are read there.
+        let window: NSWindow
+        /// Where the button sent the passage when the toolbar showed (`cm-136.7`).
+        /// The label was read for it, and a change to it takes the toolbar away.
+        let destinationAtShow: ReplyInlineDestination
         let currentSelection: () -> ReplyInlineSelectionGeometry?
     }
 
@@ -25,7 +29,7 @@ final class ReplyInlineToolbarController {
 
     private weak var host: NSView?
     private var monitor: Any?
-    private var sidebarObservation: AnyCancellable?
+    private var destinationObservation: AnyCancellable?
     private var settingObservation: AnyCancellable?
     private var selectionTimer: Timer?
 
@@ -34,10 +38,10 @@ final class ReplyInlineToolbarController {
         self.environment = environment ?? .production
     }
 
-    /// Whether the window monitor, the sidebar observer, the setting observer and
+    /// Whether the window monitor, the destination observer, the setting observer and
     /// the selection compare are installed: all four or none.
     var isWatching: Bool {
-        monitor != nil && sidebarObservation != nil && settingObservation != nil && selectionTimer != nil
+        monitor != nil && destinationObservation != nil && settingObservation != nil && selectionTimer != nil
     }
 
     /// The selection compare's timer, so a test can hold it and check it is
@@ -62,12 +66,11 @@ final class ReplyInlineToolbarController {
         guard let host else { return false }
         if shown != nil { hide(reason: .newSelection) }
 
+        let destinationAtShow = environment.destination(window, passage.sourcePanelID)
+        let labels = Self.labels(for: destinationAtShow)
         let view = ReplyInlineToolbarView(
-            title: String(localized: "reply.inline.reply", defaultValue: "Reply"),
-            accessibilityLabel: String(
-                localized: "reply.inline.reply.accessibility",
-                defaultValue: "Reply to the selected text"
-            )
+            title: labels.title,
+            accessibilityLabel: labels.accessibilityLabel
         )
         guard let placement = ReplyInlinePlacement.frame(
             toolbar: view.frame.size,
@@ -87,11 +90,11 @@ final class ReplyInlineToolbarController {
         view.onReply = { [weak self] in self?.replyClicked() }
         view.onDetach = { [weak self] in self?.paneLeftWindow() }
 
-        let sidebarAtShow = environment.sidebarShowingReply(window)
         shown = Shown(
             passage: passage,
             view: view,
-            sidebarShowingReplyAtShow: sidebarAtShow,
+            window: window,
+            destinationAtShow: destinationAtShow,
             currentSelection: currentSelection
         )
         // Above the terminal, below the find bar (the find field must win a click).
@@ -100,7 +103,7 @@ final class ReplyInlineToolbarController {
         } else {
             host.addSubview(view)
         }
-        startWatching(in: window)
+        startWatching(in: window, sourcePanelID: passage.sourcePanelID)
         #if DEBUG
         environment.log(
             "shown surface=\(passage.sourcePanelID.uuidString.prefix(5)) chars=\(passage.rawText.count) " +
@@ -108,6 +111,26 @@ final class ReplyInlineToolbarController {
         )
         #endif
         return true
+    }
+
+    /// The button's words for a destination: today's `Reply`, or `Add to reply`
+    /// when the passage goes to the Reply panel (`cm-136.7`).
+    private static func labels(for destination: ReplyInlineDestination) -> (title: String, accessibilityLabel: String) {
+        switch destination {
+        case .prompt:
+            return (
+                String(localized: "reply.inline.reply", defaultValue: "Reply"),
+                String(localized: "reply.inline.reply.accessibility", defaultValue: "Reply to the selected text")
+            )
+        case .replyPanel:
+            return (
+                String(localized: "reply.inline.addToReply", defaultValue: "Add to reply"),
+                String(
+                    localized: "reply.inline.addToReply.accessibility",
+                    defaultValue: "Add the selected text to the reply in the Reply panel"
+                )
+            )
+        }
     }
 
     // MARK: Hide
@@ -130,7 +153,7 @@ final class ReplyInlineToolbarController {
         guard let reason = ReplyInlineDismissal.reason(
             for: event,
             passage: shown.passage,
-            sidebarShowingReplyAtShow: shown.sidebarShowingReplyAtShow
+            destinationAtShow: shown.destinationAtShow
         ) else { return }
         hide(reason: reason)
     }
@@ -148,6 +171,10 @@ final class ReplyInlineToolbarController {
     /// shows now. Never submits, never writes the clipboard (Q8).
     func replyClicked() {
         guard let shown else { return }
+        if shown.destinationAtShow == .replyPanel {
+            addToReplyClicked(shown)
+            return
+        }
         let passage = shown.passage
         // The agent may have exited since the toolbar came up with no key
         // pressed (a key would have dismissed it): pasting now would put the
@@ -188,16 +215,57 @@ final class ReplyInlineToolbarController {
         #endif
     }
 
+    /// `Add to reply` (`cm-136.7`): the passage goes to the Reply panel as an
+    /// add, cleaned the way Reply cleans it, and nothing is pasted.
+    private func addToReplyClicked(_ shown: Shown) {
+        let passage = shown.passage
+        // The destination is read again, because a change that landed without
+        // its observer firing must not send the passage to the wrong place.
+        guard environment.destination(shown.window, passage.sourcePanelID) == .replyPanel else {
+            hide(reason: .destination)
+            return
+        }
+        guard environment.isAgentPane(passage.sourcePanelID) else {
+            hide(reason: .agentGone)
+            return
+        }
+        let cleaned = ReplyPassageQuote.cleanTerminalSelection(
+            passage.rawText,
+            wrapColumns: passage.wrapColumns,
+            firstRowStartColumn: passage.firstRowStartColumn
+        )
+        // A selection that was only a marker glyph has nothing to add.
+        guard !cleaned.isEmpty else {
+            hide(reason: .add)
+            return
+        }
+        let request = TerminalReplyRequest(
+            seq: environment.nextReplySeq(),
+            text: cleaned,
+            isMultiRow: cleaned.contains(where: \.isNewline),
+            sourcePanelID: passage.sourcePanelID,
+            intent: .add
+        )
+        hide(reason: .add)
+        #if DEBUG
+        environment.log(
+            "add surface=\(passage.sourcePanelID.uuidString.prefix(5)) chars=\(cleaned.count) " +
+            "rows=\(passage.bottomRow - passage.topRow + 1)"
+        )
+        #endif
+        environment.openReply(request, shown.window, host)
+    }
+
     // MARK: Watching (only while shown)
 
-    private func startWatching(in window: NSWindow) {
+    private func startWatching(in window: NSWindow, sourcePanelID: UUID) {
         monitor = environment.installMonitor { [weak self] event in
             self?.observe(event, in: window)
             return event
         }
-        sidebarObservation = environment.observeSidebar(window) { [weak self] in
+        destinationObservation = environment.observeDestination(window, sourcePanelID) { [weak self] in
             guard let self else { return }
-            self.handle(.sidebarChanged(showingReply: self.environment.sidebarShowingReply(window)))
+            self.handle(.destinationChanged(self.environment.destination(window, sourcePanelID)))
         } ?? AnyCancellable {}
         // `UserDefaults.didChangeNotification` fires for every defaults write in
         // the app, so it is held only while a toolbar shows.
@@ -215,8 +283,8 @@ final class ReplyInlineToolbarController {
     private func stopWatching() {
         if let monitor { environment.removeMonitor(monitor) }
         monitor = nil
-        sidebarObservation?.cancel()
-        sidebarObservation = nil
+        destinationObservation?.cancel()
+        destinationObservation = nil
         settingObservation?.cancel()
         settingObservation = nil
         selectionTimer?.invalidate()

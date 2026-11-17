@@ -7,7 +7,11 @@ enum ReplyInlineDismissReason: String, Equatable {
     case key
     case newSelection
     case selectionChanged
-    case sidebar
+    /// The destination the button names changed: the sidebar, the panel's
+    /// binding, or the reply it follows (`Reply` ⇄ `Add to reply`).
+    case destination
+    /// The click that adds the passage to the reply in the panel.
+    case add
     case pane
     /// The agent exited while the toolbar showed; Reply found no live session.
     case agentGone

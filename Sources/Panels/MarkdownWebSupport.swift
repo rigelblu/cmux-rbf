@@ -890,9 +890,20 @@ struct MarkdownPageReveal: Equatable {
 }
 
 /// `#cm-89` — text to find and select in the page, once per `seq`.
+///
+/// `offsets` (`cm-136.7`) asks for a range by character offset instead: an
+/// `Add to reply` that grows a mark selects the union range, and `text` is
+/// unused then.
 struct MarkdownPageFind: Equatable {
     let text: String
     let seq: Int
+    let offsets: Range<Int>?
+
+    init(text: String, seq: Int, offsets: Range<Int>? = nil) {
+        self.text = text
+        self.seq = seq
+        self.offsets = offsets
+    }
 }
 
 extension NSColor {

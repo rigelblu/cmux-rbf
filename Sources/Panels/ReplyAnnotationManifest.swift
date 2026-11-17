@@ -897,6 +897,9 @@ struct TerminalReplyRequest: Equatable {
     /// request rather than refusing here.
     let isMultiRow: Bool
     let sourcePanelID: UUID
+    /// What the panel does with it: a `⌘⇧`-drag starts a search, an
+    /// `Add to reply` adds to the reply already shown.
+    let intent: TerminalReplyIntent
 }
 
 enum TerminalReplyStartDecision: Equatable {
@@ -935,7 +938,8 @@ enum TerminalReplyStart {
             seq: seq,
             text: text,
             isMultiRow: text.contains(where: \.isNewline),
-            sourcePanelID: input.sourcePanelID
+            sourcePanelID: input.sourcePanelID,
+            intent: .start
         ))
     }
 }
@@ -963,18 +967,25 @@ enum TerminalReplyConsumeDecision: Equatable {
 /// the panel refuses to do), so that check runs first — before highlights,
 /// and before the two notices, which would otherwise describe a message the
 /// reader is not looking at.
+///
+/// **`.add` (cm-136.7) waives two checks, and only two.** `Add to reply` adds
+/// to the reply the panel already shows, so that reply carrying highlights is
+/// the normal case, not a reason to stay quiet, and a wrapped passage is added
+/// like a one-row one, so multi-row is no refusal. An older reply and a reply
+/// still being written are checked for both intents.
 enum TerminalReplyConsume {
     static func decide(
         viewingOlderReply: Bool,
         newestHasHighlights: Bool,
         newestTurnWriting: Bool,
         isMultiRow: Bool,
-        text: String
+        text: String,
+        intent: TerminalReplyIntent
     ) -> TerminalReplyConsumeDecision {
         if viewingOlderReply { return .silent }
-        if newestHasHighlights { return .silent }
+        if newestHasHighlights, intent == .start { return .silent }
         if newestTurnWriting { return .notice(.writing) }
-        if isMultiRow { return .notice(.multiRow) }
+        if isMultiRow, intent == .start { return .notice(.multiRow) }
         return .find(text)
     }
 }

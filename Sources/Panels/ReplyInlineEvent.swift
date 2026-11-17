@@ -10,8 +10,9 @@ enum ReplyInlineEvent: Equatable {
     case keyDown
     /// The selection compare while shown: what Ghostty reports now (`nil`: none).
     case selectionChecked(ReplyInlineSelectionGeometry?)
-    /// The window's sidebar changed; whether it now shows Reply.
-    case sidebarChanged(showingReply: Bool)
+    /// The destination the toolbar's button names changed; `destination` is
+    /// its value now.
+    case destinationChanged(ReplyInlineDestination)
     case paneClosed
     /// `reply.inline.enabled` changed; `enabled` is its value now.
     case settingChanged(enabled: Bool)

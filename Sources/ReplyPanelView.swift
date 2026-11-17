@@ -125,6 +125,19 @@ struct ReplyPanelView: View {
     /// `FileExplorerState`, and two triggers can fire inside it — dogfood
     /// 2026-09-13 logged `consume seq=1` twice, 22 ms apart, two finds.
     @State private var consumedTerminalReplySeq: Int?
+    /// `cm-136.7` — where an `Add to reply` stands between its find and the
+    /// selection that answers it. `nil` when no add is under way. Cleared when
+    /// the answering selection arrives, when a find finds nothing, and on a
+    /// session change or a rebind.
+    @State private var addStep: AddStep?
+
+    private enum AddStep: Equatable {
+        /// The page is finding the passage; its selection goes through
+        /// ``ReplyAddPlan`` instead of a plain insert.
+        case finding
+        /// The page is selecting the union range this mark grows to.
+        case growing(UUID)
+    }
 
     /// The mark the pointer is over, from either half.
     ///
@@ -251,6 +264,7 @@ struct ReplyPanelView: View {
             // cold read 2026-09-13).
             clearTerminalNotice(reason: "session")
             terminalFind = nil
+            addStep = nil
             consumeTerminalReplyIfReady(trigger: "session")
         }
         .onChange(of: store.boundPanelID) { _ in
@@ -258,6 +272,7 @@ struct ReplyPanelView: View {
             // old one, and a find still running would answer for it too.
             clearTerminalNotice(reason: "bind")
             terminalFind = nil
+            addStep = nil
             consumeTerminalReplyIfReady(trigger: "bind")
         }
         .onChange(of: store.model.isNewestTurnWriting) { writing in
@@ -950,6 +965,11 @@ struct ReplyPanelView: View {
                 dlog("reply.terminalStart find seq=\(seq) published=\(published ? 1 : 0)")
                 #endif
                 guard seq == terminalFind?.seq, !published else { return }
+                let step = addStep
+                addStep = nil
+                // A grow's selection that failed to publish has no notice of its own: the
+                // mark stays as it was, and the note is not opened.
+                if case .growing = step { return }
                 terminalNotice = .notFound
                 #if DEBUG
                 dlog("reply.terminalStart notice set notFound seq=\(seq)")
@@ -1785,7 +1805,8 @@ struct ReplyPanelView: View {
             newestHasHighlights: !store.draft(for: newest).annotations.isEmpty,
             newestTurnWriting: store.model.isNewestTurnWriting,
             isMultiRow: request.isMultiRow,
-            text: request.text
+            text: request.text,
+            intent: request.intent
         )
         #if DEBUG
         dlog("reply.terminalStart consume seq=\(request.seq) trigger=\(trigger) decision=\(decision) writing=\(store.model.isNewestTurnWriting ? 1 : 0) newest=\(newest.id.prefix(8)) groups=\(store.model.groups.count) following=\(store.model.viewedGroupID == nil ? 1 : 0)")
@@ -1799,6 +1820,8 @@ struct ReplyPanelView: View {
             terminalNotice = nil
             terminalFindSeq += 1
             terminalFind = MarkdownPageFind(text: text, seq: terminalFindSeq)
+            // An add's find answers to the add: its selection goes through `addPlan`.
+            addStep = request.intent == .add ? .finding : nil
         }
     }
 
@@ -1837,13 +1860,49 @@ struct ReplyPanelView: View {
         }
     }
 
-    /// Takes a new selection as a mark, refusing one that overlaps another.
+    /// Takes a new selection as a mark. A selection made in the panel is refused
+    /// where it overlaps another mark. A selection an `Add to reply` asked for
+    /// goes through ``ReplyAddPlan`` (`cm-136.7`), which may open a note or
+    /// grow one mark.
     private func takeSelection(_ selection: MarkdownPageSelection) {
+        let step = addStep
+        addStep = nil
+        switch step {
+        case .growing(let growID):
+            // The union range a grow asked the page to select: it replaces the mark
+            // it grows. `grow` refuses a range that doesn't contain the mark or that
+            // overlaps another; a selection it refuses was not the page's answer
+            // (one made by hand in the moment before it), and is taken as any
+            // selection is, below.
+            var grown = false
+            updateDraft { grown = $0.grow(growID, quote: selection.quote, range: selection.range) }
+            if grown {
+                openNote(growID)
+                return
+            }
+        case .finding:
+            switch draft.addPlan(for: selection.range) {
+            case .insert:
+                break
+            case .openNote(let id):
+                openNote(id)
+                return
+            case .grow(let id, let union):
+                addStep = .growing(id)
+                terminalFindSeq += 1
+                terminalFind = MarkdownPageFind(text: "", seq: terminalFindSeq, offsets: union)
+                return
+            }
+        case nil:
+            break
+        }
         let annotation = ReplyAnnotation(quote: selection.quote, note: "", range: selection.range)
         var accepted = false
         updateDraft { accepted = $0.insert(annotation) }
-        // A refused overlap leaves the standing mark alone: an ambiguous
-        // quote is fixed by selecting more, never by cmux widening one.
+        // A refused overlap leaves the standing mark alone. For a selection made
+        // in the panel, an ambiguous quote is fixed by selecting more. The one
+        // place cmux widens a mark is `Add to reply` above, for the passage the
+        // user asked for (`cm-136.7`, Q22).
         guard accepted else { return }
         clearTerminalNotice(reason: "highlight")
         stepArrivalID = nil
@@ -1853,6 +1912,15 @@ struct ReplyPanelView: View {
         editingText = ""
         editingOriginal = ""
         placeCaretInNoteField()
+    }
+
+    /// Opens one mark's note with the caret in it, the way a click on the mark does
+    /// (`onMarkClicked`). `Add to reply` uses it when the passage is already marked.
+    private func openNote(_ id: UUID) {
+        guard let entry = draft.numbered.first(where: { $0.id == id }) else { return }
+        clearTerminalNotice(reason: "add")
+        beginEditing(entry)
+        revealNote(id)
     }
 
     /// Says the clipboard now holds what was pasted, then goes away.
