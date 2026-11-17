@@ -1268,7 +1268,8 @@
         "figma": {
           "description": "Figma postavke.",
           "defaultFolder": "Link na Figma folder u koji idu novi dizajni kada figma.folders nema unos za njihov direktorij. Koristite link iz adresne trake Figme na stranici foldera. Agenti ga čitaju pomoću \"cmux figma folder\".",
-          "folders": "Figma folderi za direktorije: svaki ključ je direktorij, a svaka vrijednost link na Figma folder u koji trebaju ići novi dizajni napravljeni u tom direktoriju ili unutar njega. Pobjeđuje najbliži odgovarajući direktorij; drugdje vrijedi figma.defaultFolder. Agenti ga čitaju pomoću \"cmux figma folder\"."
+          "folders": "Figma folderi za direktorije: svaki ključ je direktorij, a svaka vrijednost link na Figma folder u koji trebaju ići novi dizajni napravljeni u tom direktoriju ili unutar njega. Pobjeđuje najbliži odgovarajući direktorij; drugdje vrijedi figma.defaultFolder. Agenti ga čitaju pomoću \"cmux figma folder\".",
+          "showFileNameInHeader": "Prikaži naziv datoteke koju Figma okno prikazuje u svom zaglavlju, kao Figma (name). Kada je isključeno, zaglavlje prikazuje Figma."
         },
         "reply": {
           "description": "Panel odgovora",

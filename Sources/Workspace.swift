@@ -445,6 +445,10 @@ extension Workspace {
         restoreTodoState(from: snapshot)
         // cmux-rbf #cm-73.16: restore order before queued browser emissions arrive.
         restoreFigmaFiles(from: snapshot)
+        // cmux-rbf #cm-73.43: every Figma tab, live or not shown yet, takes the rule's answer now that
+        // the list is back. Restore filled `panelTitles` from each saved title and titled each tab with
+        // `snapshot.customTitle ?? snapshot.title`; this replaces both (wrapped for an Agent Pane inside).
+        refreshFigmaTabTitles()
 
         // Status entries and agent PIDs are ephemeral runtime state tied to running
         // processes (e.g. claude_code "Running"). Don't restore them across app
@@ -5012,6 +5016,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     private func configureBrowserPanel(_ browserPanel: BrowserPanel) {
         // cmux-rbf #cm-73.2a
         browserPanel.owningWorkspace = self
+        // cmux-rbf #cm-73.43: a new or attached tab gets this workspace's name for its file.
+        syncFigmaKnownFileName(browserPanel)
         AppDelegate.shared?.auth?.browserAppSession.register(browserPanel)
         browserPanel.webViewDidRequestClose = { [weak self, weak browserPanel] in
             guard let self, let browserPanel else { return }
@@ -5285,6 +5291,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
                 title: pageTitle,
                 showsAddressBar: browserPanel.isOmnibarVisible
             )
+            // cmux-rbf #cm-73.43: after the recorder, which may have named the file, and before the
+            // title is read below.
+            self.syncFigmaKnownFileName(browserPanel)
             self.publishBrowserOpenTabSuggestion(for: browserPanel)
             // cmux-rbf #cm-73.3: a showing-side URL change also updates an already-hovered row.
             self.bonsplitController.refreshPairFigmaPage()
@@ -10039,6 +10048,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         // cmux-rbf #cm-126.3: ownership and kind precede the first tab picture and caption.
         browserPanel.ownerTerminalSurfaceId = owner?.terminalStableID
         browserPanel.ownedKind = owner?.kind
+        // cmux-rbf #cm-73.43: the tab's known Figma name precedes its first title read, so a split on a
+        // file the menu knows never reads the link's name first (`configureBrowserPanel` runs after).
+        syncFigmaKnownFileName(browserPanel)
         let initialTitle = AgentPaneMark.title(
             isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
             own: browserPanel.displayTitle
@@ -11646,6 +11658,11 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             installBrowserPanelSubscription(browserPanel)
         } else if let deferredBrowserPanel = detached.panel as? DeferredBrowserPanel {
             deferredBrowserPanel.updateWorkspaceId(id)
+            // cmux-rbf #cm-73.43: a placeholder has no subscription to re-title it, and `panelTitles` holds
+            // the title the source workspace cached. Take this workspace's name for the file and re-title.
+            if let key = deferredBrowserPanel.figmaSavedAddress.flatMap({ FigmaPaneURL.fileKey(fromPaneURL: $0) }) {
+                refreshFigmaTabTitles(key: key)
+            }
         } else if let filePreviewPanel = detached.panel as? FilePreviewPanel {
             filePreviewPanel.updateWorkspaceId(
                 id,
@@ -15079,6 +15096,10 @@ extension Workspace: BonsplitDelegate {
         if isDetaching, let panel {
             owningTabManager?.flushPendingPanelTitleUpdatesForWorkspaceSnapshot()
             let browserPanel = panel as? BrowserPanel
+            // cmux-rbf #cm-73.43: the name this workspace knew for the file stays here; the next
+            // workspace (or none, in the Dock) sets its own.
+            browserPanel?.figmaKnownFileName = nil
+            (panel as? DeferredBrowserPanel)?.figmaKnownFileName = nil
             let cachedTitle = panelTitles[panelId]
             let transferFallbackTitle = cachedTitle ?? panel.displayTitle
             let restorableAgent = restoredAgentSnapshotsByPanelId[panelId]

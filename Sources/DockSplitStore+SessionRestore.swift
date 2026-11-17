@@ -84,6 +84,10 @@ extension DockSplitStore {
             }
         }
 
+        // cmux-rbf #cm-73.43: the tabs above were made with the titles they were saved with; a Figma
+        // tab is named by the rule now. Once, after every tab is in.
+        refreshFigmaTabTitles()
+
         forceCloseDockTabIds.formUnion(scaffold.placeholderTabIds)
         for tabId in scaffold.placeholderTabIds {
             _ = bonsplitController.closeTab(tabId)

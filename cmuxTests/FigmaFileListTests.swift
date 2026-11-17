@@ -44,6 +44,39 @@ import Testing
         #expect(list.entries.first?.name == "Renamed")
     }
 
+    // cmux-rbf #cm-73.43: a title names a file only when it ends in a Figma suffix, so the
+    // address a failed load writes into the title never renames a row to the address.
+    @Test func renameIgnoresATitleWithNoFigmaSuffix() {
+        var list = FigmaFileList()
+        list.show(url("design/A/Old-slug"), title: "Onboarding – Figma")
+        let failed = "https://www.figma.com/design/A/Old-slug"
+        list.rename(key: "A", title: failed)
+        #expect(list.entries.first?.name == "Onboarding", "a failed load's title (the address) renamed the row")
+        list.rename(key: "A", title: "Figma")
+        #expect(list.entries.first?.name == "Onboarding")
+        list.show(url("design/B/Link-name"), title: failed)
+        #expect(list.entries.first?.name == "Link name", "a title with no suffix named the file")
+    }
+
+    @Test func titleNameAndLinkNameAreTheSharedRules() {
+        #expect(FigmaFileList.titleName("Ideas – FigJam") == "Ideas")
+        #expect(FigmaFileList.titleName("Q4 review – Figma Slides") == "Q4 review")
+        #expect(FigmaFileList.titleName("Onboarding – Figma") == "Onboarding")
+        #expect(FigmaFileList.titleName(" – Figma") == nil)
+        #expect(FigmaFileList.titleName("Figma") == nil)
+        #expect(FigmaFileList.titleName("Recent files") == nil)
+        #expect(FigmaFileList.linkName(url("design/A/Link-name")) == "Link name")
+        #expect(FigmaFileList.linkName(url("design/KEY/branch/BR/Branch-name")) == "Branch name")
+        #expect(FigmaFileList.linkName(url("design/A")) == nil)
+    }
+
+    // cmux-rbf #cm-73.43: the menu keeps "Untitled" for a link with no name part.
+    @Test func showOnALinkWithNoNamePartStillNamesTheRowUntitled() {
+        var list = FigmaFileList()
+        list.show(url("design/MVdKSLWiPvKNyWab361uJ2?node-id=12-2"))
+        #expect(list.entries.first?.name == "Untitled")
+    }
+
     @Test func readViewKeepsLinkAndFrameAndTitleName() throws {
         var list = FigmaFileList()
         let source = url("design/A/Read%20view-name?node-id=12-2&t=secret")
