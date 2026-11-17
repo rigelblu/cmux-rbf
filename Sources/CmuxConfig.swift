@@ -1665,6 +1665,8 @@ struct CmuxConfigIssue: Identifiable, Equatable, Sendable {
         case newWorkspaceCommandNotFound
         case newWorkspaceCommandRequiresWorkspace
         case schemaError
+        /// A bad row of `agentEvents`, from `AgentEventTableStore`; `message` is the rule. (#cm-124.5)
+        case agentEventsRow
     }
 
     let kind: Kind
@@ -1707,6 +1709,8 @@ struct CmuxConfigIssue: Identifiable, Equatable, Sendable {
             return "\(settingName) '\(commandName ?? "")' must reference a workspace command"
         case .schemaError:
             return "\(settingName) has a schema error: \(message ?? "unknown error")"
+        case .agentEventsRow:
+            return "\(settingName) is not a valid agent event row (\(message ?? "unknown rule"))" // (#cm-124.5)
         }
     }
 }
@@ -1740,6 +1744,8 @@ final class CmuxConfigStore: ObservableObject {
     @Published private(set) var surfaceTabBarButtons: [CmuxSurfaceTabBarButton] = CmuxSurfaceTabBarButton.defaults
     @Published private(set) var notificationHooks: [CmuxResolvedNotificationHook] = []
     @Published private(set) var configurationIssues: [CmuxConfigIssue] = []
+    /// The issues this store found itself; `configurationIssues` adds the app-wide agent event table's. (#cm-124.5)
+    private var ownConfigurationIssues: [CmuxConfigIssue] = []
     @Published private(set) var configRevision: UInt64 = 0
 
     /// Which config file each command came from, keyed by command id.
@@ -1854,12 +1860,26 @@ final class CmuxConfigStore: ObservableObject {
                 self.loadAll()
             }
             .store(in: &lifetimeCancellables)
+        // (#cm-124.5) The app-wide agent event table reports a bad `agentEvents` row to every window's palette through
+        // this store's issues, so the palette's one issue loop lists it. Only the store that reads the global file shows it.
+        AgentEventTableStore.shared.issues
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.configurationIssues = self.ownConfigurationIssues + self.agentEventTableIssues()
+            }
+            .store(in: &lifetimeCancellables)
         if startFileWatchers {
             if localConfigPath != nil {
                 startLocalFileWatcher()
             }
             startGlobalWatching()
         }
+    }
+
+    private func agentEventTableIssues() -> [CmuxConfigIssue] { // (#cm-124.5)
+        let store = AgentEventTableStore.shared
+        return store.path == globalConfigPath ? store.issues.value : []
     }
 
     deinit {
@@ -2177,7 +2197,8 @@ final class CmuxConfigStore: ObservableObject {
             issues.append(issue)
         }
         issues.append(contentsOf: resolvedNewWorkspaceContextMenuItems.issues)
-        configurationIssues = issues
+        ownConfigurationIssues = issues // (#cm-124.5)
+        configurationIssues = issues + agentEventTableIssues() // (#cm-124.5)
         if fileWatchingEnabled {
             updateLocalHookFileWatchers(
                 paths: localHookPaths,

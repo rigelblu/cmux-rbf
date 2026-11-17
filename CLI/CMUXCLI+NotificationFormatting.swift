@@ -35,6 +35,18 @@ extension CMUXCLI {
         return false
     }
 
+    /// The payload's own message and nothing else: the first message candidate, on one line, cut at 180. What an unmapped
+    /// type's banner says. Never the classifier's fallback words, and "" when the payload carries none. (#cm-124.5)
+    func rawClaudeNotificationMessage(parsedInput: ClaudeHookParsedInput) -> String {
+        guard let object = parsedInput.object else { return "" }
+        let nested = (object["notification"] as? [String: Any]) ?? (object["data"] as? [String: Any]) ?? [:]
+        let candidates = [
+            firstString(in: object, keys: ["message", "body", "text", "prompt", "error", "description"]),
+            firstString(in: nested, keys: ["message", "body", "text", "prompt", "error", "description"])
+        ]
+        return truncate(normalizedSingleLine(candidates.compactMap { $0 }.first ?? ""), maxLength: 180)
+    }
+
     func summarizeClaudeHookNotification(parsedInput: ClaudeHookParsedInput) -> (subtitle: String, body: String) {
         guard let object = parsedInput.object else {
             if let fallback = parsedInput.rawFallback, !fallback.isEmpty {

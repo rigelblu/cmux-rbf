@@ -8381,6 +8381,8 @@ struct CMUXCLI {
         switch command {
         case "themes", "setup-hooks", "uninstall-hooks":
             return true
+        case "config": // (#cm-124.5)
+            return configDoctorCanProceedWithoutLiveSocket(commandArgs)
         case "codex":
             let subcommand = commandArgs.first?.lowercased()
             return subcommand == "install-hooks" || subcommand == "uninstall-hooks"
@@ -28554,7 +28556,17 @@ struct CMUXCLI {
             // saved at its last meaningful event (question text, plan summary,
             // stop completion) instead of fabricating a body. The empty-body
             // marker replaces the old localized-string comparison.
-            if summary.body.isEmpty,
+            // (#cm-124.5) What the type means is decided here, once: his rows from the app, else the built-in ones. Only
+            // a typed notification no declared wait decided asks. An unmapped type's body is the payload's own message
+            // and nothing else: not the classifier's fallback words, and not the session's saved body.
+            let typedDecision: AgentTypedNotificationDecision? = {
+                guard declaredWait == nil, let type = typedNotificationType(in: parsedInput.rawObject) else { return nil }
+                return fetchAgentEventTable(socketPath: client.socketPath, socketPassword: socketPassword)
+                    .decide(agent: "claude", type: type)
+            }()
+            if typedDecision?.isUnmapped == true {
+                summary = (subtitle: summary.subtitle, body: rawClaudeNotificationMessage(parsedInput: parsedInput))
+            } else if summary.body.isEmpty,
                let mappedSession,
                let savedBody = mappedSession.lastBody, !savedBody.isEmpty {
                 summary = (subtitle: mappedSession.lastSubtitle ?? summary.subtitle, body: savedBody)
@@ -28570,47 +28582,56 @@ struct CMUXCLI {
             // ping); `idle_prompt` = the ~60s idle nag, which fires even while a
             // background task runs — its payload lacks `background_tasks`, so read
             // the pending flag cached by the most recent Stop.
-            let notificationType = typedNotificationType(in: parsedInput.rawObject)
             var notifyCategory: AgentHookNotifyCategory // (#cm-124.2) var: a declared wait overrides both below
             var notifyPending: Bool // (#cm-124.2)
-            switch notificationType {
-            case "permission_prompt":
-                notifyCategory = .needsPermission
-                notifyPending = false
-            case "idle_prompt":
-                notifyCategory = .idleReminder
-                // cm-128.1: a prompt or tool observation invalidates the previous Stop.
-                // Until the current turn records another Stop, an idle reminder
-                // cannot prove the pane safe to hibernate after Escape.
-                // cm-128.1: a session with no record gives no evidence of activity, so it is not pending.
-                notifyPending = mappedSession.map { $0.hadPendingBackgroundWorkAtStop != false } ?? false
-            case "elicitation_dialog", "elicitation_url_dialog":
-                // cm-128.5: a form is a real blocking request, never gated by background work.
-                notifyCategory = .idleReminder
-                notifyPending = false
-            case "elicitation_response", "elicitation_complete":
+            // (#cm-124.5) A row's meaning sets the gate, as the six types did by name: approval, question and resolved as
+            // `permission_prompt` and the elicitation names do today; an `ignore` row, and no type, take the words below;
+            // an unmapped type is `.other` and never pending, so no notification preference can filter its one ping.
+            let typedMeaning = typedDecision.flatMap { $0.isUnmapped ? nil : $0.meaning }
+            if typedDecision?.isUnmapped == true {
                 notifyCategory = .other
                 notifyPending = false
-            default:
-                // No (or unknown) notification_type: the cue classification only picks the gate for the banner's
-                // text. It picks no state (cm-128.5): that comes from the type alone, below.
-                // Unclassified alerts stay .other and always deliver.
-                switch classifiedSubtitle {
-                case "Permission":
+            } else {
+                switch typedMeaning {
+                case .approval?:
                     notifyCategory = .needsPermission
                     notifyPending = false
-                case "Waiting":
+                case .idle?:
                     notifyCategory = .idleReminder
+                    // cm-128.1: a prompt or tool observation invalidates the previous Stop.
+                    // Until the current turn records another Stop, an idle reminder
+                    // cannot prove the pane safe to hibernate after Escape.
+                    // cm-128.1: a session with no record gives no evidence of activity, so it is not pending.
                     notifyPending = mappedSession.map { $0.hadPendingBackgroundWorkAtStop != false } ?? false
-                case "Completed":
-                    notifyCategory = .turnComplete
-                    // cm-128.1: as at base. A completion is not an idle nag, so a Stop that was never recorded is not pending.
-                    notifyPending = (mappedSession?.hadPendingBackgroundWorkAtStop == true)
-                default:
+                case .question?:
+                    // cm-128.5: a form is a real blocking request, never gated by background work.
+                    notifyCategory = .idleReminder
+                    notifyPending = false
+                case .resolved?:
                     notifyCategory = .other
                     notifyPending = false
+                default:
+                    // No (or unknown) notification_type: the cue classification only picks the gate for the banner's
+                    // text. It picks no state (cm-128.5): that comes from the type alone, below.
+                    // Unclassified alerts stay .other and always deliver.
+                    switch classifiedSubtitle {
+                    case "Permission":
+                        notifyCategory = .needsPermission
+                        notifyPending = false
+                    case "Waiting":
+                        notifyCategory = .idleReminder
+                        notifyPending = mappedSession.map { $0.hadPendingBackgroundWorkAtStop != false } ?? false
+                    case "Completed":
+                        notifyCategory = .turnComplete
+                        // cm-128.1: as at base. A completion is not an idle nag, so a Stop that was never recorded is not pending.
+                        notifyPending = (mappedSession?.hadPendingBackgroundWorkAtStop == true)
+                    default:
+                        notifyCategory = .other
+                        notifyPending = false
+                    }
                 }
             }
+
             if let declaredWait { // (#cm-124.2)
                 notifyCategory = declaredWait.notifyCategory
                 notifyPending = false
@@ -28627,8 +28648,8 @@ struct CMUXCLI {
             // decides, and nothing else does (cm-128.5, Tom, grill Q32). Words, a
             // missing type and an unmapped type journal an observation that raises
             // and pings nothing. The payload's error flag follows it too, never the words.
-            let journalKind = declaredWait?.journalKind ?? typedNotificationJournalKind(forNotificationType: notificationType) // (#cm-124.2)
-            let journalDetail = notificationTypeDetail(notificationType, kind: journalKind)
+            let journalKind = declaredWait?.journalKind ?? typedDecision?.kind ?? .stateChanged // (#cm-124.2) (#cm-124.5)
+            let journalDetail = typedDecision?.detail // (#cm-124.5) the marker, for a question, a resolve and an unmapped type
             let payload = notificationPayload(
                 title: title,
                 subtitle: localizedClaudeNotificationSubtitle(summary.subtitle),
@@ -37051,6 +37072,18 @@ export default CMUXSessionRestore;
                 cursorApprovalNotificationCorrelationKey = rememberResult.notificationCorrelationKey
             }
 
+            // (#cm-124.5) What the kind is, decided before the summary: a typed notification nothing earlier decided asks the
+            // table, and an unmapped type's body is the payload's own message, never words cmux makes up.
+            let journalResolution = agentJournalNotificationResolution(
+                def: def,
+                nativeEvent: reportedHookEventName(from: input) ?? subcommand,
+                toolName: nil,
+                rawObject: input.rawObject,
+                cursorShellNeedsApproval: cursorShellNeedsApproval,
+                lifecycleRoute: lifecycleRoute,
+                table: { self.fetchAgentEventTable(socketPath: client.socketPath, socketPassword: socketPassword) }
+            )
+            let typedUnmapped = journalResolution.typed?.isUnmapped == true
             var summary: AgentHookNotificationSummary // (#cm-124.2)
             if let declaredWait, declaredWait.isAsk { // (#cm-124.2)
                 let body = declaredWaitExplicitMessage(in: input.rawObject ?? input.object)
@@ -37072,8 +37105,34 @@ export default CMUXSessionRestore;
                     cursorApprovalRequested: cursorShellNeedsApproval
                 )
             }
+            if typedUnmapped { // (#cm-124.5) the payload's own message, one line, cut at 180; no words picked a gate or a status
+                summary = AgentHookNotificationSummary(
+                    subtitle: summary.subtitle,
+                    body: truncate(normalizedAgentHookNotificationMessage(parsedInput: input) ?? "", maxLength: 180),
+                    status: nil,
+                    isFallback: false,
+                    notifyCategory: .other
+                )
+            }
+            // (#cm-124.5) His row says this type asks (`question` or `approval`): its gate and status come from the row, not the
+            // message's words, and word-based skips below (a "waiting" message while antigravity reports background work)
+            // can't swallow it, as they can't swallow a declared ask. A built-in row keeps today's behaviour exactly.
+            let hisRowAsks: Bool = {
+                guard let typed = journalResolution.typed, typed.isFromUserRow,
+                      typed.meaning == .question || typed.meaning == .approval else { return false }
+                return true
+            }()
+            if hisRowAsks, let typed = journalResolution.typed {
+                summary = AgentHookNotificationSummary(
+                    subtitle: summary.subtitle,
+                    body: summary.body,
+                    status: .needsInput,
+                    isFallback: summary.isFallback,
+                    notifyCategory: typed.meaning == .approval ? .needsPermission : .idleReminder
+                )
+            }
             var rebuiltFromStoredSummary = false
-            if summary.body.isEmpty, let savedBody = mapped?.lastBody, !savedBody.isEmpty {
+            if !typedUnmapped, summary.body.isEmpty, let savedBody = mapped?.lastBody, !savedBody.isEmpty { // (#cm-124.5)
                 // A notification with no usable message reuses the stored
                 // session summary for DISPLAY only: no lifecycle status is
                 // adopted from stale disk state (the journal event decides
@@ -37100,26 +37159,24 @@ export default CMUXSessionRestore;
             // rather than flipping to "needs input".
             // (#cm-124.2) A declared ask is exempt: its category and pending flag come from the declared kind.
             let suppressPendingWaitingState = declaredWait?.isAsk != true
+                && !hisRowAsks // (#cm-124.5)
                 && summary.notifyCategory == .idleReminder
                 && hasActiveAntigravityBackgroundWork()
 
             // cm-128.5: only a fact picks the journal kind (cmux's own decision, the mapper's verdict, a typed field).
             // Everything below that used to write a state from the classifier's words (the session record, the pill,
             // the stale-idle and pending checks) follows this kind, so the words stay the notification's text only.
-            let typedType = typedNotificationType(in: input.rawObject)
-            let mappedJournalKind = agentJournalNotificationKind(
-                def: def,
-                nativeEvent: reportedHookEventName(from: input) ?? subcommand,
-                toolName: nil,
-                rawObject: input.rawObject,
-                cursorShellNeedsApproval: cursorShellNeedsApproval,
-                lifecycleRoute: lifecycleRoute
-            )
+            let mappedJournalKind = journalResolution.kind // (#cm-124.5) decided above, before the summary
             let notificationJournalKind: AgentJournalEventKind =
                 suppressPendingWaitingState
                     && (mappedJournalKind == .approvalRequested || mappedJournalKind == .questionRequested)
                     ? .stateChanged
                     : mappedJournalKind
+            // (#cm-124.5) The marker goes only where the table decided the kind and nothing downgraded it, or an
+            // observation with a marker would read as an unmapped type to the reconciler.
+            let notificationTypeMarkerDetail = journalResolution.typed.flatMap {
+                $0.kind == notificationJournalKind ? $0.detail : nil
+            }
             let journalStatus: AgentHookNotificationStatus? = {
                 switch notificationJournalKind {
                 case .approvalRequested, .questionRequested, .planReviewRequested: return .needsInput
@@ -37146,7 +37203,7 @@ export default CMUXSessionRestore;
             // A rebuilt stored summary is an intentional re-notification, not
             // grok notification noise: it bypasses the nil-status filter (the
             // rebuilt summary deliberately claims no lifecycle status).
-            if def.name == "grok", summary.status == nil, notificationJournalKind == .stateChanged, !rebuiltFromStoredSummary {
+            if def.name == "grok", summary.status == nil, notificationJournalKind == .stateChanged, !rebuiltFromStoredSummary, !typedUnmapped { // (#cm-124.5) Exempt an unmapped type from grok's nil-status skip: it is journaled and pinged below (E36).
 #if DEBUG
                 agentHookDebugLog(
                     "agentHook.notification.skip agent=\(def.name) session=\(agentHookDebugShort(sessionId)) reason=nonTerminalNotification subtitleLen=\(summary.subtitle.count) bodyLen=\(summary.body.count)",
@@ -37296,7 +37353,7 @@ export default CMUXSessionRestore;
                 pendingWork: notificationPendingWork,
                 detail: notificationJournalKind == .errorReported
                     ? summary.body
-                    : notificationTypeDetail(typedType, kind: notificationJournalKind),
+                    : notificationTypeMarkerDetail, // (#cm-124.5)
                 responseTimeout: cursorShellNeedsApproval ? cursorCriticalTimeout() : nil
             )
 
@@ -37361,7 +37418,7 @@ export default CMUXSessionRestore;
                     kind: notificationJournalKind, rawObject: input.rawObject, payload: payload, cwd: hookCwd,
                     detail: notificationJournalKind == .errorReported
                         ? nil
-                        : notificationTypeDetail(typedType, kind: notificationJournalKind))
+                        : notificationTypeMarkerDetail) // (#cm-124.5)
 #if DEBUG
                 agentHookDebugLog(
                     "agentHook.notification.notify agent=\(def.name) session=\(agentHookDebugShort(sessionId)) workspace=\(agentHookDebugShort(workspaceId)) surface=\(agentHookDebugShort(surfaceId))",

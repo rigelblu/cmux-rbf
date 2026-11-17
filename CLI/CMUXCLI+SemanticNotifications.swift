@@ -44,6 +44,8 @@ extension CMUXCLI {
         case .questionRequested, .planReviewRequested, .idleObserved: presentationKind = .answer
         case .approvalRequested: presentationKind = .approval
         case .errorReported: presentationKind = .error
+        // (#cm-124.5) The marker on an observation names a type no row maps: its first-ever banner says so on its title line.
+        case .stateChanged: presentationKind = AgentNotificationTypeMarker.type(inDetail: detail).map { .newNotificationType($0) }
         default: presentationKind = nil
         }
         let presentation = AgentNotificationPresentation(agentTitle: notification.title,

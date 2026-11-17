@@ -6,6 +6,24 @@ extension CLINotifyProcessIntegrationRegressionTests {
         private let notifications = AgentHookTestNotificationPipeline()
         private(set) var commands: [String] = []
         private var commandTimestamps: [TimeInterval] = []
+        // cmux-rbf (#cm-124.5): what the mock app answers to `agent_events.rows`. Nil leaves the method unrecognized, as
+        // an app without the table; a delay holds the answer back, as an app that is slow to reply.
+        private var agentEventRows: [[String: String]]?
+        private var agentEventRowsDelay: TimeInterval = 0
+
+        func setAgentEventRows(_ rows: [[String: String]]?, delay: TimeInterval = 0) {
+            lock.lock()
+            agentEventRows = rows
+            agentEventRowsDelay = delay
+            lock.unlock()
+        }
+
+        func agentEventRowsAnswer() -> (rows: [[String: String]]?, delay: TimeInterval) {
+            lock.lock()
+            let value = (agentEventRows, agentEventRowsDelay)
+            lock.unlock()
+            return value
+        }
 
         func append(_ command: String) {
             lock.lock()

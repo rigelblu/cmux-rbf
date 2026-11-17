@@ -112,6 +112,16 @@ Your own list of workspace statuses, in the order the Status menu and Cycle Stat
 | `workspaceStatuses.color` | string | none | The color setting this status applies, written as the label of one of your workspace colors, a palette or display name, or a hex color such as #1565C0; setting this status replaces the workspace's color with it. |
 | `workspaceStatuses.icon` | `"dotted-ring"`, `"ring"`, `"quarter"`, `"half"`, `"three-quarters"`, `"full"`, `"check"`, `"pause"`, symbol name or `null` | none | The shape or symbol drawn for this status: `dotted-ring` is a ring of twelve dashes, `ring` a plain ring, `quarter`, `half`, `three-quarters` and `full` a ring with a pie filled that far, `check` a filled disc with a tick, and `pause` a ring with two vertical bars inside; or an SF Symbol's name in lowercase, such as `moon.zzz.fill`. An editor flags uppercase names (`Zzz`) and emoji (`💤`). With none, or `null`, the status draws the glyph of the cmux status it extends. A name that is neither one of cmux's shapes nor an SF Symbol on this Mac keeps the entry, is drawn as if it named none, and shows a problem in cmux's status-list notice. No other field is allowed in an entry. |
 
+## agentEvents
+
+Tells cmux what a notification type means, without rebuilding it. A top-level array of rows, each with the three fields below. Read from the global `~/.config/cmux/cmux.json` only: rows in a repo's own `cmux.json` are ignored. An edit applies whole or not at all: one bad row keeps the last valid rows. Fork-only (cmux-rbf).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `agentEvents.agent` | string | required | The agent's slug, such as `claude`, or `*` for every agent. A row reaches `claude`, `antigravity`, `kimi` and `grok`; a row for `pi`, `copilot`, `codebuddy`, `factory` or `hermes-agent` is valid and does nothing. |
+| `agentEvents.notification` | string | required | The notification type exactly as the agent sends it, such as `worker_permission_prompt`. `cmux config doctor` lists the ones it saw with no row. |
+| `agentEvents.means` | `"question"`, `"approval"`, `"resolved"` or `"ignore"` | required | What the next notification of that type does: `question` or `approval` raises the hand, `resolved` retires a lone id-less wait that a typed question raised, `ignore` gives no banner and no hand. Your row beats a built-in row for the same agent and type, and an exact agent beats `*`. No other field is allowed in a row. |
+
 ## sidebarAppearance
 
 Sidebar tint settings from Settings > Sidebar Appearance.

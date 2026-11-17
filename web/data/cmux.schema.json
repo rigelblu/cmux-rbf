@@ -1362,6 +1362,43 @@
         }
       }
     },
+    "agentEvents": {
+      "title": "agentEvents",
+      "$comment": "cmux-rbf (#cm-124.5): a fork-only key. Upstream's schema does not have it; keep it on every upstream sync.",
+      "description": "Tell cmux what a notification type means, without rebuilding it. Each row names an agent, a notification type exactly as the agent sends it, and what it means: question and approval raise the agent's hand, resolved retires a lone id-less wait that a typed question raised, ignore gives nothing. Read from this global file only: rows in a repo's own cmux.json are ignored. An edit applies whole or not at all: one bad row keeps the last valid rows. No other field is allowed in a row.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent",
+          "notification",
+          "means"
+        ],
+        "properties": {
+          "agent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The agent's slug, such as claude, or * for every agent. A row reaches claude, antigravity, kimi and grok; a row for pi, copilot, codebuddy, factory or hermes-agent is valid and does nothing."
+          },
+          "notification": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The notification type exactly as the agent sends it, such as worker_permission_prompt. cmux config doctor lists the ones it saw with no row."
+          },
+          "means": {
+            "type": "string",
+            "enum": [
+              "question",
+              "approval",
+              "resolved",
+              "ignore"
+            ],
+            "description": "What the next notification of that type does: question or approval raises the hand, resolved retires a lone id-less wait that a typed question raised, ignore gives no banner and no hand. Your row beats a built-in row for the same agent and type, and an exact agent beats *."
+          }
+        }
+      }
+    },
     "sidebarAppearance": {
       "title": "sidebarAppearance",
       "description": "Sidebar tint settings from Settings > Sidebar Appearance.",
