@@ -67,11 +67,12 @@ struct AgentEventTableStoreTests {
     }
 
     @Test func aBadEditKeepsTheLastValidRowsAndReportsOneIssuePerBadRow() throws {
+        // (#cm-124.6) `tool` is a valid row key now, so the third row's unknown key is `event`
         let valid = evaluate(#"{"agentEvents":[\#(approvalRow)]}"#)
         let bad = evaluate("""
         {"agentEvents":[\(approvalRow),
           {"agent":"claude","notification":"x","means":"aprooval"},
-          {"agent":"claude","tool":"AskUserQuestion","means":"question"}]}
+          {"agent":"claude","event":"x","notification":"y","means":"question"}]}
         """, previous: valid.table)
         #expect(bad.table == valid.table, "a bad edit changes nothing")
         #expect(bad.issues.count == 2)
@@ -101,7 +102,8 @@ struct AgentEventTableStoreTests {
              #"agentEvents[0]: means "aprooval": use question, approval, resolved or ignore"#),
             (#"{"agentEvents":[{"notification":"x","means":"ignore"}]}"#,
              #"agentEvents[0]: "agent" is missing; name one, such as "claude", or "*""#),
-            (#"{"agentEvents":[{"agent":"claude","means":"ignore"}]}"#,
+            // (#cm-124.6) a row with neither key is `noMatchKey` now; `missingNotification` is the empty-string case
+            (#"{"agentEvents":[{"agent":"claude","notification":"","means":"ignore"}]}"#,
              #"agentEvents[0]: "notification" is missing; name a type, such as "idle_prompt""#),
             (#"{"agentEvents":[{"agent":"claude","notification":"x"}]}"#,
              #"agentEvents[0]: "means" is missing; use question, approval, resolved or ignore"#),
@@ -109,8 +111,23 @@ struct AgentEventTableStoreTests {
              #"agentEvents[0]: "agent" must be text, such as "claude""#),
             (#"{"agentEvents":[\#(approvalRow),\#(approvalRow)]}"#,
              "agentEvents[1]: same agent and notification as agentEvents[0]; keep one"),
-            (#"{"agentEvents":[{"agent":"claude","tool":"x","means":"ignore"}]}"#,
-             #"agentEvents[0]: "tool" isn't a row key; a row has agent, notification, means"#),
+            // (#cm-124.6) `tool` is a row key now, so the unknown-key case uses another key and names `tool` too
+            (#"{"agentEvents":[{"agent":"claude","event":"x","notification":"x","means":"ignore"}]}"#,
+             #"agentEvents[0]: "event" is not a key: use agent, notification or tool, means"#),
+            (#"{"agentEvents":[{"agent":"claude","notification":"x","tool":"y","means":"question"}]}"#,
+             #"agentEvents[0]: a row has "notification" or "tool", not both"#),
+            (#"{"agentEvents":[{"agent":"claude","means":"question"}]}"#,
+             #"agentEvents[0]: a row needs "notification" (a type) or "tool" (a Claude tool)"#),
+            (#"{"agentEvents":[{"agent":"claude","tool":"Write","means":"ignore"}]}"#,
+             #"agentEvents[0]: means "ignore" on a tool row: use question or plan-review"#),
+            (#"{"agentEvents":[{"agent":"claude","tool":"Write","means":"question"},{"agent":"claude","tool":"Write","means":"question"}]}"#,
+             "agentEvents[1]: same agent and tool as agentEvents[0]; keep one"),
+            (#"{"agentEvents":[{"agent":"claude","tool":"Write"}]}"#,
+             #"agentEvents[0]: "means" is missing; use question or plan-review"#),
+            (#"{"agentEvents":[{"agent":"claude","tool":"","means":"question"}]}"#,
+             #"agentEvents[0]: "tool" is missing; name a Claude tool, like "AskUserQuestion""#),
+            (#"{"agentEvents":[{"agent":"claude","tool":3,"means":"question"}]}"#,
+             #"agentEvents[0]: "tool" must be text, such as "AskUserQuestion""#),
             (#"{"agentEvents":["claude"]}"#, "agentEvents[0]: a row must be an object"),
             (#"{"agentEvents":{"agent":"claude"}}"#, "agentEvents: must be a list of rows"),
         ]

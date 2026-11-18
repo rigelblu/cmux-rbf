@@ -1,4 +1,5 @@
 import Darwin
+import CmuxAgentJournal
 import Foundation
 import OSLog
 
@@ -180,6 +181,18 @@ struct AgentHookDeliveryProcess: Sendable {
         }
     }
 
+    /// The row-tool stamp, set after the allowlisted environment merge from the word the queue decided at admission, so an
+    /// agent can't spoof it: any `CMUX_AGENT_TOOL_MEANS` already in the environment is removed first. A relay-backed event is
+    /// never stamped, so a remote Claude keeps the built-in rows. (#cm-124.6)
+    static func stampingToolMeans(in environment: [String: String], for event: AgentHookDeliveryEvent) -> [String: String] {
+        var stamped = environment
+        stamped.removeValue(forKey: "CMUX_AGENT_TOOL_MEANS")
+        if !event.relayBacked, let toolMeans = event.toolMeans {
+            stamped["CMUX_AGENT_TOOL_MEANS"] = toolMeans.rawValue
+        }
+        return stamped
+    }
+
     func deliveryEnvironment(
         event: AgentHookDeliveryEvent,
         executableURL: URL
@@ -213,6 +226,7 @@ struct AgentHookDeliveryProcess: Sendable {
             deliveredEventEnvironment = event.environment
         }
         environment.merge(deliveredEventEnvironment, uniquingKeysWith: { _, eventValue in eventValue })
+        environment = Self.stampingToolMeans(in: environment, for: event) // (#cm-124.6)
         environment["CMUX_SOCKET_PATH"] = event.socketPath
         environment["CMUX_BUNDLED_CLI_PATH"] = executableURL.path
         environment["CMUX_AGENT_HOOK_DELIVERY_PROCESS_GROUP"] = "1"

@@ -19,6 +19,22 @@ extension CMUXCLI {
                                  parsedInput: ClaudeHookParsedInput, sessionStore: ClaudeHookSessionStore,
                                  routing: ClaudeHookRoutingContext) throws {
         defer { printClaudeHookAck() }
+        // (#cm-124.6) A row tool's wait is retired by its own `tool_use_id` (request identity), whether or not he ever typed.
+        // This runs beside the recorded-permission path below, which a row tool has none of when its permission got `{}`.
+        if Self.claudeToolRowMeaning(environment: ProcessInfo.processInfo.environment) != nil,
+           let sessionId = parsedInput.sessionId, let raw = parsedInput.rawObject,
+           Self.semanticAttentionContext(raw).requestIdentity != nil,
+           let mapped = try? sessionStore.lookup(sessionId: sessionId),
+           let target = try resolveClaudeHookDeliveryTarget(mappedSession: mapped, routing: routing, client: client),
+           target.isAuthoritative {
+            emitAgentJournalEvent(client: client, kind: .attentionResolved, source: "claude",
+                agentKey: Self.claudeCodeStatusKey, sessionId: sessionId,
+                workspaceId: target.workspaceId, surfaceId: target.surfaceId,
+                pendingWork: false, nativeEvent: "PostToolUse",
+                attention: AgentAttentionContext(turnIdentity: parsedInput.turnId,
+                    requestIdentity: Self.semanticAttentionContext(raw).requestIdentity),
+                occurredAtMs: Self.semanticOccurredAtMs(raw), store: sessionStore, telemetry: telemetry)
+        }
         guard let sessionId = parsedInput.sessionId,
               let raw = parsedInput.rawObject,
               let toolName = firstString(in: raw, keys: ["tool_name", "toolName"]),

@@ -114,13 +114,23 @@ Your own list of workspace statuses, in the order the Status menu and Cycle Stat
 
 ## agentEvents
 
-Tells cmux what a notification type means, without rebuilding it. A top-level array of rows, each with the three fields below. Read from the global `~/.config/cmux/cmux.json` only: rows in a repo's own `cmux.json` are ignored. An edit applies whole or not at all: one bad row keeps the last valid rows. Fork-only (cmux-rbf).
+Tells cmux what a notification type or a Claude tool means, without rebuilding it. A top-level array of rows; a row is a notification row or a tool row, never both, and no other field is allowed in either. Read from the global `~/.config/cmux/cmux.json` only: rows in a repo's own `cmux.json` are ignored. An edit applies whole or not at all: one bad row keeps the last valid rows. Fork-only (cmux-rbf).
+
+A notification row has these three fields:
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `agentEvents.agent` | string | required | The agent's slug, such as `claude`, or `*` for every agent. A row reaches `claude`, `antigravity`, `kimi` and `grok`; a row for `pi`, `copilot`, `codebuddy`, `factory` or `hermes-agent` is valid and does nothing. |
 | `agentEvents.notification` | string | required | The notification type exactly as the agent sends it, such as `worker_permission_prompt`. `cmux config doctor` lists the ones it saw with no row. |
-| `agentEvents.means` | `"question"`, `"approval"`, `"resolved"` or `"ignore"` | required | What the next notification of that type does: `question` or `approval` raises the hand, `resolved` retires a lone id-less wait that a typed question raised, `ignore` gives no banner and no hand. Your row beats a built-in row for the same agent and type, and an exact agent beats `*`. No other field is allowed in a row. |
+| `agentEvents.means` | `"question"`, `"approval"`, `"resolved"` or `"ignore"` | required | What the next notification of that type does: `question` or `approval` raises the hand, `resolved` retires a lone id-less wait that a typed question raised, `ignore` gives no banner and no hand. Your row beats a built-in row for the same agent and type, and an exact agent beats `*`. |
+
+A tool row has these three fields, with `tool` in place of `notification`:
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `agentEvents.agent` | string | required | `claude` or `*`. A tool row for any other agent is valid and does nothing: only Claude's tool hooks read tool rows. |
+| `agentEvents.tool` | string | required | Claude's tool name exactly, case included, such as `AskUserQuestion`. Claude prints it above its prompt as `● <Name>(…)`, and Claude Code's release notes name new tools. |
+| `agentEvents.means` | `"question"` or `"plan-review"` | required | What the tool's call does when it starts: raises the hand, the `Needs input` status and one banner, in every permission mode. The hand drops at your first key in the pane or when the tool ends. A row tool gets no Feed card: answer it in Claude's own prompt. Your row beats a built-in row for the same tool, and an exact agent beats `*`. |
 
 ## sidebarAppearance
 

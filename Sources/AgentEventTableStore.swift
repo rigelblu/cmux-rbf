@@ -88,12 +88,20 @@ final class AgentEventTableStore: @unchecked Sendable {
             switch field {
             case .agent: rule = "missingAgent"
             case .notification: rule = "missingNotification"
+            case .tool: rule = "missingTool" // (#cm-124.6)
             case .means: rule = "missingMeans"
             }
         case .fieldNotText(let field):
             rule = "notText"
             detail = field.rawValue
         case .unknownMeaning: rule = "badMeaning"
+        case .bothMatchKeys: rule = "bothMatchKeys" // (#cm-124.6)
+        case .noMatchKey: rule = "noMatchKey" // (#cm-124.6)
+        case .meaningNotForTool: rule = "badToolMeaning" // (#cm-124.6)
+        case .missingToolMeans: rule = "missingToolMeans" // (#cm-124.6)
+        case .duplicateToolRow(let first): // (#cm-124.6)
+            rule = "duplicateToolRow"
+            detail = String(first)
         case .unknownKey: rule = "unknownKey"
         case .duplicateRow(let first):
             rule = "duplicateRow"
@@ -112,6 +120,24 @@ final class AgentEventTableStore: @unchecked Sendable {
         case "badMeaning":
             return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.badMeaning.detail",
                 defaultValue: "%@: means \"%@\": use question, approval, resolved or ignore"), row, value)
+        case "badToolMeaning": // (#cm-124.6)
+            return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.badToolMeaning.detail",
+                defaultValue: "%@: means \"%@\" on a tool row: use question or plan-review"), row, value)
+        case "bothMatchKeys": // (#cm-124.6)
+            return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.bothMatchKeys.detail",
+                defaultValue: "%@: a row has \"notification\" or \"tool\", not both"), row)
+        case "duplicateToolRow": // (#cm-124.6)
+            return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.duplicateToolRow.detail",
+                defaultValue: "%@: same agent and tool as agentEvents[%@]; keep one"), row, value)
+        case "missingTool": // (#cm-124.6)
+            return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.missingTool.detail",
+                defaultValue: "%@: \"tool\" is missing; name a Claude tool, like \"AskUserQuestion\""), row)
+        case "missingToolMeans": // (#cm-124.6)
+            return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.missingToolMeans.detail",
+                defaultValue: "%@: \"means\" is missing; use question or plan-review"), row)
+        case "noMatchKey": // (#cm-124.6)
+            return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.noMatchKey.detail",
+                defaultValue: "%@: a row needs \"notification\" (a type) or \"tool\" (a Claude tool)"), row)
         case "duplicateRow":
             return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.duplicateRow.detail",
                 defaultValue: "%@: same agent and notification as agentEvents[%@]; keep one"), row, value)
@@ -128,7 +154,7 @@ final class AgentEventTableStore: @unchecked Sendable {
             return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.notList.detail",
                 defaultValue: "%@: must be a list of rows"), row)
         case "notText":
-            let example = ["agent": "claude", "notification": "idle_prompt", "means": "ignore"][value] ?? "claude"
+            let example = ["agent": "claude", "notification": "idle_prompt", "tool": "AskUserQuestion", "means": "ignore"][value] ?? "claude" // (#cm-124.6) tool
             return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.notText.detail",
                 defaultValue: "%@: \"%@\" must be text, such as \"%@\""), row, value, example)
         case "rowNotObject":
@@ -136,7 +162,7 @@ final class AgentEventTableStore: @unchecked Sendable {
                 defaultValue: "%@: a row must be an object"), row)
         case "unknownKey":
             return String(format: String(localized: "command.cmuxConfig.issue.agentEvents.unknownKey.detail",
-                defaultValue: "%@: \"%@\" isn't a row key; a row has agent, notification, means"), row, value)
+                defaultValue: "%@: \"%@\" is not a key: use agent, notification or tool, means"), row, value) // (#cm-124.6)
         default:
             return row
         }
@@ -182,7 +208,13 @@ final class AgentEventTableStore: @unchecked Sendable {
 
     /// `agent_events.rows`: his rows. The built-in rows live in code, so a hook adds them itself.
     nonisolated func rowsPayload() -> [String: Any] {
-        ["rows": table.userRows.map { ["agent": $0.agent, "notification": $0.notification, "means": $0.means.rawValue] }]
+        // (#cm-124.6) a tool row carries `tool` in place of `notification`
+        ["rows": table.userRows.map { row -> [String: String] in
+            var object = ["agent": row.agent, "means": row.means.rawValue]
+            if let notification = row.notification { object["notification"] = notification }
+            if let tool = row.tool { object["tool"] = tool }
+            return object
+        }]
     }
 
     /// `agent_events.unmapped_types`: every type the journal recorded that no row maps now, with agent, count and last seen.

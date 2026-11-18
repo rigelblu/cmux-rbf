@@ -438,7 +438,9 @@ extension CMUXCLI {
             }
             guard let agentEvents else { return [] }
             if !agentEvents.issues.isEmpty {
+                // (#cm-124.6) a valid row that does nothing still warns beside the bad ones (screen-designs/cm-124 render 15)
                 return agentEvents.issues.map(\.englishMessage)
+                    + agentEvents.warnings.map { "warning: " + $0.englishMessage }
                     + ["agentEvents: this edit isn't applied; cmux keeps the last valid rows"]
             }
             let summary = agentEvents.rows == 0
@@ -800,6 +802,19 @@ extension CMUXCLI {
         let first = sorted[0]
         lines.append("{ \"agent\": \"\(first.agent)\", \"notification\": \"\(first.type)\", \"means\": \"question\" }")
         return lines
+    }
+
+    /// The rows in the global `~/.config/cmux/cmux.json`, read by the hook itself through doctor's parse; no socket call.
+    /// No file, an unreadable or bad one gives the built-in table, so a hook never fails on the file. (#cm-124.6)
+    static func agentEventTableFromGlobalFile() -> AgentEventTable {
+        let path = absoluteConfigPath(primarySettingsDisplayPath)
+        guard let data = FileManager.default.contents(atPath: path), !data.isEmpty,
+              let sanitized = try? JSONCParser.preprocess(data: data),
+              let object = try? JSONSerialization.jsonObject(with: sanitized) as? [String: Any] else {
+            return .builtIn
+        }
+        let parsed = AgentEventTable.parse(object["agentEvents"])
+        return parsed.issues.isEmpty ? AgentEventTable(userRows: parsed.rows) : .builtIn
     }
 
     private static func absoluteConfigPath(_ rawPath: String) -> String {

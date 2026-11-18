@@ -20,8 +20,24 @@ struct AgentEventRowMessagesTests {
          #"agentEvents[0]: "means" must be text, such as "ignore""#),
         (AgentEventRowIssue(index: 2, rule: .duplicateRow(firstIndex: 0)), "duplicateRow",
          "agentEvents[2]: same agent and notification as agentEvents[0]; keep one"),
-        (AgentEventRowIssue(index: 0, rule: .unknownKey, value: "tool"), "unknownKey",
-         #"agentEvents[0]: "tool" isn't a row key; a row has agent, notification, means"#),
+        (AgentEventRowIssue(index: 0, rule: .unknownKey, value: "event"), "unknownKey", // (#cm-124.6) names tool too
+         #"agentEvents[0]: "event" is not a key: use agent, notification or tool, means"#),
+        (AgentEventRowIssue(index: 0, rule: .bothMatchKeys), "bothMatchKeys",
+         #"agentEvents[0]: a row has "notification" or "tool", not both"#),
+        (AgentEventRowIssue(index: 5, rule: .noMatchKey), "noMatchKey",
+         #"agentEvents[5]: a row needs "notification" (a type) or "tool" (a Claude tool)"#),
+        (AgentEventRowIssue(index: 1, rule: .meaningNotForTool, value: "ignore"), "badToolMeaning",
+         #"agentEvents[1]: means "ignore" on a tool row: use question or plan-review"#),
+        (AgentEventRowIssue(index: 2, rule: .missingToolMeans), "missingToolMeans",
+         #"agentEvents[2]: "means" is missing; use question or plan-review"#),
+        (AgentEventRowIssue(index: 3, rule: .duplicateToolRow(firstIndex: 2)), "duplicateToolRow",
+         "agentEvents[3]: same agent and tool as agentEvents[2]; keep one"),
+        (AgentEventRowIssue(index: 2, rule: .fieldNotText(.tool), value: "3"), "notText",
+         #"agentEvents[2]: "tool" must be text, such as "AskUserQuestion""#),
+        (AgentEventRowIssue(index: 2, rule: .missingField(.tool)), "missingTool",
+         #"agentEvents[2]: "tool" is missing; name a Claude tool, like "AskUserQuestion""#),
+        (AgentEventRowIssue(index: 2, rule: .unknownMeaning, value: "plan-review"), "badMeaning",
+         #"agentEvents[2]: means "plan-review": use question, approval, resolved or ignore"#),
         (AgentEventRowIssue(index: 3, rule: .rowNotAnObject), "rowNotObject", "agentEvents[3]: a row must be an object"),
         (AgentEventRowIssue(index: nil, rule: .notAList), "notList", "agentEvents: must be a list of rows"),
     ])
@@ -35,5 +51,7 @@ struct AgentEventRowMessagesTests {
             == "agentEvents[0] does nothing: pi's notifications never reach it")
         #expect(AgentEventRowWarning(index: 2, agent: "hermes-agent").englishMessage
             == "agentEvents[2] does nothing: hermes-agent's notifications never reach it")
+        #expect(AgentEventRowWarning(index: 2, agent: "codex", isToolRow: true).englishMessage
+            == "agentEvents[2] does nothing: only Claude's tools reach a tool row")
     }
 }

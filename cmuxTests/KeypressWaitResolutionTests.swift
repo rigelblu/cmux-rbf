@@ -71,6 +71,63 @@ struct KeypressWaitResolutionTests {
         }
     }
 
+    // MARK: cm-124.6 — a row tool's wait, as the CLI records it (A11i, E62, E63)
+
+    /// The drafts a row tool's `PreToolUse` records (the file `CLIToolRowTests` pins the CLI to), re-addressed to this
+    /// fixture's pane and to one `tool_use_id`.
+    private func rowToolDrafts(for fixture: Fixture, request: String) throws -> [AgentJournalEventDraft] {
+        let data = try Data(contentsOf: CLIToolRowTests.joinFixtureURL())
+        return try JSONDecoder().decode([AgentJournalEventDraft].self, from: data).enumerated().map { offset, recorded in
+            var draft = recorded
+            draft.eventId = "\(request)-\(offset)"
+            draft.workspaceId = fixture.workspace.uuidString
+            draft.surfaceId = fixture.surface.uuidString
+            draft.attention?.requestIdentity = request
+            return draft
+        }
+    }
+
+    private func postToolUse(_ fixture: Fixture, request: String) -> AgentJournalEventDraft {
+        AgentJournalEventDraft(kind: .attentionResolved, occurredAtMs: fixture.sequence + 1, source: "claude",
+            agentKey: "claude_code", sessionId: "session", workspaceId: fixture.workspace.uuidString,
+            surfaceId: fixture.surface.uuidString, nativeEvent: "PostToolUse",
+            attention: AgentAttentionContext(requestIdentity: request))
+    }
+
+    @Test func hisFirstKeyRetiresARowToolsLoneWait() throws {
+        var fixture = Fixture()
+        for draft in try rowToolDrafts(for: fixture, request: "toolu_1") { fixture.append(draft) }
+        #expect(fixture.phase == .needsInput)
+        let answer = try #require(fixture.input().first)
+        #expect(answer.kind == .attentionResolved)
+        #expect(answer.nativeEvent == "PaneInput")
+        #expect(fixture.append(answer).disposition != .stale)
+        fixture.append(.stateChanged, phase: .running)
+        #expect(fixture.phase == .running, "the hand is down after his key")
+    }
+
+    @Test func aRowToolsWaitWithNoKeyClosesAtItsPostToolUse() throws {
+        var fixture = Fixture()
+        for draft in try rowToolDrafts(for: fixture, request: "toolu_1") { fixture.append(draft) }
+        let resolved = postToolUse(fixture, request: "toolu_1")
+        #expect(!fixture.append(resolved).invalidatedCorrelationKeys.isEmpty, "its banner's notification is invalidated")
+        #expect(fixture.notifications.openRequests(source: "claude", sessionId: "session").count == 0)
+    }
+
+    @Test func twoOpenRowToolWaitsSurviveAKeyAndEachClosesAtItsOwnPostToolUse() throws {
+        var fixture = Fixture()
+        for draft in try rowToolDrafts(for: fixture, request: "toolu_1") { fixture.append(draft) }
+        for draft in try rowToolDrafts(for: fixture, request: "toolu_2") { fixture.append(draft) }
+        #expect(fixture.notifications.openRequests(source: "claude", sessionId: "session").count == 2)
+        #expect(fixture.input().isEmpty, "with two open his key retires neither")
+        #expect(fixture.phase == .needsInput)
+        fixture.append(postToolUse(fixture, request: "toolu_1"))
+        #expect(fixture.notifications.openRequests(source: "claude", sessionId: "session").identified == ["toolu_2"])
+        #expect(fixture.phase == .needsInput, "the second wait still stands")
+        fixture.append(postToolUse(fixture, request: "toolu_2"))
+        #expect(fixture.notifications.openRequests(source: "claude", sessionId: "session").count == 0)
+    }
+
     @Test func differentPaneAndAmbiguousRequestsSendNothing() {
         var fixture = Fixture()
         fixture.append(.questionRequested, request: "one", notify: true)

@@ -185,8 +185,9 @@ its next notification pings once.
 
 **Whole or nothing:** one bad row rejects the whole edit. cmux keeps the last valid rows (or the built-in ones, if it
 started with a bad file), shows one `cmux.json Configuration Warning` per bad row at the bottom left of the window and
-in the command palette (type `cmux.json`), and `cmux config doctor` prints each one and exits non-zero. A row has exactly `agent`, `notification` and `means`: any other
-key, a `tool` key included, is a bad row. No two rows share an `agent` and `notification`.
+in the command palette (type `cmux.json`), and `cmux config doctor` prints each one and exits non-zero. A notification row has exactly `agent`, `notification` and `means`: any other
+key is a bad row. No two rows share an `agent` and `notification`. A row with a `tool` key in place of `notification` is a
+tool row: see "Map a Claude tool" below.
 
 ### Which agents a row reaches
 
@@ -231,3 +232,82 @@ Every other type pings once: for now `auth_storage_failure`, `plugin_notificatio
 - A row for `agent_needs_input` may raise the hand on the wrong pane: the type doesn't say which session it names yet.
 - A session reached through `cmux ssh` uses the built-in rows only: the table is read from the local app.
 - An `ignore` row on `permission_prompt` does not stop Claude's approval hand, which also arrives as a `PermissionRequest`.
+
+## Map a Claude tool
+
+Claude Code's tools that ask you something (`AskUserQuestion`, `ExitPlanMode`) raise your hand while they wait.
+When Claude gains a new tool that asks, you give it your hand with one row in the same `agentEvents` list of your global
+`~/.config/cmux/cmux.json`. No rebuild, no restart of cmux or of Claude.
+
+### Find the tool's exact name
+
+`tool` is Claude's `tool_name`, matched exactly, case included: `"askuserquestion"` does nothing for `AskUserQuestion`.
+
+- **In the pane:** Claude prints the tool's name above its prompt, as `● <Name>(…)`
+- **In the release notes:** Claude Code's release notes name each new tool
+
+### Write the row
+
+```jsonc
+{
+  "agentEvents": [
+    { "agent": "claude", "tool": "NewAskingTool", "means": "question" }
+  ]
+}
+```
+
+`NewAskingTool` stands for the new tool's exact name; there is none yet.
+
+Save. It applies to the tool's next call. In a tool row:
+
+- `agent` is `"claude"` or `"*"`. A row for any other agent is valid and does nothing: only Claude's tool hooks read tool
+  rows. Doctor says so with a `warning:` line and still exits 0
+- `tool` is the tool's exact name
+- `means` is one of two words:
+
+| `means` | When the tool starts |
+| --- | --- |
+| `question` | Raises the hand and the `Needs input` status, and shows one banner |
+| `plan-review` | The same, for a tool that waits for you to review a plan |
+
+`ignore`, `approval`, `resolved` and `idle` are bad on a tool row. A row has `notification` or `tool`, never both.
+
+**What you see.** The hand rises on the workspace row and one banner comes, in every permission mode:
+`Claude Code · Needs your answer`, subtitle the working folder, body `Waiting for input`. cmux doesn't know a new tool's
+input, so the banner carries no question text.
+
+**Where you answer.** In Claude's own prompt in the terminal. A row tool gets **no Feed card**, and you can't answer it from
+the Feed or your phone: cmux tells Claude at once that it has no decision, so Claude shows its own prompt and nothing holds
+it. `AskUserQuestion` and `ExitPlanMode` keep their Feed cards.
+
+**Where the hand drops.** At your first key in the pane while it is the only wait, or when the tool ends. A call you decline,
+interrupt or that fails sends no end signal, so its hand drops at your next key or when the turn ends. With two calls open at
+once, your first key drops neither, and each drops when its own call ends. Claude's own "needs your permission" notification
+a few seconds later brings no second banner while the wait is open, and brings no hand back after you answered it quickly
+(less than 10 s after the call started); a later one with no wait behind it raises the approval hand as before.
+
+**Which row wins:** your row for `claude`, then your `"*"` row, then the built-in row. **Whole or nothing:** one bad row
+rejects the whole edit, as for notification rows. cmux keeps the last valid rows for the hand, but a row tool's permission
+shows today's approval card until the file is fixed. Doctor and the palette name the row and the fix.
+
+### Built-in tool rows
+
+These apply with no file and give today's behaviour exactly. Copy one into your file to change its word.
+
+```jsonc
+{ "agent": "claude", "tool": "AskUserQuestion", "means": "question" }
+{ "agent": "claude", "tool": "ExitPlanMode", "means": "plan-review" }
+```
+
+A row of yours that says the same word as the built-in row changes nothing. A row that changes it (`AskUserQuestion` to
+`plan-review`) makes the tool a row tool: no question text and no Feed card.
+
+### Cautions
+
+- **Update the app before you add a tool row.** An older app rejects the whole edit, because `tool` is an unknown key there,
+  and keeps its last valid rows
+- **Tool rows are local only.** A session reached through `cmux ssh` keeps the built-in rows
+- **A stand-in row is a test, not a use.** A row for a tool that never asks (`Write`, `Bash`) raises the hand on every call of
+  it, and moves every call's hooks into the queue's lifecycle class, where they compete with prompts and notifications for its
+  eight slots. Delete a stand-in after you try it
+- **A payload over 64 KB** loses its call id, so its hand drops at your key or the turn's end, not when the tool ends

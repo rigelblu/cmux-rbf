@@ -490,4 +490,161 @@ struct AgentNotificationReconcilerTests {
         #expect(resolved.invalidatedCorrelationKeys.isEmpty)
         #expect(reconciler.openRequests(source: "claude", sessionId: "session").identified == ["feed-1"])
     }
+
+    // MARK: cm-124.6 — a row tool's wait and Claude's own permission notification
+
+    private func rowToolEvent(_ sequence: Int64, _ kind: AgentJournalEventKind = .questionRequested,
+                              tool: String = "CmuxDemoTool", request: String? = "toolu_1", turn: String? = nil,
+                              occurredAt: Int64, notify: Bool = true, marked: Bool = true) -> AgentJournalEvent {
+        AgentJournalEvent(sequence: sequence, committedAtMs: 1000 + sequence,
+            draft: AgentJournalEventDraft(eventId: "tool-row-\(sequence)", kind: kind, occurredAtMs: occurredAt,
+                source: "claude", agentKey: "claude_code", sessionId: "session", workspaceId: workspace, surfaceId: surface,
+                nativeEvent: "PreToolUse", detail: marked ? AgentToolRowMarker.detail(forTool: tool) : nil,
+                attention: AgentAttentionContext(turnIdentity: turn, requestIdentity: request,
+                    notification: notify ? AgentJournalNotification(title: "Claude Code · Needs your answer", subtitle: "",
+                        body: "Waiting for input", category: "needs-input") : nil)))
+    }
+
+    private func claudeNotification(_ sequence: Int64, occurredAt: Int64) -> AgentJournalEvent {
+        event(sequence, .approvalRequested, source: "claude", turn: nil, occurredAt: occurredAt, nativeEvent: "Notification")
+    }
+
+    private func retire(_ sequence: Int64, request: String? = "toolu_1", occurredAt: Int64) -> AgentJournalEvent {
+        event(sequence, .attentionResolved, source: "claude", turn: nil, request: request, notify: false, occurredAt: occurredAt)
+    }
+
+    @Test func markerRoundTripsAndIgnoresOtherDetails() {
+        #expect(AgentToolRowMarker.tool(inDetail: AgentToolRowMarker.detail(forTool: "Write")) == "Write")
+        #expect(AgentToolRowMarker.tool(inDetail: "tool-row:") == nil)
+        #expect(AgentToolRowMarker.tool(inDetail: "notification-type:idle_prompt") == nil)
+        #expect(AgentToolRowMarker.tool(inDetail: nil) == nil)
+    }
+
+    @Test func claudeNotificationWhileTheRowToolWaitIsOpenIsOneWaitAndNoSecondBanner() throws {
+        var reconciler = AgentNotificationReconciler()
+        let wait = reconciler.apply(rowToolEvent(1, occurredAt: 0))
+        #expect(wait.disposition == .accepted)
+        let reminder = reconciler.apply(claudeNotification(2, occurredAt: 6000))
+        #expect(reminder.identity == wait.identity, "the reminder belongs to the one open wait")
+        #expect(reminder.disposition == .accepted)
+        #expect(!reminder.projectsLifecycle)
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 1)
+    }
+
+    @Test func claudeNotificationAfterTheKeyRetiredTheRowToolWaitIsAnObservation() {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(rowToolEvent(1, occurredAt: 0))
+        _ = reconciler.apply(retire(2, occurredAt: 3000))
+        let late = reconciler.apply(claudeNotification(3, occurredAt: 6000))
+        #expect(late.disposition == .observation)
+        #expect(late.identity == nil)
+        #expect(!late.projectsLifecycle)
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
+    }
+
+    @Test func planReviewRowWaitGetsTheSameLateGuard() {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(rowToolEvent(1, .planReviewRequested, occurredAt: 0))
+        _ = reconciler.apply(retire(2, occurredAt: 3000))
+        #expect(reconciler.apply(claudeNotification(3, occurredAt: 6000)).disposition == .observation)
+    }
+
+    @Test(arguments: [Int64(10000), 15000, 115000])
+    func claudeNotificationTenSecondsOrMoreAfterTheRowToolWaitStartedOpensAnApprovalWait(elapsed: Int64) {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(rowToolEvent(1, occurredAt: 0))
+        _ = reconciler.apply(retire(2, occurredAt: 3000))
+        #expect(reconciler.apply(claudeNotification(3, occurredAt: elapsed)).disposition == .accepted)
+    }
+
+    @Test func claudeNotificationWithNoRowToolWaitInTheSessionOpensAnApprovalWait() {
+        var reconciler = AgentNotificationReconciler()
+        #expect(reconciler.apply(claudeNotification(1, occurredAt: 6000)).disposition == .accepted)
+    }
+
+    @Test func anUnmarkedPreToolUseWaitKeepsTodaysRule() {
+        // A built-in tool's bypass-mode wait carries no `tool-row:` marker: its late notification opens a wait, as on the base.
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(rowToolEvent(1, occurredAt: 0, marked: false))
+        _ = reconciler.apply(retire(2, occurredAt: 3000))
+        #expect(reconciler.apply(claudeNotification(3, occurredAt: 6000)).disposition == .accepted)
+    }
+
+    @Test func aMarkedWaitFromAnotherSourceGivesNoFeedEvidence() {
+        var reconciler = AgentNotificationReconciler()
+        var wait = rowToolEvent(1, occurredAt: 0).draft
+        wait.source = "codex"
+        wait.agentKey = "codex"
+        _ = reconciler.apply(AgentJournalEvent(sequence: 1, committedAtMs: 1001, draft: wait))
+        #expect(reconciler.apply(claudeNotification(2, occurredAt: 6000)).disposition == .accepted)
+    }
+
+    @Test func twoOpenRowToolWaitsEachRetireByTheirOwnToolUseId() throws {
+        var reconciler = AgentNotificationReconciler()
+        let first = reconciler.apply(rowToolEvent(1, request: "toolu_1", occurredAt: 0))
+        let second = reconciler.apply(rowToolEvent(2, request: "toolu_2", occurredAt: 100))
+        #expect(first.identity != second.identity)
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 2)
+        // An id-less resolve (his key) retires neither while two are open.
+        let key = event(3, .attentionResolved, source: "claude", turn: nil, notify: false, occurredAt: 500)
+        #expect(reconciler.apply(key).invalidatedCorrelationKeys.isEmpty)
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 2)
+        let one = reconciler.apply(retire(4, request: "toolu_1", occurredAt: 800))
+        #expect(one.invalidatedCorrelationKeys == [try #require(first.identity)])
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 1)
+        let two = reconciler.apply(retire(5, request: "toolu_2", occurredAt: 900))
+        #expect(two.invalidatedCorrelationKeys == [try #require(second.identity)])
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
+    }
+
+    @Test func aRowToolWaitWithNoPostToolUseClosesAtTheTurnsStop() {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(event(1, .turnStarted, source: "claude", turn: nil, notify: false, occurredAt: 0))
+        _ = reconciler.apply(rowToolEvent(2, occurredAt: 100))
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 1)
+        _ = reconciler.apply(event(3, .turnCompleted, source: "claude", turn: nil, notify: false, occurredAt: 5000))
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
+    }
+
+    // MARK: cm-124.6 — the join with the CLI: the drafts a row tool's PreToolUse really records
+
+    /// `Fixtures/tool-row-pre-tool-use-drafts.json` is also read by `cmuxTests/CLIToolRowTests`, which fails when the CLI
+    /// stops recording exactly these drafts. Fed to the real reconciler here, they must reach the late-reminder guard.
+    private func recordedRowToolDrafts(startingAt start: Int64) throws -> [AgentJournalEvent] {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/tool-row-pre-tool-use-drafts.json")
+        let drafts = try JSONDecoder().decode([AgentJournalEventDraft].self, from: Data(contentsOf: url))
+        return drafts.enumerated().map { offset, recorded in
+            var draft = recorded
+            draft.eventId = "recorded-\(offset)"
+            draft.occurredAtMs = start
+            draft.workspaceId = workspace
+            draft.surfaceId = surface
+            return AgentJournalEvent(sequence: start + Int64(offset), committedAtMs: 1000 + start, draft: draft)
+        }
+    }
+
+    @Test func theCLIsRecordedRowToolDraftsRaiseOneWaitAndTheLateGuardReadsThem() throws {
+        var reconciler = AgentNotificationReconciler()
+        let recorded = try recordedRowToolDrafts(startingAt: 10)
+        #expect(recorded.contains { AgentToolRowMarker.tool(inDetail: $0.draft.detail) == "CmuxDemoTool" && $0.draft.attention?.notification != nil },
+                "the recorded banner draft carries the marker")
+        let decisions = recorded.map { reconciler.apply($0) }
+        #expect(decisions.last?.disposition == .accepted, "the banner's draft raises the wait")
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").identified == ["toolu_demo1"])
+        // His first key (an id-less PaneInput resolve) at 3 s, then Claude's own notification at 6 s.
+        _ = reconciler.apply(event(20, .attentionResolved, source: "claude", turn: nil, notify: false, occurredAt: 3010, nativeEvent: "PaneInput"))
+        #expect(reconciler.openRequests(source: "claude", sessionId: "session").count == 0)
+        let late = reconciler.apply(claudeNotification(21, occurredAt: 6010))
+        #expect(late.disposition == .observation, "no hand comes back for Claude's late notification")
+        #expect(late.identity == nil)
+    }
+
+    @Test func theCLIsRecordedRowToolDraftsMakeAnEarlyNotificationAReminderOfThatWait() throws {
+        var reconciler = AgentNotificationReconciler()
+        var wait: AgentNotificationDecision?
+        for recorded in try recordedRowToolDrafts(startingAt: 10) { wait = reconciler.apply(recorded) }
+        let reminder = reconciler.apply(claudeNotification(30, occurredAt: 6010))
+        #expect(reminder.identity == wait?.identity)
+        #expect(!reminder.projectsLifecycle)
+    }
 }

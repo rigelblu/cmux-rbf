@@ -377,8 +377,12 @@ public struct AgentNotificationReconciler: Sendable {
             // cm-124.5: an entry only for a wait raised on the typed path, so the guard above can tell it. (#cm-124.5)
             if let detail = draft.detail, Self.isTypedPath(detail: detail) { session.attentionTypes[identity] = detail }
             // cm-128.1: remember the newest Feed-backed wait, so its late reminder is not mistaken for a new one.
-            if draft.source == "claude",
-               draft.nativeEvent.map(Self.feedAttentionNativeEvents.contains) == true,
+            // cm-124.6: a row tool's wait has no Feed request, so its `tool-row:` marker stands in for one: Claude's late
+            // permission reminder after a quick answer is the same echo cm-128 Q24 ignores. A built-in tool's bypass-mode
+            // wait carries no marker and keeps today's rule. (#cm-124.6)
+            let isFeedEvidence = draft.nativeEvent.map(Self.feedAttentionNativeEvents.contains) == true
+                || AgentToolRowMarker.tool(inDetail: draft.detail) != nil
+            if draft.source == "claude", isFeedEvidence,
                draft.occurredAtMs >= (session.latestFeedAttention?.occurredAtMs ?? -1) {
                 session.latestFeedAttention = (identity, draft.occurredAtMs)
             }

@@ -700,6 +700,8 @@
 		C1285B73E6D4112F63D02706 /* CLIStructuredNotificationKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1285F4FACBC3D5F73E6D411 /* CLIStructuredNotificationKindTests.swift */; };
 		C124A5B0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C124A5F0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift */; };
 		C124A5B0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C124A5F0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift */; };
+		C124A6B0A1B2C3D4E5F60001 /* AgentToolRowAdmissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C124A6F0A1B2C3D4E5F60001 /* AgentToolRowAdmissionTests.swift */; };
+		C124A6B0A1B2C3D4E5F60002 /* CLIToolRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C124A6F0A1B2C3D4E5F60002 /* CLIToolRowTests.swift */; };
 		C1285BFA269D52E13C15447B /* ClaudeHookNotificationClassificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1285FC1DC010279FA269D52 /* ClaudeHookNotificationClassificationTests.swift */; };
 		C1242001A1B2C3D4E5F60001 /* CLIDeclaredWaitsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1242001A1B2C3D4E5F60002 /* CLIDeclaredWaitsTests.swift */; };
 		A5D41211A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D41212A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift */; };
@@ -5015,6 +5017,8 @@
 		C1285F4FACBC3D5F73E6D411 /* CLIStructuredNotificationKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIStructuredNotificationKindTests.swift; sourceTree = "<group>"; };
 		C124A5F0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationTypeLookupTests.swift; sourceTree = "<group>"; };
 		C124A5F0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEventTableStoreTests.swift; sourceTree = "<group>"; };
+		C124A6F0A1B2C3D4E5F60001 /* AgentToolRowAdmissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentToolRowAdmissionTests.swift; sourceTree = "<group>"; };
+		C124A6F0A1B2C3D4E5F60002 /* CLIToolRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIToolRowTests.swift; sourceTree = "<group>"; };
 		C1285FC1DC010279FA269D52 /* ClaudeHookNotificationClassificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNotificationClassificationTests.swift; sourceTree = "<group>"; };
 		C1242001A1B2C3D4E5F60002 /* CLIDeclaredWaitsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIDeclaredWaitsTests.swift; sourceTree = "<group>"; };
 		A5D41212A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIHookNoResponseTests.swift; sourceTree = "<group>"; };
@@ -12506,6 +12510,8 @@
 				C1285F4FACBC3D5F73E6D411 /* CLIStructuredNotificationKindTests.swift */,
 				C124A5F0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift */,
 				C124A5F0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift */,
+				C124A6F0A1B2C3D4E5F60001 /* AgentToolRowAdmissionTests.swift */,
+				C124A6F0A1B2C3D4E5F60002 /* CLIToolRowTests.swift */,
 				C1285FC1DC010279FA269D52 /* ClaudeHookNotificationClassificationTests.swift */,
 				C1242001A1B2C3D4E5F60002 /* CLIDeclaredWaitsTests.swift */,
 				6379A0026379A0026379A002 /* CLISSHPTYResizeInputTests.swift */,
@@ -16498,6 +16504,8 @@
 				C1285B73E6D4112F63D02706 /* CLIStructuredNotificationKindTests.swift in Sources */,
 				C124A5B0A1B2C3D4E5F60001 /* AgentNotificationTypeLookupTests.swift in Sources */,
 				C124A5B0A1B2C3D4E5F60003 /* AgentEventTableStoreTests.swift in Sources */,
+				C124A6B0A1B2C3D4E5F60001 /* AgentToolRowAdmissionTests.swift in Sources */,
+				C124A6B0A1B2C3D4E5F60002 /* CLIToolRowTests.swift in Sources */,
 				C1285BFA269D52E13C15447B /* ClaudeHookNotificationClassificationTests.swift in Sources */,
 				C1242001A1B2C3D4E5F60001 /* CLIDeclaredWaitsTests.swift in Sources */,
 				A5D41211A1B2C3D4E5F60718 /* CLIHookNoResponseTests.swift in Sources */,
