@@ -20,7 +20,8 @@ struct FigmaRefitScriptTests {
     /// Figma's frame: `clockScript` on a still board, with a parent (cmux's page) and no child frames.
     private func frame(
         path: String = "/design/KEY/slug", ancestorOrigin: String? = nil, ancestors chain: [String]? = nil,
-        topPath: String = "/cmux-preview/figma-embed.html", topIsAnotherOrigin: Bool = false
+        topPath: String = "/cmux-preview/figma-embed.html", topIsAnotherOrigin: Bool = false,
+        prelude: String = ""
     ) throws -> JSContext {
         let c = try #require(JSContext()); c.evaluateScript(FigmaMotionTests.browser)
         let ancestors = chain.map { "[" + $0.map { "'\($0)'" }.joined(separator: ",") + "]" }
@@ -33,14 +34,16 @@ struct FigmaRefitScriptTests {
         Date.now=function(){return wallTime}; canvas=false; raf=[]; requestAnimationFrame=function(f){raf.push(f)};
         document.querySelector=function(){return canvas ? {} : null};
         """)
+        if !prelude.isEmpty { c.evaluateScript(prelude) }
         c.evaluateScript(FigmaMotion.clockScript)
         try #require(c.exception == nil, "clock script failed: \(String(describing: c.exception))")
         return c
     }
 
     /// cmux's page: `pageControllerScript` with the frame at `embed.figma.com`.
-    private func page(marked: Bool = false) throws -> JSContext {
+    private func page(marked: Bool = false, prelude: String = "") throws -> JSContext {
         let c = try #require(JSContext()); c.evaluateScript(FigmaMotionTests.browser)
+        if !prelude.isEmpty { c.evaluateScript(prelude) }
         c.evaluateScript("location.search += '&motion=\(marked ? "1" : "0")'; frame.src += '&theme=light';")
         c.evaluateScript(FigmaMotion.pageScript())
         try #require(c.exception == nil, "page script failed: \(String(describing: c.exception))")
@@ -442,5 +445,137 @@ struct FigmaRefitScriptTests {
     @Test func commandScriptTakesOnlyTheClosedSetOfNames() {
         #expect(FigmaMotion.Command.allCases.map(\.rawValue).sorted() == ["freeze", "play", "refit", "still", "toggle"])
         #expect(FigmaMotion.commandScript(.refit) == "window.__cmuxMotion && window.__cmuxMotion.command('refit')")
+    }
+    // MARK: cm-73.52: full screen
+
+    /// What Safari has and the harness lacks: elements that can ask for full screen, a document whose own
+    /// `fullscreenElement` is a getter, and events the script can fire. `natives` counts the calls that reach WebKit.
+    private static let fullscreenPrelude = """
+    natives = 0; events = [];
+    Element = function () {};
+    Element.prototype = { requestFullscreen: function () { natives++; }, webkitRequestFullscreen: function () { natives++; } };
+    Event = function (type) { this.type = type; };
+    document.dispatchEvent = function (event) { events.push(event.type); };
+    document.documentElement = { name: 'html' };
+    var nativeProto = { get fullscreenElement() { return 'REAL'; }, get webkitFullscreenElement() { return 'REAL-WEBKIT'; } };
+    Object.setPrototypeOf(document, nativeProto);
+    document.exitFullscreen = function () { natives++; }; document.webkitExitFullscreen = function () { natives++; };
+    """
+
+    private func asksForFullscreen(_ c: JSContext, _ call: String, enter: Bool) -> Bool {
+        c.evaluateScript("posted = []; \(call)")
+        return bool(c, "posted.length === 1 && posted[0].cmuxKey === 'fullscreen' && posted[0].enter === \(enter)")
+    }
+
+    @Test func aBoardsFullScreenRequestGoesToCmuxAndNeverToWebKit() throws {
+        let c = try frame(prelude: Self.fullscreenPrelude)
+        for method in ["requestFullscreen", "webkitRequestFullscreen"] {
+            #expect(asksForFullscreen(c, "var r = new Element().\(method)(); window.answer = r;", enter: true), "\(method)")
+            #expect(bool(c, "typeof answer.then === 'function'"), "\(method) answers with a promise, as Figma awaits it")
+        }
+        #expect(text(c, "natives") == "0", "the request never reaches WebKit, so a redraw can't end a full screen it started")
+    }
+
+    @Test func thePlayerKeepsFigmasOwnFullScreen() throws {
+        let c = try frame(path: "/proto/KEY/slug", prelude: Self.fullscreenPrelude)
+        c.evaluateScript("posted = []; new Element().requestFullscreen(); new Element().webkitRequestFullscreen()")
+        #expect(text(c, "natives") == "2", "in the player the request goes through")
+        #expect(text(c, "posted.length") == "0", "and cmux hears nothing of it")
+        c.evaluateScript("listeners.message({source: window.parent, data: {cmuxFullscreen: true}})")
+        #expect(text(c, "document.fullscreenElement") == "REAL", "the player's getters are never wrapped")
+    }
+
+    @Test func aChildFramesRequestIsRelayedOnlyFromFigmasOwnOrigins() throws {
+        let c = try frame()
+        c.evaluateScript("window.frames=[{}]")
+        for origin in ["https://www.figma.com", "https://embed.figma.com"] {
+            c.evaluateScript("posted = []; listeners.message({source:window.frames[0],origin:'\(origin)',data:{cmuxKey:'fullscreen',enter:true}})")
+            #expect(bool(c, "posted.length === 1 && posted[0].cmuxKey === 'fullscreen' && posted[0].enter === true && posted[0].nested === true"), "\(origin)")
+        }
+        c.evaluateScript("posted = []; listeners.message({source:window.frames[0],origin:'https://www.figma.com',data:{cmuxKey:'fullscreen',enter:false}})")
+        #expect(bool(c, "posted.length === 1 && posted[0].enter === false"), "a leave is relayed too")
+        for origin in ["https://evil.example", "https://figma.com.evil.example", "http://www.figma.com", "null", ""] {
+            c.evaluateScript("posted = []; listeners.message({source:window.frames[0],origin:'\(origin)',data:{cmuxKey:'fullscreen',enter:true}})")
+            #expect(text(c, "posted.length") == "0", "a child at \(origin.debugDescription) is not relayed")
+        }
+        c.evaluateScript("posted = []; listeners.message({source:{},origin:'https://www.figma.com',data:{cmuxKey:'fullscreen',enter:true}})")
+        #expect(text(c, "posted.length") == "0", "a window that is not one of this frame's children is not relayed")
+    }
+
+    @Test func theFrameAnswersFullScreenWhileCmuxSaysItsPageIsFullScreen() throws {
+        let c = try frame(prelude: Self.fullscreenPrelude)
+        #expect(text(c, "document.fullscreenElement") == "REAL", "before cmux says so, the native answer, kept by reference")
+        c.evaluateScript("listeners.message({source: window.parent, data: {cmuxFullscreen: true}})")
+        #expect(bool(c, "document.fullscreenElement === document.documentElement"))
+        #expect(bool(c, "document.webkitFullscreenElement === document.documentElement"))
+        #expect(text(c, "events.join()") == "fullscreenchange,webkitfullscreenchange", "Figma hears the change")
+        c.evaluateScript("events = []; listeners.message({source: window.parent, data: {cmuxFullscreen: true}})")
+        #expect(text(c, "events.length") == "0", "saying it again changes nothing")
+        c.evaluateScript("listeners.message({source: window.parent, data: {cmuxFullscreen: false}})")
+        #expect(text(c, "document.fullscreenElement") == "REAL", "and back to the native answer")
+        #expect(text(c, "document.webkitFullscreenElement") == "REAL-WEBKIT")
+        #expect(text(c, "events.join()") == "fullscreenchange,webkitfullscreenchange")
+    }
+
+    @Test func onlyCmuxsPageCanSayItIsFullScreenAndItsWordReachesTheChildren() throws {
+        let c = try frame(prelude: Self.fullscreenPrelude)
+        c.evaluateScript("window.frames=[{postMessage:function(m){sent.push(m)}}]; sent=[]")
+        c.evaluateScript("listeners.message({source: {}, data: {cmuxFullscreen: true}}); listeners.message({source: window.frames[0], data: {cmuxFullscreen: true}})")
+        #expect(text(c, "document.fullscreenElement") == "REAL", "a child, or anyone else, can't claim it")
+        #expect(text(c, "events.length") == "0")
+        c.evaluateScript("listeners.message({source: window.parent, data: {cmuxFullscreen: true}})")
+        #expect(bool(c, "sent.length === 1 && sent[0].cmuxFullscreen === true"), "a child frame's Figma code hears it as well")
+        c.evaluateScript("listeners.message({source: window.parent, data: {cmuxFullscreen: 'yes'}})")
+        #expect(bool(c, "document.fullscreenElement === document.documentElement"), "only a boolean is a word")
+    }
+
+    @Test func figmasExitFromFullScreenIsARequestToCmux() throws {
+        let c = try frame(prelude: Self.fullscreenPrelude)
+        #expect(asksForFullscreen(c, "document.exitFullscreen()", enter: false))
+        #expect(asksForFullscreen(c, "document.webkitExitFullscreen()", enter: false))
+        #expect(text(c, "natives") == "0", "never called through")
+    }
+
+    @Test func thePageTellsItsFrameWhenItsOwnFullScreenChanges() throws {
+        let c = try page(prelude: "docListeners = {}; document.addEventListener = function (n, f) { docListeners[n] = f; };")
+        func told() -> String {
+            text(c, "sent.filter(function(m){return 'cmuxFullscreen' in m}).map(function(m){return m.cmuxFullscreen}).join()") ?? ""
+        }
+        c.evaluateScript("sent = []; document.fullscreenElement = frame; docListeners.fullscreenchange()")
+        #expect(told() == "true")
+        c.evaluateScript("sent = []; document.fullscreenElement = null; docListeners.fullscreenchange()")
+        #expect(told() == "false")
+        c.evaluateScript("sent = []; document.webkitFullscreenElement = frame; docListeners.webkitfullscreenchange()")
+        #expect(told() == "true", "WebKit's prefixed event too")
+    }
+
+    @Test func thePageTellsTheNewDocumentAfterEachDrawnReportAndOnlyThen() throws {
+        let c = try page(prelude: "docListeners = {}; document.addEventListener = function (n, f) { docListeners[n] = f; };")
+        func told() -> String {
+            text(c, "sent.filter(function(m){return 'cmuxFullscreen' in m}).map(function(m){return m.cmuxFullscreen}).join()") ?? ""
+        }
+        c.evaluateScript("document.fullscreenElement = frame; sent = []")
+        report(c, drawn: false)
+        #expect(told() == "", "an undrawn report is a document still loading")
+        report(c, drawn: true)
+        #expect(told() == "true", "a redraw is a new document, which starts out not knowing")
+        c.evaluateScript("sent = []")
+        report(c, drawn: true, nested: true)
+        #expect(told() == "", "a nested frame's report is not the top frame's document")
+    }
+
+    @Test func thePagePassesFigmasFullScreenRequestToThePanelOnlyFromItsFramesOwnOrigins() throws {
+        let c = try page()
+        func post(source: String = "frame.contentWindow", origin: String, data: String) {
+            c.evaluateScript("posted = []; listeners.message({source:\(source),origin:'\(origin)',data:\(data)})")
+        }
+        post(origin: Self.figma, data: "{cmuxKey:'fullscreen',enter:true}")
+        #expect(bool(c, "posted.length === 1 && posted[0].action === 'fullscreen' && posted[0].enter === true"))
+        post(origin: "https://embed.figma.com", data: "{cmuxKey:'fullscreen',enter:false}")
+        #expect(bool(c, "posted.length === 1 && posted[0].action === 'fullscreen' && posted[0].enter === false"))
+        post(origin: "https://evil.example", data: "{cmuxKey:'fullscreen',enter:true}")
+        #expect(text(c, "posted.length") == "0", "another origin is refused")
+        post(source: "{}", origin: Self.figma, data: "{cmuxKey:'fullscreen',enter:true}")
+        #expect(text(c, "posted.length") == "0", "a window that is not the frame is refused")
     }
 }

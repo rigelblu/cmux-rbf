@@ -1119,6 +1119,21 @@ struct FigmaCLIOutputTests {
         #expect(!unrelated.stderr.contains("Log in page"), "only the notboard reason is turned into the refusal: \(unrelated.stderr)")
     }
 
+    // cmux-rbf (#cm-73.52): the app answers `invalid_state` with `data.reason: fullscreen` while Figma's own button
+    // holds the pane full screen, and the CLI says it in English.
+    @Test("fit while Figma's own button holds the pane full screen gives the English refusal, from the app's fullscreen reason")
+    func fitRefusesAPreviewFullScreenByFigmasOwnButton() throws {
+        let base = Self.fitReply([Self.figmaPane(8, link: Self.readLink)])
+        let fullscreen: @Sendable (String, String?) -> String = { method, surfaceID in
+            guard method == "figma.goto" else { return base(method, surfaceID) }
+            return Self.json(["id": NSNull(), "ok": false,
+                              "error": ["code": "invalid_state", "message": "Browser operation failed", "data": ["reason": "fullscreen"]]])
+        }
+        let run = try drive(["figma", "fit"], reply: fullscreen)
+        fails(run, with: "the Figma pane is full screen by Figma's own button, not cmux's (surface surface:8), so fit moved nothing")
+        #expect(run.gotos.count == 1 && presses(run).isEmpty, "\(run.requests.map(\.method))")
+    }
+
     @Test("fit on a FigJam board or a slide deck is refused and sends nothing, in the editor and the read view")
     func fitRefusesBoardsAndDecks() throws {
         let message = "cmux figma fit works on Figma design files only: surface surface:8 shows a FigJam board or a slide deck"

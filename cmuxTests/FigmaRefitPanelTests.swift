@@ -174,6 +174,565 @@ struct FigmaRefitPanelTests {
         #expect(await refitCount(foreign) == 0, "a message from a subframe is rejected as before")
     }
 
+    // MARK: Full screen (cm-73.52): cmux owns it only when its own call succeeded
+
+    /// cmux's page with a stand-in for its iframe: `window.fsCalls` counts the full-screen requests it took.
+    /// The fixture has no window, so a real request could never succeed.
+    private func withFullscreenIframe(
+        _ p: BrowserPanel, rejects: Bool = false, rejectsAfterMs: Int? = nil, perCall: String? = nil
+    ) async throws {
+        _ = try await p.webView.evaluateJavaScript("""
+        window.fsCalls = 0; window.fsExits = 0;
+        document.exitFullscreen = function () { window.fsExits++; return Promise.resolve(); };
+        document.body.innerHTML = '<iframe></iframe>';
+        document.querySelector('iframe').requestFullscreen = function () {
+          window.fsCalls++;
+          if (\(perCall != nil ? "true" : "false")) { var n = window.fsCalls; \(perCall ?? "") }
+          return \(rejectsAfterMs.map { "new Promise(function (_, no) { setTimeout(function () { no(new Error('late')); }, \($0)); })" } ?? (rejects ? "Promise.reject(new Error('no'))" : "Promise.resolve()"));
+        };
+        0;
+        """)
+    }
+
+    private func fullscreenCalls(_ p: BrowserPanel) async -> Int {
+        ((try? await p.webView.evaluateJavaScript("window.fsCalls")) as? Int) ?? -1
+    }
+
+    private func fullscreenExits(_ p: BrowserPanel) async -> Int {
+        ((try? await p.webView.evaluateJavaScript("window.fsExits")) as? Int) ?? -1
+    }
+
+    private func clicked(_ p: BrowserPanel, secondsAgo: TimeInterval) throws {
+        try #require(p.webView as? CmuxWebView).lastLeftMouseDownUptimeForTesting = FigmaClickClock.now() - secondsAgo
+    }
+
+    @Test func aFullScreenRequestTheCallCarriedOutIsOwnedByCmux() async throws {
+        let p = try await panel(); defer { p.close() }
+        try await withFullscreenIframe(p)
+        try clicked(p, secondsAgo: 0.1)
+        p.receiveFigmaMotionMessage(from: p.webView, mainFrame: true, address: p.currentURL, body: ["action": "fullscreen", "enter": true])
+        #expect(p.cmuxOwnsFullscreen, "set before the call, so a re-fit that lands while WebKit enters knows whose it is")
+        for _ in 0..<100 where await fullscreenCalls(p) == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(await fullscreenCalls(p) == 1)
+        await settle()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(p.cmuxOwnsFullscreen, "a call that returned true keeps it until WebKit reports full screen off")
+    }
+
+    @Test func aRealMouseDownCountsAsAFreshClickWhateverBaseItsEventTimestampIsOn() async throws {
+        let p = try await panel(); defer { p.close() }
+        try await withFullscreenIframe(p)
+        // An event whose timestamp is hours from `systemUptime`, as after a sleep on this Mac.
+        let event = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 5, windowNumber: 0,
+            context: nil, eventNumber: 1, clickCount: 1, pressure: 1
+        ))
+        try #require(p.webView as? CmuxWebView).mouseDown(with: event)
+        p.requestFigmaFullscreen(enter: true)
+        #expect(p.cmuxOwnsFullscreen, "the gate reads the click on the clock it was written on")
+        for _ in 0..<100 where await fullscreenCalls(p) == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(await fullscreenCalls(p) == 1)
+    }
+
+    @Test func aFullScreenCallThatThrowsLeavesCmuxOwningNothing() async throws {
+        let p = try await panel(); defer { p.close() }
+        try await withFullscreenIframe(p, rejects: true)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        for _ in 0..<100 where p.cmuxOwnsFullscreen { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(!p.cmuxOwnsFullscreen, "a hidden window refuses; WebKit never turns on or reports off, so nothing else would clear it")
+    }
+
+    @Test func aFullScreenCallOnAPageWithNoIframeLeavesCmuxOwningNothing() async throws {
+        let p = try await panel(); defer { p.close() }
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        for _ in 0..<100 where p.cmuxOwnsFullscreen { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(!p.cmuxOwnsFullscreen)
+    }
+
+    @Test func aFailedEnterAfterWebKitWentFullScreenLeavesWhatAnEarlierCallOwns() async throws {
+        let p = try await panel(); defer { p.close() }
+        try await withFullscreenIframe(p, rejectsAfterMs: 150)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        #expect(p.cmuxOwnsFullscreen)
+        p.isElementFullscreenActiveForTesting = true // an earlier call's full screen is on by the time this one fails
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await fullscreenCalls(p) == 1)
+        #expect(p.cmuxOwnsFullscreen, "a late failure drops nothing while WebKit is full screen")
+    }
+
+    @Test func aRefusedCallsLogLineCarriesWebKitsExceptionMessageAndLine() {
+        let error = NSError(domain: "WKErrorDomain", code: 4, userInfo: [
+            NSLocalizedDescriptionKey: "A JavaScript exception occurred",
+            "WKJavaScriptExceptionMessage": "TypeError: Fullscreen request denied",
+            "WKJavaScriptExceptionLineNumber": 3
+        ])
+        let text = BrowserPanel.fullscreenFailureText(error)
+        #expect(text.contains("A JavaScript exception occurred"))
+        #expect(text.contains("message=TypeError: Fullscreen request denied"))
+        #expect(text.contains("line=3"))
+        #expect(BrowserPanel.fullscreenFailureText(NSError(domain: "x", code: 1)).contains("message=") == false, "no message, none invented")
+    }
+
+    // MARK: Enter retry (cm-73.52): the click that activates the app can beat WebKit's permission
+
+    /// Calls before `failing` fail, the rest succeed. `window.fsCalls` counts them.
+    private func iframeFailing(_ p: BrowserPanel, firstCalls failing: Int) async throws {
+        try await withFullscreenIframe(p, perCall: "if (n <= \(failing)) { return Promise.reject(new Error('not yet')); } return Promise.resolve();")
+    }
+
+    private func waitForCalls(_ p: BrowserPanel, _ count: Int) async throws {
+        for _ in 0..<100 where await fullscreenCalls(p) < count { try await Task.sleep(for: .milliseconds(20)) }
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aRefusedEnterIsRetriedOnceAfterAQuarterSecondWhenTheAppIsActive() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.figmaRefit.appIsActive = { true }
+        try await iframeFailing(p, firstCalls: 1)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        try await waitForCalls(p, 1)
+        guard await boundedSleeper(clock, .milliseconds(250)) else { return }
+        clock.advance(by: .milliseconds(249))
+        await settle()
+        #expect(await fullscreenCalls(p) == 1, "249 ms: not yet")
+        clock.advance(by: .milliseconds(1))
+        try await waitForCalls(p, 2)
+        #expect(await fullscreenCalls(p) == 2, "the retry")
+        await settle()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(p.cmuxOwnsFullscreen, "the retry succeeded, so cmux owns the full screen it asked for")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aRefusedEnterIsRetriedOnlyOnceEvenWhenTheRetryIsRefusedToo() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.figmaRefit.appIsActive = { true }
+        try await iframeFailing(p, firstCalls: 99)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        try await waitForCalls(p, 1)
+        guard await boundedSleeper(clock, .milliseconds(250)) else { return }
+        clock.advance(by: .milliseconds(250))
+        try await waitForCalls(p, 2)
+        await settle()
+        try await Task.sleep(for: .milliseconds(150))
+        clock.advance(by: .seconds(5))
+        await settle()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await fullscreenCalls(p) == 2, "one call, one retry, no more")
+        #expect(!p.cmuxOwnsFullscreen)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func theRetryNeedsTheClickToStillBeUnderASecondOld() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.figmaRefit.appIsActive = { true }
+        try await iframeFailing(p, firstCalls: 1)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        try await waitForCalls(p, 1)
+        try await Task.sleep(for: .milliseconds(100))
+        try clicked(p, secondsAgo: 2) // by the time the retry is due, the click is stale
+        guard await boundedSleeper(clock, .milliseconds(250)) else { return }
+        clock.advance(by: .milliseconds(250))
+        await settle()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await fullscreenCalls(p) == 1, "a stale click asks nothing")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aRefusalAfterWebKitWentFullScreenIsNotRetried() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.figmaRefit.appIsActive = { true }
+        try await withFullscreenIframe(p, rejectsAfterMs: 100)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        p.isElementFullscreenActiveForTesting = true // an earlier call's full screen is on when this one is refused
+        try await Task.sleep(for: .milliseconds(300))
+        clock.advance(by: .seconds(5))
+        await settle()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await fullscreenCalls(p) == 1)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func whenTheAppIsNotActiveYetTheRetryWaitsForItToBecomeActive() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.figmaRefit.appIsActive = { false }
+        try await iframeFailing(p, firstCalls: 1)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        try await waitForCalls(p, 1)
+        try await Task.sleep(for: .milliseconds(150))
+        clock.advance(by: .seconds(5))
+        await settle()
+        #expect(await fullscreenCalls(p) == 1, "no timer while the app isn't active")
+        try clicked(p, secondsAgo: 0.1) // the click that activated the app is as fresh as the activation, however busy this host is
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        try await waitForCalls(p, 2)
+        let afterActivation = await fullscreenCalls(p)
+        #expect(afterActivation == 2, "the activation releases the retry; calls=\(afterActivation)")
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        await settle()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await fullscreenCalls(p) == 2, "and a second activation retries nothing")
+    }
+
+    @Test func aSuccessOwnsTheFullScreenEvenWhenAnEarlierCallsLateFailureClearedTheFlag() async throws {
+        let p = try await panel(); defer { p.close() }
+        // Call 1 is refused after 100 ms; call 2 succeeds after 300 ms, so the failure lands first.
+        try await withFullscreenIframe(p, perCall: """
+        return new Promise(function (resolve, reject) { setTimeout(n === 1 ? function () { reject(new Error('cancelled')); } : resolve, n === 1 ? 100 : 300); });
+        """)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        p.requestFigmaFullscreen(enter: true)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(!p.cmuxOwnsFullscreen, "the first call's failure has landed and cleared the flag")
+        p.isElementFullscreenActiveForTesting = true // WebKit went full screen for the second call before it answers
+        for _ in 0..<100 where !p.cmuxOwnsFullscreen { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(await fullscreenCalls(p) == 2)
+        #expect(p.cmuxOwnsFullscreen, "the second call's success owns the full screen it made")
+    }
+
+    @Test func theFullScreenWindowIsKeyedOnActivationOnlyToRestoreWhatTheAppResignedWith() {
+        let fullScreen = NSWindow(), main = NSWindow()
+        typealias Panel = BrowserPanel
+        func toKey(
+            owns: Bool = true, active: Bool = true, web: NSWindow? = fullScreen, resigned: NSWindow? = fullScreen,
+            key: NSWindow? = main, click: Bool = false
+        ) -> NSWindow? {
+            Panel.figmaFullscreenWindowToKey(
+                ownsFullscreen: owns, isActive: active, webViewWindow: web, keyWindowAtResign: resigned,
+                currentKeyWindow: key, activatedByClick: click
+            )
+        }
+        #expect(toKey() === fullScreen, "it was key when the app resigned, and another window is key now")
+        #expect(toKey(key: nil) === fullScreen)
+        #expect(toKey(key: fullScreen) == nil, "already key")
+        #expect(toKey(resigned: main) == nil, "Tom had the main window key when he left: not ours to override")
+        #expect(toKey(resigned: nil) == nil, "nothing remembered")
+        #expect(toKey(click: true) == nil, "a click chose the window")
+        #expect(toKey(active: false) == nil, "WebKit isn't full screen")
+        #expect(toKey(owns: false) == nil, "not cmux's full screen")
+        #expect(toKey(web: nil, resigned: nil) == nil, "no window to key")
+    }
+
+    @Test func aPanelKeysItsFullScreenWindowOnlyWhenItHeldTheKeyAtResign() async throws {
+        let p = try await panel(); defer { p.close() }
+        let held = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
+        let main = NSWindow()
+        held.contentView?.addSubview(p.webView)
+        p.figmaRefit.ownsFullscreen = true
+        p.isElementFullscreenActiveForTesting = true
+        #expect(p.figmaFullscreenWindowToKey(currentKey: main, activatedByClick: false) == nil, "the app never resigned")
+        p.noteAppResigned(keyWindow: held)
+        #expect(p.figmaFullscreenWindowToKey(currentKey: main, activatedByClick: false) === held)
+        #expect(p.figmaFullscreenWindowToKey(currentKey: main, activatedByClick: true) == nil)
+        p.noteAppResigned(keyWindow: main)
+        #expect(p.figmaFullscreenWindowToKey(currentKey: held, activatedByClick: false) == nil)
+        #expect(p.figmaFullscreenWindowToKey(currentKey: nil, activatedByClick: false) == nil, "main was key at this resign")
+    }
+
+    @Test func aSuccessAfterWebKitLeftFullScreenOwnsNothing() async throws {
+        let p = try await panel(); defer { p.close() }
+        try await withFullscreenIframe(p, perCall: """
+        return new Promise(function (resolve) { setTimeout(resolve, 150); });
+        """)
+        try clicked(p, secondsAgo: 0.1)
+        p.requestFigmaFullscreen(enter: true)
+        #expect(p.cmuxOwnsFullscreen)
+        p.figmaFullscreenDidChange(active: false) // WebKit reports full screen off while the call is still out
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await fullscreenCalls(p) == 1)
+        #expect(!p.cmuxOwnsFullscreen, "a success for a full screen that is already gone must not claim the next one")
+    }
+
+    @Test func onlyACallThatReturnedTrueIsOwned() {
+        typealias Panel = BrowserPanel
+        #expect(Panel.ownsFullscreen(afterCall: .success(true)))
+        #expect(!Panel.ownsFullscreen(afterCall: .success(false)), "returned false")
+        #expect(!Panel.ownsFullscreen(afterCall: .success(NSNull())), "returned nothing")
+        #expect(!Panel.ownsFullscreen(afterCall: .success("true")), "a string is not true")
+        #expect(!Panel.ownsFullscreen(afterCall: .failure(NSError(domain: "x", code: 1))))
+    }
+
+    @Test func noClickOrAnOldClickAsksNothingAndOwnsNothing() async throws {
+        let p = try await panel(); defer { p.close() }
+        try await withFullscreenIframe(p)
+        p.receiveFigmaMotionMessage(from: p.webView, mainFrame: true, address: p.currentURL, body: ["action": "fullscreen", "enter": true])
+        #expect(!p.cmuxOwnsFullscreen, "no click ever")
+        try clicked(p, secondsAgo: 1.5)
+        p.receiveFigmaMotionMessage(from: p.webView, mainFrame: true, address: p.currentURL, body: ["action": "fullscreen", "enter": true])
+        #expect(!p.cmuxOwnsFullscreen, "a click 1.5 s ago")
+        await settle()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await fullscreenCalls(p) == 0, "page script can post the message, but can't fake the click")
+    }
+
+    // MARK: Full screen (cm-73.52): the answer and the fallback
+
+    @Test func aFullScreenFigmaPutThereItselfRefusesEveryFitAndSendsNothing() async throws {
+        let p = try await panel(); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        #expect(p.refitFigmaPreview(trigger: .cli) == .refused(.fullscreen))
+        #expect(p.refitFigmaPreview(trigger: .key) == .refused(.fullscreen), "⇧1")
+        #expect(p.refitFigmaPreview(trigger: .size) == .refused(.fullscreen), "a size change")
+        await settle()
+        #expect(await refitCount(p) == 0, "a redraw would end Figma's full screen")
+        #expect(!p.figmaRefit.inFlight)
+    }
+
+    @Test func cmuxsOwnFullScreenStillFitsAndNoFullScreenIsAsBefore() async throws {
+        let p = try await panel(); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        p.figmaRefit.ownsFullscreen = true
+        #expect(p.refitFigmaPreview(trigger: .cli) == .moved, "cmux's iframe is the full-screen element, so a redraw can't end it")
+        try await delivered(p)
+        let q = try await panel(); defer { q.close() }
+        #expect(q.refitFigmaPreview(trigger: .cli) == .moved)
+    }
+
+    // MARK: Size re-check (cm-73.52): a size change dropped while a redraw runs is looked at again
+
+    @Test(.timeLimit(.minutes(1))) func aSizeChangeSkippedWhileARedrawRunsIsCheckedAgainWhenItEnds() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        try #require(p.refitFigmaPreview(trigger: .cli) == .moved)
+        try await delivered(p) // the redraw started at 800x600
+        p.webView.frame = NSRect(x: 0, y: 0, width: 1200, height: 600)
+        await settle()
+        guard await boundedSleeper(clock, .milliseconds(500)) else { return }
+        clock.advance(by: .milliseconds(500)) // the half second lands inside the redraw: skipped
+        await settle()
+        #expect(await refitCount(p) == 1)
+        report(p, path: nil) // the echo
+        report(p, drawn: true, doc: 2) // the redraw ends; its document remembers 1200x600, which is not trusted
+        try #require(p.figmaRefit.sizeCheck.isScheduled, "a skipped size change starts the half second afresh when the redraw ends")
+        guard await boundedSleeper(clock, .milliseconds(500)) else { return }
+        clock.advance(by: .milliseconds(500))
+        try await delivered(p, count: 2)
+        #expect(await refitCount(p) == 2, "1200 is far from the 800 the redraw started at")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func theRecheckLeavesFigmasOnePointSettleAlone() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        try #require(p.refitFigmaPreview(trigger: .cli) == .moved)
+        try await delivered(p)
+        p.webView.frame = NSRect(x: 0, y: 0, width: 801, height: 600) // 1 pt, as Figma settles on every entry
+        await settle()
+        guard await boundedSleeper(clock, .milliseconds(500)) else { return }
+        clock.advance(by: .milliseconds(500))
+        await settle()
+        report(p, path: nil)
+        report(p, drawn: true, doc: 2)
+        try #require(p.figmaRefit.sizeCheck.isScheduled, "the size change was dropped, so it is checked again")
+        guard await boundedSleeper(clock, .milliseconds(500)) else { return }
+        clock.advance(by: .milliseconds(500))
+        await settle()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await refitCount(p) == 1, "1 pt from where the redraw started is not a second redraw")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aLoadOfCmuxsPageDropsTheOwedRecheckSoTheNewPagesDrawnReportSchedulesNone() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        try #require(p.refitFigmaPreview(trigger: .cli) == .moved)
+        try await delivered(p)
+        p.webView.frame = NSRect(x: 0, y: 0, width: 1200, height: 600)
+        await settle()
+        guard await boundedSleeper(clock, .milliseconds(500)) else { return }
+        clock.advance(by: .milliseconds(500)) // dropped as redrawing: a re-check is owed
+        await settle()
+        try #require(p.figmaRefit.owedRecheckFrom == Self.size, "owed from where the redraw started")
+        p.figmaRefitLoadDidStart() // a new page loads; the old redraw's start means nothing to it
+        #expect(p.figmaRefit.owedRecheckFrom == nil)
+        report(p, path: nil)
+        report(p, drawn: true, doc: 2) // the new page's first drawn report ends the old in-flight mark
+        #expect(!p.figmaRefit.sizeCheck.isScheduled, "no re-check against the old redraw's start")
+    }
+
+    @Test func aRedrawThatEndsWithNoSizeChangeSkippedSchedulesNoCheck() async throws {
+        let p = try await panel(); defer { p.close() }
+        try #require(p.refitFigmaPreview(trigger: .cli) == .moved)
+        try await delivered(p)
+        report(p, path: nil)
+        report(p, drawn: true, doc: 2)
+        #expect(!p.figmaRefit.sizeCheck.isScheduled)
+        #expect(p.refitFigmaPreview(trigger: .key) == .moved, "and a later fit works as before")
+    }
+
+    // MARK: Leaving full screen around what changes the page (cm-73.52)
+
+    @Test func cmuxOwnsNothingOnceWebKitReportsFullScreenOff() async throws {
+        let p = try await panel(); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        p.figmaRefit.ownsFullscreen = true
+        p.figmaFullscreenDidChange(active: true)
+        #expect(p.cmuxOwnsFullscreen, "still on")
+        p.isElementFullscreenActiveForTesting = false
+        p.figmaFullscreenDidChange(active: false)
+        #expect(!p.cmuxOwnsFullscreen, "a flag left set would call a later full screen cmux's own, and bring the collapse back")
+        #expect(p.refitFigmaPreview(trigger: .cli) == .moved)
+    }
+
+    @Test func aSwapWithNoFullScreenRunsAtOnce() async throws {
+        let p = try await panel(); defer { p.close() }
+        var ran = 0
+        p.afterLeavingFigmaFullscreen { ran += 1 }
+        #expect(ran == 1)
+        #expect(p.figmaRefit.leaveRequestsForTesting == 0)
+    }
+
+    @Test func aSwapDuringFullScreenAsksWebKitToLeaveAndWaitsForItsReportOnce() async throws {
+        let p = try await panel(); defer { p.close() }
+        try await withFullscreenIframe(p)
+        p.isElementFullscreenActiveForTesting = true
+        var ran = 0
+        p.afterLeavingFigmaFullscreen { ran += 1 }
+        for _ in 0..<100 where await fullscreenExits(p) == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(await fullscreenExits(p) == 1, "the page was asked to leave")
+        #expect(ran == 0, "the swap waits until WebKit reports full screen off")
+        p.figmaFullscreenDidChange(active: true)
+        #expect(ran == 0, "a report that it is still on changes nothing")
+        p.isElementFullscreenActiveForTesting = false
+        p.figmaFullscreenDidChange(active: false)
+        #expect(ran == 1)
+        p.figmaFullscreenDidChange(active: false)
+        #expect(ran == 1, "once")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aSwapGoesAheadAtTheCapWhenWebKitNeverReportsOff() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        var ran = 0
+        p.afterLeavingFigmaFullscreen { ran += 1 }
+        guard await boundedSleeper(clock, FigmaPreviewRefit.fullscreenExitWait) else { return }
+        clock.advance(by: FigmaPreviewRefit.fullscreenExitWait - .milliseconds(1))
+        await settle()
+        #expect(ran == 0, "1 ms short of the cap")
+        clock.advance(by: .milliseconds(1))
+        await settle()
+        #expect(ran == 1, "at the cap, with full screen still on")
+        #expect(p.figmaRefit.afterFullscreen.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aSecondSwapQueuedWhileWaitingDoesNotPushTheCapBack() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        var first = 0, second = 0
+        p.afterLeavingFigmaFullscreen { first += 1 }
+        guard await boundedSleeper(clock, FigmaPreviewRefit.fullscreenExitWait) else { return }
+        clock.advance(by: FigmaPreviewRefit.fullscreenExitWait - .milliseconds(400))
+        p.afterLeavingFigmaFullscreen { second += 1 }
+        await settle()
+        clock.advance(by: .milliseconds(400)) // the cap since the first
+        await settle()
+        #expect(first == 1 && second == 1, "both go ahead at the cap after the first, not after the second")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aSwapThatRanOutOfWaitDoesNotWaitAgainWhenItAsksForAnotherSwap() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        var inner = 0
+        p.afterLeavingFigmaFullscreen { p.afterLeavingFigmaFullscreen { inner += 1 } }
+        guard await boundedSleeper(clock, FigmaPreviewRefit.fullscreenExitWait) else { return }
+        clock.advance(by: FigmaPreviewRefit.fullscreenExitWait)
+        await settle()
+        #expect(inner == 1, "past the wait, a swap runs without a second wait")
+        #expect(!p.figmaRefit.swapPastFullscreen)
+    }
+
+    @Test func theSwitchToTheEditorDuringFullScreenSwapsWhenWebKitReportsItOff() async throws {
+        let p = try await panel(ready: false); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        let preview = p.webView
+        #expect(p.switchFigmaPreviewAndEditor(), "the switch is accepted")
+        #expect(p.webView === preview, "and has not detached the web view full screen holds")
+        #expect(p.showsFigmaPreview)
+        p.isElementFullscreenActiveForTesting = false
+        p.figmaFullscreenDidChange(active: false)
+        #expect(p.webView !== preview, "the swap ran once WebKit reported full screen off")
+        #expect(!p.showsFigmaPreview)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func theSwitchToTheEditorGoesAheadAtTheCapWithFullScreenStillOn() async throws {
+        let clock = SidebarTestManualClock()
+        let p = try await panel(clock: clock, ready: false); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        let preview = p.webView
+        try #require(p.switchFigmaPreviewAndEditor())
+        guard await boundedSleeper(clock, FigmaPreviewRefit.fullscreenExitWait) else { return }
+        clock.advance(by: FigmaPreviewRefit.fullscreenExitWait)
+        await settle()
+        #expect(p.webView !== preview)
+        #expect(!p.showsFigmaPreview)
+    }
+
+    @Test func closingAFigmaPreviewDuringFullScreenAsksWebKitToLeaveAndDropsTheWaitingSwaps() async throws {
+        let p = try await panel()
+        p.isElementFullscreenActiveForTesting = true
+        var ran = 0
+        p.figmaRefit.afterFullscreen.append { ran += 1 }
+        p.close()
+        #expect(p.figmaRefit.leaveRequestsForTesting == 1)
+        p.figmaFullscreenDidChange(active: false)
+        #expect(ran == 0, "a closed pane swaps nothing")
+    }
+
+    @Test func aHiddenFigmaPreviewDuringFullScreenAsksWebKitToLeave() async throws {
+        let p = try await panel(); defer { p.close() }
+        p.noteWebViewVisibility(false, reason: "fixture.hide")
+        #expect(p.figmaRefit.leaveRequestsForTesting == 0, "no full screen, nothing to leave")
+        p.noteWebViewVisibility(true, reason: "fixture.show")
+        p.isElementFullscreenActiveForTesting = true
+        p.noteWebViewVisibility(false, reason: "fixture.hide")
+        #expect(p.figmaRefit.leaveRequestsForTesting == 1)
+    }
+
+    @Test func aRepeatedHideReportDoesNotAskWebKitToLeaveAgain() async throws {
+        let p = try await panel(); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        p.noteWebViewVisibility(false, reason: "fixture.hide")
+        try #require(p.figmaRefit.leaveRequestsForTesting == 1)
+        p.noteWebViewVisibility(false, reason: "fixture.hide.again")
+        #expect(p.figmaRefit.leaveRequestsForTesting == 1, "the pane was already hidden; this report changes nothing")
+    }
+
+    // MARK: Esc (cm-73.52): cmux's own full screen, from the window that holds the web view
+
+    @Test func escIsTakenOnlyFromTheWindowHoldingTheWebViewWhileCmuxOwnsAnActiveFullScreen() {
+        let held = NSWindow(), other = NSWindow()
+        typealias Panel = BrowserPanel
+        #expect(Panel.figmaFullscreenTakesEscape(ownsFullscreen: true, isActive: true, eventWindow: held, webViewWindow: held))
+        #expect(!Panel.figmaFullscreenTakesEscape(ownsFullscreen: true, isActive: true, eventWindow: other, webViewWindow: held), "another window's Esc")
+        #expect(!Panel.figmaFullscreenTakesEscape(ownsFullscreen: true, isActive: true, eventWindow: nil, webViewWindow: held), "an Esc with no window")
+        #expect(!Panel.figmaFullscreenTakesEscape(ownsFullscreen: true, isActive: true, eventWindow: held, webViewWindow: nil))
+        #expect(!Panel.figmaFullscreenTakesEscape(ownsFullscreen: true, isActive: false, eventWindow: held, webViewWindow: held), "owned, but WebKit isn't full screen yet")
+        #expect(!Panel.figmaFullscreenTakesEscape(ownsFullscreen: false, isActive: true, eventWindow: held, webViewWindow: held), "Figma's own full screen, or an ordinary pane's")
+    }
+
+    @Test func aPanelTakesEscFromItsOwnWindowOnly() async throws {
+        let p = try await panel(); defer { p.close() }
+        let held = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
+        held.contentView?.addSubview(p.webView)
+        try #require(p.webView.window === held)
+        p.figmaRefit.ownsFullscreen = true
+        p.isElementFullscreenActiveForTesting = true
+        #expect(p.figmaFullscreenTakesEscape(from: held))
+        #expect(!p.figmaFullscreenTakesEscape(from: NSWindow()))
+        p.isElementFullscreenActiveForTesting = false
+        #expect(!p.figmaFullscreenTakesEscape(from: held))
+    }
+
     // MARK: The mark: three ends, and the echo can't clear it
 
     @Test func theEchoAndAnUndrawnReportLeaveTheMarkSetAndOnlyADrawnOneClearsIt() async throws {
@@ -591,6 +1150,7 @@ struct FigmaRefitPanelTests {
     @Test func theHalfSecondAndTheOnePointAreTheDesignedConstants() {
         #expect(Refit.settle == .milliseconds(500))
         #expect(Refit.sizeThreshold == 1)
+        #expect(Refit.recheckThreshold == 2) // cmux-rbf (#cm-73.52)
         #expect(Refit.inFlightSeconds == 15)
         #expect(Refit.interstitialSettle == .seconds(10))
     }

@@ -92,6 +92,15 @@ enum FigmaFit {
     /// The `data.reason` the app puts in that `invalid_state`.
     static let notBoardReason = "notboard"
 
+    /// The refusal when the preview is full screen by Figma's own button and not cmux's (`cm-73.52`): the app answers
+    /// `invalid_state` with `data.reason: fullscreen`, and the CLI says it in English.
+    static func fullscreenRefusal(handle: String) -> String {
+        "the Figma pane is full screen by Figma's own button, not cmux's (surface \(handle)), so fit moved nothing"
+    }
+
+    /// The `data.reason` the app puts in that `invalid_state`.
+    static let fullscreenReason = "fullscreen"
+
     /// The refusal when a text field in the page has focus.
     static func typingRefusal(handle: String) -> String {
         "a text field in the Figma pane has focus (surface \(handle)), so fit sent no key"

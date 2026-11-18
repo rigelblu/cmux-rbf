@@ -273,6 +273,19 @@ struct FigmaCLIRulesTests {
         #expect(FigmaFit.notBoardReason == "notboard")
     }
 
+    // cmux-rbf (#cm-73.52): Figma's own full screen can't be redrawn, and fit says so.
+    @Test("the refusal for a preview full screen by Figma's own button names the pane and says fit moved nothing")
+    func fullscreenRefusalText() {
+        #expect(FigmaFit.fullscreenRefusal(handle: "surface:8")
+                == "the Figma pane is full screen by Figma's own button, not cmux's (surface surface:8), so fit moved nothing")
+        #expect(FigmaFit.fullscreenReason == "fullscreen")
+    }
+
+    @Test("the help lists full screen by Figma's own button among the times fit moves nothing")
+    func helpNamesTheFullScreenRefusal() {
+        #expect(FigmaUsage.text.contains("It moves nothing while Figma's own full-screen button has the pane full screen, not cmux's."))
+    }
+
     @Test("the help describes --motion and --play for goto")
     func helpDescribesMotionAndPlay() {
         #expect(FigmaUsage.text.contains("--motion"))
