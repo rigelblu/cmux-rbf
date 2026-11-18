@@ -2166,7 +2166,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationWillBecomeActive(_ notification: Notification) { if !hasVisibleMainTerminalWindow() { _ = mainWindowVisibilityController.orderFrontApplicationWindowsBeforeActivation(windows: mainWindowsForVisibilityController(), reason: .applicationWillBecomeActive) } }
 
+    /// cmux-rbf (#cm-73.52): back into the app (⌘-Tab, the Dock), cmux's own Figma full screen gets the key back if it had it
+    /// when the app resigned, so Esc reaches the route that leaves it. Meant to skip a click activation, but a real click
+    /// rarely reads as one (see `applicationDidBecomeActive`).
+    func keyFigmaFullscreenWindow(activatedByClick: Bool) {
+        guard let window = allBrowserPanelsForInspectorWindowClose().lazy
+            .compactMap({ $0.figmaFullscreenWindowToKey(currentKey: NSApp.keyWindow, activatedByClick: activatedByClick) }).first else { return }
+        window.makeKey()
+#if DEBUG
+        cmuxDebugLog("figma.fullscreen.keyOnActivation window=\(window.windowNumber)")
+#endif
+    }
+
     func applicationDidBecomeActive(_ notification: Notification) {
+        // cmux-rbf (#cm-73.52): on the next turn only, so the code below reads the key window AppKit chose.
+        // A real click usually reads as neither here: the button is up by the time AppKit's activation event runs
+        // (`event=13`). So when full screen held the key as cmux was left, a click on the main window to come back is
+        // re-keyed to full screen anyway; read from the code, not seen. A known gap (Tom, 2026-11-19).
+        let activatedByClick = NSApp.currentEvent?.type == .leftMouseDown || NSEvent.pressedMouseButtons & 1 != 0
+#if DEBUG
+        cmuxDebugLog("figma.fullscreen.activation click=\(activatedByClick ? 1 : 0) event=\(NSApp.currentEvent?.type.rawValue ?? 0)")
+#endif
+        DispatchQueue.main.async { [weak self] in self?.keyFigmaFullscreenWindow(activatedByClick: activatedByClick) }
         PortScanner.shared.setTrackedAgentScanningPaused(false)
         let activationWindows = mainWindowsForVisibilityController()
         if mainWindowVisibilityController.finishPendingApplicationActivationRestore(windows: activationWindows, reason: .applicationDidBecomeActive) == nil, !hasVisibleMainTerminalWindow() {
@@ -2630,6 +2651,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationWillResignActive(_ notification: Notification) {
         guard !isTerminatingApp else { return }
+        let keyWindowAtResign = NSApp.keyWindow // cmux-rbf (#cm-73.52): for the one re-key on activation
+        for panel in allBrowserPanelsForInspectorWindowClose() { panel.noteAppResigned(keyWindow: keyWindowAtResign) }
         PortScanner.shared.setTrackedAgentScanningPaused(true)
         clearConfiguredShortcutChordState()
         if Self.shouldSaveSessionSnapshotOnApplicationResign(isTerminatingApp: isTerminatingApp) {
@@ -15235,6 +15258,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 #endif
 
         if isPlainEscape {
+            // cmux-rbf (#cm-73.52): WebKit never sees this Esc, so cmux's own Figma full screen leaves here, from its own window.
+            if let owner = allBrowserPanelsForInspectorWindowClose().first(where: { $0.figmaFullscreenTakesEscape(from: event.window) }) {
+                owner.requestFigmaFullscreen(enter: false)
+#if DEBUG
+                cmuxDebugLog("shortcut.escape figmaFullscreenLeave consumed=1 panel=\(owner.id.uuidString.prefix(5))")
+#endif
+                return true
+            }
             let activePaletteWindow = activeCommandPaletteWindow()
             let escapePaletteWindow: NSWindow? = {
                 if let targetWindow = commandPaletteTargetWindow {

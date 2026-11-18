@@ -103,6 +103,39 @@ struct FigmaPaneBackTests {
         #expect(try await pane.webView.evaluateJavaScript("window.cm73Place") as? String == "editor", "Forward reloaded the editor")
     }
 
+    // cmux-rbf (#cm-73.52): Back and Forward swap the web view, and WebKit's full-screen window must not hold it.
+    @Test("Back and Forward during full screen leave it first, and swap when WebKit reports it off")
+    func backAndForwardWaitForFullScreenToEnd() async throws {
+        let page = try wrapper()
+        let previewA = try FigmaPaneURL.destination(for: document, node: "12-2", wrapper: page).url
+        let pane = panel(on: previewA, wrapper: page)
+        defer { pane.close() }
+        let previewView = pane.webView
+        let loader = DocumentLoader()
+        try await loader.seed(previewView, value: "preview")
+        pane.publishObservedDocumentURL(previewA)
+        try #require(pane.switchFigmaPreviewAndEditor(wrapper: page))
+        let editorView = pane.webView
+        editorView.stopLoading()
+        try await loader.seed(editorView, value: "editor")
+        pane.publishObservedDocumentURL(editorLink("12-2"))
+
+        pane.isElementFullscreenActiveForTesting = true
+        pane.goBack()
+        #expect(pane.webView === editorView, "Back swapped while full screen held the page")
+        #expect(pane.figmaRefit.leaveRequestsForTesting == 1)
+        pane.isElementFullscreenActiveForTesting = false
+        pane.figmaFullscreenDidChange(active: false)
+        #expect(pane.webView === previewView, "Back did not follow once full screen ended")
+
+        pane.isElementFullscreenActiveForTesting = true
+        pane.goForward()
+        #expect(pane.webView === previewView, "Forward swapped while full screen held the page")
+        pane.isElementFullscreenActiveForTesting = false
+        pane.figmaFullscreenDidChange(active: false)
+        #expect(pane.webView === editorView, "Forward did not follow once full screen ended")
+    }
+
     @Test("Within the editor, Back walks the editor's own pages before it crosses to the preview")
     func backWalksEditorOwnPagesFirst() async throws {
         let page = try wrapper()

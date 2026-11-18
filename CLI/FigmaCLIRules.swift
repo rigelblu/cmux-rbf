@@ -423,6 +423,7 @@ enum FigmaUsage {
                         The editor ignores --node.
                         Run it after you draw or move boards. It works on Figma design files only.
                         It moves nothing on Figma's Log in page.
+                        It moves nothing while Figma's own full-screen button has the pane full screen, not cmux's.
                         It sends no key to a pane that is not showing, or while a text field in the pane has focus.
                         Counts the same pane goto does. --surface <handle> picks one.
       folder            Print the Figma folder for this directory as projectId,

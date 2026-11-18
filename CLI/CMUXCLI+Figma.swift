@@ -541,6 +541,9 @@ extension CMUXCLI {
             } catch let error as CLIError where error.v2Code == "invalid_state" && error.v2Reason == FigmaFit.notBoardReason {
                 // cmux-rbf (#cm-73.44): the preview shows Figma's Log in page or an error, which a redraw would break.
                 throw CLIError(message: FigmaFit.notBoardRefusal(handle: pane.handle))
+            } catch let error as CLIError where error.v2Code == "invalid_state" && error.v2Reason == FigmaFit.fullscreenReason {
+                // cmux-rbf (#cm-73.52): Figma's own full-screen button holds the pane, and a redraw would end it.
+                throw CLIError(message: FigmaFit.fullscreenRefusal(handle: pane.handle))
             }
 
         case .pressFit:

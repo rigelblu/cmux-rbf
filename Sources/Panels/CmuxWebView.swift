@@ -21,6 +21,16 @@ final class CmuxWebView: CmuxUndoableWebView {
     /// `FigmaPreviewPageGuard.pageAddress(for:)`.
     var figmaPreviewPageAddressForTesting: URL?
 
+    /// cmux-rbf (#cm-73.52): when this web view last took a left mouse-down, on `FigmaClickClock`. A Figma full-screen
+    /// request is honoured only within a second of one, since page script can post the request but can't fake this
+    /// AppKit event.
+    private(set) var lastLeftMouseDownUptime: TimeInterval?
+
+    var lastLeftMouseDownUptimeForTesting: TimeInterval? {
+        get { lastLeftMouseDownUptime }
+        set { lastLeftMouseDownUptime = newValue }
+    }
+
     /// One-shot app-owned internal navigations (file/data/blob/etc.) that
     /// must pass the browser URL policy's trusted-load seam. Page callbacks
     /// never add to this set.
@@ -953,6 +963,7 @@ final class CmuxWebView: CmuxUndoableWebView {
     // NSView (WKWebView), not to sibling SwiftUI overlays. Notify the panel system so
     // bonsplit focus tracks which pane the user clicked in.
     override func mouseDown(with event: NSEvent) {
+        lastLeftMouseDownUptime = FigmaClickClock.now() // cmux-rbf (#cm-73.52): not event.timestamp, whose base can differ from the reader's
         if diffViewerDocumentState.documentConfirmed {
             diffViewerDocumentState.invalidateFocusConfirmation()
         }
