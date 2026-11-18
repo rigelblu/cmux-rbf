@@ -127,10 +127,26 @@ struct AgentPaneMarkTests {
         let sash = rgba(9, 20), cross = rgba(32, 32)
         #expect(sash.r > 240 && sash.g > 240 && sash.b > 240 && sash.a == 255, "the frame is white: \(sash)")
         #expect(cross.r > 240 && cross.g > 240 && cross.b > 240 && cross.a == 255, "the cross is white: \(cross)")
-        let sky = rgba(20, 21), sunset = rgba(44, 43)
-        // 40 above both: `.3`'s grey mark (122, 122, 135) leans blue by 13, so a bare `>` passed on it.
-        #expect(sky.b > sky.r + 40 && sky.b > sky.g + 40, "the top-left pane is the blue-purple sky: \(sky)")
-        #expect(sunset.r > 200 && sunset.g < 120 && sunset.b < 100, "the bottom-right pane is red-orange: \(sunset)")
+        // cmux-rbf: changed on purpose (#cm-126.13, 2026-11-18). Was one blue-to-red-orange gradient across the four panes
+        // and a grey border; Tom asked for no reddish panes, each pane its own colour, pixelated glass and no border.
+        let edge = rgba(6, 32)
+        #expect(edge.r > 240 && edge.g > 240 && edge.b > 240, "no grey border on the frame's edge: \(edge)")
+        // Each pane: its base-colour cell, and a lighter cell of the same pane (the 3 × 3 tint blocks).
+        let green = rgba(13, 14), greenLight = rgba(13, 20)
+        let blue = rgba(43, 20), blueLight = rgba(37, 14)
+        let yellow = rgba(20, 36), yellowLight = rgba(13, 36)
+        let purple = rgba(43, 49), purpleLight = rgba(43, 36)
+        #expect(green.g > green.r + 60 && green.g > green.b + 50, "top-left is green: \(green)")
+        #expect(blue.b > blue.r + 100 && blue.b > blue.g + 50, "top-right is blue: \(blue)")
+        #expect(yellow.r > 230 && yellow.g > 170 && yellow.b < yellow.g - 80, "bottom-left is yellow: \(yellow)")
+        #expect(purple.r > purple.g + 50 && purple.b > purple.g + 70, "bottom-right is purple: \(purple)")
+        for (name, base, light) in [("green", green, greenLight), ("blue", blue, blueLight),
+                                    ("yellow", yellow, yellowLight), ("purple", purple, purpleLight)] {
+            // No channel near black, the way the old red-orange (≈ 229, 57, 53) had.
+            #expect(min(base.r, base.g, base.b) > 60, "the \(name) pane is no strong red or orange: \(base)")
+            let gap = max(abs(light.r - base.r), abs(light.g - base.g), abs(light.b - base.b))
+            #expect(gap >= 30, "the \(name) pane's glass is pixelated, not flat: \(base) vs \(light)")
+        }
     }
 
     @Test("paneHoldsAgentPane is true only for a pane with an Agent Pane among its tabs")
