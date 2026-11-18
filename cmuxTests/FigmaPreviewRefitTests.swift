@@ -26,12 +26,15 @@ struct FigmaPreviewRefitTests {
         isLoading: Bool = false,
         report: Refit.Report? = board,
         inFlight: Bool = false,
-        sinceFinish: Duration? = nil
+        sinceFinish: Duration? = nil,
+        fullscreen: Refit.Fullscreen = .none,
+        sizeRule: Refit.SizeRule = .settled
     ) -> Refit.Decision {
         Refit.decide(
             trigger: trigger, remembered: remembered, now: now, isPreview: isPreview,
             isShowing: isShowing, motion: motion, isLoading: isLoading,
-            lastReport: report, refitInFlight: inFlight, sinceFinish: sinceFinish
+            lastReport: report, refitInFlight: inFlight, sinceFinish: sinceFinish,
+            fullscreen: fullscreen, sizeRule: sizeRule
         )
     }
 
@@ -243,5 +246,68 @@ struct FigmaPreviewRefitTests {
         #expect(Refit.Report(snapshot: drawn)?.doc == nil, "no doc in the report is no doc, not zero")
         #expect(Refit.Report(snapshot: ["state": "still", "report": NSNull()]) == nil)
         #expect(Refit.Report(snapshot: ["state": "still"]) == nil)
+    }
+    // MARK: cm-73.52: a full screen Figma's own page asked for
+
+    @Test func aFullScreenFigmaPutThereItselfMovesNothingForAnyTrigger() {
+        let off = CGSize(width: 900, height: 600)
+        for trigger in [Refit.Trigger.size, .key, .cli] {
+            #expect(decide(trigger, now: off, fullscreen: .page) == .skip(.fullscreen), "\(trigger.rawValue)")
+        }
+    }
+
+    @Test func cmuxsOwnFullScreenAndNoFullScreenDecideAsBefore() {
+        let off = CGSize(width: 900, height: 600)
+        for fullscreen in [Refit.Fullscreen.none, .cmux] {
+            #expect(decide(.size, now: off, fullscreen: fullscreen) == .move(.differs), "\(fullscreen)")
+            #expect(decide(.key, fullscreen: fullscreen) == .move(.asked), "\(fullscreen)")
+            #expect(decide(.cli, fullscreen: fullscreen) == .move(.asked), "\(fullscreen)")
+        }
+    }
+
+    @Test func theFullScreenSkipSitsRightAfterTheEditorAndLoadingGuards() {
+        let off = CGSize(width: 900, height: 600)
+        #expect(decide(now: off, isPreview: false, fullscreen: .page) == .skip(.editor))
+        #expect(decide(now: off, isLoading: true, fullscreen: .page) == .skip(.loading))
+        #expect(decide(now: off, inFlight: true, fullscreen: .page) == .skip(.fullscreen), "a redraw running doesn't hide it")
+        #expect(decide(now: off, isShowing: false, fullscreen: .page) == .skip(.fullscreen))
+        #expect(decide(now: off, motion: .playing, fullscreen: .page) == .skip(.fullscreen))
+        let deck = Refit.Report(path: "/slides/KEY/slug", player: false, drawn: true)
+        #expect(decide(now: off, report: deck, fullscreen: .page) == .skip(.fullscreen), "even a page that is no board")
+    }
+
+    @Test func fitIsRefusedByNameWhileFigmasOwnFullScreenHoldsThePane() {
+        #expect(Refit.answer(for: .skip(.fullscreen)) == .refused(.fullscreen))
+        #expect(Refit.answer(for: .skip(.redrawing)) == .fitsItself(.redrawing))
+        #expect(Refit.answer(for: .move(.asked)) == .moved)
+        #expect(Refit.Reason.fullscreen.rawValue == "fullscreen", "the app puts this in data.reason, and the CLI reads it")
+    }
+
+    @Test func aFullScreenIsFigmasOwnUnlessCmuxAskedForIt() {
+        #expect(Refit.Fullscreen(isActive: false, cmuxOwns: false) == .none)
+        #expect(Refit.Fullscreen(isActive: false, cmuxOwns: true) == .none, "a flag left over from nothing is not a full screen")
+        #expect(Refit.Fullscreen(isActive: true, cmuxOwns: true) == .cmux)
+        #expect(Refit.Fullscreen(isActive: true, cmuxOwns: false) == .page)
+    }
+
+    // MARK: cm-73.52: the re-check at a re-fit's end moves only past 2 pt
+
+    @Test func theRecheckIgnoresFigmasOnePointSettleAndTwoPointsExactly() {
+        for delta in [CGFloat(1), -1, 2, -2] {
+            #expect(decide(now: CGSize(width: 800 + delta, height: 600), sizeRule: .recheck) == .skip(.same), "width \(delta)")
+            #expect(decide(now: CGSize(width: 800, height: 600 + delta), sizeRule: .recheck) == .skip(.same), "height \(delta)")
+        }
+    }
+
+    @Test func theRecheckMovesFromMoreThanTwoPointsInEitherDirection() {
+        for delta in [CGFloat(2.5), -2.5, 3, 300, -300] {
+            #expect(decide(now: CGSize(width: 800 + delta, height: 600), sizeRule: .recheck) == .move(.differs), "width \(delta)")
+            #expect(decide(now: CGSize(width: 800, height: 600 + delta), sizeRule: .recheck) == .move(.differs), "height \(delta)")
+        }
+    }
+
+    @Test func theOrdinaryRuleStillMovesAtOnePoint() {
+        #expect(decide(now: CGSize(width: 801, height: 600), sizeRule: .settled) == .move(.differs))
+        #expect(Refit.recheckThreshold == 2)
     }
 }

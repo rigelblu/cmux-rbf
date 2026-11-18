@@ -2437,6 +2437,11 @@ final class BrowserPanel: Panel, ObservableObject {
         }
     }
     @Published private(set) var isElementFullscreenActive: Bool = false
+    /// cmux-rbf (#cm-73.52): the re-fit tests drive WebKit's full-screen state through this. Reject a revert of this hunk on upstream sync.
+    var isElementFullscreenActiveForTesting: Bool {
+        get { isElementFullscreenActive }
+        set { isElementFullscreenActive = newValue }
+    }
     private var searchNeedleCancellable: AnyCancellable?
 
     /// Find-in-page search execution: generates the find scripts, evaluates them against the
@@ -2776,6 +2781,7 @@ final class BrowserPanel: Panel, ObservableObject {
             refreshWebViewLifecycleState()
             return
         }
+        if !visible { leaveFigmaFullscreenWhenHidden(reason: reason) } // cmux-rbf (#cm-73.52): a repeated hide report is not a hide
 
         if changed || isFirstVisibilityRecord {
             isWebViewVisibleInUI = visible
@@ -5045,6 +5051,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 if didChangeViewportOwnership, !isElementFullscreenActive {
                     self.scheduleBrowserViewportHostRestoration(reason: "fullscreenExit")
                 }
+                self.figmaFullscreenDidChange(active: isElementFullscreenActive) // cmux-rbf (#cm-73.52): last, so queued swaps run after the exit is handled. Reject a revert of this hunk on upstream sync.
 #if DEBUG
                 cmuxDebugLog(
                     "browser.fullscreen.state panel=\(self.id.uuidString.prefix(5)) " +
@@ -5808,6 +5815,11 @@ final class BrowserPanel: Panel, ObservableObject {
         guard let address = currentURL ?? webView.url,
               FigmaTabMark.applies(address: address, showsAddressBar: isOmnibarVisible, wrapper: wrapper),
               let document = FigmaPaneURL.documentURL(fromPaneURL: address, wrapper: wrapper) else { return false }
+        // cmux-rbf (#cm-73.52): WebKit's full-screen window must not hold the web view this swap detaches; leave first.
+        if figmaFullscreenHoldsPage {
+            afterLeavingFigmaFullscreen { [weak self] in _ = self?.switchFigmaPreviewAndEditor(wrapper: wrapper) }
+            return true
+        }
         let showingPreview = FigmaPaneURL.isWrapperPage(address, wrapper: wrapper)
         let destination: URL
         if showingPreview {
@@ -5941,6 +5953,7 @@ final class BrowserPanel: Panel, ObservableObject {
             if action == "toggle" { _ = toggleFigmaMotion() }
             if action == "still" { showFigmaStill() }
             if action == "fit" { refitFigmaPreview(trigger: .key) } // cmux-rbf (#cm-73.46, #cm-73.44). Reject a revert of this hunk on upstream sync.
+            if action == "fullscreen" { requestFigmaFullscreen(enter: (body["enter"] as? Bool) ?? true) } // cmux-rbf (#cm-73.52). Reject a revert of this hunk on upstream sync.
         } else { applyFigmaMotionSnapshot(body) }
     }
 
@@ -6151,6 +6164,11 @@ final class BrowserPanel: Panel, ObservableObject {
     /// history handled the press; false leaves it to the pane's ordinary Back or Forward.
     private func goFigmaHistory(back: Bool) -> Bool {
         guard figmaHistory.isActive, !isOmnibarVisible else { return false }
+        // cmux-rbf (#cm-73.52): Back and Forward can swap the web view; wait for full screen to end first.
+        if figmaFullscreenHoldsPage {
+            afterLeavingFigmaFullscreen { [weak self] in _ = self?.goFigmaHistory(back: back) }
+            return true
+        }
         figmaHistoryFollowShowing(fromObserver: false)
         if let place = back ? figmaHistory.back() : figmaHistory.forward() {
             showFigmaHistoryPlace(place)

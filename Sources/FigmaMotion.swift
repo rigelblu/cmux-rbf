@@ -215,6 +215,16 @@ enum FigmaMotion {
       // (Scenario 234, 2026-10-29), so the frame holds its clock from its own pagehide.
       window.addEventListener('pagehide', function () { endPan(); clock('freeze'); }); // cmux-rbf (#cm-73.41): never leave a pointer held.
       window.addEventListener('message', function (e) {
+        // cmux-rbf (#cm-73.52): a full-screen request is relayed only from a child frame on Figma's own origins.
+        if (e.data && e.data.cmuxKey === 'fullscreen') {
+          if (!/^https:\/\/(www|embed)\.figma\.com$/.test(e.origin || '')) return;
+          for (var j = 0; j < window.frames.length; j++) {
+            if (e.source !== window.frames[j]) continue;
+            window.parent.postMessage({ cmuxKey: 'fullscreen', enter: e.data.enter !== false, nested: true }, up);
+            return;
+          }
+          return;
+        }
         // Child clock reports and fit requests travel through their own parent, never an arbitrary window.
         // cmux-rbf (#cm-73.44): the forwarded copy carries nested: true, set here on the copy so a child can't remove it.
         if (e.data && (e.data.cmuxClockReport === true || e.data.cmuxKey === 'fit' || e.data.cmuxPanReport === true)) { // cmux-rbf (#cm-73.41)
@@ -229,6 +239,12 @@ enum FigmaMotion {
         if (e.source !== window.parent) return;
         if (parentOrigin === 'https://www.figma.com' && e.origin && e.origin !== 'null' && e.origin !== parentOrigin) return;
         var data = e.data || {};
+        // cmux-rbf (#cm-73.52): only cmux's page (the source is window.parent, and the origin is checked above) says its page is full screen; its children hear it too.
+        if (typeof data.cmuxFullscreen === 'boolean') {
+          setCmuxFullscreen(data.cmuxFullscreen);
+          for (var k = 0; k < window.frames.length; k++) window.frames[k].postMessage({ cmuxFullscreen: data.cmuxFullscreen }, '*');
+          return;
+        }
         if (!data.cmuxClockCommand) return;
         if (data.kind === 'still' || data.kind === 'player') {
           var node = data.node === undefined ? null : cmuxFigmaNode(data.node);
@@ -259,6 +275,49 @@ enum FigmaMotion {
         e.preventDefault();
         window.parent.postMessage({ cmuxKey: 'fit' }, up);
       }, true);
+      // cmux-rbf (#cm-73.52): outside the player, Figma's full-screen request goes to cmux, which puts its own iframe full
+      // screen, so a re-fit's redraw can't end it. The panel, not this frame, checks that Tom clicked.
+      var cmuxFullscreen = false;
+      function setCmuxFullscreen(value) {
+        if (player || value === cmuxFullscreen) return;
+        cmuxFullscreen = value;
+        ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (type) {
+          document.dispatchEvent(new Event(type, { bubbles: true }));
+        });
+      }
+      if (!player) {
+        var cmuxAskFullscreen = function () {
+          window.parent.postMessage({ cmuxKey: 'fullscreen', enter: true }, up);
+          return Promise.resolve();
+        };
+        try { Element.prototype.requestFullscreen = cmuxAskFullscreen; } catch (e) {}
+        try { Element.prototype.webkitRequestFullscreen = cmuxAskFullscreen; } catch (e) {}
+        // Figma's icon reads the document's full-screen element, and its exit asks the document to leave. While cmux's page
+        // is full screen the frame says it is, so the icon shows "exit", and the exit is a request to cmux. The native
+        // getters are answered when cmux's page isn't full screen.
+        var cmuxNativeGetter = function (name) {
+          for (var owner = document; owner; owner = Object.getPrototypeOf(owner)) {
+            var found = Object.getOwnPropertyDescriptor(owner, name);
+            if (found) return found.get || null;
+          }
+          return null;
+        };
+        ['fullscreenElement', 'webkitFullscreenElement'].forEach(function (name) {
+          var native = cmuxNativeGetter(name);
+          try {
+            Object.defineProperty(document, name, { configurable: true, get: function () {
+              return cmuxFullscreen ? document.documentElement : (native ? native.call(document) : null);
+            }});
+          } catch (e) {}
+        });
+        var cmuxAskExit = function () {
+          window.parent.postMessage({ cmuxKey: 'fullscreen', enter: false }, up);
+          return Promise.resolve();
+        };
+        ['exitFullscreen', 'webkitExitFullscreen', 'webkitCancelFullScreen'].forEach(function (name) {
+          try { document[name] = cmuxAskExit; } catch (e) {}
+        });
+      }
       report();
       reportFirstDrawnFrame();
     })();
@@ -306,6 +365,13 @@ enum FigmaMotion {
         window.webkit.messageHandlers.cmuxFigmaMotion.postMessage(body);
       }
     }
+    // cmux-rbf (#cm-73.52): whether cmux's page is full screen, told to the frame so Figma's icon can follow.
+    function sendFullscreen() {
+      var f = frame();
+      if (f && f.contentWindow) f.contentWindow.postMessage({ cmuxFullscreen: !!(document.fullscreenElement || document.webkitFullscreenElement) }, '*');
+    }
+    document.addEventListener('fullscreenchange', sendFullscreen);
+    document.addEventListener('webkitfullscreenchange', sendFullscreen);
     function send(command) {
       var f = frame();
       if (f && f.contentWindow) f.contentWindow.postMessage(Object.assign({ cmuxClockCommand: true }, command), '*');
@@ -387,9 +453,11 @@ enum FigmaMotion {
       // cmux-rbf (#cm-73.41): pan telemetry must never become the report fit reads.
       if (r.cmuxPanReport === true) { post({ panReport: r }); return; }
       if (r.cmuxKey === 'fit') { post({ action: 'fit' }); return; }
+      if (r.cmuxKey === 'fullscreen') { post({ action: 'fullscreen', enter: r.enter !== false }); return; } // cmux-rbf (#cm-73.52)
       if (r.cmuxClockReport !== true) return;
       // A nested frame's report (the relay always tags it) is read for the player and the pending kind, never kept as the frame's.
       if (r.nested !== true) lastReport = r;
+      if (r.drawn === true && r.nested !== true) sendFullscreen(); // cmux-rbf (#cm-73.52): a redraw is a new document.
       if (pendingKind && /^\/(design|file|proto)\//.test(r.path || '')) {
         if ((pendingKind === 'player') === r.player) pendingKind = null;
         else send({ kind: pendingKind });

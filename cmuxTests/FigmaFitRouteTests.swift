@@ -274,6 +274,21 @@ struct FigmaFitRouteTests {
         #expect(f.figma.currentURL == address)
     }
 
+    // cmux-rbf (#cm-73.52): Figma's own full screen is refused by name, so the CLI can say why fit moved nothing.
+    @Test func fitWhileFigmasOwnFullScreenHoldsThePaneIsInvalidStateWithTheReasonAndSendsNothing() async throws {
+        let f = try await fixture(); defer { tearDown(f) }
+        f.figma.isElementFullscreenActiveForTesting = true
+        let reply = try await fit(f)
+        try #require(reply["ok"] as? Bool == false, "\(reply)")
+        let error = try #require(reply["error"] as? [String: Any])
+        #expect(error["code"] as? String == "invalid_state")
+        #expect((error["data"] as? [String: Any])?["reason"] as? String == FigmaFit.fullscreenReason)
+        await settle()
+        try await flush(f)
+        #expect(try await commands(f).isEmpty, "no script was evaluated")
+        #expect(!f.figma.figmaRefit.inFlight)
+    }
+
     @Test func fitOnTheEditorKeepsTodaysPathAndSendsNoRefit() async throws {
         let f = try await fixture(); defer { tearDown(f) }
         report(f, path: "/design/KEY/slug")
