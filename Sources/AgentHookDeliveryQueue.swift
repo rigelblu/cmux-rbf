@@ -1,3 +1,4 @@
+import CmuxAgentJournal
 import Foundation
 import OSLog
 
@@ -70,6 +71,8 @@ actor AgentHookDeliveryQueue {
     nonisolated private let maximumOutstandingBestEffortEvents: Int
     private let capacityContinuation: AsyncStream<Void>.Continuation
     private let delivery: Delivery
+    /// Where the admission decision reads the agent event table; a test passes its own so no test touches the shared store. (#cm-124.6)
+    nonisolated private let toolRowTable: @Sendable () -> AgentEventTable
     private let maximumConcurrentDeliveries: Int
     private let maximumOrdinaryConcurrentDeliveries: Int
     private let maximumBestEffortConcurrentDeliveries: Int
@@ -98,6 +101,7 @@ actor AgentHookDeliveryQueue {
         maximumIngressEvents: Int = 8,
         maximumTerminalIngressEvents: Int = 4,
         maximumBarrierIngressEvents: Int = 4,
+        toolRowTable: @escaping @Sendable () -> AgentEventTable = { AgentEventTableStore.shared.table }, // (#cm-124.6)
         delivery: @escaping Delivery
     ) {
         precondition(maximumConcurrentDeliveries > 0)
@@ -128,6 +132,7 @@ actor AgentHookDeliveryQueue {
         maximumOutstandingBestEffortEvents = max(1, maximumConcurrentDeliveries - 1)
         capacityContinuation = capacityPair.continuation
         self.delivery = delivery
+        self.toolRowTable = toolRowTable
         self.maximumConcurrentDeliveries = maximumConcurrentDeliveries
         maximumOrdinaryConcurrentDeliveries = max(
             1,
@@ -172,7 +177,8 @@ actor AgentHookDeliveryQueue {
     /// Synchronously transfers ownership to bounded ingress. The socket can
     /// acknowledge immediately after this returns true; false fails open.
     nonisolated func enqueue(_ event: AgentHookDeliveryEvent) -> Bool {
-        let admittedEvent = event.admittedToQueue(at: ContinuousClock().now)
+        // (#cm-124.6) the row-tool word is decided here, once; the class, the retry count, the release and the stamp read it.
+        let admittedEvent = event.admittedToQueue(at: ContinuousClock().now).decidingToolRow(table: toolRowTable)
         let admissionClass: AdmissionClass
         if admittedEvent.isBestEffortTelemetry {
             admissionClass = .bestEffortTool

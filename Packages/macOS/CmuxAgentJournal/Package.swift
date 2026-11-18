@@ -23,7 +23,8 @@ let package = Package(
         ),
         .testTarget(
             name: "CmuxAgentJournalTests",
-            dependencies: ["CmuxAgentJournal"]
+            dependencies: ["CmuxAgentJournal"],
+            exclude: ["Fixtures"] // (#cm-124.6) read by path in the test, shared with cmuxTests/CLIToolRowTests
         ),
     ]
 )

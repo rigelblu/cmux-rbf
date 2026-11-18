@@ -36,9 +36,9 @@ struct AgentEventTableTests {
               index: 0, rule: .unknownMeaning, value: "aprooval"),
         .init(name: "idle is built-in only", rows: #"[{"agent":"claude","notification":"x","means":"idle"}]"#,
               index: 0, rule: .unknownMeaning, value: "idle"),
-        .init(name: "tool row before cm-124.6",
-              rows: #"[{"agent":"claude","tool":"AskUserQuestion","means":"question"}]"#,
-              index: 0, rule: .unknownKey, value: "tool"),
+        .init(name: "an unknown key", // (#cm-124.6) `tool` is a row key now; the old case used it as the unknown one
+              rows: #"[{"agent":"claude","event":"x","notification":"x","means":"question"}]"#,
+              index: 0, rule: .unknownKey, value: "event"),
         .init(name: "row is a string", rows: #"["claude"]"#, index: 0, rule: .rowNotAnObject, value: nil),
         .init(name: "agentEvents is an object", rows: #"{"agent":"claude"}"#, index: nil, rule: .notAList, value: nil),
         .init(name: "agentEvents is null", rows: "null", index: nil, rule: .notAList, value: nil),

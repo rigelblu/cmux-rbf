@@ -177,15 +177,30 @@ def main() -> int:
         check(expected_list()[1] in out, "bad row: list still prints", result.stdout)
         app.close()
 
-        # 5. Every other rule's line, each at most 80 cells.
+        # 5. Every other rule's line, each at most 80 cells (the unknown-key line may overflow by its key's length beyond 4).
         cases = [
             ('[{"notification": "x", "means": "ignore"}]', '  agentEvents[0]: "agent" is missing; name one, such as "claude", or "*"'),
-            ('[{"agent": "claude", "means": "ignore"}]', '  agentEvents[0]: "notification" is missing; name a type, such as "idle_prompt"'),
+            # (#cm-124.6) a row with neither key is `noMatchKey`; the empty-string case keeps the `notification` line
+            ('[{"agent": "claude", "notification": "", "means": "ignore"}]', '  agentEvents[0]: "notification" is missing; name a type, such as "idle_prompt"'),
+            ('[{"agent": "claude", "means": "ignore"}]', '  agentEvents[0]: a row needs "notification" (a type) or "tool" (a Claude tool)'),
             ('[{"agent": "claude", "notification": "x"}]', '  agentEvents[0]: "means" is missing; use question, approval, resolved or ignore'),
             ('[{"agent": 3, "notification": "x", "means": "ignore"}]', '  agentEvents[0]: "agent" must be text, such as "claude"'),
             ("[" + ROW + "," + ROW + "]", "  agentEvents[1]: same agent and notification as agentEvents[0]; keep one"),
-            ('[{"agent": "claude", "tool": "AskUserQuestion", "means": "question"}]',
-             '  agentEvents[0]: "tool" isn\'t a row key; a row has agent, notification, means'),
+            # (#cm-124.6) `tool` is a row key now: the unknown key is `event`, and the tool rules have their lines
+            ('[{"agent": "claude", "event": "x", "notification": "x", "means": "ignore"}]',
+             '  agentEvents[0]: "event" is not a key: use agent, notification or tool, means'),
+            ('[{"agent": "claude", "notification": "x", "tool": "Write", "means": "question"}]',
+             '  agentEvents[0]: a row has "notification" or "tool", not both'),
+            ('[{"agent": "claude", "tool": "Write", "means": "ignore"}]',
+             '  agentEvents[0]: means "ignore" on a tool row: use question or plan-review'),
+            ('[{"agent": "claude", "tool": "Write", "means": "question"}, {"agent": "claude", "tool": "Write", "means": "question"}]',
+             "  agentEvents[1]: same agent and tool as agentEvents[0]; keep one"),
+            ('[{"agent": "claude", "tool": "Write"}]',
+             '  agentEvents[0]: "means" is missing; use question or plan-review'),
+            ('[{"agent": "claude", "tool": "", "means": "question"}]',
+             '  agentEvents[0]: "tool" is missing; name a Claude tool, like "AskUserQuestion"'),
+            ('[{"agent": "claude", "tool": 3, "means": "question"}]',
+             '  agentEvents[0]: "tool" must be text, such as "AskUserQuestion"'),
             ('["claude"]', "  agentEvents[0]: a row must be an object"),
             ('{"agent": "claude"}', "  agentEvents: must be a list of rows"),
         ]
@@ -193,7 +208,9 @@ def main() -> int:
             write_global(home, '{"agentEvents": ' + rows + "}")
             result = run_cli(cli, ["config", "doctor"], home, missing)
             check(expected in lines(result), f"rule line {rows}", result.stdout)
-            check(len(expected) <= 80, f"rule line fits 80 cells {rows}", str(len(expected)))
+            # (#cm-124.6) the unknown-key line embeds the user's own key name: only that name's length beyond 4 may overflow
+            extra = len("event") - 4 if "is not a key" in expected else 0
+            check(len(expected) <= 80 + extra, f"rule line fits 80 cells {rows}", str(len(expected)))
             check(result.returncode == 1, f"rule exit {rows}", str(result.returncode))
 
         # 6. A warning for an agent whose notifications never reach the table: exit 0, status stays OK.

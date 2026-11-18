@@ -147779,6 +147779,124 @@
         }
       }
     },
+    "command.cmuxConfig.issue.agentEvents.badToolMeaning.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means \"%@\" on a tool row: use question or plan-review"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: ツール行の means「%@」: question または plan-review を使用してください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：工具行的 means「%@」：请使用 question 或 plan-review"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means „%@“ in einer Tool-Zeile: verwende question oder plan-review"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : means « %@ » sur une ligne d'outil : utilisez question ou plan-review"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: ‏means \"%@\" في صف أداة: استخدم question أو plan-review"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: means «%@» en una fila de herramienta: usa question o plan-review"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：工具列的 means「%@」：請使用 question 或 plan-review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 도구 행의 means \"%@\": question 또는 plan-review 중 하나를 사용하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.bothMatchKeys.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: a row has \"notification\" or \"tool\", not both"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 行には \"notification\" か \"tool\" のどちらか一方だけを指定します"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：行只能有 \"notification\" 或 \"tool\"，不能同时有两者"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: eine Zeile hat \"notification\" oder \"tool\", nicht beides"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : une ligne contient « notification » ou « tool », pas les deux"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: يحتوي الصف على \"notification\" أو \"tool\"، وليس كليهما"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: una fila tiene \"notification\" o \"tool\", no ambas"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：列只能有 \"notification\" 或 \"tool\"，不能同時有兩者"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 행에는 \"notification\" 또는 \"tool\" 중 하나만 있어야 하며 둘 다는 안 됩니다"
+          }
+        }
+      }
+    },
     "command.cmuxConfig.issue.agentEvents.duplicateRow.detail": {
       "extractionState": "manual",
       "localizations": {
@@ -147834,6 +147952,65 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@: agent와 notification이 agentEvents[%@]와 같습니다. 하나만 남겨 주세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.duplicateToolRow.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: same agent and tool as agentEvents[%@]; keep one"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: agentEvents[%@] と同じ agent と tool です。どちらか一つにしてください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：agent 和 tool 与 agentEvents[%@] 相同；请只保留一个"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: gleicher agent und gleiches tool wie agentEvents[%@]; behalte nur eine"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : mêmes agent et tool que agentEvents[%@] ; n'en gardez qu'une"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: نفس agent وtool الموجودين في agentEvents[%@]؛ احتفظ بواحد فقط"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: mismos agent y tool que agentEvents[%@]; conserva solo uno"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：agent 與 tool 與 agentEvents[%@] 相同；請只保留一個"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: agent와 tool이 agentEvents[%@]와 같습니다. 하나만 남겨 주세요"
           }
         }
       }
@@ -148011,6 +148188,183 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@: \"notification\"이 없습니다. \"idle_prompt\" 같은 유형을 지정하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.missingTool.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"tool\" is missing; name a Claude tool, like \"AskUserQuestion\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"tool\" がありません。\"AskUserQuestion\" などの Claude のツールを指定してください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"tool\"；请指定一个 Claude 工具，如 \"AskUserQuestion\""
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"tool\" fehlt; nenne ein Claude-Tool, etwa \"AskUserQuestion\""
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : \"tool\" est manquant ; indiquez un outil de Claude, comme \"AskUserQuestion\""
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"tool\" مفقود؛ سمِّ أداة من Claude، مثل \"AskUserQuestion\""
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: falta \"tool\"; indica una herramienta de Claude, como \"AskUserQuestion\""
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"tool\"；請指定一個 Claude 工具，例如 \"AskUserQuestion\""
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"tool\"이 없습니다. \"AskUserQuestion\" 같은 Claude 도구를 지정하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.missingToolMeans.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" is missing; use question or plan-review"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" がありません。question または plan-review を指定してください"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"means\"；请使用 question 或 plan-review"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" fehlt; verwende question oder plan-review"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : \"means\" est manquant ; utilisez question ou plan-review"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\" مفقود؛ استخدم question أو plan-review"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: falta \"means\"; usa question o plan-review"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：缺少 \"means\"；請使用 question 或 plan-review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: \"means\"가 없습니다. question 또는 plan-review 중 하나를 사용하세요"
+          }
+        }
+      }
+    },
+    "command.cmuxConfig.issue.agentEvents.noMatchKey.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: a row needs \"notification\" (a type) or \"tool\" (a Claude tool)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 行には \"notification\"(種類)か \"tool\"(Claude のツール)が必要です"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：行需要 \"notification\"（类型）或 \"tool\"（Claude 工具）"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: eine Zeile braucht \"notification\" (einen Typ) oder \"tool\" (ein Claude-Tool)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ : une ligne a besoin de « notification » (un type) ou de « tool » (un outil de Claude)"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: يحتاج الصف إلى \"notification\" (نوع) أو \"tool\" (أداة Claude)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: una fila necesita \"notification\" (un tipo) o \"tool\" (una herramienta de Claude)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：列需要 \"notification\"（類型）或 \"tool\"（Claude 工具）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: 행에는 \"notification\"(유형) 또는 \"tool\"(Claude 도구)이 필요합니다"
           }
         }
       }
@@ -148198,55 +148552,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: \"%@\" isn't a row key; a row has agent, notification, means"
+            "value": "%@: \"%@\" is not a key: use agent, notification or tool, means"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: \"%@\" は行のキーではありません。行には agent、notification、means を指定します"
+            "value": "%@: \"%@\" は行のキーではありません。行には agent、notification または tool と、means を指定します"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@：\"%@\" 不是行的键；行包含 agent、notification、means"
+            "value": "%@：\"%@\" 不是行的键；行包含 agent、notification 或 tool，以及 means"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: \"%@\" ist kein Zeilenschlüssel; eine Zeile hat agent, notification, means"
+            "value": "%@: \"%@\" ist kein Zeilenschlüssel; eine Zeile hat agent, notification oder tool und means"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ : « %@ » n'est pas une clé de ligne ; une ligne contient agent, notification, means"
+            "value": "%@ : « %@ » n'est pas une clé de ligne ; une ligne contient agent, notification ou tool, et means"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: \"%@\" ليس مفتاح صف؛ يحتوي الصف على agent وnotification وmeans"
+            "value": "%@: \"%@\" ليس مفتاح صف؛ يحتوي الصف على agent وnotification أو tool وmeans"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: \"%@\" no es una clave de fila; una fila tiene agent, notification, means"
+            "value": "%@: \"%@\" no es una clave de fila; una fila tiene agent, notification o tool, y means"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@：\"%@\" 不是列的鍵；列包含 agent、notification、means"
+            "value": "%@：\"%@\" 不是列的鍵；列包含 agent、notification 或 tool，以及 means"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: \"%@\"은(는) 행 키가 아닙니다. 행에는 agent, notification, means가 있습니다"
+            "value": "%@: \"%@\"은(는) 행 키가 아닙니다. 행에는 agent, notification 또는 tool, 그리고 means가 있습니다"
           }
         }
       }

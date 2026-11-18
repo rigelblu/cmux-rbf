@@ -393,3 +393,19 @@ extension CMUXCLI {
         return normalized.isEmpty ? nil : normalized
     }
 }
+
+extension CMUXCLI {
+    /// The word the app stamped for a Claude row tool's hook: `question` or `plan-review`; nil with no stamp or any other
+    /// value, which keeps the built-in path. The queue sets it after the allowlisted environment merge, so an agent can't set it through a queued hook; a process that runs `cmux hooks claude pre-tool-use` itself can, and that gives it nothing it couldn't do with other cmux commands. (#cm-124.6)
+    static func claudeToolRowMeaning(environment: [String: String]) -> AgentEventMeaning? {
+        guard let word = environment["CMUX_AGENT_TOOL_MEANS"] else { return nil }
+        return AgentEventMeaning.toolWords.first { $0.rawValue == word }
+    }
+
+    /// Whether Claude's `PermissionRequest` for `toolName` gets `{}` at once: the tool is a row tool in `table`, meaning
+    /// his winning row isn't one of the two built-in tools with its built-in word. (#cm-124.6)
+    static func feedHookAnswersEmpty(toolName: String, table: AgentEventTable) -> Bool {
+        guard !toolName.isEmpty else { return false }
+        return table.toolMeaning(agent: "claude", tool: toolName)?.isRowTool == true
+    }
+}

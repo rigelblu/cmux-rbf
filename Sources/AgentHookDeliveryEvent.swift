@@ -1,5 +1,6 @@
 import Foundation
 import CMUXAgentLaunch
+import CmuxAgentJournal
 
 /// An immutable non-decision hook accepted before downstream delivery begins.
 struct AgentHookDeliveryEvent: Sendable {
@@ -51,6 +52,11 @@ struct AgentHookDeliveryEvent: Sendable {
     let environment: [String: String]
     let sessionID: String?
     private(set) var queueAdmissionInstant: ContinuousClock.Instant?
+    /// The word a row tool's call means, decided once when the queue admits the event (#cm-124.6).
+    private(set) var toolMeans: AgentEventMeaning?
+    /// Claude's `tool_name` (`toolName` too), parsed once here for a `pre-tool-use` or `post-tool-use` and nil otherwise, so
+    /// the admission decision and `isBestEffortTelemetry` never re-parse the payload. (#cm-124.6)
+    let toolName: String?
 
     /// Events for one socket and surface retain lifecycle order. The agent PID
     /// is the fallback identity when no surface is available.
@@ -75,6 +81,10 @@ struct AgentHookDeliveryEvent: Sendable {
     /// tool events that can surface Needs input remain protected with lifecycle
     /// transitions and notifications.
     var isBestEffortTelemetry: Bool {
+        // (#cm-124.6) a row tool's pre-tool-use and post-tool-use are lifecycle events: they raise and retire a hand.
+        if toolMeans != nil {
+            return false
+        }
         if subcommand == "shell-exec" || subcommand == "shell-done" {
             return true
         }
@@ -87,10 +97,7 @@ struct AgentHookDeliveryEvent: Sendable {
         if agent == "claude", subcommand == "post-tool-use" {
             return true
         }
-        guard agent == "claude", subcommand == "pre-tool-use",
-              let data = payload.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let toolName = (object["tool_name"] ?? object["toolName"]) as? String else {
+        guard agent == "claude", subcommand == "pre-tool-use", let toolName else { // (#cm-124.6) parsed once, at init
             return false
         }
         return toolName != "AskUserQuestion" && toolName != "ExitPlanMode"
@@ -124,6 +131,8 @@ struct AgentHookDeliveryEvent: Sendable {
         self.relayBacked = params["relay_backed"] as? Bool ?? false
         self.environment = environment
         self.sessionID = Self.sessionID(from: payload)
+        self.toolName = agent == "claude" && (subcommand == "pre-tool-use" || subcommand == "post-tool-use")
+            ? Self.toolName(inPayload: payload) : nil // (#cm-124.6)
         self.queueAdmissionInstant = nil
     }
 
@@ -139,6 +148,32 @@ struct AgentHookDeliveryEvent: Sendable {
             return false
         }
         return true
+    }
+
+    /// Decides, once, whether this is a Claude call of a row tool, and stores the word on the event. (#cm-124.6)
+    ///
+    /// The queue calls this at admission with the table in force at that moment. The class, the retry count, the release
+    /// at completion and the handler's `CMUX_AGENT_TOOL_MEANS` all read the stored word, never the live table, so a
+    /// `cmux.json` save between admission and completion cannot leave a best-effort key outstanding.
+    /// - Parameter table: Read only for a non-relay Claude `pre-tool-use` or `post-tool-use` carrying a `tool_name`.
+    func decidingToolRow(table: () -> AgentEventTable) -> Self {
+        var decided = self
+        decided.toolMeans = nil
+        guard agent == "claude", !relayBacked,
+              subcommand == "pre-tool-use" || subcommand == "post-tool-use",
+              let tool = toolName,
+              let meaning = table().toolMeaning(agent: agent, tool: tool), meaning.isRowTool else {
+            return decided
+        }
+        decided.toolMeans = meaning.means
+        return decided
+    }
+
+    /// Claude's `tool_name` from a hook payload (`toolName` too); nil when absent or not text.
+    private static func toolName(inPayload payload: String) -> String? {
+        guard let data = payload.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return (object["tool_name"] ?? object["toolName"]) as? String
     }
 
     /// Anchors the delivery deadline to queue admission instead of process

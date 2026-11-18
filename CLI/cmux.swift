@@ -29012,9 +29012,19 @@ struct CMUXCLI {
             // through to the generic ".running" tail (which would leave a tab blocked
             // on a question / plan approval looking busy and silent).
             // https://github.com/manaflow-ai/cmux/issues/6606
-            if let toolName = parsedInput.object?["tool_name"] as? String,
-               toolName == "AskUserQuestion" || toolName == "ExitPlanMode",
+            // (#cm-124.6) A row tool (the app stamped `CMUX_AGENT_TOOL_MEANS` at admission) takes this branch too. A row that
+            // restates a built-in tool's word gets no stamp, so with no stamp the branch below is today's.
+            let toolRowWord = Self.claudeToolRowMeaning(environment: ProcessInfo.processInfo.environment)
+            // (#cm-124.6) The app decides from `tool_name` or `toolName`, so a stamped call reads both; an unstamped one keeps
+            // today's `tool_name` only.
+            let hookToolName = (parsedInput.object?["tool_name"] as? String)
+                ?? (toolRowWord == nil ? nil : parsedInput.object?["toolName"] as? String)
+            if let toolName = hookToolName,
+               toolName == "AskUserQuestion" || toolName == "ExitPlanMode" || toolRowWord != nil,
                let sessionId = parsedInput.sessionId {
+                let rowToolMarker = toolRowWord == nil ? nil : AgentToolRowMarker.detail(forTool: toolName)
+                let waitKind: AgentJournalEventKind = toolRowWord.map { $0 == .planReview ? .planReviewRequested : .questionRequested }
+                    ?? (toolName == "AskUserQuestion" ? .questionRequested : .planReviewRequested)
                 // Save the question / plan summary in the session so the Notification
                 // handler (when it does fire) reuses it instead of the generic
                 // "Claude Code needs your attention". The question / plan text is
@@ -29029,7 +29039,9 @@ struct CMUXCLI {
                     defaultValue: "Waiting for input"
                 )
                 let needsInputBody: String
-                if toolName == "AskUserQuestion" {
+                if toolRowWord != nil {
+                    needsInputBody = waitingBody // (#cm-124.6) a row tool's input isn't parsed, even when his row remaps a built-in tool: no question or plan text
+                } else if toolName == "AskUserQuestion" {
                     needsInputBody = describeAskUserQuestion(parsedInput.object) ?? waitingBody
                 } else {
                     needsInputBody = describeExitPlanMode(parsedInput.object) ?? waitingBody
@@ -29055,7 +29067,7 @@ struct CMUXCLI {
                 )
                 emitAgentJournalEvent(
                     client: client,
-                    kind: toolName == "AskUserQuestion" ? .questionRequested : .planReviewRequested,
+                    kind: waitKind, // (#cm-124.6)
                     source: "claude",
                     agentKey: Self.claudeCodeStatusKey,
                     sessionId: sessionId,
@@ -29063,6 +29075,7 @@ struct CMUXCLI {
                     surfaceId: existingSurfaceId,
                     isSubagent: isNestedAgentSession,
                     nativeEvent: reportedHookEventName(from: parsedInput) ?? "PreToolUse",
+                    detail: rowToolMarker, // (#cm-124.6)
                         attention: Self.semanticAttentionContext(parsedInput.rawObject),
                         occurredAtMs: Self.semanticOccurredAtMs(parsedInput.rawObject),
                     store: sessionStore,
@@ -29074,12 +29087,17 @@ struct CMUXCLI {
                 // other mode that following hook owns the status/bell and converges on
                 // the same needs-input state, so we only set the lifecycle here —
                 // doing both would double-ring the notification.
+                // (#cm-124.6) A row tool is the exception: its PermissionRequest gets `{}` from the Feed hook's early exit in
+                // `runFeedHook` (`feedHookAnswersEmpty`) and publishes nothing, so this hook owns the status and the banner
+                // in every mode. The two ends go together; `CLIToolRowTests` joins them.
                 //
                 // Read permission_mode from rawObject, which is either the
                 // original input or the transport-compacted canonical payload.
                 let permissionMode = (parsedInput.rawObject?["permission_mode"] as? String)
                     ?? (parsedInput.rawObject?["permissionMode"] as? String)
-                if permissionMode == "bypassPermissions" {
+                // (#cm-124.6) A row tool's permission gets `{}` at once and no Feed card, so this hook owns the status and the
+                // banner in every permission mode.
+                if permissionMode == "bypassPermissions" || toolRowWord != nil {
                     // Reuse the same localized "Needs input" value the in-app feed
                     // overlay sets (FeedCoordinator.needsInputStatusValue) so the two
                     // needs-input paths stay locale-consistent.
@@ -29112,8 +29130,8 @@ struct CMUXCLI {
                     _ = try? sendV1Command(
                         try semanticNotificationCommand(source: "claude", agentKey: Self.claudeCodeStatusKey,
                             sessionId: sessionId, workspaceId: workspaceId, surfaceId: existingSurfaceId,
-                            kind: toolName == "AskUserQuestion" ? .questionRequested : .planReviewRequested,
-                            rawObject: parsedInput.rawObject, payload: payload, cwd: hookCwd),
+                            kind: waitKind, rawObject: parsedInput.rawObject, payload: payload, cwd: hookCwd,
+                            detail: rowToolMarker), // (#cm-124.6)
                         client: client
                     )
                 }
@@ -39981,6 +39999,20 @@ export default CMUXSessionRestore;
         let toolName = firstString(in: stdinObj, keys: ["tool_name", "toolName"])
             ?? toolCall.flatMap { firstString(in: $0, keys: ["name"]) }
             ?? ""
+
+        // (#cm-124.6) Claude's permission for a row tool gets `{}` at once: no Feed card and no socket call, so Claude
+        // shows its own prompt and nothing holds it. This hook publishes nothing for it, so the `PreToolUse` branch of
+        // Claude's handler publishes the status and the banner in every permission mode (search `toolRowWord` in this file);
+        // the two ends go together, and `CLIToolRowTests` joins them. The rows come from the global file this hook reads itself (doctor's
+        // parse); a bad or unreadable file gives the built-in rows, so the tool keeps today's approval card.
+        // A relay-backed CLI (a `host:port` socket path, on a remote host) never answers `{}` here: the file it would read is
+        // the remote host's own, and the app stamps no relay event, so a remote Claude keeps the built-in rows.
+        let relayBacked = (client?.isRelayBacked ?? false) || (socketPath.map { SocketClient(path: $0).isRelayBacked } ?? false)
+        if source == "claude", rawEvent == "PermissionRequest", !relayBacked,
+           Self.feedHookAnswersEmpty(toolName: toolName, table: Self.agentEventTableFromGlobalFile()) {
+            print("{}")
+            return
+        }
 
         // Decide whether this event is Feed-actionable. Non-actionable
         // events are forwarded as telemetry (non-blocking) and exit `{}`

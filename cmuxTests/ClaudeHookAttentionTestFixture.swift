@@ -34,6 +34,9 @@ final class ClaudeHookAttentionTestFixture: @unchecked Sendable {
         context.cleanup()
     }
 
+    /// Extra environment for every CLI child: `CMUX_AGENT_TOOL_MEANS` is the stamp the app puts on a row tool's hook. (#cm-124.6)
+    var extraEnvironment: [String: String] = [:]
+
     var environment: [String: String] {
         ["HOME": context.root.path, "CFFIXED_USER_HOME": context.root.path,
          "PWD": context.root.path, "TMPDIR": context.root.path,
@@ -45,6 +48,7 @@ final class ClaudeHookAttentionTestFixture: @unchecked Sendable {
          "CMUX_WORKSPACE_ID": context.workspaceId, "CMUX_SURFACE_ID": context.surfaceId,
          "CMUX_CLAUDE_HOOK_STATE_PATH": context.root.appendingPathComponent("claude-hook-sessions.json").path,
          "CMUX_CLI_SENTRY_DISABLED": "1", "CMUX_CLAUDE_HOOK_SENTRY_DISABLED": "1"]
+            .merging(extraEnvironment, uniquingKeysWith: { _, extra in extra }) // (#cm-124.6)
     }
 
     /// Bounds every child through its termination callback, including SIGTERM grace.

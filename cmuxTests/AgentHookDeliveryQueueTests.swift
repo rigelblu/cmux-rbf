@@ -1,6 +1,8 @@
+import CmuxAgentJournal
 import Darwin
 import Foundation
 import Testing
+import os
 
 #if canImport(cmux_DEV)
 @testable import cmux_DEV
@@ -786,6 +788,92 @@ struct AgentHookDeliveryQueueTests {
         await process.deliver(event)
 
         #expect(try fixture.attemptCount() == 2)
+    }
+
+    @Test("A row tool's post-tool-use retries like a lifecycle event (#cm-124.6)")
+    func rowToolPostToolUseRetriesOneProcessFailure() async throws {
+        let fixture = try AgentHookDeliveryProcessFixture()
+        defer { fixture.remove() }
+        let process = AgentHookDeliveryProcess(
+            executableURLProvider: { fixture.executableURL },
+            processTimeout: .seconds(2),
+            terminationGrace: .milliseconds(100)
+        )
+        let rowTable = AgentEventTable(userRows: [.init(agent: "claude", tool: "Write", means: .question)])
+        let event = try makeEvent(
+            subcommand: "post-tool-use",
+            payload: #"{"session_id":"s1","tool_name":"Write","tool_use_id":"toolu_1"}"#,
+            surfaceID: "surface-row-tool"
+        ).decidingToolRow(table: { rowTable })
+
+        await process.deliver(event)
+
+        #expect(try fixture.attemptCount() == 2)
+    }
+
+    @Test("A row tool's event is never refused by the best-effort rule (#cm-124.6)")
+    func rowToolEventsTakeLifecycleAdmissionWhileBestEffortIsFull() async throws {
+        let blocked = #"{"tool_name":"Bash","tool_use_id":"hold"}"#
+        let probe = AgentHookDeliveryTestProbe(blockedPayloads: [blocked])
+        let rowTable = AgentEventTable(userRows: [.init(agent: "claude", tool: "Write", means: .question)])
+        let queue = AgentHookDeliveryQueue(
+            maximumConcurrentDeliveries: 2,
+            maximumResidentEvents: 4,
+            maximumIngressEvents: 4,
+            toolRowTable: { rowTable }
+        ) { event in
+            await probe.deliver(event)
+        }
+        #expect(queue.enqueue(try makeEvent(subcommand: "post-tool-use", payload: blocked, surfaceID: "surface-a")))
+        try await probe.waitUntilStarted(count: 1)
+        // The best-effort slot is taken, so a second Bash post-tool-use on another surface is refused...
+        #expect(!queue.enqueue(try makeEvent(
+            subcommand: "post-tool-use",
+            payload: #"{"tool_name":"Bash","tool_use_id":"second"}"#,
+            surfaceID: "surface-b"
+        )))
+        // ...but a row tool's post-tool-use is admitted as a lifecycle event.
+        #expect(queue.enqueue(try makeEvent(
+            subcommand: "post-tool-use",
+            payload: #"{"tool_name":"Write","tool_use_id":"toolu_1"}"#,
+            surfaceID: "surface-b"
+        )))
+        await probe.release(payload: blocked)
+        try await probe.waitUntilCompleted(count: 2)
+    }
+
+    @Test("A table change between enqueue and completion leaks no best-effort key (#cm-124.6)")
+    func tableChangeBetweenEnqueueAndCompletionStillReleasesTheKey() async throws {
+        let blocked = #"{"tool_name":"Write","tool_use_id":"toolu_1"}"#
+        let probe = AgentHookDeliveryTestProbe(blockedPayloads: [blocked])
+        let box = OSAllocatedUnfairLock<AgentEventTable>(initialState: .builtIn)
+        let queue = AgentHookDeliveryQueue(
+            maximumConcurrentDeliveries: 2,
+            maximumResidentEvents: 4,
+            maximumIngressEvents: 4,
+            toolRowTable: { box.withLock { $0 } }
+        ) { event in
+            await probe.deliver(event)
+        }
+        // No row for Write at admission: best-effort, so it holds the surface's best-effort key while it runs.
+        #expect(queue.enqueue(try makeEvent(subcommand: "pre-tool-use", payload: blocked, surfaceID: "surface-a")))
+        try await probe.waitUntilStarted(count: 1)
+        // He saves a row for Write while the hook is in flight.
+        box.withLock { $0 = AgentEventTable(userRows: [.init(agent: "claude", tool: "Write", means: .question)]) }
+        await probe.release(payload: blocked)
+        try await probe.waitUntilCompleted(count: 1)
+        // The key was released with the class decided at admission, so the next best-effort event on that surface is admitted.
+        var admitted = false
+        for _ in 0..<50 where !admitted {
+            admitted = queue.enqueue(try makeEvent(
+                agent: "cursor",
+                subcommand: "shell-exec",
+                payload: "after-table-change",
+                surfaceID: "surface-a"
+            ))
+            if !admitted { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        #expect(admitted, "a leaked best-effort key would drop every later best-effort event on this surface")
     }
 
     @Test("Best-effort tool delivery is not retried after downstream failure")
