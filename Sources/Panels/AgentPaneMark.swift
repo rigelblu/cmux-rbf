@@ -318,45 +318,86 @@ enum AgentPaneMark {
     ///
     ///     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
     ///     <defs>
-    ///     <linearGradient id="sky" gradientUnits="userSpaceOnUse" x1="0" y1="5.5" x2="0" y2="26.5">
-    ///     <stop offset="0" stop-color="#1976d2"/>
-    ///     <stop offset="0.36" stop-color="#ba68c8"/>
-    ///     <stop offset="0.66" stop-color="#e53935"/>
-    ///     <stop offset="1" stop-color="#e65100"/>
-    ///     </linearGradient>
+    ///     <clipPath id="p0">
+    ///     <path d="M7.5 5.5 H14.4 A0.8 0.8 0 0 1 15.2 6.3 V14.4 A0.8 0.8 0 0 1 14.4 15.2 H5.8 A0.8 0.8 0 0 1 5 14.4 V8 A2.5 2.5 0 0 1 7.5 5.5 Z"/>
+    ///     </clipPath>
+    ///     <clipPath id="p1">
+    ///     <path d="M17.6 5.5 H24.5 A2.5 2.5 0 0 1 27 8 V14.4 A0.8 0.8 0 0 1 26.2 15.2 H17.6 A0.8 0.8 0 0 1 16.8 14.4 V6.3 A0.8 0.8 0 0 1 17.6 5.5 Z"/>
+    ///     </clipPath>
+    ///     <clipPath id="p2">
+    ///     <path d="M5.8 16.8 H14.4 A0.8 0.8 0 0 1 15.2 17.6 V25.7 A0.8 0.8 0 0 1 14.4 26.5 H7.5 A2.5 2.5 0 0 1 5 24 V17.6 A0.8 0.8 0 0 1 5.8 16.8 Z"/>
+    ///     </clipPath>
+    ///     <clipPath id="p3">
+    ///     <path d="M17.6 16.8 H26.2 A0.8 0.8 0 0 1 27 17.6 V24 A2.5 2.5 0 0 1 24.5 26.5 H17.6 A0.8 0.8 0 0 1 16.8 25.7 V17.6 A0.8 0.8 0 0 1 17.6 16.8 Z"/>
+    ///     </clipPath>
     ///     </defs>
-    ///     <rect x="3" y="3.5" width="26" height="25" rx="4.5" fill="#ffffff" stroke="#7a7a87" stroke-width="1.4"/>
-    ///     <path d="M7.5 5.5 H14.4 A0.8 0.8 0 0 1 15.2 6.3 V14.4 A0.8 0.8 0 0 1 14.4 15.2 H5.8 A0.8 0.8 0 0 1 5 14.4 V8 A2.5 2.5 0 0 1 7.5 5.5 Z" fill="url(#sky)"/>
-    ///     <path d="M17.6 5.5 H24.5 A2.5 2.5 0 0 1 27 8 V14.4 A0.8 0.8 0 0 1 26.2 15.2 H17.6 A0.8 0.8 0 0 1 16.8 14.4 V6.3 A0.8 0.8 0 0 1 17.6 5.5 Z" fill="url(#sky)"/>
-    ///     <path d="M5.8 16.8 H14.4 A0.8 0.8 0 0 1 15.2 17.6 V25.7 A0.8 0.8 0 0 1 14.4 26.5 H7.5 A2.5 2.5 0 0 1 5 24 V17.6 A0.8 0.8 0 0 1 5.8 16.8 Z" fill="url(#sky)"/>
-    ///     <path d="M17.6 16.8 H26.2 A0.8 0.8 0 0 1 27 17.6 V24 A2.5 2.5 0 0 1 24.5 26.5 H17.6 A0.8 0.8 0 0 1 16.8 25.7 V17.6 A0.8 0.8 0 0 1 17.6 16.8 Z" fill="url(#sky)"/>
+    ///     <rect x="3" y="3.5" width="26" height="25" rx="4.5" fill="#ffffff"/>
+    ///     <g clip-path="url(#p0)">
+    ///     <rect x="5.000" y="5.500" width="3.420" height="3.253" fill="#6fcf7f"/>
+    ///     <rect x="8.400" y="5.500" width="3.420" height="3.253" fill="#97dca3"/>
+    ///     <rect x="11.800" y="5.500" width="3.420" height="3.253" fill="#80d58e"/>
+    ///     <rect x="5.000" y="8.733" width="3.420" height="3.253" fill="#a6e1b0"/>
+    ///     <rect x="8.400" y="8.733" width="3.420" height="3.253" fill="#78d287"/>
+    ///     <rect x="11.800" y="8.733" width="3.420" height="3.253" fill="#8fda9b"/>
+    ///     <rect x="5.000" y="11.967" width="3.420" height="3.253" fill="#9ddea8"/>
+    ///     <rect x="8.400" y="11.967" width="3.420" height="3.253" fill="#6fcf7f"/>
+    ///     <rect x="11.800" y="11.967" width="3.420" height="3.253" fill="#89d896"/>
+    ///     </g>
+    ///     <g clip-path="url(#p1)">
+    ///     <rect x="16.800" y="5.500" width="3.420" height="3.253" fill="#99c2f6"/>
+    ///     <rect x="20.200" y="5.500" width="3.420" height="3.253" fill="#64a2f1"/>
+    ///     <rect x="23.600" y="5.500" width="3.420" height="3.253" fill="#7eb2f3"/>
+    ///     <rect x="16.800" y="8.733" width="3.420" height="3.253" fill="#8fbcf5"/>
+    ///     <rect x="20.200" y="8.733" width="3.420" height="3.253" fill="#5a9cf0"/>
+    ///     <rect x="23.600" y="8.733" width="3.420" height="3.253" fill="#78aef3"/>
+    ///     <rect x="16.800" y="11.967" width="3.420" height="3.253" fill="#6aa6f2"/>
+    ///     <rect x="20.200" y="11.967" width="3.420" height="3.253" fill="#95c0f5"/>
+    ///     <rect x="23.600" y="11.967" width="3.420" height="3.253" fill="#61a0f1"/>
+    ///     </g>
+    ///     <g clip-path="url(#p2)">
+    ///     <rect x="5.000" y="16.800" width="3.420" height="3.253" fill="#fad883"/>
+    ///     <rect x="8.400" y="16.800" width="3.420" height="3.253" fill="#f7c548"/>
+    ///     <rect x="11.800" y="16.800" width="3.420" height="3.253" fill="#f8cf69"/>
+    ///     <rect x="5.000" y="20.033" width="3.420" height="3.253" fill="#f8cb5a"/>
+    ///     <rect x="8.400" y="20.033" width="3.420" height="3.253" fill="#fada8a"/>
+    ///     <rect x="11.800" y="20.033" width="3.420" height="3.253" fill="#f7c74f"/>
+    ///     <rect x="5.000" y="23.267" width="3.420" height="3.253" fill="#f9d478"/>
+    ///     <rect x="8.400" y="23.267" width="3.420" height="3.253" fill="#f8cd62"/>
+    ///     <rect x="11.800" y="23.267" width="3.420" height="3.253" fill="#f7c64c"/>
+    ///     </g>
+    ///     <g clip-path="url(#p3)">
+    ///     <rect x="16.800" y="16.800" width="3.420" height="3.253" fill="#cd8ae3"/>
+    ///     <rect x="20.200" y="16.800" width="3.420" height="3.253" fill="#dbaceb"/>
+    ///     <rect x="23.600" y="16.800" width="3.420" height="3.253" fill="#c982e1"/>
+    ///     <rect x="16.800" y="20.033" width="3.420" height="3.253" fill="#d69fe8"/>
+    ///     <rect x="20.200" y="20.033" width="3.420" height="3.253" fill="#cf8fe4"/>
+    ///     <rect x="23.600" y="20.033" width="3.420" height="3.253" fill="#c880e1"/>
+    ///     <rect x="16.800" y="23.267" width="3.420" height="3.253" fill="#d8a4e9"/>
+    ///     <rect x="20.200" y="23.267" width="3.420" height="3.253" fill="#c77de0"/>
+    ///     <rect x="23.600" y="23.267" width="3.420" height="3.253" fill="#d7a1e9"/>
+    ///     </g>
     ///     </svg>
     static let shippedPicture: Data = {
         let text = [
-            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAAGdUlEQVR4nO2bXWhcRRTHf3M3+9FN",
-            "ok2y+qDWxC2b0ioVxQaprQ9SQY0oilQkYkHwIS2oiNQmaWXRNltERX1Yn/yEqiAqCi0iirYVqwUVbJs2SZM2pn7VzUfTpNls9t7x",
-            "YXfvfiez20kJuH+4cJg9c+acM+fMzJ09FyqooIIK/scQpXYIBl/2zc7GV0nJNULImoVQqlRIKSaF4IzTWdUTDD4bKaWvogOk6Ora",
-            "vVFK2oF1gKN0NS8JTOB7EOHu7uc+BiHn6zCvA7Zvf2m5ZZkfAmt0aHjpIA9blnhk9+6Owbm45nRAV9futVLKL4CGVJvPV08gcB11",
-            "dUtxuZyalL04xGKzjI2N09c3yMjIWOZPESnlfaFQ56FifYs6IDnzP5E03uerp7V1A83Nfm2KLwT6+gbZu/drIpHRVFPEMOItO3fu",
-            "OFWI3ygsRopk2DcA+P2NtLdvWvTGAzQ3+2lv34Tf35hq8llW1QcgC052wcaurtDDUvIRJGa+vX0THo8bgK96JnjrYITfzkxzIWaV",
-            "peRN13p5//EmLluSWEsnpk0ee/s0v/5+oSx5XpfB6muW8MTtPjasvAyAaDRKOPyenRJCsHHXro6Pc/sWjAAp2ZKi7733Ttv4V/f9",
-            "xdPvnubIwCRixqRayrKevqEp9h+fsMf77vgEfUNTZcsTMyZHBiZ58p3TvPbl3wB4PB5aWzfYY1gWmwvZmueAYPBlH7AW0gsewP5j",
-            "5/jw27NlK5n7xDOix4xZ2uTu+eYfDiadu2LFchoa6lIRsK6jo7shx1yqchvi8dkbSO7zgUA65z89EME7766qjqocWqfsT/b/y/pk",
-            "KgQCfkZGfgaoMgzjeuBAMT0AsCxxFSS0qau73G4/M5wIUV3IdYBO2cO/T9l0pg0gr55LDwCEkDUpXTL3eSNqUq1NRXBmGOxMhq82",
-            "RE2bdLtdmb/U5rLmOaAYdIZo7sC6U6BcPeaE1hkCqmQ2rVu+sh6qjNodkEMvegdUUkDzDC3oIlgCSoiAhU0B3fLL0WNOVOtOgbxF",
-            "UK98ZT1UGavRnAIZ8pxI7fJVUUkBVUaPFdc6sENaWbRu+apQdkBVfFLrwELGs2jd8lWh7ACHOYnONDXkbBbt0OmAEi77lR1Q1+jl",
-            "/Ml/y1EnD8IQ1Dal39JqGy/HaV1AWno8XBu4QplX2QErt97B+C9DmDMXl6tCQPXyK/E21ttt1U31rH7xbqYGznKxa6HDXcXSm5uU",
-            "+dVTwOumYV1zOTopwdvow9voWzD5xVDkVvj/A+UIMKemOX+4B2tmdn7mOSAELAksw+PPvpyJDv7BdP/wRaeA4XZS27IKR/USJX5l",
-            "B5zZ/jrTvQX/WygdhkHTG514/MsAiA4Mc/qpbrDKu2bPxbmVfhpfeU6JV9kBsZ5jODSe1mZOnLQdMNN7EkfsvDbZsaNHlXnVF8FZ",
-            "fQoCCGs2i9Z6DigB6idBU6+CuQch3fJVoR4B8an5mUpAfgTola8KZQcIYloHFlhZtG75qlB2AIbmtzVhZdO65SuiBAeY8/OUgszq",
-            "FSH1y1eEugOE7hmS2bR2+WqopIAyZyUFdM+QlU0v9hQQ2lMgOwK0y1dEZQ0o0GYf+mOx9OFEeD3IaZ2ntdxdQN8aILzpMoBodCY9",
-            "ihQTubwFCiT4K/XSNzZ2zm53Nq8mduSgNiUXMgKcK1bb9Ph42gYh+DOXN88BpimPCCFMwNHfn37/r35gC7Fj32pTMn8X0OeAmgfs",
-            "IjcybIg7na689+S8K7FQqHME+B4gEhmlry9RautpuYeajc8mQlXDI9yetP0utza5NQ9vxX3LXQCcOHHSrhOUkgPB4DOjOeYWuxMU",
-            "4RS1d+/Xdh7VPvoC9Ts+xXXjOoTXk5i1Uh+HiWtVC56WVns0d0srrpVrwGGWJVN4PbhuXE/9859R2xYEEoWS+/Z9k2GTfLOgpYUd",
-            "IEVnZ+hHEC2QKJVta3vQLphc7IhGo+zZ8xmDg0OppkPd3dtuK1Q+XywCpGWJR4ARgMHBIcLhd+ntHVgglfWht3eAcPi9TOMjhhFv",
-            "K/btgEq5/OeAfWHf0FBHIHAd9fVLcblcc/S+dIjFYoyOjtPffyqvXF4Icf+uXdt+KNZ33n/Rtm0L+Q2DPcCtGnS9lDhkGPG2YmXy",
-            "KZTyycxDlsVmIVjP4v1kJg7ioJRWOBTq+ETLJzO5SBYcrxLCWLaYPpqS0hoGepLbeAUVVFBBBSr4D0t7H5PYL/3SAAAAAElFTkSu",
-            "QmCC"
+            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAAFNUlEQVR4nO2bzXMURRTAf92zn9kN",
+            "IQQ2BFZUUsaSKik4+FEKWEhheVM84MGD5X/hP+PFgwonq6zyBEjAsiiucEBAAgYCJCQksNkkMzvzPASzH9M9meyGLKnM75Tu97rz",
+            "+vX069czvZCQkJCQkLBlUWtRFpGTwGngKFAGCi/DqDaYB8aBy8BZpdS5de1dREZEZFQ2DxdF5K04Y1v1CRCRY8CvQH+njtxgngJf",
+            "KKUuRylFOkBERoArbL7B/88M8IFS6rZNYTUHXACON9Zdm7vB6NQV/q1O4AYue/K72ZYqGtv3povcroyF6sv5Ib7Zd4qckwXArQm/",
+            "X3eZfB6EdBdc4fpEzdj/u3sdpueFjKPYs13z0XCatwdTrWqXlFKf2MaobQJZDnhNg/9t4hw/jP3C7cpd3MC1NV2V+wsPuVm5s1K+",
+            "NxMYBx8X1xfuTvv8dHWR8zdCdh0TkRO2tlYHAF83Fq7N3eD85J9tG9mKF9RntRbIuvV76ZbLzcehJ+a0TT/KAUcaC6NTVzowa2P5",
+            "647XWnXMphvlgL2NhfHqRAcmbSwTs6HlVLbpRjmgKbItdbDmN5qlWmhJmaM0EAqZNo7ufN9YLwjPvIpRppViuPiGUZbR6aZyf495",
+            "Lnzfp9zvGGXZlGaoz2JwTGI7wA1C6woArTS3DFsdwEjvfua8Z6v2XfPhwaxvlC3VxBTUAChkUkzPdxZAo5bAliBxQLcN6DZb3gGx",
+            "g6BgDjYigVUWiI9YYlQg9b3aF/AjMuGUeRPAF+g0iYztgEV/yVjvKMcq84MAT8y7RyOVReHOE/Mu8PFwmt6c+cz2cFaY6uAMAckS",
+            "SByQOKBr/7lhWas1vZpdU9erEtsBpexAG6aYUSiGcqWV8r4dGr2OThguWbYNoy0WRJo3MDfwGK9OUJPmvDyQgKeWfD/nZHBoMUbB",
+            "UG4w5NAHswF3p8PbZl9e4VimabYa4LVsHpmU4lA5RT7TPDSlzM9ZbAdsdmwO2PJBMHYiRLBIULkFLcdiER/cJ+Y2ugd063pU6J7X",
+            "UfnmlzTVSY/qI5fWpDJV0GjH/KB6FR/fa26gU4r+kTxOLt7cxnZAbfxnZPFBWKBS+E9GjW10/3vIksE5SpMZ+X7FCdVJj79/fGxM",
+            "mwcOFvAq5ixxYcpjYSqcaRbLWQ58N2gfTKONsbTAPPh2kYCgem+lWH3kWs8M7VC5b07NTXQxBojxz41mywfBxAHdNqDbxN4FGoNW",
+            "Izo3hFP63NxIPGT+H7OsNr/yp5NVFPdkjWrec5+FScs7Ba1w0p3NYfw8wK8aq0V8lFg+miiNNAy0WaYa1BS+Z36xobMOvmuRpTW1",
+            "peSFSEckDui2Ad1myzsgdhDUfYeN9aLTWE/VgYcqDFt6rB+SlIaewYxRq1b1yfaZzUz3pciX0kZZXOJ/F3CnjfUqtY1g3nwHSeeG",
+            "kMpNc4elk/W+gcUZ81YX+MLc2KJRtutwkdrCy9sFmr95a/MMvYrodOiJtH6ijnJA0/FP562XLF45cgOhZWE9ykY5oOmCoR44YtN7",
+            "5dhxoKe16pJNN8oBZ5oUe9/B2XXcprt2dD31tb3xaYeBgwWK5dByPWs1wyZ4ceH4QmOdU/qM1L5v0YX9HcQEtezMHfUrN8W9WfI7",
+            "24/mOqXo2Z2h/Ol2dh0K3d8eVUpdMLVbtiYCEXkTuArsbNu67rLqVdnIREgpNQZ89aKjzcYM8GXU4CFGJvjitvWHwMX1sWtD+IPl",
+            "mY+8KQ5r/8HECeo/mHiNiPt3G0yF+g8mzkSt+YSEhISEhIQV/gNYg1chOC16qwAAAABJRU5ErkJggg=="
         ].joined()
         return Data(base64Encoded: text) ?? Data()
     }()
