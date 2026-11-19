@@ -502,6 +502,17 @@ final class AgentChatSessionRegistry {
             record.pid = event.ppid
             hookStoreConsultedAt[sessionID] = event.receivedAt
         }
+        // (cm-136.9) A Claude hook's live ppid replaces a nil or dead pid, so a
+        // Claude that herdr kept running through a cmux restart is not ended over
+        // the pid the restart killed. Runs before `storeRecord` below, or this
+        // change to the local `record` is lost. Claude only: other agents' ppid can
+        // be a short-lived hook shell. ppid 0 is a relay event, and `kill(0, 0)`
+        // would read it as alive.
+        if event.source == "claude",
+           let hookPID = event.ppid, hookPID > 0, !processIsDead(hookPID),
+           record.pid.map({ processIsDead($0) }) ?? true {
+            record.pid = hookPID
+        }
         // The hook store is a whole-file JSON read+parse; never do it on the
         // main actor. Consult it at most every 30s per session while bindings
         // are still missing (pid can legitimately stay absent), not on every

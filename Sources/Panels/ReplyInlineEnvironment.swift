@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import CmuxAgentChat
 import CmuxSettings
+import CmuxWorkspaces
 import Foundation
 
 /// Everything the Reply toolbar reads from, or does to, the world outside its
@@ -11,7 +12,8 @@ struct ReplyInlineEnvironment {
     /// `reply.inline.enabled`, read at each release. Not cached: a `UserDefaults`
     /// read is in-process and cheap.
     var settingEnabled: () -> Bool
-    /// `registry.liveSession(surfaceID:) != nil` — `#cm-89`'s live-only rule.
+    /// `#cm-89`'s live-only rule (`registry.liveSession(surfaceID:) != nil`) plus the
+    /// pane's shell state: a shell idle at its prompt is no agent (`cm-136.9`).
     var isAgentPane: (UUID) -> Bool
     var hasSelection: (ghostty_surface_t) -> Bool
     var readSelection: (GhosttyNSView, ghostty_surface_t) -> ReplyInlineSelectionGeometry?
@@ -48,8 +50,14 @@ struct ReplyInlineEnvironment {
         ReplyInlineEnvironment(
             settingEnabled: { SettingCatalog().reply.inlineEnabled.value(in: .standard) },
             isAgentPane: { panelID in
-                TerminalController.shared.agentChatTranscriptService?
+                let hasLive = TerminalController.shared.agentChatTranscriptService?
                     .registry.liveSession(surfaceID: panelID.uuidString) != nil
+                // The pane's shell state is read only for a live session: it walks every window.
+                guard hasLive else { return false }
+                return ReplyInlineAgentPaneRule.counts(
+                    hasLiveSession: true,
+                    shellState: shellState(of: panelID)
+                )
             },
             hasSelection: { ghostty_surface_has_selection($0) },
             readSelection: { view, surface in
@@ -155,6 +163,18 @@ struct ReplyInlineEnvironment {
         return sidebar.objectWillChange.sink { _ in
             DispatchQueue.main.async { onChange() }
         }
+    }
+
+    /// The shell state of the pane showing `surfaceID` (a terminal panel's id is its
+    /// surface's id), `.unknown` when no workspace holds it. A window Dock's pane, and
+    /// any pane `locateSurface` doesn't find (a remote tmux pane), reads `.unknown`, so
+    /// the gate keeps the live-only answer there.
+    @MainActor
+    private static func shellState(of surfaceID: UUID) -> PanelShellActivityState {
+        guard let located = AppDelegate.shared?.locateSurface(surfaceId: surfaceID),
+              let workspace = located.tabManager.tabs.first(where: { $0.id == located.workspaceId })
+        else { return .unknown }
+        return workspace.panelShellActivityStates[surfaceID] ?? .unknown
     }
 
     /// The Reply store of the workspace that holds the pane, if it has one
