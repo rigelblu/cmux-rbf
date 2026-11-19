@@ -20,6 +20,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     let iconImageView = NSImageView() // (#cm-110.2) shared group-status paint extension
     let groupStatusPopover = SidebarWorkspaceGroupStatusPopoverHost() // (#cm-110.2)
     private let nameField = NSTextField(labelWithString: "")
+    private let countField = NSTextField(labelWithString: "") // (#cm-145)
     // Direct-draw badge (shared with workspace rows): NSTextField's
     // intrinsic insets shift single digits off the circle's optical center.
     private let unreadBadgeView = SidebarRowUnreadBadgeView()
@@ -86,6 +87,9 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         nameField.maximumNumberOfLines = 1
         nameField.cell?.truncatesLastVisibleLine = true
         addSubview(nameField)
+        countField.maximumNumberOfLines = 1 // (#cm-145)
+        countField.isHidden = true // (#cm-145)
+        addSubview(countField) // (#cm-145)
 
         addSubview(unreadBadgeView)
 
@@ -182,6 +186,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
+        countField.isHidden = true // (#cm-145)
         if model.statusHeaderKind != nil { applyStatusHeader(model); return } // (#cm-110.1) the status headers draw in the extension at the end of this file
         let metrics = SidebarWorkspaceGroupHeaderMetrics(fontScale: model.fontScale)
         let percent = model.globalFontMagnificationPercent
@@ -376,6 +381,9 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     var plusButtonForTesting: NSView { plusButton } // (cm-128.16)
     var unreadBadgeViewForTesting: SidebarRowUnreadBadgeView { unreadBadgeView } // (cm-128.16)
     var nameFontForTesting: NSFont? { nameField.font } // (cm-128.16)
+    var nameTextForTesting: String { nameField.stringValue } // (#cm-145)
+    var nameFieldFrameForTesting: NSRect { nameField.frame } // (#cm-145)
+    var countFieldForTesting: NSTextField { countField } // (#cm-145)
 #endif
 
     private func updatePlusVisibility() {
@@ -577,8 +585,13 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             }
         }
 
-        let nameAvailable = max(0, (plusButton.frame.minX - 4) - x
-            - (badgeSize.width > 0 ? badgeSize.width + 6 : 0))
+        let countWidth = countField.isHidden ? 0 : ceil(max( // (#cm-145)
+            countField.intrinsicContentSize.width, countField.attributedStringValue.size().width)) // (#cm-145)
+        let countSpan = countWidth > 0 ? countWidth + 4 : 0 // (#cm-145)
+        let trailingLimit = model.statusHeaderKind != nil ? contentMaxX : plusButton.frame.minX - 4 // (#cm-145) a status header never reveals its +
+        let nameAvailable = max(0, trailingLimit - x // (#cm-145)
+            - (badgeSize.width > 0 ? badgeSize.width + 6 : 0)
+            - countSpan) // (#cm-145)
         let nameSize = nameField.attributedStringValue.size()
         // The field owns ALL remaining width (truncation only when genuinely
         // out of space); the badge tracks the measured text width instead.
@@ -588,8 +601,12 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             width: nameAvailable,
             height: ceil(nameSize.height)
         )
+        let nameEndX = x + min(ceil(nameSize.width), nameAvailable) // (#cm-145)
+        countField.frame = countWidth > 0 // (#cm-145)
+            ? NSRect(x: nameEndX + 4, y: nameField.frame.minY, width: countWidth, height: nameField.frame.height) // (#cm-145)
+            : .zero // (#cm-145)
         if !unreadBadgeView.isHidden {
-            let badgeX = x + min(ceil(nameSize.width), nameAvailable) + 6
+            let badgeX = nameEndX + countSpan + 6 // (#cm-145)
             unreadBadgeView.frame = NSRect(
                 x: badgeX,
                 y: midY - badgeSize.height / 2,
@@ -1129,6 +1146,11 @@ extension SidebarGroupHeaderTableCellView { // (#cm-110.1)
         nameField.textColor = kind.isSection // (#cm-110.4)
             ? colorResolver.resolvedColor(.secondaryLabelColor, for: colorScheme) // (#cm-110.1)
             : nameTextColor(model, palette: headerPalette) // (#cm-110.1)
+        let countText = kind.isSection ? nil : SidebarStatusHeaderText.statusGroupCountText(memberCount: model.memberCount) // (#cm-145)
+        countField.isHidden = countText == nil // (#cm-145)
+        countField.stringValue = countText ?? "" // (#cm-145)
+        countField.font = nameField.font // (#cm-145)
+        countField.textColor = nameField.textColor // (#cm-145)
 
         let showsBadge = model.anchorUnreadCount > 0 || model.anchorMarkedUnread // (#cm-110.1)
         unreadBadgeView.isHidden = !showsBadge // (#cm-110.1)

@@ -61,6 +61,14 @@ enum SidebarStatusHeaderText {
         )
     }
 
+    static func statusGroupCountText(memberCount: Int) -> String? { // (#cm-145)
+        guard memberCount > 0 else { return nil }
+        return String.localizedStringWithFormat(
+            String(localized: "sidebar.statusGroup.count", defaultValue: "(%lld)"),
+            memberCount
+        )
+    }
+
     /// "Workblocks, 3 status groups, expanded".
     static func statusesAreaLabel(groupCount: Int, isCollapsed: Bool) -> String {
         let countText = String(
@@ -247,10 +255,18 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
                 .font(.system(size: chevronFontPointSize, weight: .semibold))
                 .frame(width: chevronFrameWidth) // (cm-128.16)
             Image(nsImage: glyphImage)
-            Text(presentation.name)
-                .font(.system(size: nameFontPointSize, weight: .semibold))
-                .foregroundStyle(Color(nsColor: palette.primaryTextColor))
-                .lineLimit(1)
+            HStack(spacing: 4) { // (#cm-145)
+                Text(presentation.name)
+                    .font(.system(size: nameFontPointSize, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: palette.primaryTextColor))
+                    .lineLimit(1)
+                if let countText {
+                    Text(countText)
+                        .font(.system(size: nameFontPointSize, weight: .semibold))
+                        .foregroundStyle(Color(nsColor: palette.primaryTextColor))
+                        .fixedSize()
+                }
+            }
             if unreadCount > 0 || markedUnread {
                 SidebarStatusUnreadBadge(count: unreadCount, markedUnread: markedUnread, fontScale: fontScale,
                                   globalFontMagnificationPercent: globalFontMagnificationPercent, markColor: Color(nsColor: palette.unreadMarkColor(isActive: false, colorScheme: colorScheme, sidebarStandIn: sidebarContrastBackgroundHex.flatMap { NSColor(hex: $0) })))
@@ -272,6 +288,8 @@ struct SidebarStatusGroupSwiftUIHeader: View, Equatable {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { onToggle() }
     }
+
+    var countText: String? { SidebarStatusHeaderText.statusGroupCountText(memberCount: memberCount) } // (#cm-145)
 
     var chevronFontPointSize: CGFloat {
         GlobalFontMagnification.scaledSize(
