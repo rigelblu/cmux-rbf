@@ -39,8 +39,7 @@ final class FigmaRefitState {
     var afterFullscreen: [@MainActor () -> Void] = []
     /// cm-73.52: true while those swaps run, so a swap that ran out of wait goes ahead and does not wait again.
     var swapPastFullscreen = false
-    /// cm-73.52: how many times the panel asked WebKit to leave full screen; for tests, since a closing panel has no page
-    /// left to show that it did.
+    /// cm-73.52: how many times the panel asked WebKit to leave full screen; for tests.
     var leaveRequestsForTesting = 0
     /// The wait for WebKit's report that full screen is off.
     let fullscreenWait: MainActorDeferredActionScheduler
@@ -290,11 +289,11 @@ extension BrowserPanel {
     }
 
     func figmaRefitPanelDidClose() {
-        // cmux-rbf (#cm-73.52): a closing pane asks WebKit to leave full screen and goes ahead; the swaps it owed are dropped.
+        // cmux-rbf (#cm-73.52): a closing pane goes ahead; the swaps it owed are dropped.
+        // cmux-rbf (#cm-143): It does not ask WebKit to leave full screen: close() detaches the web view in this same call, and a leave in flight then frees WebKit's controller mid-exit (beganExitFullScreen, EXC_BREAKPOINT). A detach alone ends full screen, as on a plain page. Reject a revert of this hunk on upstream sync.
         figmaRefit.afterFullscreen = []
         figmaRefit.fullscreenWait.cancel()
         cancelFigmaFullscreenRetry()
-        if isElementFullscreenActive, showsFigmaPreview { requestFigmaFullscreen(enter: false) }
         figmaRefit.sizeCheck.cancel()
         figmaRefit.flightLimit.cancel()
         figmaRefit.interstitialTimer.cancel()
@@ -484,6 +483,29 @@ extension BrowserPanel {
 #if DEBUG
         cmuxDebugLog("figma.fullscreen.leaveOnHide surface=\(id.uuidString) reason=\(reason)")
 #endif
-        requestFigmaFullscreen(enter: false)
+        // cmux-rbf (#cm-143): The request waits one main-queue turn. Closing a workspace hides its panes and then closes them in the same turn, and close() detaches the web view: a leave sent in that pair frees WebKit's controller mid-exit (beganExitFullScreen, EXC_BREAKPOINT). isClosingWebViewLifecycle is set only after the hide, so the check has to run later. Reject a revert of this hunk on upstream sync.
+        let hiddenPage = ObjectIdentifier(webView)
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let skip: String?
+                if self.isClosingWebViewLifecycle {
+                    skip = "closing"
+                } else if ObjectIdentifier(self.webView) != hiddenPage {
+                    skip = "webViewReplaced"
+                } else if !self.isElementFullscreenActive || !self.showsFigmaPreview {
+                    skip = "notFullscreen"
+                } else {
+                    skip = nil
+                }
+                if let skip {
+#if DEBUG
+                    cmuxDebugLog("figma.fullscreen.leaveOnHide.skipped surface=\(self.id.uuidString) reason=\(skip)")
+#endif
+                    return
+                }
+                self.requestFigmaFullscreen(enter: false)
+            }
+        }
     }
 }

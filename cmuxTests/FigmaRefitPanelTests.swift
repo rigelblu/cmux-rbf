@@ -677,13 +677,14 @@ struct FigmaRefitPanelTests {
         #expect(!p.showsFigmaPreview)
     }
 
-    @Test func closingAFigmaPreviewDuringFullScreenAsksWebKitToLeaveAndDropsTheWaitingSwaps() async throws {
+    // cmux-rbf: changed on purpose (#cm-143): a close does not ask WebKit to leave full screen (a leave in flight frees WebKit's controller mid-exit); it still drops the waiting swaps.
+    @Test func closingAFigmaPreviewDuringFullScreenDoesNotAskWebKitToLeaveAndDropsTheWaitingSwaps() async throws {
         let p = try await panel()
         p.isElementFullscreenActiveForTesting = true
         var ran = 0
         p.figmaRefit.afterFullscreen.append { ran += 1 }
         p.close()
-        #expect(p.figmaRefit.leaveRequestsForTesting == 1)
+        #expect(p.figmaRefit.leaveRequestsForTesting == 0)
         p.figmaFullscreenDidChange(active: false)
         #expect(ran == 0, "a closed pane swaps nothing")
     }
@@ -695,6 +696,27 @@ struct FigmaRefitPanelTests {
         p.noteWebViewVisibility(true, reason: "fixture.show")
         p.isElementFullscreenActiveForTesting = true
         p.noteWebViewVisibility(false, reason: "fixture.hide")
+        await settle() // cmux-rbf: changed on purpose (#cm-143): the request goes one main-queue turn after the hide
+        #expect(p.figmaRefit.leaveRequestsForTesting == 1)
+    }
+
+    // cmux-rbf (#cm-143): closing a workspace hides its panes and closes them in the same turn; a leave sent in that pair crashes WebKit.
+    @Test func aHideFollowedByTheCloseInTheSameTurnSendsNoLeaveRequest() async throws {
+        let p = try await panel()
+        p.isElementFullscreenActiveForTesting = true
+        p.noteWebViewVisibility(false, reason: "portal.workspaceRetire")
+        p.close()
+        await settle()
+        await settle()
+        #expect(p.figmaRefit.leaveRequestsForTesting == 0, "a closing pane asks WebKit for nothing")
+    }
+
+    @Test func aHideAloneAsksWebKitToLeaveOneTurnLater() async throws {
+        let p = try await panel(); defer { p.close() }
+        p.isElementFullscreenActiveForTesting = true
+        p.noteWebViewVisibility(false, reason: "portal.workspaceRetire")
+        #expect(p.figmaRefit.leaveRequestsForTesting == 0, "not in the same turn as the hide")
+        await settle()
         #expect(p.figmaRefit.leaveRequestsForTesting == 1)
     }
 
@@ -702,8 +724,10 @@ struct FigmaRefitPanelTests {
         let p = try await panel(); defer { p.close() }
         p.isElementFullscreenActiveForTesting = true
         p.noteWebViewVisibility(false, reason: "fixture.hide")
+        await settle() // cmux-rbf: changed on purpose (#cm-143): the request goes one main-queue turn after the hide
         try #require(p.figmaRefit.leaveRequestsForTesting == 1)
         p.noteWebViewVisibility(false, reason: "fixture.hide.again")
+        await settle()
         #expect(p.figmaRefit.leaveRequestsForTesting == 1, "the pane was already hidden; this report changes nothing")
     }
 
