@@ -2790,6 +2790,7 @@
 		C136B0000000000000000010 /* ReplyInlinePasteTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000010 /* ReplyInlinePasteTarget.swift */; };
 		C136B000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift */; };
 		C136B000000000000000000E /* ReplyInlineEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000E /* ReplyInlineEnvironment.swift */; };
+		C136B0000000000000000013 /* ReplyInlineAgentPaneRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A0000000000000000013 /* ReplyInlineAgentPaneRule.swift */; };
 		C136B000000000000000000D /* ReplyInlineDismissal.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000D /* ReplyInlineDismissal.swift */; };
 		C136B000000000000000000C /* ReplyInlineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000C /* ReplyInlineEvent.swift */; };
 		C136B000000000000000000B /* ReplyInlineDismissReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136A000000000000000000B /* ReplyInlineDismissReason.swift */; };
@@ -3727,6 +3728,8 @@
 		C136D0000000000000000003 /* ReplyInlinePasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000003 /* ReplyInlinePasteTests.swift */; };
 		C136D0000000000000000002 /* ReplyInlinePlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */; };
 		C136D0000000000000000001 /* ReplyInlineTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */; };
+		C136D0000000000000000008 /* AgentChatSessionRegistryHookPidTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000008 /* AgentChatSessionRegistryHookPidTests.swift */; };
+		C136D0000000000000000007 /* ReplyInlineAgentPaneRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C136C0000000000000000007 /* ReplyInlineAgentPaneRuleTests.swift */; };
 		D5671001D5671001D5671001 /* TerminalScrollSpeedSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671002D5671002D5671002 /* TerminalScrollSpeedSettings.swift */; };
 		D5671101D5671101D5671101 /* TerminalScrollSpeedSettingsFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671102D5671102D5671102 /* TerminalScrollSpeedSettingsFileStoreTests.swift */; };
 		862C77A9D235803A22B715B5 /* TerminalSearchNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E62F3D413D19EEA3E96B1271 /* TerminalSearchNavigation.swift */; };
@@ -6977,6 +6980,7 @@
 		C136A0000000000000000010 /* ReplyInlinePasteTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlinePasteTarget.swift; sourceTree = "<group>"; };
 		C136A000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineWorkspacePasteTarget.swift; sourceTree = "<group>"; };
 		C136A000000000000000000E /* ReplyInlineEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineEnvironment.swift; sourceTree = "<group>"; };
+		C136A0000000000000000013 /* ReplyInlineAgentPaneRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineAgentPaneRule.swift; sourceTree = "<group>"; };
 		C136A000000000000000000D /* ReplyInlineDismissal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineDismissal.swift; sourceTree = "<group>"; };
 		C136A000000000000000000C /* ReplyInlineEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineEvent.swift; sourceTree = "<group>"; };
 		C136A000000000000000000B /* ReplyInlineDismissReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/ReplyInlineDismissReason.swift; sourceTree = "<group>"; };
@@ -7905,6 +7909,8 @@
 		C136C0000000000000000003 /* ReplyInlinePasteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlinePasteTests.swift; sourceTree = "<group>"; };
 		C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlinePlacementTests.swift; sourceTree = "<group>"; };
 		C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineTriggerTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000008 /* AgentChatSessionRegistryHookPidTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentChatSessionRegistryHookPidTests.swift; sourceTree = "<group>"; };
+		C136C0000000000000000007 /* ReplyInlineAgentPaneRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyInlineAgentPaneRuleTests.swift; sourceTree = "<group>"; };
 		D5671002D5671002D5671002 /* TerminalScrollSpeedSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/TerminalScrollSpeedSettings.swift; sourceTree = "<group>"; };
 		D5671102D5671102D5671102 /* TerminalScrollSpeedSettingsFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalScrollSpeedSettingsFileStoreTests.swift; sourceTree = "<group>"; };
 		E62F3D413D19EEA3E96B1271 /* TerminalSearchNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Find/TerminalSearchNavigation.swift; sourceTree = "<group>"; };
@@ -10775,6 +10781,7 @@
 				C136A0000000000000000010 /* ReplyInlinePasteTarget.swift */,
 				C136A000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift */,
 				C136A000000000000000000E /* ReplyInlineEnvironment.swift */,
+				C136A0000000000000000013 /* ReplyInlineAgentPaneRule.swift */,
 				C136A000000000000000000D /* ReplyInlineDismissal.swift */,
 				C136A000000000000000000C /* ReplyInlineEvent.swift */,
 				C136A000000000000000000B /* ReplyInlineDismissReason.swift */,
@@ -12106,6 +12113,8 @@
 				C136C0000000000000000003 /* ReplyInlinePasteTests.swift */,
 				C136C0000000000000000002 /* ReplyInlinePlacementTests.swift */,
 				C136C0000000000000000001 /* ReplyInlineTriggerTests.swift */,
+				C136C0000000000000000008 /* AgentChatSessionRegistryHookPidTests.swift */,
+				C136C0000000000000000007 /* ReplyInlineAgentPaneRuleTests.swift */,
 				D8890003D8890003D8890003 /* ReplyTerminalFindTests.swift */,
 				D8840001D8840001D8840001 /* ReplyLabelShortcutActionTests.swift */,
 				D8850001D8850001D8850001 /* ReplyLabelMenuTests.swift */,
@@ -14975,6 +14984,7 @@
 				C136B0000000000000000010 /* ReplyInlinePasteTarget.swift in Sources */,
 				C136B000000000000000000F /* ReplyInlineWorkspacePasteTarget.swift in Sources */,
 				C136B000000000000000000E /* ReplyInlineEnvironment.swift in Sources */,
+				C136B0000000000000000013 /* ReplyInlineAgentPaneRule.swift in Sources */,
 				C136B000000000000000000D /* ReplyInlineDismissal.swift in Sources */,
 				C136B000000000000000000C /* ReplyInlineEvent.swift in Sources */,
 				C136B000000000000000000B /* ReplyInlineDismissReason.swift in Sources */,
@@ -17339,6 +17349,8 @@
 				C136D0000000000000000003 /* ReplyInlinePasteTests.swift in Sources */,
 				C136D0000000000000000002 /* ReplyInlinePlacementTests.swift in Sources */,
 				C136D0000000000000000001 /* ReplyInlineTriggerTests.swift in Sources */,
+				C136D0000000000000000008 /* AgentChatSessionRegistryHookPidTests.swift in Sources */,
+				C136D0000000000000000007 /* ReplyInlineAgentPaneRuleTests.swift in Sources */,
 				D5671101D5671101D5671101 /* TerminalScrollSpeedSettingsFileStoreTests.swift in Sources */,
 				222425EC9FE2E318D8F6F46A /* TerminalSearchNavigationTests.swift in Sources */,
 				C0DE53360000000000000001 /* TerminalSearchOverlayMouseReleaseTests.swift in Sources */,
