@@ -6,4 +6,6 @@ import Foundation
 struct BrowserPaneOwner {
     let terminalStableID: UUID
     let kind: BrowserOwnedKind
+    /// cmux-rbf #cm-126.15: the agent slug this pane's caption is named for, saved on the pane before its first caption.
+    var agent: String? = nil
 }

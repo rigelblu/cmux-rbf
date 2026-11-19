@@ -24,6 +24,8 @@ extension CMUXCLI {
           --surface  the agent's terminal. Without it: herdr-agent's note for this herdr
                      pane when its attach is live, then $CMUX_SURFACE_ID; when cmux doesn't
                      know the first, the next is tried.
+          The Agent Pane's caption is the name agentPane.names in cmux.json gives this agent, else Agent Pane.
+          The agent is read from $CMUX_AGENT_LAUNCH_KIND, which cmux's wrappers set.
           Prints: OK surface=<ref> pane=<ref> workspace=<ref> action=opened|navigated|held-design-focus
           While Design Focus is on, the update is held (action=held-design-focus, exit 0)
           and the Agent Pane shows it when the mode ends: send one `cmux notify` with the
@@ -148,9 +150,14 @@ extension CMUXCLI {
                 jsonOutput: jsonOutput
             )
         }
+        var params: [String: Any] = ["url": url.absoluteString]
+        // cmux-rbf #cm-126.15: the agent this terminal runs, so the pane's caption can carry the name Tom set for it.
+        if let agent = AgentPaneCLIRules.agent(launchKind: ProcessInfo.processInfo.environment["CMUX_AGENT_LAUNCH_KIND"]) {
+            params["agent"] = agent
+        }
         try runAgentPaneCaller(
             method: "agent_pane.show",
-            params: ["url": url.absoluteString],
+            params: params,
             subcommand: "show",
             surfaceOverride: surfaceOverride,
             client: client,

@@ -81,35 +81,6 @@ struct AgentPaneMarkTests {
         #expect(AgentPaneMark.title(isAgentPaneKind: false, own: "Page title") == "Page title")
     }
 
-    // cmux-rbf #cm-126.14: title with wroteAt set shows "You wrote <time>" for an Agent Pane, but leaves a plain pane unchanged
-    @Test("title with wroteAt formats as 'You wrote <time>' for Agent Pane and leaves plain pane unchanged")
-    func titleWithWroteAtFormatsForAgentPane() {
-        let time = Date(timeIntervalSince1970: 1731815520) // 2024-11-17 03:52:00 UTC
-        let gmt = TimeZone(secondsFromGMT: 0)!
-        let enUS = Locale(identifier: "en_US")
-        let enGB = Locale(identifier: "en_GB")
-
-        let agentTitleUS = AgentPaneMark.title(isAgentPaneKind: true, own: "Page title", wroteAt: time, locale: enUS, timeZone: gmt)
-        #expect(agentTitleUS == "You wrote 3:52\u{202F}AM")
-
-        let agentTitleGB = AgentPaneMark.title(isAgentPaneKind: true, own: "Page title", wroteAt: time, locale: enGB, timeZone: gmt)
-        #expect(agentTitleGB == "You wrote 3:52")
-
-        let defaultAgentTitle = AgentPaneMark.title(isAgentPaneKind: true, own: "Page title", wroteAt: time)
-        #expect(defaultAgentTitle == "You wrote \(time.formatted(date: .omitted, time: .shortened))")
-
-        let plainTitleWithTime = AgentPaneMark.title(isAgentPaneKind: false, own: "Page title", wroteAt: time, locale: enUS, timeZone: gmt)
-        #expect(plainTitleWithTime == "Page title")
-
-        let plainTitleWithoutTime = AgentPaneMark.title(isAgentPaneKind: false, own: "Page title", wroteAt: nil)
-        #expect(plainTitleWithoutTime == "Page title")
-
-        let agentTitleWithoutTime = AgentPaneMark.title(isAgentPaneKind: true, own: "Page title", wroteAt: nil)
-        #expect(agentTitleWithoutTime == "Agent Pane")
-    }
-
-    // cmux-rbf: changed on purpose (#cm-126.13). Was `theMarkIsA32PixelPNG`, for `.3`'s SF Symbol `eyeglasses` at 32 px.
-    // The mark is now Tom's window, a 64 px PNG: 64 so it stays sharp when the tab font scales the 14 pt slot.
     @Test("the mark is the window, a 64 by 64 pixel PNG")
     func theMarkIsTheWindowAt64Pixels() throws {
         let bitmap = try #require(NSBitmapImageRep(data: AgentPaneMark.shippedPicture))
@@ -173,132 +144,19 @@ struct AgentPaneMarkTests {
 
     // MARK: - cmux-rbf #cm-126.14: State transition table
 
-    @Test("AgentPaneAnswerState transition table covers every state and event pair")
-    func answerStateTransitions() {
-        let t1 = Date(timeIntervalSince1970: 1000)
-        let t2 = Date(timeIntervalSince1970: 2000)
-
-        // Any + show -> .post
-        #expect(AgentPaneAnswerState.next(state: .post, event: .show) == .post)
-        #expect(AgentPaneAnswerState.next(state: .wroteSince(t1), event: .show) == .post)
-        #expect(AgentPaneAnswerState.next(state: .cleared, event: .show) == .post)
-
-        // Any + clear -> .cleared
-        #expect(AgentPaneAnswerState.next(state: .post, event: .clear) == .cleared)
-        #expect(AgentPaneAnswerState.next(state: .wroteSince(t1), event: .clear) == .cleared)
-        #expect(AgentPaneAnswerState.next(state: .cleared, event: .clear) == .cleared)
-
-        // .post + tomWrote(t1) -> .wroteSince(t1)
-        #expect(AgentPaneAnswerState.next(state: .post, event: .tomWrote(at: t1)) == .wroteSince(t1))
-
-        // .wroteSince(t1) + tomWrote(t2) -> unchanged (first time kept)
-        #expect(AgentPaneAnswerState.next(state: .wroteSince(t1), event: .tomWrote(at: t2)) == .wroteSince(t1))
-
-        // .cleared + tomWrote(t1) -> .cleared
-        #expect(AgentPaneAnswerState.next(state: .cleared, event: .tomWrote(at: t1)) == .cleared)
-    }
-
-    @Test("AgentPaneAnswerState helper properties")
-    func answerStateHelpers() {
-        let t1 = Date(timeIntervalSince1970: 1000)
-        #expect(AgentPaneAnswerState.post.wroteAt == nil)
-        #expect(AgentPaneAnswerState.post.isPost)
-        #expect(!AgentPaneAnswerState.post.isCleared)
-
-        #expect(AgentPaneAnswerState.wroteSince(t1).wroteAt == t1)
-        #expect(!AgentPaneAnswerState.wroteSince(t1).isPost)
-        #expect(!AgentPaneAnswerState.wroteSince(t1).isCleared)
-
-        #expect(AgentPaneAnswerState.cleared.wroteAt == nil)
-        #expect(!AgentPaneAnswerState.cleared.isPost)
-        #expect(AgentPaneAnswerState.cleared.isCleared)
-    }
-
-    // MARK: - cmux-rbf #cm-126.14: Key rule, pure
-
-    @Test("isCountedReturn counts pressed Return and keypad Enter with no modifiers")
-    func isCountedReturnCountsPressOfReturnAndKeypadEnter() {
-        #expect(AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: 0, isCommittedText: false, isComposing: false))
-        #expect(AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x4C, modsRaw: 0, isCommittedText: false, isComposing: false))
-    }
-
-    @Test("isCountedReturn rejects key releases")
-    func isCountedReturnRejectsReleases() {
-        #expect(!AgentPaneMark.isCountedReturn(isPress: false, keycode: 0x24, modsRaw: 0, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: false, keycode: 0x4C, modsRaw: 0, isCommittedText: false, isComposing: false))
-    }
-
-    @Test("isCountedReturn rejects committed text")
-    func isCountedReturnRejectsCommittedText() {
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: 0, isCommittedText: true, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x4C, modsRaw: 0, isCommittedText: true, isComposing: false))
-    }
-
-    @Test("isCountedReturn rejects IME composition commit and accumulatedText")
-    func isCountedReturnRejectsComposing() {
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: 0, isCommittedText: false, isComposing: true))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x4C, modsRaw: 0, isCommittedText: false, isComposing: true))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: 0, isCommittedText: false, isComposing: false, hasAccumulatedText: true))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x4C, modsRaw: 0, isCommittedText: false, isComposing: false, hasAccumulatedText: true))
-    }
-
-    @Test("isCountedReturn allows Caps Lock and Num Lock alone or together")
-    func isCountedReturnAllowsCapsLockAndNumLock() {
-        let caps = AgentPaneMark.capsLockModMask
-        let num = AgentPaneMark.numLockModMask
-        #expect(AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: caps, isCommittedText: false, isComposing: false))
-        #expect(AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: num, isCommittedText: false, isComposing: false))
-        #expect(AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: caps | num, isCommittedText: false, isComposing: false))
-    }
-
-    @Test("isCountedReturn rejects modifiers other than Caps/Num lock")
-    func isCountedReturnRejectsDisallowedModifiers() {
-        let shift: UInt32 = 1 << 0
-        let ctrl: UInt32 = 1 << 1
-        let alt: UInt32 = 1 << 2
-        let superMod: UInt32 = 1 << 3
-        let shiftRight: UInt32 = 1 << 6
-        let ctrlRight: UInt32 = 1 << 7
-        let altRight: UInt32 = 1 << 8
-        let superRight: UInt32 = 1 << 9
-
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: shift, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: alt, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: ctrl, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: superMod, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: shiftRight, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: altRight, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: ctrlRight, isCommittedText: false, isComposing: false))
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: superRight, isCommittedText: false, isComposing: false))
-
-        // Caps Lock + Shift is still rejected because Shift is present
-        let capsAndShift = AgentPaneMark.capsLockModMask | shift
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x24, modsRaw: capsAndShift, isCommittedText: false, isComposing: false))
-    }
-
-    @Test("isCountedReturn rejects keys other than Return and keypad Enter")
-    func isCountedReturnRejectsOtherKeys() {
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x31, modsRaw: 0, isCommittedText: false, isComposing: false)) // Space
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x35, modsRaw: 0, isCommittedText: false, isComposing: false)) // Escape
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0x00, modsRaw: 0, isCommittedText: false, isComposing: false)) // 'A'
-        #expect(!AgentPaneMark.isCountedReturn(isPress: true, keycode: 0xFF, modsRaw: 0, isCommittedText: false, isComposing: false))
-    }
-
-    // MARK: - cmux-rbf #cm-126.14: Restore derivation, pure
-
-    @Test("restoredState derives .cleared for URLs inside cleared folder and .post otherwise")
-    func restoredStateDerivation() {
+    @Test("isCleared is true for a URL inside the cleared folder and false for every other page")
+    func isClearedDerivation() {
         let clearedFolder = URL(fileURLWithPath: "/Users/test/Library/Application Support/cmux/cleared")
         let clearedPage = URL(fileURLWithPath: "/Users/test/Library/Application Support/cmux/cleared/pane-1.html")
         let otherFolderPage = URL(fileURLWithPath: "/Users/test/Library/Application Support/cmux/other/pane-1.html")
         let tmpPage = URL(fileURLWithPath: "/Volumes/tom-ssd/tmp/page.html")
         let webURL = URL(string: "https://example.com/cleared/pane-1.html")
 
-        #expect(AgentPaneMark.restoredState(url: clearedPage, clearedFolderURL: clearedFolder) == .cleared)
-        #expect(AgentPaneMark.restoredState(url: otherFolderPage, clearedFolderURL: clearedFolder) == .post)
-        #expect(AgentPaneMark.restoredState(url: tmpPage, clearedFolderURL: clearedFolder) == .post)
-        #expect(AgentPaneMark.restoredState(url: webURL, clearedFolderURL: clearedFolder) == .post)
-        #expect(AgentPaneMark.restoredState(url: nil, clearedFolderURL: clearedFolder) == .post)
+        #expect(AgentPaneMark.isCleared(url: clearedPage, clearedFolderURL: clearedFolder))
+        #expect(!AgentPaneMark.isCleared(url: otherFolderPage, clearedFolderURL: clearedFolder))
+        #expect(!AgentPaneMark.isCleared(url: tmpPage, clearedFolderURL: clearedFolder))
+        #expect(!AgentPaneMark.isCleared(url: webURL, clearedFolderURL: clearedFolder))
+        #expect(!AgentPaneMark.isCleared(url: nil, clearedFolderURL: clearedFolder))
     }
 
     @Test("isClearedPageURL checks directory boundary, scheme, dot-dot traversal, and symlinks")
@@ -554,5 +412,80 @@ struct AgentPaneMarkTests {
         #expect(target(data, post) == post, "any page that isn't file, https or http links the post")
         let figma = try #require(URL(string: "https://www.figma.com/design/AAAAAAAAAAAAAAAAAAAAAA/board"))
         #expect(target(figma, post) == figma, "a Figma page Tom went to is a page: it keeps its own link")
+    }
+
+    // MARK: - the name for the pane's agent (cmux-rbf #cm-126.15)
+
+    private let names = ["claude": "wg-still Outie", "*": "Agent Outie"]
+
+    @Test("name: an exact slug beats *, and an agent with no entry takes *")
+    func nameExactBeatsStar() {
+        #expect(AgentPaneMark.name(agent: "claude", names: names) == "wg-still Outie")
+        #expect(AgentPaneMark.name(agent: "codex", names: names) == "Agent Outie")
+    }
+
+    @Test("name: with no entry for the slug and none for *, there is no name")
+    func nameNoneWithoutEntries() {
+        #expect(AgentPaneMark.name(agent: "codex", names: ["claude": "wg-still Outie"]) == nil)
+        #expect(AgentPaneMark.name(agent: nil, names: ["claude": "wg-still Outie"]) == nil)
+        #expect(AgentPaneMark.name(agent: "claude", names: [:]) == nil)
+    }
+
+    @Test("name: * alone names every agent's pane, and an agent that is not known too")
+    func nameStarOnly() {
+        #expect(AgentPaneMark.name(agent: "claude", names: ["*": "Agent Outie"]) == "Agent Outie")
+        #expect(AgentPaneMark.name(agent: nil, names: ["*": "Agent Outie"]) == "Agent Outie")
+        #expect(AgentPaneMark.name(agent: "", names: ["*": "Agent Outie"]) == "Agent Outie")
+    }
+
+    @Test("name: the agent is normalized: case, spaces, and the launcher and lifecycle spellings")
+    func nameNormalizesTheAgent() {
+        #expect(AgentPaneMark.name(agent: " Claude ", names: ["claude": "Outie"]) == "Outie")
+        #expect(AgentPaneMark.name(agent: "claudeteams", names: ["claude": "Outie"]) == "Outie")
+        #expect(AgentPaneMark.name(agent: "codexTeams", names: ["codex": "Codex Outie", "*": "x"]) == "Codex Outie")
+        #expect(AgentPaneMark.name(agent: "claude_code", names: ["claude": "Outie"]) == "Outie")
+    }
+
+    @Test("normalizedAgentSlug trims, lowercases and reads the launcher spellings; empty is none")
+    func slugNormalizer() {
+        #expect(AgentPaneMark.normalizedAgentSlug(" Claude ") == "claude")
+        #expect(AgentPaneMark.normalizedAgentSlug("claudeteams") == "claude")
+        #expect(AgentPaneMark.normalizedAgentSlug("codexTeams") == "codex")
+        #expect(AgentPaneMark.normalizedAgentSlug("claude_code") == "claude")
+        #expect(AgentPaneMark.normalizedAgentSlug("gemini") == "gemini")
+        #expect(AgentPaneMark.normalizedAgentSlug("  ") == nil)
+        #expect(AgentPaneMark.normalizedAgentSlug(nil) == nil)
+    }
+
+    @Test("title: the name Tom set, else Agent Pane; a plain pane keeps its own title, whatever the name")
+    func titleOrder() {
+        #expect(AgentPaneMark.title(isAgentPaneKind: true, own: "Page", name: "wg-still Outie") == "wg-still Outie")
+        #expect(AgentPaneMark.title(isAgentPaneKind: true, own: "Page", name: nil) == "Agent Pane")
+        #expect(AgentPaneMark.title(isAgentPaneKind: false, own: "Page", name: "Outie") == "Page")
+    }
+
+    @Test("agent: a show that sent one records it, and the one live agent wins when it differs")
+    func agentSentAndLive() {
+        #expect(AgentPaneMark.agent(sent: "claude", saved: nil, liveAgentKeys: []) == "claude")
+        #expect(AgentPaneMark.agent(sent: "codex", saved: "claude", liveAgentKeys: []) == "codex")
+        #expect(AgentPaneMark.agent(sent: "claudeteams", saved: nil, liveAgentKeys: ["claude_code"]) == "claude")
+        // An inherited variable: gemini runs, the variable still says claude.
+        #expect(AgentPaneMark.agent(sent: "claude", saved: nil, liveAgentKeys: ["gemini"]) == "gemini")
+        // Two live agents: the variable stands.
+        #expect(AgentPaneMark.agent(sent: "claude", saved: nil, liveAgentKeys: ["gemini", "codex"]) == "claude")
+        #expect(AgentPaneMark.agent(sent: "claude", saved: nil, liveAgentKeys: ["claude_code", "claude"]) == "claude")
+    }
+
+    @Test("agent: a show that sent none takes the one live agent, else keeps the saved one, else none")
+    func agentNoneSent() {
+        // The one live agent beats a stale saved one: Claude exited and an unwrapped agent started in the terminal.
+        #expect(AgentPaneMark.agent(sent: nil, saved: "claude", liveAgentKeys: ["gemini"]) == "gemini")
+        // No live agent (exit, Clear Agent State, a restart), or two: the saved one stands.
+        #expect(AgentPaneMark.agent(sent: nil, saved: "claude", liveAgentKeys: []) == "claude")
+        #expect(AgentPaneMark.agent(sent: nil, saved: "claude", liveAgentKeys: ["gemini", "codex"]) == "claude")
+        #expect(AgentPaneMark.agent(sent: nil, saved: nil, liveAgentKeys: ["claude_code"]) == "claude")
+        #expect(AgentPaneMark.agent(sent: nil, saved: nil, liveAgentKeys: ["gemini", "codex"]) == nil)
+        #expect(AgentPaneMark.agent(sent: nil, saved: nil, liveAgentKeys: []) == nil)
+        #expect(AgentPaneMark.agent(sent: "  ", saved: "codex", liveAgentKeys: []) == "codex")
     }
 }

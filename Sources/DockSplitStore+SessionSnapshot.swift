@@ -422,7 +422,8 @@ extension DockSplitStore {
                     diffViewerToken: diffViewer?.token,
                     diffViewerRequestPath: diffViewer?.requestPath,
                     ownerTerminalSurfaceId: browser.ownerTerminalSurfaceId, // cmux-rbf #cm-73.45
-                    ownedKind: browser.ownedKind?.rawValue // cmux-rbf #cm-126.3
+                    ownedKind: browser.ownedKind?.rawValue, // cmux-rbf #cm-126.3
+                    ownerAgent: browser.ownerAgent // cmux-rbf #cm-126.15
                 )
             } else if let deferred = panel as? DeferredBrowserPanel {
                 browserSnapshot = deferred.sessionPanelSnapshot.browser

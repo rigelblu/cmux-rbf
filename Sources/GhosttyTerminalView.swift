@@ -6965,13 +6965,12 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
                         _ = sendTimedGhosttyKey(
                             surface,
                             keyEvent,
-                            hasAccumulatedText: true,
                             path: "terminal.keyDown.accumulatedGhosttySend",
                             event: event,
                             extra: "textBytes=\(text.utf8.count)"
                         )
                         #else
-                        _ = sendGhosttyKey(surface, keyEvent, hasAccumulatedText: true)
+                        _ = sendGhosttyKey(surface, keyEvent)
                         #endif
                     }
 #if DEBUG
@@ -6991,13 +6990,12 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
                     _ = sendTimedGhosttyKey(
                         surface,
                         keyEvent,
-                        hasAccumulatedText: true,
                         path: "terminal.keyDown.accumulatedGhosttySend",
                         event: event
                     )
                     ghosttySendMs += (ProcessInfo.processInfo.systemUptime - ghosttySendStart) * 1000.0
                     #else
-                    _ = sendGhosttyKey(surface, keyEvent, hasAccumulatedText: true)
+                    _ = sendGhosttyKey(surface, keyEvent)
                     #endif
                 }
             }
@@ -7013,13 +7011,12 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
                 _ = sendTimedGhosttyKey(
                     surface,
                     keyEvent,
-                    hasAccumulatedText: true,
                     path: "terminal.keyDown.accumulatedConfirmGhosttySend",
                     event: event
                 )
                 ghosttySendMs += (ProcessInfo.processInfo.systemUptime - ghosttySendStart) * 1000.0
 #else
-                _ = sendGhosttyKey(surface, keyEvent, hasAccumulatedText: true)
+                _ = sendGhosttyKey(surface, keyEvent)
 #endif
             }
         } else {
@@ -7109,8 +7106,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     ///   - isCommittedText: True for text committed by an input method, whose control characters are not physical keys. (cm-128.1)
     @discardableResult
     private func sendGhosttyKey(_ surface: ghostty_surface_t, _ keyEvent: ghostty_input_key_s,
-                                countsAsPaneInput: Bool = true, isCommittedText: Bool = false,
-                                hasAccumulatedText: Bool = false) -> Bool {
+                                countsAsPaneInput: Bool = true, isCommittedText: Bool = false) -> Bool {
 #if DEBUG
         Self.debugGhosttySurfaceKeyEventObserver?(keyEvent)
 #endif
@@ -7140,81 +7136,32 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             isGhosttyBinding = false
             isAgentBinding = false
         }
-        return dispatchGhosttyKey(
-            keyEvent,
-            countsAsPaneInput: countsAsPaneInput,
-            isCommittedText: isCommittedText,
-            hasAccumulatedText: hasAccumulatedText,
-            observesAgentInput: observesAgentInput,
-            isAgentEscape: isAgentEscape,
-            isAgentBinding: isAgentBinding,
-            manualKeyName: terminalSurface?.manualInputKeyName(for: keyEvent),
-            isBindingForManualKey: {
-                if observesAgentInput { return isGhosttyBinding }
-                var bindingFlags = ghostty_binding_flags_e(0)
-                return ghostty_surface_key_is_binding(surface, keyEvent, &bindingFlags)
-            },
-            enqueueManualKey: { keyName in
-                terminalSurface?.enqueueManualInputNamedKey(keyName) == true
-            },
-            sendToGhostty: {
-                withPotentialClipboardPasteIntent {
-                    ghostty_surface_key(surface, keyEvent)
-                }
-            }
-        )
-    }
-
-    /// Key dispatch core shared with unit tests so both the manual-key path and the
-    /// Ghostty-surface path can be exercised without a live `ghostty_surface_t`. (cm-126.14)
-    @MainActor
-    func dispatchGhosttyKey(
-        _ keyEvent: ghostty_input_key_s,
-        countsAsPaneInput: Bool = true,
-        isCommittedText: Bool = false,
-        hasAccumulatedText: Bool = false,
-        observesAgentInput: Bool = false,
-        isAgentEscape: Bool = false,
-        isAgentBinding: Bool = false,
-        manualKeyName: String? = nil,
-        isBindingForManualKey: () -> Bool = { false },
-        enqueueManualKey: (String) -> Bool = { _ in false },
-        sendToGhostty: () -> Bool
-    ) -> Bool {
         func noteAgentInput() {
             guard observesAgentInput,
                   let action = terminalSurface?.agentInputState.acceptKey(isEscape: isAgentEscape, isBinding: isAgentBinding) else { return }
             terminalSurface?.onAgentPaneInput?(action)
         }
-        func noteAgentPaneReturn() {
-            guard terminalSurface?.awaitsAgentPaneAnswer == true,
-                  countsAsPaneInput,
-                  AgentPaneMark.isCountedReturn(
-                    keyEvent: keyEvent,
-                    isCommittedText: isCommittedText,
-                    hasAccumulatedText: hasAccumulatedText
-                  ) else { return }
-            terminalSurface?.onAgentPaneReturn?()
-        }
-        if let keyName = manualKeyName {
-            let isBinding = isBindingForManualKey()
+        if let keyName = terminalSurface?.manualInputKeyName(for: keyEvent) {
+            var bindingFlags = ghostty_binding_flags_e(0)
+            // cm-128.1: reuse the binding state already sampled for the agent filter instead of asking Ghostty twice.
+            let isBinding = observesAgentInput ? isGhosttyBinding : ghostty_surface_key_is_binding(surface, keyEvent, &bindingFlags)
             if !isBinding {
-                if enqueueManualKey(keyName) {
+                if terminalSurface?.enqueueManualInputNamedKey(keyName) == true {
                     if let keyCode = UInt16(exactly: keyEvent.keycode) {
                         manualNamedKeyConsumedKeyUps.insert(keyCode)
                     }
                     terminalSurface?.didAcceptExplicitInput()
                     noteAgentInput()
-                    noteAgentPaneReturn()
                     return true
                 }
             }
         }
-        let handled = sendToGhostty()
+        let handled = withPotentialClipboardPasteIntent {
+            ghostty_surface_key(surface, keyEvent)
+        }
         if handled, keyEvent.action != GHOSTTY_ACTION_RELEASE {
             terminalSurface?.didAcceptExplicitInput()
             noteAgentInput()
-            noteAgentPaneReturn()
         }
         return handled
     }
@@ -7258,13 +7205,12 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     private func sendTimedGhosttyKey(
         _ surface: ghostty_surface_t,
         _ keyEvent: ghostty_input_key_s,
-        hasAccumulatedText: Bool = false,
         path: String,
         event: NSEvent? = nil,
         extra: String? = nil
     ) -> Bool {
         let timingStart = CmuxTypingTiming.start()
-        let handled = sendGhosttyKey(surface, keyEvent, hasAccumulatedText: hasAccumulatedText)
+        let handled = sendGhosttyKey(surface, keyEvent)
         let baseExtra = "handled=\(handled ? 1 : 0)"
         let mergedExtra: String
         if let extra, !extra.isEmpty {
@@ -14312,24 +14258,5 @@ struct GhosttyTerminalView: NSViewRepresentable {
         /// removes the park through this because `hostedView` is weak and can
         /// already be gone by then.
         weak var vacancyParkedSurface: TerminalSurface?
-    }
-}
-
-extension AgentPaneMark {
-    /// Ghostty key-event adapter for `isCountedReturn`, kept beside `sendGhosttyKey`
-    /// so `AgentPaneMark.swift` stays free of `GhosttyKit`. (cmux-rbf #cm-126.14)
-    static func isCountedReturn(
-        keyEvent: ghostty_input_key_s,
-        isCommittedText: Bool,
-        hasAccumulatedText: Bool = false
-    ) -> Bool {
-        isCountedReturn(
-            isPress: keyEvent.action != GHOSTTY_ACTION_RELEASE,
-            keycode: keyEvent.keycode,
-            modsRaw: keyEvent.mods.rawValue,
-            isCommittedText: isCommittedText,
-            isComposing: keyEvent.composing,
-            hasAccumulatedText: hasAccumulatedText
-        )
     }
 }

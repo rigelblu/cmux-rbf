@@ -59,7 +59,10 @@ extension ControlCommandCoordinator {
                 data: .object(["reason": .string("invalid_show_params")])
             )
         }
-        switch context.controlAgentPaneCheck(surfaceID: surfaceID, url: url) {
+        // cmux-rbf #cm-126.15: the agent the CLI read from CMUX_AGENT_LAUNCH_KIND. Only text counts: a value that is not a string,
+        // or is empty, is sent on as none, so a bad value never refuses a show.
+        let agent = string(request.params, "agent")
+        switch context.controlAgentPaneCheck(surfaceID: surfaceID, url: url, agent: agent) {
         case .refused(let refusal):
             return agentPaneRefusalResult(refusal, url: url)
         case .ready(let plan):

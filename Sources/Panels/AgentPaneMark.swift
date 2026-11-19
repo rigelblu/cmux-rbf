@@ -2,65 +2,6 @@ import Foundation
 
 // cmux-rbf #cm-126.3: the Agent Pane, a browser pane one agent's terminal owns.
 
-/// The answered state of an Agent Pane (cmux-rbf #cm-126.14).
-///
-/// An Agent Pane begins in `.post` when opened or steered with a new post.
-/// When Tom writes back (pressing Return in the owning terminal or submitting
-/// via cmux's text box), it moves to `.wroteSince(Date)`.
-/// When cleared, it moves to `.cleared`.
-enum AgentPaneAnswerState: Equatable, Sendable {
-    case post
-    case wroteSince(Date)
-    case cleared
-
-    enum Event: Equatable, Sendable {
-        case show
-        case clear
-        case tomWrote(at: Date)
-    }
-
-    /// Pure transition function for AgentPaneAnswerState.
-    ///
-    /// Table:
-    /// - any + show -> .post
-    /// - any + clear -> .cleared
-    /// - .post + tomWrote(t) -> .wroteSince(t)
-    /// - .wroteSince + tomWrote -> unchanged (first time kept)
-    /// - .cleared + tomWrote -> .cleared
-    static func next(state: AgentPaneAnswerState, event: Event) -> AgentPaneAnswerState {
-        switch event {
-        case .show:
-            return .post
-        case .clear:
-            return .cleared
-        case .tomWrote(let date):
-            switch state {
-            case .post:
-                return .wroteSince(date)
-            case .wroteSince:
-                return state
-            case .cleared:
-                return .cleared
-            }
-        }
-    }
-
-    var wroteAt: Date? {
-        if case .wroteSince(let date) = self {
-            return date
-        }
-        return nil
-    }
-
-    var isPost: Bool {
-        self == .post
-    }
-
-    var isCleared: Bool {
-        self == .cleared
-    }
-}
-
 /// The Agent Pane's rules, all over plain values so each tests without the app.
 ///
 /// An Agent Pane is a browser pane with an owner (the terminal's
@@ -118,74 +59,58 @@ enum AgentPaneMark {
         isAgentPaneKind ? shippedPicture : own
     }
 
-    /// A page cannot replace the Agent Pane's caption with its own title.
-    ///
-    /// When `wroteAt` is set, the caption reads "You wrote <time>" in place of "Agent Pane"
-    /// (cmux-rbf #cm-126.14). A plain browser pane keeps `own` unchanged.
-    static func title(
-        isAgentPaneKind: Bool,
-        own: String,
-        wroteAt: Date? = nil,
-        locale: Locale? = nil,
-        timeZone: TimeZone? = nil
-    ) -> String {
-        guard isAgentPaneKind else { return own }
-        if let wroteAt {
-            let timeString: String
-            if locale == nil && timeZone == nil {
-                timeString = wroteAt.formatted(date: .omitted, time: .shortened)
-            } else {
-                let style = Date.FormatStyle(
-                    date: .omitted,
-                    time: .shortened,
-                    locale: locale ?? .autoupdatingCurrent,
-                    timeZone: timeZone ?? .current
-                )
-                timeString = wroteAt.formatted(style)
-            }
-            return String(localized: "agentPane.tab.title.wrote", defaultValue: "You wrote \(timeString)")
+    /// The slug an agent goes by in `agentPane.names`: trimmed and lowercased, with the launcher spellings read as
+    /// their agent (`claudeteams` as `claude`, `codexteams` as `codex`) and the lifecycle key `claude_code` as `claude`.
+    /// `nil` for none or empty. The CLI sends `CMUX_AGENT_LAUNCH_KIND` as written, so this is the one mapping.
+    /// cmux-rbf #cm-126.15.
+    static func normalizedAgentSlug(_ raw: String?) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !trimmed.isEmpty else { return nil }
+        switch trimmed {
+        case "claudeteams", "claude_code": return "claude"
+        case "codexteams": return "codex"
+        default: return trimmed
         }
-        return String(localized: "agentPane.tab.title", defaultValue: "Agent Pane")
     }
 
-    /// Caps Lock and Num Lock modifier masks matching `ghostty.h:136-137` (`GHOSTTY_MODS_CAPS`, `GHOSTTY_MODS_NUM`).
-    static let capsLockModMask: UInt32 = 1 << 4
-    static let numLockModMask: UInt32 = 1 << 5
+    /// The name Tom set for `agent`: its slug's entry, else `*`'s, else `nil`. `names` is
+    /// `AgentPaneNameEntries.usableNames`, whose keys are already lowercased and trimmed and whose values are non-empty;
+    /// `agent` is normalized here. cmux-rbf #cm-126.15.
+    static func name(agent: String?, names: [String: String]) -> String? {
+        if let slug = normalizedAgentSlug(agent), let named = names[slug] { return named }
+        return names["*"]
+    }
 
-    /// Whether an input event represents Tom's pressed Return or keypad Enter in the terminal,
-    /// counting only real physical key presses (not release, not committed text, not IME composition commit,
-    /// no modifiers except Caps/Num lock).
-    ///
-    /// (cmux-rbf #cm-126.14)
-    static func isCountedReturn(
-        isPress: Bool,
-        keycode: UInt32,
-        modsRaw: UInt32,
-        isCommittedText: Bool,
-        isComposing: Bool,
-        hasAccumulatedText: Bool = false
-    ) -> Bool {
-        guard isPress else { return false }
-        guard !isCommittedText else { return false }
-        guard !isComposing else { return false }
-        guard !hasAccumulatedText else { return false }
-        guard keycode == 0x24 || keycode == 0x4C else { return false }
-        let allowedMods = capsLockModMask | numLockModMask
-        guard (modsRaw & ~allowedMods) == 0 else { return false }
-        return true
+    /// The agent a `show` records on the pane. `sent` is `CMUX_AGENT_LAUNCH_KIND` as the CLI read it, `saved` what the pane
+    /// already holds, `liveAgentKeys` the terminal's non-manual, non-`.unknown` lifecycle keys (`claude_code` reads as `claude`).
+    /// The one live agent wins over both, then `sent`, then `saved`:
+    /// - A wrapped agent's children inherit the variable, so an unwrapped agent started from such a shell would send the
+    ///   wrong slug; and a pane's saved agent goes stale when a different agent starts in its terminal.
+    /// - With two live agents, or none (an exit, Clear Agent State, a restart), none is picked from the state, so `sent`
+    ///   stands, and without it `saved`.
+    /// cmux-rbf #cm-126.15.
+    static func agent(sent: String?, saved: String?, liveAgentKeys: [String]) -> String? {
+        let live = Set(liveAgentKeys.compactMap(normalizedAgentSlug))
+        if live.count == 1, let only = live.first { return only }
+        return normalizedAgentSlug(sent) ?? normalizedAgentSlug(saved)
+    }
+
+    /// A page cannot replace the Agent Pane's caption with its own title: the `name` Tom set for the pane's agent
+    /// (cmux-rbf #cm-126.15, his own text, never localized), else "Agent Pane". A plain browser pane keeps `own` unchanged. A name Tom gave the tab with Rename Tab wins over
+    /// all of it, through `resolvedPanelTitle`, not here.
+    static func title(isAgentPaneKind: Bool, own: String, name: String? = nil) -> String {
+        guard isAgentPaneKind else { return own }
+        if let name { return name }
+        return String(localized: "agentPane.tab.title", defaultValue: "Agent Pane")
     }
 
     /// Subfolder under Application Support for cleared Agent Pane placeholder pages.
     static let clearedPagesSubfolder = "cleared"
 
-    /// Derives an Agent Pane's state upon workspace/session restore (cmux-rbf #cm-126.14).
-    ///
-    /// A restored Agent Pane's URL inside cmux's cleared-pages folder -> `.cleared`, else `.post`.
-    static func restoredState(url: URL?, clearedFolderURL: URL) -> AgentPaneAnswerState {
-        guard let url, isClearedPageURL(url, in: clearedFolderURL) else {
-            return .post
-        }
-        return .cleared
+    /// Whether a restored or moved Agent Pane is cleared: its URL is inside cmux's cleared-pages folder (cmux-rbf #cm-126.14).
+    static func isCleared(url: URL?, clearedFolderURL: URL) -> Bool {
+        guard let url else { return false }
+        return isClearedPageURL(url, in: clearedFolderURL)
     }
 
     /// The cleared page of one Agent Pane: one file named by the pane's id, so a page shared

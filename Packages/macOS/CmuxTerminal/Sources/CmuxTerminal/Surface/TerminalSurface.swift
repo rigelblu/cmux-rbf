@@ -255,10 +255,6 @@ public final class TerminalSurface: Identifiable, ObservableObject {
     /// Routes accepted human input to the current pane's journal owner. (cm-128.1)
     /// The Boolean requests an unknown phase after an eligible physical Escape.
     @MainActor public var onAgentPaneInput: (@MainActor (Bool) -> Void)?
-    /// Whether this terminal owns an Agent Pane currently in `.post` (awaiting Tom's reply). (cm-126.14)
-    @MainActor public var awaitsAgentPaneAnswer = false
-    /// Called when Tom presses a counted Return in this terminal while `awaitsAgentPaneAnswer` is true. (cm-126.14)
-    @MainActor public var onAgentPaneReturn: (@MainActor () -> Void)?
     /// Routes accepted explicit user input to the surface's current panel owner.
     @MainActor public var onExplicitInput: (@MainActor () -> Void)?
     /// Notifies the owner when explicit input cancels a deferred auto-resume.

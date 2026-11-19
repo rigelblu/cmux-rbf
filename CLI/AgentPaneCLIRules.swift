@@ -105,6 +105,13 @@ enum AgentPaneCLIRules {
 
     static let noCallerMessage = noCallerMessage(for: "show")
 
+    /// The agent `show` sends: `CMUX_AGENT_LAUNCH_KIND` trimmed, as written; none when absent or empty. The app maps it to a
+    /// slug (`AgentPaneMark.normalizedAgentSlug`). cmux-rbf #cm-126.15.
+    static func agent(launchKind raw: String?) -> String? {
+        guard let kind = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !kind.isEmpty else { return nil }
+        return kind
+    }
+
     /// The same words for each subcommand that names the agent's terminal (`show`, `clear`).
     static func noCallerMessage(for subcommand: String) -> String {
         "cmux agent-pane \(subcommand) needs the agent's terminal: run it in a cmux terminal or pass --surface"

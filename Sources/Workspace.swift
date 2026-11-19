@@ -869,7 +869,8 @@ extension Workspace {
                     diffViewerRequestPath: diffViewerComponents?.requestPath,
                     figmaPages: browserPanel.figmaPagesSessionSnapshot(),
                     ownerTerminalSurfaceId: browserPanel.ownerTerminalSurfaceId, // cmux-rbf #cm-73.45
-                    ownedKind: browserPanel.ownedKind?.rawValue // cmux-rbf #cm-126.3
+                    ownedKind: browserPanel.ownedKind?.rawValue, // cmux-rbf #cm-126.3
+                    ownerAgent: browserPanel.ownerAgent // cmux-rbf #cm-126.15
                 )
             } else if let deferredPanel = panel as? DeferredBrowserPanel {
                 // A deferred panel already owns the exact persisted browser DTO;
@@ -2359,11 +2360,8 @@ extension Workspace {
                 panels[restoredPanelId] = deferredPanel
                 guard let tabId = bonsplitController.createTab(
                     // cmux-rbf #cm-126.3: a deferred Agent Pane has its caption before materialization.
-                    title: snapshot.customTitle ?? AgentPaneMark.title(
-                        isAgentPaneKind: AgentPaneMark.isAgentPaneKind(
-                            owner: snapshot.browser?.ownerTerminalSurfaceId,
-                            kind: snapshot.browser?.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
-                        ),
+                    title: snapshot.customTitle ?? agentPaneCaption( // (cm-126.15)
+                        snapshot: snapshot,
                         own: snapshot.title ?? deferredPanel.displayTitle
                     ),
                     hasCustomTitle: snapshot.customTitle != nil,
@@ -2488,11 +2486,8 @@ extension Workspace {
         adoptPersistedStableSurfaceId(from: snapshot, panelId: panelId)
 
         // cmux-rbf #cm-126.3: metadata must not overwrite the placeholder's owned caption.
-        let title = AgentPaneMark.title(
-            isAgentPaneKind: AgentPaneMark.isAgentPaneKind(
-                owner: snapshot.browser?.ownerTerminalSurfaceId,
-                kind: snapshot.browser?.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
-            ),
+        let title = agentPaneCaption( // (cm-126.15)
+            snapshot: snapshot,
             own: snapshot.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         )
         if !title.isEmpty {
@@ -2595,31 +2590,21 @@ extension Workspace {
             }
         }
 
-        // cmux-rbf #cm-126.14: restore Agent Pane answer state after `browserPanel.restoreSessionSnapshot`
-        // sets `ownerTerminalSurfaceId`/`ownedKind`, preserving any existing state on materialization.
-        if let terminal = panels[panelId] as? TerminalPanel {
-            syncTerminalAgentPaneAnswerFlag(for: terminal)
-        } else if let browserSnapshot = snapshot.browser,
-                  AgentPaneMark.isAgentPaneKind(
-                    owner: browserSnapshot.ownerTerminalSurfaceId,
-                    kind: browserSnapshot.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
-                  ) {
-            if agentPaneAnswerStates[panelId] == nil {
+        // cmux-rbf #cm-126.14: restore the Agent Pane's cleared flag after `browserPanel.restoreSessionSnapshot` sets
+        // `ownerTerminalSurfaceId`/`ownedKind`, keeping one already set on materialization; cmux-rbf #cm-126.15: then set its
+        // caption, which names the pane for its saved agent.
+        if let browserSnapshot = snapshot.browser,
+           AgentPaneMark.isAgentPaneKind(
+               owner: browserSnapshot.ownerTerminalSurfaceId,
+               kind: browserSnapshot.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
+           ) {
+            if agentPaneClearedFlags[panelId] == nil {
                 let restoredURL = browserSnapshot.urlString.flatMap(URL.init(string:))
-                let isCleared: Bool
-                if let clearedFolder = agentPaneClearedFolder {
-                    isCleared = AgentPaneMark.restoredState(url: restoredURL, clearedFolderURL: clearedFolder) == .cleared
-                } else {
-                    isCleared = false
-                }
-                transitionAgentPaneState(panelId: panelId, event: isCleared ? .clear : .show)
-            } else {
-                if let owner = browserSnapshot.ownerTerminalSurfaceId,
-                   let terminal = agentPaneOwnerTerminal(stableID: owner) {
-                    syncTerminalAgentPaneAnswerFlag(for: terminal)
-                }
-                refreshAgentPaneCaption(panelId: panelId)
+                agentPaneClearedFlags[panelId] = agentPaneClearedFolder.map {
+                    AgentPaneMark.isCleared(url: restoredURL, clearedFolderURL: $0)
+                } ?? false
             }
+            refreshAgentPaneCaption(panelId: panelId)
         }
     }
 
@@ -3402,8 +3387,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     var heldAgentPaneUpdates: [UUID: HeldAgentPaneUpdate] = [:]
     /// cmux-rbf #cm-126.14: where cleared pages go; a test points it at its own folder, nil means the app's.
     var agentPaneClearedFolderOverride: URL?
-    /// cmux-rbf #cm-126.14: per-Agent-Pane answer state, in memory only (not persisted in session snapshot).
-    var agentPaneAnswerStates: [UUID: AgentPaneAnswerState] = [:]
+    /// cmux-rbf #cm-126.14: whether each Agent Pane shows its cleared page, in memory only (not persisted in the session snapshot).
+    var agentPaneClearedFlags: [UUID: Bool] = [:]
 #if DEBUG
     /// XCTest seam: assign before `configureRemoteConnection` to script the
     /// session coordinator's subprocess results. Instance-scoped injection of
@@ -5049,11 +5034,6 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             guard let self, let terminalPanel else { return false }
             return self.resumeAgentHibernation(panelId: terminalPanel.id, focus: focus)
         }
-        terminalPanel.surface.onAgentPaneReturn = { [weak self, weak terminalPanel] in
-            guard let self, let terminalPanel else { return }
-            self.noteTomWroteToTerminal(stableID: terminalPanel.stableSurfaceId)
-        }
-        syncTerminalAgentPaneAnswerFlag(for: terminalPanel)
     }
 
     private func configureBrowserPanel(_ browserPanel: BrowserPanel) {
@@ -5341,11 +5321,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             // cmux-rbf #cm-73.3: a showing-side URL change also updates an already-hovered row.
             self.bonsplitController.refreshPairFigmaPage()
             guard let existing = self.bonsplitController.tab(tabId) else { return }
-            let nextTitle = AgentPaneMark.title(
-                isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
-                own: browserPanel.displayTitle,
-                wroteAt: self.agentPaneAnswerState(for: browserPanel.id).wroteAt
-            )
+            let nextTitle = self.agentPaneCaption(for: browserPanel) // (cm-126.15)
             if self.panelTitles[browserPanel.id] != nextTitle {
                 self.panelTitles[browserPanel.id] = nextTitle
             }
@@ -6840,11 +6816,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             browserPanel.resetForWorkspaceContextChange(reason: reason)
             // cmux-rbf #cm-126.3: reset does not change the owned pane's identity.
             let isAgentPaneKind = AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind)
-            let nextTitle = AgentPaneMark.title(
-                isAgentPaneKind: isAgentPaneKind,
-                own: browserPanel.displayTitle,
-                wroteAt: agentPaneAnswerState(for: browserPanel.id).wroteAt
-            )
+            let nextTitle = agentPaneCaption(for: browserPanel) // (cm-126.15)
             _ = updatePanelTitle(panelId: browserPanel.id, title: nextTitle)
 
             guard let tabId = surfaceIdFromPanelId(browserPanel.id),
@@ -10122,13 +10094,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         // cmux-rbf #cm-126.3: ownership and kind precede the first tab picture and caption.
         browserPanel.ownerTerminalSurfaceId = owner?.terminalStableID
         browserPanel.ownedKind = owner?.kind
+        browserPanel.ownerAgent = owner?.agent // cmux-rbf #cm-126.15: before the first caption below
         // cmux-rbf #cm-73.43: the tab's known Figma name precedes its first title read, so a split on a
         // file the menu knows never reads the link's name first (`configureBrowserPanel` runs after).
         syncFigmaKnownFileName(browserPanel)
-        let initialTitle = AgentPaneMark.title(
-            isAgentPaneKind: AgentPaneMark.isAgentPaneKind(owner: browserPanel.ownerTerminalSurfaceId, kind: browserPanel.ownedKind),
-            own: browserPanel.displayTitle
-        )
+        // cmux-rbf #cm-126.15: the one caption writer; the pane is not in `panels` yet, so it takes the panel itself.
+        let initialTitle = agentPaneCaption(for: browserPanel)
         configureBrowserPanel(browserPanel)
         panels[browserPanel.id] = browserPanel
         panelTitles[browserPanel.id] = initialTitle
@@ -11747,9 +11718,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         } else if let customSidebarPanel = detached.panel as? CustomSidebarPanel {
             customSidebarPanel.reattach(to: self)
         }
-        // cmux-rbf #cm-126.14: the workspace this Agent Pane came from dropped its answer state; take the one it carried,
-        // else derive it from the page.
-        adoptDetachedAgentPaneAnswerState(panelId: detached.panelId, carried: detached.agentPaneAnswerState)
+        // cmux-rbf #cm-126.14: the workspace this Agent Pane came from dropped its cleared flag; derive it from the page.
+        deriveAgentPaneCleared(panelId: detached.panelId)
         AgentHibernationController.shared.transferTrackingStateForMovedPanel(
             panelId: detached.panelId,
             from: detached.sourceWorkspaceId,
@@ -15220,7 +15190,6 @@ extension Workspace: BonsplitDelegate {
                     ? (panelCustomTitleSources[panelId] ?? .user)
                     : nil,
                 manuallyUnread: manualUnreadPanelIds.contains(panelId),
-                agentPaneAnswerState: agentPaneAnswerStates[panelId],
                 restoredUnreadIndicator: restoredUnreadPanelIndicators[panelId],
                 restorableAgent: restorableAgent,
                 restorableAgentResumeState: restorableAgentResumeState,

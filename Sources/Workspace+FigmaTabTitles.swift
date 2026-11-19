@@ -50,29 +50,25 @@ extension Workspace {
         for (panelId, panel) in panels {
             let address: URL?
             let showsAddressBar: Bool
-            let isAgentPane: Bool
-            let displayTitle: String
+            let next: String // cmux-rbf #cm-126.15: the one caption writer, so a Figma setting flip keeps the name
             if let browser = panel as? BrowserPanel {
                 address = browser.currentURL
                 showsAddressBar = browser.isOmnibarVisible
                 guard FigmaTabMark.applies(address: address, showsAddressBar: showsAddressBar) else { continue }
                 if let key, address.flatMap({ FigmaPaneURL.fileKey(fromPaneURL: $0) }) != key { continue }
                 syncFigmaKnownFileName(browser)
-                isAgentPane = AgentPaneMark.isAgentPaneKind(owner: browser.ownerTerminalSurfaceId, kind: browser.ownedKind)
-                displayTitle = browser.displayTitle
+                next = agentPaneCaption(for: browser) // (cm-126.15)
             } else if let deferred = panel as? DeferredBrowserPanel {
                 address = deferred.figmaSavedAddress
                 showsAddressBar = deferred.figmaSavedShowsAddressBar
                 guard FigmaTabMark.applies(address: address, showsAddressBar: showsAddressBar) else { continue }
                 if let key, address.flatMap({ FigmaPaneURL.fileKey(fromPaneURL: $0) }) != key { continue }
                 syncFigmaKnownFileName(deferred)
-                isAgentPane = deferred.isAgentPaneBySnapshot
-                displayTitle = deferred.titleWithoutRename
+                next = agentPaneCaption(snapshot: deferred.sessionPanelSnapshot, own: deferred.titleWithoutRename) // (cm-126.15)
             } else {
                 continue
             }
             guard let tabId = surfaceIdFromPanelId(panelId) else { continue }
-            let next = AgentPaneMark.title(isAgentPaneKind: isAgentPane, own: displayTitle)
             if panelTitles[panelId] != next { panelTitles[panelId] = next }
             let resolved = resolvedPanelTitle(panelId: panelId, fallback: next)
             guard let existing = bonsplitController.tab(tabId), existing.title != resolved else { continue }

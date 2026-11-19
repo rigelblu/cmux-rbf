@@ -16,13 +16,15 @@ extension TerminalController: ControlAgentPaneContext {
     /// allowlist and insecure-HTTP checks here, `BrowserPanel.navigate` would stop
     /// a blocked page inside itself and still answer `navigated`, or raise the
     /// insecure-connection sheet on Tom's window.
-    func controlAgentPaneCheck(surfaceID: UUID, url: URL) -> ControlAgentPaneCheck {
-        controlAgentPaneCheck(surfaceID: surfaceID, url: url, defaults: .standard)
+    func controlAgentPaneCheck(surfaceID: UUID, url: URL, agent: String?) -> ControlAgentPaneCheck {
+        controlAgentPaneCheck(surfaceID: surfaceID, url: url, agent: agent, defaults: .standard)
     }
 
     /// The same, with the defaults the browser settings are read from, so a test
     /// never reads or flips Tom's own.
-    func controlAgentPaneCheck(surfaceID: UUID, url: URL, defaults: UserDefaults) -> ControlAgentPaneCheck {
+    func controlAgentPaneCheck(
+        surfaceID: UUID, url: URL, agent: String? = nil, defaults: UserDefaults // cmux-rbf #cm-126.15
+    ) -> ControlAgentPaneCheck {
         let workspace: Workspace
         let terminal: TerminalPanel
         switch agentPaneCaller(surfaceID: surfaceID) {
@@ -68,7 +70,8 @@ extension TerminalController: ControlAgentPaneContext {
             workspaceID: workspace.id,
             terminalID: terminal.id,
             ownerStableID: owner,
-            url: url
+            url: url,
+            agent: agent
         ))
     }
 
@@ -132,7 +135,7 @@ extension TerminalController: ControlAgentPaneContext {
         }
         guard BrowserAvailabilitySettings.isEnabled(defaults: defaults) else { return .refused(.browserOff) }
         let action: ControlAgentPanePlan.Action
-        if let agentPane, workspace.agentPaneAnswerState(for: agentPane).isCleared, !heldShow {
+        if let agentPane, workspace.agentPaneIsCleared(agentPane), !heldShow {
             // Already cleared, and no held page to retire: a no-op, even under Design Focus.
             action = .alreadyCleared(panelID: agentPane, others: others)
         } else if workspace.isDesignFocusActive {
@@ -161,18 +164,18 @@ extension TerminalController: ControlAgentPaneContext {
         switch plan.action {
         case .open:
             guard let panel = workspace.openAgentPane(
-                beside: plan.terminalID, url: plan.url, owner: plan.ownerStableID
+                beside: plan.terminalID, url: plan.url, owner: plan.ownerStableID, agent: plan.agent
             ) else { return nil }
             agentPane = panel.id
             others = 0
             action = .opened
         case .navigate(let agentPaneID, let count):
-            guard workspace.navigateAgentPane(agentPaneID, to: plan.url) != nil else { return nil }
+            guard workspace.navigateAgentPane(agentPaneID, to: plan.url, agent: plan.agent) != nil else { return nil }
             agentPane = agentPaneID
             others = count
             action = .navigated
         case .hold(let agentPaneID, let count):
-            workspace.holdAgentPaneUpdate(owner: plan.ownerStableID, url: plan.url)
+            workspace.holdAgentPaneUpdate(owner: plan.ownerStableID, url: plan.url, agent: plan.agent)
             agentPane = agentPaneID
             others = count
             action = .heldDesignFocus
