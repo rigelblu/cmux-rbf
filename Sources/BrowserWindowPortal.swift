@@ -1269,6 +1269,13 @@ final class WindowBrowserSlotView: NSView {
     private var figmaLoadBarHostingView: FigmaLoadBarHostingView?
     private var currentFigmaLoadBarConfiguration: FigmaLoadBarConfiguration?
     private var omnibarSuggestionsHostingView: BrowserPortalOmnibarSuggestionsHostingView?
+    // cmux-rbf (#cm-143): overlays whose removal waits until WebKit has put the web view back. Reject a revert of this hunk on upstream sync.
+    fileprivate enum DeferredOverlay: String {
+        case search, designComposer, figmaLoadBar, omnibarSuggestions
+    }
+    private var deferredOverlayRemovals: Set<DeferredOverlay> = []
+    /// Test seam: replaces the real "WebKit holds this slot's web view" check.
+    var overlayHoldProbeForTesting: (() -> Bool)?
     private weak var hostedWebView: WKWebView?
     private var hostedWebViewConstraints: [NSLayoutConstraint] = []
     private var forwardedDropZone: DropZone?
@@ -1437,6 +1444,91 @@ final class WindowBrowserSlotView: NSView {
 #endif
     }
 
+    // cmux-rbf (#cm-143): WebKit's element full screen moves the web view out of this slot, leaves a WKFullScreenPlaceholderView, and saves the slot's constraints. It re-activates them when full screen ends, and AppKit constraints don't retain their items: a freed overlay there is a message to a freed object. So an overlay removal waits until WebKit has put the web view back. The flush runs when the placeholder leaves the slot; the portal refresh on a full-screen state change is a fallback for a web view inside a `BrowserViewportHostView`, where the placeholder never lands in the slot, and for any later refresh (WebKit reports not-in-full-screen before the placeholder leaves, so that refresh usually finds the slot still held). Reject a revert of this hunk on upstream sync.
+    private static func isWebKitFullscreenPlaceholder(_ view: NSView) -> Bool {
+        NSStringFromClass(type(of: view)).contains("WKFullScreenPlaceholderView")
+    }
+
+    var isHeldByWebKitFullscreen: Bool {
+        if let probe = overlayHoldProbeForTesting { return probe() }
+        if subviews.contains(where: Self.isWebKitFullscreenPlaceholder) { return true }
+        return hostedWebView?.cmuxIsManagedByExternalFullscreenWindow(relativeTo: window) ?? false
+    }
+
+    private func overlayView(for kind: DeferredOverlay) -> NSView? {
+        switch kind {
+        case .search: return searchOverlayHostingView
+        case .designComposer: return designComposerHostingView
+        case .figmaLoadBar: return figmaLoadBarHostingView
+        case .omnibarSuggestions: return omnibarSuggestionsHostingView
+        }
+    }
+
+    private func clearOverlayReference(for kind: DeferredOverlay) {
+        switch kind {
+        case .search: searchOverlayHostingView = nil
+        case .designComposer: designComposerHostingView = nil
+        case .figmaLoadBar: figmaLoadBarHostingView = nil
+        case .omnibarSuggestions: omnibarSuggestionsHostingView = nil
+        }
+    }
+
+    /// Removes `view` now and returns true, or, while WebKit holds the web view, hides it, queues the removal
+    /// and returns false. The caller keeps its reference when this returns false.
+    private func removeOverlayOrDefer(_ view: NSView?, kind: DeferredOverlay) -> Bool {
+        guard let view else {
+            deferredOverlayRemovals.remove(kind)
+            return true
+        }
+        if isHeldByWebKitFullscreen {
+            // Hiding a first responder moves focus to the next key view, where removing it only resigned it; resign it first.
+            if let window, let responder = window.firstResponder as? NSView,
+               responder === view || responder.isDescendant(of: view) {
+                window.makeFirstResponder(nil)
+            }
+            view.isHidden = true
+            deferredOverlayRemovals.insert(kind)
+#if DEBUG
+            cmuxDebugLog("browser.portal.overlay.defer kind=\(kind.rawValue)")
+#endif
+            return false
+        }
+        deferredOverlayRemovals.remove(kind)
+        view.removeFromSuperview()
+        return true
+    }
+
+    private func reviveDeferredOverlay(_ view: NSView, kind: DeferredOverlay) {
+        guard deferredOverlayRemovals.remove(kind) != nil else { return }
+        view.isHidden = false
+    }
+
+    /// Runs the queued removals once WebKit no longer holds the web view; otherwise leaves them queued.
+    func flushDeferredOverlayRemovals(reason: String) {
+        guard !deferredOverlayRemovals.isEmpty, !isHeldByWebKitFullscreen else { return }
+        let kinds = deferredOverlayRemovals
+        deferredOverlayRemovals = []
+        for kind in kinds {
+            let view = overlayView(for: kind)
+            clearOverlayReference(for: kind)
+            view?.removeFromSuperview()
+#if DEBUG
+            cmuxDebugLog("browser.portal.overlay.flush kind=\(kind.rawValue) reason=\(reason)")
+#endif
+        }
+    }
+
+    override func willRemoveSubview(_ subview: NSView) {
+        super.willRemoveSubview(subview)
+        // cmux-rbf (#cm-143): the placeholder leaves just before WebKit re-activates its saved constraints; flush on the next turn. Reject a revert of this hunk on upstream sync.
+        guard !deferredOverlayRemovals.isEmpty, Self.isWebKitFullscreenPlaceholder(subview) else { return }
+        // A slot with no superview is detached or being freed: its dealloc removes its subviews through here, and a weak reference to an object that is deallocating is fatal. The queue goes with the slot.
+        guard superview != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.flushDeferredOverlayRemovals(reason: "placeholderLeft")
+        }
+    }
+
     func setSearchOverlay(_ configuration: BrowserPortalSearchOverlayConfiguration?) {
         guard let configuration else {
             logSearchOverlayEvent("remove", panelId: nil)
@@ -1448,8 +1540,8 @@ final class WindowBrowserSlotView: NSView {
                     .OBJC_ASSOCIATION_RETAIN_NONATOMIC
                 )
             }
-            searchOverlayHostingView?.removeFromSuperview()
-            searchOverlayHostingView = nil
+            // cmux-rbf (#cm-143): never free an overlay while WebKit's full screen holds the web view; its saved constraints name it. Reject a revert of this hunk on upstream sync.
+            if removeOverlayOrDefer(searchOverlayHostingView, kind: .search) { searchOverlayHostingView = nil }
             return
         }
 
@@ -1466,6 +1558,7 @@ final class WindowBrowserSlotView: NSView {
         )
 
         if let overlay = searchOverlayHostingView {
+            reviveDeferredOverlay(overlay, kind: .search) // cmux-rbf (#cm-143). Reject a revert of this hunk on upstream sync.
             logSearchOverlayEvent("updateExisting", panelId: configuration.panelId)
             overlay.rootView = rootView
             objc_setAssociatedObject(
@@ -1510,13 +1603,14 @@ final class WindowBrowserSlotView: NSView {
 
     func setDesignComposer(_ configuration: BrowserPortalDesignComposerConfiguration?) {
         guard let configuration else {
-            designComposerHostingView?.removeFromSuperview()
-            designComposerHostingView = nil
+            // cmux-rbf (#cm-143): never free an overlay while WebKit's full screen holds the web view. Reject a revert of this hunk on upstream sync.
+            if removeOverlayOrDefer(designComposerHostingView, kind: .designComposer) { designComposerHostingView = nil }
             designComposerPanelId = nil
             return
         }
 
         if let overlay = designComposerHostingView {
+            reviveDeferredOverlay(overlay, kind: .designComposer) // cmux-rbf (#cm-143). Reject a revert of this hunk on upstream sync.
             if designComposerPanelId != configuration.panelId {
                 overlay.rootView = Self.makeDesignComposerRootView(
                     configuration: configuration,
@@ -1565,8 +1659,8 @@ final class WindowBrowserSlotView: NSView {
     // cmux-rbf (#cm-73.11): pinned to the slot's top edge, 2 pt tall, taking no hits, as the search overlay is mounted. Reject a revert of this hunk on upstream sync.
     func setFigmaLoadBar(_ configuration: FigmaLoadBarConfiguration?) {
         guard let configuration else {
-            figmaLoadBarHostingView?.removeFromSuperview()
-            figmaLoadBarHostingView = nil
+            // cmux-rbf (#cm-143): never free an overlay while WebKit's full screen holds the web view. Reject a revert of this hunk on upstream sync.
+            if removeOverlayOrDefer(figmaLoadBarHostingView, kind: .figmaLoadBar) { figmaLoadBarHostingView = nil }
             currentFigmaLoadBarConfiguration = nil
             return
         }
@@ -1574,6 +1668,7 @@ final class WindowBrowserSlotView: NSView {
         currentFigmaLoadBarConfiguration = configuration
         let rootView = FigmaLoadBarView(configuration: configuration)
         if let view = figmaLoadBarHostingView {
+            reviveDeferredOverlay(view, kind: .figmaLoadBar) // cmux-rbf (#cm-143). Reject a revert of this hunk on upstream sync.
             view.rootView = rootView
             if view.superview !== self {
                 view.removeFromSuperview()
@@ -1632,8 +1727,8 @@ final class WindowBrowserSlotView: NSView {
     func setOmnibarSuggestions(_ configuration: BrowserPortalOmnibarSuggestionsConfiguration?) {
         guard let configuration else {
             logOmnibarSuggestionsEvent("remove", configuration: nil)
-            omnibarSuggestionsHostingView?.removeFromSuperview()
-            omnibarSuggestionsHostingView = nil
+            // cmux-rbf (#cm-143): never free an overlay while WebKit's full screen holds the web view. Reject a revert of this hunk on upstream sync.
+            if removeOverlayOrDefer(omnibarSuggestionsHostingView, kind: .omnibarSuggestions) { omnibarSuggestionsHostingView = nil }
             return
         }
 
@@ -1641,6 +1736,7 @@ final class WindowBrowserSlotView: NSView {
         let rootView = BrowserPortalOmnibarSuggestionsOverlay(configuration: configuration)
 
         if let overlay = omnibarSuggestionsHostingView {
+            reviveDeferredOverlay(overlay, kind: .omnibarSuggestions) // cmux-rbf (#cm-143). Reject a revert of this hunk on upstream sync.
             logOmnibarSuggestionsEvent("updateExisting", configuration: configuration)
             overlay.rootView = rootView
             overlay.popupFrameInTopLeftCoordinates = configuration.popupFrame
@@ -3159,6 +3255,8 @@ final class WindowBrowserPortal: NSObject {
             source: refreshSource,
             forcePresentationRefresh: true
         )
+        // cmux-rbf (#cm-143): fallback flush for overlay removals queued during element full screen. Reject a revert of this hunk on upstream sync.
+        entriesByWebViewId[webViewId]?.containerView?.flushDeferredOverlayRemovals(reason: refreshSource)
         guard let entry = entriesByWebViewId[webViewId],
               let webView = entry.webView,
               let containerView = entry.containerView,
