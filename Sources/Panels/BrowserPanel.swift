@@ -1898,6 +1898,9 @@ final class BrowserPanel: Panel, ObservableObject {
     /// cmux-rbf #cm-73.45: the `stableSurfaceId` of the terminal that last opened or pointed this pane. Saved; never a runtime `id`.
     var ownerTerminalSurfaceId: UUID?
     var ownedKind: BrowserOwnedKind? // cmux-rbf #cm-126.3: independent of the page's address.
+    /// cmux-rbf #cm-126.15: the slug of the agent that last posted to this Agent Pane. Saved with the pane, so the caption keeps the name
+    /// Tom set for that agent after it exits, after Clear Agent State and across a restart.
+    var ownerAgent: String?
     /// cmux-rbf #cm-126.14: the page an Agent Pane last showed (a `show`, not a cleared page). A clear links to it when the pane
     /// went back to a cleared page, so a cleared page never links to a cleared page. In memory only.
     var agentPaneLastPostURL: URL?
@@ -4834,6 +4837,7 @@ final class BrowserPanel: Panel, ObservableObject {
         restoreFigmaPagesSessionSnapshot(snapshot.figmaPages, showingURL: restoredURL)
         ownerTerminalSurfaceId = snapshot.ownerTerminalSurfaceId // cmux-rbf #cm-73.45
         ownedKind = snapshot.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:)) // cmux-rbf #cm-126.3
+        ownerAgent = snapshot.ownerAgent // cmux-rbf #cm-126.15
 
         guard shouldRenderRestoredWebView, let restoredURL else {
             shouldRenderWebView = false

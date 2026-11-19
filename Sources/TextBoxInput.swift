@@ -1287,24 +1287,6 @@ enum TextBoxSubmit {
         TextBoxSubmitEventRunner.run(events, via: surface, onComplete: onComplete)
     }
 
-    /// cmux-rbf #cm-126.14: a normal text-box submit (never the agent-launch branch, which uses `sendEvents`).
-    /// Once the terminal accepted the events, it counts as Tom writing to the terminal, so the owner's
-    /// Agent Pane shows "You wrote …". The mark is sent from the send's own completion here, so `submit()` cannot send
-    /// without it, and a test can drive this with a fake surface.
-    static func sendNormalSubmitEvents(
-        _ events: [DispatchEvent],
-        via surface: TextBoxSubmitSurfaceControlling,
-        onComplete: ((CompletionContext) -> Void)? = nil
-    ) {
-        TextBoxSubmitEventRunner.run(events, via: surface) { completionContext in
-            TextBoxInputContainer.completeNormalSubmitAgentPane(
-                didSubmit: completionContext.didSubmit,
-                surface: surface
-            )
-            onComplete?(completionContext)
-        }
-    }
-
     /// Destructive agent-command batches must start under the current identity guard, never wait in a queue.
     static func sendImmediateEvents(
         _ events: [DispatchEvent], via surface: TextBoxSubmitSurfaceControlling,
@@ -2594,19 +2576,6 @@ struct TextBoxInputContainer: View {
             )
     }
 
-    @MainActor
-    static func completeNormalSubmitAgentPane(
-        didSubmit: Bool,
-        surface: any TextBoxSubmitSurfaceControlling
-    ) {
-        guard didSubmit,
-              let terminalSurface = surface.textBoxSubmitTerminalSurface,
-              terminalSurface.awaitsAgentPaneAnswer else {
-            return
-        }
-        terminalSurface.onAgentPaneReturn?()
-    }
-
     func submit() {
         let textView = textViewReference.textView
         guard TextBoxSubmitAvailability.shouldSubmit(
@@ -2680,7 +2649,7 @@ struct TextBoxInputContainer: View {
             startPendingProviderLaunch(launchAction)
             onRecordLaunchCommand(launchContextCommand)
         }
-        TextBoxSubmit.sendNormalSubmitEvents(
+        TextBoxSubmit.sendEvents(
             submitPlan.events,
             via: surface
         ) { completionContext in

@@ -1696,6 +1696,9 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
     var ownerTerminalSurfaceId: UUID? = nil
     /// cmux-rbf #cm-126.3: a string so an unknown future kind does not fail session decoding.
     var ownedKind: String? = nil
+    /// cmux-rbf #cm-126.15: the slug of the agent that last posted to this Agent Pane (`claude`, `codex`), so its caption keeps the name Tom set for
+    /// it after the agent exits and across a restart. Added only; decoded when present, so an older session loads with none.
+    var ownerAgent: String? = nil
 
     init(
         urlString: String?,
@@ -1714,7 +1717,8 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         diffViewerRequestPath: String? = nil,
         figmaPages: SessionFigmaPagesSnapshot? = nil,
         ownerTerminalSurfaceId: UUID? = nil,
-        ownedKind: String? = nil // cmux-rbf #cm-126.3
+        ownedKind: String? = nil, // cmux-rbf #cm-126.3
+        ownerAgent: String? = nil // cmux-rbf #cm-126.15
     ) {
         self.urlString = urlString
         self.profileID = profileID
@@ -1733,6 +1737,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         self.figmaPages = figmaPages
         self.ownerTerminalSurfaceId = ownerTerminalSurfaceId
         self.ownedKind = ownedKind // cmux-rbf #cm-126.3
+        self.ownerAgent = ownerAgent // cmux-rbf #cm-126.15
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -1753,6 +1758,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         case figmaPages
         case ownerTerminalSurfaceId
         case ownedKind // cmux-rbf #cm-126.3
+        case ownerAgent // cmux-rbf #cm-126.15
     }
 
     init(from decoder: Decoder) throws {
@@ -1774,6 +1780,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         figmaPages = try? container.decodeIfPresent(SessionFigmaPagesSnapshot.self, forKey: .figmaPages)
         ownerTerminalSurfaceId = try? container.decodeIfPresent(UUID.self, forKey: .ownerTerminalSurfaceId)
         ownedKind = try? container.decodeIfPresent(String.self, forKey: .ownedKind) // cmux-rbf #cm-126.3
+        ownerAgent = try? container.decodeIfPresent(String.self, forKey: .ownerAgent) // cmux-rbf #cm-126.15
     }
 }
 struct SessionMarkdownPanelSnapshot: Codable, Sendable {

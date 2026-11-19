@@ -1861,6 +1861,23 @@
         }
       }
     },
+    "agentPane": {
+      "title": "agentPane",
+      "$comment": "cmux-rbf (#cm-126.15): a fork-only key. Upstream's schema does not have it; keep it on every upstream sync.",
+      "description": "Agent Pane settings.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "names": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The name each agent's Agent Pane shows in place of \"Agent Pane\": each key is an agent's slug, such as claude or codex, or * for every agent, and each value is the text of the caption. An exact slug beats *. A value that is not text, or is empty, is skipped. Saving the file renames the open panes, with no restart."
+        }
+      }
+    },
     "figma": {
       "title": "figma",
       "description": "Figma settings.",

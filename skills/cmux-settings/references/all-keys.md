@@ -186,6 +186,14 @@ Reply panel settings — the right sidebar's Reply mode. Top-level rather than u
 | `reply.maxMessagesBack` | integer | `5` | How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable. |
 | `reply.inline.enabled` | boolean | `true` | Show a Reply button over text selected in an agent's pane. Set `false` to turn it off in every window. `⌘⇧`-drag still starts a reply in the panel. |
 
+## agentPane
+
+Agent Pane settings (fork-only, cm-126.15). Top-level, like `reply`. Read from the global `~/.config/cmux/cmux.json`; saving it renames the open panes with no restart.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `agentPane.names` | object | `{}` | The name each agent's Agent Pane shows in place of "Agent Pane": each key is an agent's slug, such as `claude` or `codex`, or `*` for every agent, and each value is the text of the caption, shown as written. An exact slug beats `*`. The slug is the agent's `CMUX_AGENT_LAUNCH_KIND`, which cmux's wrappers set to `amp`, `campfire`, `claude`, `codex`, `grok`, `hermes-agent`, `omp`, `opencode` or `pi` (a Claude or Codex teammate counts as `claude` or `codex`); an agent they don't mark is named by the terminal's lifecycle key instead, such as `antigravity` or `gemini`. A value that is not text, or is empty, is skipped and the other entries hold. A name you gave the tab with Rename Tab comes first. |
+
 ## figma
 
 Figma settings — the default folder new designs go to, and a folder per directory. Top-level, like `reply`. Settings > Automation > Figma Default Folder edits the default. The Figma button's menu and `cmux figma folder set --dir` set a directory's; the command needs no app running.

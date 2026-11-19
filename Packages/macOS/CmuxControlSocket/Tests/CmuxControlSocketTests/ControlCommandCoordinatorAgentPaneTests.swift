@@ -341,4 +341,29 @@ struct ControlCommandCoordinatorAgentPaneTests {
         }
         #expect(result["owner_surface_id"] == .string(terminalID.uuidString))
     }
+
+    // MARK: - the agent a show sends (cmux-rbf #cm-126.15)
+
+    @Test("show hands the agent the CLI sent to the app's check, trimmed")
+    func showPassesTheAgentToTheCheck() throws {
+        let context = context()
+        _ = ControlCommandCoordinator(context: context).handle(request("agent_pane.show", [
+            "surface_id": .string(terminalID.uuidString), "url": .string(page.absoluteString), "agent": .string("  codex ")
+        ]))
+        #expect(context.checkAgents == ["codex"])
+    }
+
+    @Test("show with no agent, or one that is not text or is empty, passes none and still shows")
+    func showWithoutAnAgentPassesNone() throws {
+        for value in [nil, JSONValue.int(5), .string(""), .string("   "), .null, .object([:])] {
+            let context = context()
+            var params: [String: JSONValue] = [
+                "surface_id": .string(terminalID.uuidString), "url": .string(page.absoluteString)
+            ]
+            if let value { params["agent"] = value }
+            let result = try payload(ControlCommandCoordinator(context: context).handle(request("agent_pane.show", params)))
+            #expect(result["action"] == .string("opened"), "a bad agent value refused the show: \(String(describing: value))")
+            #expect(context.checkAgents == [nil], "agent \(String(describing: value)) reached the check as \(context.checkAgents)")
+        }
+    }
 }

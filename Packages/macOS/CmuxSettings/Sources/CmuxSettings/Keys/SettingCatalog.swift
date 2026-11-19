@@ -38,6 +38,8 @@ public struct SettingCatalog: SettingCatalogSection {
     public let computerUse = ComputerUseCatalogSection()
     /// Settings for the Figma design pane (the `figma.*` keys).
     public let figma = FigmaCatalogSection()
+    /// Settings for the Agent Pane (the `agentPane.*` keys). cmux-rbf #cm-126.15.
+    public let agentPane = AgentPaneCatalogSection()
     public let browser = BrowserCatalogSection()
     /// Settings for the built-in markdown viewer (the `markdown.*` keys).
     public let markdown = MarkdownCatalogSection()

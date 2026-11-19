@@ -257,4 +257,21 @@ struct AgentPaneCLIRulesTests {
         #expect(AgentPaneCLIRules.noCallerMessage(for: "clear")
             == "cmux agent-pane clear needs the agent's terminal: run it in a cmux terminal or pass --surface")
     }
+
+    // MARK: - the agent `show` sends (cmux-rbf #cm-126.15)
+
+    @Test("the agent is CMUX_AGENT_LAUNCH_KIND trimmed and otherwise as written: the app reads the teams launchers")
+    func agentFromLaunchKind() {
+        #expect(AgentPaneCLIRules.agent(launchKind: "claude") == "claude")
+        #expect(AgentPaneCLIRules.agent(launchKind: " Codex ") == "Codex")
+        #expect(AgentPaneCLIRules.agent(launchKind: "claudeTeams") == "claudeTeams")
+        #expect(AgentPaneCLIRules.agent(launchKind: "codexTeams") == "codexTeams")
+    }
+
+    @Test("an empty or missing launch kind sends no agent")
+    func noAgentWithoutLaunchKind() {
+        #expect(AgentPaneCLIRules.agent(launchKind: nil) == nil)
+        #expect(AgentPaneCLIRules.agent(launchKind: "") == nil)
+        #expect(AgentPaneCLIRules.agent(launchKind: "   ") == nil)
+    }
 }

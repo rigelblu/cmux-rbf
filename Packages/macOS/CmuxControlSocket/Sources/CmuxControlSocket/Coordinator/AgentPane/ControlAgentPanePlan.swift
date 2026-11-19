@@ -32,6 +32,9 @@ public struct ControlAgentPanePlan: Sendable, Equatable {
     /// The validated page. For a clear, the pane's cleared page; for a clear held with no pane open yet, the
     /// cleared-pages folder, which the socket answers as a null url.
     public let url: URL
+    /// The agent slug the caller's `show` sent (`claude`, `codex`), as the CLI read it from `CMUX_AGENT_LAUNCH_KIND`; nil when it
+    /// sent none, and for a clear. The app decides what to record from it (cmux-rbf #cm-126.15).
+    public let agent: String?
 
     /// Creates a validated action description.
     /// - Parameters:
@@ -40,11 +43,13 @@ public struct ControlAgentPanePlan: Sendable, Equatable {
     ///   - terminalID: The caller's live surface identifier.
     ///   - ownerStableID: The ownership key saved with the session.
     ///   - url: The requested page.
-    public init(action: Action, workspaceID: UUID, terminalID: UUID, ownerStableID: UUID, url: URL) {
+    ///   - agent: The agent slug the caller sent, or nil.
+    public init(action: Action, workspaceID: UUID, terminalID: UUID, ownerStableID: UUID, url: URL, agent: String? = nil) {
         self.action = action
         self.workspaceID = workspaceID
         self.terminalID = terminalID
         self.ownerStableID = ownerStableID
         self.url = url
+        self.agent = agent
     }
 }

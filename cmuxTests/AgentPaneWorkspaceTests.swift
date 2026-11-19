@@ -5,7 +5,6 @@ import CmuxControlSocket
 import CmuxSettings
 import CmuxTerminal
 import Foundation
-import GhosttyKit
 import Testing
 
 #if canImport(cmux_DEV)
@@ -189,6 +188,23 @@ struct AgentPaneWorkspaceTests {
                 surfaceID: terminal.id, url: url, defaults: defaults
             ) else { return nil }
             return TerminalController.shared.controlAgentPaneApply(plan)
+        }
+
+        /// `show` with the agent the CLI read from `CMUX_AGENT_LAUNCH_KIND` (cmux-rbf #cm-126.15).
+        func show(from terminal: TerminalPanel, _ url: URL, agent: String?) -> ControlAgentPaneApplied? {
+            guard case .ready(let plan) = TerminalController.shared.controlAgentPaneCheck(
+                surfaceID: terminal.id, url: url, agent: agent, defaults: defaults
+            ) else { return nil }
+            return TerminalController.shared.controlAgentPaneApply(plan)
+        }
+
+        /// The caption the tab shows, with the workspace's own record of it checked to agree.
+        func caption(_ panelID: UUID) -> String? {
+            let tab = workspace.surfaceIdFromPanelId(panelID).flatMap { workspace.bonsplitController.tab($0)?.title }
+            if let tab, let recorded = workspace.panelTitles[panelID], tab != recorded, workspace.panelCustomTitles[panelID] == nil {
+                return "tab \(tab) / panelTitles \(recorded)"
+            }
+            return tab
         }
 
         func check(from surfaceID: UUID, _ url: URL, defaults: UserDefaults? = nil) -> ControlAgentPaneCheck {
@@ -1134,107 +1150,23 @@ struct AgentPaneWorkspaceTests {
 
     // MARK: - cmux-rbf #cm-126.14: Answer state, Return flag, and caption refresh
 
-    @Test("Tom wrote note marks owner's first Agent Pane, sets caption, and clears terminal flag; another terminal marks nothing")
-    func tomWroteMarksFirstAgentPaneAndSetsCaption() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
-
-            let otherPaneID = try #require(rig.workspace.bonsplitController.allPaneIds.first)
-            let otherTerminal = try #require(rig.workspace.newTerminalSurface(inPane: otherPaneID, focus: false))
-            #expect(otherTerminal.surface.awaitsAgentPaneAnswer == false)
-
-            // Note to another terminal marks nothing
-            let otherResult = rig.workspace.noteTomWroteToTerminal(stableID: otherTerminal.stableSurfaceId)
-            #expect(otherResult == nil)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-
-            // Note to owner terminal marks its first Agent Pane and updates caption & flag
-            let wroteAt = Date(timeIntervalSince1970: 1731815520)
-            let marked = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
-            #expect(marked == .wroteSince(wroteAt))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-
-            let expectedTitle = AgentPaneMark.title(isAgentPaneKind: true, own: agentPane.displayTitle, wroteAt: wroteAt)
-            #expect(rig.workspace.panelTitles[agentPane.id] == expectedTitle)
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == expectedTitle)
+    @Test("clear sets the cleared flag and leaves the caption as the pane's name; a show unsets it")
+    func clearSetsTheClearedFlag() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
+                _ = try #require(rig.clear(from: rig.terminalA))
+                #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
+                #expect(rig.caption(agentPane.id) == "wg-still Outie")
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "claude"))
+                #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
+            }
         }
     }
 
-    @Test("show resets answer state to .post, restores terminal flag, and resets caption to Agent Pane")
-    func showResetsAnswerStateAndCaption() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
-            let wroteAt = Date(timeIntervalSince1970: 1731815520)
-            rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title != "Agent Pane")
-
-            // Navigate via show resets state to .post
-            _ = rig.show(from: rig.terminalA, Self.page2)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
-        }
-    }
-
-    @Test("clear sets .cleared, clears terminal flag, and a later Tom wrote note marks nothing")
-    func clearSetsClearedAndIgnoresLaterTomWrote() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-
-            rig.workspace.transitionAgentPaneState(panelId: agentPane.id, event: .clear)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
-
-            let wroteAt = Date(timeIntervalSince1970: 1731815520)
-            let afterClear = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
-            #expect(afterClear == .cleared)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Agent Pane")
-        }
-    }
-
-    @Test("a renamed tab keeps its custom name across Tom wrote and refreshAgentPaneCaption")
-    func renamedTabKeepsCustomNameOnTomWrote() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let tabID = try #require(rig.workspace.surfaceIdFromPanelId(agentPane.id))
-            #expect(rig.workspace.setPanelCustomTitle(
-                panelId: agentPane.id, title: "Tom's custom tab", propagateToRemoteTmux: false, propagateToCloud: false
-            ))
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Tom's custom tab")
-
-            let wroteAt = Date(timeIntervalSince1970: 1731815520)
-            rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
-            #expect(rig.workspace.bonsplitController.tab(tabID)?.title == "Tom's custom tab")
-        }
-    }
-
-    @Test("onAgentPaneReturn callback wired on TerminalSurface marks the workspace's Agent Pane")
-    func onAgentPaneReturnCallbackMarksWorkspace() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-            rig.terminalA.surface.onAgentPaneReturn?()
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-        }
-    }
-
-    @Test("restored terminal arriving after deferred Agent Pane reads its .post vs .cleared state into terminal flag")
-    func terminalArrivingAfterRestoredAgentPaneSyncsFlag() throws {
+    @Test("a restored Agent Pane is not cleared, and one whose page is in the cleared folder comes back cleared")
+    func restoredAgentPaneDerivesItsClearedFlag() throws {
         try withRig { rig in
             let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
             let snapshot = rig.workspace.sessionSnapshot(includeScrollback: false)
@@ -1247,8 +1179,7 @@ struct AgentPaneWorkspaceTests {
             let restoredAgentPaneID = try #require(remap[agentPane.id])
             let restoredTerminal = try #require(restored.panels[restoredTerminalID] as? TerminalPanel)
 
-            #expect(restored.agentPaneAnswerState(for: restoredAgentPaneID) == .post)
-            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == true)
+            #expect(!restored.agentPaneIsCleared(restoredAgentPaneID))
 
             // Also verify cleared URL restore sets .cleared and flag false
             let clearedFolder = try #require(Workspace.agentPaneClearedFolderURL())
@@ -1266,45 +1197,14 @@ struct AgentPaneWorkspaceTests {
             let clearedPaneID = try #require(clearedRemap[agentPane.id])
             let clearedTerminal = try #require(restoredCleared.panels[clearedTerminalID] as? TerminalPanel)
 
-            #expect(restoredCleared.agentPaneAnswerState(for: clearedPaneID) == .cleared)
-            #expect(clearedTerminal.surface.awaitsAgentPaneAnswer == false)
+            #expect(restoredCleared.agentPaneIsCleared(clearedPaneID))
         }
-    }
-
-    @Test("Ghostty key-event overload maps GHOSTTY_MODS_CAPS and GHOSTTY_MODS_NUM to plain-value masks")
-    func ghosttyKeyEventOverloadMapsRealMods() {
-        var key = ghostty_input_key_s()
-        key.action = GHOSTTY_ACTION_PRESS
-        key.keycode = 0x24
-        key.mods = GHOSTTY_MODS_NONE
-        key.composing = false
-        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
-
-        key.mods = GHOSTTY_MODS_CAPS
-        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
-
-        key.mods = GHOSTTY_MODS_NUM
-        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
-
-        key.mods = ghostty_input_mods_e(rawValue: GHOSTTY_MODS_CAPS.rawValue | GHOSTTY_MODS_NUM.rawValue)
-        #expect(AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
-
-        key.mods = GHOSTTY_MODS_SHIFT
-        #expect(!AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
-
-        key.mods = GHOSTTY_MODS_NONE
-        key.composing = true
-        #expect(!AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
-
-        key.composing = false
-        key.action = GHOSTTY_ACTION_RELEASE
-        #expect(!AgentPaneMark.isCountedReturn(keyEvent: key, isCommittedText: false))
     }
 
     // MARK: - cmux-rbf #cm-126.14: Step 2 cold-review fixes (red-first)
 
-    @Test("live non-deferred restore sets terminal flag true and Agent Pane caption when terminal restores before pane")
-    func liveNonDeferredRestoreSetsTerminalFlagAndCaption() throws {
+    @Test("a live (non-deferred) restore leaves the Agent Pane uncleared and with its caption")
+    func liveNonDeferredRestoreKeepsTheClearedFlagAndCaption() throws {
         try withRig { rig in
             let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
             let snapshot = rig.workspace.sessionSnapshot(includeScrollback: false)
@@ -1317,129 +1217,18 @@ struct AgentPaneWorkspaceTests {
             let restoredTerminal = try #require(restored.panels[restoredTerminalID] as? TerminalPanel)
             let tabID = try #require(restored.surfaceIdFromPanelId(restoredAgentPaneID))
 
-            #expect(restored.agentPaneAnswerState(for: restoredAgentPaneID) == .post)
-            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == true)
+            #expect(!restored.agentPaneIsCleared(restoredAgentPaneID))
             #expect(restored.bonsplitController.tab(tabID)?.title == "Agent Pane")
         }
     }
 
-    @Test("materializing a restored placeholder preserves 'You wrote' state, caption, and false terminal flag")
-    func materializingPlaceholderPreservesWroteSinceState() throws {
+    @Test("closing the Agent Pane drops its cleared flag")
+    func closingAgentPaneDropsItsClearedFlag() throws {
         try withRig { rig in
             let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let snapshot = rig.workspace.sessionSnapshot(includeScrollback: false)
-
-            let restored = Workspace()
-            defer { restored.teardownAllPanels() }
-            let remap = restored.restoreSessionSnapshot(snapshot, deferBrowserPanels: true)
-            let restoredTerminalID = try #require(remap[rig.terminalA.id])
-            let restoredAgentPaneID = try #require(remap[agentPane.id])
-            let restoredTerminal = try #require(restored.panels[restoredTerminalID] as? TerminalPanel)
-            let deferred = try #require(restored.panels[restoredAgentPaneID] as? DeferredBrowserPanel)
-            let tabID = try #require(restored.surfaceIdFromPanelId(restoredAgentPaneID))
-
-            let wroteAt = Date(timeIntervalSince1970: 1731815520)
-            restored.noteTomWroteToTerminal(stableID: restoredTerminal.stableSurfaceId, at: wroteAt)
-            let expectedTitle = AgentPaneMark.title(isAgentPaneKind: true, own: "", wroteAt: wroteAt)
-            #expect(restored.bonsplitController.tab(tabID)?.title == expectedTitle)
-            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == false)
-
-            _ = try #require(restored.materializeDeferredBrowserPanel(deferred))
-            #expect(restored.agentPaneAnswerState(for: restoredAgentPaneID) == .wroteSince(wroteAt))
-            #expect(restoredTerminal.surface.awaitsAgentPaneAnswer == false)
-            #expect(restored.bonsplitController.tab(tabID)?.title == expectedTitle)
-        }
-    }
-
-    @Test("closing the Agent Pane clears its answer state and sets owning terminal flag to false")
-    func closingAgentPaneClearsStateAndTerminalFlag() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-            #expect(rig.workspace.agentPaneAnswerStates[agentPane.id] == .post)
-
+            #expect(rig.workspace.agentPaneClearedFlags[agentPane.id] == false)
             #expect(rig.workspace.closePanel(agentPane.id, force: true))
-            #expect(rig.workspace.agentPaneAnswerStates[agentPane.id] == nil)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-        }
-    }
-
-    @Test("GhosttyNSView dispatchGhosttyKey marks on normal key and manual key branches, and skips IME accumulatedText")
-    func ghosttyViewDispatchKeyMarksBothBranchesAndSkipsIME() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let view = GhosttyNSView(frame: .zero)
-            view.terminalSurface = rig.terminalA.surface
-
-            var returnKey = ghostty_input_key_s()
-            returnKey.action = GHOSTTY_ACTION_PRESS
-            returnKey.keycode = 0x24
-            returnKey.mods = GHOSTTY_MODS_NONE
-            returnKey.composing = false
-
-            // 1. IME accumulatedText must NOT mark even with composing == false
-            #expect(view.dispatchGhosttyKey(returnKey, hasAccumulatedText: true, sendToGhostty: { true }))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-
-            // 2. Normal Ghostty-handled Return marks the pane
-            #expect(view.dispatchGhosttyKey(returnKey, hasAccumulatedText: false, sendToGhostty: { true }))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-
-            // 3. Reset with show, then test manual-key branch
-            _ = rig.show(from: rig.terminalA, Self.page2)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-
-            #expect(view.dispatchGhosttyKey(
-                returnKey,
-                manualKeyName: "enter",
-                isBindingForManualKey: { false },
-                enqueueManualKey: { _ in true },
-                sendToGhostty: { false }
-            ))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-        }
-    }
-
-    @Test("TextBoxInputContainer.completeNormalSubmitAgentPane marks only when didSubmit is true")
-    func textBoxNormalSubmitMarksOnlyOnDidSubmit() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-
-            TextBoxInputContainer.completeNormalSubmitAgentPane(didSubmit: false, surface: rig.terminalA.surface)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-
-            TextBoxInputContainer.completeNormalSubmitAgentPane(didSubmit: true, surface: rig.terminalA.surface)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
-        }
-    }
-
-    @Test("TextBoxSubmit.sendNormalSubmitEvents marks the owner's Agent Pane once the terminal accepted the send, and not when it rejected it")
-    func textBoxNormalSubmitSendMarksOnAcceptedSendOnly() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let fake = AgentPaneFakeTextBoxSubmitSurface(terminal: rig.terminalA.surface)
-
-            fake.sendKeyTextResult = false
-            var rejectedContext: TextBoxSubmit.CompletionContext?
-            TextBoxSubmit.sendNormalSubmitEvents([.keyText("hello")], via: fake) { rejectedContext = $0 }
-            #expect(rejectedContext?.didSubmit == false)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
-
-            fake.sendKeyTextResult = true
-            var acceptedContext: TextBoxSubmit.CompletionContext?
-            TextBoxSubmit.sendNormalSubmitEvents([.keyText("hello")], via: fake) { acceptedContext = $0 }
-            #expect(acceptedContext?.didSubmit == true)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id).wroteAt != nil)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+            #expect(rig.workspace.agentPaneClearedFlags[agentPane.id] == nil)
         }
     }
 
@@ -1460,8 +1249,7 @@ struct AgentPaneWorkspaceTests {
             #expect(rig.paneCount == paneCount, "a clear opens no pane")
             #expect(rig.agentPaneCount == 1)
             #expect(fileURLsMatch(agentPane.currentURL, rig.clearedPage(of: agentPane.id)))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == false)
+            #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
             let text = try #require(rig.clearedPageText(of: agentPane.id))
             #expect(text == AgentPaneMark.clearedPageHTML(
                 title: "Nothing to answer right now", linkText: "The last post", previousURL: Self.page1
@@ -1482,7 +1270,7 @@ struct AgentPaneWorkspaceTests {
             #expect(again.surfaceID == agentPane.id)
             #expect(rig.clearedPageText(of: agentPane.id) == before)
             #expect(agentPane.currentURL == shown)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
         }
     }
 
@@ -1492,8 +1280,7 @@ struct AgentPaneWorkspaceTests {
             let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
             _ = try #require(rig.clear(from: rig.terminalA))
             _ = try #require(rig.show(from: rig.terminalA, Self.page2))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+            #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
             #expect(agentPane.currentURL == Self.page2)
             let applied = try #require(rig.clear(from: rig.terminalA))
             #expect(applied.action == .cleared)
@@ -1501,17 +1288,6 @@ struct AgentPaneWorkspaceTests {
             #expect(text.contains("href=\"\(Self.page2.absoluteString)\""))
             #expect(!text.contains(Self.page1.absoluteString))
             #expect(try FileManager.default.contentsOfDirectory(atPath: rig.clearedFolder.path).count == 1)
-        }
-    }
-
-    @Test("Tom writing after a clear marks nothing")
-    func writingAfterAClearMarksNothing() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            _ = try #require(rig.clear(from: rig.terminalA))
-            _ = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
-            #expect(agentPane.currentURL.map { fileURLsMatch($0, rig.clearedPage(of: agentPane.id)) } == true)
         }
     }
 
@@ -1546,7 +1322,7 @@ struct AgentPaneWorkspaceTests {
             browserOff.set(true, forKey: BrowserAvailabilitySettings.disabledKey)
             #expect(rig.clearCheck(from: rig.terminalA.id, defaults: browserOff) == .refused(.browserOff))
             #expect(rig.clearedPageText(of: agentPane.id) == nil)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
         }
     }
 
@@ -1573,12 +1349,12 @@ struct AgentPaneWorkspaceTests {
             let held = try #require(rig.clear(from: rig.terminalA))
             #expect(held.action == .heldDesignFocus)
             #expect(held.surfaceID == agentPane.id)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
             #expect(agentPane.currentURL == Self.page1)
             #expect(rig.clearedPageText(of: agentPane.id) == nil)
             agentPane.navigate(to: Self.page2)
             rig.workspace.exitDesignFocus(reason: "test")
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
             #expect(fileURLsMatch(agentPane.currentURL, rig.clearedPage(of: agentPane.id)))
             let text = try #require(rig.clearedPageText(of: agentPane.id))
             #expect(text.contains(Self.page2.absoluteString), "the link is not the page the pane showed when the clear applied")
@@ -1611,7 +1387,7 @@ struct AgentPaneWorkspaceTests {
             _ = try #require(rig.clear(from: rig.terminalA))
             rig.workspace.exitDesignFocus(reason: "test")
             #expect(rig.clearedPageText(of: agentPane.id) == before, "the link now points at the cleared page itself")
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
         }
     }
 
@@ -1626,7 +1402,7 @@ struct AgentPaneWorkspaceTests {
             restored.agentPaneClearedFolderOverride = rig.clearedFolder
             let remap = restored.restoreSessionSnapshot(snapshot, deferBrowserPanels: true)
             let restoredPane = try #require(remap[agentPane.id])
-            #expect(restored.agentPaneAnswerState(for: restoredPane) == .cleared)
+            #expect(restored.agentPaneIsCleared(restoredPane))
         }
     }
 
@@ -1638,7 +1414,7 @@ struct AgentPaneWorkspaceTests {
             _ = try #require(rig.show(from: rig.terminalA, Self.page2))
             _ = try #require(rig.clear(from: rig.terminalA))
             rig.workspace.exitDesignFocus(reason: "test")
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
         }
         try withRig { rig in
             let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
@@ -1646,7 +1422,7 @@ struct AgentPaneWorkspaceTests {
             _ = try #require(rig.clear(from: rig.terminalA))
             _ = try #require(rig.show(from: rig.terminalA, Self.page2))
             rig.workspace.exitDesignFocus(reason: "test")
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
             #expect(agentPane.currentURL == Self.page2)
         }
     }
@@ -1686,7 +1462,7 @@ struct AgentPaneWorkspaceTests {
             let result = try #require(reply["result"] as? [String: Any])
             #expect(result["action"] as? String == "cleared")
             #expect(result["surface_id"] as? String == agentPane.id.uuidString)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
             let again = try rig.call("agent_pane.clear", ["surface_id": rig.terminalA.id.uuidString])
             let againResult = try #require(again["result"] as? [String: Any])
             #expect(againResult["action"] as? String == "already-cleared")
@@ -1705,7 +1481,6 @@ struct AgentPaneWorkspaceTests {
             // Tom swipes back: the pane shows the cleared page again, the state is still a post, and he writes.
             agentPane.navigate(to: cleared)
             #expect(fileURLsMatch(agentPane.currentURL, cleared))
-            _ = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId)
             let applied = try #require(rig.clear(from: rig.terminalA))
             #expect(applied.action == .cleared)
             let text = try #require(rig.clearedPageText(of: agentPane.id))
@@ -1714,8 +1489,8 @@ struct AgentPaneWorkspaceTests {
         }
     }
 
-    @Test("a cleared pane moved to another workspace is still cleared there; a post stays a post")
-    func movedPaneKeepsItsAnswerStateAcrossWorkspaces() throws {
+    @Test("a cleared pane moved to another workspace is still cleared there; an uncleared one stays uncleared")
+    func movedPaneKeepsItsClearedFlagAcrossWorkspaces() throws {
         for clearFirst in [true, false] {
             try withRig { rig in
                 let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
@@ -1726,10 +1501,7 @@ struct AgentPaneWorkspaceTests {
                 let detached = try #require(rig.workspace.detachSurface(panelId: agentPane.id))
                 let otherPane = try #require(other.bonsplitController.allPaneIds.first)
                 #expect(other.attachDetachedSurface(detached, inPane: otherPane, focus: false) == agentPane.id)
-                #expect(
-                    other.agentPaneAnswerState(for: agentPane.id) == (clearFirst ? .cleared : .post),
-                    "cleared first: \(clearFirst)"
-                )
+                #expect(other.agentPaneIsCleared(agentPane.id) == clearFirst, "cleared first: \(clearFirst)")
             }
         }
     }
@@ -1742,7 +1514,7 @@ struct AgentPaneWorkspaceTests {
             let cleared = rig.clearedPage(of: agentPane.id)
             // The record of the last post now names a cleared page, so the clear falls back to the link the page has.
             _ = try #require(rig.show(from: rig.terminalA, cleared))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
+            #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
             let applied = try #require(rig.clear(from: rig.terminalA))
             #expect(applied.action == .cleared)
             let text = try #require(rig.clearedPageText(of: agentPane.id))
@@ -1750,8 +1522,8 @@ struct AgentPaneWorkspaceTests {
         }
     }
 
-    @Test("a plain browser pane moved to another workspace gains no Agent Pane answer state")
-    func movedPlainBrowserPaneGainsNoAnswerState() throws {
+    @Test("a plain browser pane moved to another workspace gains no cleared flag")
+    func movedPlainBrowserPaneGainsNoClearedFlag() throws {
         try withRig { rig in
             let plain = try rig.addPlainBrowser()
             let other = Workspace()
@@ -1759,8 +1531,8 @@ struct AgentPaneWorkspaceTests {
             let detached = try #require(rig.workspace.detachSurface(panelId: plain.id))
             let otherPane = try #require(other.bonsplitController.allPaneIds.first)
             #expect(other.attachDetachedSurface(detached, inPane: otherPane, focus: false) == plain.id)
-            #expect(other.agentPaneAnswerStates[plain.id] == nil, "a plain browser pane got an answer state")
-            #expect(other.agentPaneAnswerStates.isEmpty)
+            #expect(other.agentPaneClearedFlags[plain.id] == nil, "a plain browser pane got a cleared flag")
+            #expect(other.agentPaneClearedFlags.isEmpty)
         }
     }
 
@@ -1778,24 +1550,6 @@ struct AgentPaneWorkspaceTests {
         }
     }
 
-    @Test("a pane moved to another workspace keeps You wrote, its time and its caption")
-    func movedPaneKeepsYouWrote() throws {
-        try withRig { rig in
-            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
-            let wroteAt = Date(timeIntervalSince1970: 1731815520)
-            _ = rig.workspace.noteTomWroteToTerminal(stableID: rig.terminalA.stableSurfaceId, at: wroteAt)
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
-            let other = Workspace()
-            defer { other.teardownAllPanels() }
-            let detached = try #require(rig.workspace.detachSurface(panelId: agentPane.id))
-            let otherPane = try #require(other.bonsplitController.allPaneIds.first)
-            #expect(other.attachDetachedSurface(detached, inPane: otherPane, focus: false) == agentPane.id)
-            #expect(other.agentPaneAnswerState(for: agentPane.id) == .wroteSince(wroteAt))
-            let tabID = try #require(other.surfaceIdFromPanelId(agentPane.id))
-            #expect(other.bonsplitController.tab(tabID)?.title == AgentPaneMark.title(isAgentPaneKind: true, own: "", wroteAt: wroteAt))
-        }
-    }
-
     @Test("a post moved to another pane is still a post")
     func movedPostPaneStaysAPost() throws {
         try withRig { rig in
@@ -1805,8 +1559,7 @@ struct AgentPaneWorkspaceTests {
             ))
             tomsPane.adoptStableSurfaceId(UUID())
             #expect(rig.workspace.moveSurface(panelId: agentPane.id, toPane: try rig.pane(of: tomsPane.id), focus: false))
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .post)
-            #expect(rig.terminalA.surface.awaitsAgentPaneAnswer == true)
+            #expect(!rig.workspace.agentPaneIsCleared(agentPane.id))
         }
     }
 
@@ -1833,7 +1586,7 @@ struct AgentPaneWorkspaceTests {
             let applied = try #require(rig.clear(from: rig.terminalA))
             #expect(applied.action == .heldDesignFocus, "answered \(applied.action)")
             rig.workspace.exitDesignFocus(reason: "test")
-            #expect(rig.workspace.agentPaneAnswerState(for: agentPane.id) == .cleared)
+            #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
             #expect(fileURLsMatch(agentPane.currentURL, rig.clearedPage(of: agentPane.id)), "the held show still opened its post")
         }
     }
@@ -1878,6 +1631,630 @@ struct AgentPaneWorkspaceTests {
             #expect(rig.agentPaneCount == 0)
         }
     }
+    // MARK: - cm-126.15: the pane named for its agent
+
+    private static let outie = ["claude": "wg-still Outie", "*": "Agent Outie"]
+    /// The names a test installs while it awaits. `AgentPaneNameSetting.current` is global and other suites (`FigmaTabTitle`) read
+    /// it from Agent Panes that have no agent, which `*` would name; a holder with no `*` leaves those readers at "Agent Pane" even if
+    /// two suites interleave at an `await`. Every test that installs `*` has no suspension point. This suite is the only writer.
+    private static let outieNoStar = ["claude": "wg-still Outie"]
+
+    /// Runs `body` with a holder that names the panes, and puts the app's back.
+    private func withNames(_ names: [String: String], _ body: () throws -> Void) rethrows {
+        let saved = AgentPaneNameSetting.current
+        defer { AgentPaneNameSetting.current = saved }
+        AgentPaneNameSetting.current = AgentPaneNameSetting(names: names)
+        try body()
+    }
+
+    @Test("15.1 a new Agent Pane's first caption is already its agent's name, and * names an agent with no entry")
+    func firstCaptionIsTheName() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let claude = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(claude.ownerAgent == "claude")
+                #expect(rig.caption(claude.id) == "wg-still Outie")
+                let terminalB = try rig.addTerminal()
+                let codex = try rig.browser(rig.show(from: terminalB, Self.page2, agent: "codex")?.surfaceID)
+                #expect(rig.caption(codex.id) == "Agent Outie")
+                // An agent cmux's wrappers don't mark, and no live state: * or Agent Pane.
+                let terminalC = try rig.addTerminal()
+                let unmarked = try rig.browser(rig.show(from: terminalC, Self.page2)?.surfaceID)
+                #expect(unmarked.ownerAgent == nil)
+                #expect(rig.caption(unmarked.id) == "Agent Outie")
+            }
+        }
+    }
+
+    @Test("15.2 with no entry for its agent and none for *, the caption reads Agent Pane as before")
+    func noEntryReadsAgentPane() throws {
+        try withNames([:]) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(rig.caption(pane.id) == "Agent Pane")
+            }
+        }
+        try withNames(["claude": "wg-still Outie"]) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "codex")?.surfaceID)
+                #expect(rig.caption(pane.id) == "Agent Pane")
+            }
+        }
+    }
+
+    @Test("15.3 changing the names renames every open pane of that agent; removing * puts Agent Pane back")
+    func changingTheNamesRenamesOpenPanes() throws {
+        let saved = AgentPaneNameSetting.current
+        defer { AgentPaneNameSetting.current = saved }
+        AgentPaneNameSetting.current = AgentPaneNameSetting(names: Self.outie)
+        try withRig { rig in
+            let claude = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+            let terminalB = try rig.addTerminal()
+            let codex = try rig.browser(rig.show(from: terminalB, Self.page2, agent: "codex")?.surfaceID)
+            AgentPaneNameSetting.current = AgentPaneNameSetting(names: ["claude": "Renamed Outie"])
+            rig.workspace.refreshAgentPaneCaptions()
+            #expect(rig.caption(claude.id) == "Renamed Outie")
+            #expect(rig.caption(codex.id) == "Agent Pane", "removing * left the codex pane named")
+            AgentPaneNameSetting.current = AgentPaneNameSetting(names: [:])
+            rig.workspace.refreshAgentPaneCaptions()
+            #expect(rig.caption(claude.id) == "Agent Pane")
+        }
+    }
+
+    @Test("15.4 a page load and a page-title change after a show keep the name")
+    func pageTitleChangeKeepsTheName() async throws {
+        let saved = AgentPaneNameSetting.current
+        defer { AgentPaneNameSetting.current = saved }
+        AgentPaneNameSetting.current = AgentPaneNameSetting(names: Self.outieNoStar)
+        let rig = try Rig()
+        defer { rig.cleanup() }
+        let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+        pane.publishObservedDocumentTitle("First title")
+        await oneMainQueueTurn()
+        #expect(rig.caption(pane.id) == "wg-still Outie", "a page title replaced the name")
+        TerminalController.shared.setActiveTabManager(rig.manager)
+        _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "claude"))
+        pane.publishObservedDocumentTitle("Second title")
+        await oneMainQueueTurn()
+        #expect(rig.caption(pane.id) == "wg-still Outie", "a navigating show replaced the name")
+    }
+
+    @Test("15.5 a terminal that switches agents renames its pane on the new agent's first post")
+    func switchingAgentsRenames() throws {
+        try withNames(["claude": "Claude Outie", "codex": "Codex Outie"]) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(rig.caption(pane.id) == "Claude Outie")
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "codexTeams"))
+                #expect(pane.ownerAgent == "codex", "newest wins")
+                #expect(rig.caption(pane.id) == "Codex Outie")
+            }
+        }
+    }
+
+    @Test("15.6 the name holds through the agent's exit, a clear, and a show with none")
+    func nameHoldsThroughExitClearAndShowWithNone() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                rig.workspace.setAgentLifecycle(key: "claude_code", panelId: rig.terminalA.id, lifecycle: .running)
+                // the agent exits: its live state goes
+                rig.workspace.agentLifecycleStatesByPanelId[rig.terminalA.id] = nil
+                #expect(rig.caption(pane.id) == "wg-still Outie")
+                // a clear
+                _ = try #require(rig.clear(from: rig.terminalA))
+                #expect(rig.workspace.agentPaneIsCleared(pane.id))
+                #expect(pane.ownerAgent == "claude", "a clear touched the saved agent")
+                #expect(rig.caption(pane.id) == "wg-still Outie")
+                // a show with no variable keeps the saved name
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: nil))
+                #expect(pane.ownerAgent == "claude")
+                #expect(rig.caption(pane.id) == "wg-still Outie")
+            }
+        }
+    }
+
+    @Test("15.6b the name holds through Clear Agent State, which empties the terminal's live state")
+    func nameHoldsThroughClearAgentState() async throws {
+        let saved = AgentPaneNameSetting.current
+        defer { AgentPaneNameSetting.current = saved }
+        AgentPaneNameSetting.current = AgentPaneNameSetting(names: Self.outieNoStar)
+        try await ClearAgentStateHarness.run { harness in
+            let workspace = harness.workspace
+            let terminal = try #require(workspace.panels[harness.panel] as? TerminalPanel)
+            terminal.adoptStableSurfaceId(UUID())
+            let pane = try #require(workspace.openAgentPane(
+                beside: terminal.id, url: Self.page1, owner: terminal.stableSurfaceId, agent: "claude"))
+            workspace.setAgentLifecycle(key: "claude_code", panelId: terminal.id, lifecycle: .running)
+            #expect(workspace.clearAgentState(journal: harness.center), "there was no agent state to clear")
+            #expect(workspace.agentLifecycleStatesByPanelId[terminal.id]?["claude_code"] == .unknown, "Clear Agent State did not run on the terminal's state")
+            #expect(pane.ownerAgent == "claude", "Clear Agent State touched the saved agent")
+            workspace.refreshAgentPaneCaption(panelId: pane.id)
+            #expect(workspace.panelTitles[pane.id] == "wg-still Outie")
+            #expect(workspace.surfaceIdFromPanelId(pane.id).flatMap { workspace.bonsplitController.tab($0)?.title } == "wg-still Outie")
+        }
+    }
+
+    @Test("15.7 with no variable the pane takes its agent from the terminal's live agent state, and the one live agent beats a stale saved one")
+    func liveStateNamesAPaneWithNoVariable() throws {
+        try withNames(["claude": "Claude Outie", "codex": "Codex Outie"]) {
+            try withRig { rig in
+                rig.workspace.setAgentLifecycle(key: "claude_code", panelId: rig.terminalA.id, lifecycle: .running)
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+                #expect(pane.ownerAgent == "claude", "claude_code was not read as claude")
+                #expect(rig.caption(pane.id) == "Claude Outie")
+                // Claude exits and a different agent runs: a show that sends no variable names the pane for it, not for the saved one
+                rig.workspace.agentLifecycleStatesByPanelId[rig.terminalA.id] = nil
+                rig.workspace.setAgentLifecycle(key: "codex", panelId: rig.terminalA.id, lifecycle: .running)
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2))
+                #expect(pane.ownerAgent == "codex", "a stale saved agent beat the one live agent")
+                #expect(rig.caption(pane.id) == "Codex Outie")
+            }
+        }
+    }
+
+    @Test("15.8 an inherited variable gives way to the one agent running in the terminal; two live agents leave the variable")
+    func liveStateBeatsAnInheritedVariable() throws {
+        try withNames(["claude": "Claude Outie", "gemini": "Gemini Outie"]) {
+            try withRig { rig in
+                rig.workspace.setAgentLifecycle(key: "gemini", panelId: rig.terminalA.id, lifecycle: .running)
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(pane.ownerAgent == "gemini")
+                #expect(rig.caption(pane.id) == "Gemini Outie", "the inherited variable named the pane")
+                // two live agents: the variable stands, none is picked from the state
+                rig.workspace.setAgentLifecycle(key: "codex", panelId: rig.terminalA.id, lifecycle: .running)
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "claude"))
+                #expect(pane.ownerAgent == "claude")
+                #expect(rig.caption(pane.id) == "Claude Outie")
+            }
+        }
+    }
+
+    @Test("15.8b a key Clear Agent State left at unknown is no live agent: the one agent still running wins over the variable")
+    func anUnknownKeyIsNotALiveAgent() throws {
+        try withNames(["claude": "Claude Outie", "gemini": "Gemini Outie"]) {
+            try withRig { rig in
+                // Two agents ran in this terminal; Claude's was cleared to unknown, Gemini runs. The variable says claude.
+                rig.workspace.setAgentLifecycle(key: "claude_code", panelId: rig.terminalA.id, lifecycle: .unknown)
+                rig.workspace.setAgentLifecycle(key: "gemini", panelId: rig.terminalA.id, lifecycle: .running)
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(pane.ownerAgent == "gemini", "a cleared agent's key counted as live: \(String(describing: pane.ownerAgent))")
+                #expect(rig.caption(pane.id) == "Gemini Outie")
+                // Only unknown keys left: no live agent at all, so the variable stands, and with no variable the saved agent does
+                rig.workspace.setAgentLifecycle(key: "gemini", panelId: rig.terminalA.id, lifecycle: .unknown)
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "claude"))
+                #expect(pane.ownerAgent == "claude")
+                _ = try #require(rig.show(from: rig.terminalA, Self.page1))
+                #expect(pane.ownerAgent == "claude", "unknown keys counted as a live agent when nothing was sent")
+            }
+        }
+    }
+
+    @Test("15.9 a show held by Design Focus keeps its agent with its page")
+    func heldShowKeepsItsAgent() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                try enterDesignFocus(rig)
+                let held = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "codex"))
+                #expect(held.action == .heldDesignFocus)
+                #expect(pane.ownerAgent == "claude", "the hold applied its agent early")
+                rig.workspace.exitDesignFocus(reason: "test")
+                #expect(pane.currentURL == Self.page2)
+                #expect(pane.ownerAgent == "codex", "the held page lost its agent")
+                #expect(rig.caption(pane.id) == "Agent Outie")
+            }
+        }
+    }
+
+    @Test("15.10 a saved session carries the agent, and a session saved before .15 decodes with none")
+    func snapshotCarriesTheAgent() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                let saved = try #require(rig.workspace.sessionSnapshot(includeScrollback: false)
+                    .panels.first { $0.id == pane.id }?.browser)
+                #expect(saved.ownerAgent == "claude", "the workspace's record lost the agent")
+                let encoded = try JSONEncoder().encode(saved)
+                var object = try #require(try JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+                #expect(object["ownerAgent"] as? String == "claude")
+                let restoredPane = BrowserPanel(workspaceId: UUID())
+                restoredPane.restoreSessionSnapshot(try JSONDecoder().decode(SessionBrowserPanelSnapshot.self, from: encoded))
+                #expect(restoredPane.ownerAgent == "claude")
+                // a session saved by a build without .15
+                object["ownerAgent"] = nil
+                let older = try JSONDecoder().decode(SessionBrowserPanelSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+                #expect(older.ownerAgent == nil)
+                // a value that is not text is no agent, never a failed session
+                object["ownerAgent"] = 5
+                let odd = try JSONDecoder().decode(SessionBrowserPanelSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+                #expect(odd.ownerAgent == nil)
+            }
+        }
+        // the Dock's record
+        let dock = DockSplitStore(workspaceId: UUID(), baseDirectoryProvider: { nil }, browserAvailabilityProvider: { true })
+        dock.hasLoadedConfiguration = true
+        defer { dock.closeAllPanels() }
+        let paneId = try #require(dock.bonsplitController.allPaneIds.first)
+        let panelId = try #require(dock.newSurface(kind: .browser, inPane: paneId, url: Self.page1, focus: false))
+        let browser = try #require(dock.panels[panelId] as? BrowserPanel)
+        browser.ownerAgent = "codex"
+        let record = try #require(dock.sessionSnapshot(includeScrollback: false).panels.first { $0.id == panelId }?.browser)
+        #expect(record.ownerAgent == "codex", "the Dock's record lost the agent")
+    }
+
+    @Test("15.11 after a restart the placeholder and the pane both read the name; a pane saved before .15 reads Agent Pane until its next show")
+    func restoreKeepsTheNameAndAnOlderPaneTakesItOnItsNextShow() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                var saved = rig.workspace.sessionSnapshot(includeScrollback: false)
+                let restored = Workspace()
+                defer { restored.teardownAllPanels() }
+                let remap = restored.restoreSessionSnapshot(saved, deferBrowserPanels: true)
+                let restoredID = try #require(remap[pane.id])
+                #expect(restored.panels[restoredID] is DeferredBrowserPanel)
+                let tabID = try #require(restored.surfaceIdFromPanelId(restoredID))
+                #expect(restored.bonsplitController.tab(tabID)?.title == "wg-still Outie", "the placeholder lost the name")
+                #expect(restored.panelTitles[restoredID] == "wg-still Outie")
+                let placeholder = try #require(restored.panels[restoredID] as? DeferredBrowserPanel)
+                let materialized = try #require(restored.materializeDeferredBrowserPanel(placeholder))
+                #expect(materialized.ownerAgent == "claude", "materializing lost the agent")
+                #expect(restored.bonsplitController.tab(tabID)?.title == "wg-still Outie")
+
+                // a session saved before .15: no ownerAgent in the record
+                let index = try #require(saved.panels.firstIndex { $0.id == pane.id })
+                saved.panels[index].browser?.ownerAgent = nil
+                let older = Workspace()
+                defer { older.teardownAllPanels() }
+                let olderRemap = older.restoreSessionSnapshot(saved, deferBrowserPanels: true)
+                let olderID = try #require(olderRemap[pane.id])
+                let olderTab = try #require(older.surfaceIdFromPanelId(olderID))
+                #expect(older.bonsplitController.tab(olderTab)?.title == "Agent Outie", "no agent saved: * names it")
+                withNames(["claude": "wg-still Outie"]) {
+                    older.refreshAgentPaneCaptions()
+                    #expect(older.bonsplitController.tab(olderTab)?.title == "Agent Pane", "a pane saved before .15 took a name with no agent")
+                }
+                // its terminal's next post names it
+                _ = try #require(older.navigateAgentPane(olderID, to: Self.page2, agent: "claude"))
+                #expect(older.bonsplitController.tab(olderTab)?.title == "wg-still Outie", "the next post did not name the pane")
+            }
+        }
+    }
+
+    @Test("15.12b the caption is always the pane's name, through a show, a clear and a refresh, and never reads 'You wrote' (Tom, 2026-11-19)")
+    func theCaptionIsAlwaysTheName() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(rig.caption(pane.id) == "wg-still Outie")
+                rig.workspace.refreshAgentPaneCaption(panelId: pane.id)
+                #expect(rig.caption(pane.id) == "wg-still Outie")
+                _ = try #require(rig.clear(from: rig.terminalA))
+                #expect(rig.caption(pane.id) == "wg-still Outie")
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "claude"))
+                #expect(rig.caption(pane.id) == "wg-still Outie")
+                // with no name set it reads Agent Pane
+                try withNames([:]) {
+                    rig.workspace.refreshAgentPaneCaptions()
+                    #expect(rig.caption(pane.id) == "Agent Pane")
+                }
+            }
+        }
+    }
+
+    @Test("15.13 Rename Tab replaces the whole caption and stays through a show and a rename of the names")
+    func renameTabWinsOverTheName() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(rig.workspace.setPanelCustomTitle(panelId: pane.id, title: "my review"))
+                #expect(rig.caption(pane.id) == "my review")
+                _ = try #require(rig.show(from: rig.terminalA, Self.page2, agent: "claude"))
+                #expect(rig.caption(pane.id) == "my review")
+                AgentPaneNameSetting.current = AgentPaneNameSetting(names: ["claude": "Other Outie"])
+                rig.workspace.refreshAgentPaneCaptions()
+                #expect(rig.caption(pane.id) == "my review")
+            }
+        }
+    }
+
+    @Test("15.14 a plain browser pane never takes a name")
+    func aPlainPaneIsNotNamed() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                _ = try #require(rig.show(from: rig.terminalA, Self.page1, agent: "claude"))
+                let plain = try rig.addPlainBrowser()
+                rig.workspace.refreshAgentPaneCaptions()
+                #expect(rig.caption(plain.id) != "Agent Outie")
+                #expect(rig.caption(plain.id) != "wg-still Outie")
+                #expect(plain.ownerAgent == nil)
+            }
+        }
+    }
+
+    @Test("15.15 the check hands the agent to the apply in its plan")
+    func theCheckCarriesTheAgentInItsPlan() throws {
+        try withRig { rig in
+            guard case .ready(let plan) = TerminalController.shared.controlAgentPaneCheck(
+                surfaceID: rig.terminalA.id, url: Self.page1, agent: "codex", defaults: rig.defaults
+            ) else { Issue.record("not ready"); return }
+            #expect(plan.agent == "codex")
+        }
+    }
+
+    @Test("15.19 a workspace-context reset keeps the name, as it keeps the Agent Pane's identity")
+    func contextResetKeepsTheName() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                rig.workspace.resetBrowserPanelsForContextChange(reason: "test")
+                #expect(rig.caption(pane.id) == "wg-still Outie", "a context reset replaced the name")
+                #expect(rig.workspace.panelTitles[pane.id] == "wg-still Outie")
+            }
+        }
+    }
+
+    @Test("15.20 a split made with its agent has the name from its first caption, before any show or state change")
+    func newSplitsFirstCaptionIsTheName() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try #require(rig.workspace.newBrowserSplit(
+                    from: rig.terminalA.id, orientation: .horizontal, url: Self.page1, focus: false,
+                    allowsExternalBrowserFallback: false,
+                    owner: BrowserPaneOwner(terminalStableID: rig.terminalA.stableSurfaceId, kind: .agentPane, agent: "claude")
+                ))
+                #expect(pane.ownerAgent == "claude")
+                let tab = try #require(rig.workspace.surfaceIdFromPanelId(pane.id).flatMap { rig.workspace.bonsplitController.tab($0) })
+                #expect(tab.title == "wg-still Outie", "the split's first caption was \(tab.title)")
+                #expect(rig.workspace.panelTitles[pane.id] == "wg-still Outie")
+            }
+        }
+    }
+
+    @Test("15.21 a session restored with its panes live reads the name where the saved title is applied")
+    func liveRestoreKeepsTheName() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                var saved = rig.workspace.sessionSnapshot(includeScrollback: false)
+                let index = try #require(saved.panels.firstIndex { $0.id == pane.id })
+                saved.panels[index].title = "Saved page title"
+                let restored = Workspace()
+                defer { restored.teardownAllPanels() }
+                let remap = restored.restoreSessionSnapshot(saved, deferBrowserPanels: false)
+                let restoredID = try #require(remap[pane.id])
+                #expect(restored.panels[restoredID] is BrowserPanel)
+                #expect(restored.panelTitles[restoredID] == "wg-still Outie", "the saved page title replaced the name")
+                let tabID = try #require(restored.surfaceIdFromPanelId(restoredID))
+                #expect(restored.bonsplitController.tab(tabID)?.title == "wg-still Outie")
+            }
+        }
+    }
+
+    @Test("15.21b the saved-title writer (applySessionPanelMetadata) writes the name, never the saved page title")
+    func sessionMetadataWritesTheName() throws {
+        try withNames(Self.outie) {
+            try withRig { rig in
+                let pane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                var record = try #require(rig.workspace.sessionSnapshot(includeScrollback: false).panels.first { $0.id == pane.id })
+                record.title = "Saved page title"
+                rig.workspace.panelTitles[pane.id] = "something else"
+                rig.workspace.applySessionPanelMetadata(record, toPanelId: pane.id)
+                #expect(rig.workspace.panelTitles[pane.id] == "wg-still Outie", "applySessionPanelMetadata wrote \(String(describing: rig.workspace.panelTitles[pane.id]))")
+            }
+        }
+    }
+
+    @Test("15.24 a pane moved into another workspace is captioned for its agent by the names in force when it arrives")
+    func movedPaneIsCaptionedOnArrival() throws {
+        try withNames(["claude": "Before Outie"]) {
+            try withRig { rig in
+                let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+                #expect(rig.caption(agentPane.id) == "Before Outie")
+                let other = Workspace()
+                defer { other.teardownAllPanels() }
+                other.agentPaneClearedFolderOverride = rig.clearedFolder
+                let detached = try #require(rig.workspace.detachSurface(panelId: agentPane.id))
+                // the names change while the pane is between workspaces, which no workspace's refresh visits
+                AgentPaneNameSetting.current = AgentPaneNameSetting(names: ["claude": "After Outie"])
+                let otherPane = try #require(other.bonsplitController.allPaneIds.first)
+                #expect(other.attachDetachedSurface(detached, inPane: otherPane, focus: false) == agentPane.id)
+                let tab = other.surfaceIdFromPanelId(agentPane.id).flatMap { other.bonsplitController.tab($0)?.title }
+                #expect(tab == "After Outie", "the moved pane kept the caption it left with: \(String(describing: tab))")
+            }
+        }
+    }
+
+    // MARK: the Figma setting's re-title, one of the seven caption writers (here, not in FigmaTabTitleTests, so this suite is the
+    // only writer of `AgentPaneNameSetting.current`)
+
+    private static let figmaLink = "https://www.figma.com/design/MVdKSLWiPvKNyWab361uJ2/cm-73-figma-native-pane"
+
+    private func figmaTabTitle(_ w: Workspace, _ id: UUID) -> String? {
+        w.surfaceIdFromPanelId(id).flatMap { w.bonsplitController.tab($0)?.title }
+    }
+
+    @Test("15.22 a Figma setting flip keeps a live Agent Pane's name")
+    func figmaSettingFlipKeepsTheName() async throws {
+        let savedNames = AgentPaneNameSetting.current
+        defer { AgentPaneNameSetting.current = savedNames }
+        AgentPaneNameSetting.current = AgentPaneNameSetting(names: Self.outieNoStar)
+        let savedFigma = FigmaTabTitleSetting.current
+        defer { FigmaTabTitleSetting.current = savedFigma }
+
+        let w = Workspace(); defer { w.teardownAllPanels() }
+        let pane = try #require(w.bonsplitController.allPaneIds.first)
+        let a = try #require(w.newFigmaSurface(inPane: pane))
+        await oneMainQueueTurn()
+        a.ownerTerminalSurfaceId = UUID()
+        a.ownedKind = .agentPane
+        a.ownerAgent = "claude"
+        a.publishObservedDocumentURL(try #require(URL(string: Self.figmaLink)))
+        a.publishObservedDocumentTitle("cm-73 - figma native pane – Figma")
+        await oneMainQueueTurn()
+        w.refreshAgentPaneCaption(panelId: a.id)
+        #expect(figmaTabTitle(w, a.id) == "wg-still Outie")
+
+        for shows in [false, true] {
+            FigmaTabTitleSetting.current = FigmaTabTitleSetting(showsFileName: shows)
+            w.refreshFigmaTabTitles()
+            #expect(figmaTabTitle(w, a.id) == "wg-still Outie", "a Figma setting flip (names: \(shows)) dropped the name")
+            #expect(w.panelTitles[a.id] == "wg-still Outie")
+        }
+    }
+
+    @Test("15.23 a restored Figma-address Agent Pane keeps its name through the Figma flip")
+    func restoredFigmaAgentPaneKeepsItsNameThroughTheFlip() throws {
+        try withNames(["claude": "wg-still Outie"]) {
+            let savedFigma = FigmaTabTitleSetting.current
+            defer { FigmaTabTitleSetting.current = savedFigma }
+            let source = Workspace()
+            defer { source.retireFromOwningTabManager() }
+            let terminal = try #require(source.focusedPanelId)
+            let made = try #require(source.newBrowserSplit(
+                from: terminal, orientation: .horizontal, url: URL(string: Self.figmaLink), focus: false,
+                allowsExternalBrowserFallback: false, chromeVisibility: BrowserChromeVisibility(omnibarVisible: false)
+            ))
+            var snapshot = source.sessionSnapshot(includeScrollback: false)
+            let index = try #require(snapshot.panels.firstIndex { $0.id == made.id })
+            snapshot.panels[index].title = "cm-73 - figma native pane – Figma"
+            var record = try #require(snapshot.panels[index].browser)
+            record.ownerTerminalSurfaceId = UUID()
+            record.ownedKind = BrowserOwnedKind.agentPane.rawValue
+            record.ownerAgent = "claude"
+            snapshot.panels[index].browser = record
+            let restored = Workspace()
+            defer { restored.teardownAllPanels() }
+            let remap = restored.restoreSessionSnapshot(snapshot, deferBrowserPanels: true)
+            let id = try #require(remap[made.id])
+            #expect(restored.panels[id] is DeferredBrowserPanel, "the restored tab was shown, so this test would prove nothing")
+            #expect(restored.panelTitle(panelId: id) == "wg-still Outie")
+            FigmaTabTitleSetting.current = FigmaTabTitleSetting(showsFileName: false)
+            restored.refreshFigmaTabTitles()
+            #expect(restored.panelTitle(panelId: id) == "wg-still Outie", "a Figma flip dropped a restored pane's name")
+            #expect(figmaTabTitle(restored, id) == "wg-still Outie")
+        }
+    }
+
+    // MARK: the holder and its route
+
+    private func waitUntil(timeout: Duration = .seconds(3), _ condition: @MainActor () -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !condition() {
+            if ContinuousClock.now >= deadline { return false }
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return true
+    }
+
+    private func scratchConfigFile() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("cm-126.15-scratch-cfg-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("cmux.json")
+    }
+
+    @Test("15.16 the holder follows cmux.json: a save changes the names, a bad entry is skipped, a names that is not an object gives none")
+    func holderFollowsTheFile() async throws {
+        let file = try scratchConfigFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        try Data(#"{"agentPane":{"names":{"claude":"wg-still Outie","codex":5,"gemini":""}}}"#.utf8).write(to: file, options: .atomic)
+        var changes = 0
+        let holder = AgentPaneNameSetting(store: JSONConfigStore(fileURL: file), onChange: { changes += 1 })
+        #expect(holder.names == ["claude": "wg-still Outie"], "bad entries were not skipped: \(holder.names)")
+
+        try Data(#"{"agentPane":{"names":{"claude":"Renamed","*":"Agent Outie"}}}"#.utf8).write(to: file, options: .atomic)
+        #expect(await waitUntil { holder.names == ["claude": "Renamed", "*": "Agent Outie"] }, "the holder missed a save: \(holder.names)")
+        #expect(await waitUntil { changes >= 1 }, "onChange did not run")
+
+        try Data(#"{"agentPane":{"names":"claude"}}"#.utf8).write(to: file, options: .atomic)
+        #expect(await waitUntil { holder.names.isEmpty }, "a names that is not an object left names behind: \(holder.names)")
+    }
+
+    @Test("15.17 saving cmux.json renames every open Agent Pane in every window, with no restart")
+    func aSaveRenamesEveryWindow() async throws {
+        let file = try scratchConfigFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        try Data("{}".utf8).write(to: file, options: .atomic)
+
+        let previousApp = AppDelegate.shared
+        let app = AppDelegate()
+        AppDelegate.shared = previousApp  // AppDelegate.init assigns shared; this test calls `app` directly
+        let saved = AgentPaneNameSetting.current
+        defer { AgentPaneNameSetting.current = saved }
+        let rig = try Rig()
+        defer { rig.cleanup() }
+        let secondManager = TabManager()
+        let firstWindowId = app.registerMainWindowContextForTesting(tabManager: rig.manager)
+        let secondWindowId = app.registerMainWindowContextForTesting(tabManager: secondManager)
+        defer {
+            app.unregisterMainWindowContextForTesting(windowId: firstWindowId)
+            app.unregisterMainWindowContextForTesting(windowId: secondWindowId)
+        }
+        let first = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+        let w2 = try #require(secondManager.selectedWorkspace)
+        let w2Terminal = try #require(w2.focusedPanelId.flatMap { w2.panels[$0] as? TerminalPanel })
+        w2Terminal.adoptStableSurfaceId(UUID())
+        let second = try #require(w2.openAgentPane(beside: w2Terminal.id, url: Self.page2, owner: w2Terminal.stableSurfaceId, agent: "claude"))
+        #expect(rig.caption(first.id) == "Agent Pane")
+
+        // The holder the app builds, over a scratch file, calling the app's own route.
+        AgentPaneNameSetting.current = AgentPaneNameSetting.makeAppSetting(
+            environment: [:], configFile: file, onChange: { app.refreshAgentPaneCaptions() }
+        )
+        try Data(#"{"agentPane":{"names":{"claude":"wg-still Outie"}}}"#.utf8).write(to: file, options: .atomic)
+        func title(_ w: Workspace, _ p: BrowserPanel) -> String? {
+            w.surfaceIdFromPanelId(p.id).flatMap { w.bonsplitController.tab($0)?.title }
+        }
+        // The holder sets its names and runs `onChange` in one main-actor step, so the moment the names show here the route has run.
+        // Read the titles right then, with no further wait: a page load's own title event also re-titles a pane through the same
+        // writer, and would hide a route that did nothing.
+        let sawNames = await waitUntil { AgentPaneNameSetting.current.names == ["claude": "wg-still Outie"] }
+        #expect(sawNames, "the holder missed the save within 3 s")
+        #expect(title(rig.workspace, first) == "wg-still Outie", "the route did not rename the first window: \(String(describing: title(rig.workspace, first)))")
+        #expect(title(w2, second) == "wg-still Outie", "the route did not rename the second window: \(String(describing: title(w2, second)))")
+
+        try Data("{}".utf8).write(to: file, options: .atomic)
+        let sawNone = await waitUntil { AgentPaneNameSetting.current.names.isEmpty }
+        #expect(sawNone, "the holder missed the removal within 3 s")
+        #expect(title(rig.workspace, first) == "Agent Pane", "removing the entry did not put Agent Pane back in the first window")
+        #expect(title(w2, second) == "Agent Pane", "removing the entry did not put Agent Pane back in the second window")
+        w2.teardownAllPanels()
+    }
+
+    @Test("15.18 the route asks for the published copy that `cmux tree` reads")
+    func theRoutePublishesWhatTreeReads() async throws {
+        let previousApp = AppDelegate.shared
+        let app = AppDelegate()
+        AppDelegate.shared = previousApp
+        let saved = AgentPaneNameSetting.current
+        defer { AgentPaneNameSetting.current = saved }
+        let rig = try Rig()
+        defer { rig.cleanup() }
+        let windowId = app.registerMainWindowContextForTesting(tabManager: rig.manager)
+        defer { app.unregisterMainWindowContextForTesting(windowId: windowId) }
+        _ = try rig.browser(rig.show(from: rig.terminalA, Self.page1, agent: "claude")?.surfaceID)
+
+        let controller = TerminalController.shared
+        let store = controller.socketReadSnapshotStore
+        #expect(await waitUntil { controller.socketReadSnapshotRefreshTask == nil })
+        var generation = store.read().generation
+        var quiet = 0
+        let settleBy = ContinuousClock.now + .seconds(3)
+        while quiet < 5, ContinuousClock.now < settleBy {
+            try? await Task.sleep(for: .milliseconds(40))
+            let now = store.read().generation
+            if now == generation { quiet += 1 } else { generation = now; quiet = 0 }
+        }
+        try #require(quiet >= 5, "the copy never held still for 200 ms, so a change can't be pinned on the route")
+        for name in ["One Outie", "Two Outie"] {
+            let before = store.read().generation
+            AgentPaneNameSetting.current = AgentPaneNameSetting(names: ["claude": name])
+            app.refreshAgentPaneCaptions()
+            #expect(await waitUntil { store.read().generation != before }, "names \(name)")
+        }
+    }
 }
 
 /// cmux-rbf #cm-126.14: Settings' "local files off", which only counts when the profile forces it (as in FigmaPageSwitchTests).
@@ -1885,22 +2262,4 @@ private final class AgentPaneForcedNoLocalFilesDefaults: UserDefaults, @unchecke
     override func objectIsForced(forKey defaultName: String) -> Bool {
         defaultName == ManagedDevicePolicyKey.browserAllowLocalFiles.rawValue
     }
-}
-
-/// cmux-rbf #cm-126.14: a text-box send target that accepts or rejects writes, and names a real terminal surface.
-@MainActor
-private final class AgentPaneFakeTextBoxSubmitSurface: TextBoxSubmitSurfaceControlling {
-    let terminal: TerminalSurface
-    var sendKeyTextResult = true
-    var clipboardReadGeneration = 0
-    var textBoxSubmitObservationWindow: NSWindow?
-    var textBoxSubmitTerminalSurface: TerminalSurface? { terminal }
-
-    init(terminal: TerminalSurface) { self.terminal = terminal }
-
-    func visibleText() -> String? { nil }
-    @discardableResult func sendKeyText(_ text: String) -> Bool { sendKeyTextResult }
-    @discardableResult func sendText(_ text: String) -> Bool { true }
-    @discardableResult func sendNamedKey(_ keyName: String) -> TerminalSurface.NamedKeySendResult { .sent }
-    @discardableResult func performBindingAction(_ action: String) -> Bool { true }
 }

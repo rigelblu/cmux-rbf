@@ -159,6 +159,7 @@ extension CmuxSettingsFileStore {
         "reply.maxMessagesBack",
         "reply.labels",
         "reply.inline.enabled",
+        "agentPane.names", // cmux-rbf #cm-126.15
         "figma.defaultFolder",
         "figma.folders",
         "figma.showFileNameInHeader",

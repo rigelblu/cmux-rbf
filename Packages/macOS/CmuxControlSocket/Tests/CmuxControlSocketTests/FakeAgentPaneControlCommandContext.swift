@@ -8,13 +8,15 @@ final class FakeAgentPaneControlCommandContext: ControlCommandContext {
     var applied: ControlAgentPaneApplied?
     var summaries: [ControlAgentPaneSummary]? = []
     var checkCalls: [(UUID, URL)] = []
+    var checkAgents: [String?] = [] // cmux-rbf #cm-126.15: the agent each check was given
     var clearCheckResult: ControlAgentPaneCheck = .refused(.noAgentPane)
     var clearCheckCalls: [UUID] = []
     var applyCalls: [ControlAgentPanePlan] = []
     var listCalls: [UUID?] = []
 
-    func controlAgentPaneCheck(surfaceID: UUID, url: URL) -> ControlAgentPaneCheck {
+    func controlAgentPaneCheck(surfaceID: UUID, url: URL, agent: String?) -> ControlAgentPaneCheck {
         checkCalls.append((surfaceID, url))
+        checkAgents.append(agent)
         return checkResult
     }
 

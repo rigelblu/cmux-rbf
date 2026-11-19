@@ -308,6 +308,31 @@ struct AgentPaneCLIOutputTests {
         #expect(run.shows.first?.params["surface_id"] as? String == Self.callerSurface)
     }
 
+    // cmux-rbf #cm-126.15: the agent `show` sends, read from CMUX_AGENT_LAUNCH_KIND by the real CLI.
+    @Test("show sends the agent CMUX_AGENT_LAUNCH_KIND names, trimmed and as written; the app reads the teams launchers")
+    func showSendsTheAgentFromTheLaunchKind() throws {
+        for (kind, sent) in [("claude", "claude"), ("claudeTeams", "claudeTeams"), ("codexTeams", "codexTeams"), (" Gemini ", "Gemini")] {
+            let run = try drive(
+                ["agent-pane", "show", Self.page],
+                environment: ["CMUX_SURFACE_ID": Self.callerSurface, "CMUX_AGENT_LAUNCH_KIND": kind],
+                reply: Self.showReply()
+            )
+            #expect(run.status == 0, "\(run.stderr)")
+            #expect(run.shows.first?.params["agent"] as? String == sent, "kind \(kind) sent \(String(describing: run.shows.first?.params["agent"]))")
+        }
+    }
+
+    @Test("show sends no agent when CMUX_AGENT_LAUNCH_KIND is absent or empty")
+    func showSendsNoAgentWithoutALaunchKind() throws {
+        for environment in [["CMUX_SURFACE_ID": Self.callerSurface],
+                            ["CMUX_SURFACE_ID": Self.callerSurface, "CMUX_AGENT_LAUNCH_KIND": "  "]] {
+            let run = try drive(["agent-pane", "show", Self.page], environment: environment, reply: Self.showReply())
+            #expect(run.status == 0, "\(run.stderr)")
+            #expect(run.shows.count == 1)
+            #expect(run.shows.first?.params["agent"] == nil, "an agent was sent: \(String(describing: run.shows.first?.params["agent"]))")
+        }
+    }
+
     @Test("an empty explicit --surface says the value is empty and sends nothing")
     func emptySurfaceOverrideNamesMissingSurface() throws {
         let run = try drive(
@@ -515,6 +540,7 @@ struct AgentPaneCLIOutputTests {
         #expect(run.stdout.contains("agent-pane show <page>"))
         #expect(run.stdout.contains("agent-pane list [--workspace <id|ref>]"))
         #expect(run.stdout.contains("Agent Pane"))
+        #expect(run.stdout.contains("agentPane.names"), "the help doesn't say where the caption's name comes from") // cmux-rbf #cm-126.15
         #expect(run.stdout.contains("Not available over `cmux ssh`."))
         #expect(run.requests.isEmpty)
     }

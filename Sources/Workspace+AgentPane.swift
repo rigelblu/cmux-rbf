@@ -6,7 +6,7 @@ import Foundation
 
 /// What a held update will do when Design Focus ends: show a page, or clear (cmux-rbf #cm-126.14).
 enum HeldAgentPaneUpdate: Equatable {
-    case show(URL)
+    case show(URL, agent: String?) // cmux-rbf #cm-126.15: the held page keeps the agent its show sent
     case clear
 }
 
@@ -57,7 +57,7 @@ extension Workspace {
     /// without focus or a hand-off to the system browser. The owner and kind go
     /// in through `newBrowserSplit(owner:)`, so the tab is made with the mark.
     @discardableResult
-    func openAgentPane(beside terminalID: UUID, url: URL, owner: UUID) -> BrowserPanel? {
+    func openAgentPane(beside terminalID: UUID, url: URL, owner: UUID, agent: String? = nil) -> BrowserPanel? {
         guard let browser = newBrowserSplit(
             from: terminalID,
             orientation: .horizontal,
@@ -66,10 +66,15 @@ extension Workspace {
             creationPolicy: .automationPreload,
             allowsExternalBrowserFallback: false,
             chromeVisibility: BrowserChromeVisibility(omnibarVisible: false),
-            owner: BrowserPaneOwner(terminalStableID: owner, kind: .agentPane)
+            // cmux-rbf #cm-126.15: the agent is on the pane before its first caption, so a new Agent Pane opens with its name.
+            owner: BrowserPaneOwner(
+                terminalStableID: owner,
+                kind: .agentPane,
+                agent: agentPaneAgentToRecord(sent: agent, saved: nil, terminalPanelId: terminalID)
+            )
         ) else { return nil }
         browser.agentPaneLastPostURL = url
-        transitionAgentPaneState(panelId: browser.id, event: .show)
+        agentPaneClearedFlags[browser.id] = false
         return browser
     }
 
@@ -79,7 +84,8 @@ extension Workspace {
     func navigateAgentPane(
         _ panelId: UUID,
         to url: URL,
-        stateEvent: AgentPaneAnswerState.Event = .show
+        isClear: Bool = false,
+        agent: String? = nil
     ) -> BrowserPanel? {
         let browser: BrowserPanel?
         if let deferred = panels[panelId] as? DeferredBrowserPanel {
@@ -89,24 +95,32 @@ extension Workspace {
         }
         guard let browser else { return nil }
         browser.navigate(to: url)
-        if stateEvent == .show { browser.agentPaneLastPostURL = url }
-        transitionAgentPaneState(panelId: browser.id, event: stateEvent)
+        if !isClear { browser.agentPaneLastPostURL = url }
+        agentPaneClearedFlags[browser.id] = isClear
+        // cmux-rbf #cm-126.15: a show records its agent and then refreshes the caption, which names the pane for it; a clear
+        // touches neither.
+        if !isClear, let owner = browser.ownerTerminalSurfaceId {
+            browser.ownerAgent = agentPaneAgentToRecord(
+                sent: agent, saved: browser.ownerAgent, terminalPanelId: agentPaneOwnerTerminal(stableID: owner)?.id
+            )
+            refreshAgentPaneCaption(panelId: browser.id)
+        }
         return browser
     }
 
-    /// Sets a moved or restored Agent Pane's state from the page it shows: in the cleared folder, cleared; else a post
-    /// (cmux-rbf #cm-126.14; what a restore does, and what a pane moved into this workspace needs, since the workspace it came from
-    /// dropped its state).
-    func deriveAgentPaneAnswerState(panelId: UUID) {
+    /// Sets a moved or restored Agent Pane's cleared flag from the page it shows (in the cleared folder: cleared), then
+    /// refreshes its caption, which a restore or a move into this workspace has not set yet (cmux-rbf #cm-126.14; the
+    /// workspace a pane came from dropped its flag).
+    func deriveAgentPaneCleared(panelId: UUID) {
         guard let candidate = agentPaneCandidates().first(where: { $0.panelID == panelId }),
               AgentPaneMark.isAgentPaneKind(owner: candidate.owner, kind: candidate.kind) else { return }
-        let isCleared = agentPaneClearedFolder.map {
-            AgentPaneMark.restoredState(url: agentPaneShownURL(panelId), clearedFolderURL: $0) == .cleared
+        agentPaneClearedFlags[panelId] = agentPaneClearedFolder.map {
+            AgentPaneMark.isCleared(url: agentPaneShownURL(panelId), clearedFolderURL: $0)
         } ?? false
-        transitionAgentPaneState(panelId: panelId, event: isCleared ? .clear : .show)
+        refreshAgentPaneCaption(panelId: panelId)
     }
 
-    // MARK: - Answer state (cm-126.14)
+    // MARK: - Cleared (cm-126.14)
 
     static func agentPaneClearedFolderURL(
         fileManager: FileManager = .default,
@@ -142,7 +156,7 @@ extension Workspace {
     /// written or the pane isn't there. cmux-rbf #cm-126.14.
     @discardableResult
     func clearAgentPane(_ panelId: UUID) -> BrowserPanel? {
-        if agentPaneAnswerState(for: panelId).isCleared {
+        if agentPaneIsCleared(panelId) {
             return panels[panelId] as? BrowserPanel
         }
         guard let folder = agentPaneClearedFolder else { return nil }
@@ -163,7 +177,7 @@ extension Workspace {
         } catch {
             return nil
         }
-        return navigateAgentPane(panelId, to: page, stateEvent: .clear)
+        return navigateAgentPane(panelId, to: page, isClear: true)
     }
 
     /// Deletes a closed Agent Pane's cleared page when Tom closed it (see
@@ -181,91 +195,71 @@ extension Workspace {
         try? FileManager.default.removeItem(at: AgentPaneMark.clearedPageURL(panelID: panelId, in: folder))
     }
 
-    func agentPaneAnswerState(for panelId: UUID) -> AgentPaneAnswerState {
-        agentPaneAnswerStates[panelId] ?? .post
+    /// Whether the Agent Pane shows its cleared page: a clear sets it, a show unsets it, a restore or a move derives it
+    /// from the page. A pane with no flag is not cleared.
+    func agentPaneIsCleared(_ panelId: UUID) -> Bool {
+        agentPaneClearedFlags[panelId] ?? false
     }
 
-    /// The one transition function for an Agent Pane's answer state.
-    ///
-    /// Also sets the owning terminal's typing-path flag (`awaitsAgentPaneAnswer`, true only in `.post`)
-    /// and refreshes the pane's caption.
-    @discardableResult
-    func transitionAgentPaneState(panelId: UUID, event: AgentPaneAnswerState.Event) -> AgentPaneAnswerState {
-        let current = agentPaneAnswerStates[panelId] ?? .post
-        let next = AgentPaneAnswerState.next(state: current, event: event)
-        applyAgentPaneAnswerState(panelId: panelId, state: next)
-        return next
+    // MARK: - The caption (cm-126.15)
+
+    /// What a `show` records as the pane's agent: ``AgentPaneMark/agent(sent:saved:liveAgentKeys:)`` over the keys the terminal
+    /// `terminalPanelId` shows now (none when the terminal is gone), a manual loader's left out. A key whose state is `.unknown`
+    /// is no live agent: Clear Agent State leaves a cleared agent's key at `.unknown` rather than removing it, so counting it
+    /// would stop the one agent that still runs from being the only one.
+    private func agentPaneAgentToRecord(sent: String?, saved: String?, terminalPanelId: UUID?) -> String? {
+        let liveKeys = terminalPanelId.map { id in
+            agentPaneStates(panelIds: [id]).entries.filter { $0.state != .unknown }.map(\.agentKey)
+        } ?? []
+        return AgentPaneMark.agent(sent: sent, saved: saved, liveAgentKeys: liveKeys)
     }
 
-    /// Stores a pane's state, then syncs its terminal's typing-path flag and the caption: the one place a state is written.
-    private func applyAgentPaneAnswerState(panelId: UUID, state next: AgentPaneAnswerState) {
-        agentPaneAnswerStates[panelId] = next
-
-        if let candidate = agentPaneCandidates().first(where: { $0.panelID == panelId }),
-           let owner = candidate.owner,
-           let terminal = agentPaneOwnerTerminal(stableID: owner) {
-            syncTerminalAgentPaneAnswerFlag(for: terminal)
-        }
-
-        refreshAgentPaneCaption(panelId: panelId)
+    /// The one writer of an Agent Pane's caption (cmux-rbf #cm-126.15), so the seven places that title a pane agree: the
+    /// browser subscription, the workspace-context reset, the restore placeholder, `applySessionPanelMetadata`,
+    /// `newBrowserSplit`, the Figma setting's re-title and ``refreshAgentPaneCaption(panelId:)``. It takes what the pane
+    /// holds rather than looking the pane up by id, because `newBrowserSplit` asks before `panels[id]` is set and a
+    /// restore placeholder has only its snapshot. The caption is the name from ``AgentPaneNameSetting`` for the pane's agent;
+    /// a plain pane keeps `own`. Rename Tab still wins afterwards, through `resolvedPanelTitle`.
+    func agentPaneCaption(owner: UUID?, kind: BrowserOwnedKind?, agent: String?, own: String) -> String {
+        let isAgentPane = AgentPaneMark.isAgentPaneKind(owner: owner, kind: kind)
+        return AgentPaneMark.title(
+            isAgentPaneKind: isAgentPane,
+            own: own,
+            name: isAgentPane ? AgentPaneMark.name(agent: agent, names: AgentPaneNameSetting.current.names) : nil
+        )
     }
 
-    /// A pane moved into this workspace: the state it carried, else one derived from its page (Agent Pane kind only).
-    func adoptDetachedAgentPaneAnswerState(panelId: UUID, carried: AgentPaneAnswerState?) {
-        guard let carried else {
-            deriveAgentPaneAnswerState(panelId: panelId)
-            return
-        }
-        guard let candidate = agentPaneCandidates().first(where: { $0.panelID == panelId }),
-              AgentPaneMark.isAgentPaneKind(owner: candidate.owner, kind: candidate.kind) else { return }
-        applyAgentPaneAnswerState(panelId: panelId, state: carried)
+    /// ``agentPaneCaption(owner:kind:agent:own:)`` for a live browser panel, which may not be in `panels` yet.
+    func agentPaneCaption(for browser: BrowserPanel) -> String {
+        agentPaneCaption(
+            owner: browser.ownerTerminalSurfaceId, kind: browser.ownedKind, agent: browser.ownerAgent, own: browser.displayTitle
+        )
     }
 
-    /// Syncs a terminal's typing-path flag from its first owned Agent Pane's current state.
-    /// Called both when an Agent Pane transitions and when a terminal joins (or adopts its stable id in) a workspace.
-    func syncTerminalAgentPaneAnswerFlag(for terminal: TerminalPanel) {
-        if let firstPane = agentPanes(ownedBy: terminal.stableSurfaceId).first {
-            terminal.surface.awaitsAgentPaneAnswer = (agentPaneAnswerState(for: firstPane) == .post)
-        } else {
-            terminal.surface.awaitsAgentPaneAnswer = false
-        }
-    }
-
-    /// Marks the first Agent Pane owned by `terminalStableId` as written to by Tom.
-    @discardableResult
-    func noteTomWroteToTerminal(stableID terminalStableId: UUID, at date: Date = Date()) -> AgentPaneAnswerState? {
-        guard let firstPane = agentPanes(ownedBy: terminalStableId).first else { return nil }
-        return transitionAgentPaneState(panelId: firstPane, event: .tomWrote(at: date))
+    /// The same for a saved record: a restore placeholder, or a snapshot applied to a panel.
+    func agentPaneCaption(snapshot: SessionPanelSnapshot, own: String) -> String {
+        agentPaneCaption(
+            owner: snapshot.browser?.ownerTerminalSurfaceId,
+            kind: snapshot.browser?.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:)),
+            agent: snapshot.browser?.ownerAgent,
+            own: own
+        )
     }
 
     /// Refreshes the caption (`panelTitles`, `resolvedPanelTitle`, and the Bonsplit tab title)
     /// for an Agent Pane, including a restore placeholder (`DeferredBrowserPanel`).
     func refreshAgentPaneCaption(panelId: UUID) {
-        let isAgentPaneKind: Bool
-        let ownTitle: String
+        let nextTitle: String
         if let browserPanel = panels[panelId] as? BrowserPanel {
-            isAgentPaneKind = AgentPaneMark.isAgentPaneKind(
-                owner: browserPanel.ownerTerminalSurfaceId,
-                kind: browserPanel.ownedKind
-            )
-            ownTitle = browserPanel.displayTitle
+            nextTitle = agentPaneCaption(for: browserPanel) // (cm-126.15)
         } else if let deferred = panels[panelId] as? DeferredBrowserPanel {
-            let browserSnapshot = deferred.sessionPanelSnapshot.browser
-            isAgentPaneKind = AgentPaneMark.isAgentPaneKind(
-                owner: browserSnapshot?.ownerTerminalSurfaceId,
-                kind: browserSnapshot?.ownedKind.flatMap(BrowserOwnedKind.init(rawValue:))
+            nextTitle = agentPaneCaption( // (cm-126.15)
+                snapshot: deferred.sessionPanelSnapshot,
+                own: deferred.sessionPanelSnapshot.title ?? deferred.displayTitle
             )
-            ownTitle = deferred.sessionPanelSnapshot.title ?? deferred.displayTitle
         } else {
             return
         }
-
-        let wroteAt = agentPaneAnswerState(for: panelId).wroteAt
-        let nextTitle = AgentPaneMark.title(
-            isAgentPaneKind: isAgentPaneKind,
-            own: ownTitle,
-            wroteAt: wroteAt
-        )
         if panelTitles[panelId] != nextTitle {
             panelTitles[panelId] = nextTitle
         }
@@ -278,12 +272,20 @@ extension Workspace {
         bonsplitController.updateTab(tabId, title: resolvedTitle)
     }
 
+    /// Re-titles every Agent Pane in this workspace, live or still a restore placeholder, when `agentPane.names` changes
+    /// (cmux-rbf #cm-126.15). Only Agent Panes: a plain pane's title is its page's.
+    func refreshAgentPaneCaptions() {
+        for candidate in agentPaneCandidates() where AgentPaneMark.isAgentPaneKind(owner: candidate.owner, kind: candidate.kind) {
+            refreshAgentPaneCaption(panelId: candidate.panelID)
+        }
+    }
+
     // MARK: - Held while Design Focus is on
 
     /// Keeps `url` as the latest page for the terminal `owner`, to show when
     /// Design Focus ends. In memory only; latest wins.
-    func holdAgentPaneUpdate(owner: UUID, url: URL) {
-        heldAgentPaneUpdates[owner] = .show(url)
+    func holdAgentPaneUpdate(owner: UUID, url: URL, agent: String? = nil) {
+        heldAgentPaneUpdates[owner] = .show(url, agent: agent)
     }
 
     /// Keeps a clear for the terminal `owner`, to apply when Design Focus ends; replaces any held
@@ -302,12 +304,12 @@ extension Workspace {
         for (owner, update) in held {
             guard let terminal = agentPaneOwnerTerminal(stableID: owner) else { continue }
             switch update {
-            case .show(let url):
+            case .show(let url, let agent):
                 switch AgentPaneMark.placement(panes: agentPanes(ownedBy: owner)) {
                 case .open:
-                    openAgentPane(beside: terminal.id, url: url, owner: owner)
+                    openAgentPane(beside: terminal.id, url: url, owner: owner, agent: agent)
                 case .navigate(let agentPane, _):
-                    navigateAgentPane(agentPane, to: url)
+                    navigateAgentPane(agentPane, to: url, agent: agent)
                 }
             case .clear:
                 // A held clear never opens a pane: when its pane closed meanwhile, it is dropped.
@@ -325,5 +327,19 @@ extension Workspace {
     func agentPaneFreePane(_ pane: PaneID?) -> PaneID? {
         guard let pane else { return nil }
         return AgentPaneMark.paneHoldsAgentPane(agentPaneCandidates(inPane: pane)) ? nil : pane
+    }
+}
+
+extension AppDelegate {
+    /// Re-titles every Agent Pane across every window's workspaces when `agentPane.names` changes (cmux-rbf #cm-126.15). The Dock
+    /// has no Agent Pane rule, so it is not visited.
+    func refreshAgentPaneCaptions() {
+        for manager in allTabManagersForManagedPolicyEnforcement() {
+            for workspace in manager.tabs {
+                workspace.refreshAgentPaneCaptions()
+            }
+        }
+        // As for the Figma re-title: `cmux tree` reads a copy that only refreshes on its own events.
+        TerminalController.shared.scheduleSocketReadSnapshotRefresh()
     }
 }

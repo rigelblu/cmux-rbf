@@ -10,11 +10,12 @@ public protocol ControlAgentPaneContext: AnyObject {
     /// - Parameters:
     ///   - surfaceID: The caller terminal's live surface identifier.
     ///   - url: The requested page.
+    ///   - agent: The agent slug the caller's CLI sent, or nil (cmux-rbf #cm-126.15). It rides in the plan.
     /// - Returns: A refusal or an applicable plan.
-    func controlAgentPaneCheck(surfaceID: UUID, url: URL) -> ControlAgentPaneCheck
+    func controlAgentPaneCheck(surfaceID: UUID, url: URL, agent: String?) -> ControlAgentPaneCheck
 
     /// Validates a caller for `clear` without changing state (cmux-rbf #cm-126.14): the same
-    /// caller lookup as ``controlAgentPaneCheck(surfaceID:url:)``, then its first Agent Pane,
+    /// caller lookup as ``controlAgentPaneCheck(surfaceID:url:agent:)``, then its first Agent Pane,
     /// its cleared page, and the same browser and local-file settings.
     /// - Parameter surfaceID: The caller terminal's live surface identifier.
     /// - Returns: A refusal, or a plan whose `url` is the pane's cleared page.

@@ -1855,6 +1855,7 @@
 		807310000000000000000002 /* FigmaTabMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807310000000000000000001 /* FigmaTabMark.swift */; };
 		807343000000000000000002 /* FigmaTabTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807343000000000000000001 /* FigmaTabTitle.swift */; };
 		807343000000000000000008 /* FigmaTabTitleSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807343000000000000000007 /* FigmaTabTitleSetting.swift */; };
+		8073F15000000000000000A2 /* AgentPaneNameSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8073F15000000000000000A1 /* AgentPaneNameSetting.swift */; }; // cmux-rbf #cm-126.15
 		97D151945D71CBE154DD3389 /* BrowserPaneOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24906C56932747523994275 /* BrowserPaneOwner.swift */; };
 		5C86D456CAE0E56BD69597AC /* BrowserOwnedKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E5A712E8CCB67B581BCE4C /* BrowserOwnedKind.swift */; };
 		1FBE5E5CA30556CF48CFA041 /* AgentPaneMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66F9E6BE6B9BF3799D170F55 /* AgentPaneMark.swift */; };
@@ -6061,6 +6062,7 @@
 		807310000000000000000001 /* FigmaTabMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaTabMark.swift; sourceTree = "<group>"; };
 		807343000000000000000001 /* FigmaTabTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaTabTitle.swift; sourceTree = "<group>"; };
 		807343000000000000000007 /* FigmaTabTitleSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/FigmaTabTitleSetting.swift; sourceTree = "<group>"; };
+		8073F15000000000000000A1 /* AgentPaneNameSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/AgentPaneNameSetting.swift; sourceTree = "<group>"; }; // cmux-rbf #cm-126.15
 		F24906C56932747523994275 /* BrowserPaneOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/BrowserPaneOwner.swift; sourceTree = "<group>"; };
 		05E5A712E8CCB67B581BCE4C /* BrowserOwnedKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/BrowserOwnedKind.swift; sourceTree = "<group>"; };
 		66F9E6BE6B9BF3799D170F55 /* AgentPaneMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/AgentPaneMark.swift; sourceTree = "<group>"; };
@@ -10564,6 +10566,7 @@
 				807310000000000000000001 /* FigmaTabMark.swift */,
 				807343000000000000000001 /* FigmaTabTitle.swift */,
 				807343000000000000000007 /* FigmaTabTitleSetting.swift */,
+				8073F15000000000000000A1 /* AgentPaneNameSetting.swift */,
 				F24906C56932747523994275 /* BrowserPaneOwner.swift */,
 				05E5A712E8CCB67B581BCE4C /* BrowserOwnedKind.swift */,
 				66F9E6BE6B9BF3799D170F55 /* AgentPaneMark.swift */,
@@ -14373,6 +14376,7 @@
 				807310000000000000000002 /* FigmaTabMark.swift in Sources */,
 				807343000000000000000002 /* FigmaTabTitle.swift in Sources */,
 				807343000000000000000008 /* FigmaTabTitleSetting.swift in Sources */,
+				8073F15000000000000000A2 /* AgentPaneNameSetting.swift in Sources */,
 				97D151945D71CBE154DD3389 /* BrowserPaneOwner.swift in Sources */,
 				5C86D456CAE0E56BD69597AC /* BrowserOwnedKind.swift in Sources */,
 				1FBE5E5CA30556CF48CFA041 /* AgentPaneMark.swift in Sources */,
