@@ -257,7 +257,7 @@ WebKit's element full screen moves the web view out of the portal's `WindowBrows
 - **Keep the `superview != nil` guard** in `willRemoveSubview`. A slot being freed removes its subviews through it, and forming `[weak self]` on a deallocating object is fatal
 - **The fallback flush** in `forceRefreshWebView` covers a web view hosted in a `BrowserViewportHostView`, where the placeholder never lands in the slot
 - **Fork code, not upstream's** (`Sources/Panels/BrowserPanel+FigmaRefit.swift`, `cm-73.52`'s): `figmaRefitPanelDidClose` must not ask WebKit to leave full screen, because the close detaches the web view in the same call. `leaveFigmaFullscreenWhenHidden` sends its request one main-queue turn later and skips it while closing, because a workspace close hides and then closes in the same turn
-- **Tests:** `cmuxTests/BrowserSlotFullscreenOverlayDeferralTests.swift`, which covers all four overlays, a real placeholder and a slot freed while held. In `cmuxTests/FigmaRefitPanelTests.swift`, four lines are marked `cmux-rbf: changed on purpose (#cm-143)`. Keep ours
+- **Tests:** `cmuxTests/BrowserSlotFullscreenOverlayDeferralTests.swift`, which covers all four overlays, a real placeholder and a slot freed while held. In `cmuxTests/FigmaRefitPanelTests.swift`, three lines are marked `cmux-rbf: changed on purpose (#cm-143)` and one new test carries `cmux-rbf (#cm-143)`. Keep ours
 - **Known base red, not this fix's:** `BrowserWindowPortalRegistryNotificationTests.registryDoesNotNotifyForUnchangedPortalVisibility`
 
 ### 🟣⋯ Send to Back and put-back marks (`#cm-128.13`): upstream tests changed on purpose, and what a sync must keep
