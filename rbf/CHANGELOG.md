@@ -7,6 +7,7 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 # 🔵⋯ [Unreleased]
 
 ## 🟠⋯ Added for End Users
+- 2026-11-19 - feat | see how many workspaces sit in each status on its sidebar header, like `Next (5)`, folded or open (#cm-145). Nested workspace groups count; a status with no workspaces shows its name alone; a long name truncates before the number
 - 2026-10-24 - feat | watch a frame's motion play in my Figma pane's preview, not only see the still frame (#cm-73.32)
 
 # 🔵⋯ v0.34.2 (2026-10-29) — #cm-110.13
