@@ -31,8 +31,12 @@
 # install rather than a leftover. Do not reintroduce that reasoning.
 #
 # ROLLBACK_ROOT is never deleted by any trap — during the swap it holds the
-# only working copy of the app on the machine, and it is removed explicitly
-# after the swap succeeds, exactly as before the split.
+# only working copy of the app on the machine, and after the swap succeeds it is
+# removed explicitly, exactly as before the split, when no keep was asked for. With a
+# keep (--keep-previous-root, #cm-142.2) the old app is never deleted: it is moved
+# into the keep folder under its own name and the then-empty rollback folder is
+# rmdir'd; if that move fails the old app stays under ROLLBACK_ROOT, which is left in
+# place, and the log and the notification name the path.
 #
 # EVERY VALUE ARRIVES THROUGH THE ARGUMENT CONTRACT. This script does not
 # source rbf-install-target.sh / rbf-channel.env — one source of truth per
@@ -44,6 +48,10 @@ set -uo pipefail
 # Code, not a value, so it does not break the one-source-of-truth rule above.
 # shellcheck source=rbf/scripts/lib/rbf-procs.sh
 source "$(dirname "${BASH_SOURCE[0]}")/rbf-procs.sh"
+# The keep branch (#cm-142.2): what "everything the app owns under its bundle
+# id" means, shared with restore-rbf-install.sh. Code, not a value.
+# shellcheck source=rbf/scripts/lib/rbf-keep-state.sh
+source "$(dirname "${BASH_SOURCE[0]}")/rbf-keep-state.sh"
 
 # ---------------------------------------------------------------------------
 # Seams. Tests override these to simulate a running app, a failing rename, or
@@ -187,13 +195,64 @@ rbf_swap_launch_detached() { # $1 staging_root, $2 log, $3 timeout_s, rest = arg
 # each message from the branch that knows it.
 rbf_swap_die() {
   printf 'error: %s\n' "$1" >&2
+  rbf_swap_drop_keep
   rbf_swap_notify "${SWAP_APP_NAME:-cmux RBF} install failed" "${2:-$1 — see $SWAP_LOG_FILE}"
   exit 1
 }
 
 rbf_swap_cleanup() {
+  rbf_swap_drop_keep
   [[ -n "${SWAP_STAGING_ROOT:-}" && -d "$SWAP_STAGING_ROOT" ]] && rm -rf "$SWAP_STAGING_ROOT"
   return 0
+}
+
+# A keep folder this run made and has not yet committed is removed on any exit
+# that is not a finished swap: "a save or a swap that fails leaves no half-made
+# folder". SWAP_KEEP_MADE is 1 only between making the folder and the new app
+# going into place; after that the folder is the way back and stays. It removes
+# only a folder this run made (rbf_swap_keep_state sets the flag after its own
+# mkdir), never a path it was merely given.
+rbf_swap_drop_keep() {
+  if [[ "${SWAP_KEEP_MADE:-0}" == 1 && -n "${SWAP_KEEP_ROOT:-}" ]]; then
+    command rm -rf "${SWAP_KEEP_ROOT:?}"
+    SWAP_KEEP_MADE=0
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# The keep branch (#cm-142.2). Runs after the quit has succeeded and before
+# anything under the install volume moves: the app rewrites its session when it
+# quits, so only now does the copy hold its last write, and a refused quit has
+# made no folder. It keeps what the id rule names (rbf-keep-state.sh), writes
+# kept.env first, and leaves the app itself for rbf_swap_install to move in.
+# Returns 1 with RBF_KEEP_ERR set when it could not; the caller aborts the install.
+# ---------------------------------------------------------------------------
+rbf_swap_keep_state() {
+  local install_path="$SWAP_INSTALL_PATH" id="$SWAP_BUNDLE_ID" name
+  SWAP_KEEP_MADE=0 SWAP_KEEP_APP_PARKED="" SWAP_KEPT_LABEL=""
+  RBF_KEEP_ERR=""
+  if [[ ! -d "$install_path" ]]; then
+    # Nothing is installed, so there is no app to keep and no way back to make.
+    rbf_swap_step "no app is installed at $install_path, so nothing to keep"
+    SWAP_KEEP_ROOT=""
+    return 0
+  fi
+  rbf_keep_plan "$id"
+  rbf_swap_step "keeping its state under $id: $RBF_KEEP_COUNT entries"
+  while IFS= read -r name; do
+    [[ -n "$name" ]] && printf '  not kept, unknown kind: %s\n' "$name"
+  done <<EOF
+$RBF_KEEP_UNKNOWN
+EOF
+  mkdir -p "$(dirname "$SWAP_KEEP_ROOT")" && mkdir "$SWAP_KEEP_ROOT" 2>/dev/null \
+    || { RBF_KEEP_ERR="couldn't make the folder $SWAP_KEEP_ROOT"; return 1; }
+  SWAP_KEEP_MADE=1
+  SWAP_KEPT_LABEL="$(rbf_keep_app_version "$install_path") ($(rbf_keep_app_commit "$install_path"))"
+  rbf_keep_write_record "$SWAP_KEEP_ROOT" "$id" "$install_path" "${SWAP_APP_NAME}" \
+    "$(rbf_keep_app_version "$install_path")" "$(rbf_keep_app_commit "$install_path")" \
+    || { RBF_KEEP_ERR="couldn't write $SWAP_KEEP_ROOT/kept.env"; return 1; }
+  rbf_keep_state_into "$SWAP_KEEP_ROOT" "$id"
 }
 
 # ---------------------------------------------------------------------------
@@ -292,7 +351,26 @@ rbf_swap_install() {
   # line is never reached, the previous install is still on disk and
   # recoverable by hand, which is the entire point of keeping it outside
   # STAGING_ROOT.
-  [[ -n "$previous" ]] && rm -rf "$rollback_root"
+  #
+  # The keep folder (if any) is now the way back and stays, whatever happens next.
+  SWAP_KEEP_MADE=0
+  if [[ -n "$previous" ]]; then
+    if [[ -n "${SWAP_KEEP_ROOT:-}" && -d "$SWAP_KEEP_ROOT" ]]; then
+      # Keep asked for: the old app goes into the folder, under its own name,
+      # where it used to be deleted. It is never deleted. If the move fails it
+      # stays where the swap parked it, and the log and the notification say so.
+      rbf_swap_step "keeping the previous app with its state"
+      if rbf_swap_mv "$previous" "$SWAP_KEEP_ROOT/$(basename "$install_path")"; then
+        rmdir "$rollback_root" 2>/dev/null || true
+      else
+        SWAP_KEEP_APP_PARKED="$previous"
+        printf 'error: could not move the previous app into %s\n' "$SWAP_KEEP_ROOT" >&2
+        printf '       it is still at: %s\n' "$previous" >&2
+      fi
+    else
+      rm -rf "$rollback_root"
+    fi
+  fi
   return 0
 }
 
@@ -336,6 +414,8 @@ Usage (from install-rbf.sh only): rbf-swap.sh --mode inline|detached \
   --bundle-id ID --upstream-bundle-id ID --upstream-path P \
   --first-install 0|1 --rbf-version V --git-commit SHA --log-file P
   [--app-name NAME] [--migration-channel rbf|dogfood]
+  [--keep-previous-root FOLDER]   keep the replaced app and its state in FOLDER
+                                  (absolute; made after the quit)
 
 install-rbf.sh picks the mode: inline (live output, any ordinary terminal)
 or detached (daemonized; log + notifications + relaunch) when the invoking
@@ -344,11 +424,22 @@ USAGE
 }
 
 rbf_swap_main() {
+  # Stop two of --build-only (#cm-142.2), independent of the installer's own
+  # exit: a build check must never reach the app, so this refuses before it
+  # parses anything, claims staging or quits anything. Staging is left for the
+  # installer's own trap, which has not been handed over.
+  if [[ "${RBF_BUILD_ONLY:-}" == 1 ]]; then
+    printf 'error: rbf-swap.sh: refusing to start: RBF_BUILD_ONLY=1 is set, so this is a build check.\n' >&2
+    printf '       It must not quit or replace the installed app. Nothing was changed.\n' >&2
+    return 1
+  fi
+
   SWAP_MODE="" SWAP_STAGED_APP="" SWAP_STAGING_ROOT="" SWAP_ROLLBACK_ROOT=""
   SWAP_INSTALL_PATH="" SWAP_BUNDLE_ID="" SWAP_UPSTREAM_BUNDLE_ID=""
   SWAP_UPSTREAM_PATH="" SWAP_FIRST_INSTALL="" SWAP_RBF_VERSION=""
   SWAP_GIT_COMMIT="" SWAP_LOG_FILE=""
   SWAP_APP_NAME="cmux RBF" SWAP_MIGRATION_CHANNEL=rbf
+  SWAP_KEEP_ROOT="" SWAP_KEEP_MADE=0 SWAP_KEEP_APP_PARKED="" SWAP_KEPT_LABEL=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -366,6 +457,7 @@ rbf_swap_main() {
       --rbf-version)         SWAP_RBF_VERSION="$2"; shift 2 ;;
       --git-commit)          SWAP_GIT_COMMIT="$2"; shift 2 ;;
       --log-file)            SWAP_LOG_FILE="$2"; shift 2 ;;
+      --keep-previous-root)  SWAP_KEEP_ROOT="$2"; shift 2 ;;
       *) printf 'error: rbf-swap.sh: unknown option: %s\n\n' "$1" >&2; rbf_swap_usage >&2; return 2 ;;
     esac
   done
@@ -390,6 +482,11 @@ rbf_swap_main() {
     printf 'error: rbf-swap.sh: --migration-channel must be rbf or dogfood\n' >&2
     return 2 ;;
   esac
+
+  if [[ -n "$SWAP_KEEP_ROOT" && "$SWAP_KEEP_ROOT" != /* ]]; then
+    printf 'error: rbf-swap.sh: --keep-previous-root must be an absolute path, got: %s\n' "$SWAP_KEEP_ROOT" >&2
+    return 2
+  fi
 
   SWAP_MIGRATE_SCRIPT="${SWAP_MIGRATE_SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/migrate-rbf-state.sh}"
 
@@ -416,6 +513,18 @@ rbf_swap_main() {
 
   rbf_swap_quit_app "$SWAP_INSTALL_PATH" "$SWAP_BUNDLE_ID" || return 1
 
+  if [[ -n "$SWAP_KEEP_ROOT" ]]; then
+    if ! rbf_swap_keep_state; then
+      # The app is quit and nothing was swapped. Detached, nobody is at a
+      # terminal, so the old app comes back before the failure is reported.
+      local why="$RBF_KEEP_ERR"
+      rbf_swap_drop_keep
+      if [[ "$SWAP_MODE" == "detached" ]]; then rbf_swap_relaunch "$SWAP_INSTALL_PATH" || true; fi
+      rbf_swap_die "could not keep the previous app's state, so nothing was swapped: $why" \
+        "The install did not happen: could not keep the previous app's state ($why). The old app was relaunched. See $SWAP_LOG_FILE"
+    fi
+  fi
+
   rbf_swap_step "installing"
   rbf_swap_install "$SWAP_STAGED_APP" "$SWAP_INSTALL_PATH" "$SWAP_ROLLBACK_ROOT"
 
@@ -427,11 +536,26 @@ rbf_swap_main() {
   printf '  bundle id    %s\n' "$SWAP_BUNDLE_ID"
   printf '  state        %s\n' "$SWAP_MIGRATION_RESULT"
   printf '  upstream     %s — untouched\n' "$SWAP_UPSTREAM_PATH"
+  local kept_note=""
+  if [[ -n "$SWAP_KEEP_ROOT" && -d "$SWAP_KEEP_ROOT" ]]; then
+    if [[ -n "$SWAP_KEEP_APP_PARKED" ]]; then
+      printf '  kept         its state, in the folder below; the app it replaced could not be moved in:\n'
+      printf '%s\n' "$SWAP_KEEP_ROOT"
+      printf '  the app it replaced, %s, is still at:\n' "$SWAP_KEPT_LABEL"
+      printf '%s\n' "$SWAP_KEEP_APP_PARKED"
+      printf '  Move it into the folder above as "%s" before a restore takes it.\n' "$(basename "$SWAP_INSTALL_PATH")"
+      kept_note="Kept its state: $(basename "$SWAP_KEEP_ROOT"), but the previous app stayed at $SWAP_KEEP_APP_PARKED. "
+    else
+      printf '  kept         %s, the app it replaced, with its state, in:\n' "$SWAP_KEPT_LABEL"
+      printf '%s\n' "$SWAP_KEEP_ROOT"
+      kept_note="Kept the previous app: $(basename "$SWAP_KEEP_ROOT"). "
+    fi
+  fi
 
   if [[ "$SWAP_MODE" == "detached" ]]; then
     rbf_swap_relaunch "$SWAP_INSTALL_PATH" || true
     rbf_swap_notify "$SWAP_APP_NAME $SWAP_RBF_VERSION installed" \
-      "Swap complete; the app has relaunched. Log: $SWAP_LOG_FILE"
+      "${kept_note}Swap complete; the app has relaunched. Log: $SWAP_LOG_FILE"
   fi
   return 0
 }
