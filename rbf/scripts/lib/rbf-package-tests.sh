@@ -15,9 +15,20 @@
 # The list is the packages whose suites the feature owns. Add a package here when it gets suites that matter to a
 # gate; CmuxFoundation is not on it because its test target does not build on this toolchain (an upstream SSH
 # file, `SSHPTYReplayOutputFilterTests.swift`), which is why the planner's suites live in CmuxWorkspaces.
+#
+# The last seven (#cm-142.1): the upstream sync moved 35 app test files out of cmuxTests into these packages'
+# own test targets, which `make test` (the cmux-unit scheme) no longer runs. They may carry failures that were
+# already upstream's at the pin; cm-142's test comparison reads them beside the upstream control's own runs.
 RBF_PACKAGE_TEST_PATHS=(
   "Packages/macOS/CmuxWorkspaces"
   "Packages/macOS/CmuxControlSocket"
+  "Packages/macOS/CmuxCloud"
+  "Packages/macOS/CmuxBrowser"
+  "Packages/macOS/CmuxRemoteSession"
+  "Packages/macOS/CmuxCloudImagePaste"
+  "Packages/macOS/CmuxTerminal"
+  "Packages/macOS/CmuxSettingsUI"
+  "Packages/macOS/CmuxSettings"
 )
 
 rbf_run_package_tests() {
