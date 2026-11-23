@@ -2,10 +2,26 @@
 # install-rbf.sh — build this checkout and install it as `cmux RBF.app`,
 # alongside upstream's cmux rather than replacing it.
 #
-#   rbf/scripts/install-rbf.sh [--dogfood] [--dry-run]
+#   rbf/scripts/install-rbf.sh [--dogfood] [--dry-run] [--build-only]
+#   RBF_KEEP_PREVIOUS=1 rbf/scripts/install-rbf.sh [--dogfood]
 #
 # --dogfood selects a second fixed channel record. Neither channel permits
 # an arbitrary install path or bundle id. Both use the same build and swap.
+#
+# RBF_KEEP_PREVIOUS=1 (#cm-142.2) keeps the app this install replaces and
+# everything it owns under its bundle id, in a pre-install-<ts> folder under
+# ~/Library/Application Support/cmux/migration-backups/<bundle id>/, and
+# restore-rbf-install.sh puts them back. It is an environment variable, not an
+# option, because `make install-dogfood` takes no ARGS.
+#
+# --build-only (#cm-142.2) does everything up to and including the signature check
+# (the Zig and Metal guards, GhosttyKit, the Release build, staging, the bundle
+# identity rewrite, inside-out signing, rbf_verify_dev_signing), then says so,
+# removes its staging folder and exits 0. It never reaches the swap, so the
+# installed app is not touched and not quit. Two independent stops keep it so: the
+# exit right after the signature check, and RBF_BUILD_ONLY=1 (exported in this mode),
+# which makes rbf_swap_main refuse to start. Nothing else compiles Release before
+# an install does: make build, run and test all build Debug.
 # Aiming an installer at an arbitrary /Applications path is the dangerous capability; the design choice was that it must not exist rather
 # than exist and be blocked. The refusal paths are proved in
 # rbf/scripts/lib/rbf-install-target.test.sh, the only place they are reachable.
@@ -67,11 +83,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/lib/rbf-install-target.sh"
 
 DRY_RUN=0
+BUILD_ONLY=0
 INSTALL_CHANNEL=rbf
 
 usage() {
   cat <<'USAGE'
-Usage: rbf/scripts/install-rbf.sh [--dogfood] [--dry-run]
+Usage: rbf/scripts/install-rbf.sh [--dogfood] [--dry-run] [--build-only]
 
 Build this checkout and install it as `cmux RBF.app` in /Applications, beside
 upstream's cmux. Upstream's install is never read, written, or replaced.
@@ -81,7 +98,18 @@ Options:
               seed its first layout from regular RBF; later updates preserve dogfood state.
   --dry-run   Print the plan -- target path, both bundle ids, signing identity,
               and the state-migration decision -- then exit without building.
+  --build-only
+              Build, stage and sign exactly as an install does, stop after the
+              signature check, remove staging and exit 0. The installed app is
+              not touched and not quit.
   -h, --help  Show this help.
+
+Environment:
+  RBF_KEEP_PREVIOUS=1
+              Keep the app this install replaces, and everything it owns under
+              its bundle id (not its caches), in
+              ~/Library/Application Support/cmux/migration-backups/<bundle id>/pre-install-<ts>.
+              rbf/scripts/restore-rbf-install.sh "<that folder>" puts them back.
 
 Only the two fixed channels are available; paths and bundle ids are not options.
 USAGE
@@ -90,6 +118,7 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
+    --build-only) BUILD_ONLY=1; shift ;;
     --dogfood) INSTALL_CHANNEL=dogfood; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'error: unknown option: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -98,6 +127,12 @@ done
 
 die() { printf 'error: %s\n' "$1" >&2; exit "${2:-1}"; }
 step() { printf '⋯ %s\n' "$1"; }
+
+# Stop two of --build-only: the swap helper refuses to start while this is set,
+# whatever the installer does next. Set before anything else can read it.
+# An exported RBF_BUILD_ONLY left in the shell would otherwise refuse every real
+# install after the build: it is this run's flag, not an inherited one.
+if [[ "$BUILD_ONLY" -eq 1 ]]; then export RBF_BUILD_ONLY=1; else unset RBF_BUILD_ONLY; fi
 
 # Load and validate the channel record before anything reads RBF_* — this is
 # the resolver's own guard (rbf-install-target.sh), not Guard 1 below.
@@ -121,6 +156,13 @@ rbf_assert_safe_target || exit 1
 # shellcheck source=rbf/scripts/lib/rbf-swap.sh
 source "$SCRIPT_DIR/lib/rbf-swap.sh"
 SWAP_MODE="$(rbf_swap_mode "$RBF_BUNDLE_ID")"
+# RBF_KEEP_PREVIOUS is read here, before anything is built, so a value this
+# script does not understand costs nothing. The folder itself is named at the
+# hand-off below, when the keep is about to happen. Only 1 keeps; unset, empty
+# and 0 do not; anything else is refused, because "yes" silently meaning "no"
+# would hand over a swap with no way back.
+rbf_keep_install_root "$RBF_BUNDLE_ID" >/dev/null \
+  || die "RBF_KEEP_PREVIOUS must be 1 (keep the replaced app and its state) or unset, got: ${RBF_KEEP_PREVIOUS:-}" 2
 SWAP_LOG="${HOME}/Library/Logs/cmux-rbf/install.log"
 [[ "$INSTALL_CHANNEL" == dogfood ]] && SWAP_LOG="${HOME}/Library/Logs/cmux-rbf/install-dogfood.log"
 # Generous on purpose: a healthy helper claims in milliseconds, so waiting costs
@@ -245,6 +287,13 @@ if [[ "$SWAP_MODE" == "detached" ]]; then
   printf '                 outcome via notification + %s\n' "$SWAP_LOG"
 else
   printf '  swap           inline — live output in this terminal\n'
+fi
+if [[ "${RBF_KEEP_PREVIOUS:-}" == 1 ]]; then
+  printf '  keep previous  yes — the app it replaces and its state, in a pre-install-<time> folder under\n'
+  printf '                 %s\n' "$(rbf_keep_backups_dir "$RBF_BUNDLE_ID")"
+fi
+if [[ "$BUILD_ONLY" -eq 1 ]]; then
+  printf '  mode           build only — builds, stages and signs, then stops; the installed app is not touched\n'
 fi
 printf '  upstream       %s (never touched)\n' "$UPSTREAM_INSTALL_PATH"
 if [[ "$INSTALL_CHANNEL" == dogfood ]]; then
@@ -394,6 +443,22 @@ codesign --force --deep --timestamp=none \
 rbf_verify_dev_signing "$STAGED_APP" || die "stable signature verification failed"
 
 # ---------------------------------------------------------------------------
+# --build-only, stop one (#cm-142.2): everything above is what an install does
+# before it touches the app; this is the last of it. Exit here, one comment block
+# above the hand-off, and the swap helper is never launched. Stop two is
+# RBF_BUILD_ONLY=1 in rbf_swap_main, which would refuse even if this exit were
+# misplaced. Staging is removed here, explicitly, and the claim-aware trap above
+# finds nothing left to do.
+# ---------------------------------------------------------------------------
+if [[ "$BUILD_ONLY" -eq 1 ]]; then
+  rm -rf "${STAGING_ROOT:?}"
+  printf '\n✓ build only: stopped after the signature check (rbf_verify_dev_signing)\n'
+  printf '  %s %s (%s) was built, staged and signed.\n' "$RBF_APP_NAME" "$RBF_VERSION" "$GIT_COMMIT"
+  printf '  The installed app at %s was not touched, and not quit.\n' "$INSTALL_PATH"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
 # The tail — quit, swap, migrate, report — lives in lib/rbf-swap.sh since
 # #cm-27, because it is the only part that cannot survive this script's own
 # parent dying. Everything below the codesign --verify above only ever touched
@@ -417,6 +482,10 @@ SWAP_ARGS=(
   --git-commit "$GIT_COMMIT"
   --log-file "$SWAP_LOG"
 )
+# The keep: named now, at the hand-off, so the folder's name is the time of the
+# swap and not of the script's start. The helper makes it, after the quit.
+KEEP_ROOT="$(rbf_keep_install_root "$RBF_BUNDLE_ID")" || die "RBF_KEEP_PREVIOUS must be 1 or unset" 2
+[[ -z "$KEEP_ROOT" ]] || SWAP_ARGS+=(--keep-previous-root "$KEEP_ROOT")
 
 if [[ "$SWAP_MODE" == "inline" ]]; then
   # A child process, deliberately not `exec`: bash skips EXIT traps on exec,
@@ -456,5 +525,7 @@ trap - EXIT
 
 printf '\n⋯ handing off — %s will quit, ending ALL its shells and agents, then swap and relaunch.\n' "$RBF_APP_NAME"
 printf '  log: %s\n' "$SWAP_LOG"
+# (with nothing installed there is nothing to keep, and no folder will be made)
+[[ -z "$KEEP_ROOT" || "$FIRST_INSTALL" -eq 1 ]] || printf '  keeping the replaced app and its state in: %s\n' "$KEEP_ROOT"
 printf '  a notification will confirm success or failure.\n'
 exit 0
