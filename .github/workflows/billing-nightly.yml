@@ -55,8 +55,7 @@ name: Billing nightly
 # Real Sandbox purchases with a tester account need a device and are a manual
 # release checklist item (docs/billing/ios-in-app-purchases.md), not this job.
 on:
-  schedule:
-    - cron: "41 9 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       post_release_check:

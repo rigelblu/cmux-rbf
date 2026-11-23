@@ -11,8 +11,7 @@ name: CI hosted backlog rescue
 # makes at most 150 GitHub calls and none when cmux-bot's budget is below that plus 500. Off: set
 # CI_HOSTED_LIGHT_RESCUE_DISABLED to 1.
 on:
-  schedule:
-    - cron: "3-59/10 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       dry_run:

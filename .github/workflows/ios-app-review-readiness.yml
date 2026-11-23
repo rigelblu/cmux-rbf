@@ -26,8 +26,7 @@ name: iOS App Review readiness
 # 10x improvement in not running useless jobs"). A dispatch keeps its own group.
 
 on:
-  push:
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 concurrency:

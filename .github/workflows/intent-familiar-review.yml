@@ -12,9 +12,8 @@ name: Familiar intent review warning (advisory)
 # request's base commit below, never from main. This copy is the one that runs,
 # so change it here.
 on:
-  pull_request_target:
-    branches: [feat-cmux-next]
-    types: [opened, reopened, synchronize, ready_for_review]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

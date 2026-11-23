@@ -1,6 +1,7 @@
 import Bonsplit
 import CMUXAgentLaunch
 import CmuxAgentChat
+import CmuxMobileHost
 import Foundation
 
 // cmux-rbf #cm-73.17/#cm-73.12: menu and bound board jobs share one delivery path.

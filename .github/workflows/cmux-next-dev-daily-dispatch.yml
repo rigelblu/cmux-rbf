@@ -10,8 +10,7 @@ name: cmux NEXT DEV daily dispatcher
 # kick-cmux-next-dev-dispatch); the 5-minute spacing below keeps that from
 # starting a DEV build per merge.
 on:
-  schedule:
-    - cron: "2-59/5 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

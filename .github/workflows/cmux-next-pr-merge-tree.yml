@@ -7,6 +7,7 @@ name: cmux-next PR merge tree (disabled)
 # artifact-publication path. A replacement must build in a credential-free PR
 # job and publish the exact artifact from default-branch workflow_run controls.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

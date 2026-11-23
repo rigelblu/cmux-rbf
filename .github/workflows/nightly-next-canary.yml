@@ -19,12 +19,7 @@ name: nightly-next canary
 # A schedule runs only from the default branch, so this file lives on main. A pull request that changes the canary runs it on
 # the newest feed build with the pull request's own harness and pulls nothing.
 on:
-  schedule:
-    # Every 5 minutes, off the hour: a build reaches Nightly only after a
-    # scheduled pass, so the tick adds to every Nightly's age
-    # (tests/test_nightly_next_canary_cadence.py). A tick with no new build
-    # stops in the pick job.
-    - cron: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       build:
@@ -32,12 +27,6 @@ on:
         required: false
         default: ''
         type: string
-  pull_request:
-    paths:
-      - .github/workflows/nightly-next-canary.yml
-      - scripts/smoke-signed-app-cli.sh
-      - scripts/cmux-next/signed-app-canary-checks.py
-      - scripts/ci/nightly_next_canary_mode.py
 
 permissions: {}
 

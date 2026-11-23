@@ -1,22 +1,7 @@
 name: Cloud task-local lifecycle
 
 on:
-  pull_request:
-    paths:
-      - Packages/macOS/CmuxCloud/Sources/CmuxCloud/Operations/CloudOperation*.swift
-      - Packages/macOS/CmuxCloud/Sources/CmuxCloud/Telemetry/CloudTelemetry*.swift
-      - Packages/macOS/CmuxCloud/Sources/CmuxCloud/Operations/CloudRemoteOperationStep.swift
-      - scripts/select-ci-xcode.sh
-      - scripts/ci/xcode-pins.txt
-      - .xcode-version
-      - Packages/macOS/CmuxFoundation/Sources/CmuxFoundation/Concurrency/TaskLocalReference.swift
-      - Packages/macOS/CmuxCloud/Sources/CmuxCloud/Reads/CloudReadRequestCoordinator.swift
-      - Sources/Surfaces/CloudMachineLoadingReservation.swift
-      - tests/cloud_task_local/**
-      - tests/surface_task_local/**
-      - tests/test_cloud_task_local_lifecycle.py
-      - tests/test_surface_task_local_reservations.py
-      - .github/workflows/cloud-task-local-tests.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

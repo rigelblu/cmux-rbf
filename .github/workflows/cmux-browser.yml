@@ -1,12 +1,8 @@
 name: cmux-browser
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_call:
-  push:
-    branches: [main]
-    paths:
-      - "cmux-browser/**"
-      - ".github/workflows/cmux-browser.yml"
 
 permissions:
   contents: read

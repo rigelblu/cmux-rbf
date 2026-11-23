@@ -23,8 +23,7 @@ name: nightly-next feed watch
 # A run whose signing or publication failed after a good compile is resumed
 # from its saved unsigned app rather than built again.
 on:
-  schedule:
-    - cron: "2-59/10 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

@@ -14,6 +14,7 @@ run-name: >-
   UI=${{ inputs.skip_ui_tests && 'off' || inputs.test_filter || 'all' }}
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_call:
     inputs:
       ref:

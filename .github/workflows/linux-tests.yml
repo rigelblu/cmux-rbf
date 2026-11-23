@@ -15,6 +15,7 @@ name: Linux tests
 # plan script comes from this workflow's own revision, never the tested commit,
 # and the job's token is read-only.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       ref:

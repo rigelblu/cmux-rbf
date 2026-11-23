@@ -13,11 +13,7 @@ name: Cloud VM DB migration
 # and #44965 shipped readers of apple_subscriptions.carried_* while the last
 # production run was 2026-10-29.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "web/db/migrations/**"
-      - "web/db/no-transaction-migrations.json"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   # GitHub matches `paths` against the first 300 changed files only. A larger
   # push that adds a migration may not start this run; the deploy gate then
   # fails closed and someone dispatches target=production.

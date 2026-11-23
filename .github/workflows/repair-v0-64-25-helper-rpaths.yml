@@ -1,6 +1,7 @@
 name: Repair v0.64.25 cmux-cua rpaths
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       confirmation:

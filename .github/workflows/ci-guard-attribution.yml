@@ -25,9 +25,8 @@ name: CI guard attribution
 # Everything is event driven: nothing polls.
 
 on:
-  workflow_run:
-    workflows: ["CI", "CI fast guards", "CI repository variables"]
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 env:
   # Temporary REST budget attribution until 2026-11-22 00:00 UTC: one gh-call line per GitHub API call

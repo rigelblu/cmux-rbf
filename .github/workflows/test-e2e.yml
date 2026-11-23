@@ -2,6 +2,7 @@ name: E2E test with video recording
 run-name: ${{ inputs.test_filter }} on ${{ github.repository_owner != 'manaflow-ai' && 'macos-26' || ((!inputs.runner || inputs.runner == 'auto') && (vars.MACOS_RUNNER_TESTS || 'blacksmith-6vcpu-macos-26') || inputs.runner) }} @ ${{ inputs.ref || github.ref_name }}${{ inputs.dispatch_id != '' && format(' [{0}]', inputs.dispatch_id) || '' }}
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       ref:

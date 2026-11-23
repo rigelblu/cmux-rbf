@@ -4,6 +4,7 @@ name: cmux-next
 # registration on the default branch so workflow_run consumers can subscribe
 # to that workflow name before the branch workflow is merged.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

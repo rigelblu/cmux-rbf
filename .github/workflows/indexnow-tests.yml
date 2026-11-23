@@ -1,13 +1,7 @@
 name: IndexNow notification tests
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/indexnow.yml
-      - .github/workflows/indexnow-tests.yml
-      - scripts/ci/notify-indexnow.py
-      - tests/test_indexnow_notification.py
-      - web/app/lib/indexnow.ts
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

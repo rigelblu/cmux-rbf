@@ -6,8 +6,7 @@ name: R2 storage census
 # the environment that already guards it; the cmux-nightly-next bucket's key is
 # limited to the nightly-next branch and is not read here.
 on:
-  schedule:
-    - cron: "41 6 * * 1"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

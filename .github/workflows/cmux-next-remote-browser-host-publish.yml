@@ -25,6 +25,7 @@ name: cmux NEXT remote browser host publish
 #          name, and writes the pin to the step summary and the
 #          remote-browser-host-pin artifact. Commit the pin; the run does not.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       branch:

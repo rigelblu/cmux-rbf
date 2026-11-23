@@ -8,19 +8,8 @@ name: Namespace autofix
 # (main never had this workflow). This copy is the one that runs, so change it
 # here.
 on:
-  pull_request_target:
-    branches: [feat-cmux-next]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "Packages/**/*.swift"
-      - "ios/cmux/**/*.swift"
-      - "scripts/lint-ios-package-conventions.sh"
-      - "scripts/lint_swift_namespaces.py"
-      - "scripts/swift_source_mask.py"
-      - "scripts/lint-namespace-types-baseline.txt"
-      - "scripts/lint-namespace-types-ratchet.txt"
-      - "scripts/lint-ios-package-conventions-baseline.txt"
-      - ".github/workflows/namespace-autofix.yml"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

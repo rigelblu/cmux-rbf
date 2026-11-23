@@ -34,6 +34,7 @@ name: rcodesign parity proof
 # names a feed that does not exist, so it never updates.
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       nightly_run_id:

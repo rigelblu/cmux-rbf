@@ -7,8 +7,7 @@ name: Notify IndexNow
 # schedule submits only what is deployed, and the state marker below keeps an
 # hourly run from resubmitting URLs IndexNow has already been sent.
 on:
-  schedule:
-    - cron: "17 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

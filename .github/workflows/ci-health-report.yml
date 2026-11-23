@@ -22,8 +22,7 @@ name: CI health report
 # issue in place. No issue is ever opened automatically: create the tracking
 # issue by hand and point the variable at it.
 on:
-  schedule:
-    - cron: "37 2,8,14,20 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       window_hours:

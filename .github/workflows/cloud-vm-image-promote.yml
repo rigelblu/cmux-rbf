@@ -12,6 +12,7 @@ name: Cloud VM image promote
 # A dispatch runs the file at --ref, so feat-cmux-next's inputs and jobs win;
 # these inputs only mirror them for the Actions form.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       channel:

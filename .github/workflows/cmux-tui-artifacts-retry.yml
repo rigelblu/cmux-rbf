@@ -26,9 +26,8 @@ name: cmux-tui artifacts retry
 # the default branch: no code of the failed run executes here. It never acts
 # on a run that a fork head started (tests/test_ci_fork_runner_routing.py).
 on:
-  workflow_run:
-    workflows: ["cmux-tui artifacts"]
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 env:
   # Temporary REST budget attribution: one gh-call line per GitHub API call (scripts/ci/api_call_log/env.sh, fetched at a fixed commit when the checkout has no copy).

@@ -1,6 +1,7 @@
 name: Iroh relay minter
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   # CI pause: preserve explicit validation without automatic PR/main runs.
   workflow_dispatch:
 

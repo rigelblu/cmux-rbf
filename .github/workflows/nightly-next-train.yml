@@ -28,6 +28,7 @@ name: nightly-next train
 # GitHub registers a dispatch workflow only from the default branch, so this
 # file is on main too; a run there does nothing.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       mode:

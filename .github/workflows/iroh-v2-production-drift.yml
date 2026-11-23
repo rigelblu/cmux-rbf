@@ -7,15 +7,8 @@ name: IROH v2 production drift
 # deploys anything.
 
 on:
-  schedule:
-    - cron: "23 */6 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - workers/iroh-v2/src/**
-      - workers/iroh-v2/scripts/check-production-drift.ts
-      - .github/workflows/iroh-v2-production-drift.yml
 
 permissions:
   contents: read

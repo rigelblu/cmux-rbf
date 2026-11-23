@@ -11,8 +11,7 @@ name: nightly-next health
 # Repository variable NIGHTLY_NEXT_HEALTH_GATE: `off` runs nothing; `report` writes verdicts and
 # pulls nothing; unset or anything else pulls a failing build.
 on:
-  schedule:
-    - cron: "7,22,37,52 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       build:

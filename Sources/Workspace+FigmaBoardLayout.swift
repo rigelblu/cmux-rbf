@@ -1,5 +1,6 @@
 import Bonsplit
 import CmuxAgentChat
+import CmuxMobileHost
 import Foundation
 
 extension Workspace {

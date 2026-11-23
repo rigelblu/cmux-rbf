@@ -25,8 +25,7 @@ name: Seed DerivedData
 # main push, in this repository).
 
 on:
-  push:
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

@@ -7,8 +7,7 @@ name: Cloud VM smoke sweep
 # deletes one throwaway user after the sweep. A leftover that still cannot be
 # deleted fails the run, so a leaked VM shows up as a red run.
 on:
-  schedule:
-    - cron: "17 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

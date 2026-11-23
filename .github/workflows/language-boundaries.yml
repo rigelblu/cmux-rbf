@@ -20,9 +20,8 @@ name: language boundaries
 # green. Leo, 2026-11-12, after a teammate's PR was told to get `leo-approved-port`: "lucas ran into this which is
 # weird. we shouldnt have that". The agents' merge gate still reads the same manifest.
 on:
-  pull_request_target:
-    branches: [main, feat-cmux-next]
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

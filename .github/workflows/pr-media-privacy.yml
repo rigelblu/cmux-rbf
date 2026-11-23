@@ -30,8 +30,7 @@ name: PR media privacy
 # The first run, with no marker, records the tip without scanning, so files
 # already on the branch are not flagged wholesale.
 on:
-  schedule:
-    - cron: "*/10 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

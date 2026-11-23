@@ -1,33 +1,8 @@
 name: CI cache receipt contract
 
 on:
-  pull_request:
-    paths:
-      - .github/actions/cache-restore/action.yml
-      - .github/actions/cache-save/action.yml
-      - .github/workflows/ci.yml
-      - .github/workflows/ci-macos.yml
-      - .github/workflows/nightly.yml
-      - .github/workflows/seed-derived-data.yml
-      - .github/workflows/ci-cache-receipts.yml
-      - scripts/ci/cache_restore_receipt.py
-      - scripts/check-test-determinism.py
-      - tests/test_ci_cache_restore_receipt.py
-      - tests/test_ci_pull_request_caches_are_read_only.py
-  push:
-    branches: [main]
-    paths:
-      - .github/actions/cache-restore/action.yml
-      - .github/actions/cache-save/action.yml
-      - .github/workflows/ci.yml
-      - .github/workflows/ci-macos.yml
-      - .github/workflows/nightly.yml
-      - .github/workflows/seed-derived-data.yml
-      - .github/workflows/ci-cache-receipts.yml
-      - scripts/ci/cache_restore_receipt.py
-      - scripts/check-test-determinism.py
-      - tests/test_ci_cache_restore_receipt.py
-      - tests/test_ci_pull_request_caches_are_read_only.py
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

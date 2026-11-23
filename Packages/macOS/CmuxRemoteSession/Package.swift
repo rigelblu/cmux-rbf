@@ -19,7 +19,7 @@ let package = Package(
         .package(path: "../CmuxRemoteDaemon"),
         .package(path: "../CmuxRemoteWorkspace"),
         .package(path: "../CMUXDebugLog"),
-        .package(path: "../../../vendor/bonsplit"),
+        .package(path: "../Bonsplit"), // cmux-rbf (#cm-142.1): vendor/bonsplit is deleted in the fork; Bonsplit lives in Packages/macOS
     ],
     targets: [
         .target(

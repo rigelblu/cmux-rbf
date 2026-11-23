@@ -21,9 +21,8 @@ name: risk tier
 # list, the commit list and the description through the API.
 
 on:
-  pull_request_target:
-    branches: [feat-cmux-next]
-    types: [opened, synchronize, reopened, edited, ready_for_review, labeled, unlabeled]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

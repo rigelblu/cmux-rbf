@@ -17,6 +17,8 @@ let package = Package(
         .package(path: "../CmuxFoundation"),
         .package(path: "../../Shared/CMUXMobileCore"),
         .package(path: "../../Shared/CmuxAgentChat"),
+        // cmux-rbf (#cm-142.1): the moved AgentChatSessionRecord (cm-73.17/24) stores WorkstreamEvent.HookEventName
+        .package(path: "../CMUXAgentLaunch"),
     ],
     targets: [
         .target(
@@ -25,6 +27,7 @@ let package = Package(
                 .product(name: "CmuxFoundation", package: "CmuxFoundation"),
                 .product(name: "CMUXMobileCore", package: "CMUXMobileCore"),
                 .product(name: "CmuxAgentChat", package: "CmuxAgentChat"),
+                .product(name: "CMUXAgentLaunch", package: "CMUXAgentLaunch"), // cmux-rbf (#cm-142.1)
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

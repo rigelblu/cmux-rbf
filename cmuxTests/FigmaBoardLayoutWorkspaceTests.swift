@@ -3,6 +3,7 @@ import Bonsplit
 import CMUXAgentLaunch
 import CmuxAgentChat
 import CmuxBrowser
+import CmuxMobileHost
 import CmuxSettings
 import Foundation
 import Testing

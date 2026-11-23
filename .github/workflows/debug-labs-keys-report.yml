@@ -4,6 +4,7 @@ name: Debug and Labs keys report
 # only a workflow the default branch has, so this inert registration lets
 # debug-labs-keys-dispatch.yml start the feat-cmux-next file by name; the run uses that branch's copy.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

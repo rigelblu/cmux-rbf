@@ -6,8 +6,7 @@ name: Prune R2 cache
 # `latest/` pointer names. It is a dry run unless a dispatch asks to delete or
 # the repository variable CI_R2_CACHE_PRUNE_DELETE is 1.
 on:
-  schedule:
-    - cron: "23 5 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       delete:

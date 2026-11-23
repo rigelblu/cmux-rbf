@@ -22,9 +22,7 @@ run-name: "${{ github.event_name == 'workflow_dispatch' && format('PR media for 
 # always come from the default branch; the tour files read from the head are
 # data, parsed as JSON and sent to the dispatch as its scenario input.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       pr:

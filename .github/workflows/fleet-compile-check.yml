@@ -15,6 +15,7 @@ run-name: fleet compile-check ${{ inputs.sha }}
 #   gh workflow run fleet-compile-check.yml --ref feat-cmux-next -f sha=<full head sha>
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       sha:

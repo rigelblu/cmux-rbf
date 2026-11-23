@@ -62,24 +62,7 @@ run-name: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow
 # null == '0' in an expression. It only polls; it runs on an ephemeral
 # Blacksmith runner (CI_TRUSTED_RUNNER), not on an owned pool it may rescue.
 on:
-  schedule:
-    - cron: "17 */2 * * *"
-  workflow_run:
-    workflows:
-      - iOS App Store screenshots
-      # The DEV publisher's runner job offers verify to an owned Mac on its
-      # first workflow_dispatch attempt; watch it for a queue/refusal rescue.
-      - cmux NEXT DEV daily
-      # cmux-next.yml: only `completed`, and only a failed DEV daily or tip
-      # Swift suite dispatch, base-branch push or same-repository pull
-      # request run (the job's `if`), so a job the runner hook refused gets
-      # its own rescue at any attempt instead of waiting up to two hours for
-      # the sweeper, whose cmux-bot listings run out of the hour's API budget
-      # (owned_pool_rescue.completed_target()). A pull request's refused swift
-      # test stayed red until then (run 40671913126, 2026-10-28). The three
-      # sources above act on `requested` only.
-      - cmux-next
-    types: [requested, completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       run_id:

@@ -15,10 +15,7 @@ name: CI main full suite
 # so CI's own routing, suite choice and runner selection stay untouched. Every
 # workflow_dispatch CI run routes every area and runs the full suite.
 on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: "23 */3 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       force:
@@ -26,10 +23,6 @@ on:
         required: false
         default: false
         type: boolean
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
 
 permissions: {}
 

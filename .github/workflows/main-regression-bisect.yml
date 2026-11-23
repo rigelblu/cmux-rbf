@@ -10,13 +10,7 @@ name: Main regression bisect
 # caps the focused runs dispatched in any 24 hours (default 24; 0 stops new
 # ones).
 on:
-  schedule:
-    - cron: "*/15 * * * *"
-  # Right after the report job posts a red run's new failures.
-  workflow_run:
-    workflows: [CI main full suite]
-    types: [completed]
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

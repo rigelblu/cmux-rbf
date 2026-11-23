@@ -13,9 +13,8 @@ name: Merge-group fail fast
 # never creates a skipped fail-fast run. This workflow checks out nothing and
 # runs on an ephemeral Blacksmith runner through the CI_TRUSTED_RUNNER selector.
 on:
-  workflow_run:
-    workflows: [Merge-group policy checks]
-    types: [in_progress]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

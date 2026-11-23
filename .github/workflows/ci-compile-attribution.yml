@@ -22,10 +22,7 @@ name: CI compile attribution
 #             auto-merge (its own CI is the check); when it declines, a revert
 #             of a confirmed culprit, labeled compile-revert, for a person.
 on:
-  workflow_run:
-    workflows: ["Seed DerivedData", "Main compile probe"]
-    types: [completed]
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       head:

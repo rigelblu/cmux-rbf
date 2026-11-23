@@ -10,8 +10,7 @@ name: Cloud chat proof nightly dispatcher
 # one issue per agent, or comments on the open one; the next green run of that agent closes it. The wait and the
 # API retries are in scripts/ci/cloud_chat_proof_dispatch.mjs (tests/cloud_chat_proof_dispatch.test.mjs).
 on:
-  schedule:
-    - cron: "23 15 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

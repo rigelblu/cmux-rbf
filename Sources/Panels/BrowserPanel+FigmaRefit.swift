@@ -1,5 +1,6 @@
 // cmux-rbf (#cm-73.46, #cm-73.44): the panel's side of the re-fit. One method for three entrances.
 import AppKit
+import CmuxBrowser
 import CmuxFoundation
 import Combine
 import ObjectiveC

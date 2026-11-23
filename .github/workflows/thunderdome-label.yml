@@ -15,14 +15,8 @@ name: thunderdome label
 # pull requests no event has labeled yet (#36859, #36885 and #36930 when it was added).
 
 on:
-  pull_request_target:
-    branches: [feat-cmux-next, main]
-    # No synchronize: the label follows the title, and a push changes no title (it started about
-    # 3,000 skipped runs a day, 2026-11-20).
-    types: [opened, reopened, edited]
-  push:
-    branches: [main]
-    paths: [.github/workflows/thunderdome-label.yml]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

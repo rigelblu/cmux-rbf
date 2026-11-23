@@ -11,13 +11,8 @@ name: CI hosted queue rescue
 # and reruns the original hosted workflow. It never runs pull-request code and
 # it never cancels a rescue that is already inspecting or rerunning a job.
 on:
-  workflow_run:
-    workflows:
-      - CLA policy guard
-      - CLA Assistant
-      - CI
-      - CI fast guards
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

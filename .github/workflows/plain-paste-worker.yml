@@ -1,16 +1,6 @@
 name: Plain paste worker controls
 on:
-  pull_request:
-    paths:
-      - 'workers/cmux-paste-text/**'
-      - 'scripts/build-plain-text-paste-worker.sh'
-      - 'tests/test_plain_text_paste_worker.py'
-      - 'tests/fixtures/plain_paste_provider.m'
-      - 'tests/fixtures/plain_paste_client.swift'
-      - 'Sources/TerminalPlainTextPasteWorker*.swift'
-      - 'Sources/TerminalPastePreparationWorkerClient.swift'
-      - 'Sources/TerminalPastePreparationWorkerError.swift'
-      - '.github/workflows/plain-paste-worker.yml'
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

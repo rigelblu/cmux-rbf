@@ -9,6 +9,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
     var pageZoom: Double
     var developerToolsVisible: Bool
     var isMuted: Bool
+    var keepLoaded: Bool = false
     var chromeVisibility: BrowserChromeVisibility? = nil
     var omnibarVisible: Bool? = nil
     var backHistoryURLStrings: [String]?
@@ -33,6 +34,14 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
     /// The team that owns ``cloudResource``'s machine. Absent in snapshots
     /// written before multi-team Cloud; restore then adopts the selected team.
     var cloudTeamID: String? = nil
+    var figmaPages: SessionFigmaPagesSnapshot? = nil
+    /// cmux-rbf #cm-73.45: the terminal (its `stableSurfaceId`) that last opened or pointed this Figma pane. Added only; decoded when present.
+    var ownerTerminalSurfaceId: UUID? = nil
+    /// cmux-rbf #cm-126.3: a string so an unknown future kind does not fail session decoding.
+    var ownedKind: String? = nil
+    /// cmux-rbf #cm-126.15: the slug of the agent that last posted to this Agent Pane (`claude`, `codex`), so its caption keeps the name Tom set for
+    /// it after the agent exits and across a restart. Added only; decoded when present, so an older session loads with none.
+    var ownerAgent: String? = nil
 
     init(
         urlString: String?,
@@ -41,6 +50,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         pageZoom: Double,
         developerToolsVisible: Bool,
         isMuted: Bool = false,
+        keepLoaded: Bool = false,
         chromeVisibility: BrowserChromeVisibility? = nil,
         omnibarVisible: Bool? = nil,
         backHistoryURLStrings: [String]?,
@@ -51,7 +61,11 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         cloudResource: SurfaceResourceID? = nil,
         interactionState: Data? = nil,
         keepsPageActive: Bool? = nil,
-        cloudTeamID: String? = nil
+        cloudTeamID: String? = nil,
+        figmaPages: SessionFigmaPagesSnapshot? = nil,
+        ownerTerminalSurfaceId: UUID? = nil,
+        ownedKind: String? = nil, // cmux-rbf #cm-126.3
+        ownerAgent: String? = nil // cmux-rbf #cm-126.15
     ) {
         self.urlString = urlString
         self.profileID = profileID
@@ -59,6 +73,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         self.pageZoom = pageZoom
         self.developerToolsVisible = developerToolsVisible
         self.isMuted = isMuted
+        self.keepLoaded = keepLoaded
         self.chromeVisibility = chromeVisibility
         self.omnibarVisible = omnibarVisible
         self.backHistoryURLStrings = backHistoryURLStrings
@@ -70,6 +85,10 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         self.interactionState = interactionState
         self.keepsPageActive = keepsPageActive
         self.cloudTeamID = cloudResource == nil ? nil : cloudTeamID
+        self.figmaPages = figmaPages
+        self.ownerTerminalSurfaceId = ownerTerminalSurfaceId
+        self.ownedKind = ownedKind // cmux-rbf #cm-126.3
+        self.ownerAgent = ownerAgent // cmux-rbf #cm-126.15
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -79,6 +98,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         case pageZoom
         case developerToolsVisible
         case isMuted
+        case keepLoaded
         case chromeVisibility
         case omnibarVisible
         case backHistoryURLStrings
@@ -90,6 +110,10 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         case interactionState
         case keepsPageActive
         case cloudTeamID
+        case figmaPages
+        case ownerTerminalSurfaceId
+        case ownedKind // cmux-rbf #cm-126.3
+        case ownerAgent // cmux-rbf #cm-126.15
     }
 
     init(from decoder: Decoder) throws {
@@ -100,6 +124,7 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         pageZoom = try container.decode(Double.self, forKey: .pageZoom)
         developerToolsVisible = try container.decode(Bool.self, forKey: .developerToolsVisible)
         isMuted = try container.decodeIfPresent(Bool.self, forKey: .isMuted) ?? false
+        keepLoaded = try container.decodeIfPresent(Bool.self, forKey: .keepLoaded) ?? false
         chromeVisibility = try container.decodeIfPresent(BrowserChromeVisibility.self, forKey: .chromeVisibility)
         omnibarVisible = try container.decodeIfPresent(Bool.self, forKey: .omnibarVisible)
         backHistoryURLStrings = try container.decodeIfPresent([String].self, forKey: .backHistoryURLStrings)
@@ -111,5 +136,9 @@ struct SessionBrowserPanelSnapshot: Codable, Sendable {
         interactionState = try container.decodeIfPresent(Data.self, forKey: .interactionState)
         keepsPageActive = try container.decodeIfPresent(Bool.self, forKey: .keepsPageActive)
         cloudTeamID = try container.decodeIfPresent(String.self, forKey: .cloudTeamID)
+        figmaPages = try? container.decodeIfPresent(SessionFigmaPagesSnapshot.self, forKey: .figmaPages)
+        ownerTerminalSurfaceId = try? container.decodeIfPresent(UUID.self, forKey: .ownerTerminalSurfaceId)
+        ownedKind = try? container.decodeIfPresent(String.self, forKey: .ownedKind) // cmux-rbf #cm-126.3
+        ownerAgent = try? container.decodeIfPresent(String.self, forKey: .ownerAgent) // cmux-rbf #cm-126.15
     }
 }

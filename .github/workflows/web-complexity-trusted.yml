@@ -1,33 +1,8 @@
 name: Web complexity
 
 on:
-  # This workflow is read from the base branch. It checks the pull-request
-  # source as data and executes only the trusted checker from the base.
-  pull_request_target:
-    branches:
-      - main
-    types: [opened, edited, reopened, synchronize, ready_for_review]
-    # Not a required check on main, so a pull request that touches no web/
-    # source or complexity policy starts no run at all (2026-10-06: 648 jobs
-    # in one day, most for pull requests with no web change). GitHub matches
-    # the pull request's own diff, so main's later web commits do not queue
-    # a stale branch. Keep this list equal to the policy paths below.
-    paths:
-      - web/**
-      - .github/workflows/web-complexity.yml
-      - .github/workflows/web-complexity-trusted.yml
-      - scripts/ci/scope-web-complexity.py
-      - scripts/ci/web_complexity_scope.py
-  # The merge queue's commit is checked the same way, as data, against the
-  # policy on the branch it is about to join.
-  merge_group:
-  push:
-    branches:
-      - main
-    paths:
-      - web/**
-      - .github/workflows/web-complexity.yml
-      - .github/workflows/web-complexity-trusted.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

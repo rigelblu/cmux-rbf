@@ -13,6 +13,7 @@ name: GITHUB_TOKEN budget sampler
 # Matching the series against the Actions run and job timeline attributes
 # the drain to workflows. Manual dispatch only; nothing else starts it.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       minutes:

@@ -1,17 +1,7 @@
 name: Localization catalog structure
 
 on:
-  pull_request:
-    paths:
-      - Resources/Localizable.xcstrings
-      - tests/test_localizable_xcstrings_structure.py
-      - .github/workflows/localization-catalog.yml
-  push:
-    branches: [main]
-    paths:
-      - Resources/Localizable.xcstrings
-      - tests/test_localizable_xcstrings_structure.py
-      - .github/workflows/localization-catalog.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

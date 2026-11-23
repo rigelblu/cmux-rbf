@@ -7,8 +7,7 @@ name: Debug and Labs keys report dispatcher
 # scheduled workflows run only from the default branch, so once a day this
 # file on main starts it there, unless a run is already pending. Report only.
 on:
-  schedule:
-    - cron: "41 13 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

@@ -7,8 +7,7 @@ name: Prune Actions artifacts
 # or the repository variable ACTIONS_ARTIFACT_PRUNE_DELETE is 1. Each run stops
 # well inside the token's hourly API quota, so a backlog drains over several.
 on:
-  schedule:
-    - cron: "37 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       delete:

@@ -15,14 +15,7 @@ name: classic deploy guard
 # request is approved; a push that rewrote history past that baseline is refused. workflow_dispatch judges one
 # commit and never cancels anything (a dry run).
 on:
-  push:
-    branches: [main]
-    paths:
-      - "web/**"
-      - "CHANGELOG.md"
-      - ".vercelignore"
-      - "config/iroh/managed-relay-catalog.json"
-      - "workers/presence/src/generated/managedRelayCatalog.ts"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_call:
     inputs:
       role:

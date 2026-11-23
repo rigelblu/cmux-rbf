@@ -8,6 +8,7 @@ name: Production extension registry crawl
 # A dispatch runs the file at --ref, so feat-cmux-next's job wins. It takes no
 # inputs there either. This copy uses no secret, environment or checkout.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

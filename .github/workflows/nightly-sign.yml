@@ -16,14 +16,7 @@ name: Nightly signing
 # tests/test_nightly_sign_shadow_workflow.py fails when a job here can sign,
 # notarize, publish, hold a secret or run code outside main's admit tool.
 on:
-  workflow_run:
-    workflows:
-      - Nightly macOS build
-    types: [completed]
-    branches:
-      - main
-      - nightly-next
-      - "rc/**"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       source_run_id:

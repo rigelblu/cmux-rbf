@@ -21,6 +21,7 @@ name: cmux NEXT Cua Driver SDK publish
 #          Commit the pin from the run's summary or its cua-driver-sdk-pin
 #          artifact; the run does not push.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       version:

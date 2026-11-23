@@ -20,19 +20,7 @@ name: Required checks drift
 # nothing, and a red scheduled run on main is the signal this repository has.
 
 on:
-  schedule:
-    - cron: "23 */6 * * *"
-  push:
-    branches: [main]
-    paths:
-      - scripts/ci/required_status_checks.py
-      - tests/test_ci_required_checks_drift.py
-      - .github/workflows/required-checks-drift.yml
-  pull_request:
-    paths:
-      - scripts/ci/required_status_checks.py
-      - tests/test_ci_required_checks_drift.py
-      - .github/workflows/required-checks-drift.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 # Read-only. The rules endpoint this reads needs no more than the repository's

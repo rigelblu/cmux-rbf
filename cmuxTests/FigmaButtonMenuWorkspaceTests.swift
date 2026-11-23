@@ -2,6 +2,7 @@ import AppKit
 import CMUXAgentLaunch
 import Bonsplit
 import CmuxBrowser
+import CmuxMobileHost
 import CmuxSettings
 import Foundation
 import Testing

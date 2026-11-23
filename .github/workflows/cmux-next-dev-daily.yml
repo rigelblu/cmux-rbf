@@ -1,6 +1,7 @@
 name: cmux NEXT DEV daily
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   # The source workflow dispatches this publisher after its exact app artifact
   # is complete. The five-minute dispatcher is the retry/backstop and also
   # hands over completed source runs. Keeping this publisher dispatch-only

@@ -7,8 +7,7 @@ name: Cloud VM image weekly full bake
 # Scheduled workflows run only from the default branch, hence this file on main. It starts one run
 # unless a bake is already queued or running; the bake itself, its smoke and cleanup live there.
 on:
-  schedule:
-    - cron: "17 9 * * 1"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

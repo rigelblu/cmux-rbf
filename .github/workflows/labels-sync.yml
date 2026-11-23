@@ -1,17 +1,7 @@
 name: Labels sync
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/labels.json
-      - scripts/ci/sync_labels.py
-      - .github/workflows/labels-sync.yml
-  pull_request:
-    paths:
-      - .github/labels.json
-      - scripts/ci/sync_labels.py
-      - .github/workflows/labels-sync.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

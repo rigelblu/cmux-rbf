@@ -1,6 +1,7 @@
 // cmux-rbf (#cm-73.46, #cm-73.44): Scenarios 258 and 300 on the panel: the kept report, the in-flight mark and its
 // three ends, the line, the answer, and the size watch on an injected clock.
 import AppKit
+import CmuxBrowser
 #if DEBUG
 import CMUXDebugLog
 #endif

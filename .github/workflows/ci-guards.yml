@@ -1,6 +1,7 @@
 name: CI guards
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_call:
     inputs:
       linux_guard_tests:

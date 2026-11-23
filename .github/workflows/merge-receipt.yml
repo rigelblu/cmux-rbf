@@ -7,9 +7,8 @@ name: Merge receipt
 # a write token; the job only reads the GitHub API and runs the script from the
 # commit this workflow was loaded from, never the pull request's code.
 on:
-  pull_request_target:
-    types: [closed]
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

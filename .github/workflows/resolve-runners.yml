@@ -22,6 +22,7 @@ name: Resolve runners
 # fromJSON(vars.X), which fails the whole workflow when the variable is unset.
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_call:
     inputs:
       fleet:

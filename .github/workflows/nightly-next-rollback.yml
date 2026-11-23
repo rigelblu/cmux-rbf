@@ -24,6 +24,7 @@ name: nightly-next rollback
 # here only so main's copy of nightly-next-rollback-drill.yml, which calls it,
 # is a valid workflow; nightly-next's copy has the drill folder's paths.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_call:
     inputs:
       reason:

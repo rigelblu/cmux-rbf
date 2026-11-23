@@ -9,9 +9,8 @@ name: Published in
 # group that the next release tag waits on. The release's own token cannot
 # trigger `release: published`, so this follows the Release run instead.
 on:
-  workflow_run:
-    workflows: ["Release macOS app"]
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 env:
   # Temporary REST budget attribution: one gh-call line per GitHub API call (scripts/ci/api_call_log/env.sh, fetched at a fixed commit when the checkout has no copy).

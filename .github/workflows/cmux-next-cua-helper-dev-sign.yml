@@ -33,6 +33,7 @@ name: cmux NEXT helper (dev) signing
 # later re-sign. The first switch from the Apple Development pin needs one
 # Accessibility and Screen Recording re-grant on every Mac that runs DEV.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       sha:

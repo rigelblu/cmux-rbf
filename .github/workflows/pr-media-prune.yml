@@ -7,8 +7,7 @@ name: Prune PR media
 # scripts/ci/prune_pr_media.py). It is a dry run unless a dispatch asks to
 # apply or the repository variable CI_PR_MEDIA_PRUNE_APPLY is 1.
 on:
-  schedule:
-    - cron: "41 6 * * 1"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       apply:

@@ -10,8 +10,7 @@ name: cmux-next-ios kit tests
 # never this one, so this file holds no test jobs to drift from it. A dispatch
 # on main does nothing.
 on:
-  schedule:
-    - cron: "47 7 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

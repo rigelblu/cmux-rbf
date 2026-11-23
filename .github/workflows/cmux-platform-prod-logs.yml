@@ -9,6 +9,7 @@ name: cmux-platform production logs
 # repeat feat-cmux-next's names so a dispatch's inputs validate. This copy uses
 # no secret, environment or checkout.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       service:

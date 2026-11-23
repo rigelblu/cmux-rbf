@@ -12,6 +12,7 @@ name: command palette search benchmarks
 # names both benchmark classes; the script's own BENCH assertions fail the job
 # if any gated benchmark silently skipped.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   # Temporarily manual-only beginning 2026-07-13 to pause automatic CI.
   # tmux-corpus.yml and perf-activation.yml -- the two closest macOS
   # benchmark nightlies -- both carry this and have their crons removed.

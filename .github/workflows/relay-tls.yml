@@ -1,12 +1,7 @@
 name: Relay TLS system trust
 
 on:
-  pull_request:
-    paths:
-      - tests/relay_tls/**
-      - Packages/Shared/CmuxIrohTransport/**
-      - Packages/Shared/CmuxIrxTransport/**
-      - .github/workflows/relay-tls.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 # A new push cancels the previous run for the same pull request. Other events

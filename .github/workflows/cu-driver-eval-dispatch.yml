@@ -8,8 +8,7 @@ name: cu driver eval dispatcher
 # main starts it on feat-cmux-next, unless a run is already pending. Report only: nothing reads its
 # result but the next run's summary diff.
 on:
-  schedule:
-    - cron: "17 11 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

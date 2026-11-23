@@ -26,9 +26,8 @@ run-name: "PR autofix push for run ${{ github.event.workflow_run.id }} (${{ gith
 # checks start on the repaired head (a GITHUB_TOKEN push starts none). vars.CMUX_PR_AUTOFIX_PUSH=0 turns it off.
 # Revert: git revert the commit that added this file; the repairs go back to being an artifact.
 on:
-  workflow_run:
-    workflows: ["cmux-next PR autofix"]
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

@@ -14,6 +14,7 @@ run-name: >-
 # test-depot.yml for a full build then.
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       ref:

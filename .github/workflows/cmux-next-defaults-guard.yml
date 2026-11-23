@@ -29,9 +29,8 @@ name: cmux-next defaults guard
 # reviews afresh. A fork's review event cannot re-run it (read-only token):
 # a maintainer re-runs the check, or the next push does.
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
-    branches: [feat-cmux-next]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

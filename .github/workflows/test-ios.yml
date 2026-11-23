@@ -5,31 +5,7 @@ run-name: >-
   on ${{ inputs.runner || 'auto' }}
 
 on:
-  # Pull requests that touch the iOS app or its packages run again. A
-  # same-repository pull request takes an idle simulator mini through the
-  # `runner` job like an `auto` dispatch, with Blacksmith as overflow; a fork's
-  # never reaches an owned Mac. Merge-group runs always exercise the iOS
-  # aggregate against the queued commit, so the queue sees the same check name.
-  # detect-ios-changes narrows pull-request work further (and decides the
-  # conventions lint).
-  pull_request:
-    paths:
-      - "ios/**"
-      - "Packages/**"
-      - "Sources/Mobile/**"
-      - "vendor/stack-auth-swift-sdk-prerelease/**"
-      - "scripts/lint-ios-package-conventions*"
-      - "scripts/lint_swift_namespaces.py"
-      - "scripts/lint-namespace-types-baseline.txt"
-      - "scripts/swift_source_mask.py"
-      - "scripts/tests/test_ios_package_conventions.py"
-      - "scripts/lint_ios_theme_tokens.py"
-      - "scripts/lint-ios-theme-tokens-baseline.txt"
-      - "scripts/tests/test_lint_ios_theme_tokens.py"
-      - "scripts/ci/ios_runner_pool.py"
-      - "scripts/ci/select_ios_simulator.py"
-      - ".github/workflows/test-ios.yml"
-  merge_group:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       ref:

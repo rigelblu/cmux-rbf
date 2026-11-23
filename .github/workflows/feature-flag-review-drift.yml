@@ -1,8 +1,7 @@
 name: Feature flag review drift
 
 on:
-  schedule:
-    - cron: "17 9 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

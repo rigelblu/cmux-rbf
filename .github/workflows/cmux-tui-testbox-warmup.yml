@@ -10,6 +10,7 @@ run-name: cmux-tui Rust Testbox setup ${{ inputs.testbox_id }}
 # Testbox later, through `blacksmith testbox run`, which synchronizes a
 # maintainer's local worktree onto the already-warm VM.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       testbox_id:

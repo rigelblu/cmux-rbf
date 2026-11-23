@@ -24,9 +24,8 @@ name: CI failure attribution
 # annotations as data. Everything is event driven: nothing polls.
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 env:
   # Temporary REST budget attribution until 2026-11-22 00:00 UTC: one gh-call line per GitHub API call

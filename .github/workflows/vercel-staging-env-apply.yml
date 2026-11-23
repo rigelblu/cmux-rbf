@@ -12,6 +12,7 @@ name: Vercel env apply
 #     -f name1=NAME -f value1=VALUE [-f name2=NAME -f value2=VALUE]
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       project:

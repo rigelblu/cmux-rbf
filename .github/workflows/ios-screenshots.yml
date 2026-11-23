@@ -12,6 +12,7 @@ run-name: iOS App Store screenshots (${{ inputs.request_id || github.run_id }})
 # raw and composed screenshot artifacts without uploading to ASC.
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_call:
     inputs:
       ref:

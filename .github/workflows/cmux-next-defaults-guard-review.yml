@@ -11,10 +11,8 @@ name: cmux-next defaults guard review
 # so trusted receipt comments wake the same guard. The guard still validates
 # the reviewer, receipt and head before it can pass.
 on:
-  pull_request_review:
-    types: [submitted, dismissed, edited]
-  issue_comment:
-    types: [created, edited]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

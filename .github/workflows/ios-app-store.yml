@@ -7,6 +7,7 @@ name: iOS App Store (production)
 # refuse-classic job below stops every dispatch before anything is archived,
 # uploaded or submitted; the steps after it are kept only for reference.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       build_number:

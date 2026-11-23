@@ -5,6 +5,7 @@ name: Testbox broker guard
 # Keep this workflow for an explicit diagnostic run without spending a
 # Blacksmith job on every pull request and main push.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch: {}
 
 permissions: {}

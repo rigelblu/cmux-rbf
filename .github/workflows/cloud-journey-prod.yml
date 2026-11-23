@@ -29,15 +29,7 @@ name: Cloud journey (production, hourly)
 # the job holds the production account and a Claude login, so no unreviewed code runs with them. Try a change with
 # `bun scripts/cmux-next/cloud-journey.ts --backend prod --model stub --credentials FILE` before it lands.
 on:
-  schedule:
-    - cron: "17 * * * *"
-    - cron: "47 */6 * * *"
-    # The real model on the other hours, only while its login has quota: the gate step runs it when the newest real
-    # run before it read a reply, and skips it otherwise (one API read, no build). With the shared login's ~37 h of
-    # quota a week, six-hourly runs give ~6 samples and the probe's newest-20 window never turns over; hourly gives
-    # ~37 (goals/cloud-first-reply-p95-journey.md in cmuxterm-hq). The six-hourly tick above stays the canary that
-    # finds the quota again after a reset.
-    - cron: "47 1-5,7-11,13-17,19-23 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       model:

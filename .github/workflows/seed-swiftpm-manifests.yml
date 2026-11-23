@@ -14,8 +14,7 @@ name: Seed SwiftPM manifests
 # back to it by prefix. An exact hit ends the job after the restore.
 
 on:
-  schedule:
-    - cron: "41 */6 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

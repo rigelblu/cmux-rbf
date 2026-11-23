@@ -1,15 +1,8 @@
 name: coderouter CLI
 
 on:
-  pull_request:
-    paths:
-      - "coderouter/**"
-      - ".github/workflows/coderouter-*.yml"
-  push:
-    branches: [main]
-    paths:
-      - "coderouter/**"
-      - ".github/workflows/coderouter-*.yml"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

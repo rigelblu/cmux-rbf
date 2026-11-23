@@ -8,8 +8,7 @@ name: screen stream eval dispatcher
 # against the previous daily run); nothing reads its result and it never fails a check. GitHub only
 # dispatches a workflow name the default branch registers: screen-stream-eval.yml here is that (inert).
 on:
-  schedule:
-    - cron: "41 10 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

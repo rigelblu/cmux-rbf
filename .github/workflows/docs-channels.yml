@@ -1,16 +1,8 @@
 name: Deploy docs channels
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "web/**"
-      - "CHANGELOG.md"
-      # Standalone lint policy is not an input to the docs build.
-      - "!web/scripts/check-complexity.mjs"
-      - "!web/oxlint-complexity-baseline.txt"
-      - "!web/.oxlintrc.json"
-    tags: ["v*"]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

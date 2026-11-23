@@ -34,8 +34,7 @@ name: cmux NEXT Stable
 # A schedule and a dispatch register only from the default branch. This is main's copy: the tick,
 # and the dispatch inputs. The publish run itself runs feat-cmux-next's copy on nightly-next.
 on:
-  schedule:
-    - cron: "5 4-14 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       mode:

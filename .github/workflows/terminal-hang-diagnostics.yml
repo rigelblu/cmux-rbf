@@ -1,28 +1,7 @@
 name: Terminal hang diagnostics
 
 on:
-  pull_request:
-    # Exactly what the jobs below compile, test or read. Hang-prone app sources
-    # (Ghostty views, window portals, Workspace) are not built here; the
-    # app-host macOS suite in ci.yml covers them.
-    paths:
-      # phase-attribution and portal-reconciliation (local dependency)
-      - Packages/Shared/CMUXMobileCore/**
-      # phase-attribution
-      - Packages/Shared/CmuxSentryTelemetry/**
-      - cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
-      # portal-reconciliation
-      - Sources/TerminalPortalReconciliation*.swift
-      - cmuxTests/TerminalPortalReconciliationReentrancyTests.swift
-      - tests/run_terminal_portal_reconciliation_tests.sh
-      # both macOS jobs
-      - scripts/select-ci-xcode.sh
-      - scripts/ci/xcode-pins.txt
-      - .xcode-version
-      # release-gate
-      - scripts/terminal-hang-release-gate.py
-      - tests/test_terminal_hang_release_gate.py
-      - .github/workflows/terminal-hang-diagnostics.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

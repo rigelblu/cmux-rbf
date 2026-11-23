@@ -9,6 +9,7 @@ name: PR status line
 # GitHub dispatches only a workflow on the default branch, so callers run it on main; the
 # same file and script are on feat-cmux-next.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       pr:

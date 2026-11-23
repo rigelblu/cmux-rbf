@@ -8,8 +8,7 @@ name: cmux NEXT post-merge batch tick
 # one batch run there; if not it exits. Nothing waits, and no runner is held between ticks. The logic
 # is feat-cmux-next's scripts/ci/post_merge_batch.py (tick).
 on:
-  schedule:
-    - cron: "11,41 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

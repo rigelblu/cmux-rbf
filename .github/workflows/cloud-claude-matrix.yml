@@ -12,8 +12,7 @@ name: Cloud chat matrix (Claude, production, nightly)
 # feat-cmux-next, never a pull request's head. Secrets: the production agent test account (cmux-next-cloud-journey
 # environment), the repository's CLAUDE_CODE_OAUTH_TOKEN for the subscription row, and ANTHROPIC_API_KEY when set.
 on:
-  schedule:
-    - cron: "23 9 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       auth:

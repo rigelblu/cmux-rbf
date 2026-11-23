@@ -1,24 +1,6 @@
 name: Cloud command deadlines
 on:
-  pull_request:
-    paths:
-      - Packages/macOS/CmuxCloud/Sources/CmuxCloud/Link/CloudTuiPersistent*.swift
-      - Packages/macOS/CmuxCloudTui/Sources/CmuxCloudTui/CloudTuiManualIO*.swift
-      - Packages/macOS/CmuxCloudTui/Sources/CmuxCloudTui/CloudTuiPersistentRequestBuilder.swift
-      - Packages/macOS/CmuxSurfaceCatalogModel/Sources/CmuxSurfaceCatalogModel/CloudTuiTerminalProjectionTarget.swift
-      - Packages/macOS/CmuxCloudTui/Sources/CmuxCloudTui/CloudTuiRemoteColors.swift
-      - cmuxTests/CloudCommand*.swift
-      - cmuxTests/CloudTuiManualIOConnectionTests.swift
-      - tests/fixtures/cloud-command-deadlines/**
-      - tests/run_cloud_command_deadline_tests.sh
-      - Packages/macOS/CmuxCloud/Sources/CmuxCloud/Environment/MobileHostIdentity.swift
-      - Packages/Shared/CMUXMobileCore/Sources/CMUXMobileCore/CmxDeviceIDCanonicalization.swift
-      - Packages/macOS/CmuxFoundation/Sources/CmuxFoundation/Concurrency/AtomicBooleanGate.swift
-      - Packages/macOS/CmuxFoundation/Sources/CmuxFoundationAtomicsC/**
-      - tests/fixtures/mobile-host-identity-cold-start/**
-      - tests/run_mobile_host_identity_cold_start_tests.sh
-      - tests/test_mobile_host_identity_cold_start.py
-      - .github/workflows/cloud-command-deadlines.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       source_ref:

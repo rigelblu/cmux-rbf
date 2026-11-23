@@ -1,12 +1,7 @@
 name: Auth and session lifecycle
 
 on:
-  pull_request:
-    paths:
-      - Packages/Shared/CmuxAuthRuntime/**
-      - Packages/Shared/CmuxIrxTransport/**
-      - vendor/stack-auth-swift-sdk-prerelease/**
-      - .github/workflows/auth-refresh-tests.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

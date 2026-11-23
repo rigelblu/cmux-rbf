@@ -31,9 +31,7 @@ name: nightly-next rollback drill
 # start, which dispatches the step here on nightly-next, where release-next
 # releases the feed's R2 token. Every other job runs only on nightly-next.
 on:
-  schedule:
-    - cron: "15 9 * * 1"
-    - cron: "15 10 * * 1"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       step:

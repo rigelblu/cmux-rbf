@@ -7,7 +7,8 @@ name: Merge-group policy checks
 # reports the same check names for the queue's merge commit without running
 # candidate code.
 on:
-  merge_group:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

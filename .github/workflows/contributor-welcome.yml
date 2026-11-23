@@ -4,9 +4,8 @@ name: Contributor welcome
 # human-written note (.github/contributor/welcome.md) when their first pull
 # request opens. It never checks out or runs PR code.
 on:
-  pull_request_target:
-    types: [opened]
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

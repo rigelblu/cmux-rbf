@@ -6,13 +6,7 @@ name: CI
 run-name: ${{ format('v1;sha={0};ref={1};cache={2};release={3};coverage={4}', github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha, github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name, inputs.cache_backend != 'default' && inputs.cache_backend || vars.CI_CACHE_BACKEND || 'r2', inputs.release_archs != 'default' && inputs.release_archs || vars.CI_RELEASE_BUILD_ARCHS || 'universal', github.event_name != 'pull_request' && 'full' || ((vars.CI_PULL_REQUEST_SUITE || 'compile-only') != 'compile-only' || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'full' || 'compile-only') }}
 
 on:
-  # Run the router for every pull request. The Linux layer is cheap and the
-  # change classifier below keeps unrelated macOS jobs skipped. A workflow-level
-  # path filter would let ordinary Swift changes merge with only ci-status from
-  # the fallback workflow without validating the app.
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-  merge_group:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       cache_backend:

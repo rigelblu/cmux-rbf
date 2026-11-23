@@ -84,11 +84,7 @@ name: CI queue janitor
 # macOS (`macos` needs `Fast static checks`, which it skips for them), and the cron still
 # sweeps their stale runs.
 on:
-  schedule:
-    - cron: "*/10 * * * *"
-  workflow_run:
-    workflows: [CI]
-    types: [requested]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       dry_run:

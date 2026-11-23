@@ -18,6 +18,7 @@ name: Cloud capture account provision
 # can be accepted): no password change, nothing sealed or uploaded.
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       grant_email:

@@ -15,8 +15,7 @@ name: Cloud composer journey (nightly's source, tagged DEV app)
 #
 # It reads no secret: the dispatched run holds the agent test account in its own environment.
 on:
-  schedule:
-    - cron: "37 */6 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       nightly_build:

@@ -13,8 +13,7 @@ name: CI shed superseded runs
 # file must be on main for the sweep to run every 10 minutes.
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       dry_run:

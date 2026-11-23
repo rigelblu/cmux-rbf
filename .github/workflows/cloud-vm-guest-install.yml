@@ -1,22 +1,7 @@
 name: Cloud VM guest installation
 
 on:
-  pull_request:
-    paths:
-      - web/services/vms/drivers/**
-      - web/services/vms/guestCli*.ts
-      - web/services/vms/guestPrompt.ts
-      - web/services/vms/workflows.ts
-      - web/services/vms/repository.ts
-      - web/services/vms/routeHelpers.ts
-      - web/services/vms/vmErrorMessages.ts
-      - web/messages/**
-      - web/tests/vm-guest-*.test.ts
-      - web/tests/fixtures/freestyleGuest.ts
-      - web/tests/vm-workflows.test.ts
-      - web/package.json
-      - web/bun.lock
-      - .github/workflows/cloud-vm-guest-install.yml
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch: {}
 
 permissions:

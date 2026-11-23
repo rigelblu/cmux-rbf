@@ -11,6 +11,7 @@ name: iOS streamed-screenshot CI validation
 # The dev secret bundle (Stack keys etc., dogfood creds swapped to a DEDICATED CI
 # test account) is provided as CMUXTERM_DEV_ENV_B64.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

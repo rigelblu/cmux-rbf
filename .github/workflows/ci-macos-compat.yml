@@ -1,6 +1,7 @@
 name: macOS Compatibility
 
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 # No real-Intel leg: GitHub-hosted macos-15-intel is the only Intel image and no

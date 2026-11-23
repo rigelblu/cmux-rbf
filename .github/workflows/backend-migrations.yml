@@ -19,14 +19,8 @@
 name: backend-migrations
 
 on:
-  # Only PRs into main and feat-cmux-next: the tooling comes from the PR base branch, so a PR
-  # into any other branch (whose tooling its author controls) must never run here.
-  pull_request_target:
-    # edited: a base-branch change (for example main -> feat-cmux-next) re-runs the gate.
-    types: [opened, synchronize, reopened, labeled, edited]
-    branches: [main, feat-cmux-next]
-  merge_group:
-    branches: [main, feat-cmux-next]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions:
   contents: read

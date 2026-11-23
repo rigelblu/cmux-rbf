@@ -17,8 +17,7 @@ name: CI fast guards
 # local pass stamps the head for the agent merge guard in cmuxterm-hq.
 
 on:
-  push:
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

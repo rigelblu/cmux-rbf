@@ -20,6 +20,7 @@ run-name: ${{ format('UI tests for CI run {0} attempt {1}', inputs.run_id, input
 # rules. The run-name is how `ui-tests` finds its run; keep it in step with
 # dispatch_title() there.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       run_id:

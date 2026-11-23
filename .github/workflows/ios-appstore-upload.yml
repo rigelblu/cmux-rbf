@@ -1,17 +1,7 @@
 name: iOS TestFlight (cmux CLASSIC)
 
 on:
-  # Upload the classic app (ios/) to its internal TestFlight-only App Store
-  # Connect record, cmux CLASSIC (dev.cmux.app.classic). The App Store record
-  # com.cmux.app (6783338052) ships cmux-next from feat-cmux-next; this
-  # workflow must never upload there again (the configuration check refuses
-  # it). Hourly polls batch main: they upload once IOS_APPSTORE_MIN_COMMITS
-  # (default 10) commits are pending or the oldest is
-  # IOS_APPSTORE_MAX_AGE_MINUTES (default 360) old. Until the repository
-  # variables IOS_CLASSIC_ASC_APP_ID and IOS_CLASSIC_INTERNAL_GROUP_ID are set,
-  # a scheduled poll skips with a summary line naming them.
-  schedule:
-    - cron: "17 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       build_number:

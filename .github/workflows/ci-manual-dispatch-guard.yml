@@ -4,10 +4,8 @@ name: CI manual dispatch guard
 # keeps its cancellation token and code outside the workflow_dispatch branch.
 # CI's read-only changes guard blocks fanout while this watcher cancels the run.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [requested]
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

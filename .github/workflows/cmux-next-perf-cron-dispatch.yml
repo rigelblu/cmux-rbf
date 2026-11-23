@@ -9,8 +9,7 @@ name: cmux NEXT perf cron dispatcher
 # bench-host time and yields to nightly and dev builds (scripts/cmux-next/perf-cron.py on
 # feat-cmux-next). Nothing reads its result and it never fails a check.
 on:
-  schedule:
-    - cron: "4,24,44 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

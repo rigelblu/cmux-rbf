@@ -4,8 +4,7 @@ name: CI hosted light rescue
 # The existing owned-pool sweeper provides the minute cadence. This schedule
 # wakes that single concurrency owner instead of racing its cancel/rerun pass.
 on:
-  schedule:
-    - cron: "*/5 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       dry_run:

@@ -36,8 +36,7 @@ name: nightly-next launch smoke
 # head). A pull request's run smokes the newest Nightly feed build and never rolls back
 # or files.
 on:
-  schedule:
-    - cron: "1,11,21,31,41,51 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       build:
@@ -45,11 +44,6 @@ on:
         required: false
         default: ''
         type: string
-  pull_request:
-    paths:
-      - .github/workflows/nightly-next-launch-smoke.yml
-      - scripts/ci/fresh_home_launch_smoke.py
-      - scripts/ci/nightly_next_launch_smoke.py
 
 permissions: {}
 

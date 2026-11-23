@@ -34,12 +34,7 @@ name: nightly-next tick
 # report. A schedule and workflow_run run only from the default branch: this
 # file must exist on main.
 on:
-  workflow_run:
-    workflows: ["cmux-next", "cmux-tui artifacts", "Nightly macOS build"]
-    branches: [feat-cmux-next, nightly-next]
-    types: [completed]
-  schedule:
-    - cron: "4-59/5 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       sha:

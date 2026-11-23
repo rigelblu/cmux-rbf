@@ -27,8 +27,7 @@ name: cmux NEXT tip suite dispatcher (Swift, daemon)
 # Each tick is one short job per suite; nothing waits or loops. Scheduled workflows run
 # only from the default branch, hence this file on main.
 on:
-  schedule:
-    - cron: "11,41 * * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions: {}

@@ -7,6 +7,7 @@ name: first-user journey (web)
 # pull_request or push trigger, so it never runs on main by itself, and a dispatch on main does nothing.
 # The inputs mirror feat-cmux-next's so a dispatch's inputs validate wherever GitHub checks them.
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       only:

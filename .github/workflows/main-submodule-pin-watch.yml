@@ -7,8 +7,8 @@ name: Main submodule pin watch
 # gates anything: on a backward or diverged pin it comments on the merged pull
 # request with the pin to restore, and fails so the run shows red on main.
 on:
-  push:
-    branches: [main]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

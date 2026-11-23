@@ -16,22 +16,7 @@ name: CI repository variables
 # tests/test_ci_check_repo_variables.py keeps this list equal to that one.
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/ci-repo-variables.yml
-      - scripts/ci/check_runner_pool_declaration.sh
-      - scripts/ci/check_repo_variables.py
-      - scripts/ci/cloud_overflow_switch.py
-      - scripts/ci/pr_runner_pool.py
-      - scripts/ci/runner_label_policy.py
-      - scripts/ci/runs_on_values.py
-      - scripts/ci/signing_runner_variables.py
-      - scripts/ci/python-with-yaml.sh
-      - scripts/ci/runner_pools.py
-      - .github/runners.json
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 permissions:

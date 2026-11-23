@@ -8,8 +8,7 @@ name: Prune R2 binaries
 # a dispatch asks to delete or the repository variable R2_BINARIES_PRUNE_DELETE
 # is 1.
 on:
-  schedule:
-    - cron: "53 7 * * *"
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       delete:

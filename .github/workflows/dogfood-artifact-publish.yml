@@ -1,9 +1,8 @@
 name: Dogfood artifact publish
 
 on:
-  workflow_run:
-    workflows: [CI, cmux-next]
-    types: [completed]
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
+  workflow_dispatch:
 
 permissions: {}
 

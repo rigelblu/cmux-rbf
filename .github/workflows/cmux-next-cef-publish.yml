@@ -23,6 +23,7 @@ name: cmux NEXT CEF publish
 #          lists each key for the pin PR's cef-manifest.json (run
 #          `publish-cef-r2.sh --dir ... --manifest` there, or copy the keys).
 on:
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
     inputs:
       tag:
