@@ -122,7 +122,12 @@ struct CachedAgentProcessIdentityValidator: Sendable {
             let observedSessionID: String?
             switch registration.sessionIdSource {
             case .argvOption(let option):
-                guard let observedSessionID = nonOptionValue(after: option, in: arguments)
+                // `muse resume` also accepts a session name; only a UUID there
+                // names the session, so a name defers to the hook record.
+                let argvSessionID = nonOptionValue(after: option, in: arguments).flatMap { value in
+                    registration.isBuiltInMuse && UUID(uuidString: value) == nil ? nil : value
+                }
+                guard let observedSessionID = argvSessionID
                     ?? authoritativeEnvironmentSessionID else {
                     // The identity option only appears on explicit resumes. A
                     // fresh launch has none: Antigravity mints its conversation
@@ -180,8 +185,13 @@ struct CachedAgentProcessIdentityValidator: Sendable {
         let observedSessionID: String?
         switch snapshot.kind {
         case .claude:
+            // In a fork, --resume names the parent. Only an explicit child
+            // identity can contradict the current hook record; a cached
+            // snapshot still cannot vouch for a missing child identity.
+            let identityOptions = Self.hasEnabledForkSessionFlag(in: arguments)
+                ? ["--session-id"] : ["--session-id", "--resume", "-r"]
             observedSessionID = firstValue(
-                after: ["--session-id", "--resume", "-r"],
+                after: identityOptions,
                 in: arguments
             ) ?? authoritativeEnvironmentSessionID
         case .codex:
@@ -208,6 +218,15 @@ struct CachedAgentProcessIdentityValidator: Sendable {
             lhs: observedSessionID,
             rhs: snapshot.sessionId
         )
+    }
+
+    private static func hasEnabledForkSessionFlag(in arguments: [String]) -> Bool {
+        arguments.contains { value in
+            if value == "--fork-session" { return true }
+            guard let suffix = value.split(separator: "=", maxSplits: 1).dropFirst().first,
+                  value.hasPrefix("--fork-session=") else { return false }
+            return !["0", "false", "no", "off"].contains(suffix.lowercased())
+        }
     }
 
     /// Built-in kinds carry no registration on hook-store snapshots, but Amp's

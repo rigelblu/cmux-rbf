@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
-import { GUEST_CMUX_SHIM, GUEST_CMUX_SHIM_PATH } from "../services/vms/guestCli";
+import { spawn } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, setSystemTime, test } from "bun:test";
-import { FreestyleApiError, type Freestyle } from "freestyle";
+import { Freestyle, FreestyleApiError } from "freestyle";
 import {
+  FREESTYLE_CREATE_ATTEMPT_METADATA_KEY,
   FREESTYLE_NETWORK_FIREWALL_RULES,
   FREESTYLE_PERSISTENT_IDLE_TIMEOUT_SECONDS,
   FreestyleProvider,
@@ -11,22 +14,18 @@ import {
   freestyleCmuxRemoteRoute,
   freestyleNetworkAddressMetadata,
   freestyleRouteAddressesFromMetadata,
-  freestyleDaemonHealthyCommand,
   freestyleDesktopHealCommand,
   freestyleEdgeRules,
   freestyleFirewallRules,
   freestylePortAddress,
   freestylePortUrls,
-  freestyleResizeRequest,
-  freestyleStartDaemonCommand,
-  freestyleTargetResources,
   mapFreestyleState,
   normalizeFreestyleExecTimeout,
-  freestylePinCheckCommand,
 } from "../services/vms/drivers/freestyle";
 import type { VMProvider } from "../services/vms/drivers/types";
-import { cmuxTuiPinCheckCommand } from "../services/vms/drivers/cmuxTuiDaemon";
-import { ProviderError, type VmEdgeRule } from "../services/vms/drivers/types";
+import { ProviderError, ProviderTunnelNetworkOverlapError, type VmEdgeRule } from "../services/vms/drivers/types";
+import { isProviderTunnelNetworkOverlap } from "../services/vms/providerErrors";
+import { isProviderCreateCleanupError, type ProviderCreateCleanupError } from "../services/vms/drivers/providerCreateCleanup";
 import { DEVBOX_DESKTOP_NOVNC_PORT } from "../services/vms/images/desktop";
 
 const VM_ID = "vm-d05087e5773e4a978036fc806b0cd759";
@@ -34,7 +33,7 @@ const CLOUD_VM_ID = "11111111-2222-4333-8444-555555555555";
 const TUNNEL_CLIENT_KEY = Buffer.alloc(32, 1).toString("base64");
 const EDGE_RULE: VmEdgeRule = {
   domain: "coderouter.dev",
-  headers: { "x-coderouter-route-token": "crt_secret-token", "x-cmux-vm-id": CLOUD_VM_ID },
+  headers: { "x-cmux-authorization": "Bearer eyJ.signed.token" },
 };
 
 // A fake Freestyle SDK client: records every create, exec, file write, and
@@ -44,12 +43,16 @@ function fakeFreestyle(input: { readonly probeExit: number; readonly guestCliExi
   const networkData = { publicIpv6: "2602:f75c:0:1::2a", vpcs: [{ ipv4: "10.4.0.7", ipv6: "fd00:4::7" }] };
   const creates: unknown[] = [];
   const execs: string[] = [];
+  const execUsers: Array<string | undefined> = [];
   const writes: Array<{ path: string; content: string }> = [];
   const deletes: string[] = [];
+  let guestCliProbeSeen = false;
   const vm = {
-    exec: async ({ command }: { command: string }) => {
+    exec: async ({ command, linuxUser }: { command: string; linuxUser?: string }) => {
       execs.push(command);
-      const statusCode = command.includes("sha256sum") ? (input.guestCliExit ?? 0)
+      execUsers.push(linuxUser);
+      const statusCode = command.includes("sha256sum") && !guestCliProbeSeen
+        ? (guestCliProbeSeen = true, input.guestCliExit ?? 0)
         : command.includes("/api/coderouter/vm-usage/self") ? input.probeExit : 0;
       return { statusCode, stdout: "", stderr: statusCode === 0 ? "" : "probe failed" };
     },
@@ -77,20 +80,37 @@ function fakeFreestyle(input: { readonly probeExit: number; readonly guestCliExi
       ref: () => vm,
     },
   } as unknown as Freestyle;
-  return { client, creates, execs, writes, deletes };
+  return { client, creates, execs, execUsers, writes, deletes };
 }
 
 function providerWith(fake: { readonly client: Freestyle }): FreestyleProvider {
   return new FreestyleProvider({
     client: () => fake.client,
-    resolveDaemonSource: async () => ({
-      url: "https://files.cmux.com/cmux-tui/abc/cmux-tui-linux-x64",
-      sha256: "0".repeat(64),
-      commit: "abc",
-      builtAt: null, hookUrl: "https://files.cmux.com/cmux-tui/test/cmux-tui-hook-x86_64-unknown-linux-musl", hookSha256: "1".repeat(64),
-    }),
   });
 }
+
+// https://github.com/manaflow-ai/cmux/issues/21820: a "destroyed" answer
+// retires the machine's row, so only Freestyle's explicit not-found contract
+// may produce it. A bare 404 from a gateway or a moved endpoint is an outage.
+describe("FreestyleProvider status of a missing machine", () => {
+  function statusProvider(response: () => Response): FreestyleProvider {
+    const client = new Freestyle({ apiKey: "test-only", fetch: (async () => response()) as typeof fetch });
+    return new FreestyleProvider({ client: () => client });
+  }
+
+  test("an explicit NOT_FOUND answer reports the machine destroyed", async () => {
+    const provider = statusProvider(() => Response.json({ code: "NOT_FOUND", message: "VM not found" }, { status: 404 }));
+    await expect(provider.getStatus(VM_ID)).resolves.toBe("destroyed");
+  });
+
+  test.each([
+    { name: "an HTML gateway page", response: () => new Response("<html>404 Not Found</html>", { status: 404 }) },
+    { name: "an unrecognized code", response: () => Response.json({ code: "ROUTE_NOT_FOUND", message: "no route" }, { status: 404 }) },
+  ])("a bare 404 with $name is a provider error, not a destroyed machine", async ({ response }) => {
+    const provider = statusProvider(response);
+    await expect(provider.getStatus(VM_ID)).rejects.toBeInstanceOf(ProviderError);
+  });
+});
 
 describe("FreestyleProvider transport contract", () => {
   test("cmux-remote is the only session transport", () => {
@@ -117,12 +137,197 @@ describe("FreestyleProvider transport contract", () => {
   });
 });
 
+describe("Freestyle fork readiness", () => {
+  // The fork readiness error is stored on the row and alerted on, so it names
+  // the stalled stage from the guest's fixed vocabulary and nothing else; the
+  // guest's log lines go only to the server log.
+  const forkClient = (stderr: string | Error) => {
+    const deletes: string[] = [];
+    const exec = async () => {
+      if (stderr instanceof Error) throw stderr;
+      return { statusCode: 1, stdout: "", stderr };
+    };
+    return {
+      deletes,
+      client: {
+        vms: {
+          create: async () => ({
+            vmId: VM_ID,
+            data: {},
+            vm: { exec, delete: async () => { deletes.push(VM_ID); } },
+          }),
+        },
+      } as unknown as Freestyle,
+    };
+  };
+
+  test("names the stalled stage without guest log text", async () => {
+    const fake = forkClient("cmux fork daemon did not become ready: stage=unbound supervisor=active\ncmux-tui: /home/cmux/private-path refused\n");
+    const error = await providerWith(fake).create({ image: "sh-fork", forked: true }).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect((error as Error).message).toContain("forked machine daemon did not become ready (stage=unbound supervisor=active)");
+    expect((error as Error).message).not.toContain("private-path");
+    expect(fake.deletes).toEqual([VM_ID]);
+  });
+
+  test("a stage outside the fixed set reads as unknown", async () => {
+    const fake = forkClient("cmux fork daemon did not become ready: stage=leaked-token supervisor=active\n");
+    const error = await providerWith(fake).create({ image: "sh-fork", forked: true }).catch((err: unknown) => err);
+    expect((error as Error).message).toContain("forked machine daemon did not become ready (stage=unknown)");
+    expect((error as Error).message).not.toContain("leaked-token");
+  });
+
+  test("a readiness exec that never answered reads as exec-unavailable and the clone is deleted", async () => {
+    const fake = forkClient(new Error("exec transport failed"));
+    const error = await providerWith(fake).create({ image: "sh-fork", forked: true }).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect((error as Error).message).toContain("forked machine daemon did not become ready (stage=exec-unavailable)");
+    expect(fake.deletes).toEqual([VM_ID]);
+  });
+
+  test("does not echo an unrecognized guest answer into the error", async () => {
+    const fake = forkClient("something else entirely: stage=$(rm -rf /)\n");
+    const error = await providerWith(fake).create({ image: "sh-fork", forked: true }).catch((err: unknown) => err);
+    expect((error as Error).message).toContain("forked machine daemon did not become ready (stage=unknown)");
+    expect((error as Error).message).not.toContain("rm -rf");
+  });
+
+  test("a clone whose rollback delete fails is reported as unconfirmed cleanup, not dropped", async () => {
+    const client = {
+      vms: {
+        create: async () => ({
+          vmId: VM_ID,
+          data: {},
+          vm: {
+            exec: async () => ({ statusCode: 1, stdout: "", stderr: "" }),
+            delete: async () => { throw new FreestyleApiError(502, { code: "BAD_GATEWAY", message: "upstream" }); },
+          },
+        }),
+      },
+    } as unknown as Freestyle;
+    const error = await providerWith({ client }).create({ image: "sh-fork", forked: true }).catch((err: unknown) => err);
+    expect(isProviderCreateCleanupError(error)).toBe(true);
+    expect((error as ProviderCreateCleanupError).providerVmId).toBe(VM_ID);
+  });
+});
+
+// A create can fail after Freestyle already allocated the VM: the error carries
+// no VM id, so the machine used to survive with no row pointing at it (stopped
+// "cmux Cloud VM" ghosts on the account). Every create is tagged with a one-off
+// attempt id, and a failed create deletes whatever Freestyle made under it.
+describe("Freestyle failed create leaves no VM behind", () => {
+  const LEAKED_VM_ID = "vm-0f725dd3d5664d1d8c5e0a6f0b7c1e22";
+  function leakingClient(options: {
+    readonly failLeakedDelete?: boolean;
+    readonly leakedDeleteNotFound?: boolean;
+    readonly ignoreListFilter?: boolean;
+    readonly failList?: boolean;
+  } = {}) {
+    const store: Array<{ id: string; metadata: Record<string, string> }> = [];
+    const creates: Array<{ metadata?: Record<string, string> }> = [];
+    const lists: string[] = [];
+    const deletes: string[] = [];
+    const client = {
+      vms: {
+        create: async (request: { metadata?: Record<string, string> }) => {
+          creates.push(request);
+          store.push({ id: LEAKED_VM_ID, metadata: request.metadata ?? {} });
+          store.push({ id: "vm-unrelated", metadata: { cmux: "cloud", [FREESTYLE_CREATE_ATTEMPT_METADATA_KEY]: "other-attempt" } });
+          throw new FreestyleApiError(502, { code: "VM_START_FAILED", message: "guest did not start" }, "/v5/vms");
+        },
+        list: async ({ metadata }: { metadata?: string }) => {
+          lists.push(metadata ?? "");
+          if (options.failList) throw new FreestyleApiError(503, { code: "UNAVAILABLE", message: "busy" });
+          const [key, value] = (metadata ?? "").split(":");
+          return { vms: options.ignoreListFilter ? store : store.filter((vm) => vm.metadata[key!] === value) };
+        },
+        ref: (id: string) => ({
+          delete: async () => {
+            if (options.failLeakedDelete) throw new FreestyleApiError(503, { code: "UNAVAILABLE", message: "busy" });
+            if (options.leakedDeleteNotFound) throw new FreestyleApiError(404, { code: "NOT_FOUND", message: "gone" });
+            deletes.push(id);
+          },
+        }),
+      },
+    } as unknown as Freestyle;
+    return { client, creates, lists, deletes };
+  }
+
+  test.each([
+    { name: "create", run: (provider: FreestyleProvider) => provider.create({ image: "sh-image" }) },
+    { name: "restore", run: (provider: FreestyleProvider) => provider.restore("sh-snapshot") },
+  ])("a failed $name deletes the VM Freestyle allocated for it, and only that VM", async ({ run }) => {
+    const fake = leakingClient();
+    const error = await run(providerWith(fake)).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(isProviderCreateCleanupError(error)).toBe(false);
+    const attempt = fake.creates[0]?.metadata?.[FREESTYLE_CREATE_ATTEMPT_METADATA_KEY];
+    expect(attempt).toMatch(/^[0-9a-f-]{36}$/);
+    expect(fake.creates[0]?.metadata?.cmux).toBe("cloud");
+    expect(fake.lists).toEqual([`${FREESTYLE_CREATE_ATTEMPT_METADATA_KEY}:${attempt}`]);
+    expect(fake.deletes).toEqual([LEAKED_VM_ID]);
+  });
+
+  test("a leaked VM that cannot be deleted keeps the create's cleanup pending with its id", async () => {
+    const fake = leakingClient({ failLeakedDelete: true });
+    const error = await providerWith(fake).create({ image: "sh-image" }).catch((err: unknown) => err);
+    expect(isProviderCreateCleanupError(error)).toBe(true);
+    expect((error as ProviderCreateCleanupError).providerVmId).toBe(LEAKED_VM_ID);
+  });
+
+  test("a list answer that ignored the filter deletes only the VM carrying this attempt's tag", async () => {
+    const fake = leakingClient({ ignoreListFilter: true });
+    await providerWith(fake).create({ image: "sh-image" }).catch(() => {});
+    expect(fake.deletes).toEqual([LEAKED_VM_ID]);
+  });
+
+  test("a leaked VM already gone counts as cleaned up", async () => {
+    const fake = leakingClient({ leakedDeleteNotFound: true });
+    const error = await providerWith(fake).create({ image: "sh-image" }).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(isProviderCreateCleanupError(error)).toBe(false);
+  });
+
+  test("a lookup that fails reports the create's own failure, not unconfirmed cleanup", async () => {
+    const fake = leakingClient({ failList: true });
+    const logged: unknown[][] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => { logged.push(args); };
+    const error = await providerWith(fake).create({ image: "sh-image" }).catch((err: unknown) => err).finally(() => {
+      console.error = original;
+    });
+    // Reported as an operator fault so the attempt can be found by its tag.
+    expect(logged.some(([event, context]) => event === "cmux.observability.error"
+      && (context as { code?: string }).code === "provider_create_cleanup_lookup_failed")).toBe(true);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(isProviderCreateCleanupError(error)).toBe(false);
+    expect(((error as ProviderError).cause as FreestyleApiError).code).toBe("VM_START_FAILED");
+    expect(fake.deletes).toEqual([]);
+  });
+
+  test("every create carries a fresh attempt id", async () => {
+    const fake = fakeFreestyle({ probeExit: 0 });
+    await providerWith(fake).create({ image: "sh-image" });
+    await providerWith(fake).create({ image: "sh-image" });
+    const attempts = (fake.creates as Array<{ metadata: Record<string, string> }>)
+      .map((request) => request.metadata[FREESTYLE_CREATE_ATTEMPT_METADATA_KEY]);
+    expect(new Set(attempts).size).toBe(2);
+  });
+});
+
 describe("Freestyle platform contract", () => {
   test("firewall on a private-network machine: outbound only, no inbound at all", () => {
     // The VPC's members-reach-each-other rule is what admits the daemon port;
     // an inbound rule here would re-expose 1337 to the Internet.
     expect(freestyleFirewallRules()).toEqual([
       { action: "allow", source: {}, destination: { public: true } },
+    ]);
+  });
+
+  test("team VM adds exactly one VPC ingress rule", () => {
+    expect(freestyleFirewallRules({ memberIngressNetworkId: "vpc-team" })).toEqual([
+      { action: "allow", source: {}, destination: { public: true } },
+      { action: "allow", source: { vpcId: "vpc-team" }, destination: {} },
     ]);
   });
 
@@ -141,11 +346,126 @@ describe("Freestyle platform contract", () => {
     ]);
   });
 
-  test("create sizes from the create response and never re-reads the machine", async () => {
-    // vms.create already returns the machine's resources; a status read after
-    // it cost ~100 ms on every prod create for nothing. A size-less image is
-    // the one path that still grows the machine, and it grows from the create
-    // response; a sized image boots at its shape and is neither read nor grown.
+  test("create and restore add team ingress only when requested", async () => {
+    const fake = fakeFreestyle({ probeExit: 0 });
+    const provider = providerWith(fake);
+    await provider.create({ image: "snapshot", network: { id: "vpc-team", memberIngress: true } });
+    const teamRules = (fake.creates[0] as { firewall: { rules: unknown[] } }).firewall.rules;
+    expect(teamRules.filter((rule) => JSON.stringify(rule).includes("vpc-team"))).toHaveLength(1);
+    await provider.create({ image: "snapshot", network: { id: "vpc-team" } });
+    const personalRules = (fake.creates[1] as { firewall: { rules: unknown[] } }).firewall.rules;
+    expect(personalRules.filter((rule) => JSON.stringify(rule).includes("vpc-team"))).toHaveLength(0);
+    await provider.restore("snapshot", { network: { id: "vpc-team", memberIngress: true } });
+    const restoreRules = (fake.creates[2] as { firewall: { rules: unknown[] } }).firewall.rules;
+    expect(restoreRules.filter((rule) => JSON.stringify(rule).includes("vpc-team"))).toHaveLength(1);
+  });
+
+  test("team network creation omits members rule, including slug conflicts", async () => {
+    const network = { id: "vpc-team", slug: "team-slug", cidr: "10.1.0.0/24", cidrV6: "fd01::/64" };
+    let createCount = 0;
+    let createdOptions: unknown;
+    const client = {
+      vpc: {
+        create: async (options: unknown) => { createCount += 1; createdOptions = options; return { data: network }; },
+        get: async () => network,
+      },
+      firewall: { rules: { list: async () => { throw new Error("members heal must not run"); }, create: async () => { throw new Error("members heal must not run"); } } },
+    } as unknown as Freestyle;
+    const provider = new FreestyleProvider({ client: () => client });
+    await provider.privateNetworking!.ensureNetwork({ slug: "team-slug", membersRule: false });
+    expect(createCount).toBe(1);
+    expect(createdOptions).toEqual({ slug: "team-slug", displayName: undefined, firewall: { rules: [] } });
+    const conflictClient = {
+      ...client,
+      vpc: {
+        create: async () => { throw new FreestyleApiError(409, { code: "CONFLICT", message: "slug exists" }); },
+        get: async () => network,
+      },
+    } as unknown as Freestyle;
+    const conflictProvider = new FreestyleProvider({ client: () => conflictClient });
+    await conflictProvider.privateNetworking!.ensureNetwork({ slug: "team-slug", membersRule: false });
+  });
+
+  test("network creation names the requested IPv4 range and omits it otherwise", async () => {
+    const creates: unknown[] = [];
+    const client = {
+      vpc: {
+        create: async (options: { slug: string; cidr?: string }) => {
+          creates.push(options);
+          return { data: { id: `vpc-${creates.length}`, slug: options.slug, cidr: options.cidr ?? "10.16.1.0/24", cidrV6: "fd01::/64" } };
+        },
+      },
+    } as unknown as Freestyle;
+    const provider = new FreestyleProvider({ client: () => client });
+    await expect(provider.privateNetworking!.ensureNetwork({ slug: "user-slug", membersRule: false, cidr: "10.200.0.0/16" }))
+      .resolves.toMatchObject({ cidr: "10.200.0.0/16" });
+    await provider.privateNetworking!.ensureNetwork({ slug: "team-slug", membersRule: false });
+    expect(creates).toEqual([
+      { slug: "user-slug", displayName: undefined, cidr: "10.200.0.0/16", firewall: { rules: [] } },
+      { slug: "team-slug", displayName: undefined, firewall: { rules: [] } },
+    ]);
+  });
+
+  test("team tunnel attach/detach maps addresses and classifies overlap", async () => {
+    const attachment = { vpcId: "vpc-team", ipv4: "10.2.0.2", ipv6: "fd02::2" };
+    const client = {
+      tunnels: {
+        attachVpc: async () => ({ attachments: [attachment] }),
+        detachVpc: async () => { throw new FreestyleApiError(404, { code: "NOT_FOUND", message: "gone" }); },
+      },
+    } as unknown as Freestyle;
+    const provider = new FreestyleProvider({ client: () => client });
+    await expect(provider.privateNetworking!.attachTunnelNetwork!("tun-1", "vpc-team")).resolves.toEqual({ networkId: "vpc-team", addressV4: "10.2.0.2", addressV6: "fd02::2" });
+    await expect(provider.privateNetworking!.detachTunnelNetwork!("tun-1", "vpc-team")).resolves.toBeUndefined();
+    const errorProvider = new FreestyleProvider({ client: () => ({ tunnels: { detachVpc: async () => { throw new Error("detach failed"); } } } as unknown as Freestyle) });
+    await expect(errorProvider.privateNetworking!.detachTunnelNetwork!("tun-1", "vpc-team")).rejects.toBeInstanceOf(ProviderError);
+    const overlapProvider = new FreestyleProvider({ client: () => ({ tunnels: { attachVpc: async () => { throw new FreestyleApiError(409, { code: "CONFLICT", message: "overlap" }); } } } as unknown as Freestyle) });
+    const overlap = await overlapProvider.privateNetworking!.attachTunnelNetwork!("tun-1", "vpc-team").catch((error) => error);
+    expect(overlap).toBeInstanceOf(ProviderTunnelNetworkOverlapError);
+    expect(isProviderTunnelNetworkOverlap({ cause: overlap })).toBe(true);
+  });
+
+  test("team network lookup by slug and its tunnel list come straight from Freestyle", async () => {
+    const gets: string[] = [];
+    const refs: string[] = [];
+    const client = {
+      vpc: {
+        get: async (idOrSlug: string) => {
+          gets.push(idOrSlug);
+          if (idOrSlug === "cmux-team-net-missing") throw new FreestyleApiError(404, { code: "NOT_FOUND", message: "missing" });
+          return { id: "vpc-team", slug: "cmux-team-net-1", cidr: "10.3.0.0/24", cidrV6: "fd03::/64" };
+        },
+        ref: (networkId: string) => {
+          refs.push(networkId);
+          return { tunnels: { list: async () => ({ tunnels: [{ id: "row-1", tunnelId: "tun-1" }, { id: "tun-2" }], totalCount: 2 }) } };
+        },
+      },
+    } as unknown as Freestyle;
+    const provider = new FreestyleProvider({ client: () => client });
+    await expect(provider.privateNetworking!.getNetwork("cmux-team-net-1")).resolves.toEqual({ id: "vpc-team", slug: "cmux-team-net-1", cidr: "10.3.0.0/24", cidrV6: "fd03::/64" });
+    await expect(provider.privateNetworking!.getNetwork("cmux-team-net-missing")).resolves.toBeNull();
+    await expect(provider.privateNetworking!.listNetworkTunnelIds!("vpc-team")).resolves.toEqual(["tun-1", "tun-2"]);
+    expect(gets).toEqual(["cmux-team-net-1", "cmux-team-net-missing"]);
+    expect(refs).toEqual(["vpc-team"]);
+    const failing = new FreestyleProvider({ client: () => ({
+      vpc: {
+        get: async () => { throw new FreestyleApiError(500, { code: "INTERNAL", message: "down" }); },
+        ref: () => ({ tunnels: { list: async () => { throw new Error("list failed"); } } }),
+      },
+    } as unknown as Freestyle) });
+    await expect(failing.privateNetworking!.getNetwork("cmux-team-net-1")).rejects.toBeInstanceOf(ProviderError);
+    await expect(failing.privateNetworking!.listNetworkTunnelIds!("vpc-team")).rejects.toBeInstanceOf(ProviderError);
+  });
+
+  test("a non-CONFLICT 409 is a provider error, not overlap", async () => {
+    const provider = new FreestyleProvider({ client: () => ({
+      tunnels: { attachVpc: async () => { throw new FreestyleApiError(409, { code: "RATE_LIMITED", message: "retry" }); } },
+    } as unknown as Freestyle) });
+    await expect(provider.privateNetworking!.attachTunnelNetwork!("tun-1", "vpc-team")).rejects.toBeInstanceOf(ProviderError);
+    await expect(provider.privateNetworking!.attachTunnelNetwork!("tun-1", "vpc-team")).rejects.not.toBeInstanceOf(ProviderTunnelNetworkOverlapError);
+  });
+
+  test("create never re-reads or resizes a snapshot-backed machine", async () => {
     const createResponse = (fake: ReturnType<typeof fakeFreestyle>, gets: string[], resizes: unknown[]) => {
       const vm = fake.client.vms.ref(VM_ID);
       vm.resize = (async (request: unknown) => {
@@ -178,7 +498,7 @@ describe("Freestyle platform contract", () => {
       memoryMb: 20480,
     } as never);
     expect(sizelessGets).toEqual([]);
-    expect(sizelessResizes).toHaveLength(1);
+    expect(sizelessResizes).toEqual([]);
 
     const sized = fakeFreestyle({ probeExit: 0 });
     const sizedGets: string[] = [];
@@ -265,27 +585,6 @@ describe("Freestyle platform contract", () => {
     expect(() => freestyleCmuxRemoteRoute({ publicIpv6: "  " }, VM_ID)).toThrow("public IPv6");
   });
 
-  test("daemon health requires a v6-table listener; start installs the dual-stack override", () => {
-    // 0x0539 = 1337; a 0.0.0.0-bound daemon appears only in /proc/net/tcp and
-    // is unreachable at the public IPv6, so it must be restarted.
-    expect(freestyleDaemonHealthyCommand()).toContain("/proc/net/tcp6");
-    expect(freestyleDaemonHealthyCommand()).toContain(":0539 ");
-    const start = freestyleStartDaemonCommand();
-    expect(start).toContain("Environment=CMUX_TUI_REMOTE_WS_BIND=[::]:1337");
-    expect(start).toContain("Environment=CMUX_TUI_REMOTE_WS_TRUSTED_CARRIER=1");
-    expect(start).toContain("systemctl restart cmux-tui-daemon");
-    expect(start).toContain("--remote-ws [::]:1337"); // non-systemd fallback
-    expect(start).toContain("--remote-ws-trusted-carrier");
-  });
-
-  test("pin check trusts the pin recorded at bake time, falling back to the live pin on older images", () => {
-    const source = { url: "https://files.cmux.com/x", sha256: "f".repeat(64), commit: "abc", builtAt: null, hookUrl: "https://files.cmux.com/cmux-tui/test/cmux-tui-hook-x86_64-unknown-linux-musl", hookSha256: "1".repeat(64) };
-    const check = freestylePinCheckCommand(source);
-    expect(check).toContain("if [ -s /etc/cmux/cmux-tui-pin ]; then");
-    expect(check).toContain("cut -d' ' -f1 /etc/cmux/cmux-tui-pin");
-    expect(check).toContain(`else ${cmuxTuiPinCheckCommand(source)}; fi`);
-  });
-
   test("edge rules map to inline egress tls rules with header transforms", () => {
     expect(freestyleEdgeRules([EDGE_RULE])).toEqual([
       {
@@ -296,8 +595,7 @@ describe("Freestyle platform contract", () => {
         transform: [
           {
             headers: {
-              "x-coderouter-route-token": "crt_secret-token",
-              "x-cmux-vm-id": CLOUD_VM_ID,
+              "x-cmux-authorization": "Bearer eyJ.signed.token",
             },
           },
         ],
@@ -310,26 +608,29 @@ describe("Freestyle platform contract", () => {
   });
 
 
-  test("exec preserves an up-to-date full guest CLI without uploading it", async () => {
+  test("exec dispatches directly to the immutable guest CLI", async () => {
     const fake = fakeFreestyle({ probeExit: 0 });
     const result = await providerWith(fake).exec(VM_ID, "echo hi", { timeoutMs: 5_000 });
     expect(result.exitCode).toBe(0);
-    expect(fake.execs).toHaveLength(2);
-    const command = fake.execs[0] ?? "";
-    expect(command).toContain(`sha256sum '${GUEST_CMUX_SHIM_PATH}'`);
-    expect(fake.execs[1]).toBe("echo hi");
+    expect(fake.execs[0]).toContain("getent passwd");
+    expect(fake.execUsers).toEqual([undefined]);
     expect(fake.writes).toHaveLength(0);
-    expect(command).not.toContain("crt_");
   });
 
-  test("exec upgrades an absent or outdated guest CLI before running the command", async () => {
+  test("cmux's own guest maintenance through exec can still ask for root", async () => {
+    const fake = fakeFreestyle({ probeExit: 0 });
+    const result = await providerWith(fake).exec(VM_ID, "true", { timeoutMs: 5_000, asRoot: true });
+    expect(result.exitCode).toBe(0);
+    expect(fake.execUsers).toEqual(["root"]);
+  });
+
+  test("exec does not repair an absent guest CLI during a command", async () => {
     const fake = fakeFreestyle({ probeExit: 0, guestCliExit: 1 });
     const result = await providerWith(fake).exec(VM_ID, "cmux self --json");
     expect(result.exitCode).toBe(0);
-    expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0]?.content).toBe(GUEST_CMUX_SHIM);
-    expect(fake.execs[1]).toContain(`mv -f`);
-    expect(fake.execs.at(-1)).toBe("cmux self --json");
+    expect(fake.writes).toHaveLength(0);
+    expect(fake.execs[0]).toContain("getent passwd");
+    expect(fake.execUsers).toEqual([undefined]);
   });
 
   test("exec timeouts clamp to the per-exec cap; killed execs read as 124", () => {
@@ -337,6 +638,36 @@ describe("Freestyle platform contract", () => {
     expect(normalizeFreestyleExecTimeout(-5)).toBe(30_000);
     expect(normalizeFreestyleExecTimeout(10 * 60 * 1000)).toBe(300_000);
     expect(normalizeFreestyleExecTimeout(12_345)).toBe(12_345);
+  });
+
+  // A command that outlives its timeout and whose kill reports no exit comes
+  // back from Freestyle as 409 VM_NON_RESPONSIVE ("exec produced no exit
+  // within 35s") even though the machine answers the next exec at once. That
+  // is the command's timeout, the same outcome the guest reports as a null
+  // status, not a provider outage (production 2026-10-07, vm-96e008...).
+  const execFailing = (err: unknown) => ({
+    client: {
+      vms: { ref: () => ({ exec: async () => { throw err; } }) },
+    } as unknown as Freestyle,
+  });
+
+  test("an exec the provider saw no exit for reads as a command timeout (124)", async () => {
+    const fake = execFailing(new FreestyleApiError(409, {
+      code: "VM_NON_RESPONSIVE",
+      message: "vm stopped responding: exec produced no exit within 35s; the guest likely stopped mid-command",
+    }));
+    const result = await providerWith(fake).exec(VM_ID, "sleep 999", { timeoutMs: 30_000 });
+    expect(result.exitCode).toBe(124);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("did not exit within 30s");
+  });
+
+  test("other non-responsive answers stay provider errors", async () => {
+    const fake = execFailing(new FreestyleApiError(409, {
+      code: "VM_NON_RESPONSIVE",
+      message: "vm stopped responding: read_file stream: early eof",
+    }));
+    await expect(providerWith(fake).exec(VM_ID, "true", { timeoutMs: 30_000 })).rejects.toBeInstanceOf(ProviderError);
   });
 
   test("stopped VMs read as paused (start() recovers them), not destroyed", () => {
@@ -395,12 +726,6 @@ describe("Freestyle platform contract", () => {
     } as unknown as Freestyle;
     const provider = new FreestyleProvider({
       client: () => client,
-      resolveDaemonSource: async () => ({
-        url: "https://files.cmux.com/cmux-tui/abc/cmux-tui-linux-x64",
-        sha256: "0".repeat(64),
-        commit: "abc",
-        builtAt: null, hookUrl: "https://files.cmux.com/cmux-tui/test/cmux-tui-hook-x86_64-unknown-linux-musl", hookSha256: "1".repeat(64),
-      }),
     });
 
     const recovered = await provider.privateNetworking!.createTunnel({
@@ -422,7 +747,105 @@ describe("Freestyle platform contract", () => {
     });
     expect(calls).toEqual({ create: 1, list: 1, attach: 0 });
   });
+
+  // Measured: tunnels.create answered 503 after ~25 s, yet the tunnel existed;
+  // only the app's later 409 retry recovered it (30.9 s to a first failure).
+  // A create with no answer or a 5xx must look for its own tunnel at once.
+  const createFailures: [string, () => Error][] = [
+    ["a provider 5xx", () => new FreestyleApiError(503, { code: "INTERNAL_ERROR", message: "upstream" })],
+    ["no response (client timeout)", () => new DOMException("The operation timed out.", "TimeoutError")],
+  ];
+  test.each(createFailures)("recovers the same-key tunnel after %s", async (_label, failure) => {
+    const calls = { create: 0, list: 0 };
+    const timeouts: (number | undefined)[] = [];
+    const tunnel = recoverableTunnel(TUNNEL_CLIENT_KEY);
+    const client = {
+      tunnels: {
+        create: async () => { calls.create += 1; throw failure(); },
+        list: async () => { calls.list += 1; return { tunnels: [tunnel], totalCount: 1 }; },
+        attachVpc: async () => tunnel,
+      },
+    } as unknown as Freestyle;
+    const provider = new FreestyleProvider({ client: (timeoutMs) => { timeouts.push(timeoutMs); return client; } });
+
+    const result = await provider.privateNetworking!.createTunnel({
+      slug: "cmux-wg-recover",
+      displayName: "cmux computer",
+      clientPublicKey: TUNNEL_CLIENT_KEY,
+      networkId: "vpc-1",
+    });
+
+    expect(result).toMatchObject({ tunnel: { id: "tun-existing" }, created: false, rotated: false });
+    expect(calls).toEqual({ create: 1, list: 1 });
+    // The create itself runs under a bounded timeout, well inside the route's 30 s.
+    expect(timeouts[0]).toBeLessThanOrEqual(10_000);
+  });
+
+  test("a 5xx never adopts a tunnel that holds another client's key", async () => {
+    const client = {
+      tunnels: {
+        create: async () => { throw new FreestyleApiError(503, { code: "INTERNAL_ERROR", message: "upstream" }); },
+        list: async () => ({ tunnels: [recoverableTunnel("other-client-key")], totalCount: 1 }),
+        attachVpc: async () => { throw new Error("must not attach"); },
+      },
+    } as unknown as Freestyle;
+    const provider = new FreestyleProvider({ client: () => client });
+
+    await expect(provider.privateNetworking!.createTunnel({
+      slug: "cmux-wg-recover",
+      displayName: "cmux computer",
+      clientPublicKey: TUNNEL_CLIENT_KEY,
+      networkId: "vpc-1",
+    })).rejects.toThrow("createTunnel(cmux-wg-recover)");
+  });
+
+  test("a definite 4xx refusal does not spend a recovery read", async () => {
+    let lists = 0;
+    const client = {
+      tunnels: {
+        create: async () => { throw new FreestyleApiError(400, { code: "BAD_REQUEST", message: "bad key" }); },
+        list: async () => { lists += 1; return { tunnels: [], totalCount: 0 }; },
+      },
+    } as unknown as Freestyle;
+    const provider = new FreestyleProvider({ client: () => client });
+
+    await expect(provider.privateNetworking!.createTunnel({
+      slug: "cmux-wg-recover",
+      displayName: "cmux computer",
+      clientPublicKey: TUNNEL_CLIENT_KEY,
+      networkId: "vpc-1",
+    })).rejects.toThrow("createTunnel(cmux-wg-recover)");
+    expect(lists).toBe(0);
+  });
 });
+
+function recoverableTunnel(clientPublicKey: string) {
+  return {
+    id: "tun-existing",
+    tunnelId: "tun-existing",
+    slug: "cmux-wg-recover",
+    displayName: "cmux computer",
+    clientConfig: "[Interface]\nPrivateKey =\n[Peer]\n",
+    endpointHost: "tun-existing.beta-vpn.freestyle.sh",
+    endpointPort: 51820,
+    clientPublicKey,
+    serverPublicKey: "server-key",
+    clientAddressV4: "100.64.0.2",
+    clientAddressV6: "fd00::2",
+    routes: ["10.0.0.0/8", "fd00::/8"],
+    attachments: [{
+      vpcId: "vpc-1",
+      ipv4: "10.40.0.2",
+      ipv6: "fd00:40::2",
+      address: "10.40.0.2",
+      vpcCidr: "10.40.0.0/24",
+      allowedIps: ["10.40.0.0/24", "fd00:40::/64"],
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }],
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
 
 describe("FreestyleProvider create with edge rules", () => {
   test("creates persistent machines with idle pausing disabled", async () => {
@@ -434,10 +857,16 @@ describe("FreestyleProvider create with edge rules", () => {
       // explicitly pauses or destroys it. The explicit -1 also overrides a
       // provider/account default that would otherwise idle-pause the VM.
       idleTimeoutSeconds: -1,
+      automaticRestart: true,
     });
   });
 
-  test("passes the rule inline, installs only the guest adapter, and returns the machine", async () => {
+  test("does not expose hard restart without a supported provider contract", () => {
+    const provider: VMProvider = providerWith(fakeFreestyle({ probeExit: 0 }));
+    expect(provider.restart).toBeUndefined();
+  });
+
+  test("passes the rule inline and returns a snapshot-v2 machine without guest setup", async () => {
     const fake = fakeFreestyle({ probeExit: 0 });
     const handle = await providerWith(fake).create({
       image: "sh-devbox",
@@ -452,14 +881,9 @@ describe("FreestyleProvider create with edge rules", () => {
       tls: { rules: freestyleEdgeRules([EDGE_RULE]) },
     });
     expect(fake.creates[0]).not.toHaveProperty("vpcs");
-    // The token reaches the platform create call and nothing else. The guest
-    // adapter itself is safe to write because it contains no issued token.
+    // The token reaches the platform create call and nothing else.
     expect(JSON.stringify(fake.execs)).not.toContain("crt_");
-    expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0]?.path).toMatch(/^\/usr\/local\/bin\/cmux\.tmp-[0-9a-f]{24}$/);
-    expect(fake.writes[0]?.content).toContain("cmux auth status");
-    expect(fake.writes[0]?.content).not.toContain("crt_secret-token");
-    expect(fake.execs.some((command) => command.includes("mv -f") && command.includes("/usr/local/bin/cmux'"))).toBe(true);
+    expect(fake.writes).toHaveLength(0);
     expect(fake.execs.some((command) => command.includes("/api/coderouter/vm-usage/self"))).toBe(false);
     expect(fake.deletes).toEqual([]);
   });
@@ -477,10 +901,7 @@ describe("FreestyleProvider create with edge rules", () => {
       tls: { rules: freestyleEdgeRules([EDGE_RULE]) },
     });
     expect(handle.providerMetadata).toMatchObject({ networkId: "vpc_1" });
-    expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0]?.path).toMatch(/^\/usr\/local\/bin\/cmux\.tmp-[0-9a-f]{24}$/);
-    expect(fake.execs.some((command) => command.includes("mv -f") && command.includes("/usr/local/bin/cmux'"))).toBe(true);
-    expect(fake.writes[0]?.content).not.toContain("crt_secret-token");
+    expect(fake.writes).toHaveLength(0);
     expect(handle.providerMetadata).toMatchObject({
       networkId: "vpc_1",
       networkIpv4: "10.4.0.7",
@@ -491,28 +912,25 @@ describe("FreestyleProvider create with edge rules", () => {
     expect(JSON.stringify(fake.writes)).not.toContain("crt_secret-token");
   });
 
-  test("omits the tls block and the probe when no rules are given", async () => {
+  test("omits the tls block and all guest work when no rules are given", async () => {
     const fake = fakeFreestyle({ probeExit: 1 });
     await providerWith(fake).create({ image: "sh-devbox" });
     expect(fake.creates[0]).not.toHaveProperty("tls");
     expect(fake.execs.some((command) => command.includes("/api/coderouter/vm-usage/self"))).toBe(false);
-    expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0]?.path).toMatch(/^\/usr\/local\/bin\/cmux\.tmp-[0-9a-f]{24}$/);
+    expect(fake.writes).toHaveLength(0);
   });
 
-  test("restore passes the rule inline and installs the guest adapter", async () => {
+  test("restore passes the rule inline without guest setup", async () => {
     const ok = fakeFreestyle({ probeExit: 0 });
     const restored = await providerWith(ok).restore("snap-1", { edgeRules: [EDGE_RULE] });
     expect(restored.image).toBe("snap-1");
     expect(ok.creates[0]).toMatchObject({
       snapshotId: "snap-1",
+      automaticRestart: true,
       idleTimeoutSeconds: FREESTYLE_PERSISTENT_IDLE_TIMEOUT_SECONDS,
       tls: { rules: freestyleEdgeRules([EDGE_RULE]) },
     });
-    expect(ok.writes).toHaveLength(1);
-    expect(ok.writes[0]?.path).toMatch(/^\/usr\/local\/bin\/cmux\.tmp-[0-9a-f]{24}$/);
-    expect(ok.writes[0]?.content).not.toContain("crt_secret-token");
-    expect(ok.execs.some((command) => command.includes("mv -f") && command.includes("/usr/local/bin/cmux'"))).toBe(true);
+    expect(ok.writes).toHaveLength(0);
     expect(ok.deletes).toEqual([]);
   });
 });
@@ -608,12 +1026,6 @@ describe("FreestyleProvider resume policy", () => {
     const client = { vms: { ref: () => vm } } as unknown as Freestyle;
     const provider = new FreestyleProvider({
       client: () => client,
-      resolveDaemonSource: async () => ({
-        url: "https://files.cmux.com/cmux-tui/abc/cmux-tui-linux-x64",
-        sha256: "0".repeat(64),
-        commit: "abc",
-        builtAt: null, hookUrl: "https://files.cmux.com/cmux-tui/test/cmux-tui-hook-x86_64-unknown-linux-musl", hookSha256: "1".repeat(64),
-      }),
     });
 
     const handle = await provider.resume(VM_ID);
@@ -648,14 +1060,45 @@ describe("Freestyle attach route source", () => {
 });
 
 describe("Freestyle client configuration", () => {
-  test("every guest exec is pinned to root", () => {
-    // The 0.2 API's linuxUser default is uid 1000, not root. The devbox image
-    // ships such a user, so an unpinned exec would silently move the daemon,
-    // its install, and the model-plane write off the root layout.
+  test("driver maintenance execs stay pinned to root", () => {
+    // Public vm exec intentionally uses the provider's uid-1000 default so it
+    // lands in the same home as Cloud terminals. Driver maintenance must keep
+    // its explicit root pin so installs and probes retain their privileged
+    // layout.
     const execCalls = driverSource.match(/\.exec\(\{[\s\S]*?\}\)/g) ?? [];
     expect(execCalls.length).toBeGreaterThan(0);
-    for (const call of execCalls) {
+    for (const call of execCalls.filter((call) => !call.includes("freestyleExecCommand(command)"))) {
       expect(call).toContain("linuxUser");
+    }
+  });
+
+  test("public vm exec leaves the guest user to the provider default", () => {
+    expect(driverSource).toContain(
+      "const r = await vm.exec(opts?.asRoot\n            ? { command, timeoutMs, linuxUser: GUEST_LINUX_USER }\n            : { command: freestyleExecCommand(command), timeoutMs });",
+    );
+  });
+
+  test("public vm exec derives HOME from the guest passwd entry", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "cmux-exec-home-"));
+    const bin = path.join(root, "bin");
+    await mkdir(bin, { recursive: true });
+    await writeFile(path.join(bin, "getent"), "#!/bin/sh\nprintf '%s\n' 'cmux:x:1000:1000::/home/cmux:/bin/bash'\n", { mode: 0o755 });
+    try {
+      const fake = fakeFreestyle({ probeExit: 0 });
+      await providerWith(fake).exec(VM_ID, 'printf "%s" "$HOME"');
+      const result = await new Promise<{ status: number | null; stdout: string }>((resolve) => {
+        const child = spawn("/bin/sh", ["-c", fake.execs[0]], {
+          env: { ...process.env, HOME: "/home/ubuntu", PATH: `${bin}:/usr/bin:/bin` },
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+        let stdout = "";
+        child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+        child.on("close", (status: number | null) => resolve({ status, stdout }));
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe("/home/cmux");
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 
@@ -670,45 +1113,7 @@ describe("Freestyle client configuration", () => {
       readFileSync(path.join(import.meta.dirname, "../package.json"), "utf8"),
     ) as { dependencies: Record<string, string> };
     expect(packageJson.dependencies["freestyle-beta"]).toBeUndefined();
-    expect(packageJson.dependencies.freestyle).toBe("0.2.10");
-  });
-});
-
-describe("Freestyle machine sizing", () => {
-  test("the plan machine is 5 vCPU / 20 GB / 32 GB, vCPUs following memory", () => {
-    expect(freestyleTargetResources(20480, {})).toEqual({ cpu: 5, memory: 20480, storage: 32768 });
-    expect(freestyleTargetResources(8192, {})).toEqual({ cpu: 2, memory: 8192, storage: 32768 });
-    expect(freestyleTargetResources(4096, { CMUX_VM_DISK_MB: "65536" })).toEqual({
-      cpu: 1,
-      memory: 4096,
-      storage: 65536,
-    });
-  });
-
-  test("resize grows the devbox snapshot size to the plan machine", () => {
-    // Every VM boots at its snapshot's resources; the devbox snapshot is
-    // 2 vCPU / 4 GB / 16 GB, so a fresh create must grow all three.
-    expect(freestyleResizeRequest(
-      { cpu: 2, memory: 4096, storage: 16384 },
-      { cpu: 5, memory: 20480, storage: 32768 },
-    )).toEqual({ cpu: 5, memory: 20480, storage: 32768 });
-  });
-
-  test("resize is grow-only and sends only the dimensions that grow", () => {
-    // A snapshot taken from an already-sized machine restores at that size:
-    // nothing to do. A snapshot larger than the request is never shrunk.
-    expect(freestyleResizeRequest(
-      { cpu: 5, memory: 20480, storage: 204800 },
-      { cpu: 5, memory: 20480, storage: 204800 },
-    )).toBeNull();
-    expect(freestyleResizeRequest(
-      { cpu: 8, memory: 32768, storage: 262144 },
-      { cpu: 5, memory: 20480, storage: 204800 },
-    )).toBeNull();
-    expect(freestyleResizeRequest(
-      { cpu: 5, memory: 20480, storage: 16384 },
-      { cpu: 5, memory: 20480, storage: 204800 },
-    )).toEqual({ storage: 204800 });
+    expect(packageJson.dependencies.freestyle).toBe("0.2.21");
   });
 });
 
@@ -716,182 +1121,43 @@ describe("Freestyle machine sizing", () => {
 // is the machine's VPC address over the owner's tunnel, nothing is minted at
 // the platform and nothing public is opened. noVNC on 6901 has no auth of
 // its own, so a machine outside a private network gets no URL at all.
-describe("Freestyle openCmuxRemote: the trusted-listener heal", () => {
-  const PRIVATE = { publicIpv6: "2602:f75c:0:1::2a", vpcs: [{ ipv4: "10.4.0.7", ipv6: "fd00:4::7" }] };
-  const SOURCE_OK = { url: "https://files.cmux.com/cmux-tui/abc/cmux-tui-linux-x64", sha256: "0".repeat(64), commit: "abc", builtAt: null, hookUrl: "https://files.cmux.com/cmux-tui/test/cmux-tui-hook-x86_64-unknown-linux-musl", hookSha256: "1".repeat(64) };
-
-  /** The attach bundle's fenced stdout with the trusted-listener probe printing `trusted`. */
-  function bundleStdout(trusted: "0" | "1"): string {
-    return [
-      "__CMUX_PROBE__",
-      JSON.stringify({ build_identity: "abc", remote_protocol: 12, version: "0.1.0" }),
-      "__CMUX_DEVICES__",
-      "[]",
-      "__CMUX_TRUSTED__",
-      trusted,
-      "__CMUX_END__",
-    ].join("\n");
-  }
-
-  /**
-   * A fake machine whose attach bundle answers `trusted[n]` on its n-th run.
-   * Every other exec (pin check, daemon restart, readiness status) succeeds.
-   */
-  function attachFake(input: { readonly trusted: readonly ("0" | "1")[]; readonly manifest: "ok" | "down" }) {
-    const execs: string[] = [];
-    let bundles = 0;
+describe("Freestyle openCmuxRemote: snapshot-v2 fast path", () => {
+  test("uses persisted network metadata without a guest probe or healing", async () => {
+    const commands: string[] = [];
     const vm = {
-      data: async () => PRIVATE,
-      exec: async ({ command }: { command: string }) => {
-        execs.push(command);
-        if (command.includes("__CMUX_PROBE__")) {
-          const trusted = input.trusted[Math.min(bundles, input.trusted.length - 1)] ?? "0";
-          bundles += 1;
-          return { statusCode: 0, stdout: bundleStdout(trusted), stderr: "" };
-        }
-        return { statusCode: 0, stdout: "", stderr: "" };
-      },
+      exec: async ({ command }: { command: string }) => { commands.push(command); return { statusCode: 0, stdout: "", stderr: "" }; },
     };
     const client = { vms: { ref: () => vm } } as unknown as Freestyle;
-    const provider = new FreestyleProvider({
-      client: () => client,
-      resolveDaemonSource: async () => {
-        if (input.manifest === "down") throw new Error("manifest fetch failed");
-        return SOURCE_OK;
-      },
+    const provider = new FreestyleProvider({ client: () => client });
+    const endpoint = await provider.openCmuxRemote(VM_ID, {
+      providerMetadata: { cmuxTuiContract: "snapshot-v2", networkIpv4: "10.4.0.7", networkIpv6: "fd00:4::7" },
     });
-    return { provider, execs, bundles: () => bundles };
-  }
-
-  test("a daemon that already serves the trusted listener attaches without reading the manifest", async () => {
-    const fake = attachFake({ trusted: ["1"], manifest: "down" });
-    const endpoint = await fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] });
-    expect(endpoint.trustedCarrier).toBe(true);
-    expect(endpoint.route).toBe("ws://10.4.0.7:1337/v1/link");
-    expect(fake.bundles()).toBe(1);
-    expect(fake.execs.some((command) => command.includes("systemctl restart cmux-tui-daemon"))).toBe(false);
+    expect(endpoint).toMatchObject({ route: "ws://10.4.0.7:1337/v1/link", trustedCarrier: true });
+    expect(commands).toEqual([]);
   });
 
-  test("an older daemon is replaced with the pinned build and the retried bundle proves trusted mode", async () => {
-    const fake = attachFake({ trusted: ["0", "1"], manifest: "ok" });
-    const endpoint = await fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] });
-    expect(endpoint.trustedCarrier).toBe(true);
-    expect(fake.bundles()).toBe(2);
-    const start = fake.execs.find((command) => command.includes("systemctl restart cmux-tui-daemon"));
-    expect(start).toBeDefined();
-    // The heal replaces a fallback daemon rather than keeping the untrusted one.
-    expect(start).toContain("pkill -f 'cmux-tui server [s]tart'");
-  });
-
-  test("a heal that leaves the daemon untrusted fails closed instead of returning an unusable endpoint", async () => {
-    const fake = attachFake({ trusted: ["0", "0"], manifest: "ok" });
-    await expect(fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] })).rejects.toThrow(ProviderError);
-    await expect(fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] })).rejects.toThrow(/still refuses the trusted listener/);
-  });
-});
-
-describe("Freestyle openCmuxRemote: agent hooks on a healthy daemon", () => {
-  const PRIVATE = { publicIpv6: "2602:f75c:0:1::2a", vpcs: [{ ipv4: "10.4.0.7", ipv6: "fd00:4::7" }] };
-  const PIN_COMMIT = "5a4780614cecd8e8ef040a24478f928ef31cc4ae";
-  const SOURCE = { url: "https://files.cmux.com/cmux-tui/abc/cmux-tui-linux-x64", sha256: "0".repeat(64), commit: PIN_COMMIT, builtAt: null, hookUrl: `https://files.cmux.com/cmux-tui/${PIN_COMMIT}/cmux-tui-hook-x86_64-unknown-linux-musl`, hookSha256: "1".repeat(64) };
-
-  /**
-   * A machine whose daemon is healthy and trusted; `hooksReady` is what the
-   * hooks-ready probe exits, `pin` what /etc/cmux/cmux-tui-pin holds. Records
-   * every manifest URL the driver resolved.
-   */
-  function hooksFake(input: { readonly hooksReady: number; readonly pin: string; readonly manifest?: "ok" | "missing-helper" }) {
-    const execs: string[] = [];
-    const manifests: (string | undefined)[] = [];
-    const vm = {
-      data: async () => PRIVATE,
-      exec: async ({ command }: { command: string }) => {
-        execs.push(command);
-        if (command.includes("__CMUX_PROBE__")) {
-          return { statusCode: 0, stdout: ["__CMUX_PROBE__", JSON.stringify({ build_identity: "abc", remote_protocol: 12, version: "0.1.0" }), "__CMUX_DEVICES__", "[]", "__CMUX_TRUSTED__", "1", "__CMUX_END__"].join("\n"), stderr: "" };
-        }
-        if (command.includes("cmux-tui-pin")) return { statusCode: 0, stdout: `${input.pin}\n`, stderr: "" };
-        if (command.includes(".local/share/cmux-tui/bin/cmux-tui-hook") && !command.includes("agent hook install")) {
-          return { statusCode: input.hooksReady, stdout: "", stderr: "" };
-        }
-        return { statusCode: 0, stdout: "", stderr: "" };
-      },
-    };
-    const client = { vms: { ref: () => vm } } as unknown as Freestyle;
-    const provider = new FreestyleProvider({
-      client: () => client,
-      resolveDaemonSource: async (_provider, manifestUrl) => {
-        manifests.push(manifestUrl);
-        if (input.manifest === "missing-helper") throw new ProviderError("freestyle", "manifest has no cmux-tui-hook");
-        return SOURCE;
-      },
+  // Cloud has not shipped a row from before snapshot-v2, so there is nothing
+  // to stay compatible with: a row without the contract or its recorded
+  // addresses is refused with a clear error, never healed or looked up.
+  for (const [name, providerMetadata] of [
+    ["without the snapshot-v2 contract", { networkIpv4: "10.4.0.8" }],
+    ["without recorded addresses", { cmuxTuiContract: "snapshot-v2" }],
+    ["with no metadata", {}],
+  ] as const) {
+    test(`a row ${name} is refused without provider reads or guest work`, async () => {
+      const commands: string[] = [];
+      let reads = 0;
+      const vm = {
+        data: async () => { reads += 1; return { vpcs: [{ ipv4: "10.4.0.9" }] }; },
+        exec: async ({ command }: { command: string }) => { commands.push(command); return { statusCode: 0, stdout: "", stderr: "" }; },
+      };
+      const client = { vms: { ref: () => vm } } as unknown as Freestyle;
+      const provider = new FreestyleProvider({ client: () => client });
+      await expect(provider.openCmuxRemote(VM_ID, { providerMetadata })).rejects.toThrow(/recreate/);
+      expect(reads).toBe(0);
+      expect(commands).toEqual([]);
     });
-    return { provider, execs, manifests };
   }
-
-  test("a healthy daemon with hooks already installed is left alone", async () => {
-    const fake = hooksFake({ hooksReady: 0, pin: PIN_COMMIT });
-    await fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] });
-    expect(fake.execs.some((command) => command.includes("agent hook install"))).toBe(false);
-    expect(fake.manifests).toEqual([]);
-  });
-
-  test("a healthy daemon without hooks gets the helper of its own pinned commit and the Claude Code and Codex hooks, with no restart", async () => {
-    const fake = hooksFake({ hooksReady: 1, pin: PIN_COMMIT });
-    await fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] });
-    // The bake's pin, not the rolling pointer: helper and daemon share a generation.
-    expect(fake.manifests).toEqual([`https://files.cmux.com/cmux-tui/${PIN_COMMIT}/manifest.json`]);
-    const install = fake.execs.find((command) => command.includes("agent hook install claude codex"));
-    expect(install).toBeDefined();
-    expect(install).toContain(SOURCE.hookUrl);
-    expect(install).not.toContain(SOURCE.url);
-    expect(fake.execs.some((command) => command.includes("systemctl restart cmux-tui-daemon"))).toBe(false);
-  });
-
-  test("a machine created from the live pin (no pin file) takes the live manifest", async () => {
-    const fake = hooksFake({ hooksReady: 1, pin: "" });
-    await fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] });
-    expect(fake.manifests).toEqual([undefined]);
-    expect(fake.execs.some((command) => command.includes("agent hook install claude codex"))).toBe(true);
-  });
-
-  test("a daemon that only needed a restart still gets its hooks, and a hook failure never fails the heal", async () => {
-    // The first attach bundle reports the daemon not ready (exit 3); the heal
-    // finds the pin intact, restarts, and must still reconcile hooks. The hook
-    // install itself fails here, and the attach still returns its route.
-    const execs: string[] = [];
-    let bundles = 0;
-    const vm = {
-      data: async () => PRIVATE,
-      fs: { writeTextFile: async () => {}, remove: async () => {} },
-      exec: async ({ command }: { command: string }) => {
-        execs.push(command);
-        if (command.includes("__CMUX_PROBE__")) {
-          bundles += 1;
-          if (bundles === 1) return { statusCode: 3, stdout: "", stderr: "" };
-          return { statusCode: 0, stdout: ["__CMUX_PROBE__", JSON.stringify({ build_identity: "abc", remote_protocol: 12, version: "0.1.0" }), "__CMUX_DEVICES__", "[]", "__CMUX_TRUSTED__", "1", "__CMUX_END__"].join("\n"), stderr: "" };
-        }
-        if (command.includes("agent hook install")) return { statusCode: 1, stdout: "", stderr: "helper download failed" };
-        if (command.includes("cmux-tui-pin")) return { statusCode: 0, stdout: `${PIN_COMMIT}\n`, stderr: "" };
-        if (command.includes(".local/share/cmux-tui/bin/cmux-tui-hook")) return { statusCode: 1, stdout: "", stderr: "" };
-        if (command.includes("pgrep -f 'cmux-tui server [s]tart'") && !command.includes("systemctl restart")) return { statusCode: 1, stdout: "", stderr: "" };
-        return { statusCode: 0, stdout: "", stderr: "" };
-      },
-    };
-    const client = { vms: { ref: () => vm } } as unknown as Freestyle;
-    const provider = new FreestyleProvider({ client: () => client, resolveDaemonSource: async () => SOURCE });
-    const endpoint = await provider.openCmuxRemote(VM_ID, { clientCapabilities: [] });
-    expect(endpoint.trustedCarrier).toBe(true);
-    expect(execs.some((command) => command.includes("systemctl restart cmux-tui-daemon"))).toBe(true);
-    expect(execs.some((command) => command.includes("agent hook install claude codex"))).toBe(true);
-  });
-
-  test("a pinned build published before the helper existed still attaches, without hooks", async () => {
-    const fake = hooksFake({ hooksReady: 1, pin: PIN_COMMIT, manifest: "missing-helper" });
-    const endpoint = await fake.provider.openCmuxRemote(VM_ID, { clientCapabilities: [] });
-    expect(endpoint.trustedCarrier).toBe(true);
-    expect(fake.execs.some((command) => command.includes("agent hook install"))).toBe(false);
-  });
 });
 
 describe("Freestyle port open: the private address, the desktop healed", () => {
@@ -909,7 +1175,7 @@ describe("Freestyle port open: the private address, the desktop healed", () => {
       },
     };
     const client = { vms: { ref: () => vm } } as unknown as Freestyle;
-    return { provider: new FreestyleProvider({ client: () => client, resolveDaemonSource: async () => { throw new Error("unused"); } }), execs };
+    return { provider: new FreestyleProvider({ client: () => client }), execs };
   }
 
   test("address: private v4, then private v6, never public (the desktop has no auth of its own)", () => {
@@ -985,7 +1251,7 @@ describe("Go provider runtime ceiling", () => {
   test("a resume adds only the remaining billing-period allowance to prior provider runtime", async () => {
     const updates: unknown[] = [];
     const client = { vms: { ref: () => ({ data: async () => ({ totalRunSeconds: 3600 }), update: async (value: unknown) => { updates.push(value); } }) } } as unknown as Freestyle;
-    const provider = new FreestyleProvider({ client: () => client, resolveDaemonSource: async () => { throw new Error("unused"); } });
+    const provider = new FreestyleProvider({ client: () => client });
     await provider.setRuntimeBudget(VM_ID, 1800);
     await provider.setRuntimeBudget(VM_ID, 0);
     await provider.setRuntimeBudget(VM_ID, null);
@@ -998,7 +1264,7 @@ describe("Go provider runtime ceiling", () => {
   test("missing provider runtime fails closed", async () => {
     let updated = false;
     const client = { vms: { ref: () => ({ data: async () => ({}), update: async () => { updated = true; } }) } } as unknown as Freestyle;
-    const provider = new FreestyleProvider({ client: () => client, resolveDaemonSource: async () => { throw new Error("unused"); } });
+    const provider = new FreestyleProvider({ client: () => client });
     await expect(provider.setRuntimeBudget(VM_ID, 1800)).rejects.toThrow("setRuntimeBudget");
     expect(updated).toBe(false);
   });

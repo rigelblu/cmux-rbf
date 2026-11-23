@@ -140,7 +140,8 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
                 isMultiSelected: true,
                 isRemote: true,
                 remoteState: .disconnected,
-                settings: settings
+                settings: settings,
+                hasManualCustomColor: true
             ),
             singleWorkspaceId: Self.rowInput(
                 workspaceId: singleWorkspaceId,
@@ -174,6 +175,9 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         )
 
         let selected = list.selectedContextMenuTargetAggregate
+        #expect(selected.hasManualCustomColor)
+        let clickedOriginTintRow = try #require(rows[connectingWorkspaceId])
+        #expect(clickedOriginTintRow.rowSnapshot(list: list).contextMenu.hasManualCustomColor)
         #expect(selected.targetWorkspaceIds == [connectingWorkspaceId, disconnectedWorkspaceId])
         #expect(selected.remoteTargetWorkspaceIds == [connectingWorkspaceId, disconnectedWorkspaceId])
         #expect(!selected.allRemoteTargetsConnecting)
@@ -320,7 +324,8 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         isRemote: Bool,
         remoteState: WorkspaceRemoteConnectionState,
         settings: SidebarTabItemSettingsSnapshot,
-        customColorHex: String? = nil
+        customColorHex: String? = nil,
+        hasManualCustomColor: Bool = false
     ) -> SidebarWorkspaceRowInput {
         SidebarWorkspaceRowInput(
             workspaceId: workspaceId,
@@ -328,7 +333,7 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
             isColorSectionMember: false,
             index: 0,
             workspaceCount: 3,
-            workspace: SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: customColorHex),
+            workspace: SidebarWorkspaceSnapshotTests.snapshot(customColorHex: customColorHex),
             isActive: false,
             isMultiSelected: isMultiSelected,
             hasUserCustomTitle: false,
@@ -356,7 +361,8 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
             contextMenuPinState: nil,
             inferredTaskStatus: .todo,
             activeTodoOverride: nil,
-            isTodoStatusHidden: false
+            isTodoStatusHidden: false,
+            hasManualCustomColor: hasManualCustomColor
         )
     }
 

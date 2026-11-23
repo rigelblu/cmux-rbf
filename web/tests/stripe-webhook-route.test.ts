@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { makeStripeWebhookHandler } from "../app/api/stripe/webhook/route";
+import { AccountDeletionUserMutationInProgressError } from "../services/account/deletionLock";
 
 let currentEvent: Record<string, unknown>;
 let constructThrows = false;
@@ -32,7 +33,11 @@ let applySubscriptionUpdateResult: unknown = {
   stackUserId: "user_1",
   isActive: true,
 };
-const applySubscriptionUpdate = mock(async () => applySubscriptionUpdateResult);
+let applySubscriptionUpdateError: Error | null = null;
+const applySubscriptionUpdate = mock(async () => {
+  if (applySubscriptionUpdateError) throw applySubscriptionUpdateError;
+  return applySubscriptionUpdateResult;
+});
 const revokeCoderouterRouteTokens = mock(async () => {});
 const revokeCoderouterTeamRouteTokens = mock(async () => {});
 const captureStripeBillingEvent = mock(async () => {});
@@ -142,6 +147,7 @@ describe("Stripe billing webhook route", () => {
     selectedEventRows = [];
     updates.length = 0;
     recordCheckoutShouldFail = false;
+    applySubscriptionUpdateError = null;
     proWelcomeShouldFail = false;
     personalWelcomeConfigured = true;
     recordCheckoutCompletionResult = {
@@ -615,6 +621,39 @@ describe("Stripe billing webhook route", () => {
     );
   });
 
+  test("keeps route tokens and API keys when the lapsed subscription leaves the person entitled", async () => {
+    // A cmux NEXT subscription ended, or a classic entitlement remains.
+    applySubscriptionUpdateResult = {
+      scope: "user",
+      stackUserId: "user_1",
+      isActive: false,
+      retainsAccess: true,
+    };
+    currentEvent = {
+      id: "evt_next_deleted",
+      type: "customer.subscription.deleted",
+      data: {
+        object: {
+          id: "sub_next",
+          customer: "cus_1",
+          status: "canceled",
+          metadata: { stackUserId: "user_1", app: "cmux", plan: "next_pro" },
+        },
+      },
+    };
+    retrievedSubscription = {
+      ...(currentEvent.data as { object: Record<string, unknown> }).object,
+      cancel_at_period_end: false,
+      items: { data: [] },
+    };
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(applySubscriptionUpdate).toHaveBeenCalledWith(retrievedSubscription);
+    expect(revokeCoderouterRouteTokens).not.toHaveBeenCalled();
+  });
+
   test("revokes every selected-team route after Team cancellation", async () => {
     applySubscriptionUpdateResult = {
       scope: "team",
@@ -801,6 +840,25 @@ describe("Stripe billing webhook route", () => {
 
     expect(response.status).toBe(500);
     expect(updates.at(-1)).toMatchObject({ error: "db down" });
+  });
+
+  test("defers a subscription event that lost the account mutation lease to a sibling event", async () => {
+    // Stripe delivers customer.subscription.created, invoice.paid, and
+    // checkout.session.completed for one purchase within a second. The losers
+    // of the per-account lease must be retried, not reported as failures.
+    currentEvent = {
+      id: "evt_1",
+      type: "customer.subscription.created",
+      data: { object: { id: "sub_1" } },
+    };
+    applySubscriptionUpdateError = new AccountDeletionUserMutationInProgressError("user_1");
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(updates.at(-1)).toMatchObject({
+      error: "retryable: Another account mutation is still in progress.",
+    });
   });
 });
 

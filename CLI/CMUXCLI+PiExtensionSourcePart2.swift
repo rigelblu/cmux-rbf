@@ -131,7 +131,12 @@ const subagentToolNames = new Set([
   "subagent",
   "team_spawn",
   "superpowers_dispatch",
+  // Mirrors the "Task" entry above: spawn-tool names seen across
+  // Claude-compatible harnesses. Claude Code renamed its own spawn tool
+  // "Task" -> "Agent" in 2.x and both spellings remain in use, and the
+  // /subagent/i fallback below matches neither.
   "Task",
+  "Agent",
 ]);
 
 function isSubagentTool(event: unknown): boolean {
@@ -311,6 +316,7 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
   // (#cm-124.2) A full UUID minted in each call of this default export. A module-level id would repeat across
   // /resume, /new and fork, which build a new factory call but keep pi's module cache.
   const extensionInstanceId = randomUUID();
+  let restorePiUIDialogHooks: (() => void) | undefined;
 
   const enqueueLifecycleTask = (
     sessionId: string,
@@ -357,10 +363,19 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
       state.stopped = false;
       state.formWindowOpen = false; // (#cm-124.2)
       state.activeFormSpan = undefined; // (#cm-124.2)
+      state.toolCommands.clear();
     }
+    restorePiUIDialogHooks?.();
+    restorePiUIDialogHooks = installPiUIDialogHooks(
+      dispatcher,
+      sessionStates,
+      ctx,
+      enqueueLifecycleTask,
+    );
     if (!sessionId) return;
     enqueueLifecycleTask(sessionId, context, async () => {
       await sendHook(dispatcher, "session-start", context);
+      await publishPiWorkspaceMetadata(dispatcher, context, sessionId);
     });
   });
 
@@ -414,6 +429,20 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
     if (ctx.isIdle()) state.formWindowOpen = false;
   });
 
+  pi.on("agent_start", (event, ctx) => {
+    const context = snapshotContext(ctx);
+    const sessionId = context.sessionId;
+    if (!sessionId) return;
+    // Idle sendMessage({ triggerTurn: true }) skips before_agent_start.
+    // Normal prompts, retries, and queued continuations already own a turn;
+    // keep that ID and its pending completion until agent_settled claims it.
+    if (stateFor(sessionStates, sessionId).activeTurnId) return;
+    const turnId = beginTurn(sessionStates, sessionId, event);
+    enqueueLifecycleTask(sessionId, context, () => (
+      sendHook(dispatcher, "prompt-submit", context, { turn_id: turnId })
+    ));
+  });
+
   const enqueueFeed = (
     eventName: PiFeedEventName,
     event: unknown,
@@ -431,11 +460,32 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
   };
 
   pi.on("tool_execution_start", (event, ctx) => {
+    const context = snapshotContext(ctx);
+    const sessionId = context.sessionId;
+    const toolCallId = firstString(objectValue(event, ["toolCallId", "tool_call_id", "id"]));
+    const command = piToolCommand(event);
+    if (sessionId && toolCallId && command) {
+      stateFor(sessionStates, sessionId).toolCommands.set(toolCallId, command);
+    }
     enqueueFeed(isSubagentTool(event) ? "SubagentStart" : "PreToolUse", event, ctx);
   });
 
   pi.on("tool_execution_end", (event, ctx) => {
     enqueueFeed(isSubagentTool(event) ? "SubagentStop" : "PostToolUse", event, ctx);
+    const context = snapshotContext(ctx);
+    const sessionId = context.sessionId;
+    const toolCallId = firstString(objectValue(event, ["toolCallId", "tool_call_id", "id"]));
+    const state = sessionId ? stateFor(sessionStates, sessionId) : undefined;
+    const command = piToolCommand(event)
+      || (toolCallId ? state?.toolCommands.get(toolCallId) : undefined);
+    if (toolCallId) state?.toolCommands.delete(toolCallId);
+    if (sessionId && command && piGitMetadataCommand(command)) {
+      const action = piPullRequestAction(command);
+      enqueueLifecycleTask(sessionId, context, async () => {
+        await publishPiWorkspaceMetadata(dispatcher, context, sessionId);
+        if (action) await publishPiPullRequestHint(dispatcher, context, sessionId, action);
+      });
+    }
   });
 
   pi.on("session_before_compact", (event, ctx) => {
@@ -455,7 +505,7 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
     // Preserve the latest low-level result until Pi confirms no automatic work remains.
     state.pendingCompletion = {
       lastAssistantMessage: assistantCompletion.lastAssistantMessage || state.pendingCompletion?.lastAssistantMessage,
-      notificationType: firstString(objectValue(event, ["stopReason", "reason", "terminationReason"])) || "completed",
+      notificationType: piQuestionLike(assistantCompletion.lastAssistantMessage) ? "question" : (firstString(objectValue(event, ["stopReason", "reason", "terminationReason"])) || "completed"),
       turnId: currentTurnId(sessionStates, sessionId, event),
       suppressNotification: assistantCompletion.suppressNotification,
     };
@@ -496,7 +546,11 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
   pi.on("session_shutdown", async (event, ctx) => {
     const context = snapshotContext(ctx);
     const sessionId = context.sessionId;
-    if (!sessionId) return;
+    if (!sessionId) {
+      restorePiUIDialogHooks?.();
+      restorePiUIDialogHooks = undefined;
+      return;
+    }
     const state = stateFor(sessionStates, sessionId);
     // (#cm-124.2) A form still open at shutdown gets its one QuestionAnswered, with the span's current id.
     const openSpan = state.activeFormSpan;
@@ -508,6 +562,8 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
       stopPayload = {
         turn_id: turnId,
         terminationReason: firstString(objectValue(event, ["reason"])) || "session_shutdown",
+        // Reload is runtime cleanup, not a completed task. Suppress cmux's fallback notification.
+        cmux_notification_routed: objectValue(event, ["reason"]) === "reload",
       };
     }
     await enqueueLifecycleTask(sessionId, context, async () => {
@@ -523,6 +579,8 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
         releaseSessionRuntime(dispatcher, sessionStates, sessionId);
       }
     });
+    restorePiUIDialogHooks?.();
+    restorePiUIDialogHooks = undefined;
   });
 }
 """#

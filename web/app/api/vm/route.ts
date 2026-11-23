@@ -1,11 +1,22 @@
+import { parseCreateNetworkPolicy } from "../../../services/vms/networkPolicyRoute";
+import { parseCreateAgentUpdates } from "../../../services/vms/agentUpdatesRoute";
+import { parseCreateIdlePause } from "../../../services/vms/idlePauseRoute";
+import {
+  creatorFor,
+  creatorUserIds,
+  readCreatorNames,
+  withCallerName,
+} from "../../../services/vms/creators";
+import { normalizedDisplayName } from "../../../services/vms/displayName";
+import { vmClientRoutesTeamNetworks, vmTeamDirectory } from "../../../services/vms/teamDirectory";
 // Authenticated REST facade over the VM control plane. Native clients use this surface so
 // provider credentials stay behind server-side ownership checks.
 
 import type { Span } from "@opentelemetry/api";
+import * as Effect from "effect/Effect";
 import { preconnectCloudDb } from "../../../db/client";
 import { preconnectFreestyle } from "../../../services/vms/drivers/freestyle";
 import {
-  unauthorized,
   verifyRequest,
   type AuthedUser,
 } from "../../../services/vms/auth";
@@ -25,19 +36,26 @@ import {
 import {
   defaultMemoryMbForPlan,
   lockedMemoryOptionsMbForPlan,
+  legacyPoolReservationForPlan,
   memoryOptionsMbForPlan,
   isPaidVmPlan,
   isVmBillingTeamResolutionError,
   maxMemoryMbForPlan,
+  maxDiskMbForPlan,
+  maxVcpusForPlan,
   upgradePlanForMemory,
+  type TeamEntitlementOverride,
   resolveVmEntitlements,
   type VmEntitlements,
   vmFreeAccessWindowDays,
 } from "../../../services/vms/entitlements";
+import { vcpusByMemoryMb } from "../../../services/vms/images/sizes";
 import {
+  findVmImageManifestEntry,
   inferVmProviderForImage,
   resolveVmImage,
 } from "../../../services/vms/images/resolver";
+import { createAttachBlock } from "../../../services/vms/attachContract";
 import {
   reportVmImageConfigError,
   isVmImageKind,
@@ -49,6 +67,7 @@ import {
 import { reconcileProPlanMetadata } from "../../../services/billing/pro";
 import { getStackServerApp, isStackConfigured } from "../../lib/stack";
 import {
+  invalidVmDisplayNameResponse,
   jsonResponse,
   requestedVmTeamIdFromRequest,
   vmErrorResponse,
@@ -57,32 +76,61 @@ import {
   vmMemoryRequiresPlanResponse,
   vmMemoryUnavailableResponse,
   resolveVmProvisioningAccountScope,
+  reverifyVmRequestForTeam,
   runAfterResponse,
   type VmWorkflowErrorOverrides,
 } from "../../../services/vms/routeHelpers";
 import { vmRequestLocale, vmUnsupportedCopy } from "../../../services/vms/vmErrorMessages";
+import { createRouteAnswerDeadline } from "../../../services/vms/routeDeadline";
 import { runVmRoute } from "../../../services/vms/routeWorkflow";
 import { captureVmProvisionOutcome } from "../../../services/vms/observability";
 import { annotateVmRequestBilling } from "../../../services/vms/requestContext";
 import {
   createVm,
   listUserVms,
+  countSavedUserVms,
 } from "../../../services/vms/workflows";
 import { recordSpanError, setSpanAttributes } from "../../../services/telemetry";
 import {
   measureVmAsync,
   VmTimingRecorder,
 } from "../../../services/vms/timings";
-import { authProviderErrorResponse } from "../../../services/vms/authErrors";
-import { getGoVmUsage, GO_SAVED_VM_LIMIT } from "../../../services/vms/goUsage";
+import { getPlanBudgetUsage, isBudgetPlanId, type PlanBudgetUsage } from "../../../services/vms/planUsage";
+import { publishVmOps, vmSyncReplaceOp } from "../../../services/vms/presencePublisher";
 
 
-// Cold creates (provider VM boot, image pull, cmux-tui bootstrap) routinely
-// run minutes; without an explicit budget the platform default killed them
-// mid-provision. 600s caps a hung provider call well below the 20-minute
-// stuck-provisioning alert. The plan allows more (app/v1/responses/route.ts
-// uses 1800).
-export const maxDuration = 600;
+// Provisioning can run minutes; without an explicit budget the platform
+// default killed it mid-provision. 960 s leaves a create answered "in
+// progress" (routeDeadline.ts, 25 s) its full 15-minute provider deadline plus
+// failure bookkeeping, well below the 20-minute stuck-provisioning alert. The
+// plan allows more (app/v1/responses/route.ts uses 1800).
+export const maxDuration = 960;
+const VM_CREATE_ADMISSION_BUDGET_MS = 200;
+
+/** Compute-hours to one decimal, disk in whole GB, and the reset time. */
+function planBudgetLimits(usage: PlanBudgetUsage | null) {
+  if (!usage) return {};
+  return {
+    computeHoursIncluded: usage.includedComputeSeconds / 3600,
+    computeHoursUsed: Math.round(usage.usedComputeSeconds / 360) / 10,
+    computeBudgetResetsAt: usage.periodEnd.toISOString(),
+    storageBudgetGb: usage.storageBudgetMb / 1024,
+    storageUsedGb: Math.ceil(usage.retainedStorageMb / 1024),
+  };
+}
+
+function createResourceFields(resourceReservation: { readonly vcpus: number; readonly memoryMb: number } | null | undefined) {
+  if (!resourceReservation) return {};
+  return {
+    resources: resourceReservation,
+    resourceReservation,
+  };
+}
+
+/** The quota uses account scope for Plus and the shared billing scope for other plans. */
+function savedMachineListCount(userId: string, billingTeamId: string | null, entitlements: VmEntitlements | null) {
+  return countSavedUserVms(userId, entitlements?.planId === "go" ? undefined : billingTeamId || userId);
+}
 
 export async function GET(request: Request): Promise<Response> {
   return withAuthedVmApiRoute(
@@ -91,6 +139,11 @@ export async function GET(request: Request): Promise<Response> {
     { "cmux.vm.operation": "list" },
     "/api/vm GET failed",
     async ({ user, span }) => {
+      // List traffic is the natural idle-path signal from the Cloud sidebar.
+      // Start warming only after auth so an unauthenticated poll cannot open a
+      // provider socket or database pool on every fresh function instance.
+      void preconnectCloudDb();
+      runAfterResponse(() => preconnectFreestyle());
       let billingTeamId: string | null = null;
       let listEntitlements: ReturnType<typeof resolveVmEntitlements> | null = null;
       const requestedBillingTeamId = requestedVmTeamIdFromRequest(request);
@@ -115,9 +168,16 @@ export async function GET(request: Request): Promise<Response> {
         throw err;
       }
 
+      // Taken BEFORE the read: the presence Worker tombstones machines missing
+      // from this list as of this instant, so a machine created after it
+      // (newer row clock) survives the replace published below.
+      const listObservedAtMs = Date.now();
       const listed = await runVmRoute(listUserVms(user.id, billingTeamId), { request });
       if (!listed.ok) return listed.response;
       const entries = listed.value;
+      // Converge the realtime `vms` collection on exactly what this list shows;
+      // best-effort after the response, never on the request path.
+      void publishVmOps(billingTeamId || user.id, [vmSyncReplaceOp(entries, listObservedAtMs)]);
       setSpanAttributes(span, { "cmux.vm.count": entries.length });
       // REST adapter: expose `id` at the top level so existing CLI + curl users don't need to
       // learn the new `providerVmId` field name. Swift CLI reads `vm["id"]`.
@@ -137,6 +197,25 @@ export async function GET(request: Request): Promise<Response> {
       const freeAccessWindowDays = listEntitlements && !isPaidVmPlan(listEntitlements.planId)
         ? vmFreeAccessWindowDays()
         : 0;
+      // Who made each machine. A team list is scoped by owner team, so this is
+      // the only thing separating one member's machines from another's.
+      const creatorNames = await readCreatorNames({
+        userIds: creatorUserIds(entries),
+        teamId: billingTeamId,
+        caller: user,
+        onFailure: (error) => setSpanAttributes(span, {
+          "cmux.vm.creator_lookup_error": error instanceof Error ? error.name : "unknown",
+        }),
+      });
+      // A migration lagging in one environment turns every row into "Unknown"
+      // with nothing else to show for it. This, with the lookup error above,
+      // separates that from nobody having set a name.
+      setSpanAttributes(span, { "cmux.vm.creator_names": creatorNames.size });
+      // A legacy row without a reservation marker reserves the provider
+      // maximum until reconciliation measures it, exactly as the repository
+      // counts it.
+      const legacyPoolShare = legacyPoolReservationForPlan(listEntitlements?.planId ?? null, process.env);
+      const poolShare = (entry: (typeof entries)[number]) => entry.resourceReservation ?? legacyPoolShare;
       const vms = entries.map((entry) => ({
         id: entry.providerVmId,
         provider: entry.provider,
@@ -150,6 +229,10 @@ export async function GET(request: Request): Promise<Response> {
         createdAt: entry.createdAt,
         displayName: entry.displayName,
         slug: entry.slug,
+        // The account that made this machine, for display. `displayName` is
+        // null when nothing has recorded a name for that account; clients fall
+        // back to "Unknown", never to the raw id.
+        createdBy: creatorFor(entry, creatorNames),
         // The machine's address on its owner's private network (reachable over
         // the WireGuard tunnel); null for machines created before private
         // networking. Clients surface it as "Copy IP Address".
@@ -158,20 +241,48 @@ export async function GET(request: Request): Promise<Response> {
         // (epoch ms); null on paid plans or when the window is disabled. Clients
         // render countdowns from this instead of re-deriving the policy.
         freeAccessExpiresAt: freeAccessExpiresAtMs(entry.createdAt, freeAccessWindowDays),
+        // "image" keeps the baked coding-agent pins; "latest" updates them on attach.
+        agentUpdates: entry.agentUpdates,
+        // Minutes idle before the machine pauses by itself; 0 is Off.
+        idlePauseMinutes: entry.idlePauseMinutes,
+        idlePause: entry.idlePause,
+        // "idle" or "user" on a machine the control plane paused, else null.
+        pauseReason: entry.pauseReason,
+        // Contract recorded when the provider attached cmux-tui. This is
+        // rollout metadata, not a live daemon probe.
+        cmuxTuiContract: entry.cmuxTuiContract,
+        // `resources` remains the server-authoritative pool claim used by
+        // limits.used*. Legacy rows conservatively claim the provider
+        // maximum until reconciliation. The explicit marker is separate so
+        // clients can use the measured live shape for grow-only checks.
+        resources: poolShare(entry),
+        ...(entry.resourceReservation ? { resourceReservation: entry.resourceReservation } : {}),
       }));
+      const activeEntries = entries.filter((vm) => vm.status === "running" || vm.status === "provisioning");
+      // Count allocations before a provider ID exists as well as visible machines.
+      // Plus is account-wide; other plans share the create admission billing scope.
+      const counted = await runVmRoute(savedMachineListCount(user.id, billingTeamId, listEntitlements), { request });
+      if (!counted.ok) return counted.response;
+      const savedVmCount = counted.value;
       const limits = listEntitlements
         ? {
           maxActiveVms: listEntitlements.maxActiveVms,
-          activeVmCount: entries.filter((vm) => vm.status === "running" || vm.status === "provisioning").length,
+          // Legacy wire key: the quota counts saved machines, including paused ones.
+          activeVmCount: savedVmCount,
+          savedVmCount,
+          savedVmLimit: listEntitlements.maxActiveVms,
+          // The plan's shared pool (null when the plan has none) and what the
+          // active machines draw from it. Paused machines do not count.
+          poolVcpus: listEntitlements.resourcePool?.vcpus ?? null,
+          poolMemoryMb: listEntitlements.resourcePool?.memoryMb ?? null,
+          usedVcpus: activeEntries.reduce((sum, entry) => sum + poolShare(entry).vcpus, 0),
+          usedMemoryMb: activeEntries.reduce((sum, entry) => sum + poolShare(entry).memoryMb, 0),
           planId: listEntitlements.planId,
           freeAccessWindowDays,
-          ...(listEntitlements.planId === "go" ? {
-            vmHoursIncluded: 40,
-            vmHoursUsed: await getGoVmUsage(user.id)
-              .then((usage) => usage ? Math.round(usage.usedSeconds / 360) / 10 : null)
-              .catch(() => null),
-            savedVmLimit: GO_SAVED_VM_LIMIT,
-          } : {}),
+          // Pro and Max monthly allowance; absent when none applies.
+          ...(isBudgetPlanId(listEntitlements.planId)
+            ? await getPlanBudgetUsage(user.id).then(planBudgetLimits).catch(() => ({}))
+            : {}),
           // The earliest expiry across the caller's machines: what a fleet header
           // counts down to. Null when nothing is on a window.
           freeAccessExpiresAt: vms.reduce<number | null>(
@@ -180,21 +291,32 @@ export async function GET(request: Request): Promise<Response> {
               : earliest === null ? vm.freeAccessExpiresAt : Math.min(earliest, vm.freeAccessExpiresAt),
             null,
           ),
-          memoryOptionsMb: memoryOptionsMbForPlan(listEntitlements.planId, process.env),
+          memoryOptionsMb: memoryOptionsMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride),
+          // Resize ceilings are part of the same plan contract as the create
+          // ladder. Native clients use these values to avoid offering a
+          // provider-valid size that the caller's plan cannot use.
+          maxDiskMb: maxDiskMbForPlan(listEntitlements.planId, process.env),
+          maxMemoryMb: maxMemoryMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride),
+          maxVcpus: maxVcpusForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride),
           // Ladder sizes the plan does not include, and the plan that sells
           // them, so a "new machine" dialog shows them locked with an upgrade
           // instead of hiding that larger machines exist.
-          lockedMemoryOptionsMb: lockedMemoryOptionsMbForPlan(listEntitlements.planId, process.env).memoryOptionsMb,
-          memoryUpgradePlanId: lockedMemoryOptionsMbForPlan(listEntitlements.planId, process.env).upgradePlanId,
-          memoryUpgradePlansByMb: Object.fromEntries(lockedMemoryOptionsMbForPlan(listEntitlements.planId, process.env).memoryOptionsMb
+          lockedMemoryOptionsMb: lockedMemoryOptionsMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride).memoryOptionsMb,
+          memoryUpgradePlanId: lockedMemoryOptionsMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride).upgradePlanId,
+          memoryUpgradePlansByMb: Object.fromEntries(lockedMemoryOptionsMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride).memoryOptionsMb
             .flatMap((mb) => {
-              const plan = upgradePlanForMemory(mb, listEntitlements.planId);
+              const plan = upgradePlanForMemory(mb, listEntitlements.planId, process.env, listEntitlements.entitlementOverride);
               return plan ? [[String(mb), plan]] : [];
             })),
+          // vCPUs for every size above, so a client labels a size without its own table.
+          vcpusByMemoryMb: vcpusByMemoryMb([
+            ...memoryOptionsMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride),
+            ...lockedMemoryOptionsMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride).memoryOptionsMb,
+          ]),
           // Kinds a client may request (and the image each resolves to) for the
           // default provider, so a "new machine" dialog offers only kinds that work.
           imageKinds: listVmImageKinds(defaultProviderId(), process.env, {
-            memoryMb: defaultMemoryMbForPlan(listEntitlements.planId, process.env),
+            memoryMb: defaultMemoryMbForPlan(listEntitlements.planId, process.env, listEntitlements.entitlementOverride),
           }),
         }
         : undefined;
@@ -204,9 +326,10 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  // Warm the Freestyle and database connections while the caller is being verified.
-  preconnectFreestyle();
-  preconnectCloudDb();
+  // Database warming is an optimization only: its driver may wait on a
+  // provider-controlled connect deadline, so it must never delay validation or
+  // turn an authenticated create into an unbounded database health check.
+  void preconnectCloudDb();
   return withAuthedVmApiRoute(
     request,
     "/api/vm",
@@ -215,7 +338,27 @@ export async function POST(request: Request): Promise<Response> {
     async ({ user: initialUser, span, authDurationMs, routeStartedAtMs, setResponseFinalizer }) => {
       const timing = new VmTimingRecorder(span, "create", { startedAt: routeStartedAtMs });
       timing.record("auth", authDurationMs);
+      // Start the provider probe after authentication, but never make machine
+      // creation wait for it. The provider request owns its connection setup;
+      // a best-effort probe cannot guarantee socket reuse and otherwise adds
+      // its full latency to the first create.
+      void preconnectFreestyle();
+      let admissionRecorded = false;
+      let admissionStartedAt = performance.now();
+      /** Records request validation even when it exits before provisioning. */
+      const recordAdmission = () => {
+        if (admissionRecorded) return;
+        admissionRecorded = true;
+        const durationMs = performance.now() - admissionStartedAt;
+        timing.record("admission", durationMs);
+        setSpanAttributes(span, {
+          "cmux.vm.admission_ms": Math.round(durationMs * 100) / 100,
+          "cmux.vm.admission_budget_ms": VM_CREATE_ADMISSION_BUDGET_MS,
+          "cmux.vm.admission_within_budget": durationMs <= VM_CREATE_ADMISSION_BUDGET_MS,
+        });
+      };
       setResponseFinalizer((response) => {
+        recordAdmission();
         timing.finish({ status: response.status });
         // Per-stage timings travel with the response too, so a client or a
         // smoke run sees where a create spent its time without Axiom.
@@ -235,9 +378,14 @@ export async function POST(request: Request): Promise<Response> {
       if (!scope.ok) return scope.response;
       const { user, entitlements } = scope;
 
-      const memory = await resolveCreateMemory(span, entitlements.planId, candidate.memoryMb as number | undefined, request);
+      // Let the workflow inspect an idempotent existing row before rejecting
+      // an old, now-over-limit shape. New allocations still receive the same
+      // typed plan error from createVm.
+      const memory = await resolveCreateMemory(span, entitlements.planId, candidate.memoryMb as number | undefined, request, !!idempotencyKey, entitlements.entitlementOverride);
       if (!memory.ok) return memory.response;
       const memoryMb = memory.memoryMb;
+      const machineOptions = parseCreateMachineOptions(candidate);
+      if (!machineOptions.ok) return machineOptions.response;
 
       // Resolve provider/image only after the paid-plan boundary. A free or
       // unknown plan must receive `vm_requires_pro` without consulting
@@ -246,7 +394,7 @@ export async function POST(request: Request): Promise<Response> {
       // provider-specific image ids without a provider field, and the
       // deployment default must not reroute them under the wrong provider.
       const provider = body.provider ?? inferVmProviderForImage(body.image) ?? defaultProviderId();
-      const selected = resolveCreateImage(provider, body, memoryMb);
+      const selected = resolveCreateImage(provider, body, memoryMb, user.id);
       if (!selected.ok) return selected.response;
       const { imageSelection } = selected;
       const image = imageSelection.image;
@@ -264,6 +412,12 @@ export async function POST(request: Request): Promise<Response> {
         "cmux.idempotency_key_set": !!idempotencyKey,
       });
 
+      // Admission starts after request validation. Its budget describes only
+      // request validation; the durable begin_create phase is recorded inside
+      // the workflow and remains authoritative.
+      admissionStartedAt = performance.now();
+      recordAdmission();
+
       // Wire the machine to coderouter inside the workflow: the route token
       // is bound to the VM row id, so provisioning runs after the row exists
       // and before the provider call, and a failure fails the create.
@@ -279,23 +433,36 @@ export async function POST(request: Request): Promise<Response> {
         billingTeamId: entitlements.billingTeamId,
         billingPlanId: entitlements.planId,
         maxActiveVms: entitlements.maxActiveVms,
+        entitlementOverride: entitlements.entitlementOverride,
         image,
         imageVersion: imageSelection.imageVersion,
         provider,
         idempotencyKey,
+        displayName: body.displayName,
         persistentHome: homeVolumeRequested && candidate.persistentHome === true,
         perMachineHome: homeVolumeRequested && candidate.perMachineHome === true,
         memoryMb,
         imageSize: imageSelection.size ?? undefined,
         modelPlane,
+        networkPolicy: machineOptions.networkPolicy,
+        agentUpdates: machineOptions.agentUpdates,
+        idlePauseMinutes: machineOptions.idlePauseMinutes,
+        teamDirectory: vmClientRoutesTeamNetworks(request) ? vmTeamDirectory() : undefined,
         timing,
+        // Keep the `vm.created` ledger write off New Machine's critical path.
+        deferAfterResponse: (work) => runAfterResponse(() => Effect.runPromise(work)),
       }), {
         request,
+        ...createRouteAnswerDeadline(idempotencyKey),
         onError: createErrorResponders(entitlements),
       });
       if (!run.ok) return run.response;
       const created = run.value;
       setSpanAttributes(span, { "cmux.vm.id": created.providerVmId });
+      const attach = createAttachBlock({
+        entry: created,
+        manifestEntry: findVmImageManifestEntry(created.provider, created.image, imageSelection.kind),
+      });
       return jsonResponse({
         id: created.providerVmId,
         provider: created.provider,
@@ -307,9 +474,37 @@ export async function POST(request: Request): Promise<Response> {
         capabilities: vmCapabilitiesFor(created.provider),
         displayName: created.displayName,
         slug: created.slug,
+        // Same field the list carries. A client that appends this response to
+        // its list instead of re-reading would otherwise show one row with no
+        // author sitting among rows that have one.
+        createdBy: creatorFor(created, withCallerName(new Map(), user)),
+        // The private address and attach contract let the app dial the new
+        // machine's baked daemon directly. Without them, New Machine pays a
+        // fleet list re-read plus a whole POST /attach-endpoint round trip
+        // (~2 s measured) for data this response already had.
+        address: { ipv4: created.addressIpv4, ipv6: created.addressIpv6 },
+        cmuxTuiContract: created.cmuxTuiContract,
+        agentUpdates: created.agentUpdates,
+        idlePauseMinutes: created.idlePauseMinutes,
+        // Keep the create response self-contained for clients that append it
+        // directly to their fleet model. Pool accounting and the per-machine
+        // resize shape are separate contracts even when they currently match.
+        ...createResourceFields(created.resourceReservation),
+        ...(attach ? { attach } : {}),
       });
     },
   );
+}
+
+/** The create body's outbound network policy and agent-update setting. */
+function parseCreateMachineOptions(candidate: Record<string, unknown>) {
+  const networkPolicy = parseCreateNetworkPolicy(candidate.networkPolicy);
+  if (!networkPolicy.ok) return networkPolicy;
+  const agentUpdates = parseCreateAgentUpdates(candidate.agentUpdates);
+  if (!agentUpdates.ok) return agentUpdates;
+  const idlePause = parseCreateIdlePause(candidate);
+  if (!idlePause.ok) return idlePause;
+  return { ok: true as const, networkPolicy: networkPolicy.policy, agentUpdates: agentUpdates.setting, idlePauseMinutes: idlePause.minutes };
 }
 
 /**
@@ -359,6 +554,7 @@ async function unsupportedCreateOptionResponse(
 }
 
 type CreateBody = {
+  readonly displayName: string | null;
   readonly image?: string;
   readonly kind?: VmImageKind;
   readonly provider?: ProviderId;
@@ -424,10 +620,12 @@ async function parseCreateRequest(
     };
   }
   const candidate = (raw ?? {}) as Record<string, unknown>;
-  const invalid = invalidCreateFieldResponse(candidate, request);
+  const invalid = await invalidCreateFieldResponse(candidate, request);
   if (invalid) return { ok: false, response: invalid };
+  const displayName = normalizedDisplayName(candidate.displayName ?? null) ?? null;
   const bodyBillingTeamId = candidate.billingTeamId ?? candidate.teamId;
   const body: CreateBody = {
+    displayName,
     image: typeof candidate.image === "string" ? candidate.image : undefined,
     kind: isVmImageKind(candidate.kind) ? candidate.kind : undefined,
     provider: candidate.provider as ProviderId | undefined,
@@ -450,7 +648,20 @@ function invalidCreateRequestResponse(message: string, action: string, details: 
 }
 
 /** The first field-level 400 for a create body, in the order the fields are documented. */
-function invalidCreateFieldResponse(candidate: Record<string, unknown>, request: Request): Response | null {
+async function invalidCreateFieldResponse(candidate: Record<string, unknown>, request: Request): Promise<Response | null> {
+  return (await invalidCreateDisplayNameResponse(candidate, request))
+    ?? invalidCreateFieldResponseWithoutDisplayName(candidate, request);
+}
+
+/** A person types the name, so unlike the other fields its rejection is localized. */
+async function invalidCreateDisplayNameResponse(candidate: Record<string, unknown>, request: Request): Promise<Response | null> {
+  if (candidate.displayName !== undefined && normalizedDisplayName(candidate.displayName) === undefined) {
+    return invalidVmDisplayNameResponse(request);
+  }
+  return null;
+}
+
+function invalidCreateFieldResponseWithoutDisplayName(candidate: Record<string, unknown>, request: Request): Response | null {
   if (candidate.image !== undefined && typeof candidate.image !== "string") {
     return invalidCreateRequestResponse(
       "`image` must be a string when provided.",
@@ -542,20 +753,16 @@ async function resolveCreateAccount(input: {
   readonly body: CreateBody;
 }): Promise<CreateAccountScope> {
   const { request, span, timing } = input;
-  let user = input.user;
   const requestedBillingTeamId = input.body.billingTeamId || requestedVmTeamIdFromRequest(request);
-  if (requestedBillingTeamId && !user.teamIds.includes(requestedBillingTeamId)) {
-    let refreshedUser: AuthedUser | null;
-    try {
-      refreshedUser = await measureVmAsync(timing, "auth", () =>
-        verifyRequest(request, { requestedTeamId: requestedBillingTeamId })
-      );
-    } catch (error) {
-      return { ok: false, response: authProviderErrorResponse(error, "/api/vm.create.team-auth") };
-    }
-    if (!refreshedUser) return { ok: false, response: unauthorized() };
-    user = refreshedUser;
-  }
+  const reverified = await reverifyVmRequestForTeam({
+    request,
+    user: input.user,
+    requestedBillingTeamId,
+    authErrorLabel: "/api/vm.create.team-auth",
+    measure: (run) => measureVmAsync(timing, "auth", run),
+  });
+  if (!reverified.ok) return reverified;
+  let user = reverified.user;
   // Read-time reconcile: a Stripe subscription change is corrected here
   // right before paid limits apply. Best-effort — billing reads must
   // not block VM creation, so the whole reconcile races a hard
@@ -628,16 +835,19 @@ async function resolveCreateMemory(
   planId: string,
   requestedMemoryMb: number | undefined,
   request: Request,
+  deferLockedPlanCheck = false,
+  override: TeamEntitlementOverride | null = null,
 ): Promise<{ readonly ok: true; readonly memoryMb: number } | { readonly ok: false; readonly response: Response }> {
-  const maxMemoryMb = maxMemoryMbForPlan(planId, process.env);
-  const memoryOptionsMb = memoryOptionsMbForPlan(planId, process.env);
-  const planMemoryMb = defaultMemoryMbForPlan(planId, process.env);
-  const locked = lockedMemoryOptionsMbForPlan(planId, process.env);
+  const maxMemoryMb = maxMemoryMbForPlan(planId, process.env, override);
+  const memoryOptionsMb = memoryOptionsMbForPlan(planId, process.env, override);
+  const planMemoryMb = defaultMemoryMbForPlan(planId, process.env, override);
+  const locked = lockedMemoryOptionsMbForPlan(planId, process.env, override);
+  const requestedLockedMemory = requestedMemoryMb !== undefined && locked.memoryOptionsMb.includes(requestedMemoryMb);
   if (
-    requestedMemoryMb !== undefined &&
-    locked.memoryOptionsMb.includes(requestedMemoryMb)
+    !deferLockedPlanCheck &&
+    requestedLockedMemory
   ) {
-    const upgradePlanId = upgradePlanForMemory(requestedMemoryMb, planId);
+    const upgradePlanId = upgradePlanForMemory(requestedMemoryMb, planId, process.env, override);
     if (!upgradePlanId) return { ok: false, response: await vmMemoryUnavailableResponse(maxMemoryMb, vmRequestLocale(request)) };
     setSpanAttributes(span, {
       "cmux.vm.memory_mb": requestedMemoryMb,
@@ -656,7 +866,7 @@ async function resolveCreateMemory(
     };
   }
   const memoryMb =
-    requestedMemoryMb === undefined || memoryOptionsMb.includes(requestedMemoryMb)
+    requestedMemoryMb === undefined || memoryOptionsMb.includes(requestedMemoryMb) || (deferLockedPlanCheck && requestedLockedMemory)
       ? requestedMemoryMb ?? planMemoryMb
       : planMemoryMb;
   setSpanAttributes(span, {
@@ -676,10 +886,10 @@ type CreateImageSelection =
  * The plan's memory picks the snapshot size (one snapshot per size on
  * Freestyle), so the machine boots at its shape with nothing to resize.
  */
-function resolveCreateImage(provider: ProviderId, body: CreateBody, memoryMb: number): CreateImageSelection {
+function resolveCreateImage(provider: ProviderId, body: CreateBody, memoryMb: number, callerUserId: string): CreateImageSelection {
   try {
     assertVmCreateEnabled(provider);
-    const imageSelection = resolveVmImage(provider, body.image, process.env, { kind: body.kind, memoryMb });
+    const imageSelection = resolveVmImage(provider, body.image, process.env, { kind: body.kind, memoryMb, callerUserId });
     return { ok: true, imageSelection };
   } catch (err) {
     if (isVmCreateDisabledError(err)) {
@@ -774,8 +984,9 @@ function createErrorResponders(entitlements: {
       vmActiveLimitExceededResponse({
         locale: context.locale,
         limit: error.limit,
+        activeMachines: error.activeMachines,
         planId: entitlements.planId,
-        retryAction: "Run `cmux vm ls`, then delete an active VM with `cmux vm rm <id>` before creating another, or upgrade your plan.",
+        retryAction: "Run `cmux vm ls`, then delete a VM with `cmux vm rm <id>` before creating another, or upgrade your plan.",
       }),
     VmCreateCreditsInsufficientError: (error) => {
       const billsUser = entitlements.billingCustomerType === "user";

@@ -1,8 +1,11 @@
+import CmuxCloudBannerCore
+import CmuxCloud
+import CmuxCore
 import Foundation
 import Observation
 
-/// One shared browser route. HTTP uses the userspace hub; HTTPS retains its
-/// certificate identity on the private network. VPN state never changes routes.
+/// One shared service route. In-app browsers use an authenticated proxy
+/// through userspace WireGuard while retaining the VM address and port.
 @MainActor
 @Observable
 final class CloudPortAccessModel {
@@ -11,6 +14,7 @@ final class CloudPortAccessModel {
         case connecting
         case stopping
         case direct
+        case proxied(CloudBrowserProxyEndpoint)
         case forwarded(UInt16)
         case failed(String)
         case closed
@@ -24,6 +28,12 @@ final class CloudPortAccessModel {
     private let wake: @MainActor () async throws -> Void
     private let startForward: @MainActor (CloudPortForwardTarget) async throws -> UInt16
     private let stopForward: @MainActor () async -> Void
+    private let startBrowserProxy: (@MainActor () async throws -> CloudBrowserProxyEndpoint)?
+    /// Browser-proxy routes can retain a guest-local origin (for example
+    /// `https://localhost:8443`). Raw loopback forwards rewrite the origin to
+    /// an HTTP listener, but the proxy preserves TLS and the original host.
+    private let preservesRemoteHost: Bool
+    var usesRemoteNetwork: Bool { route == .remoteBrowser }
     private var observation: Task<Void, Never>?
     private var operation: Task<Void, Never>?
     private var generation = 0
@@ -34,14 +44,18 @@ final class CloudPortAccessModel {
         wake: @escaping @MainActor () async throws -> Void,
         startForward: @escaping @MainActor (CloudPortForwardTarget) async throws -> UInt16,
         stopForward: @escaping @MainActor () async -> Void,
-        route: CloudPortAccessRoute = .privateNetwork
+        route: CloudPortAccessRoute = .privateNetwork,
+        startBrowserProxy: (@MainActor () async throws -> CloudBrowserProxyEndpoint)? = nil,
+        preservesRemoteHost: Bool = false
     ) {
         self.target = target
         self.coordinator = coordinator
         self.wake = wake
         self.startForward = startForward
         self.stopForward = stopForward
-        self.route = route
+        self.route = startBrowserProxy == nil || route == .remoteBrowser ? route : .browserProxy
+        self.startBrowserProxy = startBrowserProxy
+        self.preservesRemoteHost = preservesRemoteHost
     }
 
     var failureMessage: String? {
@@ -58,7 +72,18 @@ final class CloudPortAccessModel {
     }
 
     var isReady: Bool {
-        switch phase { case .direct, .forwarded: return true; default: return false }
+        switch phase { case .direct, .forwarded, .proxied: return true; default: return false }
+    }
+
+    var browserProxy: CloudBrowserProxyEndpoint? {
+        if case .proxied(let endpoint) = phase { return endpoint }
+        return nil
+    }
+
+    var usesBrowserProxy: Bool { route == .browserProxy || route == .remoteBrowser }
+
+    func connectBrowser(force: Bool = false) {
+        if force { retry() } else { connect() }
     }
 
     var localAddress: String? {
@@ -117,6 +142,15 @@ final class CloudPortAccessModel {
 
     private func start() {
         switch route {
+        case .direct:
+            run { .direct }
+        case .browserProxy, .remoteBrowser:
+            guard let startBrowserProxy else { return }
+            run { [wake] in
+                try await wake()
+                try Task.checkCancellation()
+                return .proxied(try await startBrowserProxy())
+            }
         case .loopback:
             run { [wake, startForward, target] in
                 try await wake()
@@ -160,8 +194,21 @@ final class CloudPortAccessModel {
 
     func url(for remoteURL: URL) -> URL? {
         switch phase {
-        case .direct: return CloudPortRoutePlan.privateURL(remoteURL.absoluteString, address: target.host)
-        case .forwarded(let port): return CloudPortRoutePlan.localURL(rewriting: remoteURL.absoluteString, toLoopbackPort: port)
+        case .direct where route == .direct: return remoteURL
+        case .direct: return CloudPortRoutePolicy().privateURL(remoteURL.absoluteString, address: target.host)
+        case .proxied where preservesRemoteHost:
+            // WebKit bypasses its CONNECT proxy for literal loopback hosts.
+            // Use the cmux alias only on the wire; CloudBrowserAccessState maps
+            // the committed URL back to the guest's localhost origin for the
+            // address bar and session snapshot.
+            guard remoteURL.scheme?.lowercased() == "http",
+                  RemoteLoopbackProxyAlias.isLoopbackHost(remoteURL.host ?? ""),
+                  var components = URLComponents(url: remoteURL, resolvingAgainstBaseURL: false)
+            else { return remoteURL }
+            components.host = RemoteLoopbackProxyAlias.aliasHost
+            return components.url ?? remoteURL
+        case .proxied: return CloudPortRoutePolicy().privateURL(remoteURL.absoluteString, address: target.host)
+        case .forwarded(let port): return CloudPortRoutePolicy().localURL(rewriting: remoteURL.absoluteString, toLoopbackPort: port)
         default: return nil
         }
     }

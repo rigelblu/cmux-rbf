@@ -1,3 +1,4 @@
+import CmuxCloud
 import CMUXMobileCore
 import CmuxSettings
 import Foundation
@@ -43,15 +44,12 @@ struct MobileHostIdentityTests {
             "com.cmux.app",
             "dev.cmux.app.beta",
             "dev.cmux.app.internal",
-            "dev.cmux.app.demo",
+            "dev.cmux.app.classic",
         ])
         #expect(store.selectedNamespace?.bundleIdentifier == "com.cmux.app")
         #expect(
             store.selectedPairingURLScheme?.rawValue
                 == "cmux-ios-com.cmux.app"
-        )
-        #expect(
-            store.pushTargetNamespace?.bundleIdentifier == "com.cmux.app"
         )
 
         let internalNamespace = try #require(MobileIOSAppNamespace(
@@ -59,10 +57,31 @@ struct MobileHostIdentityTests {
         ))
         #expect(store.select(internalNamespace))
         #expect(store.selectedNamespace == internalNamespace)
-        #expect(store.pushTargetNamespace == internalNamespace)
         #expect(
             store.selectedPairingURLScheme?.rawValue
                 == "cmux-ios-dev.cmux.app.internal"
+        )
+    }
+
+    @Test func storedRetiredDemoTargetFallsBackToTheAppStoreApp() throws {
+        let suiteName = "mobile-ios-target-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        // A Mac that picked cmux DEMO before it was retired.
+        defaults.set(
+            "dev.cmux.app.demo",
+            forKey: MobileIOSPairingTargetStore.defaultsKey
+        )
+        let store = MobileIOSPairingTargetStore(
+            defaults: defaults,
+            macInstanceTag: "default"
+        )
+
+        #expect(!store.availableNamespaces.map(\.bundleIdentifier).contains("dev.cmux.app.demo"))
+        #expect(store.selectedNamespace?.bundleIdentifier == "com.cmux.app")
+        #expect(
+            store.selectedPairingURLScheme?.rawValue
+                == "cmux-ios-com.cmux.app"
         )
     }
 
@@ -79,15 +98,12 @@ struct MobileHostIdentityTests {
             "com.cmux.app",
             "dev.cmux.app.beta",
             "dev.cmux.app.internal",
-            "dev.cmux.app.demo",
+            "dev.cmux.app.classic",
         ])
         #expect(store.selectedNamespace?.bundleIdentifier == "com.cmux.app")
         #expect(
             store.selectedPairingURLScheme?.rawValue
                 == "cmux-ios-com.cmux.app"
-        )
-        #expect(
-            store.pushTargetNamespace?.bundleIdentifier == "com.cmux.app"
         )
     }
 
@@ -96,7 +112,7 @@ struct MobileHostIdentityTests {
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(
-            "dev.cmux.app.demo",
+            "dev.cmux.app.classic",
             forKey: MobileIOSPairingTargetStore.defaultsKey
         )
         let store = MobileIOSPairingTargetStore(
@@ -111,13 +127,13 @@ struct MobileHostIdentityTests {
             store.selectedNamespace?.bundleIdentifier
                 == "dev.cmux.ios.future-one"
         )
-        let demoNamespace = try #require(MobileIOSAppNamespace(
-            bundleIdentifier: "dev.cmux.app.demo"
+        let classicNamespace = try #require(MobileIOSAppNamespace(
+            bundleIdentifier: "dev.cmux.app.classic"
         ))
-        #expect(!store.select(demoNamespace))
+        #expect(!store.select(classicNamespace))
         #expect(
             defaults.string(forKey: MobileIOSPairingTargetStore.defaultsKey)
-                == "dev.cmux.app.demo"
+                == "dev.cmux.app.classic"
         )
     }
 

@@ -1,6 +1,7 @@
 import AppKit
 import CmuxWorkspaces
 import CoreGraphics
+import CmuxFoundation
 import Foundation
 import SwiftUI
 
@@ -29,6 +30,9 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     let isAnchorActive: Bool
     let isMultiSelected: Bool
     let multiSelectionBackgroundStyle: SidebarWorkspaceRowBackgroundStyle
+    /// Hairline painted while this header is anchor-active; nil when subtle
+    /// selection is off.
+    var anchorActiveEdgeColor: NSColor? = nil
     let memberCount: Int
     var anchorUnreadCount: Int
     var anchorMarkedUnread: Bool = false
@@ -37,6 +41,13 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     var hasLatestNotifications: Bool
     var canMarkAllRead: Bool
     var canMarkAllUnread: Bool
+    /// Compact status mode: the loudest state among the workspaces the header
+    /// stands in for; see ``SidebarCompactStatusGlyph/groupHeader(isCollapsed:anchorId:memberIds:members:unread:)``.
+    var statusGlyph: SidebarCompactStatusGlyph?
+    /// Whether `sidebar.compactAgentStatus` is on. Compact mode shows unread
+    /// as the glyph, so the numeric badge never returns, not even when no
+    /// member state is loud enough to roll up.
+    var compactsAgentStatus = false
     /// Resolved modifier-hold hint (for example "⌘3"); nil hides the pill.
     let shortcutHintText: String?
     let shortcutHintXOffset: Double
@@ -74,10 +85,15 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     var groupStatusMenu: SidebarWorkspaceGroupStatusMenu? = nil // (#cm-110.2)
     /// Distinguishes status-related headers from upstream workspace group headers (#cm-110.1).
     var statusHeaderKind: SidebarStatusHeaderKind? = nil // (#cm-110.1)
-    /// Status glyph icon for status group header drawing (#cm-110.1).
-    var statusGlyph: WorkspaceStatusGlyph? = nil // (#cm-110.1)
+    /// Status glyph icon for status group header drawing (#cm-110.1). Named `statusHeaderGlyph`, not `statusGlyph`,
+    /// since the cm-142 sync: upstream's compact-status `statusGlyph` above took that name.
+    var statusHeaderGlyph: WorkspaceStatusGlyph? = nil // (#cm-110.1)
     /// The cmux status his entry extends: the glyph drawn when the entry names no icon of its own (#cm-110.1).
     var statusBehavesAs: WorkspaceTaskStatus = .working // (#cm-110.1)
+    /// Notification Badge color setting; nil falls back to the cmux accent.
+    let notificationBadgeColorHex: String?
+    /// Resolved cmux accent for the badge fallback and drop indicators.
+    var accentColor = CmuxAccentColor()
 }
 
 /// Behavior bundle for one group header row; recreated per apply and excluded

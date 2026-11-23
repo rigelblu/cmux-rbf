@@ -1,46 +1,5 @@
 import AppKit
 
-@MainActor
-func presentSidebarWorkspaceGroupRenamePrompt(
-    tabManager: TabManager,
-    groupId: UUID,
-    currentName: String
-) {
-    let alert = NSAlert()
-    alert.messageText = String(
-        localized: "workspaceGroup.rename.title",
-        defaultValue: "Rename Group"
-    )
-    alert.informativeText = String(
-        localized: "workspaceGroup.rename.message",
-        defaultValue: "Enter a new name for this group."
-    )
-    alert.addButton(
-        withTitle: String(localized: "workspaceGroup.rename.confirm", defaultValue: "Rename")
-    )
-    alert.addButton(
-        withTitle: String(localized: "common.cancel", defaultValue: "Cancel")
-    )
-    let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-    input.stringValue = currentName
-    input.placeholderString = String(
-        localized: "workspaceGroup.rename.placeholder",
-        defaultValue: "Group name"
-    )
-    alert.accessoryView = input
-
-    let alertWindow = alert.window
-    alertWindow.initialFirstResponder = input
-    DispatchQueue.main.async {
-        alertWindow.makeFirstResponder(input)
-        input.selectText(nil)
-    }
-
-    let response = alert.runCmuxModal()
-    guard response == .alertFirstButtonReturn else { return }
-    tabManager.renameWorkspaceGroup(groupId: groupId, name: input.stringValue)
-}
-
 /// `#RRGGBB` entry for a group's colour, the twin of the workspace row's
 /// **Choose Custom Color…**.
 ///
@@ -86,7 +45,9 @@ func presentSidebarWorkspaceGroupCustomColorPrompt(
     tabManager.setWorkspaceGroupColor(groupId: groupId, hex: normalized)
 }
 
-/// Shared "that is not a hex colour" alert for both custom-colour prompts.
+/// "That is not a hex colour" alert for the group's custom-colour prompt. Its text matches
+/// upstream's `WorkspaceCustomColorPrompt`, so a workspace and a group say the same thing
+/// about the same bad hex.
 @MainActor
 func presentInvalidWorkspaceColorAlert(_ value: String, presentingWindow: NSWindow?) {
     let alert = NSAlert()
@@ -96,7 +57,10 @@ func presentInvalidWorkspaceColorAlert(_ value: String, presentingWindow: NSWind
     if trimmed.isEmpty {
         alert.informativeText = String(localized: "alert.invalidColor.emptyMessage", defaultValue: "Enter a hex color in the format #RRGGBB.")
     } else {
-        alert.informativeText = String(localized: "alert.invalidColor.invalidMessage", defaultValue: "\"\(trimmed)\" is not a valid hex color. Use #RRGGBB.")
+        alert.informativeText = String(
+            format: String(localized: "alert.invalidColor.invalidMessage", defaultValue: "\"%@\" is not a valid hex color. Use #RRGGBB."),
+            trimmed
+        )
     }
     alert.addButton(withTitle: String(localized: "alert.invalidColor.ok", defaultValue: "OK"))
     _ = alert.runCmuxModal(presentingWindow: presentingWindow)

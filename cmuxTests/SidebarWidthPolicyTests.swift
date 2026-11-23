@@ -1,145 +1,149 @@
 import AppKit
 import CmuxAppKitSupportUI
 import CmuxFoundation
+import CmuxSettings
 import SwiftUI
 import Testing
-import XCTest
 
 #if canImport(cmux_DEV)
-@testable import cmux_DEV
+    @testable import cmux_DEV
 #elseif canImport(cmux)
-@testable import cmux
+    @testable import cmux
 #endif
 
-final class SidebarWidthPolicyTests: XCTestCase {
+@Suite(.serialized)
+struct SidebarWidthPolicyTests {
     private let settingsFileBackupsDefaultsKey = "cmux.settingsFile.backups.v1"
     private let importedManagedDefaultsKey = "cmux.settingsFile.importedManagedDefaults.v1"
 
-    func testDefaultMinimumSidebarWidthIsPersistedProductDefault() {
+    @Test
+    func defaultMinimumSidebarWidthIsPersistedProductDefault() {
         let suiteName = "SidebarWidthPolicyTests.defaultMinimum.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        XCTAssertEqual(
-            SessionPersistencePolicy.defaultMinimumSidebarWidth,
-            240,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            SessionPersistencePolicy.resolvedMinimumSidebarWidth(defaults: defaults),
-            240,
-            accuracy: 0.001
+        #expect(abs(SessionPersistencePolicy.defaultMinimumSidebarWidth - 240) <= 0.001)
+        #expect(
+            abs(SessionPersistencePolicy.resolvedMinimumSidebarWidth(defaults: defaults) - 240) <= 0.001
         )
     }
 
-    func testContentViewClampKeepsMinimumSidebarWidth() {
-        XCTAssertEqual(
-            ContentView.clampedSidebarWidth(184, maximumWidth: 600),
-            CGFloat(SessionPersistencePolicy.minimumSidebarWidth),
-            accuracy: 0.001
+    @Test
+    func contentViewClampKeepsMinimumSidebarWidth() {
+        #expect(
+            abs(
+                ContentView.clampedSidebarWidth(184, maximumWidth: 600)
+                    - CGFloat(SessionPersistencePolicy.minimumSidebarWidth)
+            ) <= 0.001
         )
     }
 
-    func testContentViewClampCanUseSmallerConfiguredMinimumSidebarWidth() {
-        XCTAssertEqual(
-            ContentView.clampedSidebarWidth(184, maximumWidth: 600, minimumWidth: 160),
-            184,
-            accuracy: 0.001
+    @Test
+    func contentViewClampCanUseSmallerConfiguredMinimumSidebarWidth() {
+        #expect(
+            abs(ContentView.clampedSidebarWidth(184, maximumWidth: 600, minimumWidth: 160) - 184) <= 0.001
         )
-        XCTAssertEqual(
-            ContentView.clampedSidebarWidth(140, maximumWidth: 600, minimumWidth: 160),
-            160,
-            accuracy: 0.001
+        #expect(
+            abs(ContentView.clampedSidebarWidth(140, maximumWidth: 600, minimumWidth: 160) - 160) <= 0.001
         )
     }
 
-    func testSessionPersistenceReadsConfiguredMinimumSidebarWidth() {
+    @Test
+    func sessionPersistenceReadsConfiguredMinimumSidebarWidth() {
         let suiteName = "SidebarWidthPolicyTests.minimumSidebarWidth.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         defaults.set(160.0, forKey: SessionPersistencePolicy.sidebarMinimumWidthKey)
-        XCTAssertEqual(
-            SessionPersistencePolicy.sanitizedSidebarWidth(140, defaults: defaults),
-            160,
-            accuracy: 0.001
+        #expect(
+            abs(SessionPersistencePolicy.sanitizedSidebarWidth(nil, defaults: defaults) - 160) <= 0.001)
+        #expect(
+            abs(SessionPersistencePolicy.sanitizedSidebarWidth(140, defaults: defaults) - 160) <= 0.001)
+        #expect(
+            abs(SessionPersistencePolicy.sanitizedSidebarWidth(184, defaults: defaults) - 184) <= 0.001)
+    }
+
+    @Test
+    func sessionPersistenceFallbackNeverExceedsMaximumSidebarWidth() {
+        let suiteName = "SidebarWidthPolicyTests.maximumSidebarWidth.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(
+            SessionPersistencePolicy.maximumSidebarWidth + 100,
+            forKey: SessionPersistencePolicy.sidebarMinimumWidthKey
         )
-        XCTAssertEqual(
-            SessionPersistencePolicy.sanitizedSidebarWidth(184, defaults: defaults),
-            184,
-            accuracy: 0.001
+        let fallback = SessionPersistencePolicy.sanitizedSidebarWidth(nil, defaults: defaults)
+
+        #expect(fallback <= SessionPersistencePolicy.maximumSidebarWidth)
+    }
+
+    @Test
+    func rightSidebarClampAllowsWideExplorerOnLargeWindows() {
+        #expect(abs(ContentView.clampedRightSidebarWidth(900, availableWidth: 1600) - 900) <= 0.001)
+    }
+
+    @Test
+    func rightSidebarFirstCustomMaximumMatchesBuiltInCap() {
+        #expect(
+            abs(
+                ContentView.clampedRightSidebarWidth(10_000, availableWidth: 10_000)
+                    - CGFloat(RightSidebarWidthSettings.defaultConfiguredMaximumWidth)
+            ) <= 0.001
         )
     }
 
-    func testRightSidebarClampAllowsWideExplorerOnLargeWindows() {
-        XCTAssertEqual(
-            ContentView.clampedRightSidebarWidth(900, availableWidth: 1600),
-            900,
-            accuracy: 0.001
+    @Test
+    func rightSidebarClampLeavesTerminalWidthWhenMaxWidthSettingIsMissing() {
+        #expect(abs(ContentView.clampedRightSidebarWidth(10_000, availableWidth: 1000) - 640) <= 0.001)
+    }
+
+    @Test
+    func rightSidebarConfiguredMaxCanExceedBuiltInDefaultOnWideWindows() {
+        #expect(
+            abs(
+                ContentView.clampedRightSidebarWidth(
+                    10_000,
+                    availableWidth: 2400,
+                    configuredMaximumWidth: 1_500
+                ) - 1_500
+            ) <= 0.001
         )
     }
 
-    func testRightSidebarFirstCustomMaximumMatchesBuiltInCap() {
-        XCTAssertEqual(
-            ContentView.clampedRightSidebarWidth(10_000, availableWidth: 10_000),
-            CGFloat(RightSidebarWidthSettings.defaultConfiguredMaximumWidth),
-            accuracy: 0.001
+    @Test
+    func rightSidebarConfiguredMaxStillLeavesTerminalWidth() {
+        #expect(
+            abs(
+                ContentView.clampedRightSidebarWidth(
+                    10_000,
+                    availableWidth: 1000,
+                    configuredMaximumWidth: 1_400
+                ) - 640
+            ) <= 0.001
         )
     }
 
-    func testRightSidebarClampLeavesTerminalWidthWhenMaxWidthSettingIsMissing() {
-        XCTAssertEqual(
-            ContentView.clampedRightSidebarWidth(10_000, availableWidth: 1000),
-            640,
-            accuracy: 0.001
+    @Test
+    func rightSidebarConfiguredMaxBelowMinimumClampsToMinimumWidth() {
+        #expect(
+            abs(
+                ContentView.clampedRightSidebarWidth(
+                    10_000,
+                    availableWidth: 1000,
+                    configuredMaximumWidth: 120
+                ) - 295
+            ) <= 0.001
         )
     }
 
-    func testRightSidebarConfiguredMaxCanExceedBuiltInDefaultOnWideWindows() {
-        XCTAssertEqual(
-            ContentView.clampedRightSidebarWidth(
-                10_000,
-                availableWidth: 2400,
-                configuredMaximumWidth: 1_500
-            ),
-            1_500,
-            accuracy: 0.001
-        )
+    @Test
+    func rightSidebarClampKeepsMinimumWidth() {
+        #expect(abs(ContentView.clampedRightSidebarWidth(20, availableWidth: 1000) - 295) <= 0.001)
     }
 
-    func testRightSidebarConfiguredMaxStillLeavesTerminalWidth() {
-        XCTAssertEqual(
-            ContentView.clampedRightSidebarWidth(
-                10_000,
-                availableWidth: 1000,
-                configuredMaximumWidth: 1_400
-            ),
-            640,
-            accuracy: 0.001
-        )
-    }
-
-    func testRightSidebarConfiguredMaxBelowMinimumClampsToMinimumWidth() {
-        XCTAssertEqual(
-            ContentView.clampedRightSidebarWidth(
-                10_000,
-                availableWidth: 1000,
-                configuredMaximumWidth: 120
-            ),
-            276,
-            accuracy: 0.001
-        )
-    }
-
-    func testRightSidebarClampKeepsMinimumWidth() {
-        XCTAssertEqual(
-            ContentView.clampedRightSidebarWidth(20, availableWidth: 1000),
-            276,
-            accuracy: 0.001
-        )
-    }
-
-    func testSettingsFileStoreAppliesRightSidebarMaxWidthSetting() throws {
+    @Test
+    func settingsFileStoreAppliesRightSidebarMaxWidthSetting() throws {
         let defaults = UserDefaults.standard
         let managedKey = RightSidebarWidthSettings.maxWidthKey
         let previousValues = [
@@ -186,14 +190,15 @@ final class SidebarWidthPolicyTests: XCTestCase {
             startWatching: false
         )
 
-        XCTAssertEqual(defaults.double(forKey: managedKey), 900, accuracy: 0.001)
-        let configuredMaximumWidth = try XCTUnwrap(
+        #expect(abs(defaults.double(forKey: managedKey) - 900) <= 0.001)
+        let configuredMaximumWidth = try #require(
             RightSidebarWidthSettings().configuredMaximumWidth(from: defaults.double(forKey: managedKey))
         )
-        XCTAssertEqual(configuredMaximumWidth, 900, accuracy: 0.001)
+        #expect(abs(configuredMaximumWidth - 900) <= 0.001)
     }
 
-    func testSettingsFileStoreClampsRightSidebarMaxWidthSetting() throws {
+    @Test
+    func settingsFileStoreClampsRightSidebarMaxWidthSetting() throws {
         let defaults = UserDefaults.standard
         let managedKey = RightSidebarWidthSettings.maxWidthKey
         let previousValues = [
@@ -240,41 +245,80 @@ final class SidebarWidthPolicyTests: XCTestCase {
             startWatching: false
         )
 
-        XCTAssertEqual(
-            defaults.double(forKey: managedKey),
-            RightSidebarWidthSettings.settingsEditorMaximumWidth,
-            accuracy: 0.001
+        #expect(
+            abs(
+                defaults.double(forKey: managedKey)
+                    - RightSidebarWidthSettings.settingsEditorMaximumWidth
+            ) <= 0.001
         )
-        let configuredMaximumWidth = try XCTUnwrap(
+        let configuredMaximumWidth = try #require(
             RightSidebarWidthSettings().configuredMaximumWidth(from: defaults.double(forKey: managedKey))
         )
-        XCTAssertEqual(
-            configuredMaximumWidth,
-            RightSidebarWidthSettings.settingsEditorMaximumWidth,
-            accuracy: 0.001
+        #expect(
+            abs(configuredMaximumWidth - RightSidebarWidthSettings.settingsEditorMaximumWidth) <= 0.001
         )
     }
 
-    func testLeadingSidebarResizeRangeFavorsSidebarSide() {
+    @Test
+    func leadingSidebarResizeRangeFavorsSidebarSide() {
         let range = SidebarResizeInteraction.Edge.leading.hitRange(dividerX: 200)
 
-        XCTAssertEqual(range.lowerBound, 194, accuracy: 0.001)
-        XCTAssertEqual(range.upperBound, 204, accuracy: 0.001)
-        XCTAssertTrue(range.contains(196))
-        XCTAssertTrue(range.contains(202))
-        XCTAssertFalse(range.contains(193.9))
-        XCTAssertFalse(range.contains(204.1))
+        #expect(abs(range.lowerBound - 194) <= 0.001)
+        #expect(abs(range.upperBound - 204) <= 0.001)
+        #expect(range.contains(196))
+        #expect(range.contains(202))
+        #expect(!range.contains(193.9))
+        #expect(!range.contains(204.1))
     }
 
-    func testTrailingSidebarResizeRangeFavorsSidebarSide() {
+    @Test
+    func trailingSidebarResizeRangeFavorsSidebarSide() {
         let range = SidebarResizeInteraction.Edge.trailing.hitRange(dividerX: 680)
 
-        XCTAssertEqual(range.lowerBound, 676, accuracy: 0.001)
-        XCTAssertEqual(range.upperBound, 686, accuracy: 0.001)
-        XCTAssertTrue(range.contains(678))
-        XCTAssertTrue(range.contains(684))
-        XCTAssertFalse(range.contains(675.9))
-        XCTAssertFalse(range.contains(686.1))
+        #expect(abs(range.lowerBound - 676) <= 0.001)
+        #expect(abs(range.upperBound - 686) <= 0.001)
+        #expect(range.contains(678))
+        #expect(range.contains(684))
+        #expect(!range.contains(675.9))
+        #expect(!range.contains(686.1))
+    }
+}
+
+@MainActor
+@Suite(.serialized)
+struct SidebarWidthWindowCreationTests {
+    @Test func newWindowUsesConfiguredMinimumWhenNoWidthWasPersisted() async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            _ = NSApplication.shared
+            let defaults = UserDefaults.standard
+            let key = SessionPersistencePolicy.sidebarMinimumWidthKey
+            let savedValue = defaults.object(forKey: key)
+            let previousAppDelegate = AppDelegate.shared
+
+            defaults.set(160.0, forKey: key)
+            let appDelegate = AppDelegate()
+            AppDelegate.shared = appDelegate
+            var windowId: UUID?
+            defer {
+                if let windowId {
+                    _ = appDelegate.closeMainWindow(windowId: windowId, recordHistory: false)
+                }
+                if let savedValue {
+                    defaults.set(savedValue, forKey: key)
+                } else {
+                    defaults.removeObject(forKey: key)
+                }
+                AppDelegate.shared = previousAppDelegate
+            }
+
+            let createdWindowId = appDelegate.createMainWindow(shouldActivate: false)
+            windowId = createdWindowId
+            let context = try #require(
+                appDelegate.mainWindowContexts.values.first { $0.windowId == createdWindowId }
+            )
+
+            #expect(context.sidebarState.persistedWidth == 160)
+        }
     }
 }
 
@@ -338,11 +382,15 @@ struct AppWebThemeContrastTests {
     }
 }
 
-final class SidebarWorkspaceSelectionColorTests: XCTestCase {
+@Suite
+struct SidebarWorkspaceSelectionColorTests {
     /// `cm-10` inverted this policy. These two tests previously asserted that a
     /// selected coloured row collapsed into the global selection background;
     /// it now keeps its own contrast-corrected colour, in both appearances.
-    func testSelectedColoredWorkspaceKeepsItsOwnColorInLightAndDark() {
+    /// cmux-rbf: changed on purpose (#cm-10): kept over upstream's standard-selection-background
+    /// test, in upstream's Swift Testing form.
+    @Test
+    func selectedColoredWorkspaceKeepsItsOwnColorInLightAndDark() {
         for colorScheme in [ColorScheme.light, .dark] {
             func fill(customColorHex: String?) -> NSColor? {
                 SidebarWorkspaceRowVisualPalette(
@@ -360,20 +408,21 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
 
             let colored = fill(customColorHex: "#E85D75")
             let uncolored = fill(customColorHex: nil)
-            XCTAssertNotNil(colored)
-            XCTAssertFalse(
-                colorsAreEqual(colored, uncolored),
+            #expect(colored != nil)
+            #expect(
+                !colorsAreEqual(colored, uncolored),
                 "A selected coloured row must keep its own colour, not the global selection background"
             )
-            XCTAssertGreaterThanOrEqual(
-                cmuxContrastRatio(foreground: .white, background: colored ?? .clear),
-                4.5,
+            #expect(
+                cmuxContrastRatio(foreground: .white, background: colored ?? .clear) >= 4.5,
                 "The active fill must stay readable with white content"
             )
         }
     }
 
-    func testConfiguredSelectionColorStillStylesUncoloredRowsOnly() {
+    /// cmux-rbf: changed on purpose (#cm-10): a configured selection colour styles uncoloured rows only.
+    @Test
+    func configuredSelectionColorStillStylesUncoloredRowsOnly() {
         func fill(customColorHex: String?) -> NSColor? {
             SidebarWorkspaceRowVisualPalette(
                 isActive: true,
@@ -389,42 +438,39 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
         }
 
         assertColor(fill(customColorHex: nil), equals: NSColor(hex: "#123456"))
-        XCTAssertFalse(
-            colorsAreEqual(fill(customColorHex: "#E85D75"), NSColor(hex: "#123456")),
+        #expect(
+            !colorsAreEqual(fill(customColorHex: "#E85D75"), NSColor(hex: "#123456")),
             "A configured selection colour must not reclaim a coloured row's fill"
         )
     }
 
-    func testDefaultSelectedForegroundFallsBackForPaleSelectionBackground() throws {
-        let background = try XCTUnwrap(NSColor(hex: "#F7F7F7"))
+    @Test
+    func defaultSelectedForegroundFallsBackForPaleSelectionBackground() throws {
+        let background = try #require(NSColor(hex: "#F7F7F7"))
         let foreground = sidebarSelectedWorkspaceForegroundNSColor(
             on: background,
             opacity: 1.0
         )
 
         assertColor(foreground, equals: .black)
-        XCTAssertGreaterThanOrEqual(
-            cmuxContrastRatio(foreground: foreground, background: background),
-            4.5
-        )
+        #expect(cmuxContrastRatio(foreground: foreground, background: background) >= 4.5)
     }
 
-    func testSelectedForegroundPrefersWhiteForSaturatedSelectionBackground() throws {
-        let background = try XCTUnwrap(NSColor(hex: "#0088FF"))
+    @Test
+    func selectedForegroundPrefersWhiteForSaturatedSelectionBackground() throws {
+        let background = try #require(NSColor(hex: "#0088FF"))
         let foreground = sidebarSelectedWorkspaceForegroundNSColor(
             on: background,
             opacity: 1.0
         )
 
         assertColor(foreground, equals: .white)
-        XCTAssertGreaterThanOrEqual(
-            cmuxContrastRatio(foreground: foreground, background: background),
-            3.0
-        )
+        #expect(cmuxContrastRatio(foreground: foreground, background: background) >= 3.0)
     }
 
-    func testSelectedForegroundKeepsWhiteForStandardInactiveSelectionBlue() throws {
-        let background = try XCTUnwrap(NSColor(hex: "#6795F5"))
+    @Test
+    func selectedForegroundKeepsWhiteForStandardInactiveSelectionBlue() throws {
+        let background = try #require(NSColor(hex: "#6795F5"))
         let foreground = sidebarSelectedWorkspaceForegroundNSColor(
             on: background,
             opacity: 0.75
@@ -433,8 +479,9 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
         assertColor(foreground, equals: NSColor.white.withAlphaComponent(0.75))
     }
 
-    func testTitlebarControlForegroundContrastsWithLightTerminalBackground() throws {
-        let background = try XCTUnwrap(NSColor(hex: "#F7F7F7"))
+    @Test
+    func titlebarControlForegroundContrastsWithLightTerminalBackground() throws {
+        let background = try #require(NSColor(hex: "#F7F7F7"))
         let snapshot = makeWindowAppearanceSnapshot(background: background)
         let foreground = titlebarControlForegroundNSColor(
             opacity: 1.0,
@@ -442,32 +489,27 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
         )
 
         assertColor(foreground, equals: .black)
-        XCTAssertGreaterThanOrEqual(
+        #expect(
             cmuxContrastRatio(
                 foreground: foreground,
                 background: snapshot.compositedTerminalBackgroundColor
-            ),
-            4.5
+            ) >= 4.5
         )
     }
 
     private func assertColor(
         _ actual: NSColor?,
         equals expected: NSColor?,
-        file: StaticString = #filePath,
-        line: UInt = #line
     ) {
         guard let actual, let expected else {
-            XCTAssertNotNil(actual, file: file, line: line)
-            XCTAssertNotNil(expected, file: file, line: line)
+            #expect(actual != nil)
+            #expect(expected != nil)
             return
         }
 
-        XCTAssertTrue(
+        #expect(
             colorsAreEqual(actual, expected),
-            "Expected \(colorDescription(actual)) to equal \(colorDescription(expected))",
-            file: file,
-            line: line
+            "Expected \(colorDescription(actual)) to equal \(colorDescription(expected))"
         )
     }
 
@@ -479,9 +521,9 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
             terminalRenderingMode: .windowHostBackdrop,
             unifySurfaceBackdrops: true,
             sidebarSettings: SidebarBackdropSettingsSnapshot(
-                materialRawValue: SidebarMaterialOption.sidebar.rawValue,
-                blendModeRawValue: SidebarBlendModeOption.withinWindow.rawValue,
-                stateRawValue: SidebarStateOption.followWindow.rawValue,
+                materialRawValue: WindowChromeSidebarMaterialOption.sidebar.rawValue,
+                blendModeRawValue: WindowChromeSidebarBlendModeOption.withinWindow.rawValue,
+                stateRawValue: WindowChromeSidebarStateOption.followWindow.rawValue,
                 tintHex: SidebarTintDefaults().hex,
                 tintHexLight: nil,
                 tintHexDark: nil,
@@ -491,7 +533,7 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
                 colorScheme: .light
             ),
             windowGlassSettings: WindowGlassSettingsSnapshot(
-                sidebarBlendModeRawValue: SidebarBlendModeOption.withinWindow.rawValue,
+                sidebarBlendModeRawValue: WindowChromeSidebarBlendModeOption.withinWindow.rawValue,
                 isEnabled: false,
                 tintHex: "#000000",
                 tintOpacity: 0,
@@ -506,7 +548,8 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
             return lhs == nil && rhs == nil
         }
         guard let lhsRGB = lhs.usingColorSpace(.sRGB),
-              let rhsRGB = rhs.usingColorSpace(.sRGB) else {
+            let rhsRGB = rhs.usingColorSpace(.sRGB)
+        else {
             return false
         }
 
@@ -521,10 +564,8 @@ final class SidebarWorkspaceSelectionColorTests: XCTestCase {
         lhsRGB.getRed(&lhsRed, green: &lhsGreen, blue: &lhsBlue, alpha: &lhsAlpha)
         rhsRGB.getRed(&rhsRed, green: &rhsGreen, blue: &rhsBlue, alpha: &rhsAlpha)
 
-        return abs(lhsRed - rhsRed) <= 0.001 &&
-            abs(lhsGreen - rhsGreen) <= 0.001 &&
-            abs(lhsBlue - rhsBlue) <= 0.001 &&
-            abs(lhsAlpha - rhsAlpha) <= 0.001
+        return abs(lhsRed - rhsRed) <= 0.001 && abs(lhsGreen - rhsGreen) <= 0.001
+            && abs(lhsBlue - rhsBlue) <= 0.001 && abs(lhsAlpha - rhsAlpha) <= 0.001
     }
 
     private func colorDescription(_ color: NSColor) -> String {

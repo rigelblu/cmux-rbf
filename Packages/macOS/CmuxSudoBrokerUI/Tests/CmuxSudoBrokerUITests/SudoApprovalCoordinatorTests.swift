@@ -117,6 +117,29 @@ struct SudoApprovalCoordinatorTests {
         #expect(await broker.stopCallCount == 1)
     }
 
+    @Test("Application termination starts broker shutdown without waiting for it")
+    func terminationShutdownDoesNotBlockCaller() async {
+        let broker = BlockingStopSudoBroker()
+        let coordinator = SudoApprovalCoordinator(
+            broker: broker,
+            presenter: RecordingSudoApprovalPresenter()
+        )
+        var startEvents = await broker.startEvents().makeAsyncIterator()
+        var stopEvents = await broker.stopEvents().makeAsyncIterator()
+
+        coordinator.start { error in
+            Issue.record("Unexpected startup failure: \(error)")
+        }
+        _ = await startEvents.next()
+
+        coordinator.stopInBackgroundForTermination()
+        _ = await stopEvents.next()
+        #expect(await broker.stopCallCount == 1)
+
+        await broker.releaseFirstStop()
+        await coordinator.stop()
+    }
+
     @Test("A restart requested during shutdown begins only after shutdown joins")
     func restartAfterCancelledTermination() async {
         let broker = BlockingStopSudoBroker()
@@ -210,17 +233,19 @@ struct SudoApprovalCoordinatorTests {
         await coordinator.stop()
     }
 
-    @Test("A closed pending review window is recreated by the next snapshot")
+    @Test("A closed pending review window is recreated by the next snapshot", .timeLimit(.minutes(1)))
     func closedPendingWindowReappears() async throws {
         let snapshot = Self.snapshot(id: "request-closed")
         let broker = RecordingSudoBroker(initialSnapshots: [snapshot])
         let presenter = RecordingSudoApprovalPresenter()
         let coordinator = SudoApprovalCoordinator(broker: broker, presenter: presenter)
+        var events = presenter.events.makeAsyncIterator()
 
         try await coordinator.start()
+        #expect(await events.next() == .presented(snapshot.request.id))
         presenter.close(id: snapshot.request.id)
         await broker.send(.snapshot([snapshot]))
-        await Task.yield()
+        #expect(await events.next() == .presented(snapshot.request.id))
 
         #expect(presenter.presentCallCount == 2)
         await coordinator.stop()
@@ -333,6 +358,7 @@ private actor BlockingStopSudoBroker: SudoBrokerServing {
     }
 
     var startCallCount: Int { starts }
+    var stopCallCount: Int { stops }
 
     func startEvents() -> AsyncStream<Void> { startEventStream }
     func stopEvents() -> AsyncStream<Void> { stopEventStream }

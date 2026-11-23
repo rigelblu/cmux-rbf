@@ -1,4 +1,10 @@
 import {
+  creatorFor,
+  readCreatorNames,
+} from "../../../../services/vms/creators";
+import { normalizedDisplayName } from "../../../../services/vms/displayName";
+import {
+  invalidVmDisplayNameResponse,
   jsonResponse,
   notFoundVm,
   resolveVmRouteAccountScope,
@@ -14,6 +20,10 @@ import { deleteVmPublicationsForVmDeletion } from "../../../../services/vm-publi
 import { publicationErrorResponse } from "../publications/routeShared";
 import { vmModelPlaneRevoker } from "../../../../services/vms/modelPlaneGateway";
 
+
+// Mirrors VM_ROUTE_DEADLINES (services/vms/routeDeadline.ts): work past the
+// route's answer deadline continues through after() until this limit.
+export const maxDuration = 300;
 
 export async function GET(
   request: Request,
@@ -34,7 +44,10 @@ export async function GET(
         billingTeamId: account.entitlements.billingTeamId,
         teamIds: user.teamIds,
         providerVmId: id,
-      }), { request });
+        // A status read is how a gone machine is usually noticed first, and the
+        // row it retires is one no destroy or cron pass can revisit.
+        modelPlane: vmModelPlaneRevoker(),
+      }), { request, readDeadline: { operation: "getVm" } });
       if (!run.ok) return run.response;
       const vm = run.value;
       // The same machine shape `GET /api/vm` lists: `kind` is what the client
@@ -51,26 +64,27 @@ export async function GET(
         createdAt: vm.createdAt,
         displayName: vm.displayName,
         slug: vm.slug,
+        // Same field the list carries. A client that merges a detail read into
+        // the row it already listed would otherwise overwrite the author with
+        // nothing, and the resulting "Unknown" reads as a client bug.
+        createdBy: creatorFor(vm, await readCreatorNames({
+          userIds: [vm.createdByUserId],
+          teamId: vm.ownerTeamId,
+          caller: user,
+        })),
         address: { ipv4: vm.addressIpv4 ?? null, ipv6: vm.addressIpv6 ?? null },
+        agentUpdates: vm.agentUpdates,
+        idlePauseMinutes: vm.idlePauseMinutes,
+        idlePause: vm.idlePause,
+        pauseReason: vm.pauseReason,
+        // Contract recorded when the provider attached cmux-tui. This is
+        // rollout metadata, not a live daemon probe.
+        cmuxTuiContract: vm.cmuxTuiContract,
       });
     },
   );
 }
 
-const DISPLAY_NAME_MAX_LENGTH = 64;
-
-/** Validates a requested display name: null clears the label; a non-empty
- * printable string up to 64 chars sets it. Returns undefined on invalid. */
-function normalizedDisplayName(raw: unknown): string | null | undefined {
-  if (raw === null) return null;
-  if (typeof raw !== "string") return undefined;
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return null;
-  if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) return undefined;
-  // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f\u007f]/.test(trimmed)) return undefined;
-  return trimmed;
-}
 
 export async function PATCH(
   request: Request,
@@ -97,10 +111,7 @@ export async function PATCH(
       }
       const displayName = normalizedDisplayName((body as { displayName: unknown }).displayName);
       if (displayName === undefined) {
-        return jsonResponse(
-          { error: `displayName must be a printable string of at most ${DISPLAY_NAME_MAX_LENGTH} characters, or null to clear` },
-          400,
-        );
+        return invalidVmDisplayNameResponse(request);
       }
       const run = await runVmRoute(renameVm({
         userId: user.id,
@@ -108,7 +119,7 @@ export async function PATCH(
         teamIds: user.teamIds,
         providerVmId: id,
         displayName,
-      }), { request });
+      }), { request, deadline: { operation: "rename" } });
       if (!run.ok) return run.response;
       const vm = run.value;
       return jsonResponse({
@@ -153,7 +164,7 @@ export async function DELETE(
         teamIds: user.teamIds,
         providerVmId: id,
         modelPlane: vmModelPlaneRevoker(),
-      }), { request });
+      }), { request, deadline: { operation: "destroy" } });
       if (!run.ok) return run.response;
       return jsonResponse({ ok: true });
     },

@@ -8,7 +8,7 @@ Workspace groups let you gather workspaces into collapsible named groups in the 
 
 Every group has one **anchor**: the workspace behind the group's name. The group header in the sidebar IS the anchor's row — there is no separate row for it. Clicking the header name focuses the anchor's panels. Clicking the chevron collapses or expands the group. (The CLI, the JSON and `cmux.json` all say "anchor".)
 
-A group's anchor is always a brand new workspace at creation time; grouping a selection or `create` never promotes one of your existing workspaces into the anchor. The anchor's working directory is inherited from the first selected workspace (when grouping a selection) or from the active workspace (when creating via the CLI without `--cwd`).
+When a group is created from existing workspaces, the first listed workspace becomes the anchor and no extra terminal is created. An empty group gets a new generated anchor. The anchor's working directory is inherited from the first selected workspace (when grouping a selection) or from the active workspace (when creating via the CLI without `--cwd`). A generated anchor that is still an untouched shell is skipped when you click the header name area and the first real member is focused instead.
 
 Closing the anchor closes only that workspace and **promotes the next workspace directly in the group to be the new anchor**, so the group and its other workspaces stay (the promoted workspace then shows the group name as the header). If the anchor was the last workspace directly in the group, what happens next depends on the group:
 
@@ -139,7 +139,7 @@ The layout, top to bottom, in the sidebar and inside every group:
 
 Press `⌃⌘G` to create a new empty workspace group. cmux inserts a fresh anchor as the group header and auto-names it `Group 1`, `Group 2`, … (rename anytime via the header context menu). `⌃⌘G` always makes the group in the sidebar, outside every group.
 
-Select two or more workspaces in the sidebar, press `⌘⇧G`. A fresh anchor is inserted above the selection; all selected workspaces join the group. The group is auto-named `Group 1`, `Group 2`, … (rename anytime via the header context menu). If the topmost selected workspace that is not another group's anchor sits inside a group, the new group is made inside that group, where that workspace was, instead of in the sidebar. `⌘⇧G` collides with React Grab's default; the group handler only consumes the chord when there is an explicit sidebar multi-selection of at least two workspaces, so React Grab still fires in single-selection and browser/terminal contexts. Rebind in Settings → Keyboard if you'd rather the two not share a key.
+Select two or more workspaces in the sidebar, press `⌘⇧G`. The first selected workspace becomes the anchor; all selected workspaces join the group without creating an extra terminal. The group is auto-named `Group 1`, `Group 2`, … (rename anytime via the header context menu). If the topmost selected workspace that is not another group's anchor sits inside a group, the new group is made inside that group, where that workspace was, instead of in the sidebar. `⌘⇧G` collides with React Grab's default; the group handler only consumes the chord when there is an explicit sidebar multi-selection of at least two workspaces, so React Grab still fires in single-selection and browser/terminal contexts. Rebind in Settings → Keyboard if you'd rather the two not share a key.
 
 Single-tab groups are not created from the shortcut. Use the workspace context menu's **New Group from Workspace** entry for that.
 

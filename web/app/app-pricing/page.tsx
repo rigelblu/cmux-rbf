@@ -1,7 +1,7 @@
 import { cache, Suspense } from "react";
 import { headers } from "next/headers";
 import { connection } from "next/server";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getStackServerApp, isStackConfigured } from "../lib/stack";
 import {
   FREE_PLAN_ID,
@@ -9,9 +9,14 @@ import {
   isDevelopmentProAccessEnabled,
   resolveProPlanStatus,
 } from "../../services/billing/pro";
-import { isGoPlanEnabled } from "../../services/billing/goPlanFlag";
+import { isWebPlusPlanEnabled as isGoPlanEnabled } from "../../services/billing/goPlanFlag";
 import { PricingView } from "../components/pricing-checkout";
-import { AppPricingContent, type AppPlanSnapshot } from "./pricing-content";
+import { isAppStoreDistributionMode } from "../lib/billing";
+import {
+  AppPricingContent,
+  appPricingRequestSignInHref,
+  type AppPlanSnapshot,
+} from "./pricing-content";
 import { AppPricingFallback, unknownPlan } from "./pricing-fallback";
 
 const ANONYMOUS_IF_EXISTS = "anonymous-if-exists[deprecated]" as const;
@@ -42,6 +47,12 @@ async function RequestPricing({
     : params.cmux_app;
   if (app !== "1") redirect("/pricing");
   const headersList = await headers();
+  // A signed-out app signs in before it sees a plan button. Checkout opens in
+  // the default browser, so a purchase from here would leave the app signed
+  // out, or bill a different account than the app uses.
+  if (!isAppStoreDistributionMode(params) && (await isSignedOut())) {
+    redirect(appPricingRequestSignInHref(params, headersList));
+  }
   const fallback = {
     params,
     headersList,
@@ -73,10 +84,32 @@ async function RequestPricing({
   );
 }
 
+/** The request's account, looked up once per render. */
+const requestUser = cache(async () => {
+  // Stack uses a clock internally; this account lookup belongs to the live request.
+  await connection();
+  return getStackServerApp().getUser({ or: ANONYMOUS_IF_EXISTS });
+});
+
+/**
+ * True only when the lookup worked and found no signed-in account. An outage
+ * keeps the page reachable; checkout still requires an account.
+ */
+async function isSignedOut(): Promise<boolean> {
+  if (!isStackConfigured() || isDevelopmentProAccessEnabled()) return false;
+  try {
+    const user = await requestUser();
+    return !user || user.isAnonymous;
+  } catch (error) {
+    unstable_rethrow(error);
+    return false;
+  }
+}
+
 const pricingState = cache(async () => {
   const snapshot = await currentPlanSnapshot();
-  const goPlanEnabled =
-    !snapshot.isPro && (await isGoPlanEnabled(snapshot.userId));
+  // Plus is offered to every visitor, paid subscribers included.
+  const goPlanEnabled = await isGoPlanEnabled(snapshot.userId);
   return { snapshot, goPlanEnabled };
 });
 
@@ -99,7 +132,30 @@ async function PersonalizedPricing({
   );
 }
 
+/**
+ * Personalization only. A Hexclave or billing outage must leave the pricing
+ * page intact, so any failure renders the signed-out plan state.
+ */
 async function currentPlanSnapshot(): Promise<AppPlanSnapshot> {
+  try {
+    return await readPlanSnapshot();
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("App pricing personalization failed", {
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
+    return {
+      authenticated: false,
+      developmentPro: false,
+      planId: FREE_PLAN_ID,
+      isPro: false,
+      billingManagement: "none",
+      email: null,
+    };
+  }
+}
+
+async function readPlanSnapshot(): Promise<AppPlanSnapshot> {
   if (!isStackConfigured()) {
     return {
       authenticated: false,
@@ -111,9 +167,7 @@ async function currentPlanSnapshot(): Promise<AppPlanSnapshot> {
     };
   }
 
-  // Stack uses a clock internally; this account lookup belongs to the live request.
-  await connection();
-  const user = await getStackServerApp().getUser({ or: ANONYMOUS_IF_EXISTS });
+  const user = await requestUser();
   if (!user) {
     const developmentPro = isDevelopmentProAccessEnabled();
     return {
@@ -146,6 +200,9 @@ async function currentPlanSnapshot(): Promise<AppPlanSnapshot> {
     planId: status.planId,
     isPro: status.isPro,
     billingManagement: status.billingManagement,
+    billingSource: status.billingSource,
+    cancelScheduled: status.cancelScheduled ?? false,
+    paymentPastDue: status.paymentPastDue ?? false,
     email: user.primaryEmail,
   };
 }

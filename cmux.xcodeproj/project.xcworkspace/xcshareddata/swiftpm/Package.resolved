@@ -1,15 +1,6 @@
 {
-  "originHash" : "ce87fe1e61890cda0ef71ec4c0e914fa469e4271990934507b3b64d069099a5c",
+  "originHash" : "3cd44ae58b61951a325387c880c3bca269f1cb94a49394241e6a05ae30104983",
   "pins" : [
-    {
-      "identity" : "aexml",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tadija/AEXML.git",
-      "state" : {
-        "revision" : "dd9206de0717d658daec6a064992894fdab8ae17",
-        "version" : "4.7.3"
-      }
-    },
     {
       "identity" : "highlightr",
       "kind" : "remoteSourceControl",
@@ -24,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/manaflow-ai/iroh-ffi.git",
       "state" : {
-        "revision" : "7bcc93b4255935546df04f66f22cf130972212e7",
-        "version" : "1.0.2-cmux.7.ios17.1"
+        "revision" : "ee19f156667ca640b912108a45f8b5bb8d156fec",
+        "version" : "1.2.0-cmux.1.ios17"
       }
     },
     {
@@ -35,15 +26,6 @@
       "state" : {
         "revision" : "2849f5323265386e200484b0d0f896e73c3411b9",
         "version" : "6.0.1"
-      }
-    },
-    {
-      "identity" : "pathkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/kylef/PathKit.git",
-      "state" : {
-        "revision" : "3bfd2737b700b9a36565a8c94f4ad2b050a5e574",
-        "version" : "1.0.1"
       }
     },
     {
@@ -74,12 +56,12 @@
       }
     },
     {
-      "identity" : "spectre",
+      "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/kylef/Spectre.git",
+      "location" : "https://github.com/apple/swift-argument-parser",
       "state" : {
-        "revision" : "26cc5e9ae0947092c7139ef7ba612e34646086c7",
-        "version" : "0.10.1"
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
       }
     },
     {
@@ -125,15 +107,6 @@
       "state" : {
         "revision" : "0687f71944021d616d34d922343dcef086855920",
         "version" : "600.0.1"
-      }
-    },
-    {
-      "identity" : "xcodeproj",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tuist/XcodeProj.git",
-      "state" : {
-        "revision" : "de37089f9c739bfc9fe8d76cd8755e26848aeefe",
-        "version" : "9.15.1"
       }
     }
   ],

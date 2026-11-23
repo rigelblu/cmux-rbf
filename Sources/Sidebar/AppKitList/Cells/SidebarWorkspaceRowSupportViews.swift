@@ -33,6 +33,24 @@ struct SidebarRowPalette {
 
     var colorScheme: ColorScheme { visual.colorScheme }
 
+    /// The resolved cmux accent from the settings snapshot (upstream), for drop lines, status entries and the
+    /// status glyph's Working colour.
+    var accent: CmuxAccentColor { model.settings.accentColor }
+
+    /// The accent in the row's concrete cmux scheme (upstream).
+    var accentColor: NSColor { accent.nsColor(for: colorScheme) }
+
+    /// The opaque colour a selected row reads as, which upstream's status and log colours are floored against: the
+    /// fork's active fill (#cm-22), else the selection colour or accent.
+    var selectedBackground: NSColor {
+        if model.isActive, let fill = visual.backgroundStyle.color { return fill }
+        return sidebarSelectedWorkspaceBackgroundNSColor(
+            for: colorScheme,
+            sidebarSelectionColorHex: model.settings.selectionColorHex,
+            accent: accent
+        )
+    }
+
     func selectedForeground(_ opacity: CGFloat) -> NSColor {
         visual.primaryTextColor.withAlphaComponent(opacity)
     }
@@ -55,15 +73,20 @@ struct SidebarRowPalette {
         inactiveOpacity: CGFloat? = nil
     ) -> NSColor {
         let color = visual.secondaryTextColor(opacity: selectedOpacity)
-        guard !model.isActive, let inactiveOpacity else { return color }
-        return color.withAlphaComponent(inactiveOpacity)
+        guard !model.isActive else { return color }
+        let inactive = inactiveOpacity.map { color.withAlphaComponent($0) } ?? color
+        // Upstream's contrast floor over a terminal-matched opaque backdrop, for a row with no fill
+        // of its own; a colour fill keeps the palette's own secondary colour (cm-142 sync).
+        guard visual.backgroundStyle.color == nil,
+              let backdrop = model.readabilityBackdropHex.flatMap({ NSColor(hex: $0) }) else { return inactive }
+        return SidebarAppearanceColorResolver().readableSecondaryColor(inactive, for: colorScheme, over: backdrop)
     }
 
     /// Link color for row-owned text. AppKit paints `.link` runs in
     /// `NSColor.linkColor` and ignores the row foreground, which is unreadable
-    /// on an active row because the sidebar selection background is the same
-    /// blue. Active rows therefore derive the link color from the selected
-    /// foreground so a custom `sidebarSelectionColorHex` stays legible.
+    /// on a solid accent selection fill. Active rows therefore derive the link
+    /// color from the selected foreground so a custom
+    /// `sidebarSelectionColorHex` stays legible.
     var linkText: NSColor {
         model.isActive ? selectedForeground(1.0) : semantic(.linkColor)
     }
@@ -332,6 +355,7 @@ final class SidebarRowIconTextLine: NSView {
                 explicitURL: entry.url,
                 onOpenURL: onOpenURL
             )
+            if entry.helpText != nil { markdownTextView.toolTip = entry.sidebarToolTip(linkURL: entry.url) }
         } else if let url = entry.url {
             textView.isHidden = true
             metadataButton.isHidden = false
@@ -340,15 +364,13 @@ final class SidebarRowIconTextLine: NSView {
                 font: font,
                 color: color,
                 underlined: true,
-                toolTip: url.absoluteString,
+                toolTip: entry.sidebarToolTip(linkURL: url),
                 onClick: { onOpenURL(url) }
             )
         } else {
             metadataButton.isHidden = true
             textView.isHidden = false
-            textView.stringValue = entry.sidebarDisplayText
-            textView.font = font
-            textView.textColor = color
+            textView.configurePlainText(entry.sidebarDisplayText, font: font, color: color, toolTip: entry.sidebarToolTip(linkURL: nil))
         }
         needsLayout = true
     }
@@ -371,22 +393,20 @@ final class SidebarRowIconTextLine: NSView {
         case .warning: iconName = "exclamationmark.triangle.fill"
         case .error: iconName = "xmark.circle.fill"
         }
-        let color: NSColor
-        if model.isActive {
-            switch log.level {
-            case .info: color = palette.secondary(0.5)
-            case .progress: color = palette.secondary(0.8)
-            default: color = palette.secondary(0.9)
-            }
-        } else {
-            switch log.level {
-            case .info: color = palette.secondary(0.5)
-            case .progress: color = .systemBlue
-            case .success: color = .systemGreen
-            case .warning: color = .systemOrange
-            case .error: color = .systemRed
-            }
+        let fallback: NSColor
+        switch log.level {
+        case .info: fallback = palette.secondary(0.5)
+        case .progress: fallback = palette.secondary(0.8)
+        default: fallback = palette.secondary(0.9)
         }
+        let color = sidebarLogPresentationNSColor(
+            level: log.level,
+            isActive: model.isActive,
+            colorScheme: palette.colorScheme,
+            accent: palette.accent,
+            selectedBackground: palette.selectedBackground,
+            fallback: fallback
+        )
         iconView.isHidden = false
         iconView.image = RenderableSystemSymbol.configuredAppKitImage(
             systemName: iconName, pointSize: model.scaled(8), weight: nil
@@ -459,6 +479,7 @@ final class SidebarRowIconTextLine: NSView {
 
     private func resetPrimaryContent() {
         textView.isHidden = true
+        textView.toolTip = nil
         textView.stringValue = ""
         textView.attributedStringValue = NSAttributedString(string: "")
         metadataButton.isHidden = true
@@ -564,7 +585,7 @@ final class SidebarRowPullRequestLine: NSView {
         if clickable {
             titleButton.configure(
                 title: title, font: font, color: color, underlined: true,
-                toolTip: String(localized: "sidebar.pullRequest.openTooltip", defaultValue: "Open pull request"),
+                toolTip: String(format: String(localized: "sidebar.pullRequest.openTooltip", defaultValue: "Open %1$@ #%2$lld"), display.label, Int64(display.number)),
                 onClick: onOpen
             )
         } else {

@@ -45,6 +45,19 @@ pub struct RegistryAgentProjection {
     pub source: String,
     pub updated_at_ms: u64,
     pub source_session: Option<String>,
+    pub agent: Option<String>,
+    /// The agent's native hook session id (`extra.agent_session_id`).
+    pub agent_session_id: Option<String>,
+}
+
+/// The agent value's `extra` object. `agent_session_id` is present only when
+/// a hook reported the agent's own session id.
+pub(crate) fn agent_projection_extra(agent: Option<&str>, agent_session_id: Option<&str>) -> Value {
+    let mut extra = json!({"agent": agent});
+    if let Some(agent_session_id) = agent_session_id {
+        extra["agent_session_id"] = json!(agent_session_id);
+    }
+    extra
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,10 +66,16 @@ pub(crate) struct RegistryAgentHookState {
     pub agent_session_id: String,
     pub applied_sequence: u64,
     pub ended: bool,
+    /// The latest hook stamp of the session; empty for rows stored before
+    /// the column existed.
+    pub order: crate::agent_hooks::HookOrderStamp,
 }
 
 impl RegistryAgentProjection {
+    /// The public `AgentSnapshot` value for this projection, including
+    /// `extra.agent_session_id` when a hook reported one.
     pub(crate) fn into_public_snapshot(self, session_id: &SessionPublicId) -> Value {
+        let extra = agent_projection_extra(self.agent.as_deref(), self.agent_session_id.as_deref());
         json!({
             "id": self.id,
             "session_id": session_id,
@@ -65,6 +84,7 @@ impl RegistryAgentProjection {
             "source": self.source,
             "updated_at_ms": self.updated_at_ms.to_string(),
             "source_session": self.source_session,
+            "extra": extra,
         })
     }
 }
@@ -130,6 +150,8 @@ struct StoredAgent {
     updated_at_ms: WireDecimal,
     source_session: Option<String>,
     #[serde(default)]
+    agent: Option<String>,
+    #[serde(default)]
     extra: Option<HashMap<String, Value>>,
 }
 
@@ -161,6 +183,7 @@ enum StoredAgentSource {
     Hook,
     Socket,
     Detected,
+    Plugin,
 }
 
 impl StoredAgentSource {
@@ -169,6 +192,7 @@ impl StoredAgentSource {
             Self::Hook => "hook",
             Self::Socket => "socket",
             Self::Detected => "detected",
+            Self::Plugin => "plugin",
         }
     }
 }
@@ -214,6 +238,9 @@ impl WorkspaceRegistry {
         })
     }
 
+    /// Current agent projections, optionally filtered by terminal and state,
+    /// decoded from their stored results (adapter and hook session id
+    /// included).
     pub(crate) fn public_agent_projections(
         &self,
         terminal: Option<&TerminalPublicId>,
@@ -237,7 +264,7 @@ impl WorkspaceRegistry {
         Ok(agents)
     }
 
-    fn live_terminal_public_ids(&self) -> anyhow::Result<HashSet<TerminalPublicId>> {
+    pub(crate) fn live_terminal_public_ids(&self) -> anyhow::Result<HashSet<TerminalPublicId>> {
         let mut statement = self.connection.prepare(
             "SELECT public_id
              FROM resource_terminals
@@ -418,7 +445,12 @@ impl WorkspaceRegistry {
                 stored.id,
                 stored.terminal_id
             );
-            let _ = stored.extra;
+            let agent_session_id = stored
+                .extra
+                .as_ref()
+                .and_then(|extra| extra.get("agent_session_id"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
             agents.push(RegistryAgentProjection {
                 id: stored.id,
                 terminal_id: stored.terminal_id,
@@ -426,6 +458,14 @@ impl WorkspaceRegistry {
                 source: stored.source.as_str().to_string(),
                 updated_at_ms: stored.updated_at_ms.get(),
                 source_session: stored.source_session,
+                agent: stored
+                    .extra
+                    .as_ref()
+                    .and_then(|extra| extra.get("agent"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+                    .or(stored.agent),
+                agent_session_id,
             });
         }
         agents.reverse();
@@ -434,7 +474,7 @@ impl WorkspaceRegistry {
 
     fn durable_agent_hook_states(&self) -> anyhow::Result<Vec<RegistryAgentHookState>> {
         let mut statement = self.connection.prepare(
-            "SELECT terminal_id, agent_session_id, applied_sequence, ended
+            "SELECT terminal_id, agent_session_id, applied_sequence, ended, hook_order
              FROM resource_agent_hook_state
              ORDER BY terminal_id ASC",
         )?;
@@ -445,16 +485,22 @@ impl WorkspaceRegistry {
                     row.get::<_, String>(1)?,
                     row.get::<_, i64>(2)?,
                     row.get::<_, bool>(3)?,
+                    row.get::<_, Option<String>>(4)?,
                 ))
             })?
             .map(|row| {
-                let (terminal_id, agent_session_id, applied_sequence, ended) = row?;
+                let (terminal_id, agent_session_id, applied_sequence, ended, hook_order) = row?;
+                // An unreadable stamp only loses the order until the next event.
+                let order = hook_order
+                    .and_then(|text| serde_json::from_str(&text).ok())
+                    .unwrap_or_default();
                 Ok(RegistryAgentHookState {
                     terminal_id: TerminalPublicId::parse(terminal_id)?,
                     agent_session_id,
                     applied_sequence: u64::try_from(applied_sequence)
                         .context("agent hook sequence is negative")?,
                     ended,
+                    order,
                 })
             })
             .collect()

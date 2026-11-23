@@ -26,6 +26,7 @@ extension View {
         ids: [UUID],
         workspaces: [Workspace],
         debouncedInterval: DispatchQueue.SchedulerTimeType.Stride,
+        deliverInitialValue: Bool = true,
         onChange: @MainActor @escaping (UUID) -> Void
     ) -> some View {
         task(id: ids) { @MainActor in
@@ -44,20 +45,29 @@ extension View {
                         .debounce(for: debouncedInterval, scheduler: DispatchQueue.main)
                         .values
                     group.addTask { @MainActor in
+                        var first = true
                         for await _ in cloudChanges {
                             if Task.isCancelled { break }
+                            if first && !deliverInitialValue { first = false; continue }
+                            first = false
                             onChange(id)
                         }
                     }
                     group.addTask { @MainActor in
+                        var first = true
                         for await _ in immediateChanges {
                             if Task.isCancelled { break }
+                            if first && !deliverInitialValue { first = false; continue }
+                            first = false
                             onChange(id)
                         }
                     }
                     group.addTask { @MainActor in
+                        var first = true
                         for await _ in debouncedChanges {
                             if Task.isCancelled { break }
+                            if first && !deliverInitialValue { first = false; continue }
+                            first = false
                             onChange(id)
                         }
                     }
@@ -189,7 +199,7 @@ extension View {
 }
 
 private struct SidebarImmediateObservationState: Equatable {
-    let customTitle: String?
+    let titleRevision: UInt64
     let customDescription: String?
     let isPinned: Bool
     let isMuted: Bool
@@ -197,6 +207,7 @@ private struct SidebarImmediateObservationState: Equatable {
     let latestConversationMessage: String?
     let latestSubmittedMessage: String?
     let latestSubmittedAt: Date?
+    let panelPrompts: [UUID: SidebarPanelPromptState]
     let taskStatusOverride: WorkspaceTaskStatusOverride?
     let ownStatus: WorkspaceOwnStatus? // (#cm-109)
     let statusHidden: Bool
@@ -211,12 +222,14 @@ private struct SidebarObservationState: Equatable {
     let panelDirectoryDisplayLabels: [UUID: String]
     let directoryChangeRevision: UInt64
     let statusEntries: [String: SidebarStatusEntry]
+    let agentUsage: [String: SidebarAgentUsage]
     let metadataBlocks: [String: SidebarMetadataBlock]
     let logEntries: [SidebarLogEntry]
     let progress: SidebarProgressState?
     let gitBranch: SidebarGitBranchState?
     let panelGitBranches: [UUID: SidebarGitBranchState]
     let pullRequest: SidebarPullRequestState?
+    let manualPullRequest: SidebarPullRequestState?
     let panelPullRequests: [UUID: SidebarPullRequestState]
     let remoteConfiguration: WorkspaceRemoteConfiguration?
     let remoteConnectionState: WorkspaceRemoteConnectionState
@@ -241,17 +254,22 @@ extension Workspace {
         // Combine exposes up to four-way convenience publishers. Compose the
         // extra fields explicitly so adding a row-affecting property does not
         // require a non-existent ``CombineLatest5`` specialization.
-        let workspaceFields = Publishers.CombineLatest4(
-            $customTitle,
+        // `setCustomTitle` writes customTitle before title. Observing
+        // `$customTitle` here would forward a leading event while title still
+        // has its old value, so the committed title publisher is the single
+        // rename invalidation source.
+        let workspaceFields = Publishers.CombineLatest3(
+            sidebarTitleDidChangePublisher,
             $customDescription,
-            $isPinned,
-            $customColor
+            $isPinned
         )
+        .combineLatest($customColor)
         .combineLatest($isMuted)
-        let conversationFields = Publishers.CombineLatest3(
+        let conversationFields = Publishers.CombineLatest4(
             $latestConversationMessage,
             $latestSubmittedMessage,
-            $latestSubmittedAt
+            $latestSubmittedAt,
+            sidebarMetadata.panelPromptsPublisher
         )
         // Todo state is row-affecting (status pill, checklist progress) but
         // lives in its own sub-model, so fold its publishers in here the same
@@ -267,14 +285,15 @@ extension Workspace {
             .combineLatest(conversationFields, todoFields)
             .map { workspaceFields, conversationFields, todoFields in
                 SidebarImmediateObservationState(
-                    customTitle: workspaceFields.0.0,
-                    customDescription: workspaceFields.0.1,
-                    isPinned: workspaceFields.0.2,
+                    titleRevision: workspaceFields.0.0.0,
+                    customDescription: workspaceFields.0.0.1,
+                    isPinned: workspaceFields.0.0.2,
                     isMuted: workspaceFields.1,
-                    customColor: workspaceFields.0.3,
+                    customColor: workspaceFields.0.1,
                     latestConversationMessage: conversationFields.0,
                     latestSubmittedMessage: conversationFields.1,
                     latestSubmittedAt: conversationFields.2,
+                    panelPrompts: conversationFields.3,
                     taskStatusOverride: todoFields.0,
                     ownStatus: todoFields.1, // (#cm-109)
                     statusHidden: todoFields.2,
@@ -339,11 +358,15 @@ extension Workspace {
             gitFields,
             remoteFields
         )
-            .combineLatest($listeningPorts, sidebarMetadata.panelDirectoryDisplayLabelsPublisher)
+            .combineLatest(
+                $listeningPorts,
+                sidebarMetadata.panelDirectoryDisplayLabelsPublisher,
+                sidebarMetadata.agentUsagePublisher
+            )
             .combineLatest(directoryChangeRevision)
             .compactMap { [weak self] values, directoryChangeRevision -> SidebarObservationState? in
                 guard let self else { return nil }
-                let (groupedFields, listeningPorts, panelDirectoryDisplayLabels) = values
+                let (groupedFields, listeningPorts, panelDirectoryDisplayLabels, agentUsage) = values
                 let workspaceFields = groupedFields.0
                 let metadataFields = groupedFields.1
                 let gitFields = groupedFields.2
@@ -356,12 +379,14 @@ extension Workspace {
                     panelDirectoryDisplayLabels: panelDirectoryDisplayLabels,
                     directoryChangeRevision: directoryChangeRevision,
                     statusEntries: metadataFields.0,
+                    agentUsage: agentUsage,
                     metadataBlocks: metadataFields.1,
                     logEntries: metadataFields.2,
                     progress: metadataFields.3,
                     gitBranch: gitFields.0,
                     panelGitBranches: gitFields.1,
                     pullRequest: gitFields.2,
+                    manualPullRequest: sidebarMetadata.manualPullRequest,
                     panelPullRequests: gitFields.3,
                     remoteConfiguration: remoteFields.0,
                     remoteConnectionState: remoteFields.1,

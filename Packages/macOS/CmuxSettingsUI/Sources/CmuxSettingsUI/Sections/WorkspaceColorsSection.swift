@@ -10,12 +10,16 @@ import UniformTypeIdentifiers
 /// and a Reset Palette action.
 @MainActor
 public struct WorkspaceColorsSection: View {
+    @Environment(\.cmuxAccentColor) private var cmuxAccent
     private let jsonStore: JSONConfigStore
     private let catalog: SettingCatalog
     private let errorLog: SettingsErrorLog
     private let hostActions: SettingsHostActions
 
     @State private var selectionHex: DefaultsValueModel<String>
+    @State private var brightenInDarkMode: DefaultsValueModel<Bool>
+    @State private var unselectedFillOpacity: DefaultsValueModel<Double>
+    @State private var activeFillOpacityDragValue: Double?
     @State private var badgeHex: DefaultsValueModel<String>
     @State private var paneFlashHex: DefaultsValueModel<String>
     @State private var paletteModel: DefaultsValueModel<[String: String]>
@@ -71,6 +75,8 @@ public struct WorkspaceColorsSection: View {
         self.errorLog = errorLog
         self.hostActions = hostActions
         _selectionHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.selectionColorHex))
+        _brightenInDarkMode = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.brightenInDarkMode))
+        _unselectedFillOpacity = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.unselectedFillOpacity))
         _badgeHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.notificationBadgeColorHex))
         _paneFlashHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.notifications.paneFlashColorHex))
         _paletteModel = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.workspaceColors.palette))
@@ -102,9 +108,15 @@ public struct WorkspaceColorsSection: View {
         }
     }
 
+    private var displayedFillOpacity: Double {
+        min(max(activeFillOpacityDragValue ?? unselectedFillOpacity.current, 0), 1)
+    }
+
     private func startObservingSettings() {
         let models: [any SettingObservationStarting] = [
             selectionHex,
+            brightenInDarkMode,
+            unselectedFillOpacity,
             badgeHex,
             paneFlashHex,
             paletteModel,
@@ -121,6 +133,50 @@ public struct WorkspaceColorsSection: View {
     @ViewBuilder
     private var mainCard: some View {
         SettingsCard {
+            // cmux-rbf: upstream's Workspace Color Indicator picker and Subtle Selection Highlight
+            // stay out: the fork removed `WorkspaceIndicatorStyle` (#cm-10, #cm-22), and subtle
+            // selection only serves upstream's left rail. Its solid-fill settings below apply to the
+            // fork's one fill (Sources/Sidebar/SidebarAppearanceSupport.swift), so they keep their rows,
+            // without upstream's per-style `.disabled`. (#cm-142.1) Reject this hunk on upstream sync.
+            SettingsCardRow(
+                configurationReview: .json("workspaceColors.brightenInDarkMode"),
+                String(localized: "settings.workspaceColors.brightenInDarkMode", defaultValue: "Brighten Colors in Dark Mode"),
+                subtitle: String(localized: "settings.workspaceColors.brightenInDarkMode.subtitle", defaultValue: "Lighten workspace colors in dark mode so they stay readable on a dark sidebar. Turn off to show colors exactly as chosen. Applies to Solid Fill; the Left Rail indicator always uses a lightened rail.")
+            ) {
+                Toggle("", isOn: Binding(get: { brightenInDarkMode.current }, set: { brightenInDarkMode.set($0) }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            SettingsCardDivider()
+
+            SettingsCardRow(
+                configurationReview: .json("workspaceColors.unselectedFillOpacity"),
+                String(localized: "settings.workspaceColors.unselectedFillOpacity", defaultValue: "Unselected Fill Opacity"),
+                subtitle: String(localized: "settings.workspaceColors.unselectedFillOpacity.subtitle", defaultValue: "How strongly a workspace color fills rows that are not selected. The maximum shows the full color. Applies to Solid Fill."),
+                controlWidth: 200
+            ) {
+                HStack(spacing: 8) {
+                    Slider(
+                        value: Binding(get: { displayedFillOpacity }, set: { activeFillOpacityDragValue = $0 }),
+                        in: 0...1,
+                        step: 0.05
+                    ) { editing in
+                        guard !editing, let value = activeFillOpacityDragValue else { return }
+                        activeFillOpacityDragValue = nil
+                        unselectedFillOpacity.set(value)
+                    }
+                    .frame(width: 140)
+                    .accessibilityIdentifier("SettingsWorkspaceColorsUnselectedFillOpacitySlider")
+
+                    Text(displayedFillOpacity, format: .percent.precision(.fractionLength(0)))
+                        .cmuxFont(size: 12, weight: .medium, design: .rounded)
+                        .monospacedDigit()
+                        .frame(width: 44, alignment: .trailing)
+                }
+            }
+            SettingsCardDivider()
+
             colorRow(
                 title: String(localized: "settings.workspaceColors.selectionColor", defaultValue: "Selection Highlight"),
                 subtitle: String(localized: "settings.workspaceColors.selectionColor.subtitle", defaultValue: "Background color of the selected workspace in the sidebar."),
@@ -143,8 +199,8 @@ public struct WorkspaceColorsSection: View {
                 json: "notifications.paneFlashColor",
                 resetLabel: String(localized: "settings.workspaceColors.paneFlashColor.reset", defaultValue: "Reset"),
                 model: paneFlashHex,
-                // Matches the runtime's system-blue fallback.
-                fallback: Color(nsColor: .systemBlue)
+                // Matches the runtime's cmux accent fallback.
+                fallback: cmuxAccent.color
             )
             SettingsCardDivider()
 
@@ -352,7 +408,7 @@ public struct WorkspaceColorsSection: View {
     }
 
     @ViewBuilder
-    private func colorRow(title: String, subtitle: String, json: String, resetLabel: String, model: DefaultsValueModel<String>, fallback: Color = Self.cmuxAccentColor()) -> some View {
+    private func colorRow(title: String, subtitle: String, json: String, resetLabel: String, model: DefaultsValueModel<String>, fallback: Color? = nil) -> some View {
         let isCustom = !model.current.isEmpty
         SettingsCardRow(
             configurationReview: .json(json),
@@ -367,7 +423,7 @@ public struct WorkspaceColorsSection: View {
                 }
                 HexColorPicker(
                     storedHex: model.current,
-                    fallback: fallback,
+                    fallback: fallback ?? cmuxAccent.color,
                     reconcileRevision: model.revision
                 ) { hex in
                     model.set(hex)
@@ -875,21 +931,6 @@ public struct WorkspaceColorsSection: View {
         Self.builtInPalette.first(where: { $0.name == name })?.hex
     }
 
-    /// cmux-themed accent color used as the live ColorPicker fallback
-    /// when the selection or notification badge has no custom hex.
-    /// Mirrors the legacy `cmuxAccentColor()` helper (see
-    /// `Sources/Sidebar/SidebarAppearanceSupport.swift`) so the rendered
-    /// swatch matches the rest of the app instead of the system accent.
-    private static func cmuxAccentColor() -> Color {
-        let nsColor = NSColor(name: nil) { appearance in
-            let bestMatch = appearance.bestMatch(from: [.darkAqua, .aqua])
-            if bestMatch == .darkAqua {
-                return NSColor(srgbRed: 0, green: 145.0 / 255.0, blue: 1.0, alpha: 1.0)
-            }
-            return NSColor(srgbRed: 0, green: 136.0 / 255.0, blue: 1.0, alpha: 1.0)
-        }
-        return Color(nsColor: nsColor)
-    }
 }
 
 /// Editable custom display name or semantic label for one palette entry.

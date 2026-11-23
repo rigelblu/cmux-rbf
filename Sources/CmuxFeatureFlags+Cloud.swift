@@ -1,10 +1,9 @@
 import Foundation
 
 extension CmuxFeatureFlags {
-    // FLAG(key: cloud-machines-enabled-release, owner: austinwang,
-    //      reviewBy: 2026-10-01, defaultWhenUnavailable: false)
-    // Remote kill switch for the macOS Cloud integration. The false fallback
-    // keeps Cloud unavailable until a rollout or a Nightly/debug override enables it.
+    // Legacy compatibility definition for tagged debug tooling and migration
+    // of persisted overrides. It is intentionally excluded from `allFlags`,
+    // so production Cloud availability never reads or delivers this key.
     nonisolated static let cloudMachinesFlag = CmuxFeatureFlagDefinition(
         key: "cloud-machines-enabled-release",
         title: String(localized: "featureFlags.cloudMachines.title", defaultValue: "Cloud Machines"),
@@ -12,7 +11,7 @@ extension CmuxFeatureFlags {
             localized: "featureFlags.cloudMachines.description",
             defaultValue: "Enables the macOS Cloud Machines integration, including entry points, attachments, and background sync."
         ),
-        defaultWhenUnavailable: false
+        defaultWhenUnavailable: CmuxFeatureFlags.cloudMachinesDefault
     )
 
     var isCloudMachinesEnabled: Bool { effectiveValue(for: Self.cloudMachinesFlag) }

@@ -22,10 +22,22 @@ struct AgentFeedSemanticInput: Sendable {
         let extra = event.extraFieldsJSON.flatMap { $0.data(using: .utf8) }
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
         let mapper = AgentSemanticEventMapper()
-        let resolved = resolvesRequest || event.hookEventName == .postToolUse
+        var nativeRequest = ["tool_use_id", "tool_call_id", "request_id", "agent_id"]
+            .compactMap { extra[$0] as? String }.first
+        let isToolActivity = event.hookEventName == .preToolUse
+            || event.hookEventName == .postToolUse
+            || event.hookEventName == .postToolUseFailure
+        // A PostToolUse with an identity also resolves a pending approval. A
+        // telemetry payload without one still proves the agent is working, but
+        // must not clear an unrelated request.
+        let resolved = resolvesRequest || (event.hookEventName == .postToolUse && nativeRequest != nil)
         let kind: AgentJournalEventKind
         if resolved {
             kind = .attentionResolved
+        } else if event.hookEventName == .stop, event.isError == true {
+            kind = .errorReported
+        } else if isToolActivity {
+            kind = .stateChanged
         } else {
             switch event.hookEventName {
             case .askUserQuestion: kind = .questionRequested
@@ -33,8 +45,6 @@ struct AgentFeedSemanticInput: Sendable {
             default: kind = mapper.kind(source: event.source, nativeEvent: event.hookEventName.rawValue)
             }
         }
-        var nativeRequest = ["tool_use_id", "tool_call_id", "request_id", "agent_id"]
-            .compactMap { extra[$0] as? String }.first
         // cmux-rbf: Claude's helper ID is a child identity, never an approval request ID. (#cm-128.3)
         if event.source == "claude", [.childSpawned, .childCompleted, .childFailed].contains(kind),
            let helperID = extra["helper_agent_id"] as? String, !helperID.isEmpty {
@@ -42,7 +52,8 @@ struct AgentFeedSemanticInput: Sendable {
         }
         let identity = nativeRequest ?? ((notification != nil || resolvesRequest) ? (requestID ?? event.requestId) : nil)
         if notification == nil, !resolved,
-           ![.sessionStarted, .turnStarted, .sessionEnded, .childSpawned, .childCompleted, .childFailed].contains(kind) {
+           ![.sessionStarted, .turnStarted, .sessionEnded, .childSpawned, .childCompleted, .childFailed].contains(kind),
+           !(kind == .stateChanged && isToolActivity) {
             return nil
         }
         guard !resolved || identity != nil,
@@ -56,7 +67,11 @@ struct AgentFeedSemanticInput: Sendable {
             source: event.source, agentKey: agentKey,
             sessionId: sessionID, workspaceId: workspace, surfaceId: surface,
             pendingWork: resolvesRequest,
-            nativeEvent: event.hookEventName.rawValue, declaredPhase: resolved ? .running : nil,
+            // Tool activity is a running assertion. It reopens a continuation
+            // that has no UserPromptSubmit hook; older activity is rejected by
+            // the reconciler's timestamp and turn-identity watermarks.
+            nativeEvent: event.hookEventName.rawValue,
+            declaredPhase: (resolvesRequest || isToolActivity) ? .running : nil,
             attention: AgentAttentionContext(eventIdentity: extra["event_id"] as? String,
                 turnIdentity: extra["turn_id"] as? String, requestIdentity: identity, notification: notification))
     }

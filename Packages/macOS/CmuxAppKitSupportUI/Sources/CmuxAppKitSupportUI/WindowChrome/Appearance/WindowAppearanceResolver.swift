@@ -33,7 +33,7 @@ public struct WindowAppearanceResolver {
                 cornerRadius: settings.sidebarCornerRadius,
                 blurOpacity: settings.sidebarBlurOpacity,
                 // The snapshot initializer replaces this compatibility value
-                // with the terminal authority below.
+                // with the resolved sidebar scheme.
                 colorScheme: settings.colorScheme
             ),
             windowGlassSettings: WindowGlassSettingsSnapshot(
@@ -51,14 +51,17 @@ public struct WindowAppearanceResolver {
                 backgroundColor: terminalAppearance.backgroundColor,
                 opacity: terminalAppearance.backgroundOpacity,
                 ambientScheme: settings.colorScheme
-            )
+            ),
+            reducesTransparency: settings.reduceTransparency,
+            ambientColorScheme: settings.colorScheme
         )
     }
 
     /// Resolves window appearance from a `UserDefaults` store.
     public func currentFromUserDefaults(
         defaults: UserDefaults,
-        colorScheme: ColorScheme? = nil
+        colorScheme: ColorScheme? = nil,
+        reduceTransparency: Bool = false
     ) -> WindowAppearanceSnapshot {
         let tintDefaults = WindowChromeSidebarTintDefaults()
         // Without an injected ambient scheme, fail closed to the terminal
@@ -72,7 +75,8 @@ public struct WindowAppearanceResolver {
                 opacity: terminalAppearance.backgroundOpacity
             )
         return current(settings: WindowAppearanceUserSettingsSnapshot(
-            unifySurfaceBackdrops: defaults.object(forKey: "sidebarMatchTerminalBackground") as? Bool ?? false,
+            unifySurfaceBackdrops: defaults.object(forKey: "sidebarMatchTerminalBackground") as? Bool
+                ?? WindowChromeSidebarTintDefaults.matchesTerminalBackground,
             colorScheme: ambientScheme,
             sidebarMaterial: defaults.string(forKey: "sidebarMaterial") ?? WindowChromeSidebarMaterialOption.sidebar.rawValue,
             sidebarBlendMode: defaults.string(forKey: "sidebarBlendMode") ?? WindowChromeSidebarBlendModeOption.withinWindow.rawValue,
@@ -85,7 +89,8 @@ public struct WindowAppearanceResolver {
             sidebarBlurOpacity: defaults.object(forKey: "sidebarBlurOpacity") as? Double ?? 1.0,
             bgGlassEnabled: defaults.object(forKey: "bgGlassEnabled") as? Bool ?? false,
             bgGlassTintHex: defaults.string(forKey: "bgGlassTintHex") ?? "#000000",
-            bgGlassTintOpacity: defaults.object(forKey: "bgGlassTintOpacity") as? Double ?? 0.03
+            bgGlassTintOpacity: defaults.object(forKey: "bgGlassTintOpacity") as? Double ?? 0.03,
+            reduceTransparency: reduceTransparency
         ))
     }
 }

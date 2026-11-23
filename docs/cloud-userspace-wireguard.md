@@ -49,17 +49,35 @@ no connection ticket and no Freestyle call.
 
 ## Ports and Desktop path
 
-In-app HTTP browser panes and Desktop use one shared authenticated HTTP loopback
-forward per machine and port, replacing the browser URL with
-`http://127.0.0.1:<port>` while preserving the noVNC path and query. The forward
-warms the hub before navigation, so the noVNC WebSocket uses the same authenticated
-relay. HTTPS uses the private VPN route because the raw TCP relay cannot preserve
-TLS routing. Forward listeners close when their machine leaves the fleet, on
-sign-out, or at process exit.
+A Cloud browser keeps the machine's private IP and original port as its actual
+URL and document origin. Command-clicking `http://0.0.0.0:8000/` or
+`http://localhost:8000/` in a Cloud terminal opens the page to the right at that
+terminal's machine address, for example `http://10.16.0.7:8000/`. Another VM can
+use the same port at `http://10.16.0.8:8000/`; their routes and origins are distinct.
 
-Command-click on a Cloud terminal's localhost, 127.0.0.1, or 0.0.0.0 web link
-replaces only its host with the VM's private address. The browser follows the
-same connection flow. Local terminals and external sites keep their own URLs.
+Each machine has one app-owned authenticated HTTP CONNECT proxy. WebKit sends
+only that machine's private-address requests through it, with direct fallback
+disabled. The proxy opens the existing daemon's `LoopbackOnly` TCP route over
+an authenticated carrier through the shared userspace WireGuard hub. The daemon
+connects to `127.0.0.1:<port>` inside the VM, so loopback-only development servers
+work as well as servers listening on all interfaces. No guest firewall rule,
+system network route, public preview, or macOS VPN approval is needed.
+
+Browser data stores are isolated per pane, profile, and machine, with stable
+identifiers across session restore. A new proxy for one VM cannot reconfigure
+another pane's networking. HTTP request bodies and WebSocket bytes are relayed
+without changing the private-IP Host header or document origin. Cleartext
+localhost fetch, XHR, WebSocket, and EventSource URLs inside the page are mapped
+to its VM address. HTTPS keeps its normal certificate validation against the
+visible private address.
+
+Opening a page starts the userspace connection automatically. Loading and failure
+states remain in the same browser pane and Reload retries the connection.
+The local proxy requires a fresh per-process credential exchanged only through
+the app's private stdout pipe; it accepts only the configured VM addresses and
+refuses the daemon port. Machine removal, sign-out, and process exit close the
+proxy and its WireGuard claim. Explicit loopback forwards for other local clients
+remain separate from the browser's stable private-IP URL.
 
 ## System-wide route (`cmux vpn up`)
 
@@ -92,10 +110,10 @@ policy is built once at the composition root from local state only, and it is
 the single decision every tunnel consumer (browser navigation, `cmux vpn up`,
 `vm.tunnel_config`, `vm.tunnel_up`) flows through:
 
-- A start is admitted only when `Settings › Beta Features › Cloud Machines` is
-  on (`cloud.beta.machines.enabled`, on by default in dev builds and off by
-  default in release builds, and never forced on by a managed `DisableCloud`
-  profile) **and** the account has at
+- A start is admitted only after the Cloud tab's first-use screen has completed
+  activation (`cloud.beta.machines.enabled` remains the migration marker and
+  is committed after authenticated readiness, and is never forced on by a
+  managed `DisableCloud` profile) **and** the account has at
   least one machine. Launch-time decisions and status answer "has a machine"
   from a cached marker written by every machine list and create
   (`cloud.machines.cachedHasAny`; cleared on sign-out, reset to unknown by a
@@ -114,15 +132,13 @@ the single decision every tunnel consumer (browser navigation, `cmux vpn up`,
   stopped. Otherwise it is built on the first admitted start. A fresh install,
   or an update from a version without the tunnel, therefore never calls
   NetworkExtension at all.
-- The Beta Features toggle is honored while the app runs: turning it off
-  brings a running tunnel down; turning it on lets the next Cloud use start
-  the tunnel without a relaunch. The periodic fleet read (`GET /api/vm` from
-  the cmux-tui registry) runs only while the toggle is on **or** this Mac has
-  used Cloud before (the marker said the account had a machine, or a tunnel
-  role was enrolled here), so an idle app that never opted in makes no Cloud
-  API traffic, while an existing Cloud user's fleet keeps reconnecting even
-  with the toggle off. Sign-out clears that evidence and stops the poll; a
-  delete resets the marker to unknown until the next list.
+- The activation marker is honored while the app runs: clearing
+  `cloud.beta.machines.enabled` brings a running tunnel down, while the Cloud
+  tab's successful first-use flow commits it and lets the next Cloud use start
+  without a relaunch. The periodic fleet read (`GET /api/vm` from the cmux-tui
+  registry) runs only while `CloudMachinesFeature.isEnabled()` is true, so an
+  unactivated app makes no Cloud API traffic. Sign-out clears account evidence
+  and stops the poll; a delete resets the machine cache until the next list.
 - `down`, `revoke`, sign-out, and quit stay available regardless, so a tunnel
   from an earlier opted-in session is always cleaned up.
 

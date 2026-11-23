@@ -1,6 +1,8 @@
+import CmuxFoundation
 import Foundation
 import Darwin
 import Testing
+import CmuxMemoryPressure
 
 #if canImport(cmux_DEV)
 @testable import cmux_DEV
@@ -18,7 +20,7 @@ struct AggregateMemoryRetentionTests {
 
     @Test("Coalition pressure survives RAM overflow and descendant reparenting",
           arguments: [UInt64(36) << 30, UInt64(45) << 30, UInt64(72) << 30])
-    func retainedDescendantsStayAccounted(coalitionBytes: UInt64) {
+    func retainedDescendantsStayAccounted(coalitionBytes: UInt64) async {
         // A small app remains after its large child's parent exits. The child
         // retains coalition membership, but a PPID walk can no longer find it.
         let snapshot = CmuxTopProcessSnapshot(
@@ -37,7 +39,7 @@ struct AggregateMemoryRetentionTests {
             availableMemoryProvider: { 512 << 20 }
         )
 
-        let sample = sampler.sample(at: Date(timeIntervalSince1970: 1))
+        let sample = await sampler.sample(at: Date(timeIntervalSince1970: 1))
         #expect(sample.source == .coalition)
         #expect(sample.aggregateBytes == coalitionBytes)
         #expect(sample.isUsable)
@@ -46,7 +48,7 @@ struct AggregateMemoryRetentionTests {
     }
 
     @Test("An unreadable process-table edge never authorizes hibernation")
-    func incompleteListingFailsClosed() {
+    func incompleteListingFailsClosed() async {
         let snapshot = CmuxTopProcessSnapshot(
             processes: [process(pid: 42, parentPID: 1, bytes: 9_000)],
             sampledAt: .distantPast,
@@ -61,9 +63,12 @@ struct AggregateMemoryRetentionTests {
             physicalMemoryProvider: { 8_000 },
             availableMemoryProvider: { nil }
         )
-        let sample = sampler.sample(at: .now)
-        #expect(sample.source == .unavailable)
+        let sample = await sampler.sample(at: .now)
+        #expect(sample.source == .descendantProcessTree)
+        #expect(sample.coverage == .lowerBound)
+        #expect(sample.aggregateBytes == 9_000)
         #expect(sample.missingProcessCount == 1)
+        #expect(sample.missingReason == .incompleteEnumeration)
         #expect(!MemoryPressureAggregatePolicy.default.evaluate(sample: sample).isActionable)
     }
 
@@ -93,7 +98,7 @@ struct AggregateMemoryRetentionTests {
     }
 
     @Test("A later live child cannot join an earlier captured topology")
-    func accountingUsesOnlyCapturedTopology() throws {
+    func accountingUsesOnlyCapturedTopology() async throws {
         let input = Pipe()
         let child = Process()
         child.executableURL = URL(fileURLWithPath: "/bin/cat")
@@ -124,7 +129,7 @@ struct AggregateMemoryRetentionTests {
         let children = try #require(memory["children"] as? [String: Any])
         #expect(children["process_count"] as? Int == 0)
         #expect(children["recursive_rss_bytes"] as? Int64 == 0)
-        let sample = DarwinMemoryPressureAggregateSampler(
+        let sample = await DarwinMemoryPressureAggregateSampler(
             processID: rootPID,
             snapshotProvider: { snapshot },
             coalitionSampler: Coalition(bytes: 0),

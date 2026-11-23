@@ -1,11 +1,25 @@
+import CmuxSSHClipboardTrust
 import AppKit
 import Bonsplit
 import Foundation
+import CmuxFoundation
 import CmuxTerminal
 import CmuxTerminalCore
 import GhosttyKit
 import CmuxSettings
 import struct CmuxSettings.AgentIntegrationSettingsStore
+
+private enum GhosttyLinkFilterAPI {
+    // Xcode 26.6's Clang importer omits this declaration even though the
+    // pinned GhosttyKit header and binary export it. Keep the ABI declaration
+    // local until the importer exposes the API directly.
+    @_silgen_name("ghostty_surface_set_link_filter")
+    static func set(
+        _ surface: ghostty_surface_t,
+        _ callback: (@convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UInt) -> Bool)?,
+        _ userdata: UnsafeMutableRawPointer?
+    )
+}
 
 // The app-side conformances and bridges injected into the CmuxTerminal
 // package through `GhosttyApp.terminalSurfaceRuntimeDependencies`. Each type
@@ -30,6 +44,17 @@ extension GhosttyApp: TerminalEngineHosting {
 /// surface model historically constructed in its initializer.
 struct TerminalSurfaceViewFactory: TerminalSurfaceViewProviding {
     let imageTransferPreparation: TerminalImageTransferPreparationService
+    let sshClipboardWriteTrustStore: SSHClipboardWriteTrustStore
+
+    init(
+        imageTransferPreparation: TerminalImageTransferPreparationService,
+        sshClipboardWriteTrustStore: SSHClipboardWriteTrustStore? = nil
+    ) {
+        self.imageTransferPreparation = imageTransferPreparation
+        self.sshClipboardWriteTrustStore = sshClipboardWriteTrustStore
+            ?? AppDelegate.shared?.sshClipboardWriteTrustStore
+            ?? SSHClipboardWriteTrustStore(defaults: .standard)
+    }
 
     @MainActor
     func makeSurfaceViews(
@@ -37,7 +62,8 @@ struct TerminalSurfaceViewFactory: TerminalSurfaceViewProviding {
     ) -> (surfaceView: any TerminalSurfaceNativeViewing, paneHost: any TerminalSurfacePaneHosting) {
         let view = GhosttyNSView(
             frame: initialFrame,
-            imageTransferPreparation: imageTransferPreparation
+            imageTransferPreparation: imageTransferPreparation,
+            sshClipboardWriteTrustStore: sshClipboardWriteTrustStore
         )
         return (view, GhosttySurfaceScrollView(surfaceView: view))
     }
@@ -73,7 +99,8 @@ final class TerminalSurfaceSpawnPolicyBridge: TerminalSurfaceSpawnPolicyProvidin
             // `DisableComputerUse` (MDM) wins over the user setting on every
             // spawn, so a new agent launch never receives the tools.
             computerUseEnabled: computerUseConfigStore.snapshotValue(for: computerUseEnabledKey)
-                && !ManagedDevicePolicy().isEnforced(.disableComputerUse)
+                && !ManagedDevicePolicy().isEnforced(.disableComputerUse),
+            piHooksEnabled: integrations.piHooksEnabled
         )
     }
 
@@ -82,6 +109,34 @@ final class TerminalSurfaceSpawnPolicyBridge: TerminalSurfaceSpawnPolicyProvidin
             preferredPath: SocketControlSettings.socketPath()
         )
     }
+
+    /// Hands the workspace's SSH foreground-auth token to an attach command
+    /// built for that token. The command reads it from the environment, so it
+    /// stays out of the process arguments. A command built for an earlier
+    /// token does not get the current one, and its readiness report fails as
+    /// it did when the token was part of the command.
+    func applyStartupCommandSecrets(
+        to environment: inout [String: String],
+        workspaceId: UUID,
+        startupCommand: String?
+    ) {
+        // The `cmux ssh` first terminal starts before `workspace.remote.configure`
+        // and runs a script file, so it relies on the token the CLI passed in
+        // its initial environment. Leave that environment as it is.
+        guard let startupCommand,
+              startupCommand.contains(SSHForegroundAuthenticationLaunch.environmentKey),
+              let token = AppDelegate.shared?.workspaceFor(tabId: workspaceId)?
+                .remoteConfiguration?.foregroundAuthToken,
+              !token.isEmpty else {
+            return
+        }
+        let launch = SSHForegroundAuthenticationLaunch(token: token)
+        if launch.isExpected(by: startupCommand) {
+            // The workspace's current token replaces one replayed from an
+            // earlier launch's initial environment.
+            environment.merge(launch.environment) { _, workspaceToken in workspaceToken }
+        }
+    }
 }
 
 // MARK: Terminal output tee
@@ -89,7 +144,15 @@ final class TerminalSurfaceSpawnPolicyBridge: TerminalSurfaceSpawnPolicyProvidin
 /// Installs the libghostty PTY tee for `MobileTerminalByteTee` and keys
 /// drop/replay state by surface id (the legacy inline
 /// `ghostty_surface_set_pty_tee_cb` + `MobileTerminalByteTee.shared` calls).
+/// It also installs the surface's link filter, whose userdata shares the
+/// tee's lifetime: both are released only after the surface is freed.
 final class TerminalOutputByteTeeBridge: TerminalByteTeeBinding {
+    private let scrollbackCheckpointActivity: TerminalScrollbackCheckpointActivity
+
+    init(scrollbackCheckpointActivity: TerminalScrollbackCheckpointActivity) {
+        self.scrollbackCheckpointActivity = scrollbackCheckpointActivity
+    }
+
     /// Wraps the retained tee userdata; `release()` runs exactly where the
     /// surface released the legacy `Unmanaged` context.
     /// @unchecked Sendable: the Unmanaged box is exclusively owned by this
@@ -97,13 +160,27 @@ final class TerminalOutputByteTeeBridge: TerminalByteTeeBinding {
     /// transport.
     final class Lease: TerminalByteTeeLease, @unchecked Sendable {
         private let context: Unmanaged<TerminalOutputTeeContext>
+        private let linkFilter: Unmanaged<TerminalLinkHoverFilter>
+        private let scrollbackCheckpointActivity: TerminalScrollbackCheckpointActivity
 
-        init(context: Unmanaged<TerminalOutputTeeContext>) {
+        init(
+            context: Unmanaged<TerminalOutputTeeContext>,
+            linkFilter: Unmanaged<TerminalLinkHoverFilter>,
+            scrollbackCheckpointActivity: TerminalScrollbackCheckpointActivity
+        ) {
             self.context = context
+            self.linkFilter = linkFilter
+            self.scrollbackCheckpointActivity = scrollbackCheckpointActivity
         }
 
         func release() {
+            let teeContext = context.takeUnretainedValue()
+            scrollbackCheckpointActivity.unregister(
+                surfaceID: teeContext.surfaceID,
+                registration: teeContext.scrollbackCheckpointFlags
+            )
             context.release()
+            linkFilter.release()
         }
     }
 
@@ -117,6 +194,8 @@ final class TerminalOutputByteTeeBridge: TerminalByteTeeBinding {
             workspaceID: workspaceID,
             surfaceID: surfaceID,
             agentDefinitions: CmuxTaskManagerCodingAgentDefinition.builtIns,
+            scrollbackCheckpointFlags: scrollbackCheckpointActivity
+                .register(surfaceID: surfaceID),
             codexRenameHandler: { confirmation in
                 // Runs on Ghostty's PTY read path. Codex redraws the same
                 // confirmation cell repeatedly, and only a pending submission
@@ -238,12 +317,19 @@ final class TerminalOutputByteTeeBridge: TerminalByteTeeBinding {
             cmuxTerminalOutputTeeCallback,
             teeContext.toOpaque()
         )
-        return Lease(context: teeContext)
+        let linkFilter = Unmanaged.passRetained(TerminalLinkHoverFilter(surfaceID: surfaceID))
+        GhosttyLinkFilterAPI.set(surface, cmuxTerminalLinkFilterCallback, linkFilter.toOpaque())
+        return Lease(
+            context: teeContext,
+            linkFilter: linkFilter,
+            scrollbackCheckpointActivity: scrollbackCheckpointActivity
+        )
     }
 
     @MainActor
     func dropSurface(surfaceID: UUID) {
         MobileTerminalByteTee.shared.dropSurface(surfaceID: surfaceID)
+        TerminalPredictionCenter.shared.unregister(surfaceID: surfaceID)
     }
 }
 
@@ -268,19 +354,27 @@ final class TerminalAgentHibernationRecorder: AgentHibernationRecording {
 // MARK: Filesystem
 
 extension TerminalSurfaceRuntimeFilesystem {
-    static func live() -> TerminalSurfaceRuntimeFilesystem {
+    static func live(
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> TerminalSurfaceRuntimeFilesystem {
         let hermesProfileAliasCatalog = HermesProfileAliasCatalog(
-            wrapperDirectoryURL: FileManager.default.homeDirectoryForCurrentUser
+            wrapperDirectoryURL: homeDirectory
                 .appendingPathComponent(".local/bin", isDirectory: true)
         )
+        // Per-surface command shims are part of the lifetime of their pane.
+        // Keep them beside cmux's durable state so macOS's periodic `$TMPDIR`
+        // cleanup cannot remove a live pane's Claude entry from `PATH`.
+        let agentCommandShimRootDirectory = homeDirectory
+            .appendingPathComponent(".cmuxterm", isDirectory: true)
         return TerminalSurfaceRuntimeFilesystem(
-            agentCommandShimTemporaryDirectory: FileManager.default.temporaryDirectory,
+            agentCommandShimRootDirectory: agentCommandShimRootDirectory,
             installAgentCommandShims: {
                 let fileManager = FileManager.default
                 return await TerminalSurface.installAgentCommandShimsIfPossible(
                     wrapperDirectoryURL: $0,
                     surfaceId: $1,
-                    temporaryDirectory: $2,
+                    rootDirectory: $2,
+                    enabledCommands: $3,
                     hermesProfileAliasCatalog: hermesProfileAliasCatalog,
                     fileManager: fileManager
                 )
@@ -312,6 +406,8 @@ extension TerminalSurface {
         additionalEnvironment: [String: String] = [:],
         focusPlacement: TerminalSurfaceFocusPlacement = .workspace,
         ioMode: TerminalSurfaceIOMode = .exec,
+        isRemoteTerminal: Bool = false,
+        allowsRemoteClipboardWrites: Bool = false,
         manualInputHandler: (@Sendable (TerminalManualInput) -> Void)? = nil,
         manualInputKeyNameResolver: (@MainActor @Sendable (ghostty_input_key_s) -> String?)? = nil,
         runtimeSpawnPolicy: TerminalSurfaceRuntimeSpawnPolicy = .immediate,
@@ -331,6 +427,8 @@ extension TerminalSurface {
             additionalEnvironment: additionalEnvironment,
             focusPlacement: focusPlacement,
             ioMode: ioMode,
+            isRemoteTerminal: isRemoteTerminal,
+            allowsRemoteClipboardWrites: allowsRemoteClipboardWrites,
             manualInputHandler: manualInputHandler,
             manualInputKeyNameResolver: manualInputKeyNameResolver,
             runtimeSpawnPolicy: runtimeSpawnPolicy,

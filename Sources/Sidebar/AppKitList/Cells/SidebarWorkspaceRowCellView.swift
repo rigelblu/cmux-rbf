@@ -1,4 +1,5 @@
 import AppKit
+import CmuxAppKitSupportUI
 import Combine
 import CmuxFoundation
 import CmuxSidebar
@@ -45,6 +46,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let mediaMicView = NSImageView()
     private let mediaCameraView = NSImageView()
     private let statusGlyphButton = SidebarRowTaskStatusGlyphButton()
+    /// `sidebar.compactAgentStatus` leading status glyph.
+    private let compactStatusGlyphView = SidebarCompactStatusGlyphImageView()
     private let titleView = SidebarRowTextView(lines: 1)
     private let cloudImageView = NSImageView()
     private let trailingBadge = SidebarRowUnreadBadgeView()
@@ -125,7 +128,30 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     func applyRebuiltModel(_ model: SidebarWorkspaceRowModel) {
         guard self.model != model else { return }
         self.model = model
-        applyModel(model)
+        applyModel(paintedModel(model))
+        needsLayout = true
+    }
+
+    /// Selection flags painted ahead of the authoritative apply. Hover and
+    /// pump repaints layer it over the stored model; before this they
+    /// repainted the stored model, so moving the pointer off a just-clicked
+    /// row snapped its highlight off until the selection render landed.
+    /// Cleared only by restoreStoredModelPaint (authoritative apply or the
+    /// preview bailout), a different workspace, or reuse.
+    private var optimisticSelection: (isActive: Bool, isMultiSelected: Bool)?
+
+    private func paintedModel(_ model: SidebarWorkspaceRowModel) -> SidebarWorkspaceRowModel {
+        guard let optimisticSelection else { return model }
+        var painted = model
+        painted.isActive = optimisticSelection.isActive
+        painted.isMultiSelected = optimisticSelection.isMultiSelected
+        return painted
+    }
+
+    private func paintOptimisticSelection(isActive: Bool, isMultiSelected: Bool) {
+        guard let model else { return }
+        optimisticSelection = (isActive, isMultiSelected)
+        applyModel(paintedModel(model))
         needsLayout = true
     }
 
@@ -138,12 +164,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     /// swap. The stored model stays authoritative; the next configure()
     /// reconciles (or reverts if the selection did not land).
     func showOptimisticSelectionHighlight() {
-        guard let model, !model.isActive else { return }
-        var optimistic = model
-        optimistic.isActive = true
-        optimistic.isMultiSelected = false
-        applyModel(optimistic)
-        needsLayout = true
+        guard let model else { return }
+        let painted = paintedModel(model)
+        guard !painted.isActive else { return }
+        paintOptimisticSelection(isActive: true, isMultiSelected: false)
     }
 
     /// Counterpart for the row selection is LEAVING: applies the full
@@ -151,12 +175,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     /// together while the authoritative render sits behind the terminal-view
     /// swap. configure() reconciles right after.
     func showOptimisticDeselection() {
-        guard let model, model.isActive || model.isMultiSelected else { return }
-        var optimistic = model
-        optimistic.isActive = false
-        optimistic.isMultiSelected = false
-        applyModel(optimistic)
-        needsLayout = true
+        // Checks the painted state, not the stored model: a row that is only
+        // optimistically highlighted (rapid clicks) must peel too.
+        guard let model else { return }
+        let painted = paintedModel(model)
+        guard painted.isActive || painted.isMultiSelected else { return }
+        paintOptimisticSelection(isActive: false, isMultiSelected: false)
     }
 
     /// Modifier-click preview: a cmd/shift press JOINS the multi-selection,
@@ -164,21 +188,25 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     /// treatment made every cmd-click flash bright blue and then settle
     /// dim once the authoritative state landed.
     func showOptimisticMultiSelection() {
-        guard let model, !model.isActive, !model.isMultiSelected else { return }
-        var optimistic = model
-        optimistic.isMultiSelected = true
-        applyModel(optimistic)
-        needsLayout = true
+        guard let model else { return }
+        let painted = paintedModel(model)
+        guard !painted.isActive, !painted.isMultiSelected else { return }
+        paintOptimisticSelection(isActive: false, isMultiSelected: true)
     }
 
     /// Restores the stored (authoritative) model's paint, undoing any
     /// optimistic treatment. Used by the preview bailout when no
     /// authoritative apply arrives to reconcile.
     func restoreStoredModelPaint() {
+        optimisticSelection = nil
         guard let model else { return }
         applyModel(model)
         needsLayout = true
     }
+
+#if DEBUG
+    var hasOptimisticSelectionForTesting: Bool { optimisticSelection != nil }
+#endif
 
     /// True when a press at this view should not repaint selection (the
     /// close button closes without selecting; the status glyph and checklist
@@ -224,6 +252,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             view.imageScaling = .scaleProportionallyDown
             contentContainer.addSubview(view)
         }
+        // The glyph view sets its own scaling mode, shared with the SwiftUI list.
+        contentContainer.addSubview(compactStatusGlyphView)
         statusGlyphButton.isHidden = true
         statusGlyphButton.onClick = { [weak self] in self?.toggleStatusPopover() }
         contentContainer.addSubview(statusGlyphButton)
@@ -235,6 +265,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         cloudImageView.setAccessibilityElement(false)
         addSubview(trailingBadge)
         closeButton.onClick = { [weak self] in self?.actions?.commands.closeWorkspace() }
+        closeButton.setAccessibilityRole(.button)
+        closeButton.setAccessibilityIdentifier("sidebarWorkspaceCloseButton")
+        closeButton.setAccessibilityElement(false)
+        closeButton.concealImmediately()
         contentContainer.addSubview(closeButton)
 
         contentContainer.addSubview(descriptionView)
@@ -279,6 +313,13 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             action()
         }
         model = nil
+        optimisticSelection = nil
+        // The recycled cell may have been the hovered row (often the one just
+        // closed). Snap its close button hidden so it cannot fade out on
+        // whichever row AppKit hands this cell to next.
+        isPointerHovering = false
+        closeButton.setAccessibilityElement(false)
+        closeButton.concealImmediately()
         hintPill.resetForReuse()
     }
 
@@ -286,6 +327,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         isPresentationActive = isActive
         markSpinner?.isPresentationActive = isActive
         trailingSpinner?.isPresentationActive = isActive
+        compactStatusGlyphView.isPresentationActive = isActive
     }
 
     func suspendPresentation(commitEdits: Bool = false) {
@@ -335,10 +377,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         suspendPresentation()
         guard previous != model else { return }
         if previous?.workspaceId != model.workspaceId {
+            optimisticSelection = nil
             invalidateLinkAccessibility()
         }
         self.model = model
-        applyModel(model)
+        applyModel(paintedModel(model))
         needsLayout = true
     }
 
@@ -367,6 +410,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let hoverChanged = self.isPointerHovering != isPointerHovering
         self.isPointerHovering = isPointerHovering
         if previous?.workspaceId != model.workspaceId {
+            optimisticSelection = nil
             invalidateLinkAccessibility()
             cancelInlineRename()
             if statusPopoverPresenter.isShown {
@@ -376,7 +420,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
         guard requiresFullApply || previous != model || hoverChanged else { return }
         self.model = model
-        applyModel(model)
+        applyModel(paintedModel(model))
         needsLayout = true
     }
 
@@ -424,7 +468,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
         // Title line
         cloudImageView.configureSidebarWorkspaceAccessory(
-            symbol: "cloud", label: snapshot.cloudWorkspaceLabel,
+            symbol: snapshot.remoteWorkspaceBadgeSymbol, label: model.settings.showsCloudDeviceIcons && !model.settings.hidesAllDetails ? snapshot.remoteWorkspaceBadgeLabel : nil,
             pointSize: model.scaled(10), tint: palette.secondary(0.7), weight: .regular
         )
         pinImageView.configureSidebarWorkspaceAccessory(
@@ -486,18 +530,22 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                     colorHex: checkedEntry.flatMap { menuModel?.colorHexes[$0.id] }, // (#cm-109.3) // (#cm-110.13)
                     contrastBackground: rowBackground, // (#cm-109.7)
                     drawnAlpha: SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: snapshot.taskStatus), // (#cm-109.7) // (#cm-110.13)
-                    isNone: indicator.isNone // (#cm-110.13)
+                    isNone: indicator.isNone, // (#cm-110.13)
+                    accent: palette.accent,
+                    differentiateWithoutColor: model.displayAccessibility.differentiateWithoutColor
                 ),
                 monochromeColor: palette.secondary(0.8),
                 neutralColor: palette.secondary(0.8)
             )
         }
         reconcileStatusPopover(model: model, showsAnchor: showsStatusGlyph)
+        configureCompactStatusGlyph(model: model, palette: palette)
 
-        let titleLineLimit = settings.wrapsWorkspaceTitles ? 8 : 1
+        // Compact status rows are one line, so title wrapping does not undo it.
+        let titleLineLimit = settings.wrapsWorkspaceTitles && snapshot.compactStatusGlyph == nil ? 8 : 1
         titleView.maximumNumberOfLines = titleLineLimit
         titleView.lineBreakMode = titleLineLimit == 1 ? .byTruncatingTail : .byWordWrapping
-        let boundedTitle = snapshot.title.sidebarBoundedDisplayString(
+        let boundedTitle = snapshot.displayTitle.sidebarBoundedDisplayString(
             maxDisplayedLines: titleLineLimit,
             maxDisplayedCharacters: 2048
         )
@@ -515,8 +563,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         titleView.alphaValue = snapshot.isMuted ? 0.6 : 1
 
         // Badges / spinner / close
-        let showsSpinner = model.showsAgentActivity && snapshot.activeCodingAgentCount > 0
-        let badgeVisible = model.unreadCount > 0 || model.markedUnread
+        // Compact status draws running and unread as its one glyph instead.
+        let compacts = snapshot.compactStatusGlyph != nil
+        let showsSpinner = !compacts && model.showsAgentActivity && snapshot.activeCodingAgentCount > 0
+        let badgeVisible = !compacts && (model.unreadCount > 0 || model.markedUnread) // (cm-128.4) marked-unread dot
         configureStatusSlot(
             model: model,
             palette: palette,
@@ -527,9 +577,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             systemName: "xmark", pointSize: model.scaled(9), weight: .medium
         )
         closeButton.contentTintColor = palette.secondary(0.7)
-        closeButton.toolTip = snapshot.isPinned
+        let closeButtonTooltip = snapshot.isPinned
             ? String(localized: "sidebar.pinnedWorkspaceProtected.tooltip", defaultValue: "Pinned workspace — protected from Close")
             : String(localized: "sidebar.closeWorkspace.tooltip", defaultValue: "Close workspace")
+        closeButton.toolTip = closeButtonTooltip
+        closeButton.setAccessibilityLabel(closeButtonTooltip)
         updateCloseVisibility()
 
         // Description / subtitle
@@ -537,13 +589,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         descriptionView.isHidden = description == nil
         if let description {
             let display = description.sidebarBoundedDisplayString(maxDisplayedLines: 12, maxDisplayedCharacters: 4096)
-            let descriptionColor = palette.secondary(0.84, inactiveOpacity: 0.95)
+            let customDescriptionColor = settings.workspaceDescriptionColorHex.flatMap(NSColor.init(hex:))
+            let descriptionColor = customDescriptionColor ?? palette.secondary(0.84, inactiveOpacity: 0.95)
             if let rendered = SidebarMarkdownRenderer(markdown: display).workspaceDescription {
                 descriptionView.configureAttributedText(
                     rendered,
                     font: .systemFont(ofSize: model.scaled(10.5)),
                     color: descriptionColor,
-                    linkColor: palette.linkText
+                    linkColor: customDescriptionColor ?? palette.linkText
                 )
             } else {
                 descriptionView.configurePlainText(
@@ -559,15 +612,21 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             let trimmed = snapshot.latestConversationMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
             return (trimmed?.isEmpty == false) ? trimmed : nil
         }()
-        let effectiveSubtitle = model.latestNotificationText ?? conversationSubtitle
+        // Compact status rows are one line; the notification leads the glyph's tooltip instead.
+        let effectiveSubtitle = snapshot.compactStatusGlyph != nil
+            ? nil
+            : model.latestNotificationText ?? conversationSubtitle
         let subtitleLineLimit = model.latestNotificationText == nil ? 2 : settings.notificationMessageLineLimit
         subtitleView.isHidden = effectiveSubtitle == nil
         if let effectiveSubtitle {
             subtitleView.maximumNumberOfLines = subtitleLineLimit
-            subtitleView.stringValue = effectiveSubtitle.sidebarBoundedDisplayString(
+            let display = effectiveSubtitle.sidebarBoundedDisplayString(
                 maxDisplayedLines: subtitleLineLimit,
                 maxDisplayedCharacters: 4096
             )
+            subtitleView.stringValue = model.latestNotificationText == nil
+                ? display
+                : SidebarMarkdownRenderer(markdown: display).plainText
             subtitleView.font = .systemFont(ofSize: model.scaled(10))
             subtitleView.textColor = palette.secondary(0.8)
         }
@@ -611,10 +670,13 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             text: model.shortcutHintText,
             fontSize: model.scaled(9),
             emphasis: model.isActive ? 1.0 : 0.9,
+            colorScheme: palette.colorScheme,
             representedIdentity: model.workspaceId
         )
-        topDropIndicator.layer?.backgroundColor = cmuxAccentNSColor(for: palette.colorScheme).cgColor
-        bottomDropIndicator.layer?.backgroundColor = cmuxAccentNSColor(for: palette.colorScheme).cgColor
+        topDropIndicator.accentColor = palette.accent
+        bottomDropIndicator.accentColor = palette.accent
+        topDropIndicator.layer?.backgroundColor = palette.accentColor.cgColor
+        bottomDropIndicator.layer?.backgroundColor = palette.accentColor.cgColor
         topDropIndicator.isHidden = !model.topDropIndicatorVisible
         bottomDropIndicator.isHidden = !model.bottomDropIndicatorVisible
         alphaValue = model.isBeingDragged ? 0.6 : 1
@@ -642,7 +704,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     func paintControllerDropIndicator(top: Bool, bottom: Bool, level: Int? = nil) {
         let colorScheme = model.map { $0.colorSchemeIsDark ? ColorScheme.dark : .light }
             ?? SidebarAppearanceColorResolver().currentColorScheme()
-        let accent = cmuxAccentNSColor(for: colorScheme)
+        let accent = (model?.settings.accentColor ?? CmuxAccentColor()).nsColor(for: colorScheme)
         topDropIndicator.layer?.backgroundColor = accent.cgColor
         bottomDropIndicator.layer?.backgroundColor = accent.cgColor
         topDropIndicator.isHidden = !top
@@ -714,6 +776,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     var pullRequestLinesForTesting: [SidebarRowPullRequestLine] { pullRequestRows } // (cm-128.16)
     var progressBarForTesting: SidebarRowProgressView { progressView } // (cm-128.16)
     var contentAlphaForTesting: CGFloat { contentContainer.alphaValue } // (cm-128.16)
+
+    var closeButtonPaintForTesting: (isHidden: Bool, alpha: CGFloat) {
+        (closeButton.isHidden, closeButton.alphaValue)
+    }
 #endif
 
     private func configureStatusSlot(
@@ -962,7 +1028,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     }
 
     private func updateCloseVisibility() {
-        closeButton.setRevealed(showsCloseNow)
+        let revealed = showsCloseNow
+        closeButton.setRevealed(revealed)
+        closeButton.setAccessibilityElement(revealed)
     }
 
     /// Authoritative hover enforcement: the controller sweeps visible cells
@@ -975,11 +1043,30 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         // trailing badge and spinner hide while the close button shows), and
         // re-deriving that subset here would drift from applyModel.
         if let model {
-            applyModel(model)
+            applyModel(paintedModel(model))
             needsLayout = true
         } else {
             updateCloseVisibility()
         }
+    }
+
+    private func configureCompactStatusGlyph(model: SidebarWorkspaceRowModel, palette: SidebarRowPalette) {
+        let glyph = model.snapshot.compactStatusGlyph?.applyingUnread(
+            model.unreadCount,
+            latestNotificationText: model.latestNotificationText
+        )
+        compactStatusGlyphView.isPresentationActive = isPresentationActive
+        compactStatusGlyphView.isHidden = glyph?.isDrawn != true
+        guard let glyph, glyph.isDrawn else { return }
+        compactStatusGlyphView.configure(
+            glyph,
+            pointSize: model.scaled(11),
+            color: glyph.color(
+                isActive: model.isActive,
+                selected: palette.selectedForeground(0.95),
+                secondary: palette.secondary(0.8)
+            )
+        )
     }
 
     private func configureMetadata(model: SidebarWorkspaceRowModel, palette: SidebarRowPalette) {
@@ -988,19 +1075,20 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let visible = model.isMetadataExpanded ? allEntries : Array(allEntries.prefix(3))
         Self.pool(&metadataRows, count: visible.count, parent: contentContainer) { SidebarRowIconTextLine() }
         for (index, entry) in visible.enumerated() {
-            // Legacy parity: on the selected row an explicit entry color
-            // yields to the selected foreground — otherwise agent-status
-            // tints (blue "Running") vanish into the blue selection
-            // highlight. Explicit colors only apply on unselected rows.
-            let explicitColor = entry.color.flatMap { NSColor(hex: $0) }
-            let entryColor: NSColor
-            if model.isActive {
-                entryColor = explicitColor != nil
-                    ? palette.selectedForeground(1.0)
-                    : palette.secondary(0.95).withAlphaComponent(0.84)
-            } else {
-                entryColor = explicitColor ?? palette.secondary()
-            }
+            // Preserve explicit status colors on selected rows when they meet
+            // the contrast floor; otherwise use selection foreground chrome.
+            let explicitColor = palette.accent.statusEntryColor(
+                hex: entry.color,
+                isDark: palette.colorScheme == .dark
+            )
+            let entryColor = sidebarStatusPresentationNSColor(
+                explicit: explicitColor,
+                isActive: model.isActive,
+                selectedBackground: palette.selectedBackground,
+                fallback: model.isActive
+                    ? (explicitColor == nil ? palette.secondary(0.95).withAlphaComponent(0.84) : palette.selectedForeground(1))
+                    : palette.secondary()
+            )
             metadataRows[index].configureMetadataEntry(
                 entry,
                 model: model,
@@ -1321,6 +1409,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
                 self?.contextMenuVisible = false
                 self?.updateCloseVisibility()
                 didClose?()
+            },
+            beginInlineRename: { [weak self] in
+                self?.beginInlineRename()
             }
         )
     }
@@ -1390,6 +1481,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             let glyphSize = SidebarRowTaskStatusGlyphButton.occupiedSize(fontScale: model.indicatorScale) // (cm-128.16)
             place(statusGlyphButton, size: glyphSize, centerY: firstLineCenter)
             x += glyphSize.width + titleRowSpacing
+        }
+        if !compactStatusGlyphView.isHidden {
+            // Sits partly in the row's leading padding, with a tighter gap
+            // to the title, so the glyph does not push the title far right.
+            let side = model.scaled(11)
+            x -= SidebarCompactStatusGlyph.leadingPullIn
+            place(compactStatusGlyphView, size: NSSize(width: side, height: side), centerY: firstLineCenter)
+            x += side + SidebarCompactStatusGlyph.titleSpacing
         }
 
         x = cloudImageView.layoutLeadingSidebarWorkspaceAccessory(

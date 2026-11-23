@@ -55,9 +55,9 @@ public struct MobileIrohV2Configuration: Sendable {
         } ?? defaultEnvironment
         let origin: String
         switch environment {
-        case "production": origin = "https://cmux-iroh-v2.debussy.workers.dev"
-        case "staging": origin = "https://cmux-iroh-v2-staging.debussy.workers.dev"
-        default: origin = "https://cmux-iroh-v2-development.debussy.workers.dev"
+        case "production": origin = "https://cmux-v2.debussy.workers.dev"
+        case "staging": origin = "https://cmux-v2-staging.debussy.workers.dev"
+        default: origin = "https://cmux-v2-development.debussy.workers.dev"
         }
         func validOrigin(_ candidate: String?) -> URL? {
             guard let candidate, let url = URL(string: candidate),
@@ -74,7 +74,7 @@ public struct MobileIrohV2Configuration: Sendable {
             }
             url = derived
         }
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
         return Self(baseURL: url, environment: environment, projectID: projectID,
                     appNamespace: namespace, buildTag: tag,
                     appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",

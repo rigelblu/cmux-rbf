@@ -7,6 +7,11 @@ import { runVmRoute } from "../../../../../services/vms/routeWorkflow";
 import { resizeVm } from "../../../../../services/vms/workflows";
 import { VM_DISK_MB_MAX, VM_DISK_MB_STEP } from "../../../../../services/vms/machineSpec";
 import { maxDiskMbForPlan, maxMemoryMbForPlan, maxVcpusForPlan } from "../../../../../services/vms/entitlements";
+import { vmModelPlaneRevoker } from "../../../../../services/vms/modelPlaneGateway";
+
+// Mirrors VM_ROUTE_DEADLINES (services/vms/routeDeadline.ts): work past the
+// route's answer deadline continues through after() until this limit.
+export const maxDuration = 300;
 
 /** Grow a Cloud VM's resources. The workflow owns plan and grow-only checks. */
 export async function POST(
@@ -53,7 +58,9 @@ export async function POST(
         cpu: cpu as number | undefined,
         memoryMb: memoryMb as number | undefined,
         maxActiveVms: account.entitlements.maxActiveVms,
-      }), { request });
+        entitlementOverride: account.entitlements.entitlementOverride,
+        modelPlane: vmModelPlaneRevoker(),
+      }), { request, deadline: { operation: "resize" } });
       if (!run.ok) return run.response;
       const stats = run.value;
       return jsonResponse({
@@ -68,8 +75,8 @@ export async function POST(
         diskTotalMb: stats.diskTotalMb,
         diskUsedMb: stats.diskUsedMb,
         maxDiskMb: maxDiskMbForPlan(account.entitlements.planId),
-        maxMemoryMb: maxMemoryMbForPlan(account.entitlements.planId),
-        maxVcpus: maxVcpusForPlan(account.entitlements.planId),
+        maxMemoryMb: maxMemoryMbForPlan(account.entitlements.planId, process.env, account.entitlements.entitlementOverride),
+        maxVcpus: maxVcpusForPlan(account.entitlements.planId, process.env, account.entitlements.entitlementOverride),
       });
     },
   );

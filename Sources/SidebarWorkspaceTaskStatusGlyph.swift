@@ -1,4 +1,5 @@
 import CmuxAppKitSupportUI // (#cm-109.7)
+import CmuxFoundation
 import CmuxWorkspaces
 import Foundation
 import SwiftUI
@@ -26,11 +27,25 @@ extension WorkspaceTaskStatus {
 // MARK: - Glyph model
 
 /// Pure mapping from a task status to the drawn glyph's shape: how much of
-/// the circle is filled, which color role it takes, and whether the
-/// checkmark renders. Kept free of SwiftUI so the mapping is unit-testable.
+/// the circle is filled, which color role it takes, and which mark renders
+/// on top. Kept free of SwiftUI so the mapping is unit-testable.
 /// Manual-override state surfaces only in the tooltip and the status
 /// popover, never as extra glyph decoration.
+///
+/// Working and Needs Attention share a half-filled pie and differ only in
+/// color. With the macOS Differentiate Without Color setting on, Needs
+/// Attention instead draws a filled circle with an exclamation mark, so
+/// every lane has a distinct shape.
 struct SidebarWorkspaceTaskStatusGlyphModel: Equatable {
+    /// The mark drawn over the circle, in the contrasting mark color.
+    enum Mark: Equatable {
+        case none
+        /// Done.
+        case checkmark
+        /// Needs attention, only with Differentiate Without Color on.
+        case exclamation
+    }
+
     /// Semantic color the view resolves against the row's palette.
     enum ColorRole: Equatable {
         /// Todo: secondary gray outline only.
@@ -48,39 +63,41 @@ struct SidebarWorkspaceTaskStatusGlyphModel: Equatable {
     /// Fraction of the progress pie that is filled, 0...1.
     let fillFraction: Double
     let colorRole: ColorRole
+    let mark: Mark
+
     /// Done renders a checkmark over the filled circle.
-    let showsCheckmark: Bool
+    var showsCheckmark: Bool { mark == .checkmark }
     let showsDot: Bool // (#cm-110.13)
 
-    init(status: WorkspaceTaskStatus, isNone: Bool = false) { // (#cm-110.13)
+    init(status: WorkspaceTaskStatus, isNone: Bool = false, differentiateWithoutColor: Bool = false) { // (#cm-110.13)
         showsDot = isNone // (#cm-110.13)
         if isNone { // (#cm-110.13)
             fillFraction = 0 // (#cm-110.13)
             colorRole = .neutral // (#cm-110.13)
-            showsCheckmark = false // (#cm-110.13)
+            mark = .none // (#cm-110.13)
             return // (#cm-110.13)
         } // (#cm-110.13)
         switch status {
         case .todo:
             fillFraction = 0
             colorRole = .neutral
-            showsCheckmark = false
+            mark = .none
         case .working:
             fillFraction = 0.5
             colorRole = .working
-            showsCheckmark = false
+            mark = .none
         case .needsAttention:
-            fillFraction = 0.5
+            fillFraction = differentiateWithoutColor ? 1 : 0.5
             colorRole = .attention
-            showsCheckmark = false
+            mark = differentiateWithoutColor ? .exclamation : .none
         case .review:
             fillFraction = 0.75
             colorRole = .review
-            showsCheckmark = false
+            mark = .none
         case .done:
             fillFraction = 1
             colorRole = .done
-            showsCheckmark = true
+            mark = .checkmark
         }
     }
 
@@ -292,6 +309,7 @@ struct SidebarWorkspaceManualStatusIndicatorMenu: View {
 /// `PullRequestMergedIcon` (custom `Path` drawing, caller passes resolved
 /// colors; no store access).
 struct SidebarWorkspaceTaskStatusGlyph: View {
+    @Environment(\.cmuxAccentColor) private var cmuxAccent
     let status: WorkspaceTaskStatus
     let hasOverride: Bool
     /// Active (inverted-foreground) rows render monochrome, matching how
@@ -316,6 +334,8 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
+
     private static let baseSize: CGFloat = 9
     static let slotWidth: CGFloat = 11 // (#cm-109.6)
     static func symbolCanvasBounds(fontScale: CGFloat) -> CGRect { // (#cm-109.6)
@@ -326,7 +346,11 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
     private static let attentionStrokeWidth: CGFloat = 1.4
 
     var model: SidebarWorkspaceTaskStatusGlyphModel { // (#cm-110.13)
-        SidebarWorkspaceTaskStatusGlyphModel(status: status, isNone: isNone) // (#cm-110.13)
+        SidebarWorkspaceTaskStatusGlyphModel( // (#cm-110.13)
+            status: status,
+            isNone: isNone, // (#cm-110.13)
+            differentiateWithoutColor: differentiateWithoutColor
+        )
     }
 
     /// The color the glyph starts from, before any contrast floor: the same one the AppKit glyph starts from. (#cm-109.7)
@@ -335,7 +359,8 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
         env.colorScheme = colorScheme // (#cm-109.7)
         let glyphModel = SidebarRowTaskStatusGlyphButton.Model( // (#cm-109.7)
             status: status, hasOverride: hasOverride, usesMonochrome: usesMonochrome, fontScale: fontScale, // (#cm-109.7)
-            colorScheme: colorScheme, colorHex: colorHex, isNone: isNone // (#cm-109.7) // (#cm-110.13)
+            colorScheme: colorScheme, colorHex: colorHex, isNone: isNone, // (#cm-109.7) // (#cm-110.13)
+            accent: cmuxAccent // upstream's accent setting (cm-142 sync)
         ) // (#cm-109.7)
         return SidebarRowTaskStatusGlyphButton.rawBaseColor( // (#cm-109.7)
             model: glyphModel, // (#cm-109.7)
@@ -454,13 +479,12 @@ struct SidebarWorkspaceTaskStatusGlyph: View {
                 SidebarStatusPieShape(fraction: model.fillFraction) // (#cm-109.6)
                     .fill(statusColor) // (#cm-109.6)
             } // (#cm-109.6)
-            if model.showsCheckmark { // (#cm-109.6)
-                SidebarStatusCheckmarkShape() // (#cm-109.6)
-                    .stroke( // (#cm-109.6)
-                        checkmarkColor, // (#cm-109.6)
-                        style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round) // (#cm-109.6)
-                    ) // (#cm-109.6)
-            } // (#cm-109.6)
+            // Upstream's mark: Done's checkmark, or Needs Attention's exclamation under Differentiate Without Color.
+            SidebarStatusMarkShape(mark: model.mark) // (#cm-109.6)
+                .stroke( // (#cm-109.6)
+                    checkmarkColor, // (#cm-109.6)
+                    style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round) // (#cm-109.6)
+                ) // (#cm-109.6)
         } // (#cm-109.6)
     } // (#cm-109.6)
 
@@ -503,15 +527,41 @@ struct SidebarStatusPieShape: Shape {
     }
 }
 
-/// A small checkmark centered in the glyph's circle.
-struct SidebarStatusCheckmarkShape: Shape {
+/// The glyph's mark (checkmark or exclamation) centered in its circle;
+/// empty when the lane has no mark.
+struct SidebarStatusMarkShape: Shape {
+    let mark: SidebarWorkspaceTaskStatusGlyphModel.Mark
+
     func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let width = rect.width
-        let height = rect.height
-        path.move(to: CGPoint(x: rect.minX + width * 0.28, y: rect.minY + height * 0.52))
-        path.addLine(to: CGPoint(x: rect.minX + width * 0.45, y: rect.minY + height * 0.68))
-        path.addLine(to: CGPoint(x: rect.minX + width * 0.74, y: rect.minY + height * 0.34))
+        mark.path(in: rect).map { Path($0) } ?? Path()
+    }
+}
+
+extension SidebarWorkspaceTaskStatusGlyphModel.Mark {
+    /// The mark's stroke path inside the glyph's circle rect, or `nil` for
+    /// no mark. Shared by the SwiftUI glyph and the AppKit row button (both
+    /// stroke it 1.2pt, round). Coordinates are y-down, matching SwiftUI and
+    /// the flipped AppKit view.
+    func path(in rect: CGRect) -> CGPath? {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + rect.width * x, y: rect.minY + rect.height * y)
+        }
+        let path = CGMutablePath()
+        switch self {
+        case .none:
+            return nil
+        case .checkmark:
+            path.move(to: point(0.28, 0.52))
+            path.addLine(to: point(0.45, 0.68))
+            path.addLine(to: point(0.74, 0.34))
+        case .exclamation:
+            path.move(to: point(0.5, 0.24))
+            path.addLine(to: point(0.5, 0.54))
+            // A near-zero segment: the round cap draws the dot.
+            path.move(to: point(0.5, 0.75))
+            path.addLine(to: point(0.5, 0.76))
+        }
         return path
     }
 }
+

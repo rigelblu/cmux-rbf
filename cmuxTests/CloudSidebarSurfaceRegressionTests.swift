@@ -1,3 +1,5 @@
+import CmuxCloud
+import CmuxSurfaceCatalogModel
 import Foundation
 import Testing
 #if canImport(cmux_DEV)
@@ -33,22 +35,14 @@ struct CloudSidebarSurfaceRegressionTests {
         let snapshot = SidebarWorkspaceSnapshotFactory(
             workspace: workspace, settings: SidebarTabItemSettingsSnapshot(defaults: defaults), showsAgentActivity: false, todoControlsEnabled: false
         ).makeSnapshot()
-        #expect(snapshot.compactDirectoryCandidates.isEmpty)
+        #expect((snapshot.compactDirectoryCandidates + snapshot.branchDirectoryLines.flatMap(\.directoryCandidates)).allSatisfy { !$0.contains("Directory unavailable") })
         #expect(snapshot.compactGitBranchSummaryText == nil)
-        #expect(snapshot.branchDirectoryLines.isEmpty)
+        #expect(snapshot.branchDirectoryLines.allSatisfy { $0.branch == nil })
         #expect(snapshot.pullRequestRows.isEmpty)
         #expect(snapshot.finderDirectoryPath == nil)
         let accessibilityLabel = snapshot.accessibilityLabel(index: 0, workspaceCount: 1)
         #expect(accessibilityLabel.contains("Cloud workspace on cloud-sidebar-vm"))
         #expect(!accessibilityLabel.contains("local-checkout"))
-        let sidebarDecision = SidebarWorkspaceSnapshotRefreshPolicy().decision(
-            current: nil,
-            next: snapshot,
-            force: false,
-            contextMenuVisible: false
-        )
-        #expect(sidebarDecision.workspaceSnapshotStorage == snapshot)
-        #expect(sidebarDecision.pendingWorkspaceSnapshot == nil)
 
         let manager = TabManager(
             initialWorkspaceTitle: "Cloud",
@@ -109,7 +103,10 @@ struct CloudSidebarSurfaceRegressionTests {
             title: "terminal", detail: "/home/cloud/project", lifecycle: .running,
             agent: nil, remoteWorkspace: nil, port: nil, url: nil
         )
-        let catalog = SurfaceCatalog()
+        let service = CloudWorkspaceRenameService(environment: CloudWorkspaceRenameEnvironment(
+            workspace: { $0 == workspace.id ? workspace : nil }, workspaces: { [workspace] }
+        ))
+        let catalog = SurfaceCatalog(cloudWorkspaceRenameService: service)
         catalog.upsert(resource)
         catalog.record(SurfaceProjection(resource: resource.id, workspaceID: workspace.id, panelID: panelID))
         let state = try #require(CmuxTuiSnapshotParser.state(fromSnapshot: [
@@ -133,9 +130,6 @@ struct CloudSidebarSurfaceRegressionTests {
             diskUsedMb: nil
         )
         catalog.replaceCloudState(state, resources: [resource], info: info)
-        let service = CloudWorkspaceRenameService(
-            environment: CloudWorkspaceRenameEnvironment(workspaces: { [workspace] })
-        )
         service.reconcileRemoteState(machine: machine, state: state, catalog: catalog, observation: .current)
         #expect(workspace.reportedPanelDirectory(panelId: panelID) == "/home/cloud/project")
         #expect(workspace.presentedCurrentDirectory == "/home/cloud/project")
@@ -177,6 +171,20 @@ struct CloudSidebarSurfaceRegressionTests {
         })
     }
 
+    @Test("Terminals stays visible while a cloud machine is connecting")
+    func terminalsBeforeSessionSnapshot() throws {
+        let terminalGroup = try #require(nodes(link: .connecting, desktop: false).first {
+            if case .terminalsPool = $0.kind { return true }
+            return false
+        })
+        #expect(terminalGroup.children.count == 1)
+        guard case .placeholder(_, let placeholder) = terminalGroup.children[0].kind else {
+            Issue.record("Connecting terminals must explain that no terminals are available yet")
+            return
+        }
+        #expect(placeholder.text == "No terminals yet")
+    }
+
     @Test("Ports distinguish loading, error, asleep, and a successful empty scan", arguments: [SurfaceLinkState.connecting, .error, .asleep, .connected])
     func emptyPortsStayVisible(link: SurfaceLinkState) throws {
         let group = try #require(nodes(link: link, desktop: false).first {
@@ -188,8 +196,62 @@ struct CloudSidebarSurfaceRegressionTests {
             Issue.record("Ports must explain why there are no rows")
             return
         }
-        if link == .connecting { #expect(value.style == .connecting) }
+        if link == .connecting { #expect(value.style == .dimmed) }
         if link == .error { #expect(value.style == .error) }
+    }
+
+    @Test("Ports project distinct discovery and route reasons with actionable copy")
+    func portStatusMatrix() {
+        let cases: [(CloudPortDiscoveryState, CloudPortsStatusAction, String)] = [
+            (.notRequested, .refresh, "not checked"),
+            (.loading, .none, "Discovering ports"),
+            (.empty(.noListeningService), .refresh, "web server"),
+            (.empty(.otherInterfaceOnly), .refresh, "interface"),
+            (.loopbackOnly, .none, "loopback"),
+            (.unavailable(.privateAddress), .refresh, "private address"),
+            (.unavailable(.transport), .refresh, "discovery unavailable"),
+            (.stale, .refresh, "out of date"),
+            (.unsupported, .openShell, "not supported"),
+        ]
+        for (state, action, phrase) in cases {
+            let info = SurfaceMachineInfo(
+                id: machine, name: machine.rawValue, status: "running", image: nil,
+                hasDesktop: false, memoryMb: nil, diskMb: nil, linkState: .connected,
+                linkError: nil, cpuPercent: nil, memoryUsedMb: nil, diskUsedMb: nil,
+                portDiscoveryState: state
+            )
+            let presentation = CloudPortsStatusPresentation.make(info: info)
+            #expect(presentation.action == action)
+            #expect(presentation.title.lowercased().contains(phrase.lowercased()) || presentation.message.lowercased().contains(phrase.lowercased()))
+            if state == .loading {
+                #expect(presentation.title == "Discovering ports…")
+                #expect(presentation.message.isEmpty)
+            }
+            if state != .loading && state != .unsupported && state != .empty(.noListeningService) {
+                #expect(presentation.message.contains("Cloud VPN"), "cmux forwarding truth must remain visible")
+            }
+        }
+    }
+
+    @Test("A route failure remains visible beside real port rows")
+    func routeFailureDoesNotReplacePorts() throws {
+        let port = CmuxTuiSnapshotParser.portBrowser(machine: machine, port: 3000, directURL: nil)
+        let info = SurfaceMachineInfo(
+            id: machine, name: machine.rawValue, status: "running", image: nil,
+            hasDesktop: false, memoryMb: nil, diskMb: nil, linkState: .connected,
+            linkError: nil, cpuPercent: nil, memoryUsedMb: nil, diskUsedMb: nil,
+            privateAddress: nil, portDiscoveryState: .unavailable(.privateAddress)
+        )
+        let snapshot = SurfaceCatalogSnapshot(machines: [info], resources: [port], projections: [])
+        let nodes = CloudTreeNodeBuilder.flattened(CloudTreeNodeBuilder.nodes(
+            machines: [MachineSnapshot(id: machine.rawValue, provider: "freestyle", image: "base", isDesktop: false, activity: .ready, createdAt: nil, label: nil)],
+            snapshot: snapshot, localWorkspaces: [], includeLocalMachine: false
+        ))
+        let group = try #require(nodes.first { if case .portsGroup = $0.kind { true } else { false } })
+        #expect(group.children.count == 2)
+        guard case .port = group.children[0].kind else { Issue.record("real ports must stay visible"); return }
+        guard case .placeholder(_, let placeholder) = group.children[1].kind else { Issue.record("route status must be appended"); return }
+        #expect(placeholder.portStatus?.action == .refresh)
     }
 
     @Test("Shell-only machines do not invent a desktop")
@@ -200,7 +262,7 @@ struct CloudSidebarSurfaceRegressionTests {
         })
     }
 
-    @Test("Cloud workspaces disappear on the last terminal move or close and return on creation", arguments: [false, true])
+    @Test("Cloud workspaces remain visible after terminal moves or closes", arguments: [false, true])
     @MainActor
     func workspaceVisibilityFollowsDaemonChanges(incremental: Bool) throws {
         let catalog = SurfaceCatalog()
@@ -208,7 +270,7 @@ struct CloudSidebarSurfaceRegressionTests {
         catalog.register(provider)
         let initial = try visibilityState()
         publishVisibility(initial, to: catalog, incremental: false)
-        #expect(workspaceIDs(catalog.snapshot) == ["ws_side"])
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"])
 
         // Repro: the focused, empty workspace acquires a terminal, which then
         // moves into another workspace while the original daemon record survives.
@@ -236,7 +298,7 @@ struct CloudSidebarSurfaceRegressionTests {
         try updateVisibility([
             ["kind": "upsert", "resource": "tab", "id": "tab_new", "value": terminalTab(pane: "pane_side")]
         ], in: catalog, incremental: incremental)
-        #expect(workspaceIDs(catalog.snapshot) == ["ws_side"], "stale local projections and daemon focus cannot keep an empty row")
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"], "daemon workspace records remain visible as Cloud drop targets")
         #expect(CloudTreeNodeBuilder.structureSignature(visibilityNodes(created)) !=
             CloudTreeNodeBuilder.structureSignature(visibilityNodes(catalog.snapshot)))
         #expect(catalog.cloudStates[machine]?.workspaces.first?.focused == true)
@@ -247,34 +309,34 @@ struct CloudSidebarSurfaceRegressionTests {
             ["kind": "delete", "resource": "tab", "id": "tab_existing"],
             ["kind": "delete", "resource": "terminal", "id": "term_existing"]
         ], in: catalog, incremental: incremental)
-        #expect(workspaceIDs(catalog.snapshot) == ["ws_side"], "removing one of two terminals keeps the workspace")
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"], "removing one of two terminals keeps both daemon workspaces")
         try updateVisibility([
             ["kind": "delete", "resource": "tab", "id": "tab_new"]
         ], in: catalog, incremental: incremental)
-        #expect(workspaceRows(catalog.snapshot).isEmpty)
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"])
         #expect(catalog.resources[terminalID]?.remoteViews == [])
         #expect(CloudTreeNodeBuilder.flattened(visibilityNodes(catalog.snapshot)).contains {
             $0.id == CloudTreeNodeBuilder.nodeID(resource: terminalID)
         }, "detaching a terminal preserves its process in the machine pool")
         #expect(catalog.cloudStates[machine]?.workspaces.count == 2)
-        #expect(CloudTreeNodeBuilder.flattened(visibilityNodes(catalog.snapshot)).contains {
+        #expect(!CloudTreeNodeBuilder.flattened(visibilityNodes(catalog.snapshot)).contains {
             $0.id == CloudTreeNodeBuilder.nodeID(workspacesPlaceholder: machine)
         })
 
         try updateVisibility([
             ["kind": "upsert", "resource": "tab", "id": "tab_new", "value": terminalTab(pane: "pane_main")]
         ], in: catalog, incremental: incremental)
-        #expect(workspaceIDs(catalog.snapshot) == ["ws_main"])
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"])
         let returned = try #require(catalog.resources[terminalID])
         // Terminal kill and accepted create receipts update resources before the
         // next complete graph; both must update visibility without a fleet poll.
         catalog.remove(terminalID, from: provider)
         #expect(catalog.resources[terminalID] == nil)
-        #expect(workspaceRows(catalog.snapshot).isEmpty)
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"])
         catalog.upsert(returned, from: provider)
-        #expect(workspaceIDs(catalog.snapshot) == ["ws_main"])
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"])
         publishVisibility(try #require(catalog.cloudStates[machine]), to: catalog, incremental: false)
-        #expect(workspaceIDs(catalog.snapshot) == ["ws_main"], "a full refresh agrees with the event stream")
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"], "a full refresh agrees with the event stream")
     }
 
     @Test("Visibility preserves workspace metadata and nonterminal content")
@@ -310,11 +372,11 @@ struct CloudSidebarSurfaceRegressionTests {
         terminal.lifecycle = lifecycle
         terminal.remoteViews = nil
         catalog.upsert(terminal, from: provider)
-        #expect(workspaceIDs(catalog.snapshot) == ["ws_side"], "retained terminal output is valid workspace content")
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"], "retained terminal output keeps daemon workspaces visible")
         terminal.remoteViews = []
         catalog.upsert(terminal, from: provider)
         #expect(catalog.resources[terminal.id]?.remoteViews == [])
-        #expect(workspaceRows(catalog.snapshot).isEmpty, "explicit detachment overrides a legacy workspace hint")
+        #expect(workspaceIDs(catalog.snapshot) == ["ws_main", "ws_side"], "explicit detachment keeps the daemon workspace visible as a drop target")
     }
 
     private func visibilityState() throws -> CloudVMState {

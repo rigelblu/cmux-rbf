@@ -133,7 +133,12 @@ extension TerminalController: ControlSurfaceContext {
         guard let ws = resolveSurfaceWorkspace(routing: routing, tabManager: tabManager) else { return nil }
 
         let summaries = controlSurfaceSummaries(workspace: ws).filter { summary in
-            routing.remoteRelayOwnerWorkspaceID == nil || ws.isRemoteTerminalContext(summary.surfaceID)
+            guard let owner = routing.remoteRelayOwnerWorkspaceID else { return true }
+            return remoteRelaySurfaceIsOwnedByWorkspace(
+                summary.surfaceID,
+                workspace: ws,
+                ownerWorkspaceID: owner
+            )
         }
         return ControlSurfaceListSnapshot(
             workspaceID: ws.id,
@@ -205,9 +210,23 @@ extension TerminalController: ControlSurfaceContext {
         }
         guard let ws = resolveSurfaceWorkspace(routing: routing, tabManager: tabManager) else { return nil }
         let containerPanelID: UUID?
-        if routing.remoteRelayOwnerWorkspaceID != nil {
-            containerPanelID = ws.activeRemoteTerminalSurfaceIds.sorted { $0.uuidString < $1.uuidString }.first
-                ?? ws.remoteTmuxSessionMirror?.controlPaneLocations().first?.pane.panel.id
+        if let owner = routing.remoteRelayOwnerWorkspaceID {
+            containerPanelID = ws.activeRemoteTerminalSurfaceIds
+                .sorted { $0.uuidString < $1.uuidString }
+                .first {
+                    remoteRelaySurfaceIsOwnedByWorkspace(
+                        $0,
+                        workspace: ws,
+                        ownerWorkspaceID: owner
+                    )
+                }
+                ?? ws.remoteTmuxSessionMirror?.controlPaneLocations().first(where: {
+                    remoteRelaySurfaceIsOwnedByWorkspace(
+                        $0.pane.panel.id,
+                        workspace: ws,
+                        ownerWorkspaceID: owner
+                    )
+                })?.pane.panel.id
         } else {
             containerPanelID = ws.focusedPanelId ?? orderedPanels(in: ws).first?.id
         }
@@ -257,6 +276,15 @@ extension TerminalController: ControlSurfaceContext {
     }
 
     // MARK: - focus
+
+    func controlSurfaceJumpToLastPrompt() -> ControlSurfaceFocusResolution? {
+        guard let app = AppDelegate.shared, let target = app.jumpToLastPrompt() else { return nil }
+        return .focused(
+            windowID: v2ResolveWindowId(tabManager: app.tabManagerFor(tabId: target.workspaceId)),
+            workspaceID: target.workspaceId,
+            surfaceID: target.panelId
+        )
+    }
 
     func controlSurfaceFocus(
         routing: ControlRoutingSelectors,
@@ -317,10 +345,8 @@ extension TerminalController: ControlSurfaceContext {
             _ = AppDelegate.shared?.focusMainWindow(windowId: windowId)
             setActiveTabManager(tabManager)
         }
-        if tabManager.selectedTabId != ws.id {
-            tabManager.selectWorkspace(ws)
-        }
-        ws.focusPanel(surfaceID)
+        // Record explicit intent before selection schedules focus restoration.
+        tabManager.focusTab(ws.id, surfaceId: surfaceID, suppressFlash: true)
         return .focused(
             windowID: v2ResolveWindowId(tabManager: tabManager),
             workspaceID: ws.id,

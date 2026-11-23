@@ -37,7 +37,7 @@ import {
 
 const ROW_ID = "00000000-0000-4000-8000-00000000c0de";
 const MATERIALS: VmModelPlaneMaterials = {
-  edgeRules: [{ domain: "coderouter.cmux.internal", destinationHost: "coderouter.dev", headers: { "x-coderouter-route-token": "crt_t", "x-cmux-vm-id": ROW_ID } }],
+  edgeRules: [{ domain: "coderouter.cmux.internal", destinationHost: "coderouter.dev", headers: { "x-cmux-authorization": "Bearer eyJ.signed.token" } }],
 };
 
 type UsageEvent = Parameters<VmRepositoryShape["recordUsageEvent"]>[0];
@@ -64,6 +64,9 @@ function row(overrides: Partial<CloudVmRow> = {}): CloudVmRow {
     failureCode: null,
     failureMessage: null,
     providerMetadata: { cmuxResourceReservation: { vcpus: 2, memoryMb: 8192, diskMb: 32768 } },
+    networkPolicy: null,
+    networkPolicyStatus: null,
+    agentUpdates: null,
     ownerTeamId: overrides.ownerTeamId ?? overrides.billingTeamId ?? "team-mp",
     coderouterPoolId: null,
     ...overrides,
@@ -96,6 +99,7 @@ function fakeRepo(input: {
     markCreateFailed: (failure) =>
       Effect.sync(() => {
         input.failed.push(failure);
+        return true;
       }),
     markCreateRunning:
       input.markCreateRunning ??
@@ -406,7 +410,7 @@ function baseRepo(failed: unknown[], overrides: Partial<VmRepositoryShape> = {})
     beginBaseOpen: () => Effect.succeed(create),
     beginBaseReset: () => Effect.succeed(create),
     markBaseCreateRunning: (update) => Effect.succeed({ ...vm, status: "running", providerVmId: update.providerVmId }),
-    markBaseCreateFailed: (failure) => Effect.sync(() => { failed.push(failure); }),
+    markBaseCreateFailed: (failure) => Effect.sync(() => { failed.push(failure); return true; }),
     ...overrides,
   };
 }
@@ -582,5 +586,30 @@ describe("model-plane error responses", () => {
   test("the workflow error unwraps from an Effect failure like every other tag", () => {
     const err = new VmModelPlaneError({ kind: "unavailable", cause: new Error("x") });
     expect(vmWorkflowErrorCause(err)?._tag).toBe("VmModelPlaneError");
+  });
+});
+
+// https://github.com/manaflow-ai/cmux/issues/27667: Freestyle tells its
+// customers' accounts apart by the customer each machine names. Every path
+// that allocates a machine must name the owning account.
+describe("provider customer tag", () => {
+  const source = row({ id: "source-row", providerVmId: "source-vm", status: "running" });
+  const entrypoints = [
+    ["create", (repo: VmRepositoryShape) => createVm(createInput).pipe(Effect.asVoid, Effect.provide(layer(repo, fakeProviders({ creates: tagged }))))],
+    ["restore", (repo: VmRepositoryShape) => restoreVm({ ...createInput, snapshotId: "snap-1" }).pipe(Effect.asVoid, Effect.provide(layer(repo, fakeProviders({ creates: tagged }))))],
+    ["fork", (repo: VmRepositoryShape) => forkVm({ ...createInput, teamIds: ["team-mp"], providerVmId: "source-vm" }).pipe(Effect.asVoid, Effect.provide(layer(
+      { ...repo, findUserVm: () => Effect.succeed(source) },
+      { ...fakeProviders({ creates: tagged }), snapshot: () => Effect.succeed({ id: "source-copy", createdAt: 0 }) },
+    )))],
+    ["Base open", () => openBaseVm(createInput).pipe(Effect.asVoid, Effect.provide(layer(baseRepo([]), fakeProviders({ creates: tagged }))))],
+    ["Base reset", () => resetBaseVm(createInput).pipe(Effect.asVoid, Effect.provide(layer(baseRepo([]), fakeProviders({ creates: tagged }))))],
+  ] as const;
+  const tagged: CreateOptions[] = [];
+
+  test.each(entrypoints)("%s names the owning account as the provider customer", async (_name, run) => {
+    tagged.length = 0;
+    await Effect.runPromise(run(fakeRepo({ usageEvents: [], failed: [] })));
+    expect(tagged).toHaveLength(1);
+    expect(tagged[0]?.customer).toEqual({ customerId: "user-mp" });
   });
 });

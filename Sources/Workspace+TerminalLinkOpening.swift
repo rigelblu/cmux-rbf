@@ -1,4 +1,7 @@
+import CmuxCloud
+import CmuxCore
 import CmuxPanes
+import CmuxSurfaceCatalogModel
 import Foundation
 
 extension Workspace: TerminalLinkOpenContainer {
@@ -20,6 +23,29 @@ extension Workspace: TerminalLinkOpenContainer {
         return !canResolveTerminalPathsAgainstLocalFilesystem(
             surfaceID: surfaceID
         )
+    }
+
+    /// Resolve the connection from the terminal's authoritative owner, including native SSH projections.
+    func remoteTerminalFilePreviewConfiguration(for surfaceID: UUID) -> WorkspaceRemoteConfiguration? {
+        guard let configuration = remoteConfiguration, configuration.transport == .ssh else { return nil }
+        if usesSSHTui {
+            let expectedMachine = SurfaceMachineID(rawValue: SSHTuiConnection(configuration: configuration).id)
+            guard machineOwningSurface(surfaceID) == expectedMachine else {
+                return nil
+            }
+        } else if !isRemoteTerminalSurface(surfaceID) {
+            return nil
+        }
+        return configuration
+    }
+
+    func deferRemoteTerminalFileLinkOpen(sourcePanelId: UUID, rawValue: String) -> Bool {
+        guard remoteConfiguration?.transport == .ssh,
+              let target = surfaceOwnershipTarget(for: sourcePanelId),
+              terminalLinkIsRemoteTerminal(target.surfaceID),
+              let panel = terminalPanel(for: target.surfaceID) else { return false }
+        _ = panel.hostedView.openRemoteFilePreview(tokens: [rawValue])
+        return true
     }
 
     func cloudTerminalLinkTarget(url: URL, sourcePanelId: UUID) -> CloudTerminalLinkTarget? {
@@ -47,7 +73,7 @@ extension Workspace: TerminalLinkOpenContainer {
         return true
     }
 
-    func openTerminalBrowserLink(url: URL, sourcePanelId: UUID) -> Bool {
+    func openTerminalBrowserLink(url: URL, sourcePanelId: UUID, focus: Bool = true) -> Bool {
         guard let target = surfaceOwnershipTarget(for: sourcePanelId) else { return false }
         // cmux-rbf `#cm-73`: a Figma link goes to a Figma pane. Asked after the caller's settings checks, so a person's link settings win.
         if openClickedFigmaLink(
@@ -59,7 +85,7 @@ extension Workspace: TerminalLinkOpenContainer {
         // cmux-rbf #cm-73.2a
         let wasDesignFocusActive = isDesignFocusActive
         if let targetPane = preferredRightSideTargetPane(fromPanelId: target.containerPanelID) {
-            if newBrowserSurface(inPane: targetPane, url: url, focus: true) != nil {
+            if newBrowserSurface(inPane: targetPane, url: url, focus: focus) != nil {
                 return true
             }
             if wasDesignFocusActive {
@@ -68,7 +94,7 @@ extension Workspace: TerminalLinkOpenContainer {
                     showsAddressBar: true,
                     target: .newTab,
                     asker: .user,
-                    wantsFocus: true,
+                    wantsFocus: focus,
                     modeEnabled: true
                 )
                 if outcome == .externalBrowser {
@@ -80,7 +106,8 @@ extension Workspace: TerminalLinkOpenContainer {
         if newBrowserSplit(
             from: target.containerPanelID,
             orientation: .horizontal,
-            url: url
+            url: url,
+            focus: focus
         ) != nil {
             return true
         }
@@ -90,7 +117,7 @@ extension Workspace: TerminalLinkOpenContainer {
                 showsAddressBar: true,
                 target: .newSplit,
                 asker: .user,
-                wantsFocus: true,
+                wantsFocus: focus,
                 modeEnabled: true
             )
             if outcome == .externalBrowser {

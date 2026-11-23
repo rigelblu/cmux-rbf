@@ -53,7 +53,10 @@ enum SidebarAgentActivitySummary {
             switch pane.state {
             case .needsInput where showsNeedsYouMarks: add(pane, to: &lists.waiting)
             case .error where showsNeedsYouMarks: add(pane, to: &lists.error, needsName: true)
-            case .running where showsAgentActivity: add(pane, to: &lists.running)
+            // Upstream's `backgroundWorkPending` counted as running in its removed `activeCodingAgentCount`; it keeps
+            // that count on the spinner here (cm-142 sync).
+            case .running where showsAgentActivity, .backgroundWorkPending where showsAgentActivity:
+                add(pane, to: &lists.running)
             case .monitoring where showsAgentActivity: add(pane, to: &lists.monitoring, needsName: true)
             case .idle where showsAgentActivity: add(pane, to: &lists.idle)
             default: break

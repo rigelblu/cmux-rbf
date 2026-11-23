@@ -1,3 +1,4 @@
+import CmuxCloud
 import AppKit
 import Foundation
 import Testing
@@ -10,6 +11,34 @@ import Testing
 
 @Suite("Auth environment")
 struct AuthEnvironmentTests {
+    @Test("debug file overrides win over stale inherited routing values and never import unknown keys")
+    func debugFileOverridesWinOverStaleInheritedRoutingValues() {
+        let merged = AuthEnvironment.mergedRuntimeEnvironment(
+            environment: [
+                "CMUX_API_BASE_URL": "https://stale.example",
+                "CMUX_VM_API_BASE_URL": "https://stale.example",
+                "CMUX_AUTH_ENVIRONMENT": "development",
+                "UNSAFE_SECRET": "process-secret",
+            ],
+            fileOverrides: [
+                "CMUX_API_BASE_URL": " https://fresh.example:4626/ ",
+                "CMUX_VM_API_BASE_URL": "https://fresh.example:4626/",
+                "UNSAFE_SECRET": "file-secret",
+            ]
+        )
+
+        #expect(merged["CMUX_API_BASE_URL"] == "https://fresh.example:4626/")
+        #expect(merged["CMUX_VM_API_BASE_URL"] == "https://fresh.example:4626/")
+        #expect(merged["UNSAFE_SECRET"] == "process-secret")
+    }
+
+    @Test("debug override parser accepts quoted values and ignores comments")
+    func debugOverrideParserAcceptsQuotedValues() {
+        let contents = "# comment\nCMUX_VM_API_BASE_URL = \"https://fresh.example:4626/\"\nOTHER=ignored\n"
+        #expect(AuthEnvironment.parseDebugOverride(key: "CMUX_VM_API_BASE_URL", contents: contents) == "https://fresh.example:4626/")
+        #expect(AuthEnvironment.parseDebugOverride(key: "CMUX_API_BASE_URL", contents: contents) == nil)
+    }
+
     @Test("macOS production auth override selects the production Stack project")
     func macOSProductionAuthOverrideSelectsProductionStackProject() {
         #expect(AuthEnvironment.resolvedStackAuthEnvironment(
@@ -551,12 +580,11 @@ struct AuthEnvironmentTests {
         #expect(state.workspaceId == nil)
     }
 
-    @Test("Pro welcome checklist automatic presentation requires Pro plan, feature flag, and unseen defaults")
+    @Test("Pro welcome checklist automatic presentation requires Pro plan and unseen defaults")
     func proWelcomeChecklistAutomaticPresentationRequiresAllGates() {
-        #expect(ProWelcomeChecklistPresenter.shouldPresentAutomatically(isPro: true, seen: false, flagEnabled: true))
-        #expect(!ProWelcomeChecklistPresenter.shouldPresentAutomatically(isPro: false, seen: false, flagEnabled: true))
-        #expect(!ProWelcomeChecklistPresenter.shouldPresentAutomatically(isPro: true, seen: true, flagEnabled: true))
-        #expect(!ProWelcomeChecklistPresenter.shouldPresentAutomatically(isPro: true, seen: false, flagEnabled: false))
+        #expect(ProWelcomeChecklistPresenter.shouldPresentAutomatically(isPro: true, seen: false))
+        #expect(!ProWelcomeChecklistPresenter.shouldPresentAutomatically(isPro: false, seen: false))
+        #expect(!ProWelcomeChecklistPresenter.shouldPresentAutomatically(isPro: true, seen: true))
     }
 
     @Test("Pro welcome checklist consume gate persists once only")
@@ -570,13 +598,11 @@ struct AuthEnvironmentTests {
         #expect(defaults.bool(forKey: ProWelcomeChecklistPresenter.seenDefaultsKey) == false)
         #expect(ProWelcomeChecklistPresenter.consumeAutomaticPresentation(
             isPro: true,
-            flagEnabled: true,
             defaults: defaults
         ))
         #expect(defaults.bool(forKey: ProWelcomeChecklistPresenter.seenDefaultsKey))
         #expect(!ProWelcomeChecklistPresenter.consumeAutomaticPresentation(
             isPro: true,
-            flagEnabled: true,
             defaults: defaults
         ))
     }
@@ -591,17 +617,13 @@ struct AuthEnvironmentTests {
 
         #expect(!ProWelcomeChecklistPresenter.consumeAutomaticPresentation(
             isPro: false,
-            flagEnabled: true,
             defaults: defaults
         ))
         #expect(!defaults.bool(forKey: ProWelcomeChecklistPresenter.seenDefaultsKey))
 
-        #expect(!ProWelcomeChecklistPresenter.consumeAutomaticPresentation(
-            isPro: true,
-            flagEnabled: false,
-            defaults: defaults
-        ))
-        #expect(!defaults.bool(forKey: ProWelcomeChecklistPresenter.seenDefaultsKey))
+        #expect(ProWelcomeChecklistPresenter.canPresentAutomatically(defaults: defaults))
+        #expect(ProWelcomeChecklistPresenter.consumeAutomaticPresentation(isPro: true, defaults: defaults))
+        #expect(!ProWelcomeChecklistPresenter.canPresentAutomatically(defaults: defaults))
     }
 
     @MainActor
@@ -767,13 +789,5 @@ struct CheckoutAttributionTests {
         #expect(maxItems.contains { $0.name == "cmux_external_browser" && $0.value == "1" })
         #expect(pro.path == "/api/billing/checkout")
         #expect(max.path == "/api/billing/checkout")
-    }
-
-    @Test
-    func intentPropertiesNameSurfaceAndChannel() {
-        let properties = CheckoutAttribution.intentProperties(source: .helpMenu, flavor: .stable)
-        #expect(properties["source"] as? String == "mac_help_menu")
-        #expect(properties["client"] as? String == "mac")
-        #expect(properties["channel"] as? String == "stable")
     }
 }

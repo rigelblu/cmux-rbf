@@ -231,8 +231,8 @@ struct CommandPaletteInteractionMonitorTests {
 
         // cmux-rbf: `weak var`, not `weak let` — Swift 6.2 rejects `weak let`
         // ("must be a mutable variable, because it may change at runtime"), and
-        // becoming nil is exactly what this assertion tests. Upstream compiles
-        // this on an older Swift. Reject this hunk on upstream sync.
+        // becoming nil is exactly what this assertion tests. Upstream made the same
+        // change by the 2026-11 sync (#cm-142.1). Reject a `weak let` on upstream sync.
         weak var weakMonitor = monitor
         monitor = nil
 

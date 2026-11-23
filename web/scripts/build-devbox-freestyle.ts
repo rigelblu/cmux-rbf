@@ -83,6 +83,10 @@
 import { Freestyle } from "freestyle";
 import { fileURLToPath } from "node:url";
 import { VM_GUEST_MODEL_PLANE_ENV_PATH, renderVmGuestModelPlaneEnvFile, vmGuestModelPlaneEnv } from "../services/coderouter/vmGuestEnv";
+import { guestResourceReporterInstallCommand } from "../services/vms/guestResourceReporter";
+import { guestBrowserInstallCommand } from "../services/vms/guestBrowser";
+import { guestCliDistributionCommand } from "../services/vms/guestCliDistribution";
+import { GUEST_CMUX_SHIM, GUEST_CMUX_SHIM_PATH } from "../services/vms/guestCli";
 import {
   CMUX_TUI_LAYOUT_MARKER_PATH,
   CMUX_TUI_SESSION,
@@ -94,12 +98,20 @@ import {
   resolveCmuxTuiSource,
 } from "../services/vms/drivers/cmuxTuiDaemon";
 import {
+  CMUX_TUI_STATE_IMAGE_PATH,
+  CMUX_TUI_STATE_MOUNT_HELPER_PATH,
+  CMUX_TUI_STATE_RESERVATION_MARKER_PATH,
+  CMUX_TUI_STATE_RESERVATION_BYTES,
   DEVBOX_DESKTOP_INSTALLS,
   devboxTerminfoInstallCommand,
   DEVBOX_INSTANCE_ID_COMMAND,
   bakeMetadata,
   bakePreflight,
   devboxAgentPins,
+  devboxBubblewrapInstallCommand,
+  devboxBubblewrapSha256,
+  devboxBubblewrapUrl,
+  devboxBubblewrapVersion,
   devboxCuaDriverVersion,
   devboxDesktopPackages,
   devboxFileBytes,
@@ -110,6 +122,9 @@ import {
   devboxIdentityInstallCommand,
   devboxJournalResetCommand,
   devboxParkDaemonCommand,
+  devboxSettleBeforeSnapshotCommand,
+  devboxPrepareTemplateTerminalCommand,
+  devboxSnapshotClockCommand,
   devboxWaitForDaemonCommand,
   cmuxTuiWebsocketSmokeCommand,
   emitBakeResult,
@@ -253,6 +268,10 @@ const interactiveShellProbe = (run: number): string =>
   `sudo -n -u ${WORK_USER} env -i HOME=${WORK_HOME} USER=${WORK_USER} TERM=xterm-256color PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin bash -c 'tmux -L probe${run} new-session -d -s login -x 120 -y 30 && sleep 3 && pane="$(tmux -L probe${run} capture-pane -pt login)"; tmux -L probe${run} kill-server 2>/dev/null; printf "%s\\n" "$pane" | grep -iE "ble\\.sh|bleopt|ble-face|denied|not found|WARRANTY${run > 1 ? "|updating tput" : ""}" && { printf "%s\\n" "$pane"; exit 1; }; printf "%s\\n" "$pane" | grep -q "λ" || { printf "%s\\n" "$pane"; echo "no cmux prompt"; exit 1; }'`;
 
 try {
+  // TSC offsets can change across resized memory snapshots. Use the
+  // hypervisor clock before snapshots so monotonic deadlines and auth time
+  // survive migration; wall-clock resynchronization cannot repair timers.
+  await step("snapshot-clock", devboxSnapshotClockCommand);
   await step(
     "base-inventory",
     `node --version && npm --version && bun --version && python3 --version && uv --version && docker --version && test -L /usr/local/bin/node && readlink /usr/local/bin/node | grep -q /usr/local/nvm/ && echo base-ok`,
@@ -269,12 +288,16 @@ try {
   // Cloud terminal.
   await step("work-user", devboxWorkUserSetupCommand());
 
-  // The Dockerfile's devtools list, bubblewrap included: codex's Linux sandbox
-  // prerequisite, so codex uses the distro's bwrap instead of warning on every
-  // launch that it is falling back to its bundled copy.
+  // The Dockerfile's devtools list.
   await step(
     "apt-devtools",
-    "apt-get update -q && apt-get install -y --no-install-recommends git ripgrep build-essential curl ca-certificates unzip zip xz-utils zstd procps iproute2 openssh-client pkg-config jq fd-find fzf sqlite3 tmux less rsync file tree nano vim sudo util-linux bubblewrap && rm -rf /var/lib/apt/lists/* && ln -sf $(command -v fdfind) /usr/local/bin/fd && echo 'LANG=C.UTF-8' > /etc/default/locale && fd --version && jq --version && fzf --version && sqlite3 --version && tmux -V && bwrap --version",
+    "apt-get update -q && apt-get install -y --no-install-recommends git ripgrep build-essential curl ca-certificates unzip zip xz-utils zstd procps coreutils iproute2 openssh-client pkg-config jq fd-find fzf sqlite3 tmux less rsync file tree nano vim sudo util-linux e2fsprogs && rm -rf /var/lib/apt/lists/* && ln -sf $(command -v fdfind) /usr/local/bin/fd && echo 'LANG=C.UTF-8' > /etc/default/locale && fd --version && jq --version && fzf --version && sqlite3 --version && tmux -V",
+  );
+
+  // Muse needs the pinned upstream bubblewrap, rather than Ubuntu's 0.9.0.
+  await step(
+    "bubblewrap",
+    devboxBubblewrapInstallCommand(devboxBubblewrapUrl(), devboxBubblewrapSha256(), devboxBubblewrapVersion()),
   );
 
   await step(
@@ -341,6 +364,12 @@ try {
   await step("cmux-etc", "mkdir -p /etc/cmux /etc/skel");
   await put("cmux-bashrc", "/etc/cmux/bashrc");
   await put("cmux-prompt.bash", "/etc/cmux/prompt.bash");
+  await step("python-completion-dir", "mkdir -p /usr/local/share/bash-completion/completions");
+  await put("cmux-python-completion.bash", "/usr/local/share/bash-completion/completions/python");
+  await step(
+    "python-completion",
+    `for f in /usr/share/bash-completion/completions/python?* /usr/share/bash-completion/completions/pypy* /usr/share/bash-completion/completions/micropython; do if [ -e "$f" ]; then ln -sf python "/usr/local/share/bash-completion/completions/\${f##*/}"; fi; done && bash -n /usr/local/share/bash-completion/completions/python`,
+  );
   await step("prompt-default-name", "echo cmux > /etc/cmux/vm-name");
   await put("seed-history", "/etc/cmux/seed-history");
   await put("cmux-terminfo.sh", "/etc/profile.d/cmux-terminfo.sh");
@@ -352,9 +381,17 @@ try {
   );
 
   await put("agent-config.sh", "/etc/cmux/agent-config.sh");
+  // Agent sign-in launchers (Dockerfile parity): /usr/local/bin/<agent> is
+  // /etc/cmux/<agent>, which resolves the team or own-login mode per launch
+  // (agent-auth.sh) and execs /usr/local/libexec/cmux-<agent>-real. The base's
+  // login PATH puts nvm's bin first, so its entries point at the launchers
+  // too; otherwise login shells and execs would bypass them.
+  await put("agent-auth.sh", "/etc/cmux/agent-auth.sh");
+  for (const agent of ["claude", "codex", "opencode"]) await put(`cmux-${agent}`, `/etc/cmux/${agent}`, 0o755);
+  await step("agent-launchers", 'sh -n /etc/cmux/agent-auth.sh && mkdir -p /usr/local/libexec && nvm_bin="$(dirname "$(readlink -f /usr/local/bin/node)")" && for a in claude codex opencode; do bash -n /etc/cmux/$a && ln -s "$(readlink -f /usr/local/bin/$a)" /usr/local/libexec/cmux-$a-real && test -f /usr/local/libexec/cmux-$a-real && rm -f /usr/local/bin/$a && chmod 755 /etc/cmux/$a && ln -s /etc/cmux/$a /usr/local/bin/$a && ln -sfn /etc/cmux/$a "$nvm_bin/$a" && $a --version >/dev/null || exit 1; done && sudo -n -u ' + WORK_USER + ' env -i HOME=' + WORK_HOME + ' USER=' + WORK_USER + ' TERM=xterm bash -lc \'for a in claude codex opencode; do test "$(readlink -f "$(type -P $a)")" = /etc/cmux/$a || exit 1; done\' && echo agent-launchers-on-login-path');
   await step(
     "agent-config",
-    `bash -n /etc/cmux/agent-config.sh && echo '[ -f /etc/cmux/agent-config.sh ] && . /etc/cmux/agent-config.sh' > /etc/profile.d/cmux-agents.sh && ${rcFiles.map((rc) => `echo '[ -f /etc/cmux/agent-config.sh ] && . /etc/cmux/agent-config.sh' >> ${rc}`).join(" && ")} && rm -rf /tmp/agent-config-check && mkdir -p /tmp/agent-config-check && env HOME=/tmp/agent-config-check OPENAI_BASE_URL=https://example.invalid/v1 OPENAI_API_KEY=cmux-vm-edge-placeholder CMUX_CODEROUTER_URL=https://example.invalid ANTHROPIC_BASE_URL=https://example.invalid ANTHROPIC_API_KEY=cmux-vm-edge-placeholder CMUX_VM_ID=vm-check bash -lc 'true' && grep -q 'model_provider = "cmux"' /tmp/agent-config-check/.codex/config.toml && grep -q 'wire_api = "responses"' /tmp/agent-config-check/.codex/config.toml && grep -q 'supports_websockets = false' /tmp/agent-config-check/.codex/config.toml && grep -q "export OPENAI_API_KEY='cmux-vm-edge-placeholder'" /tmp/agent-config-check/.config/cmux/model-plane.env && grep -q "export ANTHROPIC_BASE_URL='https://example.invalid'" /tmp/agent-config-check/.config/cmux/model-plane.env && grep -q "export CMUX_VM_ID='vm-check'" /tmp/agent-config-check/.config/cmux/model-plane.env && [ "$(stat -c %a /tmp/agent-config-check/.config/cmux/model-plane.env)" = "600" ] && grep -qF '"apiKey": "e30.' /tmp/agent-config-check/.pi/agent/models.json && ! grep -q x-coderouter-route-token /tmp/agent-config-check/.pi/agent/models.json && ! grep -q crt_ /tmp/agent-config-check/.pi/agent/models.json && test ! -e /tmp/agent-config-check/.config/opencode/opencode.json && node -e 'const j = JSON.parse(require("fs").readFileSync("/tmp/agent-config-check/.claude.json","utf8")); if (!(j.hasCompletedOnboarding === true && j.bypassPermissionsModeAccepted === true && j.projects["/"].hasTrustDialogAccepted === true && Array.isArray(j.customApiKeyResponses.approved) && j.customApiKeyResponses.approved.includes("-vm-edge-placeholder"))) process.exit(1)' && [ "$(stat -c %a /tmp/agent-config-check/.claude.json)" = "600" ] && [ "$(bash -lc 'echo $CLAUDE_CODE_SANDBOXED:$IS_SANDBOX:$DISABLE_AUTOUPDATER')" = "1:1:1" ] && rm -rf /tmp/agent-config-check && test ! -e /root/.codex/config.toml && test ! -e /root/.pi/agent/models.json && test ! -e /root/.config/opencode/opencode.json && test ! -e ${WORK_HOME}/.codex/config.toml`,
+    `bash -n /etc/cmux/agent-config.sh && echo '[ -f /etc/cmux/agent-config.sh ] && . /etc/cmux/agent-config.sh' > /etc/profile.d/cmux-agents.sh && ${rcFiles.map((rc) => `echo '[ -f /etc/cmux/agent-config.sh ] && . /etc/cmux/agent-config.sh' >> ${rc}`).join(" && ")} && rm -rf /tmp/agent-config-check && mkdir -p /tmp/agent-config-check && env HOME=/tmp/agent-config-check OPENAI_BASE_URL=https://example.invalid/v1 OPENAI_API_KEY=cmux-vm-edge-placeholder CMUX_CODEROUTER_URL=https://example.invalid ANTHROPIC_BASE_URL=https://example.invalid ANTHROPIC_API_KEY=cmux-vm-edge-placeholder CMUX_VM_ID=vm-check bash -lc 'true' && grep -q 'model_provider = "cmux"' /tmp/agent-config-check/.codex/config.toml && grep -q 'wire_api = "responses"' /tmp/agent-config-check/.codex/config.toml && grep -q 'supports_websockets = false' /tmp/agent-config-check/.codex/config.toml && grep -q "export OPENAI_API_KEY='cmux-vm-edge-placeholder'" /tmp/agent-config-check/.config/cmux/model-plane.env && grep -q "export ANTHROPIC_BASE_URL='https://example.invalid'" /tmp/agent-config-check/.config/cmux/model-plane.env && grep -q "export CMUX_VM_ID='vm-check'" /tmp/agent-config-check/.config/cmux/model-plane.env && [ "$(stat -c %a /tmp/agent-config-check/.config/cmux/model-plane.env)" = "600" ] && grep -qF '"apiKey": "e30.' /tmp/agent-config-check/.pi/agent/models.json && ! grep -q x-coderouter-route-token /tmp/agent-config-check/.pi/agent/models.json && ! grep -q crt_ /tmp/agent-config-check/.pi/agent/models.json && test ! -e /tmp/agent-config-check/.config/opencode/opencode.json && node -e 'const j = JSON.parse(require("fs").readFileSync("/tmp/agent-config-check/.claude.json","utf8")); if (!(j.hasCompletedOnboarding === true && j.bypassPermissionsModeAccepted === true && j.projects["/"].hasTrustDialogAccepted === true && Array.isArray(j.customApiKeyResponses.approved) && j.customApiKeyResponses.approved.includes("-vm-edge-placeholder"))) process.exit(1)' && [ "$(stat -c %a /tmp/agent-config-check/.claude.json)" = "600" ] && [ "$(env HOME=/tmp/agent-config-check bash -lc 'echo $CLAUDE_CODE_SANDBOXED:$IS_SANDBOX:$DISABLE_AUTOUPDATER')" = "1:1:1" ] && rm -rf /tmp/agent-config-check && test ! -e /root/.codex/config.toml && test ! -e /root/.pi/agent/models.json && test ! -e /root/.config/opencode/opencode.json && test ! -e ${WORK_HOME}/.codex/config.toml`,
   );
 
   // Login banner: pam_motd renders /etc/update-motd.d on SSH logins. The
@@ -469,6 +506,17 @@ try {
     `${cmuxTuiPinCheckCommand(cmuxTuiSource)} && mkdir -p /etc/cmux && printf '%s %s\n' ${cmuxTuiSource.sha256} ${cmuxTuiSource.commit} > /etc/cmux/cmux-tui-pin && cat /etc/cmux/cmux-tui-pin`,
   );
 
+  // The runtime VM path must not upload or install guest integration. These
+  // files are immutable image assets: create only allocates the image, while
+  // the boot supervisor starts the daemon and the reporter unit.
+  await step("guest-cli-directory", "mkdir -p /usr/local/libexec");
+  await vm.fs.writeFile(GUEST_CMUX_SHIM_PATH, GUEST_CMUX_SHIM, { mode: 0o755 });
+  await step(
+    "guest-cli-integration",
+    `mkdir -p /usr/local/libexec && ${guestBrowserInstallCommand()} && ${guestCliDistributionCommand()} && chmod 0755 ${GUEST_CMUX_SHIM_PATH} && test -x ${GUEST_CMUX_SHIM_PATH} && ${guestCliDistributionCommand(true)} && echo guest-cli-integration-ok`,
+  );
+  await step("guest-resource-reporter", guestResourceReporterInstallCommand());
+
   // The install above also wrote the work user's Claude Code and Codex hooks
   // (cmux-tui agent hook install), so a Stop, permission request, or question
   // in either agent reaches the daemon journal and the owner's Mac as a
@@ -528,10 +576,62 @@ try {
     "WantedBy=multi-user.target",
   ].join("\n");
   await put("cmux-devbox-boot", "/usr/local/bin/cmux-devbox-boot", 0o755);
+  await put("cmux-tui-state-mount", "/usr/local/bin/cmux-tui-state-mount", 0o755);
+  await put("cmux-prompt-sync", "/usr/local/bin/cmux-prompt-sync", 0o755);
   await vm.fs.writeFile("/etc/systemd/system/cmux-tui-daemon.service", `${service}\n`, { mode: 0o644 });
+  await vm.fs.writeFile(
+    "/etc/systemd/system/cmux-prompt-sync.service",
+    [
+      "[Unit]",
+      "Description=cmux Cloud prompt identity sync",
+      "After=network-online.target cmux-tui-daemon.service",
+      "Wants=network-online.target",
+      "",
+      "[Service]",
+      "Type=simple",
+      "ExecStart=/usr/local/bin/cmux-prompt-sync",
+      "Restart=on-failure",
+      "RestartSec=2",
+      "",
+      "[Install]",
+      "WantedBy=multi-user.target",
+    ].join("\n") + "\n",
+    { mode: 0o644 },
+  );
+  // Quiet resume. Every machine is a memory-snapshot clone whose monotonic
+  // clock jumps by the snapshot's age on resume, and the kernel would spend
+  // the clone's first second (the New Machine critical path) printing a
+  // workqueue-lockup report. The switch is runtime state, which the memory
+  // snapshot carries into every clone and derived size; the tmpfiles line
+  // re-applies it on a cold boot. Service watchdogs and housekeeping timers
+  // are handled by cmux-devbox-boot's park branch, right before the snapshot.
+  await step("snapshot-resume-dirs", "mkdir -p /etc/tmpfiles.d");
+  await vm.fs.writeFile(
+    "/etc/tmpfiles.d/cmux-snapshot-resume.conf",
+    "# Clones resume with a monotonic clock jump; do not report a workqueue lockup.\nw- /sys/module/workqueue/parameters/watchdog_thresh - - - - 0\n",
+    { mode: 0o644 },
+  );
+  await step(
+    "snapshot-resume-quiet",
+    "{ [ ! -e /sys/module/workqueue/parameters/watchdog_thresh ] || echo 0 > /sys/module/workqueue/parameters/watchdog_thresh; } && " +
+      "echo snapshot-resume-quiet-ok",
+  );
+  // Reserve one GiB inside the existing root disk for cmux-tui's state. The
+  // image is fully allocated before it is mounted, then the daemon's existing
+  // state (including the warm template host) is copied into it. This protects
+  // SQLite/WAL writes when general-purpose files consume the rest of the disk
+  // without changing the VM's provisioned disk size.
+  await step(
+    "cmux-tui-state-reservation",
+    `sh -n ${CMUX_TUI_STATE_MOUNT_HELPER_PATH} && ${CMUX_TUI_STATE_MOUNT_HELPER_PATH} create ${WORK_HOME} ${WORK_USER} && mountpoint -q ${WORK_HOME}/.local/state/cmux-tui && [ "$(stat -c %s ${CMUX_TUI_STATE_IMAGE_PATH})" = ${CMUX_TUI_STATE_RESERVATION_BYTES} ] && printf 'cmux-tui-state-v1\\n' > ${CMUX_TUI_STATE_RESERVATION_MARKER_PATH} && chmod 0444 ${CMUX_TUI_STATE_RESERVATION_MARKER_PATH} && echo cmux-tui-state-reservation-ok`,
+  );
   await step(
     "cmux-tui-daemon-unit",
     "sh -n /usr/local/bin/cmux-devbox-boot && rm -f /etc/cmux/bake-instance-id && mkdir -p /etc/systemd/system/multi-user.target.wants && ln -sf /etc/systemd/system/cmux-tui-daemon.service /etc/systemd/system/multi-user.target.wants/cmux-tui-daemon.service && systemctl daemon-reload && systemctl enable cmux-tui-daemon && systemctl restart cmux-tui-daemon && systemctl is-active cmux-tui-daemon",
+  );
+  await step(
+    "cmux-prompt-sync-unit",
+    "python3 -m py_compile /usr/local/bin/cmux-prompt-sync && systemctl daemon-reload && systemctl enable cmux-prompt-sync && systemctl is-enabled cmux-prompt-sync",
   );
   // Prove the daemon contract on the builder: the supervisor started the
   // daemon on its own, the session answers, and the listener is dual-stack.
@@ -543,9 +643,17 @@ try {
   // WebSocket/Noise/RPC/PTY path before this machine can become a snapshot.
   await step("cmux-tui-ready", devboxWaitForDaemonCommand());
   await step("cmux-tui-websocket-smoke", cmuxTuiWebsocketSmokeCommand());
+  // Create the warm template terminal the snapshot carries: one armed shell,
+  // fully initialized and waiting at its first prompt. A clone's daemon adopts
+  // its host process with fresh identity, so New Machine gets a live shell
+  // without creating a workspace, terminal or PTY on its critical path.
+  await step("cmux-tui-template-terminal", devboxPrepareTemplateTerminalCommand());
+  // Let the daemon, first PTY and desktop settle before the memory snapshot.
+  // Freestyle resumes the snapshot rather than replaying these startup steps.
+  await step("cmux-tui-settle-before-snapshot", "sleep 30");
   // Park it (devboxParkDaemonCommand): the supervisor stops the daemon while
-  // the machine's id equals the recorded bake id, its identity and session
-  // state are wiped, and a clone (different id) starts fresh within one tick.
+  // the machine's id equals the recorded bake id, and every per-machine file
+  // is wiped except the template terminal's host record.
   await step("cmux-tui-daemon-park", devboxParkDaemonCommand());
 
   await step(
@@ -590,6 +698,8 @@ try {
   // is the same bytes on every machine and stays; the verifier checks it.)
   await step("clean", `rm -rf /var/lib/apt/lists/* /root/.npm/_cacache ${WORK_HOME}/.npm/_cacache 2>/dev/null; rm -f /root/.claude.json ${WORK_HOME}/.claude.json; ${devboxJournalResetCommand}; sync; true`);
   await step("no-stale-claude-seed", `test ! -e /root/.claude.json && test ! -e ${WORK_HOME}/.claude.json && echo no-stale-claude-seed`);
+  // Last guest step before the snapshot; see devboxSettleBeforeSnapshotCommand.
+  await step("settle-before-snapshot", devboxSettleBeforeSnapshotCommand());
 } catch (error) {
   console.error(`bake failed: ${String(error)}`);
   await deleteBuilder();

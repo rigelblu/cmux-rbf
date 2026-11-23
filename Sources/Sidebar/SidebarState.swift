@@ -18,6 +18,9 @@ final class SidebarState: ObservableObject {
     @Published var selectedRevealScrollToken = 0 // (#cm-110.14)
     /// The status group the previous press of the cycle key opened, so the next press folds it back (#cm-110.14). Not saved.
     var cycleRecord: StatusGroupCycleRecord? // (#cm-110.14)
+    /// Hidden because the window was too narrow (SidePanelWidthFit), not by the
+    /// person; session snapshots save it as visible.
+    var isAutoCollapsed = false
     private var visibilityWillChangeOwnerId: UUID?
     private var visibilityWillChange: ((Bool) -> Void)?
 

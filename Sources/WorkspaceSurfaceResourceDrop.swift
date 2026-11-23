@@ -1,4 +1,5 @@
 import Bonsplit
+import CmuxSurfaceCatalogModel
 import Foundation
 
 extension SurfaceDestination {
@@ -49,9 +50,32 @@ extension Workspace {
 #if DEBUG
         cmuxDebugLog("surfaces.drop workspace=\(self.id.uuidString.prefix(5)) group=\(group.title) count=\(group.resources.count) target=\(target)")
 #endif
+        if let url = catalog.cloudBrowserCopyURL(for: group, intoWorkspace: id) {
+            // The normal browser creation path creates the daemon browser for this
+            // mirrored workspace, so the copy gets its own tab and sidebar row.
+            do {
+                let created = try SurfacePaneFactory.makeBrowserPane(
+                    url: url, at: target, focus: true, creationPolicy: .userInitiated
+                )
+                SurfacePaneFactory.focus(panelID: created.panelID, in: created.workspaceID)
+            } catch {
+#if DEBUG
+                cmuxDebugLog("surfaces.drop.copyFailed group=\(group.title) error=\(error)")
+#endif
+                return false
+            }
+            return true
+        }
         Task { @MainActor in
             do {
-                _ = try await catalog.projectGroup(group, into: target, focus: true)
+                let projections = try await catalog.projectGroup(group, into: target, focus: true)
+                // A Cloud drag starts in the right sidebar, so the sidebar remains
+                // the window's recorded keyboard owner after AppKit completes the
+                // drop. Re-run the shared focus transaction once the first pane is
+                // materialized so its Bonsplit focus and bright active state agree.
+                if let first = projections.first {
+                    SurfacePaneFactory.focus(panelID: first.panelID, in: first.workspaceID)
+                }
             } catch {
 #if DEBUG
                 cmuxDebugLog("surfaces.drop.failed group=\(group.title) error=\(error)")

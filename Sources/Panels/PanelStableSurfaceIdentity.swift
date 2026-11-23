@@ -1,3 +1,4 @@
+import CmuxSurfaceCatalogModel
 import Foundation
 
 /// Boxed restart-stable surface identity for durable deep links.
@@ -13,7 +14,9 @@ public final class PanelStableSurfaceIdentity {
     /// Live-transfer provenance for legacy SSH panels whose catalog IDs are local.
     fileprivate var transferredMachine: SurfaceMachineID?
 
-    public init() {}
+    public init(id: UUID = UUID()) {
+        self.id = id
+    }
 }
 
 extension Panel {

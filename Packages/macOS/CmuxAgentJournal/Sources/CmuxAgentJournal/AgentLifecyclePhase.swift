@@ -10,7 +10,11 @@ public enum AgentLifecyclePhase: String, Codable, Sendable, CaseIterable, Equata
     /// The agent is actively working on a turn.
     case running
     /// The root turn ended while only background work remains to be watched.
+    // cmux-rbf: the reconciler's projection, never written to disk (#cm-128.3). Upstream's
+    // `backgroundWorkPending` below is the reducer's own phase for a raw pending stop; both stay.
     case monitoring
+    /// The last turn completed while background work remains active.
+    case backgroundWorkPending
     /// The agent is blocked on the user (approval, question, or plan review).
     case needsInput
     /// The last turn completed and nothing is pending.

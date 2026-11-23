@@ -67,7 +67,7 @@ describe("route token request authentication", () => {
         return authenticate(token);
       },
     );
-    expect(result).toEqual({ ok: false, reason: "missing_route_token" });
+    expect(result).toEqual({ ok: false, reason: "missing_route_token", detail: "placeholder_only" });
     expect(lookups).toBe(0);
   });
 
@@ -76,7 +76,7 @@ describe("route token request authentication", () => {
       request({ authorization: "Bearer crt_unknown" }),
       authenticate,
     );
-    expect(result).toEqual({ ok: false, reason: "invalid_route_token" });
+    expect(result).toEqual({ ok: false, reason: "invalid_route_token", detail: "not_live" });
   });
 
   test("a VM request cannot substitute an unbound CLI credential", async () => {
@@ -92,28 +92,22 @@ describe("route token request authentication", () => {
       ok: true,
       identity: { teamId: "team-1", stackUserId: "user-1", vmId: null, token: "crt_cli" },
     };
-    expect(withHeader).toEqual({ ok: false, reason: "vm_mismatch" });
+    expect(withHeader).toEqual({ ok: false, reason: "vm_mismatch", detail: "binding" });
     expect(withoutHeader).toEqual(expected);
   });
 
-  test("a bound token requires the exact x-cmux-vm-id", async () => {
-    const matched = await authenticateRequestRouteToken(
-      request({ [ROUTE_TOKEN_HEADER]: "crt_vm", [VM_ID_HEADER]: " vm-1 " }),
-      authenticate,
-    );
-    expect(matched).toEqual({
-      ok: true,
-      identity: { teamId: "team-1", stackUserId: "user-1", vmId: "vm-1", token: "crt_vm" },
-    });
+  test("legacy headers remain compatibility-only while signed authorization is the new path", async () => {
     const rejected: Record<string, string>[] = [
       { [ROUTE_TOKEN_HEADER]: "crt_vm" },
+      { [ROUTE_TOKEN_HEADER]: "crt_vm", [VM_ID_HEADER]: "vm-1" },
       { [ROUTE_TOKEN_HEADER]: "crt_vm", [VM_ID_HEADER]: "" },
       { [ROUTE_TOKEN_HEADER]: "crt_vm", [VM_ID_HEADER]: "vm-2" },
       { [ROUTE_TOKEN_HEADER]: "crt_vm", [VM_ID_HEADER]: "VM-1" },
     ];
     for (const headers of rejected) {
-      expect(await authenticateRequestRouteToken(request(headers), authenticate))
-        .toEqual({ ok: false, reason: "vm_mismatch" });
+      const result = await authenticateRequestRouteToken(request(headers), authenticate);
+      if (headers[VM_ID_HEADER] === "vm-1") expect(result.ok).toBe(true);
+      else expect(result).toEqual({ ok: false, reason: "vm_mismatch", detail: "binding" });
     }
   });
 
@@ -126,6 +120,6 @@ describe("route token request authentication", () => {
     expect(await authenticateRequestRouteToken(
       request({ authorization: "Bearer crt_legacy", [VM_ID_HEADER]: "vm-1" }),
       async () => ({ teamId: "team-1", stackUserId: "user-1" }),
-    )).toEqual({ ok: false, reason: "vm_mismatch" });
+    )).toEqual({ ok: false, reason: "vm_mismatch", detail: "binding" });
   });
 });

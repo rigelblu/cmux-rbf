@@ -1,13 +1,20 @@
+import CmuxCloud
 import AppKit
 import CmuxCloudImagePaste
 import CmuxTerminal
 
 extension TerminalSurface {
     /// Runs only for a managed Cloud paste plan; there is deliberately no text fallback.
+    ///
+    /// - Parameter cleansUpTransferredFiles: Whether to delete the files once the
+    ///   paste ends. A composer submit passes `false`: its attachments own the
+    ///   files, a failed submit restores them into the draft for a retry, and a
+    ///   successful one disposes of them with the rest of the submission.
     @MainActor
     func pasteCloudImages(
         _ urls: [URL],
-        operation: TerminalImageTransferOperation = TerminalImageTransferOperation()
+        operation: TerminalImageTransferOperation = TerminalImageTransferOperation(),
+        cleansUpTransferredFiles: Bool = true
     ) async throws {
         let pasteboard = GhosttyApp.terminalPasteboard
         var ownsPreparation = false
@@ -18,7 +25,12 @@ extension TerminalSurface {
             ownsPreparation = true
             defer {
                 session.imagePaste.endPreparation()
-                pasteboard.cleanupTransferredTemporaryImageFiles(urls)
+                // A replay refetch can be deferred while the image transaction
+                // owns the attachment. The paste coordinator clears its active
+                // token before this defer runs, so retry the fidelity decision
+                // after releasing the preparation reservation.
+                session.scheduleFidelityCheck()
+                if cleansUpTransferredFiles { pasteboard.cleanupTransferredTemporaryImageFiles(urls) }
             }
             try Task.checkCancellation()
             guard ManagedFileTransferPolicy.isEnabled else {
@@ -35,12 +47,32 @@ extension TerminalSurface {
             }
             _ = operation.finish()
         } catch is CancellationError {
-            if !ownsPreparation { pasteboard.cleanupTransferredTemporaryImageFiles(urls) }
+            if cleansUpTransferredFiles, !ownsPreparation { pasteboard.cleanupTransferredTemporaryImageFiles(urls) }
             _ = operation.cancel()
             throw CancellationError()
         } catch {
-            if !ownsPreparation { pasteboard.cleanupTransferredTemporaryImageFiles(urls) }
+            if cleansUpTransferredFiles, !ownsPreparation { pasteboard.cleanupTransferredTemporaryImageFiles(urls) }
             _ = operation.finish()
+            presentCloudImagePasteFailure(error)
+            throw error
+        }
+    }
+
+    /// Checks that every image of a composer submit can be sent before any of
+    /// the submit reaches the terminal, so a refused image does not leave the
+    /// text before it already typed and duplicated by a retry.
+    @MainActor
+    func validateCloudImagesForSubmit(_ urls: [URL]) throws {
+        do {
+            guard let session = hostedView.cloudTerminalOverlay.session else {
+                throw CloudImagePasteError.unavailable
+            }
+            guard ManagedFileTransferPolicy.isEnabled else {
+                throw ManagedFileTransferPolicy.refusalError()
+            }
+            try session.imagePaste.requireAvailable()
+            for url in urls { try CloudClipboardImage.validateFile(at: url) }
+        } catch {
             presentCloudImagePasteFailure(error)
             throw error
         }
