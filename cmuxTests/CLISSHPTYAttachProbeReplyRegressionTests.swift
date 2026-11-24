@@ -137,6 +137,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let workspaceID = "22222222-2222-2222-2222-222222222222"
         let surfaceID = "33333333-3333-3333-3333-333333333333"
         let sessionID = "ssh-\(workspaceID)-\(surfaceID)"
+        // cmux-rbf (#cm-97): one statement per piece, so the type checker never sees a long `+` chain.
         var replayString: String = "remote prompt\n"
         replayString += "\u{1B}[>q" // XTVERSION query
         replayString += "\u{1B}[c" // primary device-attributes query

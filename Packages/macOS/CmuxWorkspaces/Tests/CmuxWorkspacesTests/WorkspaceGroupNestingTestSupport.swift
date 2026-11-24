@@ -930,7 +930,14 @@ func nestedApply(_ op: FlatOp, _ original: NestWindow) -> NestWindow {
     case .toggleWorkspacePin(let id):
         guard let index = window.tabs.firstIndex(where: { $0.id == id }) else { return original }
         window.tabs[index].isPinned.toggle()
+        let listed = window.groups.map(\.id)
+        let ungrouped = window.tabs[index].groupId == nil
         window.bareRepair()
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's togglePin moves an ungrouped workspace into its tier and
+        // never re-lists the groups (reorderTabForPinnedState, unchanged in effect by cce8214d25), so a window whose
+        // groups are listed out of run order keeps that list. Upstream's #15892 (3e3edb72bf) rebuilt the fixture
+        // `movingReference/runsReordered-before-sync` into such a window, which the bare repair used to re-list.
+        if ungrouped { window.groups.sort { listed.firstIndex(of: $0.id)! < listed.firstIndex(of: $1.id)! } }
     }
     return window
 }

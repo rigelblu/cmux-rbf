@@ -607,7 +607,7 @@ import CmuxWorkspaces
         var movingRenderedIds: Set<UUID> = [d]
         var sourceGroupId: UUID?
         if [.groupHeader, .groupedMember, .nestedWindow, .selectedGroupHeaders, .nestedSelectedRows, .collapsedGroupHeader, .emptyPinnedHeader].contains(shape) {
-            let g = try #require(manager.createWorkspaceGroup(name: "Source", childWorkspaceIds: [e]))
+            let g = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Source", childWorkspaceIds: [e])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             sourceGroupId = g
             let anchor = try #require(manager.workspaceGroupAnchor(for: g)).id
             labels[anchor] = "G"
@@ -636,7 +636,7 @@ import CmuxWorkspaces
                 movingRenderedIds = [empty.anchorWorkspaceId]
             }
             if shape == .selectedGroupHeaders {
-                let other = try #require(manager.createWorkspaceGroup(name: "Other", childWorkspaceIds: [d]))
+                let other = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Other", childWorkspaceIds: [d])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
                 let otherAnchor = try #require(manager.workspaceGroupAnchor(for: other)).id
                 labels[otherAnchor] = "J"
                 selected.insert(otherAnchor)
@@ -1165,7 +1165,7 @@ import CmuxWorkspaces
             kind: .statusGroup("parked"), presentation: parked, memberCount: 0, unreadCount: 0, isCollapsed: false, environment: Self.environment(), sidebarFontScale: 1.0 // (cm-128.16)
         )
         #expect(model.statusBehavesAs == .todo)
-        #expect(model.statusGlyph == nil)
+        #expect(model.statusHeaderGlyph == nil) // cmux-rbf: changed on purpose (#cm-142.1): the fork's #cm-110.1 glyph is `statusHeaderGlyph` since upstream took `statusGlyph`
         #expect(model.tintHex == "#6B7280")
     }
 

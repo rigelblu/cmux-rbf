@@ -31,6 +31,7 @@ struct SidebarWorkspaceSectionMigrationTests {
             let previous = UserDefaults.standard.object(forKey: key)
             UserDefaults.standard.set(true, forKey: key)
             defer { AppDelegate.shared = old; UserDefaults.standard.set(previous, forKey: key) }
+            let restoreChief = ChiefOffForMountedSidebar.turnOff(); defer { restoreChief() } // cmux-rbf: changed on purpose (#cm-142.1): Chief Home's new group reveals Workspaces (#cm-110.14) when the window appears
             let manager = TabManager(autoWelcomeIfNeeded: false, createInitialWorkspace: false)
             _ = manager.addWorkspace(title: "A", workingDirectory: dir.path, select: false,
                 eagerLoadTerminal: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)

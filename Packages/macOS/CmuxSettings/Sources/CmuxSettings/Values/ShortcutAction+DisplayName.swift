@@ -5,6 +5,8 @@ extension ShortcutAction {
     public var displayName: String {
         switch self {
         case .openSettings: return "Settings…"
+        case .openTeamPicker:
+            return String(localized: "shortcut.openTeamPicker.label", defaultValue: "Open Team Picker")
         case .reloadConfiguration: return "Reload Configuration"
         case .showHideAllWindows: return "Show/Hide All Windows"
         case .globalSearch: return "Global Search"
@@ -13,7 +15,13 @@ extension ShortcutAction {
         case .toggleFullScreen: return "Toggle Full Screen"
         case .quit: return "Quit cmux"
         case .toggleSidebar: return "Toggle Left Sidebar"
+        case .focusSidebar:
+            return String(localized: "shortcut.focusSidebar.label", defaultValue: "Focus Sidebar")
+        case .showWindowHints:
+            return String(localized: "shortcut.showWindowHints.label", defaultValue: "Click by Hint")
         case .newTab: return "New Workspace"
+        case .newLocalWorkspace:
+            return String(localized: "shortcut.newLocalWorkspace.label", defaultValue: "New Local Workspace")
         case .newBrowserWorkspace:
             return String(localized: "shortcut.newBrowserWorkspace.label", defaultValue: "New Browser Workspace")
         case .newCloudWorkspace:
@@ -25,7 +33,9 @@ extension ShortcutAction {
         case .openFolder: return "Open Folder"
         case .reopenPreviousSession: return "Restore Previous App Launch"
         case .goToWorkspace: return "Go to Workspace…"
-        case .commandPalette: return "Command Palette…"
+        case .commandPalette: return String(localized: "menu.file.commandPalette", defaultValue: "Command Palette…")
+        case .agentInbox: return String(localized: "shortcut.agentInbox.label", defaultValue: "Show Agent Inbox")
+        case .openChief: return String(localized: "shortcut.openChief.label", defaultValue: "Open Chief")
         case .commandPaletteNext: return "Command Palette: Next"
         case .commandPalettePrevious: return "Command Palette: Previous"
         case .sendFeedback: return "Send Feedback"
@@ -33,6 +43,8 @@ extension ShortcutAction {
         // (cm-128.11) Localized lookups on the keys the shortcut list shares with the menus (Tom, grill Q98).
         case .jumpToUnread:
             return String(localized: "shortcut.jumpToUnread.label", defaultValue: "Jump to Oldest Unread")
+        case .jumpToLastPrompt:
+            return String(localized: "shortcut.jumpToLastPrompt.label", defaultValue: "Jump to Last Prompt")
         case .toggleUnread: return "Toggle Unread"
         case .markOldestUnreadAndJumpNext:
             return String(
@@ -80,6 +92,8 @@ extension ShortcutAction {
         case .moveWorkspaceDown: return String(localized: "shortcut.moveWorkspaceDown.label", defaultValue: "Move Workspace Down")
         case .focusHistoryBack: return "Focus Back"
         case .focusHistoryForward: return "Focus Forward"
+        case .focusHistoryLast:
+            return String(localized: "shortcut.focusHistoryLast.label", defaultValue: "Focus Last")
         case .selectWorkspaceByNumber: return "Select Workspace 1…9"
         case .renameTab: return "Rename Tab"
         case .renameWorkspace: return "Rename Workspace"
@@ -108,6 +122,10 @@ extension ShortcutAction {
         case .attachTextBoxFile: return "Attach File to TextBox Input"
         case .sendCtrlFToTerminal:
             return String(localized: "shortcut.sendCtrlFToTerminal.label", defaultValue: "Send Ctrl-F to Terminal")
+        case .pasteLastScreenshot:
+            return String(localized: "shortcut.pasteLastScreenshot.label", defaultValue: "Paste Last Screenshot")
+        case .sizeTerminalToMyWindow:
+            return String(localized: "shortcut.sizeTerminalToMyWindow.label", defaultValue: "Size Terminal to My Window")
         case .clearScreenKeepScrollback:
             return String(localized: "shortcut.clearScreenKeepScrollback.label", defaultValue: "Clear Screen (Keep Scrollback)")
         case .focusLeft: return "Focus Pane Left"
@@ -120,10 +138,14 @@ extension ShortcutAction {
             return String(localized: "shortcut.focusNextPane.label", defaultValue: "Focus Next Pane")
         case .splitLeft:
             return String(localized: "shortcut.splitLeft.label", defaultValue: "Split Left")
+        case .focusPaneByNumber:
+            return String(localized: "shortcut.focusPaneByNumber.label", defaultValue: "Focus Pane 1…9")
         case .splitRight: return "Split Right"
         case .splitUp:
             return String(localized: "shortcut.splitUp.label", defaultValue: "Split Up")
         case .splitDown: return "Split Down"
+        case .newPaneAutoLayout:
+            return String(localized: "shortcut.newPaneAutoLayout.label", defaultValue: "New Pane (Auto Layout)")
         case .toggleSplitZoom: return "Toggle Pane Zoom"
         // cmux-rbf #cm-73.3
         case .switchFigmaPreviewAndEditor:
@@ -198,6 +220,8 @@ extension ShortcutAction {
             return String(localized: "shortcut.canvasDistributeVertically.label", defaultValue: "Canvas: Distribute Vertically")
         case .openDiffViewer: return "Open Diff Viewer"
         case .saveFilePreview: return "Save File Preview"
+        case .toggleFileEditorWordWrap:
+            return String(localized: "shortcut.toggleFileEditorWordWrap.label", defaultValue: "Toggle File Editor Word Wrap")
         case .openBrowser: return "Open Browser"
         case .focusBrowserAddressBar: return "Focus Address Bar"
         case .browserBack: return "Back"
@@ -246,6 +270,12 @@ extension ShortcutAction {
             return String(localized: "shortcut.diffViewerNextFile.label", defaultValue: "Diff Viewer: Next File")
         case .diffViewerPreviousFile:
             return String(localized: "shortcut.diffViewerPreviousFile.label", defaultValue: "Diff Viewer: Previous File")
+        case .diffViewerNextHunk:
+            return String(localized: "shortcut.diffViewerNextHunk.label", defaultValue: "Diff Viewer: Next Hunk")
+        case .diffViewerPreviousHunk:
+            return String(localized: "shortcut.diffViewerPreviousHunk.label", defaultValue: "Diff Viewer: Previous Hunk")
+        case .diffViewerToggleViewed:
+            return String(localized: "shortcut.diffViewerToggleViewed.label", defaultValue: "Diff Viewer: Toggle Viewed")
         case .simulatorHome:
             return String(localized: "shortcut.simulatorHome.label", defaultValue: "Simulator: Home")
         case .simulatorRotateLeft:

@@ -1,5 +1,6 @@
 import AppKit
 import CmuxAppKitSupportUI // (#cm-109.7)
+import CmuxFoundation
 import CmuxWorkspaces
 import SwiftUI
 
@@ -30,6 +31,18 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         var drawnAlpha: CGFloat = 1 // (#cm-109.7)
         /// None replaces the status, icon and color with the neutral dot. (#cm-110.13)
         var isNone: Bool = false // (#cm-110.13)
+        /// The accent setting for the Working colour (upstream). Defaulted, not required, so the fork's many
+        /// constructions (status headers, group glyphs, icon drawing, tests) keep compiling (cm-142 sync).
+        var accent = CmuxAccentColor.stored() // cmux-rbf (#cm-142.1): the default follows the Accent Color setting (#14988), as the selected row does
+        var differentiateWithoutColor = false
+
+        var glyph: SidebarWorkspaceTaskStatusGlyphModel {
+            SidebarWorkspaceTaskStatusGlyphModel(
+                status: status,
+                isNone: isNone, // (#cm-110.13)
+                differentiateWithoutColor: differentiateWithoutColor
+            )
+        }
     }
 
     private nonisolated static let baseSize: CGFloat = 9 // (#cm-109.3)
@@ -89,11 +102,11 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
            let color = WorkspaceTabColorSettings.displayNSColor(hex: hex, colorScheme: model.colorScheme, forceBright: false) { // (#cm-109.7)
             return color // (#cm-109.7)
         } // (#cm-109.7)
-        switch SidebarWorkspaceTaskStatusGlyphModel(status: model.status).colorRole { // (#cm-109.7)
+        switch model.glyph.colorRole { // (#cm-109.7)
         case .neutral: // (#cm-109.7)
             return neutralColor // (#cm-109.7)
         case .working: // (#cm-109.7)
-            return cmuxAccentNSColor(for: model.colorScheme) // (#cm-109.7)
+            return model.accent.nsColor(for: model.colorScheme) // (#cm-109.7) upstream's accent setting
         case .attention: // (#cm-109.7)
             // (#cm-109.7) Loudest lane: full-strength attention accent between orange and red.
             return NSColor(srgbRed: 1.0, green: 0.42, blue: 0.2, alpha: 1) // (#cm-109.7)
@@ -186,7 +199,7 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
                 } // (#cm-109.6)
             } // (#cm-109.6)
         } // (#cm-109.3)
-        let glyph = SidebarWorkspaceTaskStatusGlyphModel(status: model.status)
+        let glyph = model.glyph
         let strokeWidth = glyph.colorRole == .attention ? attentionStrokeWidth : Self.strokeWidth
 
         context.setStrokeColor(color)
@@ -217,28 +230,13 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
             context.fillPath()
         }
 
-        if glyph.showsCheckmark {
-            // `SidebarStatusCheckmarkShape` point fractions in the circle rect.
-            let checkmark = CGMutablePath()
-            checkmark.move(to: CGPoint(
-                x: circleRect.minX + circleRect.width * 0.28,
-                y: circleRect.minY + circleRect.height * 0.52
-            ))
-            checkmark.addLine(to: CGPoint(
-                x: circleRect.minX + circleRect.width * 0.45,
-                y: circleRect.minY + circleRect.height * 0.68
-            ))
-            checkmark.addLine(to: CGPoint(
-                x: circleRect.minX + circleRect.width * 0.74,
-                y: circleRect.minY + circleRect.height * 0.34
-            ))
-            context.addPath(checkmark)
-            context.setStrokeColor(tickColor) // (#cm-109.3)
-            context.setLineWidth(1.2)
-            context.setLineCap(.round)
-            context.setLineJoin(.round)
-            context.strokePath()
-        }
+        guard let markPath = glyph.mark.path(in: circleRect) else { return }
+        context.addPath(markPath)
+        context.setStrokeColor(tickColor) // (#cm-109.3)
+        context.setLineWidth(1.2)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.strokePath()
     }
 
     override func mouseDown(with event: NSEvent) {

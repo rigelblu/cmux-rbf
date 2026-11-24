@@ -1,4 +1,5 @@
 import AppKit
+import CmuxSettings
 import SwiftUI
 import Testing
 @testable import cmux_DEV
@@ -58,6 +59,11 @@ struct SidebarRowPaletteTests {
             #expect(palette.agentActivityColor() == NSColor.secondaryLabelColor)
         }
     }
+
+    // cmux-rbf: changed on purpose (#cm-10, #cm-22): upstream's
+    // selectedBackgroundUsesTheSameEmphasisAndContrastStateAsSelectionChrome is not taken. It tests the left rail's
+    // subtle selection through `SidebarRowPalette(model:isSelectionEmphasized:increasesSelectionContrast:)`; this
+    // fork's palette is built on `SidebarWorkspaceRowVisualPalette` and has no left rail or subtle selection.
 
     @Test(arguments: [false, true])
     func rowPaletteSemanticColorsFollowRowSchemeAcrossAppearances(colorSchemeIsDark: Bool) throws {

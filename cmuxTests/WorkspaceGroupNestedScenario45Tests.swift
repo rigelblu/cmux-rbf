@@ -84,8 +84,8 @@ struct WorkspaceGroupNestedScenario45Tests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<4 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1], ids[3]]))
-        let inner = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1], ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let inner = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let index = try #require(manager.workspaceGroups.firstIndex { $0.id == inner })
         manager.workspaceGroups[index].parentGroupId = outer
         manager.workspaces.normalizeWorkspaceGroupContiguity()
@@ -131,7 +131,7 @@ struct WorkspaceGroupNestedScenario45Tests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let group = try #require(manager.createWorkspaceGroup(name: "F", childWorkspaceIds: [ids[1]]))
+        let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "F", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(!manager.workspaces.hasNestedWorkspaceGroup)
         return (manager, group)
     }
@@ -211,9 +211,9 @@ struct WorkspaceGroupNestedScenario45Tests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<4 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let inner = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
-        let third = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ids[3]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let inner = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let third = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: inner, intoParent: outer) == .moved)
         #expect(manager.moveWorkspaceGroup(groupId: third, intoParent: inner) == .moved)
         manager.toggleWorkspaceGroupCollapsed(groupId: third)
@@ -231,8 +231,8 @@ struct WorkspaceGroupNestedScenario45Tests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1], ids[2]]))
-        let made = try #require(manager.createWorkspaceGroup(name: "N", childWorkspaceIds: [ids[2]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1], ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let made = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "N", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.workspaceGroups.first { $0.id == made }?.parentGroupId == outer)
         let before = shape(manager)
         let restored = try saveAndRestore(manager)
@@ -244,7 +244,7 @@ struct WorkspaceGroupNestedScenario45Tests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let inner = try #require(manager.createWorkspaceGroup(name: "E", childWorkspaceIds: []))
         #expect(manager.moveWorkspaceGroup(groupId: inner, intoParent: outer) == .moved)
         // Close the inner group's own workspace: it is left holding nothing, pinned so it stays.
@@ -287,9 +287,9 @@ struct WorkspaceGroupNestedScenario45Tests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
-        let r = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ids[3]]))
+        let p = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let r = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: q, intoParent: p) == .moved)
         #expect(manager.moveWorkspaceGroup(groupId: r, intoParent: q) == .moved)
         #expect(sixRules(manager).isEmpty, "the starting window: \(sixRules(manager))")
@@ -412,12 +412,12 @@ struct WorkspaceGroupNestedScenario45Tests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<5 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
-        let r = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ids[3]]))
+        let p = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let r = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: q, intoParent: p) == .moved)
         #expect(manager.moveWorkspaceGroup(groupId: r, intoParent: q) == .moved)
-        let s = try #require(manager.createWorkspaceGroup(name: "S", childWorkspaceIds: [ids[4]]))
+        let s = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "S", childWorkspaceIds: [ids[4]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: s, intoParent: q) == .moved)
         let x = ids[2], b = ids[3], y = ids[4]
         func index(_ id: UUID) -> Int? { manager.tabs.firstIndex { $0.id == id } }

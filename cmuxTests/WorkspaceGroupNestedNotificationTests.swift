@@ -21,7 +21,7 @@ struct WorkspaceGroupNestedNotificationTests {
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
         let parent = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: []))
-        let child = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[1], ids[2]]))
+        let child = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[1], ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: child, intoParent: parent) == .moved)
         manager.closeWorkspace(try #require(manager.workspaceGroupAnchor(for: parent)))
         let inside = manager.tabs.filter { $0.groupId == child }.map(\.id)
@@ -41,7 +41,7 @@ struct WorkspaceGroupNestedNotificationTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let ids = manager.tabs.map(\.id)
-        let group = try #require(manager.createWorkspaceGroup(name: "F", childWorkspaceIds: [ids[1]]))
+        let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "F", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let flat = notifications(manager, group)
         #expect(flat.state().map { _ in 1 } == nil)
         #expect(flat.markAll(read: true) == false)
@@ -81,9 +81,9 @@ struct WorkspaceGroupNestedNotificationTests {
         for _ in 0..<5 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
         let parent = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: []))
-        let child = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[1], ids[2]]))
+        let child = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[1], ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: child, intoParent: parent) == .moved)
-        let grandchild = try #require(manager.createWorkspaceGroup(name: "S", childWorkspaceIds: [ids[3], ids[4]]))
+        let grandchild = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "S", childWorkspaceIds: [ids[3], ids[4]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: grandchild, intoParent: child) == .moved)
         manager.closeWorkspace(try #require(manager.workspaceGroupAnchor(for: parent)))
         let deep = manager.tabs.filter { $0.groupId == grandchild }.map(\.id)
@@ -113,8 +113,8 @@ struct WorkspaceGroupNestedNotificationTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<2 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let parent = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let child = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
+        let parent = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let child = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: child, intoParent: parent) == .moved)
         let own = try #require(manager.workspaceGroupAnchor(for: parent)).id
         let inside = manager.tabs.filter { $0.id != own && ($0.groupId == parent || $0.groupId == child) }.map(\.id)

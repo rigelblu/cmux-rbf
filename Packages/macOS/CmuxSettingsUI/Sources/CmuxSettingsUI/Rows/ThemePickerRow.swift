@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Visual three-up Theme picker row.
 ///
-/// Mirrors the legacy in-app `ThemePickerRow`: a leading "Theme" title
+/// Mirrors the legacy in-app `ThemePickerRow`: a leading "Appearance" title
 /// and a trailing row of three tappable thumbnails (System / Light /
 /// Dark) backed by ``ThemeWindowThumbnail``. The System tile shows a
 /// split light/dark composition with a hairline divider. The selected
@@ -13,14 +13,14 @@ import SwiftUI
 struct ThemePickerRow: View {
     let selectedMode: AppearanceMode
     let onSelect: (AppearanceMode) -> Void
-    /// A caveat rendered under the "Theme" title, or `nil` for the normal case.
+    /// A caveat rendered under the "Appearance" title, or `nil` for the normal case. (#cm-21)
     ///
     /// The treatment here is *copied* from ``SettingsCardRow``, not inherited:
     /// this row is a bespoke `HStack`, not a `SettingsCardRow`, so it has no
-    /// subtitle slot to fill. The Language row directly above it uses that
-    /// component's subtitle for its own conditional caveat ("Restart cmux to
-    /// apply"), and two caveats in one card that do not look alike read as two
-    /// different kinds of message — so keep `spacing: 3`, `.caption`,
+    /// subtitle slot to fill. It opens the Themes section's first card, and the
+    /// Accent Color row directly below it uses that component's subtitle, so
+    /// two subtitles in one card that do not look alike read as two different
+    /// kinds of message — so keep `spacing: 3`, `.caption`,
     /// `.secondary` and `lineLimit(2)` in step with `SettingsCardRow.body`.
     var subtitle: String?
 
@@ -30,7 +30,7 @@ struct ThemePickerRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
-                Text(String(localized: "settings.app.theme", defaultValue: "Theme"))
+                Text(String(localized: "settings.app.appearance", defaultValue: "Appearance"))
                     .cmuxFont(size: 13, weight: .medium)
                 if let subtitle {
                     Text(subtitle)

@@ -2,6 +2,7 @@ import AppKit
 import Bonsplit
 import CmuxBrowser
 import CmuxControlSocket
+import CmuxPanes
 import Foundation
 
 /// Pane-domain witnesses keep app-coupled topology resolution in the app while
@@ -162,9 +163,6 @@ extension TerminalController: ControlPaneContext {
         if case .invalid(let raw) = placement {
             return .invalidPlacement(rawValue: raw)
         }
-        if case .dock = placement, !RightSidebarMode.dock.isAvailable() {
-            return .dockUnavailable(message: dockUnavailableMessage())
-        }
         let url = inputs.urlRaw.flatMap { URL(string: $0) }
         if case .dock = placement, let invalid = validateDockPaneCreateRouting(routing: routing, tabManager: tabManager, panelType: panelType) {
             return invalid
@@ -320,6 +318,16 @@ extension TerminalController: ControlPaneContext {
             }
         }
 
+        // Terminal splits check the minimum pane size in
+        // `newTerminalSplitOutcome`; other panel types check it here (#15371).
+        if panelType != .terminal, !ws.isRemoteTmuxMirror,
+           ws.splitSpaceVerdict(
+               splittingPanel: sourcePanelId,
+               orientation: orientation,
+               dividerPosition: initialDividerPosition.map { CGFloat($0) }
+           ) == .noSpace {
+            return .noSpace
+        }
         let newPanelId: UUID?
         let focus = v2FocusAllowed(requested: inputs.requestedFocus)
         if panelType == .browser {
@@ -341,6 +349,14 @@ extension TerminalController: ControlPaneContext {
                 focus: focus,
                 initialDividerPosition: initialDividerPosition.map { CGFloat($0) }
             )?.id
+        } else if panelType == .chief {
+            newPanelId = ws.newChiefSplit(
+                from: sourcePanelId,
+                orientation: orientation,
+                insertFirst: insertFirst,
+                focus: focus,
+                initialDividerPosition: initialDividerPosition.map { CGFloat($0) }
+            )?.id
         } else {
             switch ws.newTerminalSplitOutcome(
                 from: sourcePanelId,
@@ -354,7 +370,8 @@ extension TerminalController: ControlPaneContext {
                 startupEnvironment: inputs.startupEnvironment,
                 initialDividerPosition: initialDividerPosition.map { CGFloat($0) },
                 allowTextBoxFocusDefault: false,
-                fromSocket: true // cmux-rbf #cm-73.2a
+                fromSocket: true, // cmux-rbf #cm-73.2a
+                inheritStartupWork: false
             ) {
             case .created(let panel):
                 newPanelId = panel.id
@@ -364,6 +381,8 @@ extension TerminalController: ControlPaneContext {
                     workspaceID: ws.id,
                     typeRawValue: panelType.rawValue
                 )
+            case .noSpace:
+                return .noSpace
             case .failed:
                 newPanelId = nil
             }
@@ -389,6 +408,10 @@ extension TerminalController: ControlPaneContext {
                 }
             }
             return .createFailed
+        }
+        // An explicit divider position wins over equalize-on-create.
+        if initialDividerPosition == nil {
+            ws.equalizeSplitsAfterCreatingSplitIfEnabled(newPanelId: newPanelId)
         }
         let paneUUID = ws.paneId(forPanelId: newPanelId)?.id
         let windowId = v2ResolveWindowId(tabManager: tabManager)
@@ -564,6 +587,11 @@ extension TerminalController: ControlPaneContext {
               let targetSurfaceId = workspace.panelIdFromSurfaceId(selectedTargetTab.id) else {
             return .bothPanesNeedSurface
         }
+        for surfaceId in [sourceSurfaceId, targetSurfaceId] {
+            if let message = browserReplTabRefusalMessage(surfaceId) {
+                return .denied(surfaceId, message: message)
+            }
+        }
 
         // Keep pane identities stable during swap when one side has a single surface.
         var sourcePlaceholder: UUID?
@@ -572,7 +600,8 @@ extension TerminalController: ControlPaneContext {
             sourcePlaceholder = workspace.newTerminalSurface(
                 inPane: sourcePane,
                 focus: false,
-                allowTextBoxFocusDefault: false
+                allowTextBoxFocusDefault: false,
+                inheritStartupWork: false
             )?.id
             if sourcePlaceholder == nil {
                 return .sourcePlaceholderFailed
@@ -582,7 +611,8 @@ extension TerminalController: ControlPaneContext {
             targetPlaceholder = workspace.newTerminalSurface(
                 inPane: targetPane,
                 focus: false,
-                allowTextBoxFocusDefault: false
+                allowTextBoxFocusDefault: false,
+                inheritStartupWork: false
             )?.id
             if targetPlaceholder == nil {
                 return .targetPlaceholderFailed
@@ -663,6 +693,9 @@ extension TerminalController: ControlPaneContext {
         }
         guard sourceWorkspace.panels[surfaceId] != nil else {
             return .surfaceNotFound(surfaceId)
+        }
+        if let message = browserReplTabRefusalMessage(surfaceId) {
+            return .denied(surfaceId, message: message)
         }
         let sourceIndex = sourceWorkspace.indexInPane(forPanelId: surfaceId)
         let sourcePaneForRollback = sourceWorkspace.paneId(forPanelId: surfaceId)

@@ -1,3 +1,5 @@
+import CmuxCloud
+import CmuxSurfaceCatalogModel
 import Foundation
 
 extension SurfaceCatalog {
@@ -17,6 +19,15 @@ extension SurfaceCatalog {
         workspace: Workspace, panelID: UUID, title: String?, source: Workspace.CustomTitleSource,
         context: CloudAgentNameContext? = nil
     ) -> Bool? {
+        if let projection = projection(forPanel: panelID), projection.workspaceID == workspace.id,
+           !projection.resource.machine.isLocal, projection.resource.kind == .display, source != .auto {
+            // A display tab renames the display itself, so the sidebar and every
+            // other pane of it follow. The local title applies right away; the
+            // daemon's name settles it.
+            (provider(for: projection.resource.machine) as? CmuxTuiSurfaceProvider)?
+                .renameDisplayFromTab(displayID: projection.resource.key, name: title ?? "")
+            return nil
+        }
         guard let projection = projection(forPanel: panelID), projection.workspaceID == workspace.id,
               !projection.resource.machine.isLocal, projection.resource.kind == .terminal else { return nil }
         let machine = projection.resource.machine
@@ -26,6 +37,13 @@ extension SurfaceCatalog {
         let key = CloudRenameCoordinator.Key.tab(machine: machine, id: tabID)
         let write: Task<Void, Error>
         if source == .auto {
+            guard cloudWorkspaceRenameService.admitsTerminalRename(
+                workspace: workspace,
+                panelID: panelID,
+                resource: resource,
+                source: .auto,
+                catalog: self
+            ) else { return false }
             guard !name.isEmpty, let context,
                   context == cloudAgentNameContext(workspaceID: workspace.id, panelID: panelID),
                   cloudRenameCoordinator.pendingName(for: key) == nil,
@@ -63,12 +81,13 @@ extension SurfaceCatalog {
         }
         // Upgrade legacy projections before admitting the name. No display text
         // participates in either identity resolution or the remote payload.
-        if workspace.cloudVMBinding?.remoteWorkspaceID != target.remoteWorkspaceID {
+        if target.machine.tuiMachineID != nil, workspace.cloudVMBinding?.remoteWorkspaceID != target.remoteWorkspaceID {
             let previous = workspace.cloudVMBinding
             workspace.cloudVMBinding = WorkspaceCloudVMBinding(
                 vmID: target.machine.rawValue,
                 isBase: previous?.vmID == target.machine.rawValue ? (previous?.isBase ?? false) : false,
-                remoteWorkspaceID: target.remoteWorkspaceID
+                remoteWorkspaceID: target.remoteWorkspaceID,
+                teamID: WorkspaceCloudVMBinding.owningTeamID(forVMID: target.machine.rawValue, previous: previous)
             )
         }
         let write = enqueueRemoteWorkspaceRename(on: target.machine, id: target.remoteWorkspaceID, name: name)

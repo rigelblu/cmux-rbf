@@ -3,6 +3,7 @@ import Foundation
 enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseIterable {
     case unknown
     case running
+    case backgroundWorkPending
     case idle
     case needsInput
     case monitoring
@@ -39,6 +40,7 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
             return fallback ?? .unknown
         }
         if states.contains(.running) { return .running }
+        if states.contains(.backgroundWorkPending) { return .backgroundWorkPending }
         if states.contains(.needsInput) { return .needsInput }
         if states.contains(.monitoring) { return .monitoring }
         if states.contains(.error) { return .error }
@@ -64,6 +66,8 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
             switch state {
             case .running:
                 return .running
+            case .backgroundWorkPending:
+                hasUnknown = true
             case .needsInput:
                 hasNeedsInput = true
             case .unknown, .monitoring, .error:
@@ -89,6 +93,8 @@ enum AgentHibernationLifecycleState: String, Codable, Sendable, Equatable, CaseI
             return .unknown
         case "running":
             return .running
+        case "backgroundworkpending", "background-work-pending":
+            return .backgroundWorkPending
         case "idle":
             return .idle
         case "monitoring":
@@ -130,6 +136,7 @@ enum AgentHibernationLifecycleStatusKeys {
         "hermes-agent",
         "kiro",
         "kimi",
+        "muse",
         "omp",
         "opencode",
         "pi",

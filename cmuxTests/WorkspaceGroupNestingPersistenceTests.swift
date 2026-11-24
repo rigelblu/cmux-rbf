@@ -271,10 +271,10 @@ struct WorkspaceGroupNestingPersistenceTests {
     @Test func changingOnlyParentGroupIdChangesAutosaveFingerprint() throws {
         let manager = makeTabManager()
         let w1 = manager.tabs[0].id
-        let g1Id = try #require(manager.createWorkspaceGroup(name: "Group 1", childWorkspaceIds: [w1]))
+        let g1Id = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Group 1", childWorkspaceIds: [w1])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let w2 = manager.tabs.last!.id
-        let g2Id = try #require(manager.createWorkspaceGroup(name: "Group 2", childWorkspaceIds: [w2]))
+        let g2Id = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Group 2", childWorkspaceIds: [w2])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
 
         let baselineFingerprint = manager.sessionAutosaveFingerprint()
         // Control: with nothing changed, two fingerprints are equal, so a difference below is the parent id.

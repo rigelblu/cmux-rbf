@@ -1,7 +1,7 @@
 name: cmux-tui SDKs
 
 on:
-  # cmux-rbf: explicit dispatch only; no automatic CI in this fork. Reject upstream automatic triggers on sync.
+  # cmux-rbf: explicit dispatch only; no automatic triggers in this fork. Reject upstream automatic triggers on sync.
   workflow_dispatch:
 
 concurrency:
@@ -11,15 +11,45 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Temporary REST budget attribution: one gh-call line per GitHub API call (scripts/ci/api_call_log/env.sh, fetched at a fixed commit when the checkout has no copy).
+  BASH_ENV: '$({ w="${GITHUB_WORKSPACE:-/nonexistent}/scripts/ci/api_call_log/env.sh"; t="${RUNNER_TEMP:-/nonexistent}/api-call-log-src"; if [ -f "$w" ]; then echo "$w"; elif [ -n "${RUNNER_TEMP:-}" ]; then if [ ! -f "$t/env.sh" ] && [ ! -e "$t.tried" ] && { [ "${RUNNER_OS:-}" = Linux ] || [ "${RUNNER_OS:-}" = macOS ]; } && [ "$(date -u +%Y%m%d%H)" -lt 2026112300 ]; then : > "$t.tried"; mkdir -p "$t.part" && for x in env.sh gh sitecustomize.py isolated.py; do curl -fsSL --max-time 5 -o "$t.part/$x" "https://raw.githubusercontent.com/manaflow-ai/cmux/27647ffd3ae838c63be28ca3e5883dcd68c34518/scripts/ci/api_call_log/$x" || break; done; [ -s "$t.part/isolated.py" ] && mv "$t.part" "$t"; fi; if [ -f "$t/env.sh" ]; then echo "$t/env.sh"; else echo unset BASH_ENV > "$t.off.sh" && echo "$t.off.sh"; fi; fi; } 2>/dev/null)'
+
 jobs:
   contract:
     name: protocol contract
-    runs-on: ${{ vars.LINUX_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'ubuntu-24.04' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || 'cmux-linux' }}
     timeout-minutes: 8
+    outputs:
+      sdk_inputs: ${{ steps.sdk-inputs.outputs.changed }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          # The pull request merge commit and its base parent.
+          fetch-depth: 2
+
+      # The package, consumer and MSRV lanes read only the bindings, spec/, the
+      # cmux-tui workspace manifests and toolchain pins, and this workflow.
+      # Runtime-crate and release-workflow edits still run this contract job
+      # and the live conformance lane, which builds cmux-tui. Anything that is
+      # not a pull request, or a diff that cannot be read, runs every lane.
+      - name: Detect SDK package inputs
+        id: sdk-inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          changed=true
+          if [ "$EVENT_NAME" = "pull_request" ] && git rev-parse -q --verify 'HEAD^2' > /dev/null; then
+            if files="$(git diff --no-renames --name-only 'HEAD^1' HEAD)"; then
+              if ! grep -Eq '^(cmux-tui/[^/]+$|cmux-tui/(bindings|spec|vendor|build-support)/|cmux-tui/crates/[^/]+/Cargo\.toml$|\.github/actions/setup-cmux-tui-rust/|\.github/workflows/cmux-tui-sdks\.yml$)' <<< "$files"; then
+                changed=false
+              fi
+            fi
+          fi
+          echo "SDK package inputs changed: $changed"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -65,6 +95,9 @@ jobs:
       - name: Test SDK publishing workflow guards
         run: python3 tests/test_tui_publish_workflow_security.py -v
 
+      - name: Test public TUI installers
+        run: python3 tests/test_tui_installers.py
+
       - name: Test PyPI post-upload reconciliation helper
         run: bash tests/test_tui_pypi_postpublish_reconcile.sh
 
@@ -90,7 +123,8 @@ jobs:
   packages:
     name: ${{ matrix.language }} package
     needs: contract
-    runs-on: ${{ vars.LINUX_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+    if: ${{ needs.contract.outputs.sdk_inputs == 'true' }}
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'ubuntu-24.04' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || 'cmux-linux' }}
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -126,6 +160,16 @@ jobs:
         if: matrix.language == 'rust'
         uses: ./.github/actions/setup-cmux-tui-rust
 
+      # Keep cargo's registry and cmux-tui/target for the Rust SDK leg between runs.
+      # Only main saves, as in rust-msrv.
+      - name: Cache cargo build
+        if: matrix.language == 'rust'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-bin: false
+          workspaces: cmux-tui -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
       - name: Set up Go
         if: matrix.language == 'go'
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
@@ -135,16 +179,19 @@ jobs:
 
       - name: Select JDK 17
         if: matrix.language == 'java'
-        run: |
-          test -x "$JAVA_HOME_17_X64/bin/java"
-          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
-          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
-          "$JAVA_HOME_17_X64/bin/java" -version
-          "$JAVA_HOME_17_X64/bin/javac" -version
+        uses: ./.github/actions/setup-jdk17
 
+      # The persistent cmux-linux pool does not ship CMake; hosted images do.
       - name: Select Clang C++20
         if: matrix.language == 'cpp'
-        run: clang++ --version
+        run: |
+          set -euo pipefail
+          if ! command -v cmake >/dev/null 2>&1; then
+            sudo apt-get -o DPkg::Lock::Timeout=120 update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends cmake
+          fi
+          clang++ --version
+          cmake --version
 
       - name: Set up Zig
         if: matrix.language == 'zig'
@@ -197,12 +244,12 @@ jobs:
         working-directory: cmux-tui
         run: |
           cargo fmt -p cmux-sdk -p cmux-sidebar -- --check
-          cargo test \
+          ../scripts/ci/cargo-test-deadline.sh \
             -p cmux-sdk \
             -p cmux-sidebar \
             --all-targets \
             --locked
-          cargo test \
+          ../scripts/ci/cargo-test-deadline.sh \
             -p cmux-sdk \
             -p cmux-sidebar \
             --doc \
@@ -263,7 +310,8 @@ jobs:
   consumers:
     name: ${{ matrix.language }} consumer
     needs: contract
-    runs-on: ${{ vars.LINUX_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+    if: ${{ needs.contract.outputs.sdk_inputs == 'true' }}
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'ubuntu-24.04' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || 'cmux-linux' }}
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -301,6 +349,18 @@ jobs:
         if: matrix.language == 'rust'
         uses: ./.github/actions/setup-cmux-tui-rust
 
+      # Keep cargo's registry and the two Rust consumer example target dirs between
+      # runs. Pull requests only restore: a push to main or a dispatch saves.
+      - name: Cache cargo build
+        if: matrix.language == 'rust'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-bin: false
+          workspaces: |
+            cmux-tui/bindings/examples/rust-agent-dashboard -> target
+            cmux-tui/bindings/examples/rust-sidebar-monitor -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
       - name: Set up Go
         if: matrix.language == 'go'
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
@@ -312,16 +372,19 @@ jobs:
 
       - name: Select JDK 17
         if: matrix.language == 'java'
-        run: |
-          test -x "$JAVA_HOME_17_X64/bin/java"
-          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
-          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
-          "$JAVA_HOME_17_X64/bin/java" -version
-          "$JAVA_HOME_17_X64/bin/javac" -version
+        uses: ./.github/actions/setup-jdk17
 
+      # The persistent cmux-linux pool does not ship CMake; hosted images do.
       - name: Select Clang C++20
         if: matrix.language == 'cpp'
-        run: clang++ --version
+        run: |
+          set -euo pipefail
+          if ! command -v cmake >/dev/null 2>&1; then
+            sudo apt-get -o DPkg::Lock::Timeout=120 update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends cmake
+          fi
+          clang++ --version
+          cmake --version
 
       - name: Set up Zig
         if: matrix.language == 'zig'
@@ -353,7 +416,7 @@ jobs:
       - name: Test Rust resource consumers
         if: matrix.language == 'rust'
         run: |
-          cargo test \
+          scripts/ci/cargo-test-deadline.sh \
             --manifest-path cmux-tui/bindings/examples/rust-agent-dashboard/Cargo.toml \
             --locked
           cargo clippy \
@@ -361,7 +424,7 @@ jobs:
             --locked \
             --all-targets \
             -- -D warnings
-          cargo test \
+          scripts/ci/cargo-test-deadline.sh \
             --manifest-path cmux-tui/bindings/examples/rust-sidebar-monitor/Cargo.toml \
             --locked \
             --all-targets
@@ -421,21 +484,57 @@ jobs:
   rust-msrv:
     name: Rust SDK MSRV (1.88)
     needs: contract
-    runs-on: ${{ vars.LINUX_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+    if: ${{ needs.contract.outputs.sdk_inputs == 'true' }}
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'ubuntu-24.04' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || 'cmux-linux' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
+      # The persistent cmux-linux pool may not ship rustup, or may keep it in
+      # ~/.cargo/bin off PATH; provision it like setup-cmux-tui-rust does.
       - name: Install Rust 1.88 MSRV toolchain
-        run: rustup toolchain install 1.88.0 --profile minimal --component clippy --component rustfmt
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --profile minimal --default-toolchain none --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          rustup toolchain install 1.88.0 --profile minimal --component clippy --component rustfmt
+
+      # Before rust-cache: its cleanup must never reach a home a sibling runner builds from.
+      - name: Give this runner instance its own CARGO_HOME
+        uses: ./.github/actions/runner-cargo-home
+
+      # Keep cargo's registry and the four target dirs (the cmux-tui workspace that
+      # holds the SDK crates, and the three example workspaces) between runs. The
+      # job's own key, with the toolchain in it, so 1.88 artifacts never mix with
+      # the pinned toolchain's. Only main saves: a pull request restores what its
+      # base (and main, the default branch) saved, and a branch's own save never
+      # comes back, so it would only push useful entries out of the cache store.
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-bin: false
+          workspaces: |
+            cmux-tui -> target
+            cmux-tui/bindings/examples/rust-agent-screen-detection -> target
+            cmux-tui/bindings/examples/rust-agent-dashboard -> target
+            cmux-tui/bindings/examples/rust-sidebar-monitor -> target
+          key: rust-1.88.0
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Test public Rust SDK crates and examples on MSRV
         run: |
           cargo +1.88.0 fmt --manifest-path cmux-tui/bindings/rust/Cargo.toml -- --check
           cargo +1.88.0 test --manifest-path cmux-tui/bindings/rust/Cargo.toml --locked
           cargo +1.88.0 test --manifest-path cmux-tui/bindings/rust-sidebar/Cargo.toml --locked
+          cargo +1.88.0 test \
+            --manifest-path cmux-tui/bindings/examples/rust-agent-screen-detection/Cargo.toml \
+            --locked
           cargo +1.88.0 clippy \
             --manifest-path cmux-tui/bindings/examples/rust-agent-dashboard/Cargo.toml \
             --locked \
@@ -450,7 +549,7 @@ jobs:
   conformance:
     name: seven-language live conformance
     needs: contract
-    runs-on: ${{ vars.LINUX_RUNNER || 'blacksmith-8vcpu-ubuntu-2404' }}
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'ubuntu-24.04' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || 'cmux-linux' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -458,12 +557,13 @@ jobs:
           persist-credentials: false
 
       - name: Initialize Ghostty protocol submodule
-        run: git submodule update --init --depth 1 ghostty
+        shell: bash
+        run: bash scripts/ci/init-submodule.sh ghostty
 
       - name: Install Linux build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang libclang-dev pkg-config
+          sudo apt-get -o DPkg::Lock::Timeout=120 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y clang cmake libclang-dev pkg-config
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -487,12 +587,7 @@ jobs:
           cache-dependency-path: cmux-tui/bindings/go/go.mod
 
       - name: Select JDK 17
-        run: |
-          test -x "$JAVA_HOME_17_X64/bin/java"
-          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
-          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
-          "$JAVA_HOME_17_X64/bin/java" -version
-          "$JAVA_HOME_17_X64/bin/javac" -version
+        uses: ./.github/actions/setup-jdk17
 
       - name: Set up Zig for Ghostty
         uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
@@ -503,11 +598,37 @@ jobs:
         working-directory: cmux-tui/bindings/typescript
         run: npm ci --no-audit --no-fund
 
+      # The build reads only the cmux-tui tree, the ghostty submodule, and the
+      # zig and Rust toolchains pinned here and in cmux-tui/rust-toolchain.toml.
+      # Keyed on exactly those, an unchanged tree skips a five-minute compile,
+      # which is every run started by a workflow-only edit.
+      - name: Key the headless cmux-tui build
+        id: headless-key
+        run: |
+          set -euo pipefail
+          echo "key=cmux-tui-headless-v1-${RUNNER_OS}-${RUNNER_ARCH}-zig0.16.0-$(git rev-parse HEAD:cmux-tui)-$(git rev-parse HEAD:ghostty)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the headless cmux-tui build
+        id: headless-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: cmux-tui/target/debug/cmux-tui
+          key: ${{ steps.headless-key.outputs.key }}
+
       - name: Build exact headless cmux-tui
+        if: ${{ steps.headless-cache.outputs.cache-hit != 'true' }}
         working-directory: cmux-tui
         run: |
           test "$(zig version)" = "0.16.0"
           cargo build -p cmux-tui --bin cmux-tui --locked
+
+      # Pull request caches stay read-only; main publishes the build they reuse.
+      - name: Save the headless cmux-tui build
+        if: ${{ github.event_name == 'push' && steps.headless-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: cmux-tui/target/debug/cmux-tui
+          key: ${{ steps.headless-key.outputs.key }}
 
       - name: Set up Zig for SDK conformance
         uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5

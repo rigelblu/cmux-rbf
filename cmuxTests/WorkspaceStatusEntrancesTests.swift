@@ -258,7 +258,7 @@ struct WorkspaceStatusEntrancesTests {
             isBeingDragged: false, topDropIndicatorVisible: false, bottomDropIndicatorVisible: false,
             settings: settings, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
             isChecklistPopoverPresented: false, isRemoteContextMenuEligible: false, remoteConnectionState: .disconnected,
-            contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false
+            contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false, hasManualCustomColor: false // cmux-rbf (#cm-142.1): upstream's required field; no manual colour
         )
     }
 
@@ -949,19 +949,19 @@ struct WorkspaceStatusEntrancesTests {
 
         let snapshotWithList = factory(workspace, list: Self.hisList, settings: settings, showsAgentActivity: true).makeSnapshot()
         #expect(snapshotWithList.showsRaisedHand == true)
-        #expect(snapshotWithList.contextMenuImmediateFields.showsRaisedHand == true)
+        #expect(snapshotWithList.agentLists.waiting.isEmpty == false) // cmux-rbf: changed on purpose (#cm-142.1): upstream deleted contextMenuImmediateFields with the refresh policy (40160ee0f4); the stored waiting list, which the row model compares, carries the hand
 
         // Case B: Waiting agent with default list (.cmuxFive) -> showsRaisedHand == true
         // cmux-rbf: changed on purpose (#cm-128.6, Tom's item 9): the hand shows without a status list.
         let snapshotDefaultList = factory(workspace, list: .cmuxFive, settings: settings, showsAgentActivity: true).makeSnapshot()
         #expect(snapshotDefaultList.showsRaisedHand == true)
-        #expect(snapshotDefaultList.contextMenuImmediateFields.showsRaisedHand == true)
+        #expect(snapshotDefaultList.agentLists.waiting.isEmpty == false) // cmux-rbf: changed on purpose (#cm-142.1): upstream deleted contextMenuImmediateFields with the refresh policy (40160ee0f4); the stored waiting list, which the row model compares, carries the hand
 
         // Case C: Running (not waiting) agent with his list -> showsRaisedHand == false
         workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .running]
         let runningSnapshot = factory(workspace, list: Self.hisList, settings: settings, showsAgentActivity: true).makeSnapshot()
         #expect(runningSnapshot.showsRaisedHand == false)
-        #expect(runningSnapshot.contextMenuImmediateFields.showsRaisedHand == false)
+        #expect(runningSnapshot.agentLists.waiting.isEmpty == true) // cmux-rbf: changed on purpose (#cm-142.1): upstream deleted contextMenuImmediateFields with the refresh policy (40160ee0f4); the stored waiting list, which the row model compares, carries the hand
 
         // Case D: Waiting agent with his list, but showAgentActivity setting is false -> showsRaisedHand == false
         let (settingsOff, cleanUpOff) = self.settings(showAgentActivity: false)
@@ -969,7 +969,7 @@ struct WorkspaceStatusEntrancesTests {
         workspace.agentLifecycleStatesByPanelId[panelId] = ["agent": .needsInput]
         let activityOffSnapshot = factory(workspace, list: Self.hisList, settings: settingsOff, showsAgentActivity: false).makeSnapshot()
         #expect(activityOffSnapshot.showsRaisedHand == false)
-        #expect(activityOffSnapshot.contextMenuImmediateFields.showsRaisedHand == false)
+        #expect(activityOffSnapshot.agentLists.waiting.isEmpty == true) // cmux-rbf: changed on purpose (#cm-142.1): upstream deleted contextMenuImmediateFields with the refresh policy (40160ee0f4); the stored waiting list, which the row model compares, carries the hand
     }
 
     /// Piece 4 (#cm-109.4): Factory test: with a list in use, an agent waiting, settings.details.showAgentActivity == true
@@ -991,7 +991,7 @@ struct WorkspaceStatusEntrancesTests {
         ).makeSnapshot()
 
         #expect(snapshot.showsRaisedHand == true)
-        #expect(snapshot.contextMenuImmediateFields.showsRaisedHand == true)
+        #expect(snapshot.agentLists.waiting.isEmpty == false) // cmux-rbf: changed on purpose (#cm-142.1): upstream deleted contextMenuImmediateFields with the refresh policy (40160ee0f4); the stored waiting list, which the row model compares, carries the hand
     }
 
     /// Piece 4 (#cm-109.4): Factory test: with a list in use, an agent waiting, and settings.details.showAgentActivity == false,
@@ -1013,7 +1013,7 @@ struct WorkspaceStatusEntrancesTests {
         ).makeSnapshot()
 
         #expect(snapshot.showsRaisedHand == false)
-        #expect(snapshot.contextMenuImmediateFields.showsRaisedHand == false)
+        #expect(snapshot.agentLists.waiting.isEmpty == true) // cmux-rbf: changed on purpose (#cm-142.1): upstream deleted contextMenuImmediateFields with the refresh policy (40160ee0f4); the stored waiting list, which the row model compares, carries the hand
     }
 
     /// Piece 4 (#cm-109.4): AppKit sidebar row renders hand.raised.fill when an agent is waiting, with or without a status
@@ -2576,7 +2576,7 @@ struct WorkspaceStatusEntrancesTests {
                 isBeingDragged: false, topDropIndicatorVisible: false, bottomDropIndicatorVisible: false,
                 settings: rowSettings, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
                 isChecklistPopoverPresented: false, isRemoteContextMenuEligible: false, remoteConnectionState: .disconnected,
-                contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false
+                contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false, hasManualCustomColor: false // cmux-rbf (#cm-142.1): upstream's required field; no manual colour
             )
             let rowSnapshot = self.rowSnapshot(input)
             let row = TabItemView(
@@ -2722,7 +2722,7 @@ struct WorkspaceStatusEntrancesTests {
                 isBeingDragged: false, topDropIndicatorVisible: false, bottomDropIndicatorVisible: false,
                 settings: rowSettings, isChecklistExpanded: false, checklistAddFieldActivationToken: 0,
                 isChecklistPopoverPresented: false, isRemoteContextMenuEligible: false, remoteConnectionState: .disconnected,
-                contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false
+                contextMenuPinState: nil, inferredTaskStatus: .todo, activeTodoOverride: nil, isTodoStatusHidden: false, hasManualCustomColor: false // cmux-rbf (#cm-142.1): upstream's required field; no manual colour
             )
             let row = TabItemView(
                 snapshot: self.rowSnapshot(input),
@@ -3094,7 +3094,7 @@ struct WorkspaceNoneRowTests {
             case .workspaces: break
             case .pinned: manager.setPinned(target, pinned: true)
             case .plainGroup, .statusGroup:
-                group = try #require(manager.createWorkspaceGroup(name: "None group", childWorkspaceIds: [target.id]))
+                group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "None group", childWorkspaceIds: [target.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
                 if placement == .statusGroup {
                     #expect(WorkspaceGroupStatusUIActions.app(tabManager: manager, controlsEnabled: true)
                         .applyGroup(.status(id: "parked"), groupId: group!))
@@ -3118,7 +3118,7 @@ struct WorkspaceNoneRowTests {
                 let header = try #require(harness.descendants(of: SidebarGroupHeaderTableCellView.self, in: mounted.table)
                     .first { $0.currentModelForTesting?.groupId == group })
                 let model = try #require(header.currentModelForTesting)
-                #expect(model.groupStatusGlyph == nil && model.statusGlyph == nil)
+                #expect(model.groupStatusGlyph == nil && model.statusHeaderGlyph == nil) // cmux-rbf: changed on purpose (#cm-142.1): the fork's #cm-110.1 glyph is `statusHeaderGlyph` since upstream took `statusGlyph`
                 #expect(model.iconSymbol == RenderableSystemSymbol.defaultWorkspaceGroupIcon && header.iconImageForTesting != nil,
                         "a group on None keeps its folder and no status glyph")
             } else {

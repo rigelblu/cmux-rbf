@@ -34,6 +34,14 @@ public enum ControlSurfaceCreateResolution: Sendable, Equatable {
     /// A browser surface was requested while Design Focus is active and the URL
     /// routed to an external browser.
     case browserOpenedExternally(windowID: UUID?, workspaceID: UUID?, url: String)
+    /// An explicit browser profile selector did not identify exactly one
+    /// profile. An empty candidate list means no profile matched; otherwise the
+    /// candidates share the requested display name.
+    case invalidBrowserProfile(
+        selector: String,
+        message: String,
+        candidates: [ControlPaneBrowserProfileCandidate]
+    )
     /// No workspace resolved (legacy `not_found` / "Workspace not found").
     case workspaceNotFound
     /// The requested/focused pane did not resolve (legacy `not_found` / "Pane not

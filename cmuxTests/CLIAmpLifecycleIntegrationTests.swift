@@ -46,7 +46,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertTrue(
             AgentJournalAppendCapture.contains(
                 runningCommands,
-                kind: "agent.turn.started",
+                kind: "agent.attention.resolved",
                 agentKey: "amp",
                 sessionId: sessionID
             ),
@@ -188,6 +188,17 @@ extension CLINotifyProcessIntegrationRegressionTests {
             (settledErrorRecord["terminalPromptTurnIds"] as? [String])?.contains(errorTurnID) == true
         )
 
+        let explicitErrorTurnID = "amp-explicit-error-turn"
+        let nextPrompt = try runAmpHook(
+            context: context,
+            subcommand: "prompt-submit",
+            sessionID: sessionID,
+            pid: ampProcess.processIdentifier,
+            fields: ["hook_event_name": "UserPromptSubmit", "turn_id": explicitErrorTurnID]
+        )
+        XCTAssertFalse(nextPrompt.timedOut, nextPrompt.stderr)
+        XCTAssertEqual(nextPrompt.status, 0, nextPrompt.stderr)
+
         let beforeError = context.state.snapshot().count
         let error = try runAmpHook(
             context: context,
@@ -200,6 +211,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 "turn_outcome": "error",
                 "notification_type": "error",
                 "error": "Amp turn failed",
+                "turn_id": explicitErrorTurnID,
             ]
         )
         XCTAssertFalse(error.timedOut, error.stderr)
@@ -207,7 +219,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let errorCommands = Array(context.state.snapshot().dropFirst(beforeError))
         XCTAssertTrue(
             errorCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Stopped on an error|\(context.root.lastPathComponent)|")
                     && $0.contains("Amp turn failed")
             },
             "Amp error did not use the generic error notification path: \(errorCommands)"

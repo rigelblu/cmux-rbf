@@ -1,4 +1,5 @@
 import CMUXAgentLaunch
+import Foundation
 
 extension WorkstreamEvent {
     var feedIngressDeliveryKey: FeedIngressDeliveryKey {
@@ -21,5 +22,35 @@ extension WorkstreamEvent {
             // state, while compaction/subagent events preserve the parent state.
             return .ordinary
         }
+    }
+
+    /// Wall-clock milliseconds at which the hook CLI sent this frame, on the
+    /// agent host's clock. A blocking request is stamped only after its
+    /// ordering barrier drained every hook the agent published before it.
+    var feedHookSentAtMs: Int64? {
+        guard let value = feedExtraFields?["_hook_sent_at_ms"] as? NSNumber,
+              value.int64Value >= 0 else { return nil }
+        return value.int64Value
+    }
+
+    /// The agent's subagent identity; `nil` for the main agent thread.
+    var feedAgentID: String? {
+        // cmux-rbf (#cm-73.24, #cm-128.1, #cm-142.1): a Claude helper's id travels as `helper_agent_id` on both the blocking
+        // request and the telemetry, so upstream's supersede still tells a helper from its parent.
+        guard let value = (feedExtraFields?["helper_agent_id"] as? String) ?? (feedExtraFields?["agent_id"] as? String),
+              !value.isEmpty else { return nil }
+        return value
+    }
+
+    /// True for the synchronous hook lane whose event order is established by
+    /// the agent before the frame is sent. Detached telemetry workers omit this
+    /// marker because their completion can arrive after a newer prompt.
+    var feedHookIsOrdered: Bool {
+        feedExtraFields?["_cmux_ordered_hook"] as? Bool == true
+    }
+
+    private var feedExtraFields: [String: Any]? {
+        guard let data = extraFieldsJSON?.data(using: .utf8) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }

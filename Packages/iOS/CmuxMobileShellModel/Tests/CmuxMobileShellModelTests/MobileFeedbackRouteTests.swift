@@ -10,7 +10,7 @@ struct MobileFeedbackRouteTests {
     @Test func privilegedWhenManaflowConnectedAndHostSupportsSink() {
         #expect(
             MobileFeedbackRoute.resolve(
-                email: "lawrence@manaflow.ai",
+                email: "dev@manaflow.ai",
                 hasActiveMacConnection: true,
                 hostSupportsAgentSink: true
             ) == .privilegedAgent
@@ -20,7 +20,7 @@ struct MobileFeedbackRouteTests {
     @Test func emailWhenManaflowButNotConnected() {
         #expect(
             MobileFeedbackRoute.resolve(
-                email: "lawrence@manaflow.ai",
+                email: "dev@manaflow.ai",
                 hasActiveMacConnection: false,
                 hostSupportsAgentSink: true
             ) == .email
@@ -53,7 +53,7 @@ struct MobileFeedbackRouteTests {
         // not take the agent path and fail with `method_not_found`.
         #expect(
             MobileFeedbackRoute.resolve(
-                email: "lawrence@manaflow.ai",
+                email: "dev@manaflow.ai",
                 hasActiveMacConnection: true,
                 hostSupportsAgentSink: false
             ) == .email
@@ -94,18 +94,26 @@ struct MobileFeedbackRouteTests {
         #expect(MobileBuildType.resolve(isDebugBuild: false, bundleIdentifier: "dev.cmux.app.beta") == .beta)
     }
 
-    @Test func releaseInternalAndDemoBundlesKeepTheirOwnBuildTypes() {
+    @Test func releaseInternalAndClassicBundlesResolveAndDemoIsRetired() {
         #expect(
             MobileBuildType.resolve(
                 isDebugBuild: false,
                 bundleIdentifier: "dev.cmux.app.internal"
             ) == .internal
         )
+        // cmux DEMO is retired: its old bundle is no longer a known channel.
         #expect(
             MobileBuildType.resolve(
                 isDebugBuild: false,
                 bundleIdentifier: "dev.cmux.app.demo"
-            ) == .demo
+            ) == .prod
+        )
+        // cmux CLASSIC is the classic app's internal TestFlight home.
+        #expect(
+            MobileBuildType.resolve(
+                isDebugBuild: false,
+                bundleIdentifier: "dev.cmux.app.classic"
+            ) == .internal
         )
     }
 

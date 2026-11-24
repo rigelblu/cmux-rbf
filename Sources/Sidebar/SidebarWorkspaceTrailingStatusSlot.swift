@@ -59,6 +59,8 @@ struct SidebarWorkspaceTrailingStatusSlot: View {
                 }
                 .buttonStyle(.plain)
                 .safeHelp(closeButtonTooltip)
+                .accessibilityLabel(closeButtonTooltip)
+                .accessibilityIdentifier("sidebarWorkspaceCloseButton")
                 .opacity(showsCloseButton ? contentAlpha : 0)
                 .allowsHitTesting(showsCloseButton)
                 .accessibilityHidden(!showsCloseButton)

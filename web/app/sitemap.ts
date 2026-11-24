@@ -5,6 +5,7 @@ import {
   englishFallbackContentLocales,
   featureWorkflowContentLocales,
   managedPoliciesDocsLocales,
+  cloudSecurityDocsLocales,
   remoteTmuxDocsLocales,
 } from "../i18n/locale-availability";
 import { locales } from "../i18n/routing";
@@ -19,9 +20,36 @@ import {
   changelogVersionPath,
 } from "./lib/changelog";
 import { changelogStore } from "./lib/changelog-store";
+import { isDocsZoneDeployment } from "./lib/docs-channel";
+import { keepServedDocsEntries, releaseDocsUrls } from "./lib/release-docs-sitemap";
+import { loadAllListings } from "./extensions/_lib/registry";
+import { extensionSitemapEntries } from "./extensions/_lib/sitemap-entries";
+
+/**
+ * The served sitemap. A docs zone lists the docs it was built with. The main
+ * site rewrites /docs to the release docs zone, which is built from the latest
+ * release tag, so it lists only the docs that zone's own sitemap lists. If that
+ * sitemap cannot be read, the main site falls back to every authored entry.
+ * The main site also lists every approved extension and setup page from the
+ * registry (the index pages even when the registry cannot be read).
+ */
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  if (isDocsZoneDeployment()) return sitemapEntries();
+  // The registry and the release docs sitemap are read at once; each read is bounded by its timeout.
+  const [extensions, setups, servedDocs] = await Promise.all([
+    loadAllListings("extension"),
+    loadAllListings("setup"),
+    releaseDocsUrls().catch((error: unknown) => {
+      console.error("sitemap.release_docs_unavailable", error);
+      return null;
+    }),
+  ]);
+  const entries = [...sitemapEntries(), ...extensionSitemapEntries(extensions, setups)];
+  return servedDocs ? keepServedDocsEntries(entries, new Set(servedDocs)) : entries;
+}
 
 /** Builds localized sitemap entries, excluding unreleased download pages. */
-export default function sitemap(): MetadataRoute.Sitemap {
+export function sitemapEntries(): MetadataRoute.Sitemap {
   const base = "https://cmux.com";
   const changelog = changelogStore.versions();
   const latestChangelogDate = changelog[0]?.date ?? "2026-03-18";
@@ -86,9 +114,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/docs/browser-automation", lastModified: "2026-03-18", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/docs/skills", lastModified: "2026-05-15", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/docs/notifications", lastModified: "2026-03-18", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/cloud", lastModified: "2026-09-27", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/cloud/machines", lastModified: "2026-09-27", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/cloud/workspaces", lastModified: "2026-09-27", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/cloud/networking", lastModified: "2026-09-27", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/cloud/cli", lastModified: "2026-09-27", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/cloud/troubleshooting", lastModified: "2026-09-27", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/coderouter", lastModified: "2026-09-28", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/coderouter/agents", lastModified: "2026-09-28", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/docs/coderouter/cli", lastModified: "2026-09-28", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/docs/ssh", lastModified: "2026-07-03", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/docs/remote-tmux", lastModified: "2026-07-03", changeFrequency: "monthly" as const, priority: 0.8, locales: remoteTmuxDocsLocales },
     { path: "/docs/managed-policies", lastModified: "2026-08-18", changeFrequency: "monthly" as const, priority: 0.8, locales: managedPoliciesDocsLocales },
+    { path: "/docs/cloud-security", lastModified: "2026-09-24", changeFrequency: "monthly" as const, priority: 0.8, locales: cloudSecurityDocsLocales },
     { path: "/docs/ios", lastModified: "2026-06-21", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/docs/agent-integrations/claude-code-teams", lastModified: "2026-03-30", changeFrequency: "monthly" as const, priority: 0.7 },
     { path: "/docs/agent-integrations/oh-my-opencode", lastModified: "2026-03-30", changeFrequency: "monthly" as const, priority: 0.7 },
@@ -105,7 +143,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/community", lastModified: "2026-03-18", changeFrequency: "monthly" as const, priority: 0.5 },
     { path: "/wall-of-love", lastModified: "2026-03-18", changeFrequency: "monthly" as const, priority: 0.5 },
     { path: "/nightly", lastModified: "2026-03-18", changeFrequency: "weekly" as const, priority: 0.6 },
+    { path: "/next", lastModified: "2026-11-09", changeFrequency: "weekly" as const, priority: 0.6 },
     { path: "/assets", lastModified: "2026-06-03", changeFrequency: "monthly" as const, priority: 0.5 },
+    { path: "/art", lastModified: "2026-10-12", changeFrequency: "monthly" as const, priority: 0.5 },
     // SEO landing/guide pages: localized, not in the main nav.
     { path: "/guides", lastModified: "2026-06-22", changeFrequency: "monthly" as const, priority: 0.6 },
     { path: "/compare", lastModified: "2026-07-04", changeFrequency: "monthly" as const, priority: 0.7 },
@@ -132,8 +172,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/agents/aider", lastModified: "2026-06-23", changeFrequency: "monthly" as const, priority: 0.6 },
     { path: "/agents/amp", lastModified: "2026-06-23", changeFrequency: "monthly" as const, priority: 0.6 },
     { path: "/agents/cursor-cli", lastModified: "2026-06-23", changeFrequency: "monthly" as const, priority: 0.6 },
-    { path: "/privacy-policy", lastModified: "2026-07-10", changeFrequency: "yearly" as const, priority: 0.3 },
-    { path: "/terms-of-service", lastModified: "2026-03-18", changeFrequency: "yearly" as const, priority: 0.3 },
+    { path: "/privacy-policy", lastModified: "2026-11-17", changeFrequency: "yearly" as const, priority: 0.3 },
+    { path: "/terms-of-service", lastModified: "2026-11-17", changeFrequency: "yearly" as const, priority: 0.3 },
     { path: "/eula", lastModified: "2026-03-18", changeFrequency: "yearly" as const, priority: 0.3 },
   ];
 

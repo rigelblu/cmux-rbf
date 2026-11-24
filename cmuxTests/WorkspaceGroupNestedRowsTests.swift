@@ -18,8 +18,8 @@ struct WorkspaceGroupNestedRowsTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<4 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1], ids[3]]))
-        let inner = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1], ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let inner = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let index = try #require(manager.workspaceGroups.firstIndex { $0.id == inner })
         manager.workspaceGroups[index].parentGroupId = outer
         manager.workspaces.normalizeWorkspaceGroupContiguity()
@@ -96,7 +96,7 @@ struct WorkspaceGroupNestedRowsTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let group = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ids[1], ids[2]]))
+        let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ids[1], ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         var names: [UUID: String] = [group: "H(G)"]
         for (i, id) in ids.enumerated() { names[id] = "w\(i)" }
         for tab in manager.tabs where names[tab.id] == nil { names[tab.id] = "own" }

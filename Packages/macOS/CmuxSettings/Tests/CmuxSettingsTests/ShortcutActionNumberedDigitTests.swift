@@ -5,12 +5,20 @@ import Testing
 struct ShortcutActionNumberedDigitTests {
     @Test func onlyNumberedSelectionActionsUseDigitMatching() {
         for action in ShortcutAction.allCases {
-            let expected = action == .selectSurfaceByNumber || action == .selectWorkspaceByNumber
+            // cmux-rbf: changed on purpose (#cm-142.1): #cm-69's numbered Reply labels match digits too.
+            let expected = [.selectSurfaceByNumber, .selectWorkspaceByNumber, .focusPaneByNumber, .insertReplyLabelByNumber].contains(action)
             #expect(
                 action.usesNumberedDigitMatching == expected,
                 "\(action) usesNumberedDigitMatching should be \(expected)"
             )
         }
+    }
+
+    /// Classic keys added without a call (#19324, #19263) are unbound by
+    /// default; people bind them in Settings > Shortcuts.
+    @Test func focusSidebarAndFocusPaneByNumberAreUnboundByDefault() {
+        #expect(ShortcutAction.focusSidebar.defaultShortcut == nil)
+        #expect(ShortcutAction.focusPaneByNumber.defaultShortcut == nil)
     }
 
     @Test func diffViewerScrollToTopDefaultIsChord() {
@@ -63,6 +71,9 @@ struct ShortcutActionNumberedDigitTests {
             .diffViewerOpenFileSearch,
             .diffViewerNextFile,
             .diffViewerPreviousFile,
+            .diffViewerNextHunk,
+            .diffViewerPreviousHunk,
+            .diffViewerToggleViewed,
             .fileExplorerOpenSelection,
             .fileExplorerOpenSelectionFinderAlias,
         ]

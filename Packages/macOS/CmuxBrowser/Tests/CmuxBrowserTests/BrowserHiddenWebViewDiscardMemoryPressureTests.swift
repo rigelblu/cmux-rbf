@@ -1,0 +1,298 @@
+import AppKit
+import CmuxBrowser
+import Foundation
+import Testing
+
+@MainActor
+private final class MemoryPressureHiddenWebViewDiscardTestDelegate: BrowserHiddenWebViewDiscardManagerDelegate {
+    var snapshot: BrowserHiddenWebViewDiscardManager.BlockerSnapshot
+    var hiddenAt: Date?
+    var webViewInstanceID = UUID()
+    var hiddenWebViewDiscardKeepLoaded = false
+    var discardRequestCount = 0
+    var lastDiscardReason: String?
+
+    init(snapshot: BrowserHiddenWebViewDiscardManager.BlockerSnapshot, hiddenAt: Date?) {
+        self.snapshot = snapshot
+        self.hiddenAt = hiddenAt
+    }
+
+    var hiddenWebViewDiscardSnapshot: BrowserHiddenWebViewDiscardManager.BlockerSnapshot {
+        snapshot
+    }
+
+    var hiddenWebViewDiscardHiddenAt: Date? {
+        hiddenAt
+    }
+
+    var hiddenWebViewDiscardWebViewInstanceID: UUID {
+        webViewInstanceID
+    }
+
+    func hiddenWebViewDiscardManagerDidRequestDiscard(
+        _ manager: BrowserHiddenWebViewDiscardManager,
+        reason: String
+    ) {
+        discardRequestCount += 1
+        lastDiscardReason = reason
+    }
+
+    func hiddenWebViewDiscardManagerPolicyDidChange(
+        _ manager: BrowserHiddenWebViewDiscardManager,
+        reason: String
+    ) {}
+}
+
+@MainActor
+private func makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot(
+    isDesignModeActive: Bool = false
+) -> BrowserHiddenWebViewDiscardManager.BlockerSnapshot {
+    BrowserHiddenWebViewDiscardManager.BlockerSnapshot(
+        isClosing: false,
+        isVisibleInUI: false,
+        shouldRenderWebView: true,
+        hasPendingRemoteNavigation: false,
+        hasCurrentURL: true,
+        isLoading: false,
+        webViewIsLoading: false,
+        hasActiveMainFrameProvisionalNavigation: false,
+        isDownloading: false,
+        activeDownloadCount: 0,
+        preferredDeveloperToolsVisible: false,
+        isDeveloperToolsVisible: false,
+        isElementFullscreenActive: false,
+        isReactGrabActive: false,
+        isDesignModeActive: isDesignModeActive,
+        isVisualAutomationCaptureActive: false,
+        isMobileBrowserStreamActive: false,
+        hasPopups: false,
+        isCapturingMedia: false,
+        isPlayingMedia: false
+    )
+}
+
+@MainActor
+private func withMemoryPressureHiddenWebViewDiscardPolicyEnabled(_ body: (UserDefaults) -> Void) {
+    let suiteName = "com.cmux.BrowserHiddenWebViewDiscardMemoryPressureTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.set(true, forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
+    defaults.set(
+        BrowserHiddenWebViewDiscardPolicy.defaultHiddenDelay,
+        forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey
+    )
+    defer {
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+    body(defaults)
+}
+
+@MainActor
+@Suite(.serialized)
+struct BrowserHiddenWebViewDiscardMemoryPressureTests {
+    @Test func sleepNotificationBlocksDiscardBeforeActorWorkDrains() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date()
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot(),
+                hiddenAt: now.addingTimeInterval(-7_200)
+            )
+            let center = NotificationCenter()
+            manager.delegate = delegate
+            manager.installSystemSleepObservers(center: center)
+
+            center.post(name: NSWorkspace.willSleepNotification, object: nil)
+
+            #expect(!manager.requestImmediateDiscardIfSafe(reason: "system_memory_pressure", now: now))
+            #expect(delegate.discardRequestCount == 0)
+        }
+    }
+
+    @Test func wakeNotificationDefersDiscardBeforeActorWorkDrains() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date()
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot(),
+                hiddenAt: now.addingTimeInterval(-7_200)
+            )
+            let center = NotificationCenter()
+            manager.delegate = delegate
+            manager.installSystemSleepObservers(center: center)
+            defer { manager.cancel() }
+
+            center.post(name: NSWorkspace.didWakeNotification, object: nil)
+
+            #expect(!manager.requestImmediateDiscardIfSafe(reason: "system_memory_pressure", now: now))
+            #expect(delegate.discardRequestCount == 0)
+        }
+    }
+
+    @Test func activeDesignModeBlocksHiddenWebViewDiscard() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot(isDesignModeActive: true)
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+
+            #expect(manager.blockers(for: snapshot) == ["design_mode"])
+        }
+    }
+
+    @Test func systemMemoryPressureRequestsImmediateHiddenWebViewDiscard() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date(timeIntervalSince1970: 1_000)
+            let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot()
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: snapshot,
+                hiddenAt: now.addingTimeInterval(-10)
+            )
+            manager.delegate = delegate
+
+            #expect(manager.requestImmediateDiscardIfSafe(reason: "system_memory_pressure", now: now))
+
+            #expect(!manager.hasScheduledDiscard)
+            #expect(delegate.discardRequestCount == 1)
+            #expect(delegate.lastDiscardReason == "system_memory_pressure")
+        }
+    }
+
+    @Test func systemMemoryPressureDoesNotDiscardBeforeHiddenStateIsRecorded() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date(timeIntervalSince1970: 1_500)
+            let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot()
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: snapshot,
+                hiddenAt: nil
+            )
+            manager.delegate = delegate
+
+            #expect(!manager.requestImmediateDiscardIfSafe(reason: "system_memory_pressure", now: now))
+
+            #expect(manager.hasScheduledDiscard)
+            #expect(delegate.discardRequestCount == 0)
+            #expect(delegate.lastDiscardReason == nil)
+        }
+    }
+
+    @Test func systemMemoryPressureDefersImmediateDiscardDuringPostWakeWindow() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let wakeAt = Date(timeIntervalSince1970: 2_000)
+            let pressureAt = wakeAt.addingTimeInterval(1)
+            let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot()
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: snapshot,
+                hiddenAt: wakeAt.addingTimeInterval(-7_200)
+            )
+            manager.delegate = delegate
+
+            manager.noteSystemDidWake(now: wakeAt)
+            #expect(!manager.requestImmediateDiscardIfSafe(reason: "system_memory_pressure", now: pressureAt))
+
+            #expect(manager.hasScheduledDiscard)
+            #expect(delegate.discardRequestCount == 0)
+            #expect(delegate.lastDiscardReason == nil)
+        }
+    }
+
+    // cmux-rbf (#cm-74.1): Keep Page Loaded. These came with this file when upstream moved it
+    // into CmuxBrowser; the session round-trip test that sat beside them reads the app's
+    // `SessionBrowserPanelSnapshot`, which this package can't see, so it lives in
+    // `cmuxTests/FigmaPaneOwnerTests.swift` (`SessionBrowserPanelSnapshotKeepLoadedTests`).
+    @Test func keepLoadedSuppressesScheduledHiddenWebViewDiscard() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            // cmux-rbf (#cm-142.1): the timer path, which upstream's default mode (the memory budget) never arms.
+            defaults.set("timer", forKey: BrowserHiddenWebViewDiscardPolicy.modeKey)
+            let now = Date(timeIntervalSince1970: 1_000)
+            let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot()
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: snapshot,
+                hiddenAt: now.addingTimeInterval(-10)
+            )
+            delegate.hiddenWebViewDiscardKeepLoaded = true
+            manager.delegate = delegate
+
+            manager.scheduleIfNeeded(reason: "test_hidden", now: now)
+
+            #expect(!manager.hasScheduledDiscard)
+            #expect(delegate.discardRequestCount == 0)
+        }
+    }
+
+    @Test func keepLoadedStillDiscardsOnSystemMemoryPressure() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date(timeIntervalSince1970: 1_000)
+            let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot()
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: snapshot,
+                hiddenAt: now.addingTimeInterval(-10)
+            )
+            delegate.hiddenWebViewDiscardKeepLoaded = true
+            manager.delegate = delegate
+
+            #expect(manager.requestImmediateDiscardIfSafe(reason: "system_memory_pressure", now: now))
+
+            #expect(!manager.hasScheduledDiscard)
+            #expect(delegate.discardRequestCount == 1)
+            #expect(delegate.lastDiscardReason == "system_memory_pressure")
+        }
+    }
+
+    // cmux-rbf (#cm-142.1, #cm-74.1): the memory budget, upstream's default mode, is routine, not pressure: a kept page is
+    // never eligible, and the same page unkept is (the control).
+    @Test func keepLoadedIsNeverEligibleForTheMemoryBudget() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date(timeIntervalSince1970: 1_000)
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot(),
+                hiddenAt: now.addingTimeInterval(-(BrowserHiddenWebViewDiscardPolicy.defaultHiddenDelay + 1))
+            )
+            manager.delegate = delegate
+
+            #expect(manager.isEligibleForMemoryBudgetDiscard(now: now), "control: the same page unkept is eligible")
+
+            delegate.hiddenWebViewDiscardKeepLoaded = true
+            #expect(!manager.isEligibleForMemoryBudgetDiscard(now: now))
+            #expect(!manager.requestMemoryBudgetDiscard(now: now))
+            #expect(delegate.discardRequestCount == 0)
+        }
+    }
+
+    // The keep-loaded flag must never reach the blocker list: `blockers(for:)` gates the
+    // emergency memory-pressure discard as well as the timer, so a blocker-shaped exemption
+    // would make a kept page permanently unreclaimable. The manager must be given the
+    // delegate here — an earlier version of this test compared two snapshots taken from the
+    // same object, which is an input compared to itself and survived the mutation.
+    @Test func keepLoadedDoesNotAlterBlockers() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date(timeIntervalSince1970: 1_000)
+            let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot()
+
+            let unkeptDelegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: snapshot,
+                hiddenAt: now.addingTimeInterval(-10)
+            )
+            unkeptDelegate.hiddenWebViewDiscardKeepLoaded = false
+            let unkeptManager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            unkeptManager.delegate = unkeptDelegate
+
+            let keptDelegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: snapshot,
+                hiddenAt: now.addingTimeInterval(-10)
+            )
+            keptDelegate.hiddenWebViewDiscardKeepLoaded = true
+            let keptManager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            keptManager.delegate = keptDelegate
+
+            let unkeptBlockers = unkeptManager.blockers(for: snapshot)
+            let keptBlockers = keptManager.blockers(for: snapshot)
+
+            #expect(unkeptBlockers == keptBlockers)
+            #expect(!keptBlockers.contains("keep_loaded"))
+        }
+    }
+}

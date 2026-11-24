@@ -1,3 +1,6 @@
+import CmuxCloud
+import CmuxCloudTui
+import CmuxSurfaceCatalogModel
 import Foundation
 import Testing
 
@@ -16,7 +19,6 @@ struct CloudTerminalPaneReservationTests {
         let relay = CloudOptimisticInputRelay()
         relay.send(.bytes(Data("ls".utf8)))
         relay.send(.namedKey("enter"))
-        #expect(relay.pendingCount == 2)
 
         let queue = DispatchQueue(label: "reservation-test")
         let router = CloudTuiManualIOInputRouter(surfaceID: 17, queue: queue)
@@ -25,9 +27,51 @@ struct CloudTerminalPaneReservationTests {
         // Attaching flushes the queue into the router (which itself holds the
         // lines until a transport exists) and forwards later input directly.
         relay.attach(router)
-        #expect(relay.pendingCount == 0)
         relay.send(.bytes(Data("pwd\n".utf8)))
-        #expect(relay.pendingCount == 0)
+
+        let transport = CloudTuiManualIOConnection(socketPath: connection.socketPath)
+        defer { transport.close() }
+        try await transport.start()
+        router.setConnection(transport)
+        let first = await connection.nextCommand(timeout: .seconds(2))
+        let second = await connection.nextCommand(timeout: .seconds(2))
+        let third = await connection.nextCommand(timeout: .seconds(2))
+        #expect(first?.inputBytes == Data("ls".utf8))
+        #expect(second?.cmd == "send-key")
+        #expect(third?.inputBytes == Data("pwd\n".utf8))
+        #expect(first?.surface == 17 && second?.surface == 17 && third?.surface == 17)
+    }
+
+    @Test
+    func relaySendsEarlyInputToStableTerminalBeforePromotingTheSurfaceRouter() async throws {
+        let relay = CloudOptimisticInputRelay()
+        let sender = RecordingUntrackedSender()
+        relay.send(.bytes(Data("ls".utf8)))
+        relay.send(.namedKey("enter"))
+        let bindingToken = try #require(relay.beginRemoteBinding())
+        relay.bindRemoteTerminal(terminalID: "term_created", sender: sender, token: bindingToken)
+
+        let queue = DispatchQueue(label: "reservation-early-input-test")
+        let router = CloudTuiManualIOInputRouter(surfaceID: 17, queue: queue)
+        let connection = try CloudManualMirrorSocketFixture()
+        defer { connection.close() }
+        relay.attach(router)
+
+        try await Self.waitUntilAsync { await sender.count >= 2 }
+        let requests = await sender.requests
+        #expect(requests.map(\.operation) == ["terminal.input.write", "terminal.input.keys"])
+        #expect(requests[0].params["terminal"] as? String == "term_created")
+        #expect(requests[1].params["terminal"] as? String == "term_created")
+        #expect((requests[1].params["keys"] as? [String]) == ["enter"])
+
+        let transport = CloudTuiManualIOConnection(socketPath: connection.socketPath)
+        defer { transport.close() }
+        try await transport.start()
+        router.setConnection(transport)
+        relay.send(.bytes(Data("pwd\n".utf8)))
+        let forwarded = await connection.nextCommand(timeout: .seconds(2))
+        #expect(forwarded?.inputBytes == Data("pwd\n".utf8))
+        #expect(forwarded?.surface == 17)
     }
 
     @Test
@@ -35,20 +79,53 @@ struct CloudTerminalPaneReservationTests {
         let relay = CloudOptimisticInputRelay()
         relay.send(.bytes(Data("typed too early".utf8)))
         relay.discard()
-        #expect(relay.pendingCount == 0)
         relay.send(.bytes(Data("still discarded".utf8)))
-        #expect(relay.pendingCount == 0)
         let router = CloudTuiManualIOInputRouter(surfaceID: 17)
         relay.attach(router)
         relay.send(.bytes(Data("after retry".utf8)))
-        #expect(relay.pendingCount == 0)
     }
 
     @Test
-    func relayBoundsTheQueue() {
+    func relayBoundsTheQueue() async throws {
         let relay = CloudOptimisticInputRelay()
         for _ in 0..<5_000 { relay.send(.bytes(Data([0x61]))) }
-        #expect(relay.pendingCount == 4_096)
+        let sender = RecordingUntrackedSender()
+        let bindingToken = try #require(relay.beginRemoteBinding())
+        relay.bindRemoteTerminal(terminalID: "term_created", sender: sender, token: bindingToken)
+        try await Self.waitUntilAsync { await sender.count == 4_096 }
+    }
+
+    @Test
+    func relayHandsQueuedInputToAnAdoptingDeviceRouterInOrder() async {
+        let relay = CloudOptimisticInputRelay()
+        relay.send(.bytes(Data("ls".utf8)))
+        relay.send(.bytes(Data("\r".utf8)))
+
+        let recorder = DeviceInputRecorder()
+        let router = DeviceTerminalInputRouter(
+            send: { await recorder.append($0) },
+            onFailure: { _ in }
+        )
+        // A device mirror adopting a reserved pane must receive what was typed
+        // before its terminal attached, then everything typed after.
+        relay.attach(router)
+        relay.send(.bytes(Data("pwd\r".utf8)))
+
+        let expected = Data("ls\rpwd\r".utf8)
+        let deadline = ContinuousClock.now + .seconds(2)
+        while await recorder.bytes != expected, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(await recorder.bytes == expected)
+    }
+
+    @Test @MainActor
+    func devicePaneReservationsLeaveNamedKeysToGhostty() {
+        // The device router sends bytes only, so a named-key resolver on a
+        // device reservation would silently drop Enter, arrows and Tab.
+        let device = SurfaceMachineID.device(SurfaceDeviceInstanceID(deviceID: "other-mac", tag: "default"))
+        #expect(Workspace.reservationKeyNameResolver(for: device) == nil)
+        #expect(Workspace.reservationKeyNameResolver(for: .cloud("reservation-fixture")) != nil)
     }
 
     @Test @MainActor
@@ -140,6 +217,132 @@ struct CloudTerminalPaneReservationTests {
         #expect(!store.hasActiveRequests)
     }
 
+    @Test @MainActor
+    func restoredPaneCapturesItsSavedAttachmentTarget() async throws {
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let app = try VaultPaneAppFixture()
+            defer { app.tearDown() }
+            let workspace = app.workspace
+            let sourceID = try #require(workspace.focusedPanelId)
+            let pane = try #require(workspace.paneId(forPanelId: sourceID))
+            let snapshot = try #require(workspace.sessionSnapshot(includeScrollback: false).panels.first)
+            let record = SurfaceProjectionRecord(
+                panelID: sourceID, resource: Self.resource().id,
+                remoteWorkspaceID: "saved-workspace", remoteTabID: "saved-tab"
+            )
+            let panelID = try #require(workspace.reserveRestoredCloudTerminalPane(
+                snapshot: snapshot, projection: record, inPane: pane
+            ))
+            let reservation = try #require(workspace.cloudPendingCreations[panelID])
+            #expect(reservation.attachmentPlacement == SurfaceResourcePlacement(
+                resource: record.resource, remoteWorkspaceID: record.remoteWorkspaceID,
+                remoteTabID: record.remoteTabID
+            ))
+            #expect(reservation.remoteWorkspaceID == record.remoteWorkspaceID)
+            #expect(reservation.remoteTabID == record.remoteTabID)
+            #expect(workspace.machineOwningSurface(panelID) == record.resource.machine)
+        }
+    }
+
+    @Test("Restored attachment validates the exact saved view after catalog changes",
+          arguments: ["moved", "removed", "metadataMissing", "wrongTabReceipt", "wrongWorkspaceReceipt", "wrongResource", "wrongMachine"])
+    @MainActor
+    func restoredAttachmentRejectsChangedPlacement(change: String) throws {
+        let catalog = SurfaceCatalog()
+        var resource = Self.resource()
+        let provider = CloudTerminalPlacementTestProvider(machine: resource.machine, catalog: catalog)
+        catalog.register(provider)
+        defer { catalog.unregister(machine: provider.machine) }
+        let saved = SurfaceRemoteWorkspace(id: "saved-workspace", name: "Saved", index: 0, focused: false)
+        let other = SurfaceRemoteWorkspace(id: "other-workspace", name: "Other", index: 1, focused: true)
+        resource.remoteWorkspace = other
+        resource.remoteViews = [
+            SurfaceRemoteView(tabID: "other-tab", workspace: other),
+            SurfaceRemoteView(tabID: "sibling-tab", workspace: saved),
+            SurfaceRemoteView(tabID: "saved-tab", workspace: saved)
+        ]
+        catalog.upsert(resource, from: provider)
+        try #require(catalog.resources[resource.id] == resource)
+        let reservation = CloudTerminalPaneReservation(
+            workspaceID: UUID(), panelID: UUID(), machine: resource.machine,
+            attachmentPlacement: SurfaceResourcePlacement(
+                resource: resource.id, remoteWorkspaceID: saved.id, remoteTabID: "saved-tab"
+            )
+        )
+        let expected = SurfaceRemotePlacement(workspaceID: saved.id, tabID: "saved-tab")
+        #expect(try reservation.validatedAttachmentPlacement(
+            resourceID: resource.id, remoteTabID: "saved-tab", catalog: catalog
+        ) == expected)
+
+        var returnedPlacement = expected
+        var returnedResourceID = resource.id
+        switch change {
+        case "moved": resource.remoteViews?[2].workspace = other
+        case "removed": resource.remoteViews?.removeLast()
+        case "metadataMissing": resource.remoteViews = nil
+        case "wrongTabReceipt": returnedPlacement = SurfaceRemotePlacement(workspaceID: saved.id, tabID: "sibling-tab")
+        case "wrongWorkspaceReceipt": returnedPlacement = SurfaceRemotePlacement(workspaceID: other.id, tabID: "saved-tab")
+        case "wrongResource": returnedResourceID = SurfaceResourceID(machine: resource.machine, kind: .terminal, key: "other-terminal")
+        case "wrongMachine": returnedResourceID = SurfaceResourceID(machine: .cloud("other-machine"), kind: .terminal, key: resource.id.key)
+        default: Issue.record("Unknown placement change")
+        }
+        catalog.upsert(resource, from: provider)
+        try #require(catalog.resources[resource.id] == resource)
+        #expect(throws: CloudDiagnosticFailure.placement) {
+            try reservation.validatedAttachmentPlacement(
+                resourceID: returnedResourceID, remoteTabID: "saved-tab",
+                materializedPlacement: returnedPlacement, catalog: catalog
+            )
+        }
+    }
+
+    @Test @MainActor
+    func aNewCreationDoesNotMistakeItsSourceTabForTheAttachmentTarget() throws {
+        let resource = Self.resource()
+        let reservation = CloudTerminalPaneReservation(
+            workspaceID: UUID(), panelID: UUID(), machine: resource.machine,
+            sourcePlacement: CloudTerminalSourcePlacement(
+                machine: resource.machine, remoteWorkspaceID: "workspace", remoteTabID: "source-tab"
+            )
+        )
+        let created = SurfaceRemotePlacement(workspaceID: "workspace", tabID: "new-tab")
+        #expect(reservation.attachmentPlacement == nil)
+        #expect(try reservation.validatedAttachmentPlacement(
+            resourceID: resource.id, remoteTabID: created.tabID,
+            materializedPlacement: created, catalog: SurfaceCatalog()
+        ) == created)
+    }
+
+    @Test("Exact restored replacement preserves saved identity while legacy inference remains available",
+          arguments: [false, true])
+    @MainActor
+    func replacementKeepsSavedPlacementWhenRequested(preservingSavedPlacement: Bool) throws {
+        let catalog = SurfaceCatalog()
+        var resource = Self.resource()
+        let provider = CloudTerminalPlacementTestProvider(machine: resource.machine, catalog: catalog)
+        catalog.register(provider)
+        defer { catalog.unregister(machine: provider.machine) }
+        let other = SurfaceRemoteWorkspace(id: "other-workspace", name: "Other", index: 0, focused: true)
+        resource.remoteViews = [SurfaceRemoteView(tabID: "other-tab", workspace: other)]
+        catalog.upsert(resource, from: provider)
+        try #require(catalog.resources[resource.id] == resource)
+        let previous = SurfaceProjection(
+            resource: resource.id, workspaceID: UUID(), panelID: UUID(),
+            remoteWorkspaceID: "saved-workspace", remoteTabID: "saved-tab"
+        )
+        catalog.record(previous)
+        let panelID = UUID()
+        catalog.replaceProjection(
+            previous, withPanel: panelID, in: previous.workspaceID,
+            remotePlacement: nil, preservingSavedPlacement: preservingSavedPlacement
+        )
+        let replacement = catalog.projection(forPanel: panelID)
+        #expect(catalog.projection(forPanel: previous.panelID) == nil)
+        #expect(replacement?.resource == resource.id)
+        #expect(replacement?.remoteWorkspaceID == (preservingSavedPlacement ? "saved-workspace" : other.id))
+        #expect(replacement?.remoteTabID == (preservingSavedPlacement ? "saved-tab" : "other-tab"))
+    }
+
     private static func resource() -> SurfaceResource {
         SurfaceResource(
             id: SurfaceResourceID(machine: .cloud("reservation-fixture"), kind: .terminal, key: "term_created"),
@@ -159,5 +362,39 @@ struct CloudTerminalPaneReservationTests {
             try await Task.sleep(for: .milliseconds(5))
         }
         try #require(condition())
+    }
+
+    private static func waitUntilAsync(
+        timeout: Duration = .seconds(5),
+        _ condition: @escaping () async -> Bool
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while !(await condition()), ContinuousClock.now < deadline {
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try #require(await condition())
+    }
+}
+
+private actor RecordingUntrackedSender: CloudTuiUntrackedCommandSending {
+    private(set) var requests: [CloudTuiRequest] = []
+
+    var count: Int { requests.count }
+
+    func sendUntrackedTuiCommand(arguments: CloudTuiRequest) async throws {
+        requests.append(arguments)
+    }
+
+    func sendTuiCommandAndAwaitAck(arguments: CloudTuiRequest) async throws {
+        requests.append(arguments)
+    }
+}
+
+private actor DeviceInputRecorder {
+    private(set) var bytes = Data()
+
+    func append(_ data: Data) {
+        bytes.append(data)
     }
 }

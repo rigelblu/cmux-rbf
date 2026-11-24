@@ -1038,13 +1038,15 @@ struct WorkspaceStatusIconDrawingTests {
         let snapshot = SidebarWorkspaceSnapshotBuilder.Snapshot( // (#cm-109.7)
             presentationKey: SidebarWorkspaceSnapshotFactory.presentationKey( // (#cm-109.7)
                 settings: settings, // (#cm-109.7)
-                showsAgentActivity: false // (#cm-109.7)
+                showsAgentActivity: false, // (#cm-109.7)
+                customColorHex: nil // cmux-rbf (#cm-142.1): upstream's new required parameter; no colour
             ), // (#cm-109.7)
             title: "Done Workspace", // (#cm-109.7)
             customDescription: nil, // (#cm-109.7)
             isPinned: false, // (#cm-109.7)
             isMuted: false, // (#cm-109.7)
             customColorHex: nil, // (#cm-109.7)
+            hasManualCustomColor: false, // cmux-rbf (#cm-142.1): upstream's required field; no manual colour
             cloudWorkspaceLabel: nil, // (#cm-109.7)
             remoteWorkspaceSidebarText: nil, // (#cm-109.7)
             remoteConnectionStatusText: "", // (#cm-109.7)

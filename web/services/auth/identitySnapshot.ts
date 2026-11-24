@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { cloudDb } from "../../db/client";
 import { stackIdentitySnapshots } from "../../db/schema";
 import type { AuthedTeam, AuthedUser } from "../vms/auth";
+import { teamEntitlementOverrideFromUnknown, withEntitlementOverride } from "../vms/teamEntitlementOverride";
 
 /**
  * How long a stored identity snapshot may answer for Stack.
@@ -74,6 +75,7 @@ function authedUserFromSnapshotRow(
     displayName: team.displayName ?? null,
     billingPlanId: team.billingPlanId ?? null,
     billingSeats: team.billingSeats ?? null,
+    ...withEntitlementOverride("entitlementOverride", teamEntitlementOverrideFromUnknown(team.entitlementOverride)),
   }));
   return {
     id: row.userId,
@@ -87,6 +89,14 @@ function authedUserFromSnapshotRow(
     userBillingPlanId: row.userBillingPlanId,
     billingPlanId: row.billingPlanId,
     billingSeats: row.billingSeats,
+    // The billing team is always one of the stored teams, so its deal rides
+    // in the teams column and needs no column of its own.
+    ...withEntitlementOverride(
+      "billingEntitlementOverride",
+      row.billingCustomerType === "team"
+        ? teams.find((team) => team.id === row.billingTeamId)?.entitlementOverride
+        : null,
+    ),
   };
 }
 
@@ -109,6 +119,7 @@ export async function writeIdentitySnapshot(
     displayName: team.displayName,
     billingPlanId: team.billingPlanId,
     billingSeats: team.billingSeats,
+    ...withEntitlementOverride("entitlementOverride", team.entitlementOverride),
   }));
   try {
     await (db ?? cloudDb())
@@ -148,19 +159,24 @@ export async function writeIdentitySnapshot(
 }
 
 /**
- * Forget the stored identity for a user. Called when a session is revoked or
- * the account is deleted, so no instance can keep answering from a snapshot
- * the user just invalidated.
+ * Forget the stored identity for a user. Called when a session is revoked, the
+ * account is deleted, or the user leaves a team, so no instance can keep
+ * answering from a snapshot the user just invalidated.
+ *
+ * Best effort by default. `throwOnError` is for revocation callers that must
+ * report failure so the event is retried (the Stack membership webhook).
  */
 export async function deleteIdentitySnapshot(
   userId: string,
   db?: SnapshotDb,
+  options: { readonly throwOnError?: boolean } = {},
 ): Promise<void> {
   try {
     await (db ?? cloudDb())
       .delete(stackIdentitySnapshots)
       .where(eq(stackIdentitySnapshots.userId, userId));
-  } catch {
+  } catch (error) {
+    if (options.throwOnError) throw error;
     // Best effort: the snapshot expires on its own within the TTL.
   }
 }

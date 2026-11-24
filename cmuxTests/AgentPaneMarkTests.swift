@@ -135,7 +135,10 @@ struct AgentPaneMarkTests {
         #expect(AgentPaneMark.refusal(for: try #require(URL(string: "data:text/html,x"))) == .badScheme)
         #expect(AgentPaneMark.refusal(for: try #require(URL(string: "about:blank"))) == .badScheme)
         #expect(AgentPaneMark.refusal(for: try #require(URL(string: "https://www.figma.com/design/K/x?node-id=1-2"))) == .figmaAddress)
-        #expect(AgentPaneMark.refusal(for: FigmaPaneURL.previewPageURL) == .badScheme)
+        // cmux-rbf (#cm-126.3, #cm-73.40, #cm-142.1): cmux's page moved from cmux-figma: to an https address under
+        // www.figma.com (#cm-73.40). The old address is refused for its scheme, the new one as a Figma address.
+        #expect(AgentPaneMark.refusal(for: FigmaPaneURL.legacyServedPageURL) == .badScheme)
+        #expect(AgentPaneMark.refusal(for: FigmaPaneURL.previewPageURL) == .figmaAddress)
         #expect(AgentPaneMark.refusal(for: FigmaPaneURL.wrapperFileURL()) == .figmaAddress)
         #expect(AgentPaneMark.refusal(for: try #require(URL(string: "https://example.org/"))) == nil)
         #expect(AgentPaneMark.refusal(for: try #require(URL(string: "http://localhost:8000/p.html"))) == nil)

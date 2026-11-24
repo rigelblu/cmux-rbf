@@ -57,6 +57,7 @@ struct SidebarWorkspaceRowInput {
     var dropLineLevel: Int? = nil
     /// The SwiftUI list's width, for the cap on the indent; nil in the AppKit list, which reads its own (#cm-106).
     var listWidth: CGFloat? = nil
+    let hasManualCustomColor: Bool
 
     @MainActor
     func rowSnapshot(list: SidebarWorkspaceRowsSnapshot) -> SidebarWorkspaceRowSnapshot {
@@ -110,6 +111,7 @@ struct SidebarWorkspaceRowInput {
                 canMarkUnread: targetAggregate.canMarkUnread,
                 hasLatestNotification: targetAggregate.hasLatestNotification,
                 allNotificationsMuted: targetAggregate.allNotificationsMuted,
+                hasManualCustomColor: targetAggregate.hasManualCustomColor,
                 notifications: targetAggregate.notifications,
                 targetColorHexes: targetAggregate.targetColorHexes
             ),

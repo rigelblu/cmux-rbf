@@ -19,15 +19,18 @@ import Testing
         .filePreview: "filePreview",
         .rightSidebarTool: "rightSidebarTool",
         .customSidebar: "customSidebar",
+        .simulator: "simulator",
         .agentSession: "agentSession",
         .project: "project",
         .extensionBrowser: "extensionBrowser",
         .workspaceTodo: "todo",
-        .cloudVMLoading: "cloudVMLoading",
+        .coderouterGuide: "coderouterGuide",
         .notifications: "notifications",
-        .simulator: "simulator",
+        .cloudVMLoading: "cloudVMLoading",
         .mobilePairing: "mobilePairing",
         .accountSignIn: "accountSignIn",
+        .cloudVPNSetup: "cloudVPNSetup",
+        .chief: "chief",
     ]
 
     @Test func everyPanelTypeMapsToItsCanonicalWireKind() throws {

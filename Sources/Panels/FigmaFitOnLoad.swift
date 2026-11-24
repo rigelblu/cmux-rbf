@@ -85,7 +85,7 @@ enum FigmaFitOnLoad {
         isShowing: () -> Bool,
         isTyping: () async -> Bool,
         zoomLabel: () async -> String?,
-        press: (_ attempt: Int) -> Void,
+        press: (_ attempt: Int) async -> Void, // cmux-rbf (#cm-142.1): async since upstream made the key replay async
         pause: () async -> Void
     ) async -> Outcome {
         var baseline = await zoomLabel()
@@ -95,7 +95,7 @@ enum FigmaFitOnLoad {
             // After the focus check, right before the press: the pane can be hidden while that script runs.
             guard isShowing() else { return Outcome(stop: .notShowing, tries: tries) }
             tries += 1
-            press(tries)
+            await press(tries)
             await pause()
             let label = await zoomLabel()
             if let label {
@@ -149,7 +149,8 @@ extension BrowserPanel {
                 zoomLabel: { await evaluate(FigmaFit.zoomLabelScript) },
                 press: { attempt in
                     guard let event = BrowserKeyboardEvent(rawKey: FigmaFit.fitKey) else { return }
-                    webView.replayBrowserKeyboardEvent(event, action: .press)
+                    // cmux-rbf (#cm-142.1): awaited, so the press lands before the pause and the zoom read that follows it.
+                    await webView.replayBrowserKeyboardEvent(event, action: .press)
 #if DEBUG
                     cmuxDebugLog("figma.fit.onLoad press surface=\(surface) try=\(attempt)")
 #endif

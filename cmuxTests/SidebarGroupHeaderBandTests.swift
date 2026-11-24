@@ -98,7 +98,8 @@ struct SidebarGroupHeaderBandTests {
             isBeingDragged: false,
             topDropIndicatorVisible: false,
             bottomDropIndicatorVisible: false,
-            colorSchemeIsDark: colorSchemeIsDark
+            colorSchemeIsDark: colorSchemeIsDark,
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): upstream made it required
         )
     }
 
@@ -635,7 +636,8 @@ struct SidebarGroupHeaderColorMenuTests {
             isBeingDragged: false,
             topDropIndicatorVisible: false,
             bottomDropIndicatorVisible: false,
-            colorSchemeIsDark: colorSchemeIsDark
+            colorSchemeIsDark: colorSchemeIsDark,
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): upstream made it required
         )
     }
 

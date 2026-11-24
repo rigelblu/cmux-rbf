@@ -11,13 +11,19 @@ struct WorkspaceGroupPinnedHeaderMoveTests {
     }
 
     /// Moves `mover` to each of `targets` in a fresh window and checks what must hold after every call: the same
-    /// workspaces, the six group rules, and, for a group with nothing but its own workspace, that group as the last
-    /// row (the end of the pinned tier, where the same call puts it when an unpinned row stands below).
+    /// workspaces, the six group rules, and, for a group with nothing but its own workspace, that group's row at the
+    /// target, brought into the pinned tier (every row is pinned here, so the tier is the whole list).
+    ///
+    /// cmux-rbf: changed on purpose (#cm-142.1): this used to expect that group as the last row. That was a side effect
+    /// of the fork's crash fix (#cm-113, 4744a759dc), which only capped the index and whose commit leaves "the mismatch
+    /// between the two pin tests" as it was, so Move Up could send the header down. Upstream fixed the same crash at its
+    /// cause (c895b03af7, #13688 for #13417): a pinned group's anchor is tiered by its group's pin, so the move lands
+    /// where asked, and the iOS move policy predicts the same. The no-crash, same-workspaces and rule checks stay.
     private func check(
         mover: String,
         moverGroup: String,
         targets: [Int],
-        endsLast: Bool = true,
+        landsAtTarget: Bool = true, // cmux-rbf (#cm-142.1): was `endsLast`
         build: (inout Labels) -> NestedWorld
     ) {
         for target in targets {
@@ -28,8 +34,10 @@ struct WorkspaceGroupPinnedHeaderMoveTests {
             #expect(Set(w.model.tabs.map(\.id)) == before, "\(mover) to \(target): same workspaces")
             #expect(w.model.tabs.count == before.count, "\(mover) to \(target): none lost or doubled")
             #expect(w.violations(lab).isEmpty, "\(mover) to \(target): \(w.violations(lab))")
-            if endsLast, before.count > 1 {
-                #expect(w.model.tabs.last?.groupId == lab.id(moverGroup), "\(mover) to \(target): \(w.compact(lab))")
+            if landsAtTarget, before.count > 1 { // cmux-rbf: changed on purpose (#cm-142.1): lands at the target within the pinned tier
+                let rows = w.model.sidebarTopLevelWorkspaceIdsIncludingEmptyGroups()
+                let expected = max(0, min(target, rows.count - 1))
+                #expect(rows.firstIndex(of: lab.id(mover)) == expected, "\(mover) to \(target): \(w.compact(lab))")
             }
         }
     }
@@ -74,8 +82,8 @@ struct WorkspaceGroupPinnedHeaderMoveTests {
                 groups: [lab.group("G1", pinned: true, own: "a1"), lab.group("G2", pinned: true, own: "a2")]
             )
         }
-        check(mover: "a1", moverGroup: "G1", targets: [0, 1, 2, 3, 4, 99], endsLast: false, build: build)
-        check(mover: "a2", moverGroup: "G2", targets: [0, 1, 2, 3, 4, 99], endsLast: false, build: build)
+        check(mover: "a1", moverGroup: "G1", targets: [0, 1, 2, 3, 4, 99], landsAtTarget: false, build: build)
+        check(mover: "a2", moverGroup: "G2", targets: [0, 1, 2, 3, 4, 99], landsAtTarget: false, build: build)
     }
 
     // A control: with a nested group these moves step by level and never reach the clamp, so this passes without the guard too.

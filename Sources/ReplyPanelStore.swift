@@ -1,5 +1,6 @@
 import AppKit
 import CmuxAgentChat
+import CmuxMobileHost
 import CmuxSettings
 import Foundation
 import Observation

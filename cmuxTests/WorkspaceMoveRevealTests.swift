@@ -93,7 +93,7 @@ struct WorkspaceMoveRevealTests {
             var ws: [String: Workspace] = [:]
             for key in ["a", "b", "c", "d"] { ws[key] = Workspace() }
             manager.tabs = ["a", "b", "c", "d"].compactMap { ws[$0] }
-            let g = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ws["c"]!.id]))
+            let g = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ws["c"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             ws["g"] = try #require(manager.workspaceGroupAnchor(for: g))
             manager.selectWorkspace(ws["a"]!)
             let rig = try Rig(handle: handle, manager: manager)
@@ -289,7 +289,7 @@ struct WorkspaceMoveRevealTests {
             let m = rig.manager
             m.selectWorkspace(world.w("p1"))
             for id in [world.r, world.n] { world.fold(id, true) }
-            let created = try #require(m.createWorkspaceGroup(name: "X", childWorkspaceIds: [world.w("n2").id], selectAnchor: false, collapseSidebarSelection: false))
+            let created = try #require(m.createWorkspaceGroupWithOwnAnchor(name: "X", childWorkspaceIds: [world.w("n2").id], selectAnchor: false, collapseSidebarSelection: false)) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             try #require(world.w("n2").groupId == created, "n2 moved into the new group")
             try #require(world.group(created).parentGroupId == world.n, "the new group sits inside N")
             #expect(!folded(rig, world.n) && !folded(rig, world.r), "N folded=\(folded(rig, world.n)) R folded=\(folded(rig, world.r)); expected both open")

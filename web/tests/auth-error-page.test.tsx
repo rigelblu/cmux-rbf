@@ -59,12 +59,35 @@ const messagesByLocale = {
 type AuthErrorMessages = {
   emailUnverifiedTitle: string;
   emailUnverifiedBody: string;
+  signupPendingBody: string;
   genericTitle: string;
   genericBody: string;
   backToSignIn: string;
 };
 
 describe("localized browser auth error page", () => {
+  test("a ChatGPT sign-in for an email that already has an account asks for the usual sign-in, then links", async () => {
+    acceptLanguage = "en";
+    const link = "/handler/chatgpt/link?return_to=%2Fhandler%2Fsign-in";
+    const element = await AuthErrorPage({
+      searchParams: Promise.resolve({ code: "chatgpt-link", after_auth_return_to: link }),
+    });
+    const html = renderToStaticMarkup(element);
+    expect(html).toContain('data-auth-error="chatgptLink"');
+    expect(html).toContain("Sign in once to connect ChatGPT");
+    expect(html).toContain(`href="/handler/sign-in?after_auth_return_to=${encodeURIComponent(link).replace(/%2F/g, "%2F")}"`);
+  });
+
+  test("every locale has the ChatGPT sign-in states", () => {
+    for (const locale of locales) {
+      const messages = messagesByLocale[locale].authError as Record<string, string>;
+      for (const key of ["chatgptLinkTitle", "chatgptLinkBody", "chatgptEmailUnverifiedBody"]) {
+        expect(messages[key]?.length ?? 0).toBeGreaterThan(0);
+        if (locale !== "en") expect(messages[key]).not.toBe((englishMessages.authError as Record<string, string>)[key]);
+      }
+    }
+  });
+
   test("renders safe unverified-email guidance without upstream details", async () => {
     acceptLanguage = "en-US,en;q=0.9";
     const element = await AuthErrorPage({
@@ -90,6 +113,21 @@ describe("localized browser auth error page", () => {
     expect(html).toContain('lang="ja"');
     expect(html).toContain("サインインを完了できませんでした");
     expect(html).not.toContain("unexpected");
+  });
+
+  test("renders signup recovery without disclosing whether an account exists", async () => {
+    acceptLanguage = "en-US,en;q=0.9";
+    const element = await AuthErrorPage({
+      searchParams: Promise.resolve({ code: "signup-pending" }),
+    });
+    const html = renderToStaticMarkup(element);
+
+    expect(html).toContain('data-auth-error="signupPending"');
+    expect(html).toContain("Verify your email to continue");
+    expect(html).toContain(
+      "If you already have an account, sign in with the method you used before. If you just created an account, verify your email before signing in.",
+    );
+    expect(html).not.toContain("USER_EMAIL_ALREADY_EXISTS");
   });
 
   test("sets right-to-left direction for Arabic recovery copy", async () => {

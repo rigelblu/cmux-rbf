@@ -42,27 +42,37 @@ struct ControlCommandExecutionPolicyTests {
     @Test func fixedWorkerSetRunsOnTheSocketWorker() {
         for method in [
             "system.ping", "system.capabilities", "auth.status", "auth.sign_in_url",
+            "auth.team.list", "auth.team.use", "auth.team.create",
+            "auth.team.members", "auth.team.invite", "auth.team.invite_link",
+            "auth.team.revoke_invite", "auth.team.remove_member", "auth.team.open_members",
+            "auth.team.invitations", "auth.team.accept_invite", "auth.team.decline_invite",
+            "coderouter.handoff.complete",
             "feed.jump", "feed.push", "agent.hook.enqueue", "agent.hook.barrier",
             "agent.restore.admit", "agent.restore.release",
             // cmux-rbf (#cm-124.5): the reads of the agent event table run on the worker, never the main actor.
             "agent_events.rows", "agent_events.unmapped_types",
+            "agent.message.send", "agent.message.list", "agent.message.claim",
+            "agent.message.ack",
+            "agent.message.mark_read", "agent.message.poll", "agent.message.settings",
             "browser.download.list", "browser.download.wait", "system.top", "system.memory",
             "workspace.remote.pty_bridge", "workspace.env", "sidebar.custom.reload",
             "sidebar.custom.open",
             "debug.sidebar.simulate_drag", "debug.mobile.transport.disconnect", "debug.mobile.transport.reconnect_loop",
-            "debug.window.screenshot", "mobile.attach_ticket.create",
+            "debug.window.screenshot", "debug.window_hints", "debug.global_search.query", "mobile.attach_ticket.create",
             "mobile.terminal.set_font", "mobile.task.models.list",
+            "terminal.size_state", "terminal.size_policy.set", "terminal.size_to_me",
+            "terminal.size_counts.set", "terminal.participant.disconnect",
+            "terminal.participants.disconnect_others",
             // Vault session-index verbs scan transcript stores on disk and
             // must never hold the main actor (see socketWorkerMethods).
             "vault.sessions", "vault.search", "vault.checkpoints",
             "vault.checkpoint", "vault.fork",
             "mobile.compatible_tags.get", "mobile.compatible_tags.set",
-            "mobile.panel.artifact.stat", "mobile.panel.artifact.fetch",
-            "mobile.panel.artifact.thumbnail",
+            "mobile.panel.artifact.stat", "mobile.panel.artifact.thumbnail",
             // JavaScript-evaluating browser methods block on page JS and must
             // not hold the main actor (see socketWorkerMethods rationale).
             "browser.eval", "browser.wait", "browser.snapshot", "browser.click",
-            "browser.fill", "browser.navigate", "browser.get.text",
+            "browser.fill", "browser.set_input_files", "browser.navigate", "browser.get.text",
             "browser.find.text", "browser.highlight",
             // Adjacent WebKit/page-state methods wait on JS, cookie, or
             // capture callbacks and follow the same worker-lane contract.
@@ -73,10 +83,20 @@ struct ControlCommandExecutionPolicyTests {
             "browser.errors.list", "browser.state.save", "browser.state.load",
             "browser.addinitscript", "browser.addscript", "browser.addstyle",
             "browser.design_mode.set", "browser.design_mode.status",
+            "browser.geolocation.set", "browser.offline.set",
         ] {
             #expect(ControlCommandExecutionPolicy(forMethod: method).runsOnSocketWorker, "\(method)")
         }
-        for method in ["agent.restore.admit", "agent.restore.release"] {
+        for method in [
+            "agent.restore.admit", "agent.restore.release",
+            "agent.hibernate", "agent.wake",
+            "agent.message.send", "agent.message.list", "agent.message.claim",
+            "agent.message.ack",
+            "agent.message.mark_read", "agent.message.poll", "agent.message.settings",
+            // Chief awaits its owner actor and the store's send; never inline on main.
+            "chief.open", "chief.send", "chief.status", "chief.conversations",
+            "chief.read", "chief.mark_read", "chief.stop", "chief.approve", "chief.answer", "chief.debug",
+        ] {
             #expect(
                 ControlCommandExecutionPolicy(forMethod: method)
                     == .socketWorker(mainThreadCallable: false),
@@ -90,10 +110,13 @@ struct ControlCommandExecutionPolicyTests {
             "workspace.create", "browser.url.get",
             "browser.open_split", "browser.get.title", "browser.frame.main",
             "mobile.terminal.create", "mobile.task.attachment.upload",
+            // Artifact fetch needs the authenticated mobile execution context;
+            // the local socket must answer method_not_found, not serve bytes.
+            "mobile.panel.artifact.fetch",
             "vmx.create", "",
             // Focus-intent verbs stay on the main lane until the mutations
             // tranche decides them deliberately.
-            "surface.focus", "workspace.select", "pane.focus", "window.focus",
+            "surface.focus", "surface.jump_to_last_prompt", "workspace.select", "pane.focus", "window.focus",
         ] {
             let policy = ControlCommandExecutionPolicy(forMethod: method)
             #expect(policy == .mainActor, "\(method)")
@@ -105,8 +128,6 @@ struct ControlCommandExecutionPolicyTests {
         for method in [
             "remote.tmux.test_exec", "remote.tmux.test_set_frame",
             "remote.tmux.test_perturb_divider",
-            // window is a DEBUG-only alias of mirror; it must share the worker lane.
-            "remote.tmux.window",
         ] {
             let policy = ControlCommandExecutionPolicy(forMethod: method)
 #if DEBUG
@@ -138,6 +159,30 @@ struct ControlCommandExecutionPolicyTests {
         #expect(policy == .mainActor) // (#cm-110.3)
 #endif // (#cm-110.3)
     } // (#cm-110.3)
+
+    @Test func remoteTmuxWindowRunsOnTheReleaseWorkerLane() {
+        #expect(ControlCommandExecutionPolicy.socketWorkerMethods.contains("remote.tmux.window"))
+        #expect(
+            ControlCommandExecutionPolicy(forMethod: "remote.tmux.window")
+                == .socketWorker(mainThreadCallable: false)
+        )
+    }
+
+    @Test func windowCaptureRunsOnTheWorkerAndIsNotMainThreadCallable() {
+        // A recording samples the window for as long as the clip lasts, and a
+        // still waits on the same capture once, so these verbs must never be
+        // callable inline on the main thread: the window being captured has to
+        // keep drawing while ScreenCaptureKit answers.
+        for method in [
+            "window.record.start", "window.record.stop", "window.record.status",
+            "window.record.note", "window.record.list",
+            "window.screenshot",
+        ] {
+            let policy = ControlCommandExecutionPolicy(forMethod: method)
+            #expect(policy == .socketWorker(mainThreadCallable: false), "\(method)")
+            #expect(policy.runsOnSocketWorker, "\(method)")
+        }
+    }
 
     @Test func v2ResolutionReadsRunOnTheWorkerAndAreMainThreadCallable() {
         // Tranche D (issue #5757): the implicit handle-normalization reads.
@@ -197,9 +242,20 @@ struct ControlCommandExecutionPolicyTests {
         #expect(ControlCommandExecutionPolicy(forMethod: "system.top") == .socketWorker(mainThreadCallable: false))
         #expect(ControlCommandExecutionPolicy(forMethod: "mobile.task.models.list") == .socketWorker(mainThreadCallable: false))
         #expect(ControlCommandExecutionPolicy(forMethod: "mobile.panel.artifact.stat") == .socketWorker(mainThreadCallable: false))
-        #expect(ControlCommandExecutionPolicy(forMethod: "mobile.panel.artifact.fetch") == .socketWorker(mainThreadCallable: false))
+        #expect(ControlCommandExecutionPolicy(forMethod: "mobile.panel.artifact.fetch") == .mainActor)
         #expect(ControlCommandExecutionPolicy(forMethod: "mobile.panel.artifact.thumbnail") == .socketWorker(mainThreadCallable: false))
         #expect(ControlCommandExecutionPolicy(forMethod: "vm.create") == .socketWorker(mainThreadCallable: false))
+    }
+
+    @Test func coderouterHandoffRunsOffMainAndIsNotMainThreadCallable() {
+        #expect(
+            ControlCommandExecutionPolicy(forMethod: "coderouter.handoff.complete")
+                == .socketWorker(mainThreadCallable: false)
+        )
+        #expect(
+            ControlCommandExecutionPolicy(forMethod: "coderouter.handoff")
+                == .socketWorker(mainThreadCallable: false)
+        )
     }
 
     @Test func terminalReadsRunOnTheWorkerAndAreNotMainThreadCallable() {
@@ -209,6 +265,8 @@ struct ControlCommandExecutionPolicyTests {
         // that formatting inline on the main thread, which is exactly the
         // stall the lane move removes, and no in-process caller needs it.
         #expect(ControlCommandExecutionPolicy(forMethod: "surface.read_text") == .socketWorker(mainThreadCallable: false))
+        #expect(ControlCommandExecutionPolicy(forMethod: "surface.input_state") == .socketWorker(mainThreadCallable: false))
+        #expect(ControlCommandExecutionPolicy(forMethod: "surface.wait_text_change") == .socketWorker(mainThreadCallable: false))
         #expect(ControlCommandExecutionPolicy(forMethod: "surface.read_selection") == .socketWorker(mainThreadCallable: false))
         #expect(ControlCommandExecutionPolicy(forV1Command: "read_screen") == .socketWorker(mainThreadCallable: false))
     }
@@ -325,7 +383,7 @@ struct ControlCommandExecutionPolicyTests {
 
     @Test func v1CommandsDefaultToTheMainActor() {
         for command in [
-            "right_sidebar", "focus_surface",
+            "left_sidebar", "right_sidebar", "focus_surface",
             "sidebar_state", "reset_sidebar", "list_panes", "new_pane",
             "new_workspace", "select_workspace", "close_workspace",
             "help", "",

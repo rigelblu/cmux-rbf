@@ -546,7 +546,8 @@ extension VerticalTabsSidebar { // (#cm-110.1)
             isFoldedOverSelection: false,
             holdsGroups: holdsGroups,
             statusHeaderKind: kind,
-            statusGlyph: presentation?.glyph
+            statusHeaderGlyph: presentation?.glyph, // (#cm-110.1)
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): status headers keep the accent badge they drew before the sync
         )
         model.statusBehavesAs = presentation?.behavesAs ?? .working
         return model

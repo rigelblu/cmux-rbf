@@ -140,7 +140,8 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
                 isMultiSelected: true,
                 isRemote: true,
                 remoteState: .disconnected,
-                settings: settings
+                settings: settings,
+                hasManualCustomColor: true
             ),
             singleWorkspaceId: Self.rowInput(
                 workspaceId: singleWorkspaceId,
@@ -174,6 +175,9 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         )
 
         let selected = list.selectedContextMenuTargetAggregate
+        #expect(selected.hasManualCustomColor)
+        let clickedOriginTintRow = try #require(rows[connectingWorkspaceId])
+        #expect(clickedOriginTintRow.rowSnapshot(list: list).contextMenu.hasManualCustomColor)
         #expect(selected.targetWorkspaceIds == [connectingWorkspaceId, disconnectedWorkspaceId])
         #expect(selected.remoteTargetWorkspaceIds == [connectingWorkspaceId, disconnectedWorkspaceId])
         #expect(!selected.allRemoteTargetsConnecting)
@@ -218,12 +222,12 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
             teal: Self.rowInput(
                 workspaceId: teal, groupId: nil, unreadCount: 0, isMultiSelected: true,
                 isRemote: false, remoteState: .disconnected, settings: settings,
-                customColorHex: "#006B6B"
+                customColorHex: "#006B6B", hasManualCustomColor: true // cmux-rbf: changed on purpose (#cm-142.1): only a manual colour is a target colour
             ),
             red: Self.rowInput(
                 workspaceId: red, groupId: nil, unreadCount: 0, isMultiSelected: true,
                 isRemote: false, remoteState: .disconnected, settings: settings,
-                customColorHex: "#C0392B"
+                customColorHex: "#C0392B", hasManualCustomColor: true // cmux-rbf: changed on purpose (#cm-142.1): only a manual colour is a target colour
             ),
             uncolored: Self.rowInput(
                 workspaceId: uncolored, groupId: nil, unreadCount: 0, isMultiSelected: true,
@@ -258,12 +262,12 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
             selected: Self.rowInput(
                 workspaceId: selected, groupId: nil, unreadCount: 0, isMultiSelected: false,
                 isRemote: false, remoteState: .disconnected, settings: settings,
-                customColorHex: "#006B6B"
+                customColorHex: "#006B6B", hasManualCustomColor: true // cmux-rbf: changed on purpose (#cm-142.1): only a manual colour is a target colour
             ),
             other: Self.rowInput(
                 workspaceId: other, groupId: nil, unreadCount: 0, isMultiSelected: false,
                 isRemote: false, remoteState: .disconnected, settings: settings,
-                customColorHex: "#C0392B"
+                customColorHex: "#C0392B", hasManualCustomColor: true // cmux-rbf: changed on purpose (#cm-142.1): only a manual colour is a target colour
             ),
         ]
 
@@ -293,7 +297,7 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
             known: Self.rowInput(
                 workspaceId: known, groupId: nil, unreadCount: 0, isMultiSelected: true,
                 isRemote: false, remoteState: .disconnected, settings: settings,
-                customColorHex: "#006B6B"
+                customColorHex: "#006B6B", hasManualCustomColor: true // cmux-rbf: changed on purpose (#cm-142.1): only a manual colour is a target colour
             ),
         ]
 
@@ -312,6 +316,26 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         )
     }
 
+    /// cmux-rbf (#cm-142.1): a colour that is only a tint (upstream's origin tint) is no target colour, so No Color reads as current.
+    @Test
+    func aggregateReadsATintOnlyColorAsNoColor() throws {
+        let tinted = UUID()
+        let suiteName = "TargetColorTint.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let rows = [tinted: Self.rowInput(
+            workspaceId: tinted, groupId: nil, unreadCount: 0, isMultiSelected: false,
+            isRemote: false, remoteState: .disconnected, settings: settings,
+            customColorHex: "#006B6B", hasManualCustomColor: false
+        )]
+        let aggregate = SidebarWorkspaceContextMenuTargetAggregate(
+            targetWorkspaceIds: [tinted], workspaceRowsById: rows, anchorWorkspaceIds: [],
+            notificationIndex: SidebarWorkspaceNotificationIndex(notifications: [])
+        )
+        #expect(aggregate.targetColorHexes == [nil], "a tint is not a colour the menu should tick")
+    }
+
     static func rowInput(
         workspaceId: UUID,
         groupId: UUID?,
@@ -320,7 +344,8 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
         isRemote: Bool,
         remoteState: WorkspaceRemoteConnectionState,
         settings: SidebarTabItemSettingsSnapshot,
-        customColorHex: String? = nil
+        customColorHex: String? = nil,
+        hasManualCustomColor: Bool = false
     ) -> SidebarWorkspaceRowInput {
         SidebarWorkspaceRowInput(
             workspaceId: workspaceId,
@@ -328,7 +353,7 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
             isColorSectionMember: false,
             index: 0,
             workspaceCount: 3,
-            workspace: SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(customColorHex: customColorHex),
+            workspace: SidebarWorkspaceSnapshotTests.snapshot(customColorHex: customColorHex),
             isActive: false,
             isMultiSelected: isMultiSelected,
             hasUserCustomTitle: false,
@@ -356,7 +381,8 @@ struct SidebarWorkspaceContextMenuTargetAggregateTests {
             contextMenuPinState: nil,
             inferredTaskStatus: .todo,
             activeTodoOverride: nil,
-            isTodoStatusHidden: false
+            isTodoStatusHidden: false,
+            hasManualCustomColor: hasManualCustomColor
         )
     }
 

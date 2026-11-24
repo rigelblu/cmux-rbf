@@ -1,6 +1,7 @@
 // cmux-rbf (#cm-73.46, #cm-73.44): Scenarios 258 and 300 on the panel: the kept report, the in-flight mark and its
 // three ends, the line, the answer, and the size watch on an injected clock.
 import AppKit
+import CmuxBrowser
 #if DEBUG
 import CMUXDebugLog
 #endif
@@ -1177,6 +1178,17 @@ struct FigmaRefitPanelTests {
         #expect(Refit.recheckThreshold == 2) // cmux-rbf (#cm-73.52)
         #expect(Refit.inFlightSeconds == 15)
         #expect(Refit.interstitialSettle == .seconds(10))
+    }
+
+    // cmux-rbf (#cm-142.1, #cm-73.3): a kept page's web view is bound again without a new content controller; the second
+    // bind must not meet the first react-grab handler, which upstream moved into its own content world. Red is a crash of
+    // the test host (WebKit's "a handler with this name already exists"), so its red run goes alone.
+    @Test func bindingTheSameWebViewTwiceReplacesTheReactGrabHandler() {
+        let panel = BrowserPanel(workspaceId: UUID(), renderInitialNavigation: false, websiteDataStore: .nonPersistent())
+        defer { panel.close() }
+        panel.setupReactGrabMessageHandler(for: panel.webView)
+        panel.setupReactGrabMessageHandler(for: panel.webView)
+        #expect(panel.reactGrabMessageHandler != nil)
     }
 }
 

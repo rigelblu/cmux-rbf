@@ -30,6 +30,8 @@ struct WorkspaceColorMenuRows: View {
     /// never picked and leave **No Color** looking inert.
     let targetHexes: [String?]
     let colorScheme: ColorScheme
+    /// `workspaceColors.brightenInDarkMode`, so swatches match the rows (upstream #17308).
+    var brightenInDarkMode = true
     /// The chosen hex, or `nil` for **No Color**.
     let apply: (String?) -> Void
     /// Opens the `#RRGGBB` entry alert. Required, not optional: both menus offer the
@@ -140,7 +142,8 @@ struct WorkspaceColorMenuRows: View {
         WorkspaceTabColorSettings.displayNSColor(
             hex: hex,
             colorScheme: colorScheme,
-            forceBright: false
+            forceBright: false,
+            brightenInDarkMode: brightenInDarkMode
         ) ?? NSColor(hex: hex) ?? .gray
     }
 }
@@ -235,12 +238,12 @@ extension TabItemView {
 
         if let key = renameWorkspaceShortcut.keyEquivalent {
             Button(String(localized: "contextMenu.renameWorkspace", defaultValue: "Rename Workspace…")) {
-                promptRename()
+                beginInlineRenameFromContextMenu()
             }
             .keyboardShortcut(key, modifiers: renameWorkspaceShortcut.eventModifiers)
         } else {
             Button(String(localized: "contextMenu.renameWorkspace", defaultValue: "Rename Workspace…")) {
-                promptRename()
+                beginInlineRenameFromContextMenu()
             }
         }
 
@@ -290,6 +293,7 @@ extension TabItemView {
             WorkspaceColorMenuRows(
                 targetHexes: context.targetColorHexes,
                 colorScheme: colorScheme,
+                brightenInDarkMode: settings.brightenInDarkMode,
                 apply: { hex in applyTabColor(hex, targetIds: targetIds) },
                 promptCustomColor: { promptCustomColor(targetIds: targetIds) }
             )
@@ -338,6 +342,10 @@ extension TabItemView {
             }
         }
         .disabled(targetIds.isEmpty)
+
+        if !isMulti {
+            WorkspaceMergeIntoMenu(sourceWorkspaceId: snapshot.workspaceId)
+        }
 
         Divider()
 

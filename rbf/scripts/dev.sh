@@ -97,17 +97,13 @@ derive_build_id() {
 BUILD_ID_VALUE="$(derive_build_id)"
 [[ -n "$BUILD_ID_VALUE" ]] || { echo "dev.sh: could not derive a build-id" >&2; exit 1; }
 
-# --- Landmine 1: XcodeProj resolves forward and breaks the build --------------
-# `Packages/macOS/CMUXProjectModel/Package.swift` declares XcodeProj as
-# `from: "9.0.0"` — an open upper bound — so any build that lets SwiftPM resolve
-# freely will drift the tracked lockfile from 9.13.0 to 9.15.0. 9.15.0 adds a
-# `.fileSystemSynchronizedGroup` case and `XcodeProjectAdapter.swift:706` stops
-# being exhaustive, so the build fails to compile.
-#
-# It is nastier than it sounds: the build that *does* the bump usually succeeds,
-# and the next one fails, so it presents as "it worked yesterday."
-# `reload.sh:715` already honours this env var; default it on so a plain
-# `make run` is reproducible. Set it to 0 when you genuinely add a dependency.
+# --- Landmine 1: SwiftPM resolving forward on its own -------------------------
+# This guarded XcodeProj, which resolved past its cap and broke the build the
+# *next* time ("it worked yesterday"). Upstream dropped XcodeProj and PathKit
+# (fcad43f225, #13111), and the cm-142 sync took upstream's CMUXProjectModel
+# Package.swift, so that dependency is gone (#cm-142.1). The default stays,
+# because it still makes a plain `make run` resolve nothing on its own:
+# reload.sh honours this env var. Set it to 0 when you genuinely add a dependency.
 export CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION="${CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION:-1}"
 
 # --- Landmine 2: ghostty needs one exact Zig version --------------------------
@@ -139,6 +135,20 @@ ensure_zig() { rbf_ensure_zig; }
 # `help` and every command that doesn't build stay untouched. See the lib header.
 # shellcheck source=rbf/scripts/lib/rbf-git-env.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-git-env.sh"
+
+# --- Landmine 6: upstream's reload.sh wants cmuxterm-hq (#cm-142.1) -----------
+# Since the cm-142 sync, upstream's reload.sh resolves a tagged build's dev backend
+# through a cmuxterm-hq checkout this fork never has, unless CMUX_DEV_BACKEND_MODE=local.
+# Defines the function only; the call is in the build|run|test pre-case below.
+# shellcheck source=rbf/scripts/lib/rbf-backend-mode.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-backend-mode.sh"
+
+# --- Landmine 7: no published cmux-tui client for a fork commit (#cm-142.1) ---
+# Upstream's reload.sh bundles a cmux-tui client published for a commit with HEAD's
+# client inputs, which include `ghostty` and two workflows this fork changes, so no
+# fork commit has one. Defines the function only; the call is in the build|run case.
+# shellcheck source=rbf/scripts/lib/rbf-tui-client.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-tui-client.sh"
 
 # Running-app checks match the executable, never argv. See the lib header.
 # shellcheck source=rbf/scripts/lib/rbf-procs.sh
@@ -205,7 +215,14 @@ case "$cmd" in
   build|run|test)
     # First, so the export reaches ensure_ghosttykit, reload.sh and xcodebuild.
     rbf_git_env_apply "$REPO_ROOT"
+    rbf_backend_mode_apply
     rbf_configure_dev_signing || exit 1
+    ;;
+esac
+case "$cmd" in
+  build|run)
+    # Only these reach reload.sh, which bundles the client; `test` runs xcodebuild directly.
+    rbf_tui_client_apply "$REPO_ROOT"
     ;;
 esac
 
@@ -217,6 +234,8 @@ case "$cmd" in
   build)
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
     [[ -z "$RBF_GIT_ENV_NOTE" ]] || echo "==> git $RBF_GIT_ENV_NOTE"
+    [[ -z "$RBF_BACKEND_MODE_NOTE" ]] || echo "==> $RBF_BACKEND_MODE_NOTE"
+    [[ -z "$RBF_TUI_CLIENT_NOTE" ]] || echo "==> $RBF_TUI_CLIENT_NOTE"
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
@@ -234,6 +253,8 @@ case "$cmd" in
   run)
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
     [[ -z "$RBF_GIT_ENV_NOTE" ]] || echo "==> git $RBF_GIT_ENV_NOTE"
+    [[ -z "$RBF_BACKEND_MODE_NOTE" ]] || echo "==> $RBF_BACKEND_MODE_NOTE"
+    [[ -z "$RBF_TUI_CLIENT_NOTE" ]] || echo "==> $RBF_TUI_CLIENT_NOTE"
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
@@ -354,20 +375,58 @@ case "$cmd" in
     #
     # Keep the newest rather than deleting after the run — `make test`'s tail is
     # app-log noise, so a real failure can only be read out of the bundle.
-    result_bundle="$(rbf_tmp_dir "cmux-rbf/xcresults")/cmux-$dd_slug.xcresult"
-    rm -rf "$result_bundle"
-    echo "dev.sh: result bundle -> $result_bundle" >&2
-
-    exec xcodebuild test \
-      -project cmux.xcodeproj \
-      -scheme cmux-unit \
-      -configuration Debug \
-      -destination 'platform=macOS' \
-      -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/cmux-$dd_slug" \
-      -resultBundlePath "$result_bundle" \
-      ${resolve_args[@]+"${resolve_args[@]}"} \
-      ${sign_args[@]+"${sign_args[@]}"} \
-      "$@"
+    #
+    # Two schemes (#cm-142.1). The upstream sync moved CLI test classes into a second test
+    # target, cmuxCLITests, which only its own scheme, cmux-cli-tests, runs. `make test` runs
+    # cmux-unit, then cmux-cli-tests. ARGS naming only -only-testing:cmuxCLITests/… runs the CLI
+    # scheme alone; naming only -only-testing:cmuxTests/… runs the unit scheme alone. Each
+    # scheme gets its own result bundle and only its own -only-testing filters, because
+    # xcodebuild refuses a filter that names a target outside the scheme. Every other argument
+    # goes to both. The exit status is the first failing scheme's.
+    common_args=()
+    unit_filters=()
+    cli_filters=()
+    for arg in "$@"; do
+      case "$arg" in
+        -only-testing:cmuxCLITests|-only-testing:cmuxCLITests/*) cli_filters+=("$arg") ;;
+        -only-testing:cmuxTests|-only-testing:cmuxTests/*) unit_filters+=("$arg") ;;
+        *) common_args+=("$arg") ;;
+      esac
+    done
+    run_unit=1
+    run_cli=1
+    if [[ ${#unit_filters[@]} -gt 0 || ${#cli_filters[@]} -gt 0 ]]; then
+      [[ ${#unit_filters[@]} -gt 0 ]] || run_unit=0
+      [[ ${#cli_filters[@]} -gt 0 ]] || run_cli=0
+    fi
+    run_test_scheme() { # <scheme> <bundle suffix> [<-only-testing filter> …]
+      local scheme="$1" suffix="$2" result_bundle
+      shift 2
+      result_bundle="$(rbf_tmp_dir "cmux-rbf/xcresults")/cmux-$dd_slug$suffix.xcresult"
+      rm -rf "$result_bundle"
+      echo "dev.sh: result bundle -> $result_bundle" >&2
+      xcodebuild test \
+        -project cmux.xcodeproj \
+        -scheme "$scheme" \
+        -configuration Debug \
+        -destination 'platform=macOS' \
+        -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/cmux-$dd_slug" \
+        -resultBundlePath "$result_bundle" \
+        ${resolve_args[@]+"${resolve_args[@]}"} \
+        ${sign_args[@]+"${sign_args[@]}"} \
+        ${common_args[@]+"${common_args[@]}"} \
+        "$@"
+    }
+    test_status=0
+    if [[ $run_unit -eq 1 ]]; then
+      run_test_scheme cmux-unit "" ${unit_filters[@]+"${unit_filters[@]}"} || test_status=$?
+    fi
+    if [[ $run_cli -eq 1 ]]; then
+      cli_status=0
+      run_test_scheme cmux-cli-tests "-cli" ${cli_filters[@]+"${cli_filters[@]}"} || cli_status=$?
+      [[ $test_status -ne 0 ]] || test_status=$cli_status
+    fi
+    exit "$test_status"
     ;;
   test-packages)
     # The workspace-group packages' own `swift test` runs (#cm-106). `make test` never runs them. Logic is in

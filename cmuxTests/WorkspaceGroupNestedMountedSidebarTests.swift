@@ -105,7 +105,7 @@ struct WorkspaceGroupNestedMountedSidebarTests {
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let ids = manager.tabs.map(\.id)
-        let own = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ids[1]]))
+        let own = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let empty = try #require(manager.createWorkspaceGroup(name: "E", childWorkspaceIds: []))
         manager.toggleWorkspaceGroupPinned(groupId: empty)
         manager.closeWorkspace(try #require(manager.workspaceGroupAnchor(for: empty)))
@@ -121,8 +121,8 @@ struct WorkspaceGroupNestedMountedSidebarTests {
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
         let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: []))
-        let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[1]]))
-        let r = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ids[2]]))
+        let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let r = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: q, intoParent: p) == .moved)
         #expect(manager.moveWorkspaceGroup(groupId: r, intoParent: q) == .moved)
         manager.closeWorkspace(try #require(manager.workspaceGroupAnchor(for: p)))
@@ -182,9 +182,9 @@ struct WorkspaceGroupNestedMountedSidebarTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
-        let r = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ids[3]]))
+        let p = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let r = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: q, intoParent: p) == .moved)
         #expect(manager.moveWorkspaceGroup(groupId: r, intoParent: q) == .moved)
         manager.selectWorkspace(manager.tabs[0])
@@ -259,8 +259,8 @@ struct WorkspaceGroupNestedMountedSidebarTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<2 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let active = try #require(manager.createWorkspaceGroup(name: "A", childWorkspaceIds: [ids[1]]))
-        let idle = try #require(manager.createWorkspaceGroup(name: "I", childWorkspaceIds: [ids[2]]))
+        let active = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "A", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let idle = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "I", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.selectWorkspace(try #require(manager.workspaceGroupAnchor(for: active)))
         let mounted = try await mount(manager)
         defer { close(mounted) }

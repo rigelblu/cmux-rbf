@@ -1,6 +1,10 @@
 import XCTest
 import Darwin
 import SQLite3
+import CMUXAgentLaunch
+import CmuxFoundation
+
+// These fixtures exercise the queued hook delivery contract.
 
 extension CLINotifyProcessIntegrationRegressionTests {
     struct GenericHookPersistenceScenario {
@@ -10,11 +14,55 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let executable: String
         let launchArguments: [String]
         let extraEnvironment: [String: String]
+        let existingLaunchArguments: [String]?
+        let existingLaunchEnvironment: [String: String]?
+        let existingLaunchRejectionReason: String?
         let expectedArguments: [String]
         let expectedEnvironment: [String: String]?
+        let expectedSource: String?
+        let expectedRejectionReason: String?
+        let expectExecutablePath: Bool
+        let resolveAnyPID: Bool
+
+        init(
+            agent: String,
+            subcommand: String,
+            sessionId: String,
+            executable: String,
+            launchArguments: [String],
+            extraEnvironment: [String: String],
+            expectedArguments: [String],
+            expectedEnvironment: [String: String]?,
+            expectedSource: String? = nil,
+            expectedRejectionReason: String? = nil,
+            expectExecutablePath: Bool = true,
+            resolveAnyPID: Bool = false,
+            existingLaunchArguments: [String]? = nil,
+            existingLaunchEnvironment: [String: String]? = nil,
+            existingLaunchRejectionReason: String? = nil
+        ) {
+            self.agent = agent
+            self.subcommand = subcommand
+            self.sessionId = sessionId
+            self.executable = executable
+            self.launchArguments = launchArguments
+            self.extraEnvironment = extraEnvironment
+            self.existingLaunchArguments = existingLaunchArguments
+            self.existingLaunchEnvironment = existingLaunchEnvironment
+            self.existingLaunchRejectionReason = existingLaunchRejectionReason
+            self.expectedArguments = expectedArguments
+            self.expectedEnvironment = expectedEnvironment
+            self.expectedSource = expectedSource
+            self.expectedRejectionReason = expectedRejectionReason
+            self.expectExecutablePath = expectExecutablePath
+            self.resolveAnyPID = resolveAnyPID
+        }
     }
 
     func testGenericHookAgentsPersistSanitizedLaunchCommandsForSessionRestore() throws {
+        // Keep these Process/socket integration scenarios in this existing
+        // XCTest harness: moving only the new cases to Swift Testing would
+        // split the shared fixture and behavior suite.
         let scenarios: [GenericHookPersistenceScenario] = [
             GenericHookPersistenceScenario(
                 agent: "cursor",
@@ -73,6 +121,130 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 expectedEnvironment: ["GEMINI_CLI_HOME": "/tmp/gemini home"]
             ),
             GenericHookPersistenceScenario(
+                agent: "gemini",
+                subcommand: "session-start",
+                sessionId: "gemini-rejected-session-123",
+                executable: "/Users/example/.bun/bin/gemini",
+                launchArguments: [
+                    "/Users/example/.bun/bin/gemini",
+                    "--prompt",
+                    "one-shot prompt"
+                ],
+                extraEnvironment: [:],
+                expectedArguments: [],
+                expectedEnvironment: nil,
+                expectedSource: "rejected",
+                expectedRejectionReason: "sanitizerRejectedArgv"
+            ),
+            GenericHookPersistenceScenario(
+                agent: "gemini",
+                subcommand: "session-start",
+                sessionId: "gemini-decode-failed-session-123",
+                executable: "/Users/example/.bun/bin/gemini",
+                launchArguments: ["/Users/example/.bun/bin/gemini"],
+                extraEnvironment: [
+                    "CMUX_AGENT_LAUNCH_ARGV_B64": "not-base64",
+                    "GEMINI_CLI_HOME": "/tmp/gemini decode-failed home",
+                ],
+                expectedArguments: [],
+                expectedEnvironment: ["GEMINI_CLI_HOME": "/tmp/gemini decode-failed home"],
+                expectedSource: "rejected",
+                expectedRejectionReason: "argvDecodeFailed"
+            ),
+            GenericHookPersistenceScenario(
+                agent: "gemini",
+                subcommand: "session-start",
+                sessionId: "gemini-decode-failed-empty-environment-session-123",
+                executable: "/Users/example/.bun/bin/gemini",
+                launchArguments: ["/Users/example/.bun/bin/gemini"],
+                extraEnvironment: ["CMUX_AGENT_LAUNCH_ARGV_B64": "not-base64"],
+                expectedArguments: [],
+                expectedEnvironment: nil,
+                expectedSource: "rejected",
+                expectedRejectionReason: "argvDecodeFailed"
+            ),
+            GenericHookPersistenceScenario(
+                agent: "gemini",
+                subcommand: "session-start",
+                sessionId: "gemini-empty-argv-fallback-session-123",
+                executable: "/Users/example/.bun/bin/gemini",
+                launchArguments: ["/Users/example/.bun/bin/gemini"],
+                extraEnvironment: [
+                    "CMUX_AGENT_LAUNCH_ARGV_B64": "   ",
+                    "GEMINI_CLI_HOME": "/tmp/gemini empty argv home",
+                    "CMUX_GEMINI_PID": "999999999",
+                ],
+                expectedArguments: [],
+                expectedEnvironment: ["GEMINI_CLI_HOME": "/tmp/gemini empty argv home"],
+                expectedSource: "environment",
+                expectedRejectionReason: "argvUnavailable",
+                expectExecutablePath: false
+            ),
+            GenericHookPersistenceScenario(
+                agent: "gemini",
+                subcommand: "session-start",
+                sessionId: "gemini-pid-fallback-mismatch-fallback-session-123",
+                executable: "/Users/example/.bun/bin/gemini",
+                launchArguments: ["/Users/example/.bun/bin/gemini"],
+                extraEnvironment: [
+                    // The test host is a live, unrelated process. Its argv is
+                    // available, but the typed PID verdict must not turn the
+                    // env-only fallback into a hard capture rejection.
+                    "CMUX_AGENT_LAUNCH_ARGV_B64": "   ",
+                    "GEMINI_CLI_HOME": "/tmp/gemini pid fallback home",
+                    "CMUX_GEMINI_PID": String(ProcessInfo.processInfo.processIdentifier),
+                ],
+                expectedArguments: [],
+                expectedEnvironment: ["GEMINI_CLI_HOME": "/tmp/gemini pid fallback home"],
+                expectedSource: "environment",
+                expectedRejectionReason: "nativeProcessDoesNotDescribeKind",
+                expectExecutablePath: false,
+                resolveAnyPID: true
+            ),
+            GenericHookPersistenceScenario(
+                agent: "gemini",
+                subcommand: "session-start",
+                sessionId: "gemini-rejected-does-not-downgrade-session-123",
+                executable: "/Users/example/.bun/bin/gemini",
+                launchArguments: ["/Users/example/.bun/bin/gemini"],
+                extraEnvironment: [
+                    "CMUX_AGENT_LAUNCH_ARGV_B64": "not-base64",
+                    "GEMINI_CLI_HOME": "/tmp/gemini rejected home",
+                    "CMUX_GEMINI_PID": "999999999",
+                ],
+                expectedArguments: [
+                    "/Users/example/.bun/bin/gemini",
+                    "--model",
+                    "stable-model",
+                ],
+                expectedEnvironment: nil,
+                expectedSource: "environment",
+                existingLaunchArguments: [
+                    "/Users/example/.bun/bin/gemini",
+                    "--model",
+                    "stable-model",
+                ]
+            ),
+            GenericHookPersistenceScenario(
+                agent: "gemini",
+                subcommand: "session-start",
+                sessionId: "gemini-rejected-preserves-env-only-fallback-session-123",
+                executable: "/Users/example/.bun/bin/gemini",
+                launchArguments: ["/Users/example/.bun/bin/gemini"],
+                extraEnvironment: [
+                    "CMUX_AGENT_LAUNCH_ARGV_B64": "not-base64",
+                    "GEMINI_CLI_HOME": "/tmp/gemini rejected home",
+                    "CMUX_GEMINI_PID": "999999999",
+                ],
+                expectedArguments: [],
+                expectedEnvironment: ["GEMINI_CLI_HOME": "/tmp/gemini stable home"],
+                expectedSource: "environment",
+                expectedRejectionReason: "argvUnavailable",
+                existingLaunchArguments: [],
+                existingLaunchEnvironment: ["GEMINI_CLI_HOME": "/tmp/gemini stable home"],
+                existingLaunchRejectionReason: "argvUnavailable"
+            ),
+            GenericHookPersistenceScenario(
                 agent: "kiro",
                 subcommand: "session-start",
                 sessionId: "kiro-session-123",
@@ -108,8 +280,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 executable: "/Users/example/.local/bin/agy",
                 launchArguments: [
                     "/Users/example/.local/bin/agy",
-                    "--conversation",
-                    "old-conversation",
+                    "--prompt-interactive",
+                    "models",
                     "--sandbox",
                     "danger-full-access",
                     "--add-dir",
@@ -393,6 +565,28 @@ extension CLINotifyProcessIntegrationRegressionTests {
             "Idle-classified Antigravity notifications must not override the running status while background work is active, saw \(backgroundDuplicateCommands)"
         )
 
+        // An empty notification may rebuild the last display summary while
+        // the background task is still running. That presentation-only event
+        // must preserve the idle completion marker used to recognize the next
+        // real turn boundary.
+        let rebuiltSummary = runAntigravityHook(
+            "notification",
+            input: #"{"session_id":"\#(sessionId)","cwd":"\#(root.path)","hook_event_name":"Notification"}"#
+        )
+        XCTAssertFalse(rebuiltSummary.timedOut, rebuiltSummary.stderr)
+        XCTAssertEqual(rebuiltSummary.status, 0, rebuiltSummary.stderr)
+        XCTAssertEqual(rebuiltSummary.stdout, "{}\n")
+
+        let storeURL = root.appendingPathComponent("antigravity-hook-sessions.json", isDirectory: false)
+        let rebuiltJSON = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any]
+        )
+        let rebuiltSessions = try XCTUnwrap(rebuiltJSON["sessions"] as? [String: Any])
+        let rebuiltSession = try XCTUnwrap(rebuiltSessions[sessionId] as? [String: Any])
+        XCTAssertEqual(rebuiltSession["agentLifecycle"] as? String, "running")
+        XCTAssertEqual(rebuiltSession["runtimeStatus"] as? String, "running")
+        XCTAssertEqual(rebuiltSession["lastNotificationStatus"] as? String, "idle")
+
         let missingFullyIdleSessionId = "\(sessionId)-missing-fully-idle"
         let missingFullyIdleStart = runAntigravityHook(
             "session-start",
@@ -538,6 +732,15 @@ extension CLINotifyProcessIntegrationRegressionTests {
             stopErrorCommands.contains { $0.contains("set_status antigravity Antigravity error") },
             "Expected Antigravity Stop errors to mark error status, saw \(stopErrorCommands)"
         )
+
+        // This is a new failure boundary, not a second description of the
+        // Stop error already delivered for the previous turn.
+        let nextPrompt = runAntigravityHook(
+            "prompt-submit",
+            input: #"{"session_id":"\#(sessionId)","cwd":"\#(root.path)","hook_event_name":"UserPromptSubmit","prompt":"try again"}"#
+        )
+        XCTAssertFalse(nextPrompt.timedOut, nextPrompt.stderr)
+        XCTAssertEqual(nextPrompt.status, 0, nextPrompt.stderr)
 
         let errorMessage = "Execution failed"
         let errorCommandStart = state.commands.count
@@ -757,7 +960,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let finalCommands = Array(state.commands.dropFirst(finalCommandStart))
         XCTAssertTrue(
             finalCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent · Finished|\(root.lastPathComponent)|")
                     && $0.contains("|\(finalResponse)")
             },
             "Hermes must notify from the final post_llm_call after automatic tool approval, saw \(finalCommands)"
@@ -1069,6 +1273,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             "HOME": root.path,
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
             "PWD": root.path,
+            "CURSOR_CONFIG_DIR": cursorConfigDirectory.path,
             "CMUX_SOCKET_PATH": socketPath,
             "CMUX_WORKSPACE_ID": workspaceId,
             "CMUX_SURFACE_ID": surfaceId,
@@ -1091,6 +1296,19 @@ extension CLINotifyProcessIntegrationRegressionTests {
             )
             wait(for: [serverHandled], timeout: 5)
             return result
+        }
+
+        func pendingApprovalKeys() throws -> [String] {
+            let data = try Data(contentsOf: root.appendingPathComponent("cursor-hook-sessions.json"))
+            let store = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let session = try XCTUnwrap((store["sessions"] as? [String: Any])?[sessionId] as? [String: Any])
+            let approvals = session["pendingCursorShellApprovals"] as? [[String: Any]] ?? []
+            return try approvals.map { try XCTUnwrap($0["notificationCorrelationKey"] as? String) }
+        }
+
+        func clearedKeys(_ commands: [String]) -> [String] {
+            let prefix = "clear_notifications --tab=\(workspaceId) --panel=\(surfaceId) --correlation-key="
+            return commands.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
         }
 
         func isCursorSurfaceClear(_ command: String) -> Bool {
@@ -1206,6 +1424,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(secondApproval.status, 0, secondApproval.stderr)
         XCTAssertEqual(secondApproval.stdout, #"{"permission":"ask"}"# + "\n")
 
+        let secondApprovalKey = try XCTUnwrap(try pendingApprovalKeys().first)
+        XCTAssertEqual(try pendingApprovalKeys(), [secondApprovalKey])
+
         let thirdCommand = "python -c print('third')"
         let thirdApproval = runCursorHook(
             "shell-exec",
@@ -1214,6 +1435,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertFalse(thirdApproval.timedOut, thirdApproval.stderr)
         XCTAssertEqual(thirdApproval.status, 0, thirdApproval.stderr)
         XCTAssertEqual(thirdApproval.stdout, #"{"permission":"ask"}"# + "\n")
+
+        let thirdApprovalKey = try XCTUnwrap(try pendingApprovalKeys().first { $0 != secondApprovalKey })
+        XCTAssertEqual(Set(try pendingApprovalKeys()), [secondApprovalKey, thirdApprovalKey])
 
         let remainingCompletionStart = state.snapshot().count
         let remainingCompletion = runCursorHook(
@@ -1230,18 +1454,16 @@ extension CLINotifyProcessIntegrationRegressionTests {
             },
             "Refreshing a remaining Cursor approval must not clear unrelated surface notifications, saw \(remainingCompletionCommands)"
         )
-        XCTAssertTrue(
-            remainingCompletionCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Cursor|Permission|Approval needed")
-            },
-            "Resolving one of two approvals must refresh the remaining command notice, saw \(remainingCompletionCommands)"
-        )
-        XCTAssertTrue(
-            remainingCompletionCommands.contains {
-                $0.contains(";s=needsInput")
-            },
-            "A refreshed Cursor approval must retain its Needs input sound context, saw \(remainingCompletionCommands)"
-        )
+        XCTAssertEqual(clearedKeys(remainingCompletionCommands), [secondApprovalKey])
+        XCTAssertEqual(try pendingApprovalKeys(), [thirdApprovalKey])
+        let remainingCandidates = remainingCompletionCommands.compactMap(AgentHookTestNotificationPipeline.candidatePresentation)
+        XCTAssertEqual(remainingCandidates.count, 1)
+        // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+        XCTAssertTrue(remainingCandidates.first?.contains("Cursor · Needs your approval|\(root.lastPathComponent)|Approval needed") == true)
+        XCTAssertTrue(remainingCandidates.first?.contains(";s=needsInput;k=\(thirdApprovalKey)") == true,
+            "The retained request must keep its identity and sound context, saw \(remainingCandidates)")
+        XCTAssertFalse(remainingCompletionCommands.contains { $0.hasPrefix("notify_target_async ") },
+            "An already admitted remaining request must not ring again")
 
         let mismatchedCompletionStart = state.snapshot().count
         let mismatchedCompletion = runCursorHook(
@@ -1381,6 +1603,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             "A retried Cursor shell hook must resolve as one approval, saw \(duplicateCompletionCommands)"
         )
 
+        var quotedApprovalKeys: [String] = []
         let quotedSpacingCommands = ["printf 'a  b'", "printf 'a b'"]
         for quotedCommand in quotedSpacingCommands {
             let quotedApproval = runCursorHook(
@@ -1390,7 +1613,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
             XCTAssertFalse(quotedApproval.timedOut, quotedApproval.stderr)
             XCTAssertEqual(quotedApproval.status, 0, quotedApproval.stderr)
             XCTAssertEqual(quotedApproval.stdout, #"{"permission":"ask"}"# + "\n")
+            let newKey = try XCTUnwrap(try pendingApprovalKeys().first { !quotedApprovalKeys.contains($0) })
+            quotedApprovalKeys.append(newKey)
         }
+        XCTAssertEqual(quotedApprovalKeys.count, 2)
+        XCTAssertEqual(Set(try pendingApprovalKeys()), Set(quotedApprovalKeys))
         let firstQuotedCompletionStart = state.snapshot().count
         let firstQuotedCompletion = runCursorHook(
             "shell-done",
@@ -1399,12 +1626,14 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertFalse(firstQuotedCompletion.timedOut, firstQuotedCompletion.stderr)
         XCTAssertEqual(firstQuotedCompletion.status, 0, firstQuotedCompletion.stderr)
         let firstQuotedCompletionCommands = Array(state.snapshot().dropFirst(firstQuotedCompletionStart))
-        XCTAssertTrue(
-            firstQuotedCompletionCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Cursor|Permission|Approval needed")
-            },
-            "Quoted whitespace must remain part of Cursor command identity, saw \(firstQuotedCompletionCommands)"
-        )
+        XCTAssertEqual(clearedKeys(firstQuotedCompletionCommands), [quotedApprovalKeys[0]])
+        XCTAssertEqual(try pendingApprovalKeys(), [quotedApprovalKeys[1]],
+            "Quoted whitespace must remain part of Cursor command identity")
+        let quotedCandidates = firstQuotedCompletionCommands.compactMap(AgentHookTestNotificationPipeline.candidatePresentation)
+        XCTAssertEqual(quotedCandidates.count, 1)
+        XCTAssertTrue(quotedCandidates.first?.contains(";k=\(quotedApprovalKeys[1])") == true)
+        XCTAssertFalse(firstQuotedCompletionCommands.contains { $0.hasPrefix("notify_target_async ") },
+            "The second quoted command already has an admitted notification")
         let secondQuotedCompletion = runCursorHook(
             "shell-done",
             input: #"{"session_id":"\#(sessionId)","cwd":"\#(root.path)","hook_event_name":"afterShellExecution","command":"printf 'a b'","output":"","duration":1,"sandbox":false}"#
@@ -1419,6 +1648,13 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertFalse(firstReusedApproval.timedOut, firstReusedApproval.stderr)
         XCTAssertEqual(firstReusedApproval.status, 0, firstReusedApproval.stderr)
+        let previousTurnStop = runCursorHook(
+            "stop",
+            input: #"{"session_id":"\#(sessionId)","cwd":"\#(root.path)","hook_event_name":"stop","reason":"cancelled"}"#
+        )
+        XCTAssertFalse(previousTurnStop.timedOut, previousTurnStop.stderr)
+        XCTAssertEqual(previousTurnStop.status, 0, previousTurnStop.stderr)
+        XCTAssertEqual(try pendingApprovalKeys(), [])
         let turnBoundary = runCursorHook(
             "prompt-submit",
             input: #"{"session_id":"\#(sessionId)","cwd":"\#(root.path)","hook_event_name":"beforeSubmitPrompt"}"#
@@ -1453,6 +1689,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertFalse(cancelledApproval.timedOut, cancelledApproval.stderr)
         XCTAssertEqual(cancelledApproval.status, 0, cancelledApproval.stderr)
+        let pendingStopKeys = try pendingApprovalKeys()
+        XCTAssertEqual(pendingStopKeys.count, 2)
         let stopStart = state.snapshot().count
         let stop = runCursorHook(
             "stop",
@@ -1461,12 +1699,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertFalse(stop.timedOut, stop.stderr)
         XCTAssertEqual(stop.status, 0, stop.stderr)
         let stopCommands = Array(state.snapshot().dropFirst(stopStart))
-        XCTAssertTrue(
-            stopCommands.contains {
-                isTargetedCursorSurfaceClear($0)
-            },
-            "Cursor stop/cancellation must clear a pending approval, saw \(stopCommands)"
-        )
+        XCTAssertEqual(Set(clearedKeys(stopCommands)), Set(pendingStopKeys),
+            "Cursor stop/cancellation must clear both pending request identities, saw \(stopCommands)")
+        XCTAssertTrue((try pendingApprovalKeys()).isEmpty && !stopCommands.contains { $0.contains("set_status cursor") && $0.contains("Needs input") })
 
         let unrestrictedConfig: [String: Any] = [
             "version": 1,
@@ -1640,15 +1875,53 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let afterEntries = try XCTUnwrap(hooks["afterShellExecution"] as? [[String: Any]])
         let afterCommands = afterEntries.compactMap { $0["command"] as? String }
         XCTAssertEqual(afterCommands.filter { $0 == userAfterCommand }.count, 1)
-        XCTAssertEqual(afterCommands.filter { $0.contains("hooks cursor shell-done") }.count, 1)
+        XCTAssertEqual(afterCommands.filter { $0.contains("hooks enqueue cursor shell-done") }.count, 1)
 
         let failureEntries = try XCTUnwrap(hooks["postToolUseFailure"] as? [[String: Any]])
         let failureCommands = failureEntries.compactMap { $0["command"] as? String }
-        XCTAssertEqual(failureCommands.filter { $0.contains("hooks cursor shell-failed") }.count, 1)
+        XCTAssertEqual(failureCommands.filter { $0.contains("hooks enqueue cursor shell-failed") }.count, 1)
         XCTAssertEqual(failureEntries.first?["matcher"] as? String, "Shell")
 
         let customEntries = try XCTUnwrap(hooks["userCustomEvent"] as? [[String: Any]])
         XCTAssertEqual(customEntries.compactMap { $0["command"] as? String }, [userCustomCommand])
+    }
+
+    func testCodexHookTrustKeysUseTheDefaultCodexHomeVerbatim() throws {
+        // Codex canonicalizes an explicit CODEX_HOME for its hook trust keys
+        // but uses $HOME/.codex verbatim. Keying by the resolved path leaves
+        // every cmux hook untrusted when the home is reached through a symlink.
+        let cliPath = try bundledCLIPath()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cmux-codex-hook-trust-\(UUID().uuidString)", isDirectory: true)
+        let realHome = root.appendingPathComponent("real-home", isDirectory: true)
+        let linkedHome = root.appendingPathComponent("linked-home", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: realHome.appendingPathComponent(".codex", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(at: linkedHome, withDestinationURL: realHome)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let result = runProcess(
+            executablePath: cliPath,
+            arguments: ["hooks", "codex", "install", "--yes"],
+            environment: [
+                "HOME": linkedHome.path,
+                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                "CMUX_CLI_SENTRY_DISABLED": "1",
+            ],
+            timeout: 10
+        )
+        XCTAssertFalse(result.timedOut, result.stderr)
+        XCTAssertEqual(result.status, 0, result.stderr)
+
+        let config = try String(
+            contentsOf: realHome.appendingPathComponent(".codex/config.toml"),
+            encoding: .utf8
+        )
+        let codexKeyPrefix = "[hooks.state.\"\(linkedHome.path)/.codex/hooks.json:stop:"
+        XCTAssertTrue(config.contains(codexKeyPrefix), config)
+        XCTAssertFalse(config.contains(realHome.resolvingSymlinksInPath().path + "/.codex/hooks.json"), config)
     }
 
     func testHermesAgentSessionEndIsTurnBoundaryButFinalizeTearsDown() throws {
@@ -1893,7 +2166,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 && ($0["timeout"] as? Int) == 10
         }?["command"] as? String)
         XCTAssertTrue(
-            stopCommand.contains(#"if [ "$cmux_hook_status" -ne 0 ]; then echo '{}'; fi"#),
+            stopCommand.contains("cmux_hook_status=$?")
+                && stopCommand.contains(#"[ "$cmux_hook_status" -ne 0 ]"#)
+                && stopCommand.contains("echo '{}'"),
             "Antigravity queued admission must emit a neutral response when cmux is unavailable, saw \(stopCommand)"
         )
         XCTAssertTrue(
@@ -1949,8 +2224,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             .flatMap { entries in entries.compactMap { $0["command"] as? String } }
         XCTAssertFalse(commands.isEmpty)
 
-        let ambientInvocation = #""$CMUX_BUNDLED_CLI_PATH" --socket "$CMUX_SOCKET_PATH" hooks antigravity"#
-        let pinnedInvocation = "--socket '\(pinnedSocketPath)' hooks antigravity"
+        let ambientInvocation = #""${cmux_hook_ambient_cli:-}" --socket "${cmux_hook_ambient_socket:-}" hooks enqueue antigravity"#
+        let pinnedInvocation = "--socket '\(pinnedSocketPath)' hooks enqueue antigravity"
         for command in commands {
             let ambientRange = command.range(of: ambientInvocation)
             let pinnedRange = command.range(of: pinnedInvocation)
@@ -1970,11 +2245,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 )
             }
             XCTAssertTrue(
-                command.contains(#"[ -S "$CMUX_SOCKET_PATH" ]"#),
+                command.contains(#"[ -S "${cmux_hook_ambient_socket:-}" ]"#),
                 "Ambient dispatch must require a live socket so an exited app falls back to the pinned build, saw \(command)"
             )
             XCTAssertTrue(
-                command.contains(#"[ -f "${CMUX_BUNDLED_CLI_PATH:-}" ]"#),
+                command.contains(#"[ -f "${cmux_hook_ambient_cli:-}" ]"#),
                 "Ambient dispatch must require a bundled CLI file, not a directory, saw \(command)"
             )
         }
@@ -2044,7 +2319,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 Darwin.bind(socketFD, sockaddrPointer, socklen_t(MemoryLayout<sockaddr_un>.size))
             }
         }
-        XCTAssertEqual(bindResult, 0, String(cString: strerror(errno)))
+        let bindErrno = errno
+        XCTAssertEqual(bindResult, 0, String(cString: strerror(bindErrno)))
         close(socketFD)
         XCTAssertTrue(FileManager.default.fileExists(atPath: staleSocketPath))
 
@@ -2067,11 +2343,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(calls.count, 2, "expected the ambient attempt and then the pinned fallback, saw \(calls)")
         XCTAssertEqual(
             calls.first,
-            "ambient-cmux --socket \(staleSocketPath) hooks antigravity session-start"
+            "ambient-cmux --socket \(staleSocketPath) hooks enqueue antigravity session-start"
         )
         XCTAssertEqual(
             calls.last,
-            "pinned-cmux --socket \(pinnedSocketPath) hooks antigravity session-start"
+            "pinned-cmux --socket \(pinnedSocketPath) hooks enqueue antigravity session-start"
         )
     }
 
@@ -2154,18 +2430,30 @@ extension CLINotifyProcessIntegrationRegressionTests {
             guard let id = payload["id"] as? String, let method = payload["method"] as? String else {
                 return self.malformedRequestResponse(id: payload["id"] as? String, raw: line)
             }
-            XCTAssertEqual(method, "feed.push")
-            return self.v2Response(
-                id: id,
-                ok: true,
-                result: [
-                    "status": "resolved",
-                    "decision": [
-                        "kind": "permission",
-                        "mode": "deny",
-                    ],
-                ]
-            )
+            switch method {
+            case "agent.resolve_delivery_target":
+                return self.v2Response(id: id, ok: true, result: [
+                    "source": "surface",
+                    "workspace_id": workspaceId,
+                    "surface_id": surfaceId,
+                ])
+            case "agent.hook.barrier":
+                return self.v2Response(id: id, ok: true, result: [:])
+            case "feed.push":
+                return self.v2Response(
+                    id: id,
+                    ok: true,
+                    result: [
+                        "status": "resolved",
+                        "decision": [
+                            "kind": "permission",
+                            "mode": "deny",
+                        ],
+                    ]
+                )
+            default:
+                return self.v2Response(id: id, ok: false, error: ["code": "unexpected_method", "message": method])
+            }
         }
 
         let result = runProcess(
@@ -2190,6 +2478,12 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertFalse(result.timedOut, result.stderr)
         XCTAssertEqual(result.status, 2, result.stderr)
         XCTAssertTrue(result.stderr.contains("User denied permission via cmux Feed."), result.stderr)
+        XCTAssertTrue(
+            waitForConditionBlocking(timeout: 5) {
+                state.commands.contains { self.jsonObject($0)?["method"] as? String == "feed.push" }
+            },
+            state.commands.joined(separator: "\n")
+        )
 
         let feedEvents = state.commands.compactMap { command -> [String: Any]? in
             guard let payload = self.jsonObject(command),
@@ -2206,78 +2500,19 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(feedEvents.first?["_ppid"] as? Int, 525252)
     }
 
-    /// The Feed permission modes that allow a tool (`once` / `always` / `all`
-    /// / `bypass`, the WorkstreamPermissionMode raw values) must exit 0 so
-    /// Kiro proceeds; an unrecognized/malformed mode must fail closed with
-    /// exit 2 rather than silently allowing the tool.
-    func testKiroFeedAllowModesProceedAndUnknownModeDenies() throws {
-        func runKiroDecision(mode: String) throws -> ProcessRunResult {
-            let cliPath = try bundledCLIPath()
-            let socketPath = makeSocketPath("kiro-feed-mode")
-            let listenerFD = try bindUnixSocket(at: socketPath)
-            let state = MockSocketServerState()
-            let root = FileManager.default.temporaryDirectory
-                .appendingPathComponent("cmux-kiro-feed-mode-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            defer {
-                Darwin.close(listenerFD)
-                unlink(socketPath)
-                try? FileManager.default.removeItem(at: root)
-            }
-            let serverHandled = startMockServer(listenerFD: listenerFD, state: state) { line in
-                guard let payload = self.jsonObject(line), let id = payload["id"] as? String else {
-                    return self.malformedRequestResponse(raw: line)
-                }
-                return self.v2Response(
-                    id: id,
-                    ok: true,
-                    result: [
-                        "status": "resolved",
-                        "decision": ["kind": "permission", "mode": mode],
-                    ]
-                )
-            }
-            let result = runProcess(
-                executablePath: cliPath,
-                arguments: ["hooks", "feed", "--source", "kiro", "--event", "preToolUse"],
-                environment: [
-                    "HOME": root.path,
-                    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
-                    "PWD": root.path,
-                    "CMUX_SOCKET_PATH": socketPath,
-                    "CMUX_WORKSPACE_ID": "33333333-3333-3333-3333-333333333333",
-                    "CMUX_SURFACE_ID": "44444444-4444-4444-4444-444444444444",
-                    "CMUX_KIRO_PID": "525252",
-                    "CMUX_KIRO_NOTIFICATION_LEVEL": "standard",
-                    "CMUX_CLI_SENTRY_DISABLED": "1",
-                ],
-                standardInput: #"{"hook_event_name":"preToolUse","session_id":"kiro-session-mode","cwd":"\#(root.path)","tool_name":"fs_write","tool_input":{"operations":[{"mode":"Line","path":"\#(root.appendingPathComponent("README.md").path)"}]}}"#,
-                timeout: 5
-            )
-            wait(for: [serverHandled], timeout: 5)
-            return result
-        }
-
-        for mode in ["once", "always", "all", "bypass"] {
-            let result = try runKiroDecision(mode: mode)
-            XCTAssertFalse(result.timedOut, "\(mode): \(result.stderr)")
-            XCTAssertEqual(result.status, 0, "mode \(mode) should allow (exit 0): \(result.stderr)")
-            XCTAssertEqual(result.stdout, "{}\n", "mode \(mode) should print {}")
-        }
-
-        let unknown = try runKiroDecision(mode: "totally-bogus-mode")
-        XCTAssertFalse(unknown.timedOut, unknown.stderr)
-        XCTAssertEqual(unknown.status, 2, "unrecognized mode must fail closed (exit 2): \(unknown.stderr)")
-        XCTAssertTrue(unknown.stderr.contains("unrecognized"), unknown.stderr)
-    }
-
     /// At the default `standard` notification level, Kiro read-only tool
     /// events (`fs_read`) are suppressed (no Feed telemetry) while mutating
     /// tools (`fs_write`) still emit. Guards that suppression keys off the
     /// classified wire name (`PostToolUse`) rather than the raw camelCase hook
     /// event — i.e. the suppression actually triggers for real Kiro events.
     func testKiroStandardLevelSuppressesReadOnlyToolFeedEvents() throws {
-        func feedPushCount(forTool tool: String) throws -> Int {
+        // A suppressed hook returns `{}` without ever opening the cmux socket,
+        // so the negative case is settled by the listener's empty accept queue
+        // once the hook process has exited — never by waiting out a timeout.
+        func runKiroPostToolUseHook(
+            forTool tool: String,
+            servesSocket: Bool
+        ) throws -> (feedPushCount: Int, openedSocket: Bool) {
             let cliPath = try bundledCLIPath()
             let socketPath = makeSocketPath("kiro-suppress")
             let listenerFD = try bindUnixSocket(at: socketPath)
@@ -2290,11 +2525,14 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 unlink(socketPath)
                 try? FileManager.default.removeItem(at: root)
             }
-            let serverHandled = startMockServer(listenerFD: listenerFD, state: state) { line in
-                guard let payload = self.jsonObject(line), let id = payload["id"] as? String else {
-                    return self.malformedRequestResponse(raw: line)
+            var serverHandled: XCTestExpectation?
+            if servesSocket {
+                serverHandled = startMockServer(listenerFD: listenerFD, state: state) { line in
+                    guard let payload = self.jsonObject(line), let id = payload["id"] as? String else {
+                        return self.malformedRequestResponse(raw: line)
+                    }
+                    return self.v2Response(id: id, ok: true, result: ["status": "acknowledged"])
                 }
-                return self.v2Response(id: id, ok: true, result: ["status": "acknowledged"])
             }
             let result = runProcess(
                 executablePath: cliPath,
@@ -2316,17 +2554,28 @@ extension CLINotifyProcessIntegrationRegressionTests {
             XCTAssertFalse(result.timedOut, "\(tool): \(result.stderr)")
             XCTAssertEqual(result.status, 0, "\(tool): \(result.stderr)")
             XCTAssertEqual(result.stdout, "{}\n", "\(tool) stdout")
-            // A non-suppressed event sends one feed.push, so wait for the
-            // server to record it (generous timeout to avoid flaking on the
-            // socket/process round-trip under CI load). A suppressed event
-            // sends nothing, so this wait simply times out silently.
-            _ = XCTWaiter().wait(for: [serverHandled], timeout: 5)
-            return state.commands.filter { $0.contains("feed.push") }.count
+            // A non-suppressed event sends one feed.push, so wait on the server
+            // recording it. The suppressed run serves no connection at all: the
+            // exited hook either left a connection queued on the listener or
+            // never dialed it, and poll answers that immediately.
+            if let serverHandled {
+                wait(for: [serverHandled], timeout: 10)
+            }
+            var listener = pollfd(fd: listenerFD, events: Int16(POLLIN), revents: 0)
+            let queuedConnection = Darwin.poll(&listener, 1, 0) > 0
+            return (
+                state.commands.filter { $0.contains("feed.push") }.count,
+                queuedConnection || !state.commands.isEmpty
+            )
         }
 
-        XCTAssertEqual(try feedPushCount(forTool: "fs_read"), 0,
+        let suppressed = try runKiroPostToolUseHook(forTool: "fs_read", servesSocket: false)
+        XCTAssertFalse(suppressed.openedSocket,
+                       "read-only kiro tool at standard level must be suppressed before it dials cmux")
+        XCTAssertEqual(suppressed.feedPushCount, 0,
                        "read-only kiro tool at standard level must be suppressed")
-        XCTAssertGreaterThan(try feedPushCount(forTool: "fs_write"), 0,
+        let reported = try runKiroPostToolUseHook(forTool: "fs_write", servesSocket: true)
+        XCTAssertGreaterThan(reported.feedPushCount, 0,
                              "mutating kiro tool at standard level must still emit telemetry")
     }
 
@@ -2478,10 +2727,10 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(sessionIds.count, 3, "Expected three feed events, saw \(state.commands)")
         XCTAssertEqual(sessionIds[0], sessionIds[1])
         XCTAssertNotEqual(sessionIds[1], sessionIds[2])
-        XCTAssertTrue(
-            sessionIds[0].hasPrefix("antigravity-fallback-"),
-            "Expected deterministic Antigravity fallback session id, saw \(sessionIds[0])"
-        )
+        let workstream = try XCTUnwrap(FeedWorkstreamIdentifier(rawValue: sessionIds[0]))
+        XCTAssertEqual(workstream.agentID, "antigravity")
+        XCTAssertTrue(workstream.sessionID.hasPrefix("fallback-"),
+            "Expected deterministic Antigravity fallback identity in the versioned workstream, saw \(sessionIds[0])")
         XCTAssertEqual(events.compactMap { $0["_ppid"] as? Int }, [424242, 424242, 424242])
     }
 
@@ -3023,6 +3272,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(session["lastBody"] as? String, waitingMessage)
         // cmux-rbf: changed on purpose (#cm-128.5): words write no needs-input record.
         XCTAssertNotEqual(session["lastNotificationStatus"] as? String, "needsInput")
+        XCTAssertEqual(session["agentLifecycle"] as? String, "idle") // upstream (#18631), holds under cm-128.5
+        XCTAssertEqual(session["runtimeStatus"] as? String, "idle") // upstream (#18631), holds under cm-128.5
 
         for neutralMessage in ["Invalid input format", "Question mark rendered"] {
             let neutralCommandStart = state.commands.count
@@ -3049,7 +3300,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let incompleteWaitingCommandStart = state.commands.count
         let incompleteWaiting = runGrokHook(
             "notification",
-            input: #"{"sessionId":"\#(sessionId)","cwd":"\#(root.path)","hookEventName":"Notification","message":"\#(incompleteWaitingMessage)"}"#
+            input: #"{"sessionId":"\#(sessionId)","cwd":"\#(root.path)","hookEventName":"Notification","request_id":"incomplete-waiting-request","message":"\#(incompleteWaitingMessage)"}"#
         )
         XCTAssertFalse(incompleteWaiting.timedOut, incompleteWaiting.stderr)
         XCTAssertEqual(incompleteWaiting.status, 0, incompleteWaiting.stderr)
@@ -3116,6 +3367,164 @@ extension CLINotifyProcessIntegrationRegressionTests {
             neutralFallbackCommands.contains { $0.contains("set_status grok ") },
             "No wait was recorded from words, so the fallback has no needs-input status to preserve, saw \(neutralFallbackCommands)"
         )
+
+        let resumedSessionID = "grok-resumed-after-stop"
+        let resumedCommandStart = state.commands.count
+        _ = runGrokHook(
+            "session-start",
+            input: #"{"sessionId":"\#(resumedSessionID)","cwd":"\#(root.path)","hookEventName":"SessionStart"}"#
+        )
+        _ = runGrokHook(
+            "prompt-submit",
+            input: #"{"sessionId":"\#(resumedSessionID)","cwd":"\#(root.path)","hookEventName":"UserPromptSubmit","prompt":"first turn"}"#
+        )
+        _ = runGrokHook(
+            "stop",
+            input: #"{"sessionId":"\#(resumedSessionID)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
+        )
+        _ = runGrokHook(
+            "prompt-submit",
+            input: #"{"sessionId":"\#(resumedSessionID)","cwd":"\#(root.path)","hookEventName":"UserPromptSubmit","prompt":"second turn"}"#
+        )
+        let resumedReminder = runGrokHook(
+            "notification",
+            input: #"{"sessionId":"\#(resumedSessionID)","cwd":"\#(root.path)","hookEventName":"Notification","reason":"idle_prompt","message":"Stale waiting reminder"}"#
+        )
+        XCTAssertFalse(resumedReminder.timedOut, resumedReminder.stderr)
+        XCTAssertEqual(resumedReminder.status, 0, resumedReminder.stderr)
+        let resumedCommands = Array(state.commands.dropFirst(resumedCommandStart))
+        XCTAssertFalse(
+            resumedCommands.contains { $0.contains("set_status grok Grok needs input") },
+            "A stale idle reminder after a new prompt must not revive Grok, saw \(resumedCommands)"
+        )
+        // cmux-rbf: changed on purpose (#cm-128.5): `reason: idle_prompt` is words, not a typed field, so it journals an
+        // observation (`agent.state.changed`), not upstream's `agent.idle.observed`.
+        XCTAssertFalse(
+            AgentJournalAppendCapture.contains(
+                resumedCommands,
+                kind: "agent.idle.observed",
+                agentKey: "grok",
+                sessionId: resumedSessionID
+            ),
+            "A grok idle reminder from words must journal no idle observation, saw \(resumedCommands)"
+        )
+        XCTAssertFalse(
+            AgentJournalAppendCapture.contains(
+                resumedCommands,
+                kind: "agent.question.requested",
+                agentKey: "grok",
+                sessionId: resumedSessionID
+            ),
+            "A structured idle reminder must not journal a question for the active turn, saw \(resumedCommands)"
+        )
+        json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any])
+        sessions = try XCTUnwrap(json["sessions"] as? [String: Any])
+        let resumedSession = try XCTUnwrap(sessions[resumedSessionID] as? [String: Any])
+        XCTAssertEqual(resumedSession["agentLifecycle"] as? String, "running")
+        XCTAssertEqual(resumedSession["runtimeStatus"] as? String, "running")
+
+        // cmux-rbf: changed on purpose (#cm-128.5): a prose waiting request is words, so it raises no hand even after a
+        // completed Stop. Upstream expects `Grok needs input` here.
+        let realWaitingSessionID = "grok-real-waiting-after-stop"
+        _ = runGrokHook(
+            "session-start",
+            input: #"{"sessionId":"\#(realWaitingSessionID)","cwd":"\#(root.path)","hookEventName":"SessionStart"}"#
+        )
+        _ = runGrokHook(
+            "stop",
+            input: #"{"sessionId":"\#(realWaitingSessionID)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
+        )
+        let realWaitingCommandStart = state.commands.count
+        let realWaiting = runGrokHook(
+            "notification",
+            input: #"{"sessionId":"\#(realWaitingSessionID)","cwd":"\#(root.path)","hookEventName":"Notification","message":"Grok is waiting for your input"}"#
+        )
+        XCTAssertFalse(realWaiting.timedOut, realWaiting.stderr)
+        XCTAssertEqual(realWaiting.status, 0, realWaiting.stderr)
+        let realWaitingCommands = Array(state.commands.dropFirst(realWaitingCommandStart))
+        XCTAssertFalse(
+            realWaitingCommands.contains { $0.contains("set_status grok Grok needs input") },
+            "A prose waiting request from words must raise no hand, saw \(realWaitingCommands)"
+        )
+        json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any])
+        sessions = try XCTUnwrap(json["sessions"] as? [String: Any])
+        let realWaitingSession = try XCTUnwrap(sessions[realWaitingSessionID] as? [String: Any])
+        XCTAssertNotEqual(realWaitingSession["agentLifecycle"] as? String, "needsInput")
+
+        // A turn-boundary SessionEnd closes only the nested turn. Its running
+        // parent must retain the running runtime projection.
+        let nestedSessionID = "grok-nested-session-end"
+        _ = runGrokHook(
+            "session-start",
+            input: #"{"sessionId":"\#(nestedSessionID)","cwd":"\#(root.path)","hookEventName":"SessionStart"}"#
+        )
+        _ = runGrokHook(
+            "prompt-submit",
+            input: #"{"sessionId":"\#(nestedSessionID)","cwd":"\#(root.path)","hookEventName":"UserPromptSubmit","prompt":"outer turn"}"#
+        )
+        let nestedPrompt = runGrokHook(
+            "prompt-submit",
+            input: #"{"sessionId":"\#(nestedSessionID)","cwd":"\#(root.path)","hookEventName":"UserPromptSubmit","prompt":"nested turn"}"#
+        )
+        XCTAssertFalse(nestedPrompt.timedOut, nestedPrompt.stderr)
+        XCTAssertEqual(nestedPrompt.status, 0, nestedPrompt.stderr)
+        let nestedPermission = runGrokHook(
+            "notification",
+            input: #"{"sessionId":"\#(nestedSessionID)","cwd":"\#(root.path)","hookEventName":"Notification","message":"Permission required"}"#
+        )
+        XCTAssertFalse(nestedPermission.timedOut, nestedPermission.stderr)
+        XCTAssertEqual(nestedPermission.status, 0, nestedPermission.stderr)
+        let nestedSessionEnd = runGrokHook(
+            "session-end",
+            input: #"{"sessionId":"\#(nestedSessionID)","cwd":"\#(root.path)","hookEventName":"SessionEnd"}"#
+        )
+        XCTAssertFalse(nestedSessionEnd.timedOut, nestedSessionEnd.stderr)
+        XCTAssertEqual(nestedSessionEnd.status, 0, nestedSessionEnd.stderr)
+        json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any])
+        sessions = try XCTUnwrap(json["sessions"] as? [String: Any])
+        let nestedSession = try XCTUnwrap(sessions[nestedSessionID] as? [String: Any])
+        XCTAssertEqual(nestedSession["agentLifecycle"] as? String, "running")
+        XCTAssertEqual(nestedSession["runtimeStatus"] as? String, "running")
+        // cmux-rbf: changed on purpose (#cm-128.5): "Permission required" is words and records no needs-input status,
+        // so there is none for the parent to retain. Upstream expects `needsInput` here.
+        XCTAssertNotEqual(nestedSession["lastNotificationStatus"] as? String, "needsInput")
+
+        let endedSessionID = "grok-session-end-order"
+        _ = runGrokHook(
+            "session-start",
+            input: #"{"sessionId":"\#(endedSessionID)","cwd":"\#(root.path)","hookEventName":"SessionStart"}"#
+        )
+        _ = runGrokHook(
+            "stop",
+            input: #"{"sessionId":"\#(endedSessionID)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
+        )
+        let endedReminderStart = state.commands.count
+        _ = runGrokHook(
+            "notification",
+            input: #"{"sessionId":"\#(endedSessionID)","cwd":"\#(root.path)","hookEventName":"Notification","reason":"idle_prompt","message":"Waiting after stop"}"#
+        )
+        _ = runGrokHook(
+            "session-end",
+            input: #"{"sessionId":"\#(endedSessionID)","cwd":"\#(root.path)","hookEventName":"SessionEnd"}"#
+        )
+        let lateReminder = runGrokHook(
+            "notification",
+            input: #"{"sessionId":"\#(endedSessionID)","cwd":"\#(root.path)","hookEventName":"Notification","reason":"idle_prompt","message":"Late waiting reminder"}"#
+        )
+        XCTAssertFalse(lateReminder.timedOut, lateReminder.stderr)
+        XCTAssertEqual(lateReminder.status, 0, lateReminder.stderr)
+        let endedReminderCommands = Array(state.commands.dropFirst(endedReminderStart))
+        XCTAssertFalse(
+            endedReminderCommands.contains { $0.contains("set_status grok Grok needs input") },
+            "Idle reminders before or after SessionEnd must not revive Grok, saw \(endedReminderCommands)"
+        )
+        json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any])
+        sessions = try XCTUnwrap(json["sessions"] as? [String: Any])
+        let endedSession = try XCTUnwrap(sessions[endedSessionID] as? [String: Any])
+        XCTAssertEqual(endedSession["agentLifecycle"] as? String, "idle")
+        XCTAssertEqual(endedSession["runtimeStatus"] as? String, "idle")
+        XCTAssertNil(endedSession["lastNotificationStatus"])
+        XCTAssertEqual(endedSession["hookEventName"] as? String, "SessionEnd")
     }
 
     func testGrokSessionStartUsesLiveTargetWithoutHookEnvironmentAndDescribesResolutionFailures() throws {
@@ -3253,7 +3662,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(failedStart.stdout, "{}\n")
         let capturedError = try String(contentsOfFile: probePath, encoding: .utf8)
         XCTAssertTrue(
-            capturedError.contains("Grok") && capturedError.contains("session-start"),
+            capturedError.contains("stage=agent-hook-target-resolution")
+                && capturedError.contains("Agent hook target resolution failed for grok session-start."),
             "Target-resolution telemetry must describe the failure, saw \(capturedError)"
         )
         XCTAssertFalse(capturedError.contains("(null)"), capturedError)
@@ -3278,6 +3688,21 @@ extension CLINotifyProcessIntegrationRegressionTests {
             Darwin.close(listenerFD)
             unlink(socketPath)
             try? FileManager.default.removeItem(at: root)
+        }
+
+        var agentProcesses: [Process] = []
+        defer {
+            for process in agentProcesses {
+                if process.isRunning { process.terminate() }
+                process.waitUntilExit()
+            }
+        }
+        for _ in surfaceIds {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+            process.arguments = ["300"]
+            try process.run()
+            agentProcesses.append(process)
         }
 
         let baseEnvironment: [String: String] = [
@@ -3333,6 +3758,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             }
             var environment = baseEnvironment
             environment["CMUX_SURFACE_ID"] = surfaceId
+            let surfaceIndex = surfaceIds.firstIndex(of: surfaceId)!
+            environment["CMUX_GROK_PID"] = String(agentProcesses[surfaceIndex].processIdentifier)
             let result = runProcess(
                 executablePath: cliPath,
                 arguments: ["hooks", "grok", subcommand],
@@ -3526,7 +3953,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let stopCommands = Array(state.commands.dropFirst(stopCommandStart))
         XCTAssertTrue(
             stopCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Grok session completed")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished||Task completed")
             },
             "Expected Grok Stop without cwd to notify with a generic completion body, saw \(stopCommands)"
         )
@@ -3735,7 +4163,23 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(start.status, 0, start.stderr)
         XCTAssertEqual(start.stdout, "{}\n")
 
+        var admittedKeyOffset = 0
         for index in 1...2 {
+            // Seed actual attention so continuation must dismiss the request,
+            // rather than requiring a blanket clear when there was nothing pending.
+            let attention = runGrokHook(
+                "notification",
+                // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1): the fork reads Grok's type from notificationType, not reason.
+                input: #"{"sessionId":"\#(sessionId)","cwd":"\#(root.path)","hookEventName":"Notification","notificationType":"permission_prompt","request_id":"request-\#(index)","message":"Grok needs permission to continue"}"#
+            )
+            XCTAssertFalse(attention.timedOut, attention.stderr)
+            XCTAssertEqual(attention.status, 0, attention.stderr)
+
+            let admittedKeys = state.admittedNotificationKeysSnapshot()
+            let expectedClearKeys = Set(admittedKeys.dropFirst(admittedKeyOffset))
+            XCTAssertEqual(expectedClearKeys.count, index,
+                "Continuation retires the new request and, on turn two, the previous completion")
+            admittedKeyOffset = admittedKeys.count
             let promptCommandStart = state.commands.count
             let prompt = runGrokHook(
                 "prompt-submit",
@@ -3750,10 +4194,13 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 promptCommands.contains { $0.contains("set_status grok Running") },
                 "Expected Grok prompt \(index) to reuse the saved target without CMUX env, saw \(promptCommands)"
             )
-            XCTAssertTrue(
-                promptCommands.contains { $0 == "clear_notifications --tab=\(workspaceId) --panel=\(surfaceId)" },
-                "Expected Grok prompt \(index) to clear only its own surface notifications, saw \(promptCommands)"
-            )
+            let clearCommands = promptCommands.filter { $0.hasPrefix("clear_notifications ") }
+            let clearPrefix = "clear_notifications --tab=\(workspaceId) --panel=\(surfaceId) --correlation-key="
+            XCTAssertEqual(clearCommands.count, expectedClearKeys.count)
+            XCTAssertTrue(clearCommands.allSatisfy { $0.hasPrefix(clearPrefix) })
+            let clearedKeys = Set(clearCommands.map { String($0.dropFirst(clearPrefix.count)) })
+            XCTAssertEqual(clearedKeys, expectedClearKeys,
+                "Grok continuation must retire exactly the admitted requests/completion for its own pane")
             XCTAssertFalse(
                 promptCommands.contains { $0 == "clear_notifications --tab=\(workspaceId)" },
                 "Grok prompt \(index) must not clear sibling surface notifications, saw \(promptCommands)"
@@ -3945,13 +4392,17 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertFalse(completingStart.timedOut, completingStart.stderr)
         XCTAssertEqual(completingStart.status, 0, completingStart.stderr)
 
-        let runningStop = runGrokHook(
+        // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1): a Notification's completion words ping nothing; the session's
+        // Stop pings ("Task completed"), as for the completing session below.
+        let runningCompletion = runGrokHook(
             "stop",
             input: #"{"sessionId":"\#(runningSessionId)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
         )
-        XCTAssertFalse(runningStop.timedOut, runningStop.stderr)
-        XCTAssertEqual(runningStop.status, 0, runningStop.stderr)
+        XCTAssertFalse(runningCompletion.timedOut, runningCompletion.stderr)
+        XCTAssertEqual(runningCompletion.status, 0, runningCompletion.stderr)
 
+        let expectedClearKeys = Set(state.admittedNotificationKeysSnapshot())
+        XCTAssertEqual(expectedClearKeys.count, 1, "The prior running-surface notification must have delivered one completion")
         let promptCommandStart = state.commands.count
         let runningPrompt = runGrokHook(
             "prompt-submit",
@@ -3961,10 +4412,12 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(runningPrompt.status, 0, runningPrompt.stderr)
 
         let promptCommands = Array(state.commands.dropFirst(promptCommandStart))
-        XCTAssertTrue(
-            promptCommands.contains { $0 == "clear_notifications --tab=\(workspaceId) --panel=\(runningSurfaceId)" },
-            "Expected running Grok prompt to clear only its own surface notifications, saw \(promptCommands)"
-        )
+        let clearCommands = promptCommands.filter { $0.hasPrefix("clear_notifications ") }
+        let clearPrefix = "clear_notifications --tab=\(workspaceId) --panel=\(runningSurfaceId) --correlation-key="
+        XCTAssertEqual(clearCommands.count, 1)
+        XCTAssertTrue(clearCommands.allSatisfy { $0.hasPrefix(clearPrefix) })
+        XCTAssertEqual(Set(clearCommands.map { String($0.dropFirst(clearPrefix.count)) }), expectedClearKeys,
+            "Running Grok prompt must clear exactly its prior completion, leaving sibling notifications alone")
         XCTAssertTrue(
             promptCommands.contains { $0.contains("set_status grok Running") },
             "Expected running Grok prompt to mark Grok running, saw \(promptCommands)"
@@ -4090,7 +4543,9 @@ extension CLINotifyProcessIntegrationRegressionTests {
             case "feed.push":
                 return self.v2Response(id: id, ok: true, result: [:])
             default:
-                return self.v2Response(id: id, ok: true, result: [:])
+                return self.v2Response(id: id, ok: false, error: [
+                    "code": "unrecognized_method", "message": "Unexpected method: \(method)",
+                ])
             }
         }
         let completion = runProcess(
@@ -4249,7 +4704,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             "Expected Grok Notification to use queued admission, saw \(notificationCommands)"
         )
         XCTAssertFalse(
-            notificationCommands.contains { $0.contains("cmux hooks grok stop") },
+            notificationCommands.contains { $0.contains("hooks grok stop") },
             "Grok Notification should not use the generic stop handler, saw \(notificationCommands)"
         )
         XCTAssertEqual(notificationTimeouts, [5])
@@ -4276,10 +4731,10 @@ extension CLINotifyProcessIntegrationRegressionTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let pinnedCLI = root.appendingPathComponent("cmux pinned dev cli", isDirectory: false)
-        let captureURL = root.appendingPathComponent("timeout.txt", isDirectory: false)
+        let captureURL = root.appendingPathComponent("arguments.txt", isDirectory: false)
         try makeCodexHookExecutableShellFile(at: pinnedCLI, lines: [
             "#!/bin/sh",
-            "printf '%s' \"${CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC:-missing}\" > \"$CMUX_TEST_CAPTURE\"",
+            "{ printf 'pinned:%s\\n' \"${CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC:-missing}\"; printf '%s\\n' \"$@\"; } > \"$CMUX_TEST_CAPTURE\"",
         ])
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pinnedCLI.path)
 
@@ -4334,19 +4789,53 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let notificationCommand = try XCTUnwrap(
             allCommands.first { $0.contains("hooks enqueue grok notification") }
         )
-        let ambientResult = runProcess(
-            executablePath: "/bin/sh",
-            arguments: ["-c", notificationCommand],
-            environment: [
-                "CMUX_BUNDLED_CLI_PATH": pinnedCLI.path,
-                "CMUX_SOCKET_PATH": socketPath,
+        let ambientCLI = root.appendingPathComponent("cmux ambient '$ cli\n", isDirectory: false)
+        try makeCodexHookExecutableShellFile(at: ambientCLI, lines: [
+            "#!/bin/sh",
+            "{ printf 'ambient:%s\\n' \"${CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC:-missing}\"; printf '%s\\n' \"$@\"; } > \"$CMUX_TEST_CAPTURE\"",
+        ])
+        let failedAmbientCLI = root.appendingPathComponent("cmux failed ambient", isDirectory: false)
+        try makeCodexHookExecutableShellFile(at: failedAmbientCLI, lines: ["#!/bin/sh", "exit 1"])
+        let ambientSocketPath = socketPath + "\n"
+        let ambientSocketFD = try bindUnixSocket(at: ambientSocketPath)
+        defer {
+            Darwin.close(ambientSocketFD)
+            unlink(ambientSocketPath)
+        }
+        func capture(_ route: String, socket: String) -> String {
+            "\(route):0.5\n--socket\n\(socket)\nhooks\nenqueue\ngrok\nnotification\n"
+        }
+        let cases: [(name: String, cli: String?, socket: String?, expected: String)] = [
+            ("sanitized environment", nil, nil, capture("pinned", socket: socketPath)),
+            ("live launching terminal", ambientCLI.path, ambientSocketPath, capture("ambient", socket: ambientSocketPath)),
+            ("stale launching socket", ambientCLI.path, ambientSocketPath + ".missing", capture("pinned", socket: socketPath)),
+            ("failed launching CLI", failedAmbientCLI.path, ambientSocketPath, capture("pinned", socket: socketPath)),
+        ]
+        for testCase in cases {
+            var environment = [
+                "HOME": root.path,
+                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
                 "CMUX_TEST_CAPTURE": captureURL.path,
-            ],
-            timeout: 2
-        )
-        XCTAssertFalse(ambientResult.timedOut, ambientResult.stderr)
-        XCTAssertEqual(ambientResult.status, 0, ambientResult.stderr)
-        XCTAssertEqual(try String(contentsOf: captureURL, encoding: .utf8), "0.5")
+            ]
+            environment["CMUX_BUNDLED_CLI_PATH"] = testCase.cli
+            environment["CMUX_SOCKET_PATH"] = testCase.socket
+            for shellOptions in ["-c", "-ec"] {
+                try? FileManager.default.removeItem(at: captureURL)
+                let execution = runProcess(
+                    executablePath: "/bin/sh",
+                    arguments: [shellOptions, notificationCommand],
+                    environment: environment,
+                    timeout: 2
+                )
+                XCTAssertFalse(execution.timedOut, "\(testCase.name) \(shellOptions): \(execution.stderr)")
+                XCTAssertEqual(execution.status, 0, "\(testCase.name) \(shellOptions): \(execution.stderr)")
+                XCTAssertEqual(
+                    try String(contentsOf: captureURL, encoding: .utf8),
+                    testCase.expected,
+                    "\(testCase.name) \(shellOptions)"
+                )
+            }
+        }
     }
 
     func testGrokHookInstallPreservesUserWrappedLegacyCommands() throws {
@@ -4562,7 +5051,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             "Codex setup should replace bundled-CLI hooks that did not pin CMUX_SOCKET_PATH, saw \(commandBodies)"
         )
         XCTAssertEqual(
-            allCommands.filter { $0.contains("hooks enqueue codex prompt-submit") }.count,
+            commandBodies.filter { $0.contains("hooks enqueue codex prompt-submit") }.count,
             1,
             "Codex setup should collapse duplicate cmux-owned prompt hooks to one entry, saw \(allCommands)"
         )
@@ -4594,7 +5083,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertFalse(result.timedOut, result.stderr)
         XCTAssertNotEqual(result.status, 0, result.stdout)
         XCTAssertTrue(
-            result.stderr.contains("cmux could not create the hooks directory: a file exists at \(hooksPath.path); remove or rename the conflicting file and re-run `cmux hooks setup`"),
+            result.stderr.contains("cmux could not create the hooks directory: a file exists at \(hooksPath.path). Remove or rename the conflicting file, then run `cmux hooks setup` again."),
             result.stderr
         )
         XCTAssertFalse(
@@ -4624,6 +5113,42 @@ extension CLINotifyProcessIntegrationRegressionTests {
             try? FileManager.default.removeItem(at: root)
         }
 
+        if scenario.existingLaunchArguments != nil || scenario.existingLaunchEnvironment != nil {
+            let now = Date().timeIntervalSince1970
+            var existingLaunchCommand: [String: Any] = [
+                "launcher": scenario.agent,
+                "executablePath": scenario.executable,
+                "arguments": scenario.existingLaunchArguments ?? [],
+                "workingDirectory": workspace.path,
+                "source": "environment",
+            ]
+            if let existingLaunchEnvironment = scenario.existingLaunchEnvironment {
+                existingLaunchCommand["environment"] = existingLaunchEnvironment
+            }
+            if let existingLaunchRejectionReason = scenario.existingLaunchRejectionReason {
+                existingLaunchCommand["rejectionReason"] = existingLaunchRejectionReason
+            }
+            let existingStore: [String: Any] = [
+                "version": 1,
+                "sessions": [
+                    scenario.sessionId: [
+                        "sessionId": scenario.sessionId,
+                        "workspaceId": workspaceId,
+                        "surfaceId": surfaceId,
+                        "cwd": workspace.path,
+                        "startedAt": now,
+                        "updatedAt": now,
+                        "launchCommand": existingLaunchCommand,
+                    ],
+                ],
+            ]
+            let existingData = try JSONSerialization.data(withJSONObject: existingStore, options: [.sortedKeys])
+            try existingData.write(
+                to: root.appendingPathComponent("\(scenario.agent)-hook-sessions.json", isDirectory: false),
+                options: .atomic
+            )
+        }
+
         let serverHandled = startMockServer(listenerFD: listenerFD, state: state) { line in
             guard let payload = self.jsonObject(line) else {
                 return "OK"
@@ -4632,6 +5157,38 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 return self.malformedRequestResponse(id: payload["id"] as? String, raw: line)
             }
             switch method {
+            case "agent.resolve_delivery_target":
+                // The rejected-follow-up scenario supplies a deliberately dead PID. Resolve that
+                // fixture identity so the hook reaches the persistence path instead of spending its
+                // entire timeout probing an unavailable process.
+                let params = payload["params"] as? [String: Any] ?? [:]
+                if scenario.resolveAnyPID, params["pid"] is NSNumber {
+                    return self.v2Response(
+                        id: id,
+                        ok: true,
+                        result: [
+                            "workspace_id": workspaceId,
+                            "surface_id": surfaceId,
+                            "source": "pid",
+                        ]
+                    )
+                }
+                if let pid = params["pid"] as? NSNumber, pid.intValue == 999999999 {
+                    return self.v2Response(
+                        id: id,
+                        ok: true,
+                        result: [
+                            "workspace_id": workspaceId,
+                            "surface_id": surfaceId,
+                            "source": "pid",
+                        ]
+                    )
+                }
+                return self.v2Response(
+                    id: id,
+                    ok: false,
+                    error: ["code": "unrecognized_method", "message": "unexpected resolver probe"]
+                )
             case "surface.list":
                 return self.surfaceListResponse(id: id, surfaceId: surfaceId)
             case "surface.resume.set":
@@ -4684,10 +5241,71 @@ extension CLINotifyProcessIntegrationRegressionTests {
 
         let launchCommand = try XCTUnwrap(session["launchCommand"] as? [String: Any])
         XCTAssertEqual(launchCommand["launcher"] as? String, scenario.agent)
-        XCTAssertEqual(launchCommand["executablePath"] as? String, scenario.executable)
+        // A malformed trusted capture has no independently validated executable path. Keeping
+        // that path would make an argv-less rejection look actionable to a later restore.
+        if scenario.expectedRejectionReason == "argvDecodeFailed" || !scenario.expectExecutablePath {
+            XCTAssertNil(launchCommand["executablePath"])
+        } else {
+            XCTAssertEqual(launchCommand["executablePath"] as? String, scenario.executable)
+        }
         XCTAssertEqual(launchCommand["arguments"] as? [String], scenario.expectedArguments)
         XCTAssertEqual(launchCommand["workingDirectory"] as? String, workspace.path)
         XCTAssertEqual(launchCommand["environment"] as? [String: String], scenario.expectedEnvironment)
+        if let expectedSource = scenario.expectedSource {
+            XCTAssertEqual(launchCommand["source"] as? String, expectedSource)
+        }
+        if let expectedRejectionReason = scenario.expectedRejectionReason {
+            XCTAssertEqual(launchCommand["rejectionReason"] as? String, expectedRejectionReason)
+        }
+        if scenario.expectedRejectionReason == "nativeProcessDoesNotDescribeKind" {
+            let launchData = try JSONSerialization.data(withJSONObject: launchCommand, options: [])
+            let decoded = try JSONDecoder().decode(AgentLaunchCommand.self, from: launchData)
+            XCTAssertFalse(
+                decoded.isRejectedCapture,
+                "a PID-only mismatch must keep the env-only fallback eligible for restore"
+            )
+        }
+        if let existingLaunchArguments = scenario.existingLaunchArguments,
+           !existingLaunchArguments.isEmpty {
+            XCTAssertNil(
+                launchCommand["rejectionReason"],
+                "a rejected follow-up must not add a rejection marker to the preserved argv"
+            )
+            let resumeSetRequests = state.commands.compactMap { command -> [String: Any]? in
+                guard let payload = self.jsonObject(command),
+                      payload["method"] as? String == "surface.resume.set" else {
+                    return nil
+                }
+                return payload["params"] as? [String: Any]
+            }
+            let resumeParams = try XCTUnwrap(
+                resumeSetRequests.last,
+                "a rejected follow-up must retain the existing resume binding"
+            )
+            XCTAssertTrue(
+                (resumeParams["command"] as? String)?.contains("stable-model") == true,
+                "the preserved argv must remain the authoritative resume command: \(resumeParams)"
+            )
+            XCTAssertFalse(
+                state.commands.contains { command in
+                    self.jsonObject(command)?["method"] as? String == "surface.resume.clear"
+                },
+                "a rejected follow-up must not clear a richer existing binding: \(state.commands)"
+            )
+        }
+        if scenario.existingLaunchEnvironment != nil {
+            XCTAssertEqual(
+                launchCommand["rejectionReason"] as? String,
+                scenario.existingLaunchRejectionReason,
+                "a classified rejection must not replace a safe argv-less fallback"
+            )
+            XCTAssertFalse(
+                state.commands.contains { command in
+                    self.jsonObject(command)?["method"] as? String == "surface.resume.clear"
+                },
+                "a classified rejection must not clear an argv-less fallback binding: \(state.commands)"
+            )
+        }
 
         if scenario.agent == "kiro" {
             let resumeSetRequests = state.commands.compactMap { command -> [String: Any]? in
@@ -4712,6 +5330,34 @@ extension CLINotifyProcessIntegrationRegressionTests {
                     self.jsonObject(command)?["method"] as? String == "surface.resume.clear"
                 },
                 "Kiro should publish a resume binding instead of clearing it: \(state.commands)"
+            )
+        }
+
+        if scenario.agent == "antigravity" {
+            let resumeSetRequests = state.commands.compactMap { command -> [String: Any]? in
+                guard let payload = self.jsonObject(command),
+                      payload["method"] as? String == "surface.resume.set" else {
+                    return nil
+                }
+                return payload["params"] as? [String: Any]
+            }
+            XCTAssertEqual(resumeSetRequests.count, 1, state.commands.joined(separator: "\n"))
+            let params = try XCTUnwrap(resumeSetRequests.first)
+            XCTAssertEqual(params["kind"] as? String, "antigravity")
+            XCTAssertEqual(params["checkpoint_id"] as? String, scenario.sessionId)
+            XCTAssertEqual(params["auto_resume"] as? Bool, true)
+            let resumeCommand = try XCTUnwrap(params["command"] as? String)
+            XCTAssertTrue(resumeCommand.contains("/bin/sh -c"), resumeCommand)
+            XCTAssertTrue(resumeCommand.contains("CMUX_AGY_WRAPPER_SHIM"), resumeCommand)
+            XCTAssertTrue(resumeCommand.contains(scenario.executable), resumeCommand)
+            var expectedResumeEnvironment = scenario.expectedEnvironment ?? [:]
+            expectedResumeEnvironment["CMUX_CUSTOM_ANTIGRAVITY_PATH"] = scenario.executable
+            XCTAssertEqual(params["environment"] as? [String: String], expectedResumeEnvironment)
+            XCTAssertFalse(
+                state.commands.contains { command in
+                    self.jsonObject(command)?["method"] as? String == "surface.resume.clear"
+                },
+                "Antigravity should publish a resume binding instead of clearing it: \(state.commands)"
             )
         }
     }
@@ -4847,6 +5493,23 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let persistedLaunch = try XCTUnwrap(
             persisted["launchCommand"] as? [String: Any],
             "env-only launchCommand must be persisted for the fork path"
+        )
+        XCTAssertEqual(
+            persistedLaunch["source"] as? String,
+            "environment",
+            "an unavailable PID must keep the historical env-only fallback source"
+        )
+        // With no cmux capture, the hook's inferred PID is whatever process ran it (the test host
+        // here), so the recorded ground is argvUnavailable or a PID-only mismatch. Either way it
+        // must be a diagnostic ground, not a positive capture rejection that would quarantine the
+        // env-only fallback.
+        let persistedReason = try XCTUnwrap(
+            (persistedLaunch["rejectionReason"] as? String).map(AgentLaunchCaptureRejectionReason.init(rawValue:)),
+            "an argv-less record must name its ground"
+        )
+        XCTAssertFalse(
+            persistedReason.isPositiveCaptureRejection,
+            "an unavailable PID should be distinguishable from a positively rejected capture; got \(persistedReason.rawValue)"
         )
         XCTAssertEqual(
             (persistedLaunch["environment"] as? [String: String])?["CODEX_HOME"], codexHome,
@@ -5126,17 +5789,24 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(result.status, 0, result.stderr)
 
         // Persist the rejection marker so reload cannot treat it as a plain default Codex hook.
-        if let data = try? Data(contentsOf: root.appendingPathComponent("codex-hook-sessions.json")),
-           let storeJSON = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let sessions = storeJSON["sessions"] as? [String: Any],
-           let persisted = sessions[sessionId] as? [String: Any] {
-            let launchCommand = try XCTUnwrap(persisted["launchCommand"] as? [String: Any]); XCTAssertEqual(launchCommand["source"] as? String, "rejected")
-            let env = launchCommand["environment"] as? [String: String]
-            XCTAssertNil(
-                env?["CODEX_HOME"],
-                "non-restorable codex exec must not persist an env-only CODEX_HOME record; launchCommand=\(persisted["launchCommand"] ?? "nil")"
-            )
-        }
+        // Unwrapped rather than pattern-matched: a store the hook never wrote is a failure of
+        // this test's subject, not a reason to skip its assertions.
+        let data = try Data(contentsOf: root.appendingPathComponent("codex-hook-sessions.json"))
+        let storeJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let sessions = try XCTUnwrap(storeJSON["sessions"] as? [String: Any])
+        let persisted = try XCTUnwrap(sessions[sessionId] as? [String: Any])
+        let launchCommand = try XCTUnwrap(persisted["launchCommand"] as? [String: Any])
+        XCTAssertEqual(launchCommand["source"] as? String, "rejected")
+        XCTAssertEqual(
+            launchCommand["rejectionReason"] as? String,
+            "sanitizerRejectedArgv",
+            "a rejected capture must record the ground it was rejected on; launchCommand=\(launchCommand)"
+        )
+        let env = launchCommand["environment"] as? [String: String]
+        XCTAssertNil(
+            env?["CODEX_HOME"],
+            "non-restorable codex exec must not persist an env-only CODEX_HOME record; launchCommand=\(persisted["launchCommand"] ?? "nil")"
+        )
     }
 
     private func writeCodexResumeTranscript(at url: URL, sessionID: String) throws {

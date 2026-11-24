@@ -77,11 +77,19 @@ struct AgentNotificationSourceLineTests {
         let fixture = try ClaudeHookAttentionTestFixture()
         try fixture.run(["hooks", source, "notification"], event: "Notification",
             extra: ["cwd": "/work/cm-128", "message": message])
-        let draft = try #require(fixture.context.state.snapshot().compactMap { line -> AgentJournalEventDraft? in
+        let drafts = fixture.context.state.snapshot().compactMap { line -> AgentJournalEventDraft? in
             let prefix = "agent_journal_append "
             guard line.hasPrefix(prefix) else { return nil }
             return try? JSONDecoder().decode(AgentJournalEventDraft.self, from: Data(line.dropFirst(prefix.count).utf8))
-        }.last { $0.attention?.notification != nil })
+        }
+        // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): upstream's #10233, taken in the merge, never pings a Claude
+        // completion Notification; the parent's Stop owns the one Finished banner. Only the observation is journaled.
+        if source == "claude" && token == "Completed" {
+            #expect(!drafts.contains { $0.attention?.notification != nil })
+            #expect(drafts.contains { $0.kind == .stateChanged && $0.nativeEvent == "Notification" })
+            return
+        }
+        let draft = try #require(drafts.last { $0.attention?.notification != nil })
         let notification = try #require(draft.attention?.notification)
         let name = source == "claude" ? "Claude Code" : "Codex"
         #expect(notification.title == "\(name) · \(kind)")

@@ -94,30 +94,52 @@ extension WorkspacesModel {
     /// own tier in its group. An ungrouped pinned workspace does not move.
     /// Returns the groups whose row changed place.
     func nestedMoveTabToTopForNotification(_ tab: Tab) -> [UUID] {
+        let bump = nestedNotificationBump(tab)
+        guard bump.changed else { return [] }
+        applyGroupLayout(bump.layout)
+        return groupsWhoseRowChangedPlace(bump.walked, from: bump.original, to: bump.layout, tree: bump.tree)
+    }
+
+    /// Nested `isAtTopOfUnpinnedTier`: true when the nested notification bump would change nothing. Like upstream's,
+    /// false for a pinned workspace and for one the walk cannot reach because a group on its way is pinned, since
+    /// callers check pinning separately. Reads the same plan the bump applies, so the two cannot disagree (cm-142.1).
+    func nestedIsAtTopOfUnpinnedTier(_ tab: Tab) -> Bool {
+        if tab.isPinned { return false }
+        let bump = nestedNotificationBump(tab)
+        return bump.reachedWorkspace && !bump.changed
+    }
+
+    /// The nested notification bump as a plan: the edited layout, whether anything moved, the groups walked, and
+    /// whether the walk reached the workspace (it stops at the first pinned group). Applies nothing.
+    private func nestedNotificationBump(_ tab: Tab) -> (
+        layout: WorkspaceGroupLayout,
+        original: WorkspaceGroupLayout,
+        tree: WorkspaceGroupTree,
+        walked: [UUID],
+        changed: Bool,
+        reachedWorkspace: Bool
+    ) {
         var layout = nestedGroupLayout()
         let original = layout
         let tree = nestedGroupTree()
         let chain = nestedGroupChain(of: tab, tree: tree)
         var changed = false
         var walked: [UUID] = []
-        func finish() -> [UUID] {
-            guard changed else { return [] }
-            applyGroupLayout(layout)
-            return groupsWhoseRowChangedPlace(walked, from: original, to: layout, tree: tree)
-        }
         for groupId in chain {
-            guard let group = workspaceGroups.first(where: { $0.id == groupId }), !group.isPinned else { return finish() }
+            guard let group = workspaceGroups.first(where: { $0.id == groupId }), !group.isPinned else {
+                return (layout, original, tree, walked, changed, false)
+            }
             walked.append(groupId)
             if layout.move(.group(groupId), to: tree.parent(of: groupId), at: .firstOfTier) == .moved { changed = true }
         }
-        if chain.isEmpty, tab.isPinned { return [] }
+        if chain.isEmpty, tab.isPinned { return (layout, original, tree, walked, false, false) }
         let isHeader = tab.groupId.flatMap { id in
             workspaceGroups.first(where: { $0.id == id })?.liveAnchorWorkspaceId
         } == tab.id
         if !isHeader {
             if layout.move(.workspace(tab.id), to: tab.groupId, at: .firstOfTier) == .moved { changed = true }
         }
-        return finish()
+        return (layout, original, tree, walked, changed, true)
     }
 
     /// Nested `reorderWorkspace(tabId:toIndex:)` for Move Up, Move Down and an index from the socket:
@@ -167,5 +189,20 @@ extension WorkspacesModel {
         guard layout.move(row, to: level, at: .index(finalRow)) == .moved else { return true }
         applyGroupLayout(layout)
         return true
+    }
+
+    /// Nested `selectionTargetAfterClose`: the workspace the sidebar draws for the slot's occupant. That is the
+    /// own workspace of the outermost folded group that hides it, or the occupant itself when no fold hides it. The folds
+    /// that hide it are the ones `nestedExpandWorkspaceGroups(containing:)` would open: none for a workspace drawn in
+    /// Pinned, and none above a group drawn outside its parent (#cm-110.3, #cm-110.18). A folded group with no workspace
+    /// of its own draws no selectable row, so the occupant stays (#cm-106).
+    func nestedSelectionTarget(for candidate: Tab) -> UUID { // (#cm-106, #cm-142.1)
+        guard !workspaceIdsShownInPinned().contains(candidate.id), let groupId = candidate.groupId else { return candidate.id } // (#cm-110.18, #cm-142.1)
+        let tree = nestedGroupTree()
+        let shown = groupIdsShownOutsideParent()
+        var upward = [groupId] + tree.ancestors(of: groupId)
+        if let root = upward.firstIndex(where: shown.contains) { upward = Array(upward[...root]) } // (#cm-110.3, #cm-142.1)
+        let outermostFolded = upward.last { id in workspaceGroups.first { $0.id == id }?.isCollapsed == true }
+        return outermostFolded.flatMap { id in workspaceGroups.first { $0.id == id }?.liveAnchorWorkspaceId } ?? candidate.id
     }
 }

@@ -909,7 +909,9 @@ final class SendToBackAndMarkUnreadTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
         let sidebar = VerticalTabsSidebar(
-            updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: CmuxFeatureFlags(),
+            updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(),
+            sessionIndexStore: SessionIndexStore(), // cmux-rbf (#cm-142.1): upstream's new parameter, as its own tests pass it
+            featureFlags: CmuxFeatureFlags(),
             sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
             windowId: UUID(), onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
             observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,
@@ -941,7 +943,7 @@ final class SendToBackAndMarkUnreadTests: XCTestCase {
             readLastSelectionIndex: { nil }, writeLastSelectionIndex: { _ in }, setSelectionToTabs: {},
             snapshotProvider: { nil }
         )
-        let menu = SidebarWorkspaceRowMenuBuilder(commands: commands).build(onOpen: {}, onClose: {})
+        let menu = SidebarWorkspaceRowMenuBuilder(commands: commands).build(onOpen: {}, onClose: {}, beginInlineRename: {}) // cmux-rbf (#cm-142.1): upstream's builder takes the rename hook
         let title = String(localized: "contextMenu.markWorkspaceUnread", defaultValue: "Mark Workspace as Unread")
         let itemIndex = try XCTUnwrap(menu.items.firstIndex { $0.title == title })
         XCTAssertTrue(menu.items[itemIndex].isEnabled)
@@ -1154,7 +1156,10 @@ final class SendToBackAndMarkUnreadTests: XCTestCase {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         let ws1 = manager.addWorkspace(select: false, eagerLoadTerminal: false)
         let ws2 = manager.addWorkspace(select: false, eagerLoadTerminal: false)
-        let groupId = try XCTUnwrap(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ws1.id, ws2.id]))
+        // cmux-rbf: changed on purpose (#cm-128.13, #cm-142.1): upstream #15892 makes the first listed workspace the anchor,
+        // and Mark All leaves the anchor out, so the group gets an anchor of its own (createWorkspaceGroupWithOwnAnchor) and
+        // ws1 and ws2 stay members.
+        let groupId = try XCTUnwrap(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ws1.id, ws2.id])) // cmux-rbf: changed on purpose (#cm-128.13, #cm-142.1)
         let anchor = try XCTUnwrap(manager.workspaceGroupAnchor(for: groupId))
         let otherWs = manager.addWorkspace(select: false, eagerLoadTerminal: false)
         let a1 = notification(tab: ws1.id, surface: nil, queuedAt: 1, isRead: true)
@@ -1193,7 +1198,7 @@ final class SendToBackAndMarkUnreadTests: XCTestCase {
         let ws1 = manager.addWorkspace(select: false, eagerLoadTerminal: false)
         let otherWs = manager.addWorkspace(select: false, eagerLoadTerminal: false)
         let outer = try XCTUnwrap(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: []))
-        let inner = try XCTUnwrap(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ws1.id]))
+        let inner = try XCTUnwrap(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ws1.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         XCTAssertEqual(manager.moveWorkspaceGroup(groupId: inner, intoParent: outer), .moved)
         let a = notification(tab: ws1.id, surface: nil, queuedAt: 1, isRead: true)
         let b = notification(tab: otherWs.id, surface: nil, queuedAt: 2)
@@ -1465,7 +1470,7 @@ final class SendToBackAndMarkUnreadTests: XCTestCase {
             readLastSelectionIndex: { nil }, writeLastSelectionIndex: { _ in }, setSelectionToTabs: {},
             snapshotProvider: { nil }
         )
-        return SidebarWorkspaceRowMenuBuilder(commands: commands).build(onOpen: {}, onClose: {})
+        return SidebarWorkspaceRowMenuBuilder(commands: commands).build(onOpen: {}, onClose: {}, beginInlineRename: {}) // cmux-rbf (#cm-142.1): upstream's builder takes the rename hook
     }
 
     private func sendToBackItemIndex(in menu: NSMenu) -> Int? {

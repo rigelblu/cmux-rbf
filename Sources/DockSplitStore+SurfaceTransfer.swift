@@ -309,6 +309,8 @@ extension DockSplitStore {
             customTitleSource: titleMetadata.customTitleSource,
             manuallyUnread: wasManuallyUnread,
             restoredUnreadIndicator: preservedTransfer?.restoredUnreadIndicator,
+            promptState: preservedTransfer?.promptState,
+            programStatusStore: preservedTransfer?.programStatusStore,
             restorableAgent: transferredRestorableAgent,
             restorableAgentResumeState: transferredResumeState,
             restoredAgentCompletedGeneration: transferredCompletedGeneration,
@@ -377,7 +379,7 @@ extension DockSplitStore {
         atIndex index: Int? = nil,
         focus: Bool = true
     ) -> UUID? {
-        guard !isRetired else { return nil }
+        guard !isRetired, acceptsDetachedSurface(detached) else { return nil }
         guard containsPane(paneId.id), panels[detached.panelId] == nil else { return nil }
         let panel = detached.panel
         panel.retainTransferredSurfaceMachine(detached.surfaceMachine)
@@ -399,6 +401,7 @@ extension DockSplitStore {
             hasCustomTitle: detached.customTitle != nil,
             icon: detached.icon,
             iconImageData: restoredIconImageData,
+            iconAsset: panel is ChiefPanel ? ChiefPanel.iconAssetName : nil,
             kind: kind,
             isDirty: panel.isDirty,
             showsNotificationBadge: detached.manuallyUnread,
@@ -474,7 +477,7 @@ extension DockSplitStore {
         insertFirst: Bool,
         focus: Bool = true
     ) -> UUID? {
-        guard !isRetired else { return nil }
+        guard !isRetired, acceptsDetachedSurface(detached) else { return nil }
         guard containsPane(paneId.id), panels[detached.panelId] == nil else {
             return nil
         }
@@ -487,6 +490,7 @@ extension DockSplitStore {
             hasCustomTitle: detached.customTitle != nil,
             icon: detached.icon,
             iconImageData: panel is TerminalPanel ? nil : detached.iconImageData,
+            iconAsset: panel is ChiefPanel ? ChiefPanel.iconAssetName : nil,
             kind: kind,
             isDirty: panel.isDirty,
             showsNotificationBadge: detached.manuallyUnread,
@@ -580,8 +584,8 @@ extension DockSplitStore {
                     window: NSApp.keyWindow ?? NSApp.mainWindow
                 )
             }
+            scheduleDockPortalReconcile(reason: reconcileReason)
         }
-        scheduleDockPortalReconcile(reason: reconcileReason)
     }
 
     /// Returns the Bonsplit tab kind for a transferred Dock panel.

@@ -1,5 +1,6 @@
 import CMUXAgentLaunch
 import CmuxAgentChat
+@testable import CmuxMobileHost // cmux-rbf (#cm-142.1): AgentChatTranscriptTailer.Batch has an internal memberwise init, as upstream's own cmuxTests import it
 import Foundation
 import Testing
 #if canImport(cmux_DEV)

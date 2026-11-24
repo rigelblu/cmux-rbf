@@ -48,33 +48,45 @@ struct SidebarAgentMonitoringTests {
     }
 
     /// cm-128.6 (Scenario 97): the lists are compared, not only their counts. Claude Code running and Pi running are both one
-    /// agent, yet a row that changed which agent runs redraws at once with the menu open, and the other details stay frozen.
-    @Test func aChangedRunningListRedrawsTheRowWhileTheMenuKeepsOtherDetailsFrozen() {
+    /// agent, yet a row that changed which agent runs redraws at once.
+    // cmux-rbf: changed on purpose (#cm-142.1): upstream deleted `SidebarWorkspaceSnapshotRefreshPolicy` (40160ee0f4), which
+    // had no production caller here either, so the menu-open freeze these tests also checked is gone. What redraws a row is
+    // the cell's `guard self.model != model` (SidebarWorkspaceRowCellView), so the lists must make two row models differ.
+    @Test func aChangedRunningListRedrawsTheRow() throws {
         let claude = SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: false)
         let pi = SidebarAgentStateEntry(statusKey: "pi", displayName: "Pi", paneCount: 1, usageLimit: false)
-        var current = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "old")
+        var current = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "same")
         current.agentLists = SidebarAgentStateLists(running: [claude])
-        var next = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "new")
+        var next = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "same")
         next.agentLists = SidebarAgentStateLists(running: [pi])
         #expect(current.activeCodingAgentCount == next.activeCodingAgentCount, "control: the counts are the same")
-        let open = SidebarWorkspaceSnapshotRefreshPolicy().decision(current: current, next: next,
-            force: false, contextMenuVisible: true)
-        #expect(open.workspaceSnapshotStorage?.agentLists.running == [pi],
-                "stored \(String(describing: open.workspaceSnapshotStorage?.agentLists))")
-        #expect(open.workspaceSnapshotStorage?.latestConversationMessage == "old")
-        let closed = SidebarWorkspaceSnapshotRefreshPolicy().decision(current: current, next: next,
-            force: false, contextMenuVisible: false)
-        #expect(closed.workspaceSnapshotStorage == next, "a changed name redraws the row")
+        let suite = "cmux.monitoring.redraw.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let id = UUID()
+        let model = { (snapshot: SidebarWorkspaceSnapshotBuilder.Snapshot) in
+            SidebarAppKitRowCellTests.makeModel(workspaceId: id, settings: settings, snapshot: snapshot)
+        }
+        #expect(model(current) == model(current), "control: one snapshot gives one model")
+        #expect(model(current) != model(next), "a changed name redraws the row")
     }
 
-    @Test func aWaveformUpdatesWhileTheMenuKeepsOtherDetailsFrozen() {
-        let current = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "old")
-        let next = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "new", monitoringAgentCount: 1) // cmux-rbf: changed on purpose (#cm-128.6)
-        let decision = SidebarWorkspaceSnapshotRefreshPolicy().decision(current: current, next: next,
-            force: false, contextMenuVisible: true)
-        #expect(decision.workspaceSnapshotStorage?.monitoringAgentCount == 1)
-        #expect(decision.workspaceSnapshotStorage?.latestConversationMessage == "old")
-        #expect(decision.pendingWorkspaceSnapshot == next)
+    // cmux-rbf: changed on purpose (#cm-142.1): see above; the row model's inequality is what redraws the waveform.
+    @Test func aStartedMonitorRedrawsTheRow() throws {
+        let current = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "same")
+        let next = SidebarWorkspaceSnapshotRefreshPolicyTests.snapshot(latestConversationMessage: "same", monitoringAgentCount: 1) // cmux-rbf: changed on purpose (#cm-128.6)
+        #expect(next.monitoringAgentCount == 1)
+        let suite = "cmux.monitoring.waveform.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let id = UUID()
+        let model = { (snapshot: SidebarWorkspaceSnapshotBuilder.Snapshot) in
+            SidebarAppKitRowCellTests.makeModel(workspaceId: id, settings: settings, snapshot: snapshot)
+        }
+        #expect(model(current) == model(current), "control: one snapshot gives one model")
+        #expect(model(current) != model(next), "a started monitor redraws the row")
     }
 
     @Test func appKitShowsAStaticTwelvePointWaveformAndRemovesItWhenMonitoringEnds() throws {

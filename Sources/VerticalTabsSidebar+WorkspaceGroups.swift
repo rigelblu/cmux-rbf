@@ -1,4 +1,6 @@
 import AppKit
+import CmuxAppKitSupportUI
+import CmuxCommandPalette
 import CmuxFoundation
 import CmuxNotifications
 import SwiftUI
@@ -9,6 +11,7 @@ extension VerticalTabsSidebar {
     func sidebarWorkspaceGroupTableConfiguration(
         group: WorkspaceGroup,
         memberWorkspaceIds: [UUID],
+        memberStatusGlyphs: [UUID: SidebarCompactStatusGlyph.GroupMember],
         renderContext: WorkspaceListRenderContext
     ) -> SidebarWorkspaceTableRowConfiguration {
         let settings = renderContext.tabItemSettings
@@ -33,7 +36,11 @@ extension VerticalTabsSidebar {
             isMultiSelected: true,
             customColorHex: effectiveColor,
             colorScheme: renderContext.environment.colorScheme,
-            sidebarSelectionColorHex: settings.selectionColorHex
+            sidebarSelectionColorHex: settings.selectionColorHex,
+            brightenInDarkMode: settings.brightenInDarkMode,
+            unselectedFillOpacity: settings.unselectedFillOpacity,
+            increaseContrast: renderContext.environment.displayAccessibility.increaseContrast,
+            accent: settings.accentColor
         )
         let cwdContextMenuItems = resolvedConfig?.contextMenuItems ?? []
         let newWorkspacePlacement = resolvedConfig?.newWorkspacePlacement
@@ -46,6 +53,15 @@ extension VerticalTabsSidebar {
         let anchorUnreadSummary = unreadSnapshot.badgeSummary(forWorkspaceIds:
             group.isCollapsed ? badgeWorkspaceIds : liveAnchorId.map { [$0] } ?? [])
         let anchorUnreadCount = anchorUnreadSummary.unreadCount
+        // The tooltip leads with the notification text only where rows show it.
+        let showsNotificationMessage = settings.showsNotificationMessage
+        let statusGlyph = SidebarCompactStatusGlyph.groupHeader(
+            isCollapsed: group.isCollapsed,
+            anchorId: liveAnchorId,
+            memberIds: memberWorkspaceIds,
+            members: memberStatusGlyphs,
+            unread: { (unreadSnapshot.unreadCount(forWorkspaceId: $0), showsNotificationMessage ? unreadSnapshot.summary(forWorkspaceId: $0).latestNotificationText : nil) }
+        )
         let anchorIds = liveAnchorId.map { [$0] } ?? []
         let canMarkAnchorRead = unreadSnapshot.canMarkWorkspaceRead(forWorkspaceIds: anchorIds)
         let canMarkAnchorUnread = unreadSnapshot.canMarkWorkspaceUnread(forWorkspaceIds: anchorIds)
@@ -103,6 +119,8 @@ extension VerticalTabsSidebar {
             hasLatestNotifications: anchorHasLatestNotification,
             canMarkAllRead: canMarkAllRead,
             canMarkAllUnread: canMarkAllUnread,
+            statusGlyph: statusGlyph,
+            compactsAgentStatus: settings.compactsAgentStatus,
             // Dead until `#cm-29`: no hint is computed for group headers.
             // `#cm-28` first excluded them because grouped workspaces left the
             // numbering; `#cm-37` gave an expanded group's *members* their
@@ -129,7 +147,9 @@ extension VerticalTabsSidebar {
             isFoldedOverSelection: headerOnlyLook.isFoldedOverSelection, // (#cm-106)
             holdsGroups: renderContext.workspaceGroups.contains { $0.parentGroupId == group.id }, // (#cm-106) (#cm-110.2)
             groupStatusGlyph: Self.workspaceGroupStatusGlyph(for: group), // (#cm-110.2)
-            groupStatusMenu: Self.workspaceGroupStatusMenu(for: group) // (#cm-110.2)
+            groupStatusMenu: Self.workspaceGroupStatusMenu(for: group), // (#cm-110.2)
+            notificationBadgeColorHex: settings.notificationBadgeColorHex,
+            accentColor: settings.accentColor
         )
         let actions = makeWorkspaceGroupHeaderActions(
             groupId: group.id,
@@ -147,8 +167,8 @@ extension VerticalTabsSidebar {
                 .union(liveAnchorId.map { [$0] } ?? []),
             unreadRebuild: {
                 [model, liveAnchorId,
-                 isCollapsed = group.isCollapsed, badgeWorkspaceIds,
-                 nonAnchorMemberIds] snapshot in
+                 isCollapsed = group.isCollapsed, badgeWorkspaceIds, memberWorkspaceIds,
+                 nonAnchorMemberIds, memberStatusGlyphs, showsNotificationMessage] snapshot in
                 // Membership and collapse are structural row inputs, so their
                 // changes rebuild this configuration. Reuse the render context's
                 // indexed members instead of rescanning every tab per unread row.
@@ -171,6 +191,13 @@ extension VerticalTabsSidebar {
                 )
                 fresh.canMarkAllUnread = snapshot.canMarkWorkspaceUnread(
                     forWorkspaceIds: nonAnchorMemberIds
+                )
+                fresh.statusGlyph = SidebarCompactStatusGlyph.groupHeader(
+                    isCollapsed: isCollapsed,
+                    anchorId: liveAnchorId,
+                    memberIds: memberWorkspaceIds,
+                    members: memberStatusGlyphs,
+                    unread: { (snapshot.unreadCount(forWorkspaceId: $0), showsNotificationMessage ? snapshot.summary(forWorkspaceId: $0).latestNotificationText : nil) }
                 )
                 return fresh
             }
@@ -211,6 +238,7 @@ extension VerticalTabsSidebar {
         group: WorkspaceGroup,
         memberWorkspaceIds: [UUID],
         renderContext: WorkspaceListRenderContext,
+        memberStatusGlyphs: [UUID: SidebarCompactStatusGlyph.GroupMember],
         unreadSnapshot: SidebarUnreadSnapshot,
         notificationIndex: SidebarWorkspaceNotificationIndex,
         shouldCollectWorkspaceDropTargets: Bool
@@ -235,7 +263,11 @@ extension VerticalTabsSidebar {
             isMultiSelected: true,
             customColorHex: effectiveColor,
             colorScheme: renderContext.environment.colorScheme,
-            sidebarSelectionColorHex: settings.selectionColorHex
+            sidebarSelectionColorHex: settings.selectionColorHex,
+            brightenInDarkMode: settings.brightenInDarkMode,
+            unselectedFillOpacity: settings.unselectedFillOpacity,
+            increaseContrast: renderContext.environment.displayAccessibility.increaseContrast,
+            accent: settings.accentColor
         )
         let cwdContextMenuItems = resolvedConfig?.contextMenuItems ?? []
         let newWorkspacePlacement = resolvedConfig?.newWorkspacePlacement
@@ -245,6 +277,16 @@ extension VerticalTabsSidebar {
         let anchorUnreadSummary = unreadSnapshot.badgeSummary(forWorkspaceIds:
             group.isCollapsed ? badgeWorkspaceIds : liveAnchorId.map { [$0] } ?? [])
         let anchorUnreadCount = anchorUnreadSummary.unreadCount
+        let statusGlyph = SidebarCompactStatusGlyph.groupHeader(
+            isCollapsed: group.isCollapsed,
+            anchorId: liveAnchorId,
+            memberIds: memberWorkspaceIds,
+            members: memberStatusGlyphs,
+            unread: {
+                let summary = unreadSummariesByWorkspaceId[$0]
+                return (summary?.unreadCount ?? 0, settings.showsNotificationMessage ? summary?.latestNotificationText : nil)
+            }
+        )
         let canMarkAnchorRead = unreadSnapshot.canMarkWorkspaceRead(
             forWorkspaceIds: liveAnchorId.map { [$0] } ?? []
         )
@@ -306,6 +348,8 @@ extension VerticalTabsSidebar {
             hasLatestNotifications: anchorHasLatestNotification,
             canMarkAllRead: canMarkAllRead,
             canMarkAllUnread: canMarkAllUnread,
+            statusGlyph: statusGlyph,
+            compactsAgentStatus: settings.compactsAgentStatus,
             shortcutDigit: nil,
             shortcutModifierSymbol: nil,
             showsShortcutHint: false,
@@ -329,7 +373,8 @@ extension VerticalTabsSidebar {
             listWidth: renderContext.listWidth, // (#cm-106)
             dropLineLevel: (topDropIndicatorVisible || bottomDropIndicatorVisible) ? dragState.dropIndicatorLevel : nil, // (#cm-106) (#cm-110.2)
             groupStatusGlyph: Self.workspaceGroupStatusGlyph(for: group), // (#cm-110.2)
-            groupStatusMenu: Self.workspaceGroupStatusMenu(for: group) // (#cm-110.2)
+            groupStatusMenu: Self.workspaceGroupStatusMenu(for: group), // (#cm-110.2)
+            notificationBadgeColorHex: settings.notificationBadgeColorHex
         )
     }
 
@@ -360,6 +405,7 @@ extension VerticalTabsSidebar {
             isAnchorActive: snapshot.isAnchorActive,
             isMultiSelected: snapshot.isMultiSelected,
             multiSelectionBackgroundStyle: snapshot.multiSelectionBackgroundStyle,
+            anchorActiveEdgeColor: snapshot.anchorActiveEdgeColor,
             memberCount: snapshot.memberCount,
             anchorUnreadCount: snapshot.anchorUnreadCount,
             anchorMarkedUnread: snapshot.anchorMarkedUnread,
@@ -368,6 +414,8 @@ extension VerticalTabsSidebar {
             hasLatestNotifications: snapshot.hasLatestNotifications,
             canMarkAllRead: snapshot.canMarkAllRead,
             canMarkAllUnread: snapshot.canMarkAllUnread,
+            statusGlyph: snapshot.statusGlyph,
+            compactsAgentStatus: snapshot.compactsAgentStatus,
             shortcutDigit: snapshot.shortcutDigit,
             shortcutModifierSymbol: snapshot.shortcutModifierSymbol,
             showsShortcutHint: snapshot.showsShortcutHint,
@@ -391,6 +439,7 @@ extension VerticalTabsSidebar {
             listWidth: snapshot.listWidth, // (#cm-106)
             groupStatusGlyph: snapshot.groupStatusGlyph, // (#cm-110.2)
             groupStatusMenu: snapshot.groupStatusMenu, // (#cm-110.2)
+            notificationBadgeColorHex: snapshot.notificationBadgeColorHex,
             actions: actions,
             onContextMenuAppear: {},
             onContextMenuDisappear: {}
@@ -499,10 +548,14 @@ extension VerticalTabsSidebar {
             },
             onTapPlus: { [weak tabManager] in
                 guard let tabManager else { return }
-                _ = tabManager.createWorkspaceInGroup(
-                    groupId: groupId,
-                    placement: resolvePlacement()
-                )
+                if tabManager.isChiefHomeGroup(groupId) {
+                    ChiefHomeNavigation.newConversation(in: tabManager)
+                } else {
+                    _ = tabManager.createWorkspaceInGroup(
+                        groupId: groupId,
+                        placement: resolvePlacement()
+                    )
+                }
             },
             onRunResolvedItem: { [weak tabManager] item in
                 guard let tabManager else { return }
@@ -512,14 +565,21 @@ extension VerticalTabsSidebar {
                     groupId: groupId
                 )
             },
-            onRename: { [weak tabManager] in
+            onRename: { [weak tabManager, resolveLiveAnchor] in
+                // Group headers have no inline title editor; rename in the
+                // palette editor, which already owns group renames.
                 guard let tabManager else { return }
                 let currentName = tabManager.workspaceGroups
                     .first(where: { $0.id == groupId })?.name ?? fallbackGroupName
-                presentSidebarWorkspaceGroupRenamePrompt(
-                    tabManager: tabManager,
-                    groupId: groupId,
-                    currentName: currentName
+                AppDelegate.shared?.requestCommandPaletteRename(
+                    CommandPaletteRenameTarget(
+                        kind: .workspaceGroup(groupId: groupId),
+                        currentName: currentName
+                    ),
+                    preferredWindow: resolveLiveAnchor().flatMap {
+                        AppDelegate.shared?.mainWindowContainingWorkspace($0.1)
+                    },
+                    source: "groupContextMenu.rename"
                 )
             },
             onSetColor: { [weak tabManager] hex in
@@ -588,6 +648,7 @@ extension VerticalTabsSidebar {
             },
             onDelete: { [weak tabManager] in
                 guard let tabManager,
+                      !tabManager.isChiefHomeGroup(groupId),
                       let confirmation = tabManager.workspaceGrouping.deletionConfirmation(
                           groupId: groupId,
                           fallbackGroupName: fallbackGroupName,
@@ -607,7 +668,7 @@ extension VerticalTabsSidebar {
                         return
                     }
                 }
-                tabManager.workspaceGrouping.deleteWorkspaceGroup(confirmed: confirmation)
+                tabManager.deleteWorkspaceGroup(confirmed: confirmation)
             },
             onEditConfig: {
                 SidebarWorkspaceGroupConfigOpener.openCmuxConfigInEditor()
@@ -634,25 +695,37 @@ extension VerticalTabsSidebar {
         selectedTabIds: Binding<Set<UUID>>,
         lastSidebarSelectionIndex: Binding<Int?>
     ) {
+        guard let group = tabManager.workspaceGroups.first(where: { $0.id == groupId }) else { return }
+        // A click on the name of a header with no workspace behind it folds or unfolds the group, in every window (#cm-106).
+        // Before upstream's anchor guard, which would otherwise return first.
+        if !modifiers.contains(.command), !modifiers.contains(.shift),
+           tabManager.workspaceGroupAnchor(for: groupId) == nil {
+            tabManager.toggleWorkspaceGroupCollapsed(groupId: groupId)
+            return
+        }
+        guard let anchor = tabManager.workspaceGroupAnchor(for: groupId),
+              let target = tabManager.workspaceGroupHeaderTarget(for: groupId) else { return }
+        let hasRealMember = tabManager.tabs.contains { $0.groupId == groupId && $0.id != anchor.id }
+        if group.anchorWorkspaceProvenance == .generated,
+           !hasRealMember,
+           tabManager.workspaceGroupGeneratedAnchorIsUntouched(anchor) {
+            tabManager.toggleWorkspaceGroupCollapsed(groupId: groupId)
+            return
+        }
+
         let anchorId: UUID
         if modifiers.contains(.command) || modifiers.contains(.shift) {
-            guard let anchor = tabManager.workspaceGroupAnchor(for: groupId) else { return }
             let selection = SidebarSelectionKindPolicy().anchorCmdClickSelection(
                 current: selectedTabIds.wrappedValue,
                 clickedAnchorId: anchor.id,
                 anchorIds: Set(tabManager.workspaceGroups.compactMap(\.liveAnchorWorkspaceId))
             )
             selectedTabIds.wrappedValue = selection
-            guard let selectedAnchor = tabManager.selectWorkspaceGroupAnchor(for: groupId) else { return }
-            anchorId = selectedAnchor.id
+            tabManager.selectWorkspace(target)
+            anchorId = anchor.id
         } else {
-            // A click on the name of a header with no workspace behind it folds or unfolds the group, in every window (#cm-106).
-            if tabManager.workspaceGroupAnchor(for: groupId) == nil {
-                tabManager.toggleWorkspaceGroupCollapsed(groupId: groupId)
-                return
-            }
-            guard let selectedAnchor = tabManager.selectWorkspaceGroupAnchor(for: groupId) else { return }
-            anchorId = selectedAnchor.id
+            tabManager.selectWorkspace(target)
+            anchorId = target.id
             if selectedTabIds.wrappedValue != [anchorId] {
                 selectedTabIds.wrappedValue = [anchorId]
             }

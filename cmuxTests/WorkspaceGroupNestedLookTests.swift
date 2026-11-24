@@ -56,7 +56,8 @@ struct WorkspaceGroupNestedLookTests {
             colorSchemeIsDark: isDark,
             depth: depth,
             hasOwnWorkspace: hasOwnWorkspace,
-            isFoldedOverSelection: isFoldedOverSelection
+            isFoldedOverSelection: isFoldedOverSelection,
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): upstream made it required
         )
     }
 

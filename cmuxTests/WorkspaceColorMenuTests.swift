@@ -182,6 +182,28 @@ struct WorkspaceColorMenuTests {
         }
     }
 
+    #if compiler(>=6.4)
+    /// macOS 27 hides menu item images by default, which dropped the swatches.
+    @Test
+    func paletteSwatchesOptIntoVisibleImages() {
+        guard #available(macOS 27.0, *) else { return }
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's `SidebarWorkspaceRowColorMenu` stays deleted (#cm-97);
+        // the fork's shared `SidebarColorSubmenu` draws the swatches, so the opt-in is checked there.
+        let menu = SidebarColorSubmenu.make(
+            targetHexes: [nil],
+            apply: { _ in },
+            promptCustomColor: {}
+        )
+        let visiblePalette = WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: [nil]).compactMap {
+            if case let .paletteEntry(entry) = $0.kind { return entry }; return nil
+        }
+        #expect(!visiblePalette.isEmpty)
+        let swatches = Array(menu.items.dropFirst(3).prefix(visiblePalette.count))
+        #expect(swatches.map(\.title) == visiblePalette.map(\.displayName))
+        #expect(swatches.allSatisfy { $0.preferredImageVisibility == .visible })
+    }
+    #endif
+
     @Test
     func unmatchedCustomColorLeavesNamedPaletteItemsUnmarked() throws {
         let palette = WorkspaceTabColorSettings.labeledPaletteEntries()

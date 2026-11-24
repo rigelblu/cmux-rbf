@@ -3,6 +3,7 @@ import Bonsplit
 import CMUXAgentLaunch
 import CmuxAgentChat
 import CmuxBrowser
+import CmuxMobileHost
 import CmuxSettings
 import Foundation
 import Testing
@@ -150,6 +151,11 @@ struct FigmaBoardLayoutWorkspaceTests {
         func navigate(_ address: String) {
             browser.navigateWithoutInsecureHTTPPrompt(request: URLRequest(url: URL(string: address)!),
                 recordTypedNavigation: false, trustedInternalNavigation: true)
+            // cmux-rbf: changed on purpose (#cm-142.1): upstream's #18318 publishes the web view's address on a later
+            // main-actor turn, and not while the load is provisional. Publish what the observer published here before,
+            // the address the web view took, through its seam: a refused load leaves the old file and fails below. The
+            // subject is which file the board matches.
+            browser.publishObservedDocumentURL(browser.webView.url)
         }
         @discardableResult func send(_ orientation: BoardLayoutOrientation, automatic: Bool = false) -> Bool {
             w.handOffBoardLayout(orientation, requireChange: automatic, registry: registry, home: home,

@@ -505,6 +505,10 @@ struct FigmaPreviewPageSchemeTests {
             // goBack, goForward and the funnel set the user agent for the target first; without it the delegate restarts the navigation.
             panel.webView.applyBrowserUserAgentPolicy(for: page)
             delegate.webView(panel.webView, decidePolicyFor: FakeNavigationAction(page, frame: frame, type: type)) { policy = $0 }
+            // cmux-rbf: changed on purpose (#cm-142.1): upstream's #14502 decides an allowed main-frame action on a later
+            // main-actor task, after its local-file encoding probe. Wait for the decision (5 s at most) before reading it.
+            let deadline = Date().addingTimeInterval(5)
+            while policy == nil, Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
             return (policy, delegate.refusedFigmaPreviewPageURLs, delegate.lastAttemptedURL, panel.currentURL)
         }
         let backForward = try await decide(KeptFrames.main, .backForward, onPage: true)
@@ -694,6 +698,10 @@ struct FigmaPreviewPageSchemeTests {
         defer { panel.close() }
         let target = address(newPage, node: "172-310")
         panel.navigate(to: target)
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's #18318 publishes the web view's address on a later
+        // main-actor turn, and skips it once WebKit reports the provisional load, so whether it lands is a race. Publish
+        // the address the observer published here before, through the same seam; this test's subject is the guard below.
+        panel.publishObservedDocumentURL(target)
         try #require(panel.currentURL == target, "fixture: the funnel did not set the pane's address")
         panel.publishObservedDocumentURL(nil)
         #expect(panel.currentURL == target, "the pending page address was cleared: \(String(describing: panel.currentURL))")
@@ -731,6 +739,9 @@ struct FigmaPreviewPageSchemeTests {
         let editorView = pane.webView
         try #require(editorView !== held, "fixture: the editor did not get its own web view")
         editorView.stopLoading()
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's #18318 delivers the web view's address one main-actor turn
+        // later; let the switch's and the stop's deliveries land before the fixture sets the address the tests compare to.
+        await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         pane.publishObservedDocumentURL(editor)
         let editorDelegate = try #require(editorView.navigationDelegate as? BrowserNavigationDelegate)
         try #require(editorDelegate !== heldDelegate, "fixture: both sides share one delegate")
@@ -765,6 +776,25 @@ struct FigmaPreviewPageSchemeTests {
         #expect(shown.editorDelegate.lastAttemptedURL != page, "the editor's web view was asked to load the page")
         #expect(shown.editorView.url?.path != newPage.path, "the editor's web view turned into the preview: \(String(describing: shown.editorView.url))")
         #expect(shown.pane.currentURL == editor, "the pane's address moved to \(String(describing: shown.pane.currentURL))")
+    }
+
+    // cmux-rbf (#cm-73.3, #cm-142.1): review-b2 N2 (B3-1). The pane keeps one restoration state, for the web view on show;
+    // a form posted in a frame of the held page must not mark it.
+    @Test("A form posted in a frame of the held page leaves the restoration state of the page on show alone")
+    func heldSubframeFormPostLeavesTheShownPagesRestorationState() async throws {
+        let shown = try await paneHoldingThePreview(node: "12-2")
+        defer { shown.pane.close() }
+        let post = URL(string: "https://www.figma.com/cmux-test/form")!
+        try #require(!shown.pane.pageRestoration.liveContainsFormSubmission, "fixture: the pane already records a form submission")
+        var policy: WKNavigationActionPolicy?
+        shown.heldDelegate.webView(shown.held, decidePolicyFor: FakeNavigationAction(post, frame: KeptFrames.sub, type: .formSubmitted, method: "POST")) { policy = $0 }
+        #expect(policy == .allow, "the held page's frame was not allowed: \(String(describing: policy?.rawValue))")
+        #expect(!shown.pane.pageRestoration.liveContainsFormSubmission, "the held page's form post marked the page on show")
+        // Control: the same post in a frame of the page on show is recorded, so the fixture reaches the note.
+        var shownPolicy: WKNavigationActionPolicy?
+        shown.editorDelegate.webView(shown.editorView, decidePolicyFor: FakeNavigationAction(post, frame: KeptFrames.sub, type: .formSubmitted, method: "POST")) { shownPolicy = $0 }
+        #expect(shownPolicy == .allow)
+        #expect(shown.pane.pageRestoration.liveContainsFormSubmission, "control: the page on show's own form post was not recorded")
     }
 
     @Test("A repair noted for one navigation is dropped when the next navigation starts")
@@ -1048,8 +1078,10 @@ private final class FakeNavigationAction: WKNavigationAction {
     private let fakeTargetFrame: WKFrameInfo?
     private let fakeType: WKNavigationType
 
-    init(_ url: URL, frame: WKFrameInfo? = nil, type: WKNavigationType = .linkActivated) {
-        fakeRequest = URLRequest(url: url)
+    init(_ url: URL, frame: WKFrameInfo? = nil, type: WKNavigationType = .linkActivated, method: String = "GET") {
+        var request = URLRequest(url: url)
+        request.httpMethod = method // cmux-rbf (#cm-73.3, #cm-142.1): a form post, for the held page's frames (B3-1)
+        fakeRequest = request
         fakeTargetFrame = frame
         fakeType = type
         super.init()
@@ -1100,6 +1132,9 @@ private final class FakeFrameInfo: WKFrameInfo {
         super.init()
     }
     override var isMainFrame: Bool { main }
+    // cmux-rbf: changed on purpose (#cm-142.1): upstream's REPL guard reads a navigation's source frame's web view
+    // (`BrowserReplDocumentProvenance.makers(of:)`); WebKit's own getter crashes on a stand-in (CFRetain NULL).
+    override var webView: WKWebView? { nil }
 }
 
 /// Window features with only a width, so a scripted open counts as a popup.

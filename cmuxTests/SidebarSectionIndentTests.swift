@@ -233,12 +233,12 @@ struct SidebarSectionIndentMountedTests {
             let keys = ["p1", "g1", "u", "w", "c1", "r1", "m1", "v", "q1"]
             for key in keys { let workspace = Workspace(); workspace.hideTaskStatus(); ws[key] = workspace }
             manager.tabs = keys.compactMap { ws[$0] }
-            let g = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ws["g1"]!.id]))
-            let r = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ws["r1"]!.id]))
-            let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ws["q1"]!.id]))
+            let g = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ws["g1"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+            let r = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ws["r1"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+            let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ws["q1"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             var m: UUID?
             if nested {
-                m = try #require(manager.createWorkspaceGroup(name: "M", childWorkspaceIds: [ws["m1"]!.id]))
+                m = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "M", childWorkspaceIds: [ws["m1"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
                 _ = manager.moveWorkspaceGroup(groupId: try #require(m), intoParent: r)
                 ws["m"] = try #require(manager.workspaceGroupAnchor(for: try #require(m)))
             } else {
@@ -336,8 +336,30 @@ struct SidebarSectionIndentMountedTests {
         return try #require(cell.currentModelForTesting).depth
     }
 
+    /// cmux-rbf: changed on purpose (#cm-142.1): in batch u33 every 19-row window left its last row unrealized and every window of
+    /// 17 rows or fewer realized all of them (R6a), so the row can sit below the table's visible rect, not only arrive late. Scroll
+    /// the lowest unrealized row into view and drain, bounded, until `key`'s row is drawn.
+    func realize(_ mounted: Mounted, workspace key: String, in world: World) async throws {
+        let id = world.w(key).id
+        func drawn() -> Bool {
+            descendants(of: SidebarWorkspaceRowTableCellView.self, in: mounted.table)
+                .contains { $0.currentModelForMeasurement?.workspaceId == id }
+        }
+        for _ in 0..<200 where !drawn() {
+            let table = mounted.table
+            if let row = (0..<table.numberOfRows).last(where: { table.view(atColumn: 0, row: $0, makeIfNecessary: false) == nil }) {
+                table.scrollRowToVisible(row)
+            }
+            await drain(mounted.window, iterations: 5)
+        }
+        try #require(drawn(), "row \(key) is drawn (rows \(mounted.table.numberOfRows), visible \(mounted.table.rows(in: mounted.table.visibleRect)))")
+    }
+
     private func gate(_ body: @MainActor () async throws -> Void) async throws {
-        try await AppContextSerialGate.withExclusiveAppContext { try await body() }
+        try await AppContextSerialGate.withExclusiveAppContext {
+            let restoreChief = ChiefOffForMountedSidebar.turnOff(); defer { restoreChief() } // cmux-rbf: changed on purpose (#cm-142.1): upstream's ContentView makes Chief Home on appear
+            try await body()
+        }
     }
 
     // MARK: rows
@@ -359,6 +381,7 @@ struct SidebarSectionIndentMountedTests {
             #expect(try depth(mounted, group: world.g) == 1, "a pinned group's header")
             #expect(try depth(mounted, workspace: "g1", in: world) == 2, "a pinned group's member")
             // Under Statuses: where they were (a loose status member 2, a group under its status 2, its member 3).
+            try await realize(mounted, workspace: "v", in: world) // cmux-rbf: changed on purpose (#cm-142.1): v is the 19th row
             #expect(try depth(mounted, workspace: "v", in: world) == 2, "a loose row under a status")
             #expect(try depth(mounted, group: world.q) == 2, "a group header under a status")
             #expect(try depth(mounted, workspace: "q1", in: world) == 3, "and its member")

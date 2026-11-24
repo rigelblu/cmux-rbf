@@ -379,6 +379,11 @@ struct FigmaPageSwitchTests {
         let boardDoc = URL(string: "https://www.figma.com/board/KEY/whiteboard")!
         let boardPreview = try FigmaPaneURL.destination(for: boardDoc, node: "12-2", motion: true).url
         figma.navigate(to: boardPreview)
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's #18318 publishes the web view's address on a later
+        // main-actor turn, and not while the load is provisional. Publish what the observer published here before,
+        // the address the web view took, through its seam: a refused load leaves the design preview and fails below.
+        // The subject is the motion rule for a board.
+        figma.publishObservedDocumentURL(figma.webView.url)
         #expect(workspace.figmaMotionTarget() == nil)
         snapshot.setBool(CommandPaletteContextKeys.workspaceCanToggleFigmaMotion, workspace.figmaMotionTarget() != nil)
         #expect(!contribution.enablement(snapshot))

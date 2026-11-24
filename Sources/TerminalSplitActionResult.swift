@@ -10,6 +10,9 @@ enum TerminalSplitActionResult: Equatable {
     case unsupported(TerminalSplitUnsupportedReason)
     /// The split was attempted and did not happen.
     case failed
+    /// cmux-rbf (#cm-142.1): upstream's `TerminalPanelCreationOutcome.noSpace` (#15371): a
+    /// resulting pane would fall below the minimum size, so nothing was created.
+    case noSpace
 
     /// Whether the entry point must stop without attempting a fallback.
     var isHandled: Bool {
@@ -20,7 +23,7 @@ enum TerminalSplitActionResult: Equatable {
     var didSucceed: Bool {
         switch self {
         case .created, .routedToRemote: return true
-        case .unsupported, .failed: return false
+        case .unsupported, .failed, .noSpace: return false // cmux-rbf (#cm-142.1)
         }
     }
 
@@ -35,7 +38,7 @@ enum TerminalSplitActionResult: Equatable {
         case .unsupported:
             beep()
             return true
-        case .created, .routedToRemote, .failed:
+        case .created, .routedToRemote, .failed, .noSpace: // cmux-rbf (#cm-142.1)
             return false
         }
     }

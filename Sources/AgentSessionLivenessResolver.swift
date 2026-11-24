@@ -1,4 +1,6 @@
 import CmuxAgentJournal
+import CmuxFoundation
+import CmuxMobileHost
 import Foundation
 
 /// A PID that fits `pid_t` and can name a process.

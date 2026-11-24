@@ -7,16 +7,30 @@ extension AgentJournalLifecycleCenter {
     struct LifecycleApplication: Sendable {
         let assignment: AgentLifecycleAssignment
         let workspaceHint: String?
+        /// The meaningful transition this live event caused, if any. Drives
+        /// agent-activity sidebar ordering; startup replay never sets it.
+        let activity: AgentLifecycleActivity?
+        /// The app's own drain check settled this pane to idle, so no hook
+        /// will replace its Waiting pill.
+        var settledDrainedBackgroundWork = false
     }
 
+    /// - Parameter sourceKind: The kind the producer emitted. The notification
+    ///   reconciler rewrites some kinds (idle observations, attention
+    ///   resolutions, child events) into phase assertions before reduction;
+    ///   ordering must classify the original kind, not the rewrite.
     static func reduceIngest(
         _ event: AgentJournalEvent,
+        sourceKind: AgentJournalEventKind? = nil,
         aliases: AgentJournalAliasResolver,
         reducer: AgentLifecycleReducer,
         state: inout AgentLifecycleReducerState
     ) -> LifecycleApplication? {
         guard event.kind != .messagePublished else { return nil }
         let canonical = canonicalized(event, aliases: aliases)
+        let previousPhase = canonical.draft.surfaceId.flatMap {
+            state.combinedPhase(surfaceId: $0, agentKey: canonical.agentKey)
+        }
         reducer.apply(canonical, to: &state)
         guard canonical.draft.unattributedReason == nil else {
             publishUnattributedDiagnostic(canonical)
@@ -27,15 +41,50 @@ extension AgentJournalLifecycleCenter {
             return nil
         }
         guard !canonical.draft.isSubagent else { return nil }
+        let phase = state.combinedPhase(surfaceId: surfaceId, agentKey: canonical.agentKey)
         return LifecycleApplication(
             assignment: AgentLifecycleAssignment(
                 surfaceId: surfaceId,
                 agentKey: canonical.agentKey,
-                phase: state.combinedPhase(surfaceId: surfaceId, agentKey: canonical.agentKey),
-                usageLimit: state.hasUsageLimit(surfaceId: surfaceId, agentKey: canonical.agentKey)
+                phase: phase,
+                usageLimit: state.hasUsageLimit(surfaceId: surfaceId, agentKey: canonical.agentKey) // cmux-rbf (#cm-128.5)
             ),
-            workspaceHint: canonical.draft.workspaceId
+            workspaceHint: canonical.draft.workspaceId,
+            activity: AgentLifecycleActivity.classify(
+                event: sourceKind ?? canonical.kind,
+                from: previousPhase,
+                to: phase
+            ),
+            settledDrainedBackgroundWork: (previousPhase == .backgroundWorkPending || previousPhase == .monitoring) // cmux-rbf (#cm-142.1, cm-128.3)
+                && phase == .idle
+                && canonical.draft.nativeEvent == ClaudeBackgroundWorkDrain.nativeEvent
         )
+    }
+
+    /// The drain check's synthetic completion, admitted only while its
+    /// session and pane still wait on background work, and stamped with the
+    /// session's newest event time instead of the check's. A turn that began
+    /// meanwhile keeps the pane whichever of the two commits first: the drain
+    /// never raises the watermark a late-committed hook is judged against.
+    /// Every other event passes through unchanged.
+    static func admittingBackgroundWorkDrain(
+        _ event: AgentJournalEvent,
+        state: AgentLifecycleReducerState
+    ) -> AgentJournalEvent? {
+        guard event.draft.nativeEvent == ClaudeBackgroundWorkDrain.nativeEvent else { return event }
+        guard let surfaceId = event.draft.surfaceId,
+              let combined = state.combinedPhase(surfaceId: surfaceId, agentKey: event.agentKey),
+              combined == .backgroundWorkPending || combined == .monitoring, // cmux-rbf (#cm-142.1, cm-128.3)
+              let session = state.session(
+                  surfaceId: surfaceId,
+                  agentKey: event.agentKey,
+                  sessionKey: AgentLifecycleReducerState.sessionKey(for: event.draft)
+              ),
+              !session.ended,
+              session.phase == .backgroundWorkPending || session.phase == .monitoring else { return nil } // cmux-rbf (#cm-142.1, cm-128.3)
+        var draft = event.draft
+        draft.occurredAtMs = session.lastOccurredAtMs
+        return AgentJournalEvent(sequence: event.sequence, committedAtMs: event.committedAtMs, draft: draft)
     }
 
     static func reduceStartupReplay(
@@ -73,7 +122,10 @@ extension AgentJournalLifecycleCenter {
             }
             if page.isEmpty { break }
             for event in page.events {
-                let canonical = canonicalized(event, aliases: aliases)
+                guard let canonical = admittingBackgroundWorkDrain(
+                    canonicalized(event, aliases: aliases),
+                    state: state
+                ) else { continue }
                 fold(canonical, reducer: reducer, state: &state, notifications: &notifications)
                 let draft = canonical.draft
                 if !draft.isSubagent, let surfaceId = draft.surfaceId, let workspaceId = draft.workspaceId,
@@ -232,7 +284,13 @@ extension AgentJournalLifecycleCenter {
     /// - Parameter appDelegate: Where to look the panel up; `AppDelegate.shared` when nil. A center built for a test passes
     ///   its own, so a suite that reassigns `AppDelegate.shared` meanwhile cannot redirect the projection. (cm-128.2)
     @MainActor
-    static func apply(_ assignment: AgentLifecycleAssignment, workspaceHint: String?, appDelegate: AppDelegate? = nil) {
+    static func apply(
+        _ assignment: AgentLifecycleAssignment,
+        workspaceHint: String?,
+        appDelegate: AppDelegate? = nil,
+        activity: AgentLifecycleActivity? = nil,
+        settledDrainedBackgroundWork: Bool = false
+    ) {
         guard AgentHibernationLifecycleStatusKeys.isAllowed(assignment.agentKey) else { return }
         guard let panelId = UUID(uuidString: assignment.surfaceId) else { return }
         let owner: ControlSidebarPanelOwner?
@@ -282,6 +340,16 @@ extension AgentJournalLifecycleCenter {
         } else {
             owner.clearAgentLifecycle(key: assignment.agentKey, panelId: panelId)
         }
+        if settledDrainedBackgroundWork, assignment.phase == .idle {
+            owner.setStatusEntry(
+                ClaudeBackgroundWorkDrain.idleStatusEntry(),
+                key: assignment.agentKey,
+                panelId: panelId
+            )
+        }
+        if let activity, case .workspace(let workspace) = owner {
+            WorkspaceActivityReorderController.shared.agentActivity(activity, workspaceId: workspace.id)
+        }
 #if DEBUG
         cmuxDebugLog(
             "agentJournal.apply surface=\(assignment.surfaceId.prefix(8)) " +
@@ -296,6 +364,7 @@ extension AgentJournalLifecycleCenter {
         switch phase {
         case .unknown: .unknown
         case .running: .running
+        case .backgroundWorkPending: .backgroundWorkPending
         case .monitoring: .monitoring
         case .needsInput: .needsInput
         case .idle: .idle

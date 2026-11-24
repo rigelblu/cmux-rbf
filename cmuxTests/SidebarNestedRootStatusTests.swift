@@ -84,11 +84,11 @@ struct SidebarNestedRootStatusTests {
                 let workspace = Workspace(); workspace.hideTaskStatus(); ws[key] = workspace
             }
             manager.tabs = ["u", "r1", "r2", "n1", "n2", "m1", "g1", "q1", "v", "p1"].compactMap { ws[$0] }
-            let r = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ws["r1"]!.id, ws["r2"]!.id]))
-            let n = try #require(manager.createWorkspaceGroup(name: "N", childWorkspaceIds: [ws["n1"]!.id, ws["n2"]!.id]))
-            let m = try #require(manager.createWorkspaceGroup(name: "M", childWorkspaceIds: [ws["m1"]!.id]))
-            let g = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ws["g1"]!.id]))
-            let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ws["q1"]!.id]))
+            let r = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ws["r1"]!.id, ws["r2"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+            let n = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "N", childWorkspaceIds: [ws["n1"]!.id, ws["n2"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+            let m = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "M", childWorkspaceIds: [ws["m1"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+            let g = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ws["g1"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+            let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ws["q1"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             _ = manager.moveWorkspaceGroup(groupId: m, intoParent: n)
             _ = manager.moveWorkspaceGroup(groupId: n, intoParent: r)
             for (key, group) in [("r", r), ("n", n), ("m", m), ("g", g), ("q", q)] {
@@ -616,7 +616,9 @@ struct SidebarNestedRootStatusTests {
                 MobileWorkspaceListObserver.subscriberPresenceOverrideForTesting = previousPresence
             }
             let root = VerticalTabsSidebar(
-                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: flags,
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(),
+                sessionIndexStore: SessionIndexStore(), // cmux-rbf (#cm-142.1): upstream's new parameter, as its own tests pass it
+                featureFlags: flags,
                 sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
                 windowId: windowId, onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
                 observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,

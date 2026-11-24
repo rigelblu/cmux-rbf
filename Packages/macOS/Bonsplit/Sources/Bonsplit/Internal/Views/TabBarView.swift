@@ -47,6 +47,11 @@ public enum BonsplitTabBarHitRegionRegistry {
     }
 }
 
+/// Tab item hit regions are AppKit views queried from `hitTest`, so the
+/// requirement is statically main-actor isolated. A dynamic
+/// `MainActor.assumeIsolated` check here aborted inside the macOS 26.1 Swift
+/// concurrency runtime ("Attempt to use unknown class") during hit testing.
+@MainActor
 public protocol BonsplitTabItemHitRegionProviding: AnyObject {
     func containsBonsplitTabItemHit(localPoint: NSPoint) -> Bool
 }
@@ -83,6 +88,11 @@ public enum BonsplitTabItemHitRegionRegistry {
         return true
     }
 
+    /// Main-actor only: it asks AppKit views for their hit regions. Callers
+    /// are AppKit hit-test and event paths that already run on the main
+    /// thread; `@preconcurrency` keeps existing Swift 5 mode callers that are
+    /// not annotated yet source compatible.
+    @preconcurrency @MainActor
     public static func containsWindowPoint(_ windowPoint: CGPoint, in window: NSWindow) -> Bool {
         for view in snapshot() {
             guard view.window === window,
@@ -196,7 +206,23 @@ enum TabBarStyling {
         )
     }
 
+    /// Resolves a configured split-button icon name to the glyph the tab bar
+    /// should draw.
+    ///
+    /// Memoized, because `splitActionButtonIcon` calls this during every tab
+    /// bar body evaluation, once per split button, and resolving is far more
+    /// expensive than it looks. See ``resolveSplitActionSystemImage(for:)``.
     static func splitActionSystemImage(for name: String) -> SplitActionSystemImage {
+        SplitActionSystemImageCache.shared.image(for: name)
+    }
+
+    /// The uncached resolution.
+    ///
+    /// The only way to ask AppKit whether a name is a real SF Symbol is to load
+    /// the symbol image and throw it away, which walks the symbol catalog and
+    /// builds a representation. The answer cannot change while the process
+    /// runs, so it is worth remembering.
+    static func resolveSplitActionSystemImage(for name: String) -> SplitActionSystemImage {
         if NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil {
             return SplitActionSystemImage(name: name, rotationDegrees: 0, pointSize: 12)
         }
@@ -281,6 +307,34 @@ enum TabBarStyling {
         let left = max(0, normalizedStart)
         let right = max(0, clampedTotal - normalizedEnd)
         return (left: left, right: right)
+    }
+
+    /// Whether the split buttons stay hidden until the pointer is over the tab
+    /// bar. Minimal mode always hides them; hosts can opt in elsewhere through
+    /// ``BonsplitConfiguration/Appearance/splitButtonsOnHover``.
+    static func hidesSplitButtonsUntilHover(isMinimalMode: Bool, splitButtonsOnHover: Bool) -> Bool {
+        isMinimalMode || splitButtonsOnHover
+    }
+
+    /// Whether the split buttons are visible and whether they reserve a lane in
+    /// the tab row. Hover-only buttons fade in as an overlay and reserve no lane,
+    /// so the tabs keep the full bar width while the buttons are hidden.
+    static func splitButtonLane(
+        showSplitButtons: Bool,
+        buttonCount: Int,
+        isMinimalMode: Bool,
+        splitButtonsOnHover: Bool,
+        isHoveringTabBar: Bool
+    ) -> (visible: Bool, reservesLane: Bool) {
+        let hidesUntilHover = hidesSplitButtonsUntilHover(
+            isMinimalMode: isMinimalMode,
+            splitButtonsOnHover: splitButtonsOnHover
+        )
+        let renders = showSplitButtons && buttonCount > 0
+        return (
+            visible: renders && (!hidesUntilHover || isHoveringTabBar),
+            reservesLane: showSplitButtons && !hidesUntilHover
+        )
     }
 
     static func trailingTabContentInset(
@@ -718,6 +772,7 @@ struct TabBarChromeSnapshot {
 
 struct TabContextMenuState {
     let isPinned: Bool
+    let canCloseTab: Bool
     let isUnread: Bool
     let isBrowser: Bool
     let isAudioMuted: Bool
@@ -735,6 +790,8 @@ struct TabContextMenuState {
     let hasSplits: Bool
     let shortcuts: [TabContextAction: KeyboardShortcut]
     var canDisconnectRemote: Bool = false
+    /// Shared-terminal presence; non-nil adds the terminal-size menu section.
+    var presence: TabPresence?
 
     var canMarkAsUnread: Bool {
         !isUnread
@@ -746,6 +803,7 @@ struct TabContextMenuState {
 
     init(
         isPinned: Bool,
+        canCloseTab: Bool = true,
         isUnread: Bool,
         isBrowser: Bool,
         isAudioMuted: Bool,
@@ -762,9 +820,11 @@ struct TabContextMenuState {
         isFullWidthTabMode: Bool = false,
         hasSplits: Bool,
         shortcuts: [TabContextAction: KeyboardShortcut],
-        canDisconnectRemote: Bool = false
+        canDisconnectRemote: Bool = false,
+        presence: TabPresence? = nil
     ) {
         self.isPinned = isPinned
+        self.canCloseTab = canCloseTab
         self.isUnread = isUnread
         self.isBrowser = isBrowser
         self.isAudioMuted = isAudioMuted
@@ -782,6 +842,7 @@ struct TabContextMenuState {
         self.hasSplits = hasSplits
         self.shortcuts = shortcuts
         self.canDisconnectRemote = canDisconnectRemote
+        self.presence = presence
     }
 
     @MainActor
@@ -807,6 +868,7 @@ struct TabContextMenuState {
             }
         self.init(
             isPinned: tab.isPinned,
+            canCloseTab: allowsCloseTabs && !tab.isPinned,
             isUnread: tab.showsNotificationBadge,
             isBrowser: tab.kind == "browser",
             isAudioMuted: tab.isAudioMuted,
@@ -823,7 +885,8 @@ struct TabContextMenuState {
             isFullWidthTabMode: pane.isFullWidthTabMode,
             hasSplits: splitViewController.rootNode.allPaneIds.count > 1,
             shortcuts: controller.contextMenuShortcuts,
-            canDisconnectRemote: controller.tabContextDisconnectRemoteAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? false
+            canDisconnectRemote: controller.tabContextDisconnectRemoteAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? false,
+            presence: tab.presence
         )
     }
 }
@@ -843,6 +906,12 @@ struct TabBarView: View {
     @AppStorage("debugFadeColorStyle") private var fadeColorStyle = -1
     @State private var isHoveringTabBar = false
     @State private var boardControlState = PairBoardControlState()
+    /// One hovered tab for the whole strip, resolved from the pointer against
+    /// the registered tab frames. Per-tab `.onHover` never fires when a tab
+    /// slides under a stationary pointer (closing the tab to its left), so the
+    /// tab under the cursor showed no hover or close button until the mouse
+    /// moved, while the tab that slid away could keep its stale hover.
+    @State private var hoveredTabId: UUID?
     @State private var dropTargetIndex: Int?
     @State private var scrollOffset: CGFloat = 0
     @State private var contentWidth: CGFloat = 0
@@ -921,7 +990,7 @@ struct TabBarView: View {
             tabContentWidthExcludingSplitButtonLane: tabContentWidthExcludingSplitButtonLane,
             splitButtonCount: visibleSplitButtons.count,
             splitButtonLaneVisible: shouldShowSplitButtons,
-            reservesSplitButtonLane: showSplitButtons && !isMinimalMode,
+            reservesSplitButtonLane: splitButtonLane.reservesLane,
             measuredSplitButtonLaneWidth: measuredSplitButtonLaneWidth
         )
     }
@@ -946,7 +1015,17 @@ struct TabBarView: View {
     }
 
     private var shouldShowSplitButtons: Bool {
-        shouldRenderSplitButtons && (!isMinimalMode || isHoveringTabBar)
+        splitButtonLane.visible
+    }
+
+    private var splitButtonLane: (visible: Bool, reservesLane: Bool) {
+        TabBarStyling.splitButtonLane(
+            showSplitButtons: showSplitButtons,
+            buttonCount: visibleSplitButtons.count,
+            isMinimalMode: isMinimalMode,
+            splitButtonsOnHover: appearance.splitButtonsOnHover,
+            isHoveringTabBar: isHoveringTabBar
+        )
     }
 
     private var splitButtonsBackdropWidth: CGFloat {
@@ -1047,6 +1126,14 @@ struct TabBarView: View {
         return pane.tabs.enumerated().map { index, tab in
             (index, tab)
         }
+    }
+
+    private var pinnedTabEntries: [(index: Int, tab: TabItem)] {
+        visibleTabEntries.filter { $0.tab.isPinned }
+    }
+
+    private var scrollableTabEntries: [(index: Int, tab: TabItem)] {
+        visibleTabEntries.filter { !$0.tab.isPinned }
     }
 
     private var tabIds: [UUID] {
@@ -1153,7 +1240,7 @@ struct TabBarView: View {
                 captionItem(for: tab)
                     .id(tab.id)
             } else {
-                ForEach(visibleTabEntries, id: \.tab.id) { entry in
+                ForEach(scrollableTabEntries, id: \.tab.id) { entry in
                     tabItem(for: entry.tab, at: entry.index)
                         .id(entry.tab.id)
                 }
@@ -1184,7 +1271,23 @@ struct TabBarView: View {
         )
     }
 
+    @ViewBuilder
+    private var pinnedTabContent: some View {
+        HStack(spacing: TabBarMetrics.tabSpacing) {
+            ForEach(pinnedTabEntries, id: \.tab.id) { entry in
+                tabItem(for: entry.tab, at: entry.index, fillsWidth: false)
+                    .id(entry.tab.id)
+            }
+        }
+        .padding(.leading, TabBarMetrics.barPadding)
+        .frame(height: tabBarHeight, alignment: .topLeading)
+    }
+
     var body: some View {
+        let _ = controller.internalController.recordTabBarRender(
+            paneId: pane.id,
+            tabCount: pane.tabs.count
+        )
         HStack(spacing: 0) {
             if appearance.tabBarLeadingInset > 0 && controller.internalController.rootNode.allPaneIds.first == pane.id {
                 TabBarDragZoneView(
@@ -1193,6 +1296,11 @@ struct TabBarView: View {
                     onSingleClick: focusPaneFromTabBarChrome
                 ) { return false }
                     .frame(width: appearance.tabBarLeadingInset)
+            }
+            // Pinned tabs stay outside the scroll view so their frames remain fixed
+            // while the unpinned tab row moves through the remaining viewport.
+            if !pinnedTabEntries.isEmpty {
+                pinnedTabContent
             }
             // Scrollable tabs with fade overlays
             GeometryReader { containerGeo in
@@ -1266,7 +1374,13 @@ struct TabBarView: View {
         }
         .background(dragAndHoverBackground)
         .overlay(
-            TabBarHoverTrackingView { updateTabBarHover($0) }
+            TabBarHoverTrackingView(
+                geometryRegistry: tabItemGeometryRegistry,
+                tabIds: pane.tabs.map(\.id),
+                isDraggingTab: splitViewController.tabDragSession != nil,
+                onHoverChanged: { updateTabBarHover($0) },
+                onHoveredTabChanged: { updateHoveredTab($0) }
+            )
         )
         .overlay(tabDropDestination)
         .overlay(alignment: .trailing) { pairHeaderControls } // cmux-rbf #cm-73.2a
@@ -1447,18 +1561,31 @@ struct TabBarView: View {
         }
     }
 
+    private func updateHoveredTab(_ tabId: UUID?) {
+        withTransaction(Transaction(animation: nil)) {
+            hoveredTabId = tabId
+        }
+    }
+
     @ViewBuilder
-    private func tabItem(for tab: TabItem, at index: Int) -> some View {
-        let contextMenuState = contextMenuState(for: tab, at: index)
+    private func tabItem(
+        for tab: TabItem,
+        at index: Int,
+        fillsWidth: Bool? = nil
+    ) -> some View {
+        let tabFillsWidth = fillsWidth ?? fillsTabsToWidth
         let showsZoomIndicator = splitViewController.zoomedPaneId == pane.id && pane.selectedTabId == tab.id
         let isImmediatelyBeforeSelected = pane.tabs.indices.contains(index + 1)
             && pane.tabs[index + 1].id == pane.selectedTabId
+        // A dropped tab's drag image is still sliding here: one tab, not two.
+        let isSettling = splitViewController.settlingTabId == tab.id
         TabItemView(
             tab: tab,
             isSelected: pane.selectedTabId == tab.id,
+            isHovered: hoveredTabId == tab.id,
             showsZoomIndicator: showsZoomIndicator,
             appearance: appearance,
-            fillsWidth: fillsTabsToWidth,
+            fillsWidth: tabFillsWidth,
             saturation: tabBarSaturation,
             trailingSeparatorBottomInset: isImmediatelyBeforeSelected
                 ? TabBarMetrics.selectedTabLeftSeparatorBottomInset
@@ -1469,8 +1596,17 @@ struct TabBarView: View {
             showsControlShortcutHint: showsControlShortcutHints,
             shortcutModifierSymbol: controlKeyMonitor.shortcutModifierSymbol,
             allowsClose: controller.configuration.allowCloseTabs,
+            middleClickCapture: controller.tabMiddleClickCapture,
             allowsContextMenu: controller.configuration.allowsTabContextMenu,
-            contextMenuState: contextMenuState,
+            contextMenuStateProvider: { [pane, controller, splitViewController] in
+                TabContextMenuState(
+                    tab: tab,
+                    index: index,
+                    pane: pane,
+                    controller: controller,
+                    splitViewController: splitViewController
+                )
+            },
             moveDestinationsProvider: {
                 controller.tabContextMoveDestinationsProvider?(TabID(id: tab.id), pane.id) ?? []
             },
@@ -1519,6 +1655,7 @@ struct TabBarView: View {
                 controller.requestTabMove(toDestination: destinationId, for: TabID(id: tab.id), inPane: pane.id)
             }
         )
+        .opacity(isSettling ? 0 : 1)
         .background(
             TabItemHitRegionView(
                 tabId: tab.id,
@@ -1534,6 +1671,8 @@ struct TabBarView: View {
         }
     }
 
+    // cmux-rbf (#cm-142.1): the fork's caption item builds its menu state up front; upstream's tab
+    // items moved to `contextMenuStateProvider` and dropped this helper in the bonsplit sync.
     private func contextMenuState(for tab: TabItem, at index: Int) -> TabContextMenuState {
         return TabContextMenuState(
             tab: tab,
@@ -1800,6 +1939,7 @@ struct TabBarView: View {
                     ))
             }
             .buttonStyle(SplitActionButtonStyle(appearance: appearance, layout: tabBarLayout))
+            .accessibilityLabel(splitActionButtonTooltip(button, tooltips: tooltips))
         }
     }
 
@@ -2023,6 +2163,53 @@ private struct TabBarLayerBackedColor: NSViewRepresentable {
     }
 }
 
+/// Remembers ``TabBarStyling/splitActionSystemImage(for:)`` results by name.
+///
+/// Names come from host configuration, so the live set is a handful of entries
+/// and never turns over. The bound exists so a pathological host cannot grow
+/// this without limit.
+final class SplitActionSystemImageCache {
+    /// The instance the tab bar uses. Tests build their own so they never race
+    /// each other through shared state.
+    static let shared = SplitActionSystemImageCache()
+
+    private static let capacity = 256
+
+    private let lock = NSLock()
+    private var resolved: [String: TabBarStyling.SplitActionSystemImage] = [:]
+    private var resolutions = 0
+
+    init() {}
+
+    func image(for name: String) -> TabBarStyling.SplitActionSystemImage {
+        lock.lock()
+        if let hit = resolved[name] {
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+
+        // Resolved outside the lock so a symbol lookup never blocks another
+        // caller. Two threads racing on the same name both resolve and agree.
+        let image = TabBarStyling.resolveSplitActionSystemImage(for: name)
+
+        lock.lock()
+        resolutions += 1
+        if resolved.count < Self.capacity {
+            resolved[name] = image
+        }
+        lock.unlock()
+        return image
+    }
+
+    /// How many times the uncached resolution has run. Tests only.
+    var resolutionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return resolutions
+    }
+}
+
 private final class SplitActionButtonImageCache {
     static let shared = SplitActionButtonImageCache()
 
@@ -2124,24 +2311,83 @@ private final class SplitActionMouseDownNSView: NSView {
     }
 }
 
+/// Resolves which tab the pointer is over from the strip's registered tab
+/// frames. Pure so the stationary-pointer cases are unit testable.
+struct TabBarHoveredTabResolver {
+    func hoveredTabId(
+        pointInView: NSPoint?,
+        barBounds: CGRect,
+        tabIds: [UUID],
+        frames: [UUID: CGRect],
+        trailingObscuredWidth: CGFloat = 0
+    ) -> UUID? {
+        guard let pointInView, barBounds.insetBy(dx: -1, dy: -1).contains(pointInView) else {
+            return nil
+        }
+        // Tabs scrolled under the trailing action lane are masked out; the
+        // pointer there is over the split buttons, not a tab.
+        guard pointInView.x < barBounds.maxX - trailingObscuredWidth else { return nil }
+        return tabIds.first { frames[$0]?.contains(pointInView) == true }
+    }
+}
+
 private struct TabBarHoverTrackingView: NSViewRepresentable {
+    let geometryRegistry: TabBarItemGeometryRegistry
+    let tabIds: [UUID]
+    let isDraggingTab: Bool
     let onHoverChanged: (Bool) -> Void
+    let onHoveredTabChanged: (UUID?) -> Void
 
     func makeNSView(context: Context) -> HoverNSView {
         let view = HoverNSView()
-        view.onHoverChanged = onHoverChanged
+        update(view)
         return view
     }
 
     func updateNSView(_ nsView: HoverNSView, context: Context) {
-        nsView.onHoverChanged = onHoverChanged
+        update(nsView)
     }
 
-    final class HoverNSView: NSView {
+    static func dismantleNSView(_ nsView: HoverNSView, coordinator: ()) {
+        nsView.geometryRegistry?.unregisterObserver(nsView)
+    }
+
+    private func update(_ view: HoverNSView) {
+        view.onHoverChanged = onHoverChanged
+        view.onHoveredTabChanged = onHoveredTabChanged
+        if view.geometryRegistry !== geometryRegistry {
+            view.geometryRegistry?.unregisterObserver(view)
+            view.geometryRegistry = geometryRegistry
+            geometryRegistry.registerObserver(view)
+        }
+        view.tabIds = tabIds
+        view.isDraggingTab = isDraggingTab
+    }
+
+    final class HoverNSView: NSView, TabBarItemGeometryObserving {
         var onHoverChanged: ((Bool) -> Void)?
+        var onHoveredTabChanged: ((UUID?) -> Void)?
+        weak var geometryRegistry: TabBarItemGeometryRegistry?
+        var tabIds: [UUID] = [] {
+            didSet {
+                guard tabIds != oldValue else { return }
+                schedulePointerRecheck()
+            }
+        }
         private var trackingArea: NSTrackingArea?
         private var localMouseMonitor: Any?
         private var isHovering = false
+        private var hoveredTabId: UUID?
+        private var pointerRecheckScheduled = false
+        /// A tab drag gets no move events here, but its autoscroll still
+        /// changes geometry; resolving hover then would reveal the close
+        /// button on the drop target under the drag.
+        var isDraggingTab = false {
+            didSet {
+                guard isDraggingTab != oldValue else { return }
+                schedulePointerRecheck()
+            }
+        }
 
         deinit {
             removeLocalMouseMonitor()
@@ -2154,10 +2400,10 @@ private struct TabBarHoverTrackingView: NSViewRepresentable {
             if let window {
                 window.acceptsMouseMovedEvents = true
                 installLocalMouseMonitorIfNeeded()
-                updateHoverFromCurrentMouseLocation()
+                schedulePointerRecheck()
             } else {
                 removeLocalMouseMonitor()
-                emitHoverChanged(false)
+                emitHover(pointInView: nil)
             }
         }
 
@@ -2187,6 +2433,27 @@ private struct TabBarHoverTrackingView: NSViewRepresentable {
             updateHover(from: event)
         }
 
+        /// Tabs were added, removed, resized, or scrolled: the pointer may now
+        /// sit over a different tab without having moved.
+        func tabBarItemGeometryDidChange() {
+            schedulePointerRecheck()
+        }
+
+        /// Tab-set and geometry changes arrive inside SwiftUI view updates
+        /// (updateNSView, hit-region registration), where publishing hover
+        /// would modify TabBarView state mid-update. Coalesce them into one
+        /// recheck on the next main-queue turn, resolved against the state at
+        /// that time so a superseded change never publishes.
+        private func schedulePointerRecheck() {
+            guard !pointerRecheckScheduled else { return }
+            pointerRecheckScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.pointerRecheckScheduled = false
+                self.updateHoverFromCurrentMouseLocation()
+            }
+        }
+
         private func installLocalMouseMonitorIfNeeded() {
             guard localMouseMonitor == nil else { return }
             localMouseMonitor = NSEvent.addLocalMonitorForEvents(
@@ -2206,34 +2473,52 @@ private struct TabBarHoverTrackingView: NSViewRepresentable {
 
         private func updateHover(from event: NSEvent) {
             guard let window else {
-                emitHoverChanged(false)
+                emitHover(pointInView: nil)
                 return
             }
             guard event.window == nil || event.window === window else {
-                emitHoverChanged(false)
+                emitHover(pointInView: nil)
                 return
             }
 
             let pointInWindow = event.window === window
                 ? event.locationInWindow
                 : window.mouseLocationOutsideOfEventStream
-            let pointInView = convert(pointInWindow, from: nil)
-            emitHoverChanged(bounds.insetBy(dx: -1, dy: -1).contains(pointInView))
+            emitHover(pointInView: convert(pointInWindow, from: nil))
         }
 
         private func updateHoverFromCurrentMouseLocation() {
-            guard let window else {
-                emitHoverChanged(false)
+            guard let window,
+                  NSWindow.windowNumber(at: NSEvent.mouseLocation, belowWindowWithWindowNumber: 0)
+                    == window.windowNumber else {
+                emitHover(pointInView: nil)
                 return
             }
-            let pointInView = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-            emitHoverChanged(bounds.insetBy(dx: -1, dy: -1).contains(pointInView))
+            emitHover(pointInView: convert(window.mouseLocationOutsideOfEventStream, from: nil))
         }
 
-        private func emitHoverChanged(_ newValue: Bool) {
-            guard isHovering != newValue else { return }
-            isHovering = newValue
-            onHoverChanged?(newValue)
+        private func emitHover(pointInView: NSPoint?) {
+            let hovering = pointInView.map { bounds.insetBy(dx: -1, dy: -1).contains($0) } ?? false
+            if isHovering != hovering {
+                isHovering = hovering
+                onHoverChanged?(hovering)
+            }
+            let tabId: UUID?
+            if isDraggingTab {
+                tabId = nil
+            } else {
+                tabId = TabBarHoveredTabResolver().hoveredTabId(
+                    pointInView: pointInView,
+                    barBounds: bounds,
+                    tabIds: tabIds,
+                    frames: geometryRegistry?.visibleFrames(for: tabIds, in: self) ?? [:],
+                    trailingObscuredWidth: geometryRegistry?.trailingObscuredWidth ?? 0
+                )
+            }
+            if hoveredTabId != tabId {
+                hoveredTabId = tabId
+                onHoveredTabChanged?(tabId)
+            }
         }
     }
 }
@@ -2341,17 +2626,18 @@ struct TabBarDragAndHoverView: NSViewRepresentable {
             if superview == nil {
                 BonsplitTabBarHitRegionRegistry.unregister(self)
                 BonsplitTabItemHitRegionRegistry.unregister(self)
+            } else if window != nil {
+                BonsplitTabBarHitRegionRegistry.register(self)
+                BonsplitTabItemHitRegionRegistry.register(self)
             }
         }
 
-        nonisolated func containsBonsplitTabItemHit(localPoint: NSPoint) -> Bool {
-            MainActor.assumeIsolated {
-                BonsplitTabItemHitTesting.containsTabLaneHit(
-                    localPoint: localPoint,
-                    tabFrames: tabItemFrames(for: liveTabIds).values.map { $0 },
-                    bounds: bounds
-                )
-            }
+        func containsBonsplitTabItemHit(localPoint: NSPoint) -> Bool {
+            BonsplitTabItemHitTesting.containsTabLaneHit(
+                localPoint: localPoint,
+                tabFrames: tabItemFrames(for: liveTabIds).values.map { $0 },
+                bounds: bounds
+            )
         }
 
         private var liveTabIds: [UUID] {
@@ -3274,17 +3560,29 @@ enum TabControlShortcutHintPolicy {
 private struct TabBarHostWindowReader: NSViewRepresentable {
     let onResolve: (NSWindow?) -> Void
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { [weak view] in
-            onResolve(view?.window)
+    func makeNSView(context: Context) -> WindowTrackingView {
+        let view = WindowTrackingView()
+        Task { @MainActor [weak view] in
+            onResolve(view?.trackedWindow)
         }
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { [weak nsView] in
-            onResolve(nsView?.window)
+    func updateNSView(_ nsView: WindowTrackingView, context: Context) {
+        Task { @MainActor [weak nsView] in
+            onResolve(nsView?.trackedWindow)
+        }
+    }
+
+    final class WindowTrackingView: NSView {
+        // NSView.window can still return a deallocating window. Capture it
+        // while AppKit attaches the view so deferred lookups safely read nil
+        // during teardown, before the shortcut monitor forms another weak ref.
+        private(set) weak var trackedWindow: NSWindow?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            trackedWindow = window
         }
     }
 }
@@ -3293,7 +3591,11 @@ private struct TabBarHostWindowReader: NSViewRepresentable {
 @Observable
 private final class TabControlShortcutKeyMonitor {
     private(set) var isShortcutHintVisible = false
-    private(set) var shortcutModifierSymbol = TabControlShortcutHintPolicy.configuredShortcutModifierSymbol()
+    /// `start()` resolves the configured symbol. The initial value is a
+    /// constant because `@State` evaluates it on every `TabBarView` init and
+    /// discards it after the first; reading user defaults here ran a defaults
+    /// lookup and JSON decode for every pane on every tab-bar rebuild.
+    private(set) var shortcutModifierSymbol = TabControlShortcutSettings.defaultShortcut.modifierSymbol
 
     @ObservationIgnored private weak var hostWindow: NSWindow?
     @ObservationIgnored private var hostWindowDidBecomeKeyObserver: NSObjectProtocol?
@@ -3337,6 +3639,11 @@ private final class TabControlShortcutKeyMonitor {
     }
 
     func start() {
+        // Resolve the configured symbol before the first update: one that
+        // queues a hint while the modifier is already held keeps the symbol.
+        if !isShortcutHintVisible {
+            shortcutModifierSymbol = TabControlShortcutHintPolicy.configuredShortcutModifierSymbol()
+        }
         guard flagsMonitor == nil else {
             update(from: NSEvent.modifierFlags, eventWindow: nil)
             return

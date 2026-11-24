@@ -1,3 +1,6 @@
+import CmuxCloud
+import CmuxCloudTui
+import CmuxSurfaceCatalogModel
 import Darwin
 import Foundation
 import Testing
@@ -39,6 +42,163 @@ import Testing
             ["id": "agent_1", "terminal_id": "term_build", "state": "working", "source": "claude"],
         ],
     ]
+    @Test func creationAttachmentUsesOnlyTheCommittedTerminalAndGeneration() {
+        var result: [String: Any] = [
+            "value": ["terminal_id": "term_test", "tab_id": "tab_test"],
+            "generation": "g1", "revision": "2"
+        ]
+        let identity = CmuxTuiSnapshotParser.createdTerminal(fromRunResult: result)?.attachment
+        #expect(identity?.terminalID == "term_test")
+        #expect(identity?.generation == "g1")
+        result.removeValue(forKey: "generation")
+        #expect(CmuxTuiSnapshotParser.createdTerminal(fromRunResult: result)?.attachment == nil)
+    }
+
+    @Test func browserCreationReceiptPreservesRemotePlacement() throws {
+        let result: [String: Any] = [
+            "value": [
+                "kind": "browser",
+                "workspace_id": "ws_main",
+                "screen_id": "screen_1",
+                "pane_id": "pane_1",
+                "tab_id": "tab_browser",
+                "browser_id": "browser_cloud",
+            ],
+            "generation": "g1",
+            "revision": "8",
+        ]
+        let created = try #require(CmuxTuiSnapshotParser.createdBrowser(fromCreateResult: result))
+        #expect(created.browserID == "browser_cloud")
+        #expect(created.workspaceID == "ws_main")
+        #expect(created.screenID == "screen_1")
+        #expect(created.paneID == "pane_1")
+        #expect(created.tabID == "tab_browser")
+        #expect(created.cursor == CloudVMCursor(generation: "g1", revision: 8))
+    }
+
+    @Test func browserCreationReceiptRejectsAnUnboundRemotePath() {
+        let result: [String: Any] = [
+            "value": [
+                "kind": "browser",
+                "workspace_id": "ws_main",
+                "screen_id": "screen_1",
+                "pane_id": "pane_1",
+                "browser_id": "browser_cloud",
+            ]
+        ]
+        #expect(CmuxTuiSnapshotParser.createdBrowser(fromCreateResult: result) == nil)
+    }
+
+    @Test func malformedBrowserCreationReceiptHasAResponseFailure() {
+        #expect(CloudDiagnosticFailure.classify(CmuxTuiSurfaceProvider.ProviderError.browserNotCreated) == .response)
+    }
+
+    @Test @MainActor
+    func committedBrowserReceiptMovesToTheReplacementProvider() throws {
+        let catalog = SurfaceCatalog()
+        let summary = VMSummary(id: "browser-replacement-\(UUID())", provider: "freestyle", status: "running", image: "fixture", createdAt: 0, base: nil)
+        let links = CloudMachineLinkManager(clientURL: nil, hub: nil, hostThemeColors: { nil })
+        let original = CmuxTuiSurfaceProvider(summary: summary, ownerTeamID: "team", links: links, catalog: catalog)
+        let replacement = CmuxTuiSurfaceProvider(summary: summary, ownerTeamID: "team", links: links, catalog: catalog)
+        catalog.register(original)
+        original.suspendForFeatureFlag()
+        catalog.register(replacement)
+        defer {
+            original.suspendForFeatureFlag()
+            replacement.suspendForFeatureFlag()
+            catalog.unregister(machine: original.machine)
+        }
+        let receipt = CmuxTuiSnapshotParser.CreatedBrowserPath(
+            browserID: "browser_created", workspaceID: "ws_main", screenID: "screen_1",
+            paneID: "pane_1", tabID: "tab_created", cursor: CloudVMCursor(generation: "g1", revision: 8)
+        )
+
+        let resource = try original.recordCommittedBrowser(receipt, url: URL(string: "http://localhost:4312/health")!, name: nil)
+
+        #expect(original.pendingRemoteCreations.isEmpty)
+        #expect(replacement.pendingRemoteCreations[resource.id]?.receipt == receipt.cursor)
+        #expect(catalog.resources[resource.id]?.remoteViews?.first?.tabID == "tab_created")
+        #expect(catalog.resources[resource.id]?.remoteViews?.first?.workspace.id == "ws_main")
+    }
+
+    @Test @MainActor
+    func committedBrowserReceiptCannotCrossOwnershipTeardown() throws {
+        let catalog = SurfaceCatalog()
+        let summary = VMSummary(id: "browser-retirement-\(UUID())", provider: "freestyle", status: "running", image: "fixture", createdAt: 0, base: nil)
+        let links = CloudMachineLinkManager(clientURL: nil, hub: nil, hostThemeColors: { nil })
+        let original = CmuxTuiSurfaceProvider(summary: summary, ownerTeamID: "old-team", links: links, catalog: catalog)
+        let replacement = CmuxTuiSurfaceProvider(summary: summary, ownerTeamID: "new-team", links: links, catalog: catalog)
+        catalog.register(original)
+        original.suspendForFeatureFlag()
+        catalog.register(replacement)
+        defer {
+            replacement.suspendForFeatureFlag()
+            catalog.unregister(machine: original.machine)
+        }
+        let receipt = CmuxTuiSnapshotParser.CreatedBrowserPath(
+            browserID: "browser_created", workspaceID: "ws_main", screenID: "screen_1",
+            paneID: "pane_1", tabID: "tab_created", cursor: CloudVMCursor(generation: "g1", revision: 8)
+        )
+
+        #expect(throws: (any Error).self) {
+            try original.recordCommittedBrowser(receipt, url: URL(string: "http://localhost:4312/health")!, name: nil)
+        }
+        #expect(replacement.pendingRemoteCreations.isEmpty)
+        #expect(catalog.resources.isEmpty)
+    }
+
+    @Test func browserCreationRequestTargetsTheBoundMachineWorkspaceAndPane() {
+        let request = CloudTuiRequests.createBrowserArguments(
+            socketPath: "/tmp/cmux-tui.sock",
+            workspaceID: "ws_main",
+            screenID: "screen_1",
+            paneID: "pane_1",
+            url: "http://127.0.0.1:4312/health",
+            name: "health",
+            idempotencyKey: "browser-attempt",
+            correlationKey: "browser-correlation"
+        )
+        #expect(request.operation == "tab.create_browser")
+        #expect(request.params["machine"] as? String == "current")
+        #expect(request.params["workspace"] as? String == "ws_main")
+        #expect(request.params["screen"] as? String == "screen_1")
+        #expect(request.params["pane"] as? String == "pane_1")
+        #expect(request.params["url"] as? String == "http://127.0.0.1:4312/health")
+        #expect(request.params["name"] as? String == "health")
+        #expect(request.params["correlation_key"] as? String == "browser-correlation")
+        #expect(request.idempotencyKey == "browser-attempt")
+    }
+
+    @Test func browserSnapshotKeepsTheRemoteWorkspaceAndTabPlacement() throws {
+        var snapshot = Self.sessionSnapshot
+        snapshot["browsers"] = [[
+            "id": "browser_cloud",
+            "tab_id": "tab_3",
+            "url": "http://127.0.0.1:4312/health",
+            "title": "Cloud health",
+            "status": "ready",
+        ]]
+        // The tab's content identity is the browser row's daemon id. Keep the
+        // fixture's foreign-key edge consistent so the parser exercises the
+        // placement join rather than rejecting a malformed snapshot.
+        snapshot["tabs"] = (snapshot["tabs"] as? [[String: Any]] ?? []).map { tab in
+            guard tab["id"] as? String == "tab_3" else { return tab }
+            var corrected = tab
+            corrected["content_id"] = "browser_cloud"
+            return corrected
+        }
+        let browser = try #require(
+            CmuxTuiSnapshotParser.terminals(fromSnapshot: snapshot, machine: Self.machine)
+                .first(where: { $0.id == SurfaceResourceID(machine: Self.machine, kind: .browser, key: "browser_cloud") })
+        )
+        let view = try #require(browser.remoteViews?.first)
+        #expect(browser.remoteWorkspace?.id == "ws_main")
+        #expect(browser.url == "http://127.0.0.1:4312/health")
+        #expect(view.tabID == "tab_3")
+        #expect(view.screenID == "screen_1")
+        #expect(view.paneID == "pane_1")
+    }
+
     @Test func legacyScreensKeepArrivalOrderAndExplicitPositions() throws {
         var snapshot = Self.sessionSnapshot
         snapshot["screens"] = [
@@ -122,6 +282,7 @@ import Testing
         #expect(build.detail == "/root/work/app")
         #expect(build.lifecycle == .running)
         #expect(build.agent == SurfaceAgentBadge(state: "working", source: "claude"))
+        #expect(build.terminalAgentIconAssetName == "AgentIcons/Claude")
         #expect(build.remoteWorkspace == SurfaceRemoteWorkspace(id: "ws_main", name: "main", index: 0, focused: true))
         #expect(build.remoteViews?.map(\.tabID) == ["tab_1", "tab_4"])
         #expect(build.remoteWorkspaces.map(\.id) == ["ws_main", "ws_api"])
@@ -142,6 +303,15 @@ import Testing
         #expect(detached.remoteViews == [])
         #expect(detached.remoteWorkspaces.isEmpty)
         #expect(detached.lifecycle == .running)
+    }
+
+    @Test func providerAwareAgentFieldResolvesCodexMark() throws {
+        var snapshot = Self.sessionSnapshot
+        snapshot["agents"] = [["id": "agent_1", "terminal_id": "term_build", "state": "working", "source": "hook", "agent": "codex"]]
+        let resources = CmuxTuiSnapshotParser.terminals(fromSnapshot: snapshot, machine: Self.machine)
+        let terminal = try #require(resources.first { $0.id.key == "term_build" })
+        #expect(terminal.agent?.agent == "codex")
+        #expect(terminal.terminalAgentIconAssetName == "AgentIcons/Codex")
     }
 
     @Test func userTabNameStaysOnTheIndividualRemoteView() throws {
@@ -779,7 +949,8 @@ import Testing
         #expect(CmuxTuiSnapshotParser.state(fromSnapshot: conflictingAgents, machine: Self.machine) == nil)
 
         // A repeated tab reference in one terminal is harmless to identity, but
-        // reverse tab edges still retain every distinct view.
+        // it must not produce duplicate rename targets or duplicate tree rows.
+        // The graph also contributes tab_4, even when the terminal omits it.
         var repeatedReference = snapshot
         repeatedReference["terminals"] = [
             ["id": "term_build", "tab_ids": ["tab_1", "tab_1"], "title": "one", "lifecycle": "running"],
@@ -996,8 +1167,8 @@ import Testing
         LISTEN  0       128     127.0.0.1:5901      0.0.0.0:*
         LISTEN  0       128     0.0.0.0:3000        0.0.0.0:*
         """
-        #expect(CmuxTuiSnapshotParser.listeningPorts(fromSocketListing: ss) == [1337, 3000, 5901])
-        #expect(CmuxTuiSnapshotParser.internalPorts.isSuperset(of: [1337, 5901, 6901]))
+        #expect(CmuxTuiSnapshotParser.listeningPorts(fromSocketListing: ss) == [1337, 3000, 5901]); let probe = VMExecResult(exitCode: 0, stdout: ss, stderr: ""); #expect(CmuxTuiSurfaceProvider.ports(from: probe, displayPortsOwned: true) == [3000]); #expect(CmuxTuiSurfaceProvider.ports(from: probe, displayPortsOwned: false) == [3000, 5901])
+        #expect(CmuxTuiSnapshotParser.displayPorts.isSuperset(of: [5901, 5902, 5916, 6901, 6902, 6916]))
         #expect(CmuxTuiSnapshotParser.machineHasDesktop(image: "cmux-xfce-vnc:latest"))
         #expect(!CmuxTuiSnapshotParser.machineHasDesktop(image: "cmuxd-ws:tooling-20260509f"))
 
@@ -1014,18 +1185,26 @@ import Testing
     @Test func clientArgvIsExact() {
         // A machine's trusted listener is dialed with --carrier: no invite file, no enrollment.
         #expect(CloudTuiCommandLine.linkArguments(route: "wss://m.vm.cmux.sh/v1/link?t=1", deviceName: "cmux-mac", stateDir: "/s", carrier: true) ==
-            ["remote", "connect", "wss://m.vm.cmux.sh/v1/link?t=1", "--device-name", "cmux-mac", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent", "--carrier"])
+            ["remote", "connect", "wss://m.vm.cmux.sh/v1/link?t=1", "--device-name", "cmux-mac", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent", "--lanes", "single", "--carrier"])
         // A machine this Mac enrolled with before trusted listeners presents its stored key.
         #expect(CloudTuiCommandLine.linkArguments(route: "r", deviceName: "d", stateDir: "/s") ==
-            ["remote", "connect", "r", "--device-name", "d", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent"])
+            ["remote", "connect", "r", "--device-name", "d", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent", "--lanes", "single"])
         // A private-network machine dials through the app's WireGuard hub. Both long-lived
         // helper processes must also stop if their app parent exits without cleanup.
         #expect(CloudTuiCommandLine.linkArguments(route: "ws://[fd00::10]:1337/v1/link", deviceName: "d", stateDir: "/s", carrier: true, wireguardHubSocket: "/h.sock") ==
-            ["remote", "connect", "ws://[fd00::10]:1337/v1/link", "--device-name", "d", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent", "--carrier", "--wireguard-hub", "/h.sock"])
+            ["remote", "connect", "ws://[fd00::10]:1337/v1/link", "--device-name", "d", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent", "--lanes", "single", "--carrier", "--wireguard-hub", "/h.sock"])
         #expect(CloudTuiCommandLine.linkArguments(route: "r", deviceName: "d", stateDir: "/s", wireguardHubSocket: "") ==
-            ["remote", "connect", "r", "--device-name", "d", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent"])
+            ["remote", "connect", "r", "--device-name", "d", "--state-dir", "/s", "--headless", "--json", "--exit-with-parent", "--lanes", "single"])
         #expect(CloudTuiCommandLine.wireGuardHubArguments(configPath: "/w/cmux-app.conf", socketPath: "/w/hub-1.sock") ==
             ["wg", "hub", "--config", "/w/cmux-app.conf", "--socket", "/w/hub-1.sock", "--exit-with-parent"])
+        let browserProxy = CloudTuiCommandLine.browserProxyArguments(
+            route: "ws://10.0.0.4:1337/v1/link", addresses: ["10.0.0.4"],
+            stateDir: "/s", wireGuardHubSocket: "/h.sock", carrier: false, remoteNetwork: true
+        )
+        #expect(browserProxy.contains("--allow-loopback"))
+        #expect(browserProxy.contains("localhost"))
+        #expect(browserProxy.contains("::1"))
+        #expect(browserProxy.contains("--allow-remote-network"))
         #expect(CloudTuiCommandLine.snapshotArguments(socketPath: "/k.sock") == ["--socket", "/k.sock", "--json", "session", "current", "snapshot"])
         #expect(CloudTuiCommandLine.eventsArguments(socketPath: "/k.sock") == ["--socket", "/k.sock", "--jsonl", "session", "current", "events"])
         #expect(CloudTuiCommandLine.runArguments(socketPath: "/k.sock", workspaceID: "ws_main", command: ["claude", "-p", "fix it"]) ==
@@ -1059,6 +1238,43 @@ import Testing
         #expect(CloudRemoteRenameName(rawValue: "  db shell  ").wireValue == "db shell")
         #expect(CloudTuiCommandLine.renameTabArguments(socketPath: "/k.sock", tabID: "tab_1", name: "db shell", expectedRevision: 9) ==
             ["--socket", "/k.sock", "--json", "--expected-revision", "9", "tab", "tab_1", "rename", "--name", "db shell"])
+    }
+
+    @Test func vmTuiConnectPassesReceiptSession() throws {
+        let harness = CMUXCLIErrorOutputRegressionTests()
+        let cliPath = try harness.bundledCLIPath()
+        // The pane helper enters through the CLI's app-socket connection gate.
+        let socketPath = "/tmp/cmux-tui-argv-\(UUID().uuidString.prefix(8)).sock"
+        let responder = try UnixSocketResponder(path: socketPath, response: "OK")
+        defer { responder.stop() }
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cmux-tui-argv-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = root.appendingPathComponent("client")
+        try "#!/bin/sh\nprintf '%s\\n' \"$@\"\n".write(to: client, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: client.path)
+        let configURL = root.appendingPathComponent("config.json")
+        try JSONSerialization.data(withJSONObject: [
+            "vmId": "vm-1", "route": "ws://10.0.0.7:1337/v1/link",
+            "session": "cloud", "carrier": true, "clientPath": client.path,
+            "stateDir": root.path, "deviceName": "cmux-mac",
+        ]).write(to: configURL)
+        var environment = BundledCLITestSupport.hermeticCLIEnvironment(home: root)
+        environment["CMUX_SOCKET_PATH"] = socketPath
+        let result = harness.runProcess(
+            executablePath: cliPath,
+            arguments: ["vm-tui-connect", "--config", configURL.path],
+            environment: environment
+        )
+        #expect(!result.timedOut, "\(result.stderr)")
+        #expect(result.status == 0, "\(result.stderr)")
+        #expect(result.stdout.split(separator: "\n").map(String.init) == [
+            "remote", "connect", "ws://10.0.0.7:1337/v1/link",
+            "--device-name", "cmux-mac", "--state-dir", root.path,
+            "--carrier", "--session", "cloud",
+        ])
+        #expect(!FileManager.default.fileExists(atPath: configURL.path))
     }
 
     @Test func socketRenameParameterPreservesExplicitEmptyValue() {
@@ -1158,47 +1374,6 @@ import Testing
         #expect(await eof.result == nil, "finished without a value reads as nil")
     }
 
-    @Test func linkCommandCarriesSecretInputThroughAPipe() async throws {
-        let link = CloudMachineLink(machineID: "test-machine", clientURL: URL(fileURLWithPath: "/bin/cat"), paths: CloudTuiClientPaths())
-        let payload = Data("private receiver wire\n".utf8)
-        #expect(try await link.run(arguments: [], input: payload) == payload)
-    }
-
-    @Test func cancellingLinkCommandStopsItsChildBeforeReturning() async throws {
-        let pidFile = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cmux-cloud-command-\(UUID().uuidString.lowercased()).pid")
-        defer { try? FileManager.default.removeItem(at: pidFile) }
-        let link = CloudMachineLink(
-            machineID: "test-machine",
-            clientURL: URL(fileURLWithPath: "/bin/sh"),
-            paths: CloudTuiClientPaths()
-        )
-        let task = Task {
-            try await link.run(
-                arguments: ["-c", "echo $$ > '\(pidFile.path)'; exec /bin/sleep 30"],
-                timeout: .seconds(60)
-            )
-        }
-        for _ in 0..<200 where !FileManager.default.fileExists(atPath: pidFile.path) {
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        let rawPID = try String(contentsOf: pidFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let pid = try #require(Int32(rawPID))
-        defer { _ = Darwin.kill(pid, SIGKILL) }
-
-        task.cancel()
-        do {
-            _ = try await task.value
-            Issue.record("a cancelled link command must throw")
-        } catch is CancellationError {
-            // Expected.
-        } catch {
-            Issue.record("a cancelled link command returned \(error) instead of CancellationError")
-        }
-        #expect(Darwin.kill(pid, 0) == -1 && errno == ESRCH, "the child must be reaped before run returns")
-    }
-
     @Test func linkClientExitingBeforeItsSocketLineReportsTheExitNotATimeout() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-cloud-connect-exit-\(UUID().uuidString.lowercased())", isDirectory: true)
@@ -1224,15 +1399,15 @@ import Testing
         do {
             _ = try await link.connect(route: "ws://10.0.0.1:1337/v1/link", session: "main", carrier: true, timeout: .seconds(60))
             Issue.record("a client that exits before its socket line must fail the connect")
-        } catch CloudMachineLink.LinkError.exited(let status, let output) {
+        } catch CloudMachineLink.LinkError.exitedBeforeSocket(let status, let output) {
             #expect(status == 2)
             #expect(output.contains("unknown option"), "the client's stderr must reach the error: \(output)")
         } catch {
-            Issue.record("expected LinkError.exited, got \(error)")
+            Issue.record("expected LinkError.exitedBeforeSocket, got \(error)")
         }
     }
 
-    @Test func disconnectStopsLinkAndEventChildrenBeforeReturning() async throws {
+    @Test func disconnectStopsTheOnlyLinkChildBeforeReturning() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-cloud-disconnect-\(UUID().uuidString.lowercased())", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -1257,22 +1432,16 @@ import Testing
             paths: CloudTuiClientPaths(home: root)
         )
         _ = try await link.connect(route: "ws://10.0.0.1:1337/v1/link", session: "main")
-        for _ in 0..<200 where !FileManager.default.fileExists(atPath: eventPIDFile.path) {
-            try await Task.sleep(for: .milliseconds(10))
-        }
         let linkPID = try #require(Int32(try String(contentsOf: linkPIDFile, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)))
-        let eventPID = try #require(Int32(try String(contentsOf: eventPIDFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)))
-        defer {
-            _ = Darwin.kill(linkPID, SIGKILL)
-            _ = Darwin.kill(eventPID, SIGKILL)
-        }
+        defer { _ = Darwin.kill(linkPID, SIGKILL) }
 
         await link.disconnect()
 
-        #expect(Darwin.kill(linkPID, 0) == -1 && errno == ESRCH, "disconnect must reap the link child")
-        #expect(Darwin.kill(eventPID, 0) == -1 && errno == ESRCH, "disconnect must reap the event child")
+        let killResult = Darwin.kill(linkPID, 0)
+        let killErrno = errno
+        #expect(killResult == -1 && killErrno == ESRCH, "disconnect must reap the link child")
+        #expect(!FileManager.default.fileExists(atPath: eventPIDFile.path), "event subscription must not spawn a CLI child")
     }
 
     @Test func displayTabsPointWorkspacesAtTheMachineScreen() throws {
@@ -2152,9 +2321,14 @@ import Testing
         #expect(decoded == group)
         #expect(decoded.placements.first?.remoteTabID == "tab_4")
 
+        let legacyResources = try JSONSerialization.jsonObject(with: JSONEncoder().encode([resource]))
         let legacy = try JSONDecoder().decode(
             SurfaceResourceGroup.self,
-            from: Data(#"{"title":"api","resources":[{"machine":{"cloud":{"_0":"vivid-newt"}},"kind":"terminal","key":"term_build"}],"remoteWorkspaceID":"ws_api"}"#.utf8)
+            from: JSONSerialization.data(withJSONObject: [
+                "title": "api",
+                "resources": legacyResources,
+                "remoteWorkspaceID": "ws_api",
+            ])
         )
         #expect(legacy.placements.first?.remoteTabID == nil)
         #expect(legacy.placements.first?.remoteWorkspaceID == "ws_api")

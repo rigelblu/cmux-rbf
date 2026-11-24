@@ -1,3 +1,4 @@
+import CmuxCloud
 import AppKit
 import Foundation
 
@@ -73,13 +74,15 @@ extension AppDelegate {
 
     func makeNewWorkspaceContextMenu(
         context: MainWindowContext,
-        cmuxConfigStore: CmuxConfigStore
+        cmuxConfigStore: CmuxConfigStore,
+        isAuthenticated: Bool? = nil
     ) -> NSMenu? {
+        let isAuthenticated = isAuthenticated ?? (AppDelegate.shared?.auth?.accountFlow.isAuthenticated == true)
         let model = NewWorkspaceMenuModel.build(
             newWorkspaceContextMenuItems: cmuxConfigStore.newWorkspaceContextMenuItems.filter { item in
                 guard case .action(let menuAction) = item,
                       case .builtIn(let builtIn) = menuAction.action.action else { return true }
-                return Self.isBuiltInActionAvailableInNewWorkspaceMenu(builtIn)
+                return Self.isBuiltInActionAvailableInNewWorkspaceMenu(builtIn, isAuthenticated: isAuthenticated)
             },
             agentChatAction: resolvedBuiltInNewAgentChatAction(cmuxConfigStore: cmuxConfigStore),
             templateNames: savedLayoutNames(),
@@ -100,11 +103,14 @@ extension AppDelegate {
     /// Feature gates for built-in plus-menu rows, evaluated when the menu
     /// opens (not at config load) so flag and setting flips apply at once.
     /// Mirrors the command palette's gates for the same actions.
-    static func isBuiltInActionAvailableInNewWorkspaceMenu(_ action: CmuxSurfaceTabBarBuiltInAction) -> Bool {
+    static func isBuiltInActionAvailableInNewWorkspaceMenu(
+        _ action: CmuxSurfaceTabBarBuiltInAction,
+        isAuthenticated: Bool? = nil
+    ) -> Bool {
         switch action {
         case .newCloudWorkspace, .newCloudMachine, .cloudVM:
             return CloudMachinesFeature.isEnabled
-                && AppDelegate.shared?.auth?.accountFlow.isAuthenticated == true
+                && (isAuthenticated ?? (AppDelegate.shared?.auth?.accountFlow.isAuthenticated == true))
         // cmux-rbf `#cm-73.9`: a Figma tab is a browser tab; offered while the browser is on.
         case .newBrowser, .newAgentChat, .newFigma:
             return BrowserAvailabilitySettings.isEnabled()
@@ -112,7 +118,8 @@ extension AppDelegate {
             return CmuxFeatureFlags.shared.isSimulatorEnabled
         case .mobileConnect:
             return !MobileRemoteControlPolicy.isDisabled
-        case .newWorkspace, .newTerminal, .splitRight, .splitDown, .splitLeft, .splitUp:
+        case .newWorkspace, .newTerminal, .splitRight, .splitDown, .splitLeft, .splitUp,
+             .copyWorkingDirectory, .copyProjectRoot, .copyScreen:
             return true
         }
     }
@@ -162,7 +169,17 @@ extension AppDelegate {
             NSSound.beep()
             return
         }
-        guard executeConfiguredCmuxAction(box.action, context: context, preferredWindow: window) else {
+        let didExecute: Bool
+        if case .builtIn(.newWorkspace) = box.action.action {
+            didExecute = performNewWorkspaceAction(
+                tabManager: context.tabManager,
+                debugSource: "newWorkspace.contextMenu",
+                skipConfiguredAction: true
+            )
+        } else {
+            didExecute = executeConfiguredCmuxAction(box.action, context: context, preferredWindow: window)
+        }
+        guard didExecute else {
             NSSound.beep()
             return
         }

@@ -225,6 +225,13 @@ source "$SCRIPT_DIR/lib/rbf-metal.sh"
 source "$SCRIPT_DIR/lib/rbf-git-env.sh"
 rbf_git_env_apply "$REPO_ROOT"
 
+# cmux-rbf (#cm-142.1): the pinned-packages landmine dev.sh disarms, for the same reason this is a lib:
+# this path never passes through dev.sh, and its xcodebuild resolved swift-asn1 forward (1.7.3 → 1.7.5)
+# and rewrote Package.resolved. Applied before the plan prints, so the plan shows the row. See the lib header.
+# shellcheck source=rbf/scripts/lib/rbf-package-resolution.sh
+source "$SCRIPT_DIR/lib/rbf-package-resolution.sh"
+rbf_package_resolution_apply
+
 RBF_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/rbf/VERSION" 2>/dev/null || true)"
 [[ -n "$RBF_VERSION" ]] || die "rbf/VERSION is empty or unreadable"
 if [[ -d "$REPO_ROOT/.jj" ]]; then
@@ -281,6 +288,7 @@ printf '  source         %s (working copy)\n' "$REPO_ROOT"
 printf '  signing        %s\n'  "$CODESIGN_IDENTITY"
 printf '  zig            %s\n'  "$ZIG_STATUS"
 [[ -z "$RBF_GIT_ENV_NOTE" ]] || printf '  git env        %s\n'  "$RBF_GIT_ENV_NOTE"
+printf '  packages       %s\n'  "$RBF_PACKAGE_RESOLUTION_NOTE" # cmux-rbf (#cm-142.1)
 printf '  derived data   %s\n'  "$DERIVED_DATA"
 if [[ "$SWAP_MODE" == "detached" ]]; then
   printf '  swap           detached — this terminal is hosted by the app being replaced;\n'
@@ -368,6 +376,7 @@ xcodebuild \
   -configuration Release \
   -destination 'platform=macOS' \
   -derivedDataPath "$DERIVED_DATA" \
+  ${RBF_PACKAGE_RESOLUTION_ARGS[@]+"${RBF_PACKAGE_RESOLUTION_ARGS[@]}"} \
   ASSETCATALOG_COMPILER_APPICON_NAME="$RBF_ICON_SET" \
   CODE_SIGN_ENTITLEMENTS="" \
   TOOLCHAINS="" \

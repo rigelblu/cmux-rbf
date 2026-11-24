@@ -13,6 +13,15 @@ final class FakeWorkspaceGroupSafetyContext: ControlCommandContext {
     var deleteResult = 2
     var listResolution: ControlWorkspaceGroupListResolution = .tabManagerUnavailable // (#cm-106)
     var moveResolution: ControlWorkspaceGroupMoveResolution = .moved // (#cm-106)
+    var pinResolution: ControlWorkspaceGroupPinResolution = .applied
+
+    func controlSetWorkspaceGroupPinned(
+        routing: ControlRoutingSelectors,
+        groupID: UUID,
+        isPinned: Bool
+    ) -> ControlWorkspaceGroupPinResolution {
+        pinResolution
+    }
 
     func controlCreateWorkspaceGroup(
         routing: ControlRoutingSelectors,

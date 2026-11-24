@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import {
+  AdminGrantConflictError,
   type AdminGrantablePlanId,
   AdminInvalidEmailError,
   createPendingEmailGrant,
@@ -22,7 +23,10 @@ import { enforceBrowserMutationProtection } from "../../../../services/vms/route
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * POST /api/admin/email-grants { email, plan: "pro" | "founders" }
+ * POST /api/admin/email-grants { email, plan: "pro" | "max" | "founders" | "next_plus" | "next_pro" | "next_max" }
+ *
+ * The plan lands in its own slot (a cmux NEXT plan in the NEXT slot), so an
+ * account's grant in the other slot is kept.
  *
  * Grants directly when exactly one non-anonymous Stack user owns the email
  * with a verified mailbox. Otherwise records a pending grant that is applied
@@ -76,8 +80,17 @@ async function createEmailGrant(
       canonicalizeEmailForMatching(user.email) === canonical,
   );
   if (matches.length === 1) {
-    const user = await setManualPlanGrant({ targetUserId: matches[0]!.id, plan, admin });
-    return adminJsonResponse({ user });
+    try {
+      const user = await setManualPlanGrant({ targetUserId: matches[0]!.id, plan, admin });
+      return adminJsonResponse({ user });
+    } catch (error) {
+      // A double-submitted form races its own first grant for the account
+      // lease; the users route answers the same conflict with 409.
+      if (error instanceof AdminGrantConflictError) {
+        return adminJsonResponse({ error: "mutation_in_progress" }, 409);
+      }
+      throw error;
+    }
   }
   if (matches.length > 1) {
     return adminJsonResponse({ error: "ambiguous_email" }, 409);

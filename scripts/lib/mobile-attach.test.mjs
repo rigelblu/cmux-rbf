@@ -64,6 +64,7 @@ function waitForUsableSession(
   timeout = "15",
   event = '{"seq":101,"name":"mobile.rpc.ready","payload":{"connection_id":"connection-a","client_id":"phone-a","transport":"iroh","stream_id":"events"}}',
   expectedClientID = "phone-a",
+  graceSeconds = "0",
 ) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cmux-mobile-admission-test-"));
   const argsPath = path.join(tempRoot, "args");
@@ -94,6 +95,7 @@ function waitForUsableSession(
         CMUX_TEST_ARGS: argsPath,
         CMUX_TEST_EVENT: event,
         CMUX_TEST_STATUS: String(status),
+        CMUX_ATTACH_READY_GRACE_SECONDS: graceSeconds,
       },
     );
     result.eventArgs = fs.existsSync(argsPath) ? fs.readFileSync(argsPath, "utf8").trim() : "";
@@ -547,7 +549,7 @@ test("dogfood readiness rejects an event from another client", () => {
 });
 
 test("dogfood readiness fails when a usable RPC session misses its deadline", () => {
-  const result = waitForUsableSession(1);
+  const result = waitForUsableSession(1, "100", "1");
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /did not establish a usable RPC session.*readiness deadline/i);
@@ -562,6 +564,14 @@ test("dogfood readiness writes a secret-free identity and latency receipt", () =
   assert.deepEqual(result.receipt, {
     schema: "cmux-ios-dogfood-readiness-v1",
     git_sha: "0123456789abcdef0123456789abcdef01234567",
+    tooling_checkout_sha: "0123456789abcdef0123456789abcdef01234567",
+    installed_bundle: {
+      bundle_id: "dev.cmux.ios.iosrdy",
+      executable_sha256: null,
+      source: "legacy_receipt_writer",
+      target: "physical_device",
+      target_id: "phone-a",
+    },
     tag: "iosrdy",
     bundle_id: "dev.cmux.ios.iosrdy",
     target: "physical_device",
@@ -575,6 +585,14 @@ test("dogfood readiness writes a secret-free identity and latency receipt", () =
     workspace_count: 2,
     stream_id: "events",
     transport: "iroh",
+    tooling_checkout_sha: "0123456789abcdef0123456789abcdef01234567",
+    installed_bundle: {
+      bundle_id: "dev.cmux.ios.iosrdy",
+      target: "physical_device",
+      target_id: "phone-a",
+      source: "legacy_receipt_writer",
+      executable_sha256: null,
+    },
   });
   assert.equal(result.directoryMode, 0o700);
   assert.equal(result.receiptMode, 0o600);
@@ -588,6 +606,78 @@ test("macOS and iOS reloads share the dev API backend override", () => {
   assert.match(macReload, /CMUX_DEV_API_BASE_URL_VALUE=.*cmux_attach_resolve_dev_api_base_url/);
   assert.match(macReload, /CMUX_API_BASE_URL="\$CMUX_DEV_API_BASE_URL_VALUE"/);
   assert.match(iosReload, /explicit_base_url=.*CMUX_DEV_API_BASE_URL/);
+});
+
+function resolveIrohV2Environment(prodAuth, explicit = "") {
+  return run("bash", [
+    "-c",
+    'source "$1"; CMUX_IROH_V2_ENVIRONMENT="$3" cmux_attach_resolve_iroh_v2_environment "$2"',
+    "mobile-attach-test",
+    validator,
+    prodAuth,
+    explicit,
+  ]);
+}
+
+// A --prod-auth build signs in with a production account; the development v2
+// Worker refuses that token with HTTP 403, so pairing fails (#38747).
+test("--prod-auth builds use the production Iroh v2 control plane unless set explicitly", () => {
+  for (const [prodAuth, explicit, expected] of [
+    ["1", "", "production"],
+    ["0", "", "development"],
+    ["1", "staging", "staging"],
+    ["0", "production", "production"],
+  ]) {
+    const result = resolveIrohV2Environment(prodAuth, explicit);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, expected, `PROD_AUTH=${prodAuth} explicit=${explicit || "unset"}`);
+  }
+});
+
+function resolveIrohV2BaseURL(environment, explicit = "") {
+  return run("bash", [
+    "-c",
+    'source "$1"; CMUX_IROH_V2_BASE_URL="$3" cmux_attach_resolve_iroh_v2_base_url "$2"',
+    "mobile-attach-test",
+    validator,
+    environment,
+    explicit,
+  ]);
+}
+
+// The macOS app keeps the last non-empty v2 URL in its defaults and never clears
+// it, so a tag rebuilt with --prod-auth must bake the matching Worker URL.
+test("macOS reload bakes the Worker URL of the resolved Iroh v2 environment", () => {
+  for (const [environment, explicit, expected] of [
+    ["production", "", "https://cmux-v2.debussy.workers.dev"],
+    ["staging", "", "https://cmux-v2-staging.debussy.workers.dev"],
+    ["development", "", "https://cmux-v2-development.debussy.workers.dev"],
+    ["production", "https://v2.example.test", "https://v2.example.test"],
+    ["produciton", "", ""],
+  ]) {
+    const result = resolveIrohV2BaseURL(environment, explicit);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, expected, `${environment} explicit=${explicit || "unset"}`);
+  }
+});
+
+test("macOS and iOS reloads resolve the Iroh v2 environment from --prod-auth", () => {
+  const macReload = fs.readFileSync(path.join(repoRoot, "scripts/reload.sh"), "utf8");
+  const iosReload = fs.readFileSync(path.join(repoRoot, "ios/scripts/reload.sh"), "utf8");
+  for (const [script, source] of [["scripts/reload.sh", macReload], ["ios/scripts/reload.sh", iosReload]]) {
+    assert.match(
+      source,
+      /CMUX_IROH_V2_ENVIRONMENT_VALUE="\$\(cmux_attach_resolve_iroh_v2_environment "\$PROD_AUTH"\)"/,
+      script,
+    );
+    assert.doesNotMatch(source, /CMUX_IROH_V2_ENVIRONMENT:-development/, script);
+  }
+  assert.match(
+    macReload,
+    /CMUX_IROH_V2_BASE_URL_VALUE="\$\(cmux_attach_resolve_iroh_v2_base_url "\$CMUX_IROH_V2_ENVIRONMENT_VALUE"\)"/,
+  );
+  // The iOS app derives the URL from the environment and clears a stale stored one.
+  assert.match(iosReload, /CMUX_IROH_V2_BASE_URL_VALUE="\$\{CMUX_IROH_V2_BASE_URL:-\}"/);
 });
 
 test("tagged macOS launches require a personal credential file by default", () => {
@@ -696,22 +786,22 @@ test("cloud physical-device archives bake staging origins with override escape h
   assert.match(workflow, /CMUX_IROH_BROKER_BASE_URL="\$iroh_broker_base_url"/);
 });
 
-test("physical-device mint rejects a ticket with only plaintext Tailscale routes", async () => {
+test("physical-device mint accepts the authenticated Tailscale fallback", async () => {
   const result = await mintAttachURL(
     "physical_device",
     [attachPayload("tailscale"), attachPayload("tailscale")],
     2,
   );
-  assert.equal(result.status, 2);
-  assert.equal(result.stdout, "");
-  assert.equal(result.callCount, 2);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, attachPayload("tailscale").attach_url);
+  assert.equal(result.callCount, 1);
 });
 
-test("physical-device mint waits for asynchronous Iroh publication", async () => {
+test("physical-device mint waits when no route is published yet", async () => {
   const payload = attachPayload("iroh");
   const result = await mintAttachURL(
     "physical_device",
-    [attachPayload("tailscale"), payload],
+    [attachPayload("none"), payload],
     2,
   );
   assert.equal(result.status, 0, result.stderr);
@@ -742,6 +832,22 @@ test("physical-device mint distinguishes malformed successful output", async () 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /attach readiness exhausted: malformed_response/);
   assert.doesNotMatch(result.stderr, /secret-payload-value/);
+});
+
+test("physical-device mint ignores successful CLI diagnostics on stderr", async () => {
+  const payload = attachPayload("iroh");
+  const result = await mintAttachURL(
+    "physical_device",
+    {
+      cliResponse: {
+        status: 0,
+        stdout: JSON.stringify(payload),
+        stderr: "warning: cached auth metadata was refreshed",
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, payload.attach_url);
 });
 
 test("physical-device mint accepts an encrypted Iroh route", async () => {
@@ -839,7 +945,7 @@ test("release gate grants asynchronous Iroh publication a bounded startup window
   );
   assert.match(
     gate,
-    /CMUX_ATTACH_MINT_MAX_ATTEMPTS=600 \\[\s\S]{0,320}\.\/scripts\/mobile-dev-launch\.sh/,
+    /CMUX_ATTACH_MINT_MAX_ATTEMPTS=600 \\[\s\S]{0,800}\.\/scripts\/mobile-dev-launch\.sh/,
   );
   assert.match(
     gate,

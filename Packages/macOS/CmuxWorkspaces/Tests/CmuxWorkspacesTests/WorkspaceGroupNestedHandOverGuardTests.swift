@@ -67,6 +67,10 @@ struct WorkspaceGroupNestedHandOverGuardTests {
         "reorderSidebarWorkspaces: workspaces dropped on a group of a nested window",
         "reorderSidebarWorkspaces: workspaces dropped at the top level of a nested window",
         "createWorkspaceGroup: the first eligible workspace in a group",
+        "createWorkspaceGroup: a new group inside a folded parent opens it", // (cm-142.1)
+        "placeNewWorkspaceGroupAtCreationPosition: a group made inside a group", // (cm-142.1)
+        "isAtTopOfUnpinnedTier", // (cm-142.1)
+        "selectionTargetAfterClose", // (cm-142.1) hands over at WorkspacesModel+CloseSelection.swift:26
         "setWorkspaceGroupPinned: the notice ids",
         "moveTabsToTop: the notice ids",
         "moveTabToTopForNotification: the notice ids",
@@ -84,6 +88,10 @@ struct WorkspaceGroupNestedHandOverGuardTests {
         "WorkspaceGroupCoordinator+GeneratedAnchorCleanup.swift#removeGeneratedAnchorWorkspace",
         "WorkspaceGroupCoordinator.swift#addWorkspaceToGroup",
         "WorkspaceGroupCoordinator.swift#createWorkspaceGroup",
+        "WorkspaceGroupCoordinator.swift#createWorkspaceGroup", // (cm-142.1) the folded parent opens
+        "WorkspaceGroupCoordinator.swift#placeNewWorkspaceGroupAtCreationPosition", // (cm-142.1)
+        "WorkspaceReorderCoordinator.swift#isAtTopOfUnpinnedTier", // (cm-142.1)
+        "WorkspacesModel+CloseSelection.swift#selectionTargetAfterClose", // (cm-142.1) hands over at WorkspacesModel+CloseSelection.swift:26
         "WorkspaceGroupCoordinator.swift#createWorkspaceInGroup",
         "WorkspaceGroupCoordinator.swift#moveWorkspaceGroup",
         "WorkspaceGroupCoordinator.swift#removeWorkspaceFromGroup",
@@ -215,7 +223,9 @@ struct WorkspaceGroupNestedHandOverGuardTests {
         "WorkspaceGroupCoordinator.swift#moveWorkspaceGroupSlot": "one level is right here because it is private and its only caller, moveWorkspaceGroup(groupId:toIndex:), hands over before it",
         "WorkspaceGroupCoordinator.swift#applyWorkspaceGroupSlotOrderToTabs": "one level is right here because it is private and its only caller, moveWorkspaceGroup(groupId:toIndex:), hands over before it",
         "WorkspaceGroupCoordinator.swift#nextAutoWorkspaceGroupName": "one level is right here because it reads only the names of the groups, at any level",
-        "WorkspaceGroupCoordinator.swift#placeNewWorkspaceGroupAtCreationPosition": "one level is right here because it is private, runs after nestedPlaceNewWorkspaceGroup in createWorkspaceGroup, and orders through normalizeWorkspaceGroupContiguity, topLevelWorkspaceIdsPreservingOrder and syncWorkspaceGroupsOrderToAnchorOrder, which all hand over",
+        "WorkspaceGroupCoordinator.swift#placeNewWorkspaceGroupAtCreationPosition": "hands over at parentGroupIdIfNested(", // (cm-142.1) since the anchor is a chosen workspace, the flat normalize re-sorted a nested run
+        "WorkspaceGroupCoordinator.swift#removeGeneratedAnchorIfOrphaned": "one level is right here because it only reads the group's direct workspaces to ask whether its generated workspace is alone, and the removal it calls, removeGeneratedAnchorWorkspace, refuses a group that holds groups (its #cm-106 guard), so it acts only on a group with no group inside, whose direct workspaces are all of its workspaces", // (cm-142.1)
+        "WorkspaceReorderCoordinator.swift#isAtTopOfUnpinnedTier": "hands over at hasNestedWorkspaceGroup", // (cm-142.1) answers from the plan the nested bump applies
         // WorkspaceGroupCoordinator+DeletionConfirmation.swift
         "WorkspaceGroupCoordinator+DeletionConfirmation.swift#deletionConfirmation": "hands over at hasNestedWorkspaceGroup",
         "WorkspaceGroupCoordinator+DeletionConfirmation.swift#deleteWorkspaceGroup": "hands over at hasNestedWorkspaceGroup",

@@ -68,6 +68,7 @@ extension ShortcutAction {
     private var builtInDefaultStroke: ShortcutStroke? {
         switch self {
         case .openSettings: return ShortcutStroke(key: ",", command: true)
+        case .openTeamPicker: return ShortcutStroke(key: "t", command: true, shift: true, option: true)
         case .reloadConfiguration: return ShortcutStroke(key: ",", command: true, shift: true)
         case .showHideAllWindows: return ShortcutStroke(key: ".", command: true, option: true, control: true)
         case .globalSearch: return ShortcutStroke(key: "f", command: true, option: true)
@@ -76,7 +77,10 @@ extension ShortcutAction {
         case .toggleFullScreen: return ShortcutStroke(key: "f", command: true, control: true)
         case .quit: return ShortcutStroke(key: "q", command: true)
         case .toggleSidebar: return ShortcutStroke(key: "b", command: true)
+        case .focusSidebar: return nil
+        case .showWindowHints: return ShortcutStroke(key: "j", command: true)
         case .newTab: return ShortcutStroke(key: "n", command: true)
+        case .newLocalWorkspace: return ShortcutStroke(key: "n", command: true, option: true, control: true)
         case .newBrowserWorkspace: return ShortcutStroke(key: "n", command: true, option: true)
         case .newCloudWorkspace: return ShortcutStroke(key: "y", command: true)
         // cmux-rbf cm-78.1: the new Cloud action must not take Reply's key.
@@ -86,11 +90,14 @@ extension ShortcutAction {
         case .reopenPreviousSession: return ShortcutStroke(key: "o", command: true, shift: true)
         case .goToWorkspace: return ShortcutStroke(key: "p", command: true)
         case .commandPalette: return ShortcutStroke(key: "p", command: true, shift: true)
+        case .agentInbox: return ShortcutStroke(key: "i", command: true, shift: true)
+        case .openChief: return ShortcutStroke(key: "c", command: true, shift: true)
         case .commandPaletteNext: return ShortcutStroke(key: "n", control: true)
         case .commandPalettePrevious: return ShortcutStroke(key: "p", control: true)
         case .sendFeedback: return nil
         case .showNotifications: return ShortcutStroke(key: "i", command: true)
         case .jumpToUnread: return ShortcutStroke(key: "u", command: true, shift: true)
+        case .jumpToLastPrompt: return ShortcutStroke(key: "b", command: true, shift: true)
         case .toggleUnread: return ShortcutStroke(key: "u", command: true, option: true)
         case .markOldestUnreadAndJumpNext: return ShortcutStroke(key: "u", command: true, control: true)
         case .markAllNotificationsRead, .clearAllNotifications: return nil
@@ -111,6 +118,7 @@ extension ShortcutAction {
         case .nextSidebarTabInGroup, .prevSidebarTabInGroup: return nil
         case .focusHistoryBack: return ShortcutStroke(key: "[", command: true)
         case .focusHistoryForward: return ShortcutStroke(key: "]", command: true)
+        case .focusHistoryLast: return nil
         case .renameTab: return ShortcutStroke(key: "r", command: true)
         case .renameWorkspace: return ShortcutStroke(key: "r", command: true, shift: true)
         case .editWorkspaceDescription: return ShortcutStroke(key: "e", command: true, option: true)
@@ -138,8 +146,10 @@ extension ShortcutAction {
         // browser, Shift+Cmd+K clears the screen), and Reset must return them here
         // rather than to a chord that displaces a shipped binding.
         case .splitLeft, .splitUp: return nil
+        case .focusPaneByNumber: return nil
         case .splitRight: return ShortcutStroke(key: "d", command: true)
         case .splitDown: return ShortcutStroke(key: "d", command: true, shift: true)
+        case .newPaneAutoLayout: return ShortcutStroke(key: "n", command: true, control: true)
         case .toggleSplitZoom: return ShortcutStroke(key: "\r", command: true, shift: true)
         // cmux-rbf #cm-73.3
         case .switchFigmaPreviewAndEditor: return ShortcutStroke(key: "c", command: true, shift: true, option: true)
@@ -205,12 +215,15 @@ extension ShortcutAction {
         case .cycleTextBoxSubmitAction: return ShortcutStroke(key: "\t", shift: true)
         case .attachTextBoxFile: return ShortcutStroke(key: "a", command: true, shift: true, option: true)
         case .sendCtrlFToTerminal: return nil
+        case .pasteLastScreenshot: return nil
+        case .sizeTerminalToMyWindow: return ShortcutStroke(key: "=", command: true, option: true, control: true)
         case .clearScreenKeepScrollback: return ShortcutStroke(key: "k", command: true, shift: true)
         case .toggleRightSidebar: return ShortcutStroke(key: "b", command: true, option: true)
         case .fileExplorerOpenSelection: return ShortcutStroke(key: "\r")
         case .fileExplorerOpenSelectionFinderAlias: return ShortcutStroke(key: "↓", command: true)
         case .openDiffViewer: return ShortcutStroke(key: "d", command: true, shift: true, control: true)
         case .saveFilePreview: return ShortcutStroke(key: "s", command: true)
+        case .toggleFileEditorWordWrap: return ShortcutStroke(key: "z", option: true)
         case .openBrowser: return ShortcutStroke(key: "l", command: true, shift: true)
         case .focusBrowserAddressBar: return ShortcutStroke(key: "l", command: true)
         case .browserBack: return ShortcutStroke(key: "[", command: true)
@@ -253,6 +266,9 @@ extension ShortcutAction {
         case .simulatorToggleSoftwareKeyboard: return ShortcutStroke(key: "k", command: true)
         case .diffViewerNextFile: return nil
         case .diffViewerPreviousFile: return nil
+        case .diffViewerNextHunk: return ShortcutStroke(key: "n")
+        case .diffViewerPreviousHunk: return ShortcutStroke(key: "p")
+        case .diffViewerToggleViewed: return ShortcutStroke(key: "v")
         }
     }
 }

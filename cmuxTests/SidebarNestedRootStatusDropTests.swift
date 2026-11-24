@@ -234,7 +234,7 @@ struct SidebarNestedRootStatusDropTests {
         try await AppContextSerialGate.withExclusiveAppContext {
             let f = try scene(deep: true); defer { f.close() }
             f.named["l2"]?.hideTaskStatus()
-            let top = try #require(f.manager.createWorkspaceGroup(name: "Top", childWorkspaceIds: [f.w("l2").id]))
+            let top = try #require(f.manager.createWorkspaceGroupWithOwnAnchor(name: "Top", childWorkspaceIds: [f.w("l2").id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             f.named["topAnchor"] = try #require(f.manager.workspaceGroupAnchor(for: top))
             f.named["topAnchor"]?.hideTaskStatus()
             let index = try #require(f.manager.workspaceGroups.firstIndex { $0.id == top })
@@ -259,7 +259,7 @@ struct SidebarNestedRootStatusDropTests {
     // MARK: a group inside a root, and the root's own block
 
     private func withInnerGroup(_ f: F) throws -> UUID {
-        let inner = try #require(f.manager.createWorkspaceGroup(name: "Inner", childWorkspaceIds: [f.w("l2").id]))
+        let inner = try #require(f.manager.createWorkspaceGroupWithOwnAnchor(name: "Inner", childWorkspaceIds: [f.w("l2").id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         _ = f.manager.moveWorkspaceGroup(groupId: inner, intoParent: f.q)
         f.named["innerAnchor"] = try #require(f.manager.workspaceGroupAnchor(for: inner))
         f.named["innerAnchor"]?.hideTaskStatus()
@@ -329,7 +329,7 @@ struct SidebarNestedRootStatusDropTests {
         try await AppContextSerialGate.withExclusiveAppContext {
             let f = try scene(deep: true); defer { f.close() }
             f.named["l2"]?.hideTaskStatus()
-            let other = try #require(f.manager.createWorkspaceGroup(name: "Other", childWorkspaceIds: [f.w("l2").id]))
+            let other = try #require(f.manager.createWorkspaceGroupWithOwnAnchor(name: "Other", childWorkspaceIds: [f.w("l2").id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             _ = f.manager.moveWorkspaceGroup(groupId: other, intoParent: try #require(f.manager.workspaceGroups.first { $0.id == f.p }?.parentGroupId))
             f.named["otherAnchor"] = try #require(f.manager.workspaceGroupAnchor(for: other))
             f.named["otherAnchor"]?.hideTaskStatus()
@@ -358,7 +358,7 @@ struct SidebarNestedRootStatusDropTests {
     private func sceneWithTwoRoots() throws -> (F, UUID) {
         let f = try scene(deep: false)
         f.named["l2"]?.hideTaskStatus()
-        let second = try #require(f.manager.createWorkspaceGroup(name: "Q2", childWorkspaceIds: [f.w("l2").id]))
+        let second = try #require(f.manager.createWorkspaceGroupWithOwnAnchor(name: "Q2", childWorkspaceIds: [f.w("l2").id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         _ = f.manager.moveWorkspaceGroup(groupId: second, intoParent: f.p)
         f.named["q2Anchor"] = try #require(f.manager.workspaceGroupAnchor(for: second))
         f.named["q2Anchor"]?.hideTaskStatus()

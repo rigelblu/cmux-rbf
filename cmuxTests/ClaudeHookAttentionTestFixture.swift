@@ -24,6 +24,8 @@ final class ClaudeHookAttentionTestFixture: @unchecked Sendable {
             listenerFD: try support.bindUnixSocket(at: socket), state: .init(), root: root,
             workspaceId: "11111111-1111-1111-1111-111111111111",
             surfaceId: "22222222-2222-2222-2222-222222222222")
+        // cmux-rbf (#cm-124.6, #cm-142.1): upstream's Feed resolves its target before a blocking card, so this app owns the surface.
+        context.state.setResolvesDeliveryTarget(true)
         support.startAgentHookMockServerAccepting(context: context)
     }
 

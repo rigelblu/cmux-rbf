@@ -1,19 +1,18 @@
+import CmuxSurfaceCatalogModel
+import CmuxWorkspaces
 import Foundation
 import Combine
 import Bonsplit
 import OSLog
-
 private let closedItemHistoryLogger = Logger(
     subsystem: "com.cmuxterm.app",
     category: "ClosedItemHistory"
 )
-
 struct ClosedPanelSplitPlacement: Codable, Sendable {
     let orientation: SplitOrientation
     let insertFirst: Bool
     let anchorPanelId: UUID?
 }
-
 struct ClosedPanelHistoryEntry: Codable, Sendable {
     let workspaceId: UUID
     let paneId: UUID
@@ -29,7 +28,8 @@ struct ClosedPanelHistoryEntry: Codable, Sendable {
     /// Workspace identity encoded into the panel snapshot. This can differ
     /// from `sourceWorkspaceId` after a session restore.
     let sourceSnapshotWorkspaceId: UUID?
-
+    let layout: SessionWorkspaceLayoutSnapshot?
+    let projection: SurfaceProjectionRecord?
     init(
         workspaceId: UUID,
         paneId: UUID,
@@ -39,7 +39,9 @@ struct ClosedPanelHistoryEntry: Codable, Sendable {
         snapshot: SessionPanelSnapshot,
         fallbackSplitPlacement: ClosedPanelSplitPlacement? = nil,
         sourceWorkspaceId: UUID? = nil,
-        sourceSnapshotWorkspaceId: UUID? = nil
+        sourceSnapshotWorkspaceId: UUID? = nil,
+        layout: SessionWorkspaceLayoutSnapshot? = nil,
+        projection: SurfaceProjectionRecord? = nil
     ) {
         self.workspaceId = workspaceId
         self.paneId = paneId
@@ -50,53 +52,69 @@ struct ClosedPanelHistoryEntry: Codable, Sendable {
         self.fallbackSplitPlacement = fallbackSplitPlacement
         self.sourceWorkspaceId = sourceWorkspaceId
         self.sourceSnapshotWorkspaceId = sourceSnapshotWorkspaceId
+        self.layout = layout
+        self.projection = projection
     }
 }
-
 struct ClosedWorkspaceHistoryEntry: Codable, Sendable {
     let workspaceId: UUID
     let windowId: UUID?
     let workspaceIndex: Int
     let snapshot: SessionWorkspaceSnapshot
 }
-
 struct ClosedWindowHistoryEntry: Codable, Sendable {
     let windowId: UUID?
     let snapshot: SessionWindowSnapshot
-
     let workspaceIds: [UUID]
-
     init(windowId: UUID? = nil, snapshot: SessionWindowSnapshot, workspaceIds: [UUID] = []) {
         self.windowId = windowId
         self.snapshot = snapshot
         self.workspaceIds = workspaceIds
     }
 }
-
 enum ClosedItemHistoryEntry: Codable, Sendable {
     case panel(ClosedPanelHistoryEntry)
     case workspace(ClosedWorkspaceHistoryEntry)
     case window(ClosedWindowHistoryEntry)
 }
-
+extension SessionWorkspaceSnapshot {
+    /// True when every panel, Dock panels included, is a Chief pane.
+    var holdsOnlyChiefPanels: Bool {
+        let all = panels + (dock?.panels ?? [])
+        return !all.isEmpty && all.allSatisfy { $0.type == .chief }
+    }
+}
+extension ClosedItemHistoryEntry {
+    /// True when reopening would bring back only Chief panes, which Chief
+    /// being off refuses. Such records are hidden and skipped while it's off.
+    var holdsOnlyChief: Bool {
+        switch self {
+        case .panel(let entry):
+            return entry.snapshot.type == .chief
+        case .workspace(let entry):
+            return entry.snapshot.holdsOnlyChiefPanels
+        case .window(let entry):
+            let workspaces = entry.snapshot.tabManager.workspaces
+            return !workspaces.isEmpty && workspaces.allSatisfy(\.holdsOnlyChiefPanels)
+                && entry.snapshot.dock?.panels.isEmpty != false
+        }
+    }
+}
 struct ClosedItemHistoryRecord: Identifiable, Codable, Sendable {
     let id: UUID
     let closedAt: Date
     var entry: ClosedItemHistoryEntry
-
     init(id: UUID = UUID(), closedAt: Date = Date(), entry: ClosedItemHistoryEntry) {
         self.id = id
         self.closedAt = closedAt
         self.entry = entry
     }
 }
-
 struct ClosedItemHistoryMenuItem: Identifiable, Equatable {
     let id: UUID
     let title: String
     let detail: String
     let closedAt: Date
-
     var menuSubtitle: String {
         let closed = String(
             format: String(localized: "historyPane.closedAtFormat", defaultValue: "Closed %@"),
@@ -108,7 +126,6 @@ struct ClosedItemHistoryMenuItem: Identifiable, Equatable {
             closed
         )
     }
-
     var menuTitle: String {
         HistoryMenuLineFormatter.titleWithSubtitle(
             title: title,
@@ -116,13 +133,11 @@ struct ClosedItemHistoryMenuItem: Identifiable, Equatable {
         )
     }
 }
-
 struct ClosedItemHistoryMenuSnapshot: Equatable {
     let items: [ClosedItemHistoryMenuItem]
     let totalItemCount: Int
     let isLimited: Bool
 }
-
 enum ClosedWindowRestoreValidation {
     static func hasUsableRestoredContent(
         snapshot: SessionWindowSnapshot,
@@ -134,7 +149,6 @@ enum ClosedWindowRestoreValidation {
         return restoredPanelIdsByWorkspaceIndex.contains { !$0.isEmpty }
     }
 }
-
 @MainActor
 final class ClosedItemHistoryStore: ObservableObject {
     /// Bounds the shared reopen history to a useful recency window without
@@ -146,7 +160,6 @@ final class ClosedItemHistoryStore: ObservableObject {
         workspaceCapacity: defaultWorkspaceCapacity,
         fileURL: defaultHistoryFileURL()
     )
-
     @Published private(set) var revision: UInt64 = 0
     @Published private var records: [ClosedItemHistoryRecord] = []
     private let notificationCenter: NotificationCenter
@@ -157,7 +170,6 @@ final class ClosedItemHistoryStore: ObservableObject {
     private var needsPersistenceAfterPersistedRecordsLoad = false
     private var shouldDiscardPersistedRecordsOnLoad = false
     private var pendingPersistedRecordMutations: [PendingPersistedRecordMutation] = []
-
     private enum PendingPersistedRecordMutation {
         case remapPanelWorkspaceIds(
             oldWorkspaceId: UUID,
@@ -200,7 +212,13 @@ final class ClosedItemHistoryStore: ObservableObject {
     }
 
     var canReopen: Bool {
-        !records.isEmpty
+        records.contains(where: isOffered)
+    }
+
+    /// Whether a record is listed and reopenable now: Chief-only records are
+    /// hidden while Chief is off and come back when it's on.
+    private func isOffered(_ record: ClosedItemHistoryRecord) -> Bool {
+        !record.entry.holdsOnlyChief || ChiefSettings.isEnabled
     }
 
     private func advanceRevision() {
@@ -235,6 +253,7 @@ final class ClosedItemHistoryStore: ObservableObject {
         let candidates = records.enumerated()
             .filter { _, record in
                 guard !excludedRecordIds.contains(record.id) else { return false }
+                guard isOffered(record) else { return false }
                 guard isCandidate(record.entry) else { return false }
                 guard let cutoff else { return true }
                 return record.closedAt >= cutoff
@@ -284,17 +303,18 @@ final class ClosedItemHistoryStore: ObservableObject {
 
     func menuSnapshot(maxItemCount: Int? = nil) -> ClosedItemHistoryMenuSnapshot {
         // Build only visible rows; this runs on every menu rebuild and persisted history can be larger.
-        if let maxItemCount, maxItemCount >= 0, records.count > maxItemCount {
+        let offered = ChiefSettings.isEnabled ? records : records.filter(isOffered)
+        if let maxItemCount, maxItemCount >= 0, offered.count > maxItemCount {
             return ClosedItemHistoryMenuSnapshot(
-                items: records.suffix(maxItemCount).reversed().map(Self.menuItem(for:)),
-                totalItemCount: records.count,
+                items: offered.suffix(maxItemCount).reversed().map(Self.menuItem(for:)),
+                totalItemCount: offered.count,
                 isLimited: true
             )
         }
 
         return ClosedItemHistoryMenuSnapshot(
-            items: records.reversed().map(Self.menuItem(for:)),
-            totalItemCount: records.count,
+            items: offered.reversed().map(Self.menuItem(for:)),
+            totalItemCount: offered.count,
             isLimited: false
         )
     }
@@ -584,7 +604,9 @@ final class ClosedItemHistoryStore: ObservableObject {
                 fallbackSplitPlacement: fallbackSplitPlacement,
                 sourceWorkspaceId: panelEntry.sourceWorkspaceId,
                 sourceSnapshotWorkspaceId:
-                    panelEntry.sourceSnapshotWorkspaceId
+                    panelEntry.sourceSnapshotWorkspaceId,
+                layout: panelEntry.layout?.remappingPanelIDs(panelIdMap),
+                projection: panelEntry.projection
             )))
         }
         return (remappedRecords, didUpdate)
@@ -598,6 +620,7 @@ final class ClosedItemHistoryStore: ObservableObject {
         var didUpdate = false
         let remappedRecords = records.map { record in
             guard case .panel(let panelEntry) = record.entry else { return record }
+            let layout = panelEntry.layout?.remappingPanelIDs([oldPanelId: newPanelId])
             let paneAnchorPanelId = panelEntry.paneAnchorPanelId == oldPanelId
                 ? newPanelId
                 : panelEntry.paneAnchorPanelId
@@ -612,7 +635,8 @@ final class ClosedItemHistoryStore: ObservableObject {
                 )
             }
             if paneAnchorPanelId != panelEntry.paneAnchorPanelId ||
-                fallbackSplitPlacement?.anchorPanelId != panelEntry.fallbackSplitPlacement?.anchorPanelId {
+                fallbackSplitPlacement?.anchorPanelId != panelEntry.fallbackSplitPlacement?.anchorPanelId ||
+                layout != panelEntry.layout {
                 didUpdate = true
             }
             return ClosedItemHistoryRecord(id: record.id, closedAt: record.closedAt, entry: .panel(ClosedPanelHistoryEntry(
@@ -625,7 +649,9 @@ final class ClosedItemHistoryStore: ObservableObject {
                 fallbackSplitPlacement: fallbackSplitPlacement,
                 sourceWorkspaceId: panelEntry.sourceWorkspaceId,
                 sourceSnapshotWorkspaceId:
-                    panelEntry.sourceSnapshotWorkspaceId
+                    panelEntry.sourceSnapshotWorkspaceId,
+                layout: layout,
+                projection: panelEntry.projection
             )))
         }
         return (remappedRecords, didUpdate)
@@ -689,11 +715,16 @@ final class ClosedItemHistoryStore: ObservableObject {
     nonisolated fileprivate static func loadRecords(fileURL: URL) -> [ClosedItemHistoryRecord] {
         guard let data = try? Data(contentsOf: fileURL) else { return [] }
         let decoder = JSONDecoder()
-        if let snapshot = try? decoder.decode(ClosedItemHistoryPersistenceSnapshot.self, from: data),
-           snapshot.version == ClosedItemHistoryPersistenceSnapshot.currentVersion {
+        // Records carry workspace layout trees; decode on a main-sized stack
+        // because this runs on a 512 KB concurrency pool thread (#4656).
+        if let snapshot = try? SessionSnapshotCodingStack().run({
+            try decoder.decode(ClosedItemHistoryPersistenceSnapshot.self, from: data)
+        }), snapshot.version == ClosedItemHistoryPersistenceSnapshot.currentVersion {
             return snapshot.records
         }
-        return (try? decoder.decode([ClosedItemHistoryRecord].self, from: data)) ?? []
+        return (try? SessionSnapshotCodingStack().run {
+            try decoder.decode([ClosedItemHistoryRecord].self, from: data)
+        }) ?? []
     }
 
     nonisolated fileprivate static func saveRecords(_ records: [ClosedItemHistoryRecord], fileURL: URL) {
@@ -719,7 +750,7 @@ final class ClosedItemHistoryStore: ObservableObject {
             let snapshot = ClosedItemHistoryPersistenceSnapshot(records: records)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
-            let data = try encoder.encode(snapshot)
+            let data = try SessionSnapshotCodingStack().run { try encoder.encode(snapshot) }
             if let existingData = try? Data(contentsOf: fileURL), existingData == data {
                 return
             }

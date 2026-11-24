@@ -110,10 +110,24 @@ enum TabControlShortcutHintStyle {
     static let fontWeight: Font.Weight = .semibold
     static let nsFontWeight: NSFont.Weight = .semibold
     static let fontDesign: Font.Design = .rounded
-    static let foregroundColor = Color.primary
+    /// Opaque palette shared with the host's shortcut-hint pills so every
+    /// Cmd-hold hint reads the same in both schemes: 10.4:1 on dark
+    /// chrome and 15.1:1 on light chrome, independent of what is behind it.
+    static func foregroundColor(isDark: Bool) -> Color {
+        isDark ? Color.white.opacity(0.95) : Color.black.opacity(0.85)
+    }
+    static func backgroundColor(isDark: Bool) -> Color {
+        isDark
+            ? Color(.sRGB, red: 0x3A / 255, green: 0x3A / 255, blue: 0x3C / 255, opacity: 1)
+            : Color.white
+    }
+    static func borderColor(isDark: Bool) -> Color {
+        isDark ? Color.white.opacity(0.18) : Color.black.opacity(0.12)
+    }
     static let horizontalPadding: CGFloat = 6
     static let verticalPadding: CGFloat = 2
-    static let strokeOpacity = 0.30
+    /// Width of the Liquid Glass rim around the opaque center on macOS 26.
+    static let glassRimWidth: CGFloat = 1.5
     static let strokeWidth: CGFloat = 0.8
     static let shadowOpacity = 0.22
     static let shadowRadius: CGFloat = 2
@@ -132,16 +146,10 @@ enum TabControlShortcutHintStyle {
 }
 
 struct TabControlShortcutHintPillBackground: View {
+    let isDark: Bool
+
     var body: some View {
-        Capsule(style: .continuous)
-            .fill(.regularMaterial)
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(
-                        Color.white.opacity(TabControlShortcutHintStyle.strokeOpacity),
-                        lineWidth: TabControlShortcutHintStyle.strokeWidth
-                    )
-            )
+        fill
             .shadow(
                 color: Color.black.opacity(TabControlShortcutHintStyle.shadowOpacity),
                 radius: TabControlShortcutHintStyle.shadowRadius,
@@ -149,21 +157,60 @@ struct TabControlShortcutHintPillBackground: View {
                 y: TabControlShortcutHintStyle.shadowY
             )
     }
+
+    /// A Liquid Glass rim around the opaque palette center where the OS has
+    /// glass, the bordered opaque capsule before macOS 26. Glass takes its
+    /// color from the backdrop, so the text sits on the opaque fill and keeps
+    /// its contrast. Matches the host's pills.
+    @ViewBuilder
+    private var fill: some View {
+        #if compiler(>=6.3)
+        if #available(macOS 26.0, *) {
+            ZStack {
+                Color.clear
+                    .glassEffect(.regular, in: Capsule(style: .continuous))
+                Capsule(style: .continuous)
+                    .inset(by: TabControlShortcutHintStyle.glassRimWidth)
+                    .fill(TabControlShortcutHintStyle.backgroundColor(isDark: isDark))
+            }
+        } else {
+            opaqueFill
+        }
+        #else
+        opaqueFill
+        #endif
+    }
+
+    private var opaqueFill: some View {
+        Capsule(style: .continuous)
+            .fill(TabControlShortcutHintStyle.backgroundColor(isDark: isDark))
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(
+                        TabControlShortcutHintStyle.borderColor(isDark: isDark),
+                        lineWidth: TabControlShortcutHintStyle.strokeWidth
+                    )
+            )
+    }
 }
 
 struct TabControlShortcutHintPill: View {
     let text: String
+    /// The tab bar's own light/dark choice; `nil` follows the color scheme.
+    var usesDarkChrome: Bool? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let isDark = usesDarkChrome ?? (colorScheme == .dark)
         Text(text)
             .font(TabControlShortcutHintStyle.font)
             .monospacedDigit()
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
-            .foregroundColor(TabControlShortcutHintStyle.foregroundColor)
+            .foregroundColor(TabControlShortcutHintStyle.foregroundColor(isDark: isDark))
             .padding(.horizontal, TabControlShortcutHintStyle.horizontalPadding)
             .padding(.vertical, TabControlShortcutHintStyle.verticalPadding)
-            .background(TabControlShortcutHintPillBackground())
+            .background(TabControlShortcutHintPillBackground(isDark: isDark))
     }
 }
 
@@ -269,6 +316,9 @@ enum TabItemStyling {
 struct TabItemView: View {
     let tab: TabItem
     let isSelected: Bool
+    /// Owned by the tab strip so hover follows the pointer when tabs move
+    /// under it (see `TabBarView.hoveredTabId`).
+    let isHovered: Bool
     let showsZoomIndicator: Bool
     let appearance: BonsplitConfiguration.Appearance
     /// When true, the tab drops its fixed maximum width and grows to fill the slack
@@ -285,8 +335,9 @@ struct TabItemView: View {
     let showsControlShortcutHint: Bool
     let shortcutModifierSymbol: String
     let allowsClose: Bool
+    let middleClickCapture: ((@escaping () -> Void) -> AnyView)?
     let allowsContextMenu: Bool
-    let contextMenuState: TabContextMenuState
+    let contextMenuStateProvider: () -> TabContextMenuState
     let moveDestinationsProvider: () -> [TabContextMoveDestination]
     let forkConversationAvailabilityProvider: () -> TabContextForkConversationAvailability
     let sendToBackAvailabilityProvider: () -> Bool // (cm-128.13)
@@ -297,10 +348,10 @@ struct TabItemView: View {
     let onContextAction: (TabContextAction) -> Void
     let onMoveDestination: (String) -> Void
 
-    @State private var isHovered = false
-    @State private var isCloseHovered = false
+    @State private var closeButtonPointerInside = false
     @State private var isZoomHovered = false
     @State private var isAudioHovered = false
+    @State private var isPresenceHovered = false
     @State private var showGlobeFallback = true
     @State private var globeFallbackScheduler = TabIconFallbackScheduler()
     @State private var lastIsLoadingObserved = false
@@ -341,20 +392,28 @@ struct TabItemView: View {
         // Icon-only pinned tabs always size to their fixed compact width.
         .fixedSize(horizontal: isIconOnlyPinned || !fillsWidth, vertical: false)
         .background(tabBackground.saturation(saturation))
-        .tabControlShortcutHintVisibilityAnimation(value: showsShortcutHint)
+        .background(TabPopoverAnchorView(tabId: tab.id, kind: .tabItem))
+        // The hint crossfade is animated where it happens (`trailingAccessory`,
+        // `iconOnlyContent`). An animation here would wrap the whole tab and
+        // copy its entire view value on every render.
         .contentShape(Rectangle().inset(by: -BonsplitTabItemHitTesting.horizontalSlop))
         // Middle click to close (macOS convention).
-        // Uses an AppKit event monitor so it doesn't interfere with left click selection or drag/reorder.
-        .background(MiddleClickMonitorView(onMiddleClick: {
-            guard allowsClose, !tab.isPinned else { return }
-            onClose(.middleClick)
-        }))
+        // The host capture view intercepts mouse-down on this tab without
+        // interfering with left-click selection or drag/reorder.
+        .background {
+            if let middleClickCapture {
+                middleClickCapture {
+                    guard allowsClose, !tab.isPinned else { return }
+                    onClose(.middleClick)
+                }
+            }
+        }
         .background {
             if allowsContextMenu {
                 TabContextMenuPresenter(
                     snapshot: TabContextMenuSnapshot(
                         tabId: tab.id,
-                        state: contextMenuState,
+                        stateProvider: contextMenuStateProvider,
                         moveDestinationsProvider: moveDestinationsProvider,
                         forkConversationAvailabilityProvider: forkConversationAvailabilityProvider,
                         forkConversationAvailabilityRefreshHandler: forkConversationAvailabilityRefreshHandler,
@@ -373,13 +432,16 @@ struct TabItemView: View {
                 onZoomToggle()
             }
         )
-        .onHover { hovering in
-            withTransaction(Transaction(animation: nil)) {
-                isHovered = hovering
-            }
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(tab.title)
+        // The close button is only built while selected or hovered and is
+        // merged into this element, so VoiceOver needs a named action to
+        // close any tab.
+        .accessibilityActions {
+            if allowsClose && !tab.isPinned {
+                Button(closeTabAccessibilityName) { onClose(.closeButton) }
+            }
+        }
         .accessibilityValue(accessibilityValue)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .safeHelp(tab.title)
@@ -400,6 +462,57 @@ struct TabItemView: View {
         }
         .tabGeometryDebugOnChange(of: tab.isLoading) { newValue in
             debugRecordIsLoadingStateChange(newValue)
+        }
+        .overlayPreferenceValue(TabPresenceAccessoryBoundsKey.self) { anchor in
+            presenceAccessoryOverlay(anchor)
+        }
+    }
+
+    private func presenceAccessory(_ presence: TabPresence) -> some View {
+        TabPresenceAccessoryView(
+            presence: presence,
+            colors: TabBarColors.presenceColors(for: appearance, isSelected: isSelected),
+            isHovered: isPresenceHovered,
+            hoverBackground: TabBarColors.hoveredTabBackground(for: appearance)
+        )
+    }
+
+    /// The clickable presence accessory, placed over the space the title row
+    /// reserved for it. Toggles the host's size panel, which anchors to it.
+    @ViewBuilder
+    private func presenceAccessoryOverlay(_ anchor: Anchor<CGRect>?) -> some View {
+        if let anchor, let presence = tab.presence, presence.showsAccessory {
+            GeometryReader { proxy in
+                let rect = proxy[anchor]
+                Button {
+                    onContextAction(.toggleSizePanel)
+                } label: {
+                    presenceAccessory(presence)
+                }
+                .buttonStyle(.plain)
+                .background(TabPopoverAnchorView(tabId: tab.id, kind: .presenceAccessory))
+                .onHover { hovering in
+                    withTransaction(Transaction(animation: nil)) {
+                        isPresenceHovered = hovering
+                    }
+                }
+                .saturation(saturation)
+                .safeHelp(presence.accessibilityLabel)
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel(presence.accessibilityLabel)
+                .accessibilityHint(
+                    BonsplitResourceBundle.localizedString(
+                        forKey: "tabPresence.toggleSizePanel",
+                        defaultValue: "Shows or hides the terminal size panel"
+                    )
+                )
+                .accessibilityIdentifier("tabPresenceAccessory")
+                .accessibilityAction { onContextAction(.toggleSizePanel) }
+                .tabBarButtonAnimationsDisabled()
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+            }
         }
     }
 
@@ -553,6 +666,17 @@ struct TabItemView: View {
                         debugRecordGeometry(which: "title", frame: frame)
                     }
 
+                if let presence = tab.presence, presence.showsAccessory {
+                    // Reserves the accessory's space in the title row. The live
+                    // button is drawn by `presenceAccessoryOverlay`, outside the
+                    // tab's combined accessibility element, so it stays its own
+                    // AXButton.
+                    presenceAccessory(presence)
+                        .hidden()
+                        .accessibilityHidden(true)
+                        .anchorPreference(key: TabPresenceAccessoryBoundsKey.self, value: .bounds) { $0 }
+                }
+
                 if tab.showsRemoteIndicator {
                     Image(systemName: "network")
                         .font(.system(size: accessoryFontSize, weight: .semibold))
@@ -573,10 +697,9 @@ struct TabItemView: View {
                 // route. Hidden when the tab is neither playing nor muted.
                 if tab.isAudioMuted || tab.isAudioPlaying {
                     let isMuted = tab.isAudioMuted
-                    let audioLabel = Bundle.module.localizedString(
+                    let audioLabel = BonsplitResourceBundle.localizedString(
                         forKey: isMuted ? "tabContext.unmuteTab" : "tabContext.muteTab",
-                        value: isMuted ? "Unmute Tab" : "Mute Tab",
-                        table: nil
+                        defaultValue: isMuted ? "Unmute Tab" : "Mute Tab"
                     )
                     Button {
                         onContextAction(.toggleAudioMute)
@@ -684,7 +807,7 @@ struct TabItemView: View {
                 .allowsHitTesting(!showsShortcutHint)
 
             if let shortcutHintLabel {
-                TabControlShortcutHintPill(text: shortcutHintLabel)
+                TabControlShortcutHintPill(text: shortcutHintLabel, usesDarkChrome: TabBarColors.usesDarkChrome(for: appearance))
                     .opacity(showsShortcutHint ? 1 : 0)
                     .allowsHitTesting(false)
             }
@@ -765,10 +888,9 @@ struct TabItemView: View {
         if !tab.isLoading {
             if tab.isAudioMuted || tab.isAudioPlaying {
                 let isMuted = tab.isAudioMuted
-                let audioLabel = Bundle.module.localizedString(
+                let audioLabel = BonsplitResourceBundle.localizedString(
                     forKey: isMuted ? "tabContext.unmuteTab" : "tabContext.muteTab",
-                    value: isMuted ? "Unmute Tab" : "Mute Tab",
-                    table: nil
+                    defaultValue: isMuted ? "Unmute Tab" : "Mute Tab"
                 )
                 Button {
                     onContextAction(.toggleAudioMute)
@@ -923,7 +1045,7 @@ struct TabItemView: View {
     private var trailingAccessory: some View {
         ZStack(alignment: .center) {
             if let shortcutHintLabel {
-                TabControlShortcutHintPill(text: shortcutHintLabel)
+                TabControlShortcutHintPill(text: shortcutHintLabel, usesDarkChrome: TabBarColors.usesDarkChrome(for: appearance))
                     .offset(
                         x: TabControlShortcutHintDebugSettings.clamped(controlShortcutHintXOffset),
                         y: TabControlShortcutHintDebugSettings.clamped(controlShortcutHintYOffset)
@@ -986,10 +1108,10 @@ struct TabItemView: View {
         if tab.showsNotificationBadge { parts.append("Unread") }
         if tab.isDirty { parts.append("Modified") }
         if tab.isAudioMuted {
-            parts.append(Bundle.module.localizedString(forKey: "tabContext.audioMutedAccessibility", value: "Muted", table: nil))
+            parts.append(BonsplitResourceBundle.localizedString(forKey: "tabContext.audioMutedAccessibility", defaultValue: "Muted"))
         }
         if tab.showsRemoteIndicator {
-            parts.append(Bundle.module.localizedString(forKey: "tabContext.remoteConnectedAccessibility", value: "Connected over SSH", table: nil))
+            parts.append(BonsplitResourceBundle.localizedString(forKey: "tabContext.remoteConnectedAccessibility", defaultValue: "Connected over SSH"))
         }
         if showsZoomIndicator { parts.append("Zoomed") }
         return parts.joined(separator: ", ")
@@ -1023,11 +1145,24 @@ struct TabItemView: View {
 
     // MARK: - Close Button / Dirty Indicator
 
+    /// Close-button highlight. Gated by the strip-owned tab hover so a stale
+    /// button-level flag cannot keep highlighting after the tab moved away.
+    private var isCloseHovered: Bool {
+        closeButtonPointerInside && isHovered
+    }
+
+    private var closeTabAccessibilityName: String {
+        BonsplitResourceBundle.localizedString(
+            forKey: "tab.close.accessibilityLabel",
+            defaultValue: "Close Tab"
+        )
+    }
+
     @ViewBuilder
     private var closeOrDirtyIndicator: some View {
         ZStack {
             // Dirty indicator (shown when dirty and not hovering, hidden for selected tab)
-            if (!isSelected && !isHovered && !isCloseHovered) && (tab.isDirty || tab.showsNotificationBadge) {
+            if (!isSelected && !isHovered) && (tab.isDirty || tab.showsNotificationBadge) {
                 HStack(spacing: 2) {
                     if tab.showsNotificationBadge {
                         Circle()
@@ -1044,14 +1179,14 @@ struct TabItemView: View {
             }
 
             if tab.isPinned {
-                if isSelected || isHovered || isCloseHovered || (!tab.isDirty && !tab.showsNotificationBadge) {
+                if isSelected || isHovered || (!tab.isDirty && !tab.showsNotificationBadge) {
                     Image(systemName: "pin.fill")
                         .font(.system(size: scaledCloseIconSize, weight: .semibold))
                         .foregroundStyle(TabBarColors.inactiveText(for: appearance))
                         .frame(width: accessorySlotSize, height: accessorySlotSize)
                         .saturation(saturation)
                 }
-            } else if allowsClose && (isSelected || isHovered || isCloseHovered) {
+            } else if allowsClose && (isSelected || isHovered) {
                 // Close button (always visible on active tab, shown on hover for others)
                 Button {
                     onClose(.closeButton)
@@ -1076,9 +1211,15 @@ struct TabItemView: View {
                 .buttonStyle(.plain)
                 .onHover { hovering in
                     withTransaction(Transaction(animation: nil)) {
-                        isCloseHovered = hovering
+                        closeButtonPointerInside = hovering
                     }
                 }
+                // Pinning, allowsClose, or deselect can remove the button with
+                // the pointer still on it, and .onHover(false) never arrives.
+                .onDisappear { closeButtonPointerInside = false }
+                // The tab element's named "Close Tab" action covers this;
+                // merged into the tab it would be announced twice.
+                .accessibilityHidden(true)
                 .saturation(saturation)
             }
         }
@@ -1299,6 +1440,8 @@ struct FaviconIconView: NSViewRepresentable {
     }
 }
 
+// cmux-rbf: kept (upstream deleted it with TabItemView's own middle-click handling); the fork's
+// SurfaceCaptionView closes a surface on middle click through it. (#cm-142.1)
 struct MiddleClickMonitorView: NSViewRepresentable {
     let onMiddleClick: () -> Void
 
@@ -1366,9 +1509,10 @@ enum TabContextMenuBuilder {
     }
 
     static func makeMenu(
-        snapshot: TabContextMenuSnapshot,
+        snapshot unresolvedSnapshot: TabContextMenuSnapshot,
         target: TabContextMenuActionTarget
     ) -> TabContextMenu {
+        let snapshot = unresolvedSnapshot.resolvingState()
         let state = snapshot.state
         let forkConversationAvailability = snapshot.forkConversationAvailabilityProvider()
         let forkConversationEnabled = forkConversationAvailability == .available
@@ -1395,7 +1539,20 @@ enum TabContextMenuBuilder {
             )
         }
 
+        if let presence = state.presence {
+            addTerminalSizeSection(presence: presence, state: state, target: target, to: menu)
+        }
+
         menu.addItem(.separator())
+
+        addAction(
+            title: localized("tabContext.closeTab", defaultValue: "Close Tab"),
+            action: .close,
+            enabled: state.canCloseTab,
+            state: state,
+            target: target,
+            to: menu
+        )
 
         addAction(
             title: localized("tabContext.closeTabsToLeft", defaultValue: "Close Tabs to Left"),
@@ -1606,6 +1763,64 @@ enum TabContextMenuBuilder {
         return menu
     }
 
+    /// Adds the shared-terminal size actions for a tab that has presence:
+    /// Size to My Window, a Terminal Size submenu, and Disconnect Others…
+    /// while anyone else is attached.
+    private static func addTerminalSizeSection(
+        presence: TabPresence,
+        state: TabContextMenuState,
+        target: TabContextMenuActionTarget,
+        to menu: NSMenu
+    ) {
+        menu.addItem(.separator())
+        addAction(
+            title: localized("tabContext.sizeToMyWindow", defaultValue: "Size to My Window"),
+            action: .sizeToMyWindow,
+            state: state,
+            target: target,
+            to: menu
+        )
+        let sizeTitle = localized("tabContext.terminalSizeHeader", defaultValue: "Terminal Size")
+        let sizeItem = NSMenuItem(title: sizeTitle, action: nil, keyEquivalent: "")
+        let sizeMenu = NSMenu(title: sizeTitle)
+        for mode in TabPresence.SizeMode.allCases {
+            addAction(
+                title: sizeModeTitle(mode),
+                action: .sizeMode(mode),
+                state: state,
+                target: target,
+                to: sizeMenu,
+                stateValue: presence.sizeMode == mode ? .on : .off
+            )
+        }
+        sizeItem.submenu = sizeMenu
+        menu.addItem(sizeItem)
+        if presence.canDisconnectOthers {
+            addAction(
+                title: localized("tabContext.disconnectOthers", defaultValue: "Disconnect Others…"),
+                action: .disconnectOtherClients,
+                state: state,
+                target: target,
+                to: menu
+            )
+        }
+    }
+
+    private static func sizeModeTitle(_ mode: TabPresence.SizeMode) -> String {
+        switch mode {
+        case .latest:
+            return localized("tabContext.sizeMode.followLatest", defaultValue: "Follow Latest")
+        case .smallest:
+            return localized("tabContext.sizeMode.fitEveryone", defaultValue: "Fit Everyone")
+        case .largest:
+            return localized("tabContext.sizeMode.largest", defaultValue: "Largest Window")
+        case .priority:
+            return localized("tabContext.sizeMode.priority", defaultValue: "Priority List…")
+        case .fixed:
+            return localized("tabContext.sizeMode.fixed", defaultValue: "Fixed Size…")
+        }
+    }
+
     static func updateForkConversationAvailability(
         _ availability: TabContextForkConversationAvailability,
         in menu: NSMenu
@@ -1779,6 +1994,7 @@ enum TabContextMenuBuilder {
         case .rename,
              .clearName,
              .copyIdentifiers,
+             .close,
              .closeToLeft,
              .closeToRight,
              .closeOthers,
@@ -1798,7 +2014,15 @@ enum TabContextMenuBuilder {
              .sendToBack, // (cm-128.13)
              .toggleZoom,
              .toggleFullWidthTab,
-             .disconnectRemote:
+             .disconnectRemote,
+             .sizeToMyWindow,
+             .sizeModeLatest,
+             .sizeModeSmallest,
+             .sizeModeLargest,
+             .sizeModePriority,
+             .sizeModeFixed,
+             .toggleSizePanel,
+             .disconnectOtherClients:
             assertionFailure("Non-fork action cannot be the default fork destination: \(action)")
             return localized(
                 "tabContext.forkConversation.default.right",
@@ -1839,7 +2063,7 @@ enum TabContextMenuBuilder {
     }
 
     private static func localized(_ key: String, defaultValue: String) -> String {
-        Bundle.module.localizedString(forKey: key, value: defaultValue, table: nil)
+        BonsplitResourceBundle.localizedString(forKey: key, defaultValue: defaultValue)
     }
 }
 

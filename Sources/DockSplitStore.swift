@@ -6,6 +6,7 @@ import CmuxAppKitSupportUI
 import CmuxBrowser
 import CmuxCore
 import CmuxFoundation
+import CmuxHomeCore
 import CmuxNotifications
 import CmuxSettings
 import CmuxTerminal
@@ -99,6 +100,9 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         terminalStartupRestoreCoordinator.lifecycle
     }
     @ObservationIgnored var surfaceResumeBindingsByPanelId: [UUID: SurfaceResumeBindingSnapshot] = [:]
+    /// Journals agent sessions ended by closing their terminal. Tests point it
+    /// at a private journal.
+    @ObservationIgnored var agentSessionCloseJournal = AgentSessionCloseJournal()
     /// In-memory compare-and-claim state held while a CLI restore hands the
     /// validated binding to its child process.
     @ObservationIgnored var surfaceResumeRestoreClaimsByPanelId: [
@@ -162,6 +166,12 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     private let settingsCatalog = SettingCatalog()
     let agentSessionAutoResumeDefaults: UserDefaults
     @ObservationIgnored let restorableAgentIndexProvider: @MainActor () -> RestorableAgentSessionIndex?
+    /// The foreground process of a Dock terminal, as libghostty reports it.
+    @ObservationIgnored let foregroundProcessIDProvider: @MainActor (TerminalPanel) -> Int?
+    /// Reads a process's argv and environment for snapshot-time recognition.
+    @ObservationIgnored let processArgumentsProvider: (Int) -> CmuxTopProcessArguments?
+    /// The last `claude attach` viewer observation per Dock terminal.
+    @ObservationIgnored var claudeBackgroundViewerObservationsByPanelId: [UUID: ClaudeBackgroundViewerObservation] = [:]
 
     /// Weak registry of every live Dock store. Lets control-surface routing
     /// resolve a Dock surface/pane by querying only the workspaces that actually
@@ -324,7 +334,13 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         fileContentChangeCoordinator: FileContentChangeCoordinator? = nil,
         terminalWorkingDirectoryResolver: TerminalWorkingDirectoryResolver = TerminalWorkingDirectoryResolver(),
         closedItemHistoryStore: ClosedItemHistoryStore? = nil,
-        restorableAgentIndexProvider: (@MainActor () -> RestorableAgentSessionIndex?)? = nil
+        restorableAgentIndexProvider: (@MainActor () -> RestorableAgentSessionIndex?)? = nil,
+        foregroundProcessIDProvider: @escaping @MainActor (TerminalPanel) -> Int? = {
+            $0.surface.foregroundProcessID()
+        },
+        processArgumentsProvider: @escaping (Int) -> CmuxTopProcessArguments? = {
+            CmuxTopProcessSnapshot.processArgumentsAndEnvironment(for: $0)
+        }
     ) {
         let tabDragTransferRegistry = tabDragTransferRegistry ?? TabDragTransferRegistry()
         self.workspaceId = workspaceId
@@ -338,6 +354,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             terminalTitleUpdateCoalescer ?? NotificationBurstCoalescer()
         self.settings = settings
         self.agentSessionAutoResumeDefaults = agentSessionAutoResumeDefaults
+        self.foregroundProcessIDProvider = foregroundProcessIDProvider
+        self.processArgumentsProvider = processArgumentsProvider
         self.restorableAgentIndexProvider = restorableAgentIndexProvider ?? {
             SharedLiveAgentIndex.shared.currentIndexForOwnershipSensitiveRestore()
         }
@@ -361,11 +379,16 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             configuration: Self.makeConfiguration(),
             tabDragTransferRegistry: tabDragTransferRegistry
         )
+        self.bonsplitController.tabMiddleClickCapture = { onMiddleClick in
+            AnyView(MiddleClickCapture(onMiddleClick: onMiddleClick))
+        }
         self.sourceLabel = String(localized: "dock.source.title", defaultValue: "Dock")
         self.bonsplitController.delegate = self
         self.bonsplitController.contextMenuShortcuts = Workspace.buildContextMenuShortcuts()
         self.bonsplitController.onTabCloseRequest = { [weak self] tabId, _, source in
-            guard source == .closeButton else { return }
+            guard source == .closeButton || source == .middleClick else { return }
+            // Both pointer close gestures use the explicit tab-close path. This
+            // preserves the close warning and closed-surface history behavior.
             self?.tabCloseButtonCloseDockTabIds.insert(tabId)
         }
         self.bonsplitController.onTabZoomToggleRequest = { [weak self] _, paneId in
@@ -438,6 +461,18 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         (panel as? BrowserPanel)?.isMuted
             ?? (panel as? DeferredBrowserPanel)?.sessionPanelSnapshot.browser?.isMuted
             ?? false
+    }
+
+    /// The live browser a browser automation command drives, materializing a
+    /// restore placeholder in place without changing focus. Nil when the
+    /// panel is not a browser or restore is still in progress.
+    func browserPanelForAutomation(_ panelId: UUID) -> BrowserPanel? {
+        if let browserPanel = panels[panelId] as? BrowserPanel { return browserPanel }
+        guard let deferredPanel = panels[panelId] as? DeferredBrowserPanel,
+              sessionRestoreDepth == 0 else {
+            return nil
+        }
+        return materializeDeferredBrowserPanel(deferredPanel)
     }
 
     /// Requests a deferred browser transition from the Dock owner.
@@ -639,9 +674,10 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         transparentBackground: Bool = false,
         bypassRemoteProxy: Bool? = nil,
         allowsExternalBrowserFallback: Bool = true,
-        websiteDataStore: WKWebsiteDataStore? = nil
+        websiteDataStore: WKWebsiteDataStore? = nil,
+        conversationID: ConversationID? = nil
     ) -> UUID? {
-        guard !isRetired else { return nil }
+        guard !isRetired, kind != .browser || acceptsUnownedBrowserURL(initialRequest?.url ?? url) else { return nil }
         ensureLoaded()
         let source = resolveSourcePanelId(sourcePanelId, preferredPaneId: paneId)
         let resolvedBrowserProfileID = kind == .browser
@@ -675,7 +711,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             transparentBackground: transparentBackground,
             bypassRemoteProxy: bypassRemoteProxy,
             allowsExternalBrowserFallback: allowsExternalBrowserFallback,
-            websiteDataStore: websiteDataStore
+            websiteDataStore: websiteDataStore,
+            conversationID: conversationID
         ) else { return nil }
         let previousFocus = focus ? nil : focusedDockPaneSelection()
         guard let tabId = attachPanelAsTab(panel, kind: kind, title: panel.displayTitle, inPane: paneId) else {
@@ -722,9 +759,10 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         bypassRemoteProxy: Bool? = nil,
         allowsExternalBrowserFallback: Bool = true,
         websiteDataStore: WKWebsiteDataStore? = nil,
-        focus: Bool = true
+        focus: Bool = true,
+        conversationID: ConversationID? = nil
     ) -> UUID? {
-        guard !isRetired else { return nil }
+        guard !isRetired, kind != .browser || acceptsUnownedBrowserURL(initialRequest?.url ?? url) else { return nil }
         ensureLoaded()
         let source = resolveSourcePanelId(sourcePanelId)
         let resolvedBrowserProfileID = kind == .browser
@@ -757,7 +795,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             transparentBackground: transparentBackground,
             bypassRemoteProxy: bypassRemoteProxy,
             allowsExternalBrowserFallback: allowsExternalBrowserFallback,
-            websiteDataStore: websiteDataStore
+            websiteDataStore: websiteDataStore,
+            conversationID: conversationID
         ) else { return nil }
 
         guard let source, let sourcePaneId = paneId(forPanelId: source) else {
@@ -788,6 +827,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         let newTab = Bonsplit.Tab(
             title: panel.displayTitle,
             icon: panel.displayIcon,
+            iconAsset: kind == .chief ? ChiefPanel.iconAssetName : nil,
             kind: tabKindRaw(kind),
             isDirty: panel.isDirty,
             isPinned: false
@@ -1025,7 +1065,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         transparentBackground: Bool = false,
         bypassRemoteProxy: Bool? = nil,
         allowsExternalBrowserFallback: Bool = true,
-        websiteDataStore: WKWebsiteDataStore? = nil
+        websiteDataStore: WKWebsiteDataStore? = nil,
+        conversationID: ConversationID? = nil
     ) -> (any Panel)? {
         guard !isRetired else { return nil }
         switch kind {
@@ -1062,6 +1103,9 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
                 bypassRemoteProxy: bypassRemoteProxy,
                 websiteDataStore: websiteDataStore
             )
+        case .chief:
+            guard ChiefSettings.isEnabled else { return nil }
+            return ChiefPanel(conversationID: conversationID)
         }
     }
 
@@ -1085,6 +1129,9 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
                 url: def.url.flatMap { URL(string: $0) },
                 chromeVisibility: def.showsBrowserChrome ? .visible : .chromeless
             )
+        case .chief:
+            guard ChiefSettings.isEnabled else { return nil }
+            return ChiefPanel()
         }
     }
 
@@ -1125,7 +1172,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             focusPlacement: .rightSidebarDock,
             runtimeSpawnPolicy: terminalStartupRestoreCoordinator.runtimeSpawnPolicy(
                 requestedPolicy: .immediate,
-                willRunStartupCommand: false,
                 willRunStartupInput: startupRestoreAgent != nil && initialInput != nil
             )
         )
@@ -1141,7 +1187,6 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
             panel: terminal,
             snapshot: snapshot,
             manualResumeAvailable: true,
-            willRunStartupCommand: false,
             willRunStartupInput: initialInput != nil,
             resumeWorkingDirectory: snapshot.workingDirectory
         )
@@ -1152,6 +1197,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         switch kind {
         case .terminal: return "terminal"
         case .browser: return "browser"
+        case .chief: return SurfaceKind.chief.rawValue
         }
     }
 
@@ -1170,6 +1216,7 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
         guard let tabId = bonsplitController.createTab(
             title: title,
             icon: panel.displayIcon,
+            iconAsset: kind == .chief ? ChiefPanel.iconAssetName : nil,
             kind: tabKindRaw(kind),
             isDirty: panel.isDirty,
             isPinned: false,
@@ -1350,8 +1397,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
               ) else {
             return false
         }
-        let title = change.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return true }
+        let title = AutomaticTerminalTitle(change.title)?.value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let title, !title.isEmpty else { return true }
         guard shouldApplyRestoredPanelTitle(
             panelId: change.surfaceId,
             rawTitle: title

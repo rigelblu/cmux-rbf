@@ -172,7 +172,10 @@ final class TerminalNotificationSocketActionTests: XCTestCase {
         let targetWorkspace = fixture.manager.addWorkspace(title: "Unread Target", select: false)
         let targetSurfaceId = try XCTUnwrap(targetWorkspace.focusedPanelId)
         let older = makeNotification(tabId: fixture.workspace.id, surfaceId: fixture.surfaceId, title: "Older")
-        let latest = makeNotification(tabId: targetWorkspace.id, surfaceId: targetSurfaceId, title: "Latest")
+        // cmux-rbf: changed on purpose (#cm-128.11, #cm-142.1): the jump opens the pane that has waited longest, ties by a
+        // random id. Both factory notifications share one createdAt, so the target is made the one that waited longest.
+        var latest = makeNotification(tabId: targetWorkspace.id, surfaceId: targetSurfaceId, title: "Latest")
+        latest.queuedAt = older.queuedAt.addingTimeInterval(-1)
         fixture.store.replaceNotificationsForTesting([latest, older])
         fixture.manager.selectTab(fixture.workspace)
 

@@ -30,7 +30,7 @@ struct ClearAgentStateEntranceTests {
     private func menu(for workspace: Workspace, in manager: TabManager, targets: [UUID]? = nil,
                       store: TerminalNotificationStore) -> NSMenu {
         let row = commands(for: workspace, in: manager, targets: targets ?? [workspace.id], store: store)
-        return SidebarWorkspaceRowMenuBuilder(commands: row).build(onOpen: {}, onClose: {})
+        return SidebarWorkspaceRowMenuBuilder(commands: row).build(onOpen: {}, onClose: {}, beginInlineRename: {}) // cmux-rbf (#cm-142.1): upstream's builder takes the rename hook
     }
 
     private func wire(_ workspace: Workspace, key: String = "claude_code", _ state: AgentHibernationLifecycleState = .needsInput) throws {

@@ -1,4 +1,6 @@
+import CmuxFoundation
 import AppKit
+import CmuxSettings
 import CmuxSidebar
 import CmuxWorkspaces
 import SwiftUI
@@ -17,18 +19,21 @@ struct SidebarAppKitRowCellTests {
         metadataEntries: [SidebarStatusEntry] = [],
         metadataBlocks: [SidebarMetadataBlock] = [],
         customColorHex: String? = nil,
-        attentionTaskStatus: WorkspaceTaskStatus? = nil
+        attentionTaskStatus: WorkspaceTaskStatus? = nil,
+        compactStatusGlyph: SidebarCompactStatusGlyph? = nil
     ) -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: SidebarWorkspaceSnapshotFactory.presentationKey(
                 settings: SidebarTabItemSettingsSnapshot(defaults: UserDefaults(suiteName: UUID().uuidString)!),
-                showsAgentActivity: false
+                showsAgentActivity: false,
+                customColorHex: nil
             ),
             title: title,
             customDescription: customDescription,
             isPinned: isPinned,
             isMuted: false,
             customColorHex: customColorHex,
+            hasManualCustomColor: false,
             cloudWorkspaceLabel: nil,
             remoteWorkspaceSidebarText: nil,
             remoteConnectionStatusText: "",
@@ -56,7 +61,8 @@ struct SidebarAppKitRowCellTests {
             checklistItems: [],
             checklistCompletedCount: 0,
             checklistTotalCount: 0,
-            checklistFirstUncheckedText: nil
+            checklistFirstUncheckedText: nil,
+            compactStatusGlyph: compactStatusGlyph
         )
     }
 
@@ -69,6 +75,7 @@ struct SidebarAppKitRowCellTests {
         customDescription: String? = nil,
         metadataEntries: [SidebarStatusEntry] = [],
         metadataBlocks: [SidebarMetadataBlock] = [],
+        compactStatusGlyph: SidebarCompactStatusGlyph? = nil,
         shortcutHintText: String? = nil,
         isMarkdownExpanded: Bool = false,
         colorSchemeIsDark: Bool = true,
@@ -83,7 +90,8 @@ struct SidebarAppKitRowCellTests {
                 customDescription: customDescription,
                 isPinned: isPinned,
                 metadataEntries: metadataEntries,
-                metadataBlocks: metadataBlocks
+                metadataBlocks: metadataBlocks,
+                compactStatusGlyph: compactStatusGlyph
             ),
             settings: resolvedSettings,
             isActive: isActive,
@@ -163,6 +171,7 @@ struct SidebarAppKitRowCellTests {
                 canMarkUnread: false,
                 hasLatestNotification: false,
                 allNotificationsMuted: false,
+                hasManualCustomColor: false,
                 notifications: [],
                 targetColorHexes: []
             )
@@ -251,6 +260,62 @@ struct SidebarAppKitRowCellTests {
             contextMenuDidClose: {}
         )
         return cell
+    }
+
+    @Test
+    func workspaceCloseButtonAccessibilityFollowsRevealState() throws {
+        let model = Self.makeModel(canClose: true)
+        let cell = SidebarWorkspaceRowTableCellView()
+        cell.configure(
+            model: model,
+            actions: Self.makeActions(model: model),
+            isPointerHovering: false,
+            contextMenuDidOpen: {},
+            contextMenuDidClose: {}
+        )
+        let closeButton = try #require(
+            Self.descendants(of: cell)
+                .compactMap { $0 as? NSButton }
+                .first { $0.accessibilityIdentifier() == "sidebarWorkspaceCloseButton" }
+        )
+
+        #expect(closeButton.isHidden)
+        #expect(!closeButton.isAccessibilityElement())
+
+        cell.enforcePointerHovering(true)
+
+        #expect(!closeButton.isHidden)
+        #expect(closeButton.isAccessibilityElement())
+        #expect(closeButton.accessibilityRole() == .button)
+        #expect(
+            closeButton.accessibilityLabel()
+                == String(localized: "sidebar.closeWorkspace.tooltip", defaultValue: "Close workspace")
+        )
+        #expect(closeButton.accessibilityIdentifier() == "sidebarWorkspaceCloseButton")
+
+        cell.enforcePointerHovering(false)
+
+        #expect(closeButton.isHidden)
+        #expect(!closeButton.isAccessibilityElement())
+    }
+
+    @Test(arguments: [false, true], [
+        ("**Pi finished.**", "Pi finished."),
+        ("Run `swift test` and read [the results](https://example.com).", "Run swift test and read the results."),
+        ("**Done**\n*All checks passed*", "Done\nAll checks passed"),
+    ])
+    func notificationPreviewDisplaysPlainText(isActive: Bool, content: (String, String)) throws {
+        let (markdown, expected) = content
+        var model = Self.makeModel(isActive: isActive)
+        model.latestNotificationText = markdown
+        let cell = Self.configuredCell(model: model)
+        let subtitle = try #require(Self.descendants(of: cell)
+            .compactMap { $0 as? SidebarRowTextView }
+            .first { !$0.isHidden && $0.stringValue == expected })
+
+        #expect(Self.accessibilityLinks(in: subtitle).isEmpty)
+        #expect(subtitle.maximumNumberOfLines == model.settings.notificationMessageLineLimit)
+        #expect(cell.currentModelForMeasurement?.latestNotificationText == markdown)
     }
 
     static func descendants(of view: NSView) -> [NSView] {
@@ -638,7 +703,7 @@ struct SidebarAppKitRowCellTests {
             Self.accessibilityLinks(in: textView).first { $0.accessibilityURL() == url }
         )
         let accessibilityValue = try #require(
-            textView.cell?.accessibilityAttributedString(
+            textView.accessibilityAttributedString(
                 for: NSRange(location: 0, length: textView.attributedStringValue.length)
             )
         )
@@ -676,6 +741,37 @@ struct SidebarAppKitRowCellTests {
         let expectedLink = try Self.resolvedColor(NSColor.linkColor, in: darkAppearance)
         let renderedSRGB = try Self.resolvedColor(rendered, in: darkAppearance)
         #expect(Self.distance(renderedSRGB, expectedLink) < 0.001)
+        #expect(
+            textView.attributedStringValue.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int
+                == NSUnderlineStyle.single.rawValue
+        )
+    }
+
+    @Test
+    func customWorkspaceDescriptionColorOverridesRowStateAndLinkColor() throws {
+        let url = try #require(URL(string: "https://cmux.com"))
+        let defaults = Self.makeDefaults()
+        let key = SettingCatalog().sidebar.workspaceDescriptionColorHex.userDefaultsKey
+        defaults.set("#A6E3A1", forKey: key)
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        #expect(settings.workspaceDescriptionColorHex == "#A6E3A1")
+
+        let model = Self.makeModel(
+            isActive: true,
+            settings: settings,
+            customDescription: url.absoluteString
+        )
+        let cell = Self.configuredCell(model: model)
+        Self.layoutCell(cell, model: model)
+        let textView = try #require(Self.descriptionTextView(in: cell, showing: url.absoluteString))
+        let rendered = try #require(
+            textView.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        )
+        let expected = try #require(NSColor(hex: "#A6E3A1"))
+        let renderedSRGB = try #require(rendered.usingColorSpace(.sRGB))
+        let expectedSRGB = try #require(expected.usingColorSpace(.sRGB))
+
+        #expect(Self.distance(renderedSRGB, expectedSRGB) < 0.001)
         #expect(
             textView.attributedStringValue.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int
                 == NSUnderlineStyle.single.rawValue
@@ -753,6 +849,172 @@ struct SidebarAppKitRowCellTests {
         #expect(cmuxContrastRatio(foreground: proseGlyph, background: background) >= 3)
         #expect(cmuxContrastRatio(foreground: linkGlyph, background: background) >= 3)
         #expect(Self.distance(proseGlyph, linkGlyph) > 0.15)
+    }
+
+    @Test
+    func rowPaletteSemanticColorsRemainDynamicAcrossAppearances() throws {
+        let lightAppearance = try #require(NSAppearance(named: .aqua))
+        let darkAppearance = try #require(NSAppearance(named: .darkAqua))
+        let semanticColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? .white
+                : .black
+        }
+        let palette = SidebarRowPalette(model: Self.makeModel())
+        let colors = [
+            (palette.semantic(semanticColor), CGFloat(1)),
+            (palette.semantic(semanticColor, opacity: 0.6), CGFloat(0.6)),
+        ]
+
+        for (color, expectedAlpha) in colors {
+            let light = try Self.resolvedColor(color, in: lightAppearance)
+            let dark = try Self.resolvedColor(color, in: darkAppearance)
+
+            // SidebarRowPalette resolves semantic colors against the row's
+            // concrete cmux scheme before AppKit paints the detached cell.
+            // Ambient light/dark appearance must therefore not change the
+            // already-resolved color.
+            #expect(Self.distance(light, dark) < 0.001)
+            #expect(abs(light.alphaComponent - expectedAlpha) < 0.001)
+            #expect(abs(dark.alphaComponent - expectedAlpha) < 0.001)
+        }
+    }
+
+    @Test
+    func statusPresentationKeepsReadableExplicitColorAndUsesSelectedFallback() throws {
+        let selectedBackground = try #require(NSColor(hex: "#005FCC"))
+        let readableExplicit = try #require(NSColor(hex: "#FFFFFF"))
+        let lowContrastExplicit = try #require(NSColor(hex: "#0066CC"))
+        let inactiveFallback = NSColor.secondaryLabelColor
+        let selectedFallback = try #require(NSColor(hex: "#FF00FF")).withAlphaComponent(0.37)
+
+        let inactive = sidebarStatusPresentationNSColor(
+            explicit: readableExplicit,
+            isActive: false,
+            selectedBackground: selectedBackground,
+            fallback: inactiveFallback
+        )
+        let activeReadable = sidebarStatusPresentationNSColor(
+            explicit: readableExplicit,
+            isActive: true,
+            selectedBackground: selectedBackground,
+            fallback: selectedFallback
+        )
+        let activeFloored = sidebarStatusPresentationNSColor(
+            explicit: lowContrastExplicit,
+            isActive: true,
+            selectedBackground: selectedBackground,
+            fallback: selectedFallback
+        )
+
+        #expect(Self.distance(inactive, readableExplicit) < 0.001)
+        #expect(Self.distance(activeReadable, readableExplicit) < 0.001)
+        #expect(Self.distance(activeFloored, selectedFallback) < 0.001)
+    }
+
+    @Test
+    func selectedLogPresentationKeepsReadableTintAndFloorsLowContrastTint() throws {
+        let selectedBackground = try #require(NSColor(hex: "#005FCC"))
+        let readableAccent = CmuxAccentColor(mode: .custom, customHex: "#FFFFFF")
+        let lowContrastAccent = CmuxAccentColor(mode: .custom, customHex: "#0066CC")
+        let selectedFallback = try #require(NSColor(hex: "#FF00FF"))
+        let inactiveFallback = try #require(NSColor(hex: "#00FFFF"))
+
+        let readable = sidebarLogPresentationNSColor(
+            level: .progress,
+            isActive: true,
+            colorScheme: .dark,
+            accent: readableAccent,
+            selectedBackground: selectedBackground,
+            fallback: selectedFallback
+        )
+        let floored = sidebarLogPresentationNSColor(
+            level: .progress,
+            isActive: true,
+            colorScheme: .dark,
+            accent: lowContrastAccent,
+            selectedBackground: selectedBackground,
+            fallback: selectedFallback
+        )
+        let inactive = sidebarLogPresentationNSColor(
+            level: .progress,
+            isActive: false,
+            colorScheme: .dark,
+            accent: lowContrastAccent,
+            selectedBackground: selectedBackground,
+            fallback: inactiveFallback
+        )
+
+        #expect(Self.distance(readable, try #require(NSColor(hex: "#FFFFFF"))) < 0.001)
+        #expect(Self.distance(floored, selectedFallback) < 0.001)
+        #expect(Self.distance(inactive, try #require(NSColor(hex: "#0066CC"))) < 0.001)
+    }
+
+    // cmux-rbf: changed on purpose (#cm-10): upstream's statusContrastUsesThePaintedSubtleSelectionState is not
+    // taken. It reads the left rail's subtle selection, and this fork has no left rail
+    // (`sidebarSelectedWorkspaceBackgroundNSColor` takes no `activeTabIndicatorStyle`, `subtleSelection` or `isEmphasized`).
+
+    /// Issue #18383: `cmux set-status --color` on the selected workspace row.
+    /// The rendered status text keeps its explicit color whenever that color
+    /// reaches 3:1 against the selection fill, and only falls back to the
+    /// selection foreground below that floor.
+    @Test(arguments: [
+        ("#FFFFFF", true),  // 5.98:1 against #005FCC
+        ("#FFD60A", true),  // 4.24:1, between the 3:1 floor and 4.5:1
+        ("#FF453A", false), // 1.76:1, unreadable on the selection fill
+    ])
+    func selectedRowStatusTextKeepsExplicitColorAboveContrastFloor(
+        _ statusHex: String,
+        _ keepsExplicitColor: Bool
+    ) throws {
+        let selectionHex = "#005FCC"
+        let defaults = Self.makeDefaults()
+        defaults.set(selectionHex, forKey: "sidebarSelectionColorHex")
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let selectionBackground = try #require(NSColor(hex: selectionHex)?.usingColorSpace(.sRGB))
+        let explicit = try #require(NSColor(hex: statusHex)?.usingColorSpace(.sRGB))
+        let contrast = cmuxContrastRatio(foreground: explicit, background: selectionBackground)
+        #expect((contrast >= 3) == keepsExplicitColor, "fixture contrast \(contrast) does not match its case")
+
+        let value = "Deploying"
+        let model = Self.makeModel(
+            isActive: true,
+            settings: settings,
+            metadataEntries: [SidebarStatusEntry(key: "deploy", value: value, color: statusHex)]
+        )
+        let cell = Self.configuredCell(model: model)
+        Self.layoutCell(cell, model: model)
+        let textView = try #require(Self.descriptionTextView(in: cell, showing: value))
+        let rendered = try #require(textView.textColor?.usingColorSpace(.sRGB))
+
+        let expected: NSColor
+        if keepsExplicitColor {
+            expected = explicit
+        } else {
+            expected = try #require(
+                sidebarSelectedWorkspaceForegroundNSColor(on: selectionBackground, opacity: 1.0)
+                    .usingColorSpace(.sRGB)
+            )
+        }
+        #expect(
+            Self.distance(rendered, expected) < 0.001,
+            "status \(statusHex) at \(contrast):1 rendered \(rendered), expected \(expected)"
+        )
+    }
+
+    @Test
+    func statusPresentationUsesInactiveFallbackWithoutExplicitColor() throws {
+        let selectedBackground = try #require(NSColor(hex: "#005FCC"))
+        let fallback = try #require(NSColor(hex: "#E0E0E0"))
+
+        let presented = sidebarStatusPresentationNSColor(
+            explicit: nil,
+            isActive: false,
+            selectedBackground: selectedBackground,
+            fallback: fallback
+        )
+
+        #expect(Self.distance(presented, fallback) < 0.001)
     }
 
     @Test
@@ -993,11 +1255,10 @@ struct SidebarAppKitRowCellTests {
             Self.accessibilityLinks(in: textView).first { $0.accessibilityURL() == url }
         )
         let attributedAccessibilityLink = try #require(
-            textView.attributedStringValue.attribute(
-                .accessibilityLink,
-                at: linkLocation,
-                effectiveRange: nil
-            ) as? SidebarRowTextAccessibilityLink
+            textView.accessibilityAttributedString(
+                for: NSRange(location: linkLocation, length: 1)
+            )?.attribute(.accessibilityLink, at: 0, effectiveRange: nil)
+                as? SidebarRowTextAccessibilityLink
         )
 
         #expect(accessibilityLink === attributedAccessibilityLink)
@@ -1322,7 +1583,7 @@ struct SidebarAppKitRowCellTests {
             Self.accessibilityLinks(in: textView).first { $0.accessibilityURL() == url }
         )
         let accessibilityValue = try #require(
-            textView.cell?.accessibilityAttributedString(
+            textView.accessibilityAttributedString(
                 for: NSRange(location: 0, length: attributed.length)
             )
         )
@@ -1801,12 +2062,71 @@ struct SidebarAppKitRowCellTests {
         #expect(applies == 1)
     }
 
+    /// Closing a workspace reloads the table, so every visible row gets a
+    /// fresh or recycled cell. None of them may paint the close button
+    /// unless the pointer is on that row.
+    @Test
+    func closeButtonStaysConcealedOnFreshUnhoveredCell() {
+        let cell = SidebarWorkspaceRowTableCellView()
+        #expect(cell.closeButtonPaintForTesting.isHidden)
+        #expect(cell.closeButtonPaintForTesting.alpha == 0)
+
+        let configured = Self.configuredCell(model: Self.makeModel())
+        #expect(configured.closeButtonPaintForTesting.isHidden)
+        #expect(configured.closeButtonPaintForTesting.alpha == 0)
+    }
+
+    /// The close X shares the trailing slot with the unread badge and
+    /// spinner, which swap synchronously. The X must land in the same frame
+    /// on hover-in and leave in the same frame on hover-out.
+    @Test
+    func hoverRevealsAndConcealsCloseButtonInSameFrame() {
+        let cell = Self.configuredCell(model: Self.makeModel())
+
+        cell.enforcePointerHovering(true)
+        #expect(!cell.closeButtonPaintForTesting.isHidden)
+        #expect(cell.closeButtonPaintForTesting.alpha == 1)
+
+        cell.enforcePointerHovering(false)
+        #expect(cell.closeButtonPaintForTesting.isHidden)
+        #expect(cell.closeButtonPaintForTesting.alpha == 0)
+    }
+
+    @Test
+    func recycledHoveredCellSnapsCloseButtonHidden() throws {
+        let cell = Self.configuredCell(model: Self.makeModel())
+        cell.enforcePointerHovering(true)
+        #expect(!cell.closeButtonPaintForTesting.isHidden)
+        let closeButton = try #require(
+            Self.descendants(of: cell)
+                .compactMap { $0 as? NSButton }
+                .first { $0.accessibilityIdentifier() == "sidebarWorkspaceCloseButton" }
+        )
+        #expect(closeButton.isAccessibilityElement())
+
+        cell.prepareForReuse()
+        #expect(cell.closeButtonPaintForTesting.isHidden)
+        #expect(cell.closeButtonPaintForTesting.alpha == 0)
+        #expect(!closeButton.isAccessibilityElement())
+
+        let nextModel = Self.makeModel()
+        cell.configure(
+            model: nextModel,
+            actions: Self.makeActions(model: nextModel),
+            isPointerHovering: false,
+            contextMenuDidOpen: {},
+            contextMenuDidClose: {}
+        )
+        #expect(cell.closeButtonPaintForTesting.isHidden)
+        #expect(cell.closeButtonPaintForTesting.alpha == 0)
+    }
+
     @Test
     func shortcutHintPillKeepsVisibleDuringFadeOut() async throws {
         let pill = SidebarShortcutHintPillView(reduceMotionProvider: { false })
-        pill.configure(text: "⌘1", fontSize: 10, emphasis: 1)
+        pill.configure(text: "⌘1", fontSize: 10, emphasis: 1, colorScheme: .dark)
 
-        pill.configure(text: nil, fontSize: 10, emphasis: 1)
+        pill.configure(text: nil, fontSize: 10, emphasis: 1, colorScheme: .dark)
 
         #expect(!pill.isHidden)
         let clock = ContinuousClock()
@@ -1818,12 +2138,38 @@ struct SidebarAppKitRowCellTests {
     }
 
     @Test
-    func shortcutHintPillUsesExplicitOpacityAnimationInsideDisabledTransaction() {
+    func shortcutHintPillFadesIn() {
         let pill = SidebarShortcutHintPillView(reduceMotionProvider: { false })
+
+        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1, colorScheme: .dark)
+
+        #expect(!pill.isHidden)
+        #expect(pill.layer?.opacity == 1)
+        let fadeIn = (pill.layer?.animationKeys() ?? []).compactMap {
+            pill.layer?.animation(forKey: $0) as? CABasicAnimation
+        }.first { $0.keyPath == "opacity" }
+        #expect((fadeIn?.fromValue as? Float) == 0)
+        #expect((fadeIn?.toValue as? Float) == 1)
+    }
+
+    @Test
+    func shortcutHintPillAppearsAtOnceUnderReduceMotion() {
+        let pill = SidebarShortcutHintPillView(reduceMotionProvider: { true })
+
+        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1, colorScheme: .dark)
+
+        #expect(pill.layer?.opacity == 1)
+        #expect((pill.layer?.animationKeys() ?? []).isEmpty)
+    }
+
+    @Test
+    func shortcutHintPillFadesOutWithExplicitOpacityAnimationInsideDisabledTransaction() {
+        let pill = SidebarShortcutHintPillView(reduceMotionProvider: { false })
+        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1, colorScheme: .dark)
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1)
+        pill.configure(text: nil, fontSize: 9, emphasis: 1, colorScheme: .dark)
         CATransaction.commit()
 
         // `#cm-23` — was `#expect(!(pill.layer?.animationKeys() ?? []).isEmpty)`,
@@ -1849,12 +2195,12 @@ struct SidebarAppKitRowCellTests {
     func shortcutHintPillAppliesReducedMotionVisibilityImmediately() {
         let pill = SidebarShortcutHintPillView(reduceMotionProvider: { true })
 
-        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1)
+        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1, colorScheme: .dark)
         #expect(!pill.isHidden)
         #expect(pill.layer?.opacity == 1)
         #expect((pill.layer?.animationKeys() ?? []).isEmpty)
 
-        pill.configure(text: nil, fontSize: 9, emphasis: 1)
+        pill.configure(text: nil, fontSize: 9, emphasis: 1, colorScheme: .dark)
         #expect(pill.isHidden)
         #expect(pill.layer?.opacity == 0)
         #expect((pill.layer?.animationKeys() ?? []).isEmpty)
@@ -1885,7 +2231,7 @@ struct SidebarAppKitRowCellTests {
     func shortcutHintPillNeverInterceptsPointerEvents() {
         let pill = SidebarShortcutHintPillView()
         pill.frame = NSRect(x: 0, y: 0, width: 32, height: 18)
-        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1)
+        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1, colorScheme: .dark)
         pill.layoutSubtreeIfNeeded()
 
         #expect(pill.hitTest(NSPoint(x: 16, y: 9)) == nil)
@@ -1894,22 +2240,34 @@ struct SidebarAppKitRowCellTests {
     @Test
     func shortcutHintPillUsesCompactHorizontalPadding() throws {
         let pill = SidebarShortcutHintPillView()
-        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1)
+        pill.configure(text: "⌘1", fontSize: 9, emphasis: 1, colorScheme: .dark)
         let label = try #require(Self.descendants(of: pill).compactMap { $0 as? NSTextField }.first)
 
         #expect(pill.fittingPillSize().width == ceil(label.sidebarNaturalCellSize.width) + 8)
     }
 
     @Test
-    func shortcutHintPillClipsMaterialToItsCapsule() throws {
+    func shortcutHintPillKeepsAnOpaqueCapsuleUnderItsText() throws {
         let pill = SidebarShortcutHintPillView()
         pill.frame = NSRect(x: 0, y: 0, width: 36, height: 18)
-        pill.configure(text: "⌘1", fontSize: 10, emphasis: 1)
+        pill.configure(text: "⌘1", fontSize: 10, emphasis: 1, colorScheme: .dark)
         pill.layoutSubtreeIfNeeded()
 
-        let material = try #require(Self.descendants(of: pill).compactMap { $0 as? NSVisualEffectView }.first)
-        #expect(material.layer?.masksToBounds == true)
-        #expect(material.layer?.cornerRadius == pill.bounds.height / 2)
+        let glass = pill.subviews.first { $0.className == "NSGlassEffectView" }
+        let fill = try #require(pill.subviews.first {
+            $0.className != "NSGlassEffectView" && !($0 is NSTextField)
+        })
+        let rim = glass == nil ? 0 : ShortcutHintPalette.glassRimWidth
+        // Glass takes its color from the backdrop, so the text's contrast
+        // comes from this opaque palette fill on every OS.
+        #expect(fill.layer?.backgroundColor == ShortcutHintPalette.background(for: .dark).cgColor)
+        #expect(fill.layer?.masksToBounds == true)
+        #expect(fill.frame == pill.bounds.insetBy(dx: rim, dy: rim))
+        #expect(fill.layer?.cornerRadius == pill.bounds.height / 2 - rim)
+        if let glass {
+            #expect(glass.frame == pill.bounds)
+            #expect(pill.subviews.firstIndex(of: glass)! < pill.subviews.firstIndex(of: fill)!)
+        }
     }
 
     @Test
@@ -1963,6 +2321,41 @@ struct SidebarAppKitRowCellTests {
         let expectedBytes = try #require(expected?.tiffRepresentation, "the expected symbol did not render")
         let shownBytes = try #require(triangle.image?.tiffRepresentation, "the triangle shows no image")
         #expect(shownBytes == expectedBytes, "the triangle must draw exclamationmark.triangle.fill")
+    }
+
+    /// Moving the pointer off a just-clicked row repaints it for hover. That
+    /// repaint used the stored (still unselected) model and snapped the
+    /// highlight off until the selection render landed.
+    @Test
+    func hoverRepaintKeepsOptimisticSelection() {
+        let cell = Self.configuredCell(model: Self.makeModel(isActive: false))
+        var appliedActive: [Bool] = []
+        cell.applyModelProbeForTesting = { appliedActive.append($0.isActive) }
+
+        cell.showOptimisticSelectionHighlight()
+        cell.enforcePointerHovering(true)
+        cell.enforcePointerHovering(false)
+
+        #expect(appliedActive == [true, true, true])
+        #expect(cell.hasOptimisticSelectionForTesting)
+
+        cell.restoreStoredModelPaint()
+        #expect(appliedActive.last == false)
+        #expect(!cell.hasOptimisticSelectionForTesting)
+    }
+
+    /// Rapid clicks: the previous click's row is only optimistically
+    /// highlighted, so the next click's peel must see the painted state.
+    @Test
+    func optimisticDeselectionPeelsOptimisticallyHighlightedRow() {
+        let cell = Self.configuredCell(model: Self.makeModel(isActive: false))
+        var appliedActive: [Bool] = []
+        cell.applyModelProbeForTesting = { appliedActive.append($0.isActive) }
+
+        cell.showOptimisticSelectionHighlight()
+        cell.showOptimisticDeselection()
+
+        #expect(appliedActive == [true, false])
     }
 
     @Test
@@ -2157,7 +2550,8 @@ struct SidebarPinnedIndicatorColorTests {
             isBeingDragged: false,
             topDropIndicatorVisible: false,
             bottomDropIndicatorVisible: false,
-            colorSchemeIsDark: false
+            colorSchemeIsDark: true,
+            notificationBadgeColorHex: nil
         ))
 
         let workspacePin = try #require(
@@ -2172,5 +2566,74 @@ struct SidebarPinnedIndicatorColorTests {
         )
 
         #expect(groupPin.contentTintColor == workspacePin.contentTintColor)
+    }
+}
+
+// cmux-rbf: changed on purpose (#cm-10): upstream's SidebarGroupHeaderSelectionEdgeTests suite is not taken. It
+// tests the group header's subtle-selection hairline through `sidebarGroupHeaderAnchorActiveEdgeNSColor` and the left
+// rail's `sidebarWorkspaceRowBackgroundStyle(activeTabIndicatorStyle:subtleSelection:)`, neither of which this fork has.
+
+@Suite
+@MainActor
+struct SidebarGroupHeaderBadgeColorTests {
+    private static func badgeFill(notificationBadgeColorHex: String?) throws -> CGColor {
+        let cell = SidebarGroupHeaderTableCellView()
+        cell.configurePresentation(model: SidebarGroupHeaderRowModel(
+            groupId: UUID(),
+            anchorWorkspaceId: UUID(),
+            name: "Group",
+            iconSymbol: "folder",
+            tintHex: nil,
+            customColorHex: nil, // cmux-rbf (#cm-142.1): the fork's required field; these headers carry no colour
+            isCollapsed: false,
+            isPinned: false,
+            isAnchorActive: false,
+            isMultiSelected: false,
+            multiSelectionBackgroundStyle: .clear,
+            memberCount: 1,
+            anchorUnreadCount: 3,
+            canMarkRead: true,
+            canMarkUnread: false,
+            hasLatestNotifications: true,
+            canMarkAllRead: false,
+            canMarkAllUnread: false,
+            shortcutHintText: nil,
+            shortcutHintXOffset: 0,
+            shortcutHintYOffset: 0,
+            fontScale: 1,
+            globalFontMagnificationPercent: 100,
+            cwdContextMenuItems: [],
+            rowSpacing: 2,
+            isFirstRow: true,
+            isBeingDragged: false,
+            topDropIndicatorVisible: false,
+            bottomDropIndicatorVisible: false,
+            colorSchemeIsDark: true,
+            notificationBadgeColorHex: notificationBadgeColorHex
+        ))
+        let badge = try #require(
+            SidebarAppKitRowCellTests.descendants(of: cell)
+                .compactMap { $0 as? SidebarRowUnreadBadgeView }
+                .first { !$0.isHidden }
+        )
+        return try #require(badge.layer?.backgroundColor)
+    }
+
+    @Test
+    func groupBadgeUsesNotificationBadgeColorSetting() throws {
+        let expected = try #require(NSColor(hex: "#E5484D"))
+        #expect(try Self.badgeFill(notificationBadgeColorHex: "#E5484D") == expected.cgColor)
+    }
+
+    @Test
+    func groupBadgeFallsBackToCmuxAccentNotSystemAccent() throws {
+        #expect(try Self.badgeFill(notificationBadgeColorHex: nil) == CmuxAccentColor().nsColor(isDark: true).cgColor)
+    }
+
+    @Test
+    func badgeResolverIgnoresInvalidHex() {
+        let fallback = NSColor.systemPurple
+        #expect(cmuxNotificationBadgeNSColor(hex: "not a color", fallback: fallback) == fallback)
+        #expect(cmuxNotificationBadgeNSColor(hex: nil, fallback: fallback) == fallback)
     }
 }

@@ -1,3 +1,4 @@
+import CmuxFoundation
 import Darwin
 import Foundation
 import os
@@ -10,7 +11,10 @@ import CmuxWorkspaces
 @testable import cmux
 #endif
 
-@Suite(.serialized)
+// cmux-rbf: changed on purpose (#cm-142.1): hibernationRecordsDoNotReusePanelIDFallbackForMovedLiveProcess builds AppDelegate(),
+// which replaces AppDelegate.shared; the trait puts it back (AppDelegateMainWindowTestingSupport.swift:313-314), so a later suite
+// doesn't inherit a windowless delegate.
+@Suite(.serialized, .exclusiveAppContext)
 struct AgentHibernationTerminationFailureTests {
     @Test(arguments: [Int32?.none, Int32(EPERM)])
     func escalationFailureOrPostKillDeadlineFailsClosed(signalError: Int32?) async {
@@ -126,6 +130,65 @@ struct AgentHibernationTerminationFailureTests {
         await recovery?.value
 
         #expect(panel.agentHibernationTerminationFailed == false)
+        #expect(controller.committedTerminationObservationsByPanelID[panel.id] == nil)
+    }
+
+    @MainActor
+    @Test
+    func recoveryObservesExitBeforeWaitingForTeardownFence() async {
+        let panel = TerminalPanel(workspaceId: UUID())
+        defer { panel.close() }
+        let identity = AgentPIDProcessIdentity(
+            pid: 101,
+            startSeconds: 10,
+            startMicroseconds: 1
+        )
+        let termination = AgentHibernationController.ScopedProcessTermination(
+            processID: 101,
+            processIdentity: identity,
+            processGroupID: 101,
+            ttyDevice: 123
+        )
+        let processExitCompletion = AgentHibernationProcessExitCompletion()
+        let recoveryExit = AsyncStream<Void>.makeStream()
+        let controller = AgentHibernationController.shared
+        var didRecover = false
+
+        controller.observeCommittedTermination(
+            panelID: panel.id,
+            terminations: [termination],
+            processExitCompletion: processExitCompletion,
+            waitForExit: { _ in false },
+            waitForRecoveryExit: { _ in
+                for await _ in recoveryExit.stream { return true }
+                return false
+            },
+            waitForRecoveryReadiness: {
+                await processExitCompletion.wait()
+            },
+            onExit: { true },
+            onFailure: {
+                panel.beginAgentHibernationTerminationRecovery()
+            },
+            onRecovery: {
+                didRecover = true
+                panel.completeAgentHibernationTermination()
+            },
+            onRecoveryFailure: {
+                panel.failAgentHibernationTermination()
+            }
+        )
+        let initial = controller.committedTerminationObservationsByPanelID[panel.id]?.task
+        await initial?.value
+        let recovery = controller.committedTerminationObservationsByPanelID[panel.id]?.task
+        #expect(recovery != nil)
+
+        recoveryExit.continuation.yield()
+        recoveryExit.continuation.finish()
+        await recovery?.value
+
+        #expect(didRecover)
+        #expect(await processExitCompletion.wait())
         #expect(controller.committedTerminationObservationsByPanelID[panel.id] == nil)
     }
 

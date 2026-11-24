@@ -14,7 +14,7 @@ struct AgentClearStateResolver: Sendable {
     /// and the spinner or waveform. Idle and `unknown` draw none, so a clear leaves those sessions, and an idle pane stays hibernatable.
     static func phaseDrawsMark(_ phase: AgentLifecyclePhase) -> Bool {
         switch phase {
-        case .needsInput, .running, .monitoring, .error: true
+        case .needsInput, .running, .backgroundWorkPending, .monitoring, .error: true // cmux-rbf (#cm-142.1): upstream's backgroundWorkPending takes running's arm
         case .idle, .unknown: false
         }
     }

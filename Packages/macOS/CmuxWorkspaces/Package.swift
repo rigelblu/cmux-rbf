@@ -14,6 +14,7 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(path: "../CmuxFoundation"),
         // WorkspaceGroupNewPlacement (the typed setting value for new
         // in-group workspace placement) is owned by CmuxSettings.
         .package(path: "../CmuxSettings"),
@@ -23,17 +24,19 @@ let package = Package(
         .package(path: "../CMUXDebugLog"),
         // CmuxTestSupport backs FileOpen/ PreferredEditorService UI-test capture.
         .package(path: "../CmuxTestSupport"),
-        // The sidebar drop planner (#cm-106): the tests plan a drop with it and commit the plan through the coordinator.
-        .package(path: "../CmuxFoundation"),
+        // CMUXAgentLaunch owns the OMX HUD command match the Session/ restore policy shares with the CLI.
+        .package(path: "../CMUXAgentLaunch"),
     ],
     targets: [
         .target(
             name: "CmuxWorkspaces",
             dependencies: [
+                .product(name: "CmuxFoundation", package: "CmuxFoundation"),
                 .product(name: "CmuxSettings", package: "CmuxSettings"),
                 .product(name: "Bonsplit", package: "bonsplit"),
                 .product(name: "CMUXDebugLog", package: "CMUXDebugLog"),
                 .product(name: "CmuxTestSupport", package: "CmuxTestSupport"),
+                .product(name: "CMUXAgentLaunch", package: "CMUXAgentLaunch"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
@@ -45,9 +48,11 @@ let package = Package(
             name: "CmuxWorkspacesTests",
             dependencies: [
                 "CmuxWorkspaces",
+                // The sidebar drop planner (#cm-106): the tests plan a drop with it and commit the plan through the
+                // coordinator. Upstream's library now depends on CmuxFoundation too (2026-11 sync, #cm-142.1).
+                .product(name: "CmuxFoundation", package: "CmuxFoundation"),
                 .product(name: "Bonsplit", package: "bonsplit"),
                 .product(name: "CmuxTestSupport", package: "CmuxTestSupport"),
-                .product(name: "CmuxFoundation", package: "CmuxFoundation"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

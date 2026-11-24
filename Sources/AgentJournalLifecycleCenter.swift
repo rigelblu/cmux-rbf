@@ -1,4 +1,5 @@
 import CmuxAgentJournal
+import CmuxMobileHost
 import Foundation
 
 /// App-side owner of the agent journal: the single writer for
@@ -110,10 +111,14 @@ final class AgentJournalLifecycleCenter: Sendable {
             }
             func reconcile(_ event: AgentJournalEvent, store: AgentJournalStore, deliver: Bool) async -> Bool {
                 guard let eventAliases = resolver(store) else { return false }
-                let canonical = Self.canonicalized(event, aliases: eventAliases)
+                guard let canonical = Self.admittingBackgroundWorkDrain(
+                    Self.canonicalized(event, aliases: eventAliases),
+                    state: state
+                ) else { return false }
                 let decision = notifications.apply(canonical)
                 if decision.disposition != .stale, decision.projectsLifecycle,
-                   let application = Self.reduceIngest(notifications.lifecycleEvent(canonical), aliases: eventAliases,
+                   let application = Self.reduceIngest(notifications.lifecycleEvent(canonical), sourceKind: canonical.kind,
+                       aliases: eventAliases,
                        reducer: reducer, state: &state) {
                     // cm-128.1: push the pane's Claude vim editor mode onto its surface, so the Escape filter asks for two presses.
                     let selected = inputResolver.newestSession(surfaceId: canonical.draft.surfaceId ?? "", state: state)
@@ -126,7 +131,13 @@ final class AgentJournalLifecycleCenter: Sendable {
                     }
                     let selectedUsesVim = usesVim
                     await MainActor.run {
-                        Self.apply(application.assignment, workspaceHint: application.workspaceHint, appDelegate: appDelegate())
+                        Self.apply(
+                            application.assignment,
+                            workspaceHint: application.workspaceHint,
+                            appDelegate: appDelegate(),
+                            activity: application.activity,
+                            settledDrainedBackgroundWork: application.settledDrainedBackgroundWork
+                        )
                         if let surfaceId = UUID(uuidString: application.assignment.surfaceId) {
                             GhosttyApp.terminalSurfaceRegistry.terminalSurface(id: surfaceId)?.agentInputState.usesVimEditor = selectedUsesVim
                         }
@@ -135,11 +146,21 @@ final class AgentJournalLifecycleCenter: Sendable {
                         editorModes.removeValue(forKey: sessionId)
                     }
                 }
+                // Live events only: the startup replay folds history through
+                // its own path, so restoring a session never types `continue`.
+                if decision.disposition != .stale {
+                    await MainActor.run { AgentAutoResumeCoordinator.shared.observe(canonical.draft) }
+                }
                 Self.clearInvalidatedNotifications(canonical, decision: decision)
                 let notificationEvent = Self.canonicalized(decision.notificationEvent ?? canonical, aliases: eventAliases)
                 guard notificationEvent.draft.attention?.notification != nil else { return false }
                 guard let identity = decision.identity else {
                     Self.notificationDiagnostic(canonical.draft, reason: decision.disposition.rawValue)
+                    return false
+                }
+                if let completion = decision.remindedCompletion,
+                   await MainActor.run(body: { Self.reminderRepeatsAcknowledgedCompletion(completion) }) {
+                    Self.notificationDiagnostic(canonical.draft, reason: "completion-acknowledged", identity: identity)
                     return false
                 }
                 guard !Task.isCancelled,

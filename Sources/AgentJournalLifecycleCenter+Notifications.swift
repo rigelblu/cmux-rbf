@@ -20,6 +20,25 @@ extension AgentJournalLifecycleCenter {
         }
     }
 
+    /// An idle reminder repeats its turn's completion. cmux-rbf (#cm-128.4, #cm-142.1): once the notification store
+    /// recorded that completion, read or unread, no agent's idle reminder comes back as a new notification; an unread
+    /// one may get cmux's own reminder instead (AgentUnattendedNudgeDelivery: only with the idle-reminder setting on,
+    /// for a turn with no pending work that isn't a prompt turn, and only while the user is away). The durable receipt
+    /// is not evidence here: it is claimed before mute and policy gates, so only a completion that was never recorded
+    /// keeps its reminder.
+    @MainActor
+    static func reminderRepeatsAcknowledgedCompletion(
+        _ completion: AgentNotificationDecision.RemindedCompletion
+    ) -> Bool {
+        let state = TerminalNotificationStore.shared.agentNotificationState(correlationKey: completion.correlationKey)
+        // cmux-rbf (#cm-128.4, #cm-142.1): an unread recorded completion may get cmux's own reminder instead
+        // (AgentUnattendedNudgeDelivery). Tom's rule: "A finished turn left unread gets one banner-only reminder 60 s
+        // after it finishes, in cmux's words" (2026-11-02, d189e4fafd). Reading "one" as cmux's reminder alone, any
+        // agent's own idle reminder repeats a completion only when it was never recorded, as the fork did before this
+        // merge: the conductor's reading (cm-142.1). Upstream's #20547 also keeps the reminder while it is unread.
+        return state.recorded
+    }
+
     static func clearInvalidatedNotifications(_ event: AgentJournalEvent, decision: AgentNotificationDecision) {
         // cm-128.2: a clear closes the request but keeps its notification (marked read by the clear) and a waiting Feed card.
         guard event.draft.nativeEvent != AgentClearStateResolver.nativeEvent else { return }
@@ -111,9 +130,12 @@ extension AgentJournalLifecycleCenter {
         let category = AgentNotifyCategory(rawValue: notification.category)
         let alert: NotificationSoundAlertType? = draft.kind == .errorReported ? .errorStalled : category?.soundAlertType
         let sound = alert.flatMap { NotificationSoundOverrideContext(agentID: draft.source, alertType: $0) }
+        // cmux-rbf (#cm-128.4, #cm-142.1): the title is the CLI's source line, `<Agent> · <kind>`, and the folder
+        // is the subtitle. Upstream's #16869 workspace prefix is not taken here; reject a revert on upstream sync.
+        let title = notification.title
         let delivered = delivery.enqueue(
             workspaceID: live.tabId, surfaceID: liveSurfaceID,
-            title: notification.title, subtitle: notification.subtitle, body: notification.body,
+            title: title, subtitle: notification.subtitle, body: notification.body,
             category: category, pending: draft.pendingWork, soundContext: sound,
             agentKind: draft.source, isSubagent: draft.isSubagent,
             correlationKey: notification.correlationKey ?? identity,

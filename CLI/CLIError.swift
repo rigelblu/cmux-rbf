@@ -7,6 +7,9 @@ struct CLIError: Error, CustomStringConvertible {
         case pathTypeConflict
         case pathOwnershipConflict
         case startupTimeout
+        /// SO_RCVTIMEO was rejected with EINVAL, which macOS returns once the
+        /// peer has shut the socket down. Other setsockopt failures stay untyped.
+        case receiveTimeoutConfiguration
     }
 
     let message: String
@@ -31,6 +34,9 @@ struct CLIError: Error, CustomStringConvertible {
     /// cmux-rbf (#cm-73.44): the `reason` the app put in a v2 error's data, so `fit` can tell a pane that shows
     /// no board from any other failure without reading display text.
     let v2Reason: String?
+    /// The v2 method whose response carried this error, so an uncaught
+    /// `method_not_found` can name it (``CLIVersionSkew``).
+    let v2Method: String?
 
     init(
         message: String,
@@ -41,7 +47,8 @@ struct CLIError: Error, CustomStringConvertible {
         vmBackendCode: String? = nil,
         vmBackendHTTPStatus: Int? = nil,
         socketFailureKind: SocketFailureKind? = nil,
-        v2Reason: String? = nil
+        v2Reason: String? = nil,
+        v2Method: String? = nil
     ) {
         self.message = message
         self.exitCode = exitCode
@@ -52,6 +59,7 @@ struct CLIError: Error, CustomStringConvertible {
         self.vmBackendHTTPStatus = vmBackendHTTPStatus
         self.socketFailureKind = socketFailureKind
         self.v2Reason = v2Reason
+        self.v2Method = v2Method
     }
 
     var description: String { message }

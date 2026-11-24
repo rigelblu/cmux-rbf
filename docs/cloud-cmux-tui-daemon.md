@@ -92,8 +92,8 @@ never on a connection-scoped lease.
 ## Freestyle delivery and state ownership
 
 Freestyle is the only active provider. One pinned
-`cmux-tui-x86_64-unknown-linux-musl` artifact is installed by the Freestyle
-driver at create or restore time, then started by the snapshot's systemd unit.
+`cmux-tui-x86_64-unknown-linux-musl` artifact is baked into the active
+snapshot, then started by the snapshot's systemd unit.
 The active snapshot and its provenance are recorded in
 `web/services/vms/images/manifest.json`. There is no provider-specific daemon
 protocol or alternate image selector.
@@ -108,6 +108,15 @@ resurrection. Session state (`--state`) lives there too, so workspace layout
 restores from the journal checkpoint after a daemon restart. Running processes
 do not survive a restart, and clients see the generation change instead of a
 silent new shell.
+
+Public `cmux vm exec` commands leave the provider account unset, so Freestyle
+selects its uid-1000 account (usually `cmux`, with a legacy root fallback when
+that account is absent) and derives `HOME` from its passwd entry on every
+invocation. That often matches the terminal work user, but the daemon's layout
+selector can fall back to root when the work user's home is unusable; exec still
+uses the provider-selected account. This repairs the stale `/home/ubuntu`
+environment found on older uid-1000 images without requiring a machine reboot;
+commands that need root should use `sudo`.
 
 Machines created from an image baked before that work user existed have no
 `cmux` account and carry their binary, daemon and state under `/root`. The

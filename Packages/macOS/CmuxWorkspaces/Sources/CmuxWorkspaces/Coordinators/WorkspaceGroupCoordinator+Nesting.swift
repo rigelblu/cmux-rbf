@@ -16,14 +16,17 @@ private let nestedGroupLogger = Logger(subsystem: "com.cmuxterm.app", category: 
 extension WorkspaceGroupCoordinator {
     // MARK: - A new group made in place
 
-    /// The nested `createWorkspaceGroup`, after the group and its own workspace are stored. When the first eligible
+    /// The nested `createWorkspaceGroup`, after the group is stored. When the first eligible
     /// workspace in sidebar order sits in a group, the new group's row goes into that group at that workspace's
     /// place, and each eligible workspace then moves into it in sidebar order: read the layout, two kinds of edit,
     /// write once. A group made from grouped workspaces so stays inside the group. Returns false, having changed
     /// nothing, when the first eligible workspace sits in no group; upstream's assignment and placement then run.
     ///
-    /// The new group already has its own workspace here, so the layout reads it as a group with a run and does not
-    /// snap it back to the place rule 4 (WorkspaceGroupLayout.swift, "The six rules") gives a group with none.
+    /// The new group has no workspace of its own yet: since the 2026-11 sync its anchor is the first selected workspace
+    /// (upstream #15892), not a generated one. By rule 2 (WorkspaceGroupLayout.swift, "The six rules") the first
+    /// workspace moved into a group with none becomes its own workspace, so `anchorId` moves in first, before the
+    /// group's row is placed: the group then has a run, and rule 4 does not snap its row to the end of the level. The
+    /// others follow in sidebar order (cm-142.1).
     @discardableResult
     func nestedPlaceNewWorkspaceGroup(groupId: UUID, anchorId: UUID, eligibleChildren: [UUID]) -> Bool {
         let eligible = Set(eligibleChildren)
@@ -34,8 +37,13 @@ extension WorkspaceGroupCoordinator {
         var layout = model.nestedGroupLayout()
         let level = layout.level(of: .workspace(first.id)) ?? nil
         guard let index = layout.rows(of: level).firstIndex(of: .workspace(first.id)) else { return false }
+        if eligible.contains(anchorId) { // (cm-142.1) the anchor first, so the layout's own workspace is upstream's anchor
+            _ = layout.move(.workspace(anchorId), to: groupId, at: .lastOfTier)
+        }
+        // (cm-142.1) `index` was read before the anchor left this level; the anchor is `first` or comes after it in
+        // sidebar order, so the index still names the place `first` held.
         guard layout.move(.group(groupId), to: level, at: .index(index)) == .moved else { return false }
-        for tab in model.tabs where eligible.contains(tab.id) {
+        for tab in model.tabs where eligible.contains(tab.id) && tab.id != anchorId { // (cm-142.1)
             guard layout.move(.workspace(tab.id), to: groupId, at: .lastOfTier) == .moved else { continue }
         }
         model.applyGroupLayout(layout)
@@ -179,8 +187,12 @@ extension WorkspaceGroupCoordinator {
         placement: WorkspaceGroupNewPlacement?,
         referenceWorkspaceId: UUID?
     ) {
+        let previousGroupId = model.tabs.first(where: { $0.id == workspaceId })?.groupId // (#cm-106, #cm-142.1) upstream's generated-anchor cleanup
         let place = nestedPlace(for: placement, groupId: groupId, referenceWorkspaceId: referenceWorkspaceId, workspaceId: workspaceId)
         guard nestedMoveWorkspace(workspaceId, toGroup: groupId, at: place) else { return }
+        if let previousGroupId, previousGroupId != groupId { // (#cm-106, #cm-142.1)
+            _ = removeGeneratedAnchorIfOrphaned(groupId: previousGroupId, additionalMovedWorkspaceIds: [workspaceId]) // (#cm-106, #cm-142.1)
+        } // (#cm-106, #cm-142.1)
         // A nested window shows the selection only when the reassigned workspace is the selected one.
         if model.selectedTabId == workspaceId { model.expandWorkspaceGroupForSelectionIfNeeded() }
         host?.workspaceOrderDidChange(movedWorkspaceIds: [workspaceId])
@@ -189,6 +201,7 @@ extension WorkspaceGroupCoordinator {
     func nestedRemoveWorkspaceFromGroup(workspaceId: UUID, groupId: UUID) {
         let parent = model.parentGroupIdIfNested(of: groupId)
         guard nestedMoveWorkspace(workspaceId, toGroup: parent, at: .directlyBelow(.group(groupId))) else { return }
+        if removeGeneratedAnchorIfOrphaned(groupId: groupId, additionalMovedWorkspaceIds: [workspaceId]) { return } // (#cm-106, #cm-142.1) upstream's generated-anchor cleanup
         host?.workspaceOrderDidChange(movedWorkspaceIds: [workspaceId])
     }
 
@@ -400,6 +413,8 @@ extension WorkspaceGroupCoordinator {
                 insideGroups.insert(groupId)
             }
         }
+        let newlyProtected = insideGroups.filter { deletingGroupIds.insert($0).inserted } // (#cm-106, #cm-142.1) as the flat path, so the orphan cleanup leaves the batch's groups alone
+        defer { deletingGroupIds.subtract(newlyProtected) } // (#cm-106, #cm-142.1)
         let lateGroupIds = liveDescendants.filter { !confirmedGroupIds.contains($0) }
         // The order groups close in is fixed: the deepest level first, the groups of one level in the order they stand in
         // the sidebar, and the deleted group last (it is the shallowest of them).

@@ -1,3 +1,4 @@
+import CmuxCloud
 import CmuxSettings
 import Foundation
 import Testing
@@ -37,18 +38,61 @@ struct CloudNightlyOverrideTests {
         #expect(capability.policy(for: CmuxFeatureFlags.simulatorFlag) == .remoteFirst)
     }
 
-    @Test(arguments: [false, true])
-    func nightlyPickerControlsEitherRemoteValue(remote: Bool) throws {
+    @Test
+    func taggedArtifactPreservesActivationButClearsDogfoodOverride() throws {
+        let suite = "cmux.cloud.debug.marker.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: BetaFeaturesCatalogSection().cloudMachines.userDefaultsKey)
+        defaults.set(true, forKey: "cmux.flags.override.\(cloud.key)")
+
+        _ = CmuxFeatureFlags(
+            defaults: defaults,
+            overrideCapability: CmuxFeatureFlagOverrideCapability(
+                bundleIdentifier: "com.cmuxterm.app.debug.old", isDebugBuild: true,
+                cloudDogfoodRequested: false, cloudDogfoodMarkerPresent: true
+            ),
+            remoteFlagValueProvider: { _ in false }
+        )
+
+        #expect(defaults.bool(forKey: BetaFeaturesCatalogSection().cloudMachines.userDefaultsKey))
+        #expect(defaults.bool(forKey: "cmux.flags.override.\(cloud.key)") == false)
+    }
+
+    @Test
+    func ordinaryDebugBuildKeepsPersistedCloudSettings() throws {
+        let suite = "cmux.cloud.debug.stable.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let betaKey = BetaFeaturesCatalogSection().cloudMachines.userDefaultsKey
+        let overrideKey = "cmux.flags.override.\(cloud.key)"
+        defaults.set(true, forKey: betaKey)
+        defaults.set(true, forKey: overrideKey)
+
+        _ = CmuxFeatureFlags(
+            defaults: defaults,
+            overrideCapability: CmuxFeatureFlagOverrideCapability(
+                bundleIdentifier: "com.cmuxterm.app.debug", isDebugBuild: true, cloudDogfoodRequested: false
+            ),
+            remoteFlagValueProvider: { _ in false }
+        )
+
+        #expect(defaults.bool(forKey: betaKey))
+        #expect(defaults.bool(forKey: overrideKey))
+    }
+
+    @Test
+    func nightlyPickerControlsLegacyLocalOverride() throws {
         let suite = "cmux.cloud.nightly.picker.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let flags = CmuxFeatureFlags(
-            defaults: defaults, overrideCapability: nightly, remoteFlagValueProvider: { _ in remote }
+            defaults: defaults, overrideCapability: nightly, remoteFlagValueProvider: { _ in nil }
         )
         flags.applyLoadedFlags()
         let initial = InternalFlagRowSnapshot(definition: cloud, flags: flags)
         #expect(initial.resolution.allowsLocalOverride)
-        #expect(initial.resolution.source == .remote)
+        #expect(initial.resolution.source == .default)
         #expect(initial.overrideChoice == .noOverride)
         #expect(initial.overrideNote == String(
             localized: "featureFlags.override.cloudDogfoodNote",
@@ -63,7 +107,7 @@ struct CloudNightlyOverrideTests {
             #expect(row.resolution.source == .override)
             #expect(row.sourceTitle == String(localized: "featureFlags.source.override", defaultValue: "Override"))
             #expect(row.resolution.allowsLocalOverride)
-            #expect(flags.remoteValue(for: cloud) == remote)
+            #expect(flags.remoteValue(for: cloud) == nil)
             flags.applyLoadedFlags()
             #expect(flags.resolution(for: cloud) == row.resolution)
         }
@@ -71,8 +115,8 @@ struct CloudNightlyOverrideTests {
         flags.setOverride(InternalFlagOverrideChoice.noOverride.overrideValue, for: cloud)
         let cleared = InternalFlagRowSnapshot(definition: cloud, flags: flags)
         #expect(cleared.overrideChoice == .noOverride)
-        #expect(cleared.resolution.source == .remote)
-        #expect(cleared.resolution.effectiveValue == remote)
+        #expect(cleared.resolution.source == .default)
+        #expect(cleared.resolution.effectiveValue == CmuxFeatureFlags.cloudMachinesDefault)
         #expect(cleared.resolution.allowsLocalOverride)
     }
 
@@ -91,7 +135,7 @@ struct CloudNightlyOverrideTests {
         let relaunched = CmuxFeatureFlags(
             defaults: nextDefaults, overrideCapability: nightly, remoteFlagValueProvider: { _ in nil }
         )
-        #expect(relaunched.remoteValue(for: cloud) == false)
+        #expect(relaunched.remoteValue(for: cloud) == nil)
         #expect(relaunched.overrideValue(for: cloud) == true)
         #expect(relaunched.isCloudMachinesEnabled)
         relaunched.applyLoadedFlags()
@@ -100,90 +144,47 @@ struct CloudNightlyOverrideTests {
 
         let cleared = CmuxFeatureFlags(defaults: nextDefaults, overrideCapability: nightly)
         #expect(cleared.overrideValue(for: cloud) == nil)
-        #expect(!cleared.isCloudMachinesEnabled)
+        #expect(cleared.isCloudMachinesEnabled)
         cleared.setOverride(true, for: cloud)
         cleared.clearAllOverrides()
         #expect(cleared.overrideValue(for: cloud) == nil)
-        #expect(!cleared.isCloudMachinesEnabled)
+        #expect(cleared.isCloudMachinesEnabled)
         let afterClearAll = CmuxFeatureFlags(defaults: nextDefaults, overrideCapability: nightly)
         #expect(afterClearAll.overrideValue(for: cloud) == nil)
-        #expect(!afterClearAll.isCloudMachinesEnabled)
+        #expect(afterClearAll.isCloudMachinesEnabled)
     }
 
-    @Test(arguments: [nil, false, true] as [Bool?])
-    func stableIgnoresPersistedOverrideAndRejectsWrites(remote: Bool?) throws {
+    @Test
+    func stableIgnoresPersistedOverrideAndRejectsWrites() throws {
+        // A stable identity disables overrides and keeps the local definition's
+        // fallback. The retired key is never loaded from a remote payload.
+        let expectedValue = CmuxFeatureFlags.cloudMachinesDefault
+        let persistedOverride = !expectedValue
         let suite = "cmux.cloud.stable.override.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let dogfood = CmuxFeatureFlags(defaults: defaults, overrideCapability: nightly)
-        dogfood.setOverride(true, for: cloud)
+        dogfood.setOverride(persistedOverride, for: cloud)
         let stable = CmuxFeatureFlags(
             defaults: defaults,
             overrideCapability: .init(bundleIdentifier: "com.cmuxterm.app", isDebugBuild: false),
-            remoteFlagValueProvider: { _ in remote }
+            remoteFlagValueProvider: { _ in true }
         )
         stable.applyLoadedFlags()
         let row = InternalFlagRowSnapshot(definition: cloud, flags: stable)
         #expect(!row.resolution.allowsLocalOverride)
-        #expect(row.resolution.effectiveValue == (remote ?? false))
-        #expect(row.resolution.source == (remote == nil ? .default : .remote))
+        #expect(row.resolution.effectiveValue == expectedValue)
+        #expect(row.resolution.source == .default)
         #expect(row.overrideNote == String(
             localized: "featureFlags.override.remoteControlledNote",
             defaultValue: "Controlled remotely; local override inactive."
         ))
-        stable.setOverride(false, for: cloud)
-        #expect(stable.overrideValue(for: cloud) == true)
+        stable.setOverride(!persistedOverride, for: cloud)
+        #expect(stable.overrideValue(for: cloud) == persistedOverride)
         stable.clearAllOverrides()
         stable.setOverride(true, for: cloud)
         #expect(stable.overrideValue(for: cloud) == nil)
-        #expect(stable.isCloudMachinesEnabled == (remote ?? false))
-    }
-
-    @Test
-    func overrideDrivesLiveCloudAvailabilityAndKeepsOtherGates() throws {
-        let suite = "cmux.cloud.nightly.availability.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let optInKey = BetaFeaturesCatalogSection().cloudMachines.userDefaultsKey
-        defaults.set(true, forKey: optInKey)
-        let policy = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil, forcedObject: { _, _ in nil })
-        var remote = false
-        let flags = CmuxFeatureFlags(
-            defaults: defaults, overrideCapability: nightly, remoteFlagValueProvider: { _ in remote }
-        )
-        flags.applyLoadedFlags()
-        var transitions: [Bool] = []
-        let observer = CloudFeatureAvailabilityObserver(
-            isEnabled: {
-                CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy, remoteEnabled: flags.isCloudMachinesEnabled)
-            },
-            didChange: { transitions.append($0) }
-        )
-        flags.setOverride(true, for: cloud)
-        flags.setOverride(true, for: cloud)
-        #expect(transitions == [false, true])
-        flags.setOverride(nil, for: cloud)
-        #expect(transitions == [false, true, false])
-        flags.setOverride(true, for: cloud)
-        flags.clearAllOverrides()
-        #expect(transitions == [false, true, false, true, false])
-
-        remote = true
-        flags.applyLoadedFlags()
-        flags.setOverride(false, for: cloud)
-        #expect(Array(transitions.suffix(2)) == [true, false])
-        flags.clearAllOverrides()
-        #expect(transitions.last == true)
-        remote = false
-        flags.applyLoadedFlags()
-        #expect(transitions.last == false)
-        flags.setOverride(true, for: cloud)
-        defaults.set(false, forKey: optInKey)
-        #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy, remoteEnabled: flags.isCloudMachinesEnabled))
-        defaults.set(true, forKey: optInKey)
-        let managedOff = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil, forcedObject: { _, _ in true })
-        #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: managedOff, remoteEnabled: flags.isCloudMachinesEnabled))
-        withExtendedLifetime(observer) {}
+        #expect(stable.isCloudMachinesEnabled == expectedValue)
     }
 
     @Test
@@ -202,4 +203,44 @@ struct CloudNightlyOverrideTests {
             #expect(!flags.resolution(for: flag).allowsLocalOverride)
         }
     }
+
+    @Test(arguments: ["com.cmuxterm.app", "com.cmuxterm.app.staging",
+                      "com.cmuxterm.app.nightly", "com.cmuxterm.app.debug",
+                      "com.cmuxterm.app.debug.cloud-dogfood"])
+    func reloadMarkerPreservesTaggedDebugActivation(bundleID: String) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let contents = root.appendingPathComponent("Fixture.bundle/Contents")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        let plist: [String: Any] = [
+            "CFBundleIdentifier": bundleID,
+            "CFBundleVersion": "1",
+            "CMUXCloudDogfoodEnabled": true
+        ]
+        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            .write(to: contents.appendingPathComponent("Info.plist"))
+        let bundle = try #require(Bundle(url: contents.deletingLastPathComponent()))
+        let suite = "cmux.cloud.reload.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let betaKey = BetaFeaturesCatalogSection().cloudMachines.userDefaultsKey
+        defaults.set(false, forKey: betaKey)
+        let flags = CmuxFeatureFlags(
+            defaults: defaults,
+            overrideCapability: .init(bundle: bundle),
+            remoteFlagValueProvider: { _ in false }
+        )
+        flags.applyLoadedFlags()
+        #if DEBUG
+        let expected = bundleID == "com.cmuxterm.app.debug.cloud-dogfood"
+        #else
+        let expected = false
+        #endif
+        #expect(defaults.bool(forKey: betaKey) == expected)
+        #expect(flags.isCloudMachinesEnabled)
+        let managedOff = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil, forcedObject: { _, _ in true })
+        #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: managedOff))
+    }
+
 }

@@ -18,6 +18,7 @@ struct RestartCommandRestoreSummaryRowView: View, Equatable {
     let onToggleRead: () -> Void
 
     @State private var isHovering = false
+    @Environment(\.cmuxAccentColor) private var cmuxAccent // cmux-rbf (#cm-142.1): upstream removed the global accent function
 
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -73,7 +74,7 @@ struct RestartCommandRestoreSummaryRowView: View, Equatable {
     private var rowContent: some View {
         HStack(spacing: 0) {
             Rectangle()
-                .fill(summary.isRead ? Color.clear : cmuxAccentColor())
+                .fill(summary.isRead ? Color.clear : cmuxAccent.color)
                 .frame(width: 2.5)
                 .padding(.vertical, 6)
 

@@ -1,5 +1,7 @@
+import CmuxCloud
 import AppKit
 import Bonsplit
+import CmuxSurfaceCatalogModel
 import Testing
 
 #if canImport(cmux_DEV)
@@ -26,7 +28,7 @@ struct CloudSidebarOrderingTests {
         #expect(up.isEnabled)
         #expect(NSApp.sendAction(action, to: up.target, from: up))
         let group = try #require(outline.parent(forItem: folder) as? CloudTreeNode)
-        #expect(group.children.map(\.id) == [folder.id, fixture.folderID("ws_1")])
+        #expect(group.children.filter(\.canOrganize).map(\.id) == [folder.id, fixture.folderID("ws_1")])
         try fixture.attachScreenshot(named: "cloud-sidebar-after-move")
         let pin = try #require(menu.items.first { $0.title == String(localized: "cloudTree.menu.pin", defaultValue: "Pin") })
         #expect(NSApp.sendAction(try #require(pin.action), to: pin.target, from: pin))
@@ -35,6 +37,18 @@ struct CloudSidebarOrderingTests {
         try fixture.attachScreenshot(named: "cloud-sidebar-after-pin")
         #expect(fixture.provider.moved.isEmpty && fixture.provider.closedTabs.isEmpty && fixture.provider.projected.isEmpty)
         #expect(fixture.provider.refreshCount == 0)
+    }
+
+    @Test("An organization pin committed by another entrypoint repaints the right sidebar immediately")
+    func externalPinCommitRepaintsImmediately() throws {
+        let fixture = CloudSidebarOrderingFixture()
+        defer { fixture.close() }
+        fixture.coordinator.apply(nodes: fixture.nodes())
+        let outline = try #require(fixture.coordinator.outlineView)
+        let folder = try #require(CloudTreeNodeBuilder.flattened(fixture.nodes()).first { $0.id == fixture.folderID("ws_2") })
+        #expect(fixture.catalog.sidebarOrganization.perform(.pin, id: folder.id, nodes: fixture.nodes()))
+        let current = try #require(outline.item(atRow: outline.row(forItem: folder)) as? CloudTreeNode)
+        #expect(current.isPinned)
     }
     @Test("Pins and relative moves survive reconnect, restart, and renamed duplicate titles")
     func preferencesSurviveFreshSnapshots() throws {
@@ -48,14 +62,14 @@ struct CloudSidebarOrderingTests {
         let restored = CloudSidebarOrganizationStore(defaults: fixture.defaults)
         let reconnect = CloudSidebarOrganizationTree(nodes: fixture.nodes(titles: ["renamed", "renamed"])).arrange(using: restored.state)
         let group = try #require(CloudSidebarOrganizationTree(nodes: reconnect).parent(of: first))
-        #expect(group.children.map(\.id) == [second, first])
+        #expect(group.children.filter(\.canOrganize).map(\.id) == [second, first])
         #expect(group.children[0].isPinned)
-        #expect(group.children.map(\.searchableTitle) == ["renamed", "renamed"])
+        #expect(group.children.filter(\.canOrganize).map(\.searchableTitle) == ["renamed", "renamed"])
         #expect(restored.perform(.unpin, id: second, nodes: reconnect))
         #expect(restored.perform(.down, id: second, nodes: reconnect))
         let restarted = CloudSidebarOrganizationStore(defaults: fixture.defaults)
         let rows = CloudSidebarOrganizationTree(nodes: fixture.nodes()).arrange(using: restarted.state)
-        #expect(CloudSidebarOrganizationTree(nodes: rows).parent(of: first)?.children.map(\.id) == [first, second])
+        #expect(CloudSidebarOrganizationTree(nodes: rows).parent(of: first)?.children.filter(\.canOrganize).map(\.id) == [first, second])
         #expect(restarted.state.groups.values.allSatisfy { $0.pinned.isEmpty })
     }
 
@@ -72,12 +86,12 @@ struct CloudSidebarOrderingTests {
             unreadTerminalIDs: [fixture.machine.rawValue: [resource.id.key]], includeLocalMachine: false)
         let parent = try #require(CloudTreeNodeBuilder.flattened(nodes).first { $0.id == fixture.folderID("ws_1") })
         #expect(parent.children.count == 2)
-        let ids = parent.children.map(\.id)
+        let ids = parent.children.filter(\.canOrganize).map(\.id)
         let groups = parent.children.map(\.dragGroup)
         #expect(fixture.catalog.sidebarOrganization.perform(.pin, id: ids[1], nodes: nodes))
         let arranged = CloudSidebarOrganizationTree(nodes: nodes).arrange(using: fixture.catalog.sidebarOrganization.state)
         let moved = try #require(CloudSidebarOrganizationTree(nodes: arranged).parent(of: ids[0]))
-        #expect(moved.children.map(\.id) == Array(ids.reversed()))
+        #expect(moved.children.filter(\.canOrganize).map(\.id) == Array(ids.reversed()))
         #expect(moved.children.map(\.dragGroup) == Array(groups.reversed()))
         #expect(moved.children.map(\.isPinned) == [true, false])
         #expect(moved.children.allSatisfy { if case .terminal(let row) = $0.kind { return row.hasUnreadNotification }; return false })
@@ -102,6 +116,52 @@ struct CloudSidebarOrderingTests {
         let folder = try #require(folders.first)
         let drag = try #require(writer.outlineView(outline, pasteboardWriterForItem: folder) as? NSPasteboardItem)
         #expect(drag.string(forType: .cloudSidebarRow) == folder.id)
+    }
+
+    @Test("A lifted workspace drop commits the slot the rows show, inside its pin tier")
+    func liftedWorkspaceDropUsesSlot() throws {
+        let fixture = CloudSidebarOrderingFixture()
+        defer { fixture.close() }
+        let nodes = fixture.nodes()
+        let first = fixture.folderID("ws_1"), second = fixture.folderID("ws_2")
+        let owner = fixture.catalog.sidebarOrganization
+        func drop(_ id: String, slot: Int) -> CloudSidebarOrganizationAction? {
+            let drop = CloudSidebarOrganizationDrop(
+                sourceID: id, nodes: nodes, state: owner.state, proposedItem: nil,
+                proposedChildIndex: NSOutlineViewDropOnItemIndex, dropAfterItem: false, liftSlot: slot
+            )
+            guard case .organization(let action) = drop?.operation else { return nil }
+            return action
+        }
+        #expect(drop(first, slot: 1) == .after(second))
+        #expect(drop(second, slot: 0) == .before(first))
+        // The row's own slot, or one past the tier, is not a move.
+        #expect(drop(first, slot: 0) == nil)
+        #expect(drop(first, slot: 2) == nil)
+        #expect(owner.perform(.pin, id: second, nodes: nodes))
+        // Alone in its tier, a pinned row has nowhere to go.
+        #expect(drop(second, slot: 0) == nil)
+    }
+
+    @Test("A remote workspace keeps organization dragging when pane projection is unavailable")
+    func remoteWorkspaceFallsBackToOrganizationWithoutProjectionRegistry() throws {
+        let fixture = CloudSidebarOrderingFixture()
+        defer { fixture.close() }
+        let nodes = fixture.nodes()
+        let workspace = try #require(
+            CloudTreeNodeBuilder.flattened(nodes).first { $0.id == fixture.folderID("ws_2") }
+        )
+
+        // The real pane registry may be unavailable while a Cloud outline is
+        // being reconstructed. The row must still produce its sidebar move
+        // payload instead of disappearing from AppKit's drag source callback.
+        let registration = try #require(
+            CloudTreeDragRegistration(node: workspace, registry: nil)
+        )
+        guard case .organization = registration else {
+            Issue.record("Remote workspace should retain organization drag when projection registration is unavailable")
+            return
+        }
     }
 
     @Test("Folder drags use the shared provisional owner without exposing pane projection")
@@ -132,7 +192,10 @@ struct CloudSidebarOrderingTests {
         let folder = try #require(CloudTreeNodeBuilder.flattened(fixture.nodes()).first { $0.id == fixture.folderID("ws_2") })
         let menu = try #require(fixture.coordinator.contextMenu(forRow: outline.row(forItem: folder)))
         let pin = try #require(menu.items.first { $0.title == String(localized: "cloudTree.menu.pin", defaultValue: "Pin") })
-        _ = fixture.catalog.replaceResources([fixture.snapshot().resources[0]], on: fixture.machine, from: fixture.provider)
+        let remainingInfo = try #require(fixture.snapshot(titles: ["cmux1"]).machines.first)
+        _ = fixture.catalog.replaceResources(
+            [fixture.snapshot().resources[0]], on: fixture.machine, info: remainingInfo, from: fixture.provider
+        )
         #expect(NSApp.sendAction(try #require(pin.action), to: pin.target, from: pin))
         #expect(fixture.catalog.sidebarOrganization.state.groups.isEmpty)
     }
@@ -168,23 +231,25 @@ final class CloudSidebarOrderingFixture {
     let defaultsName = "cloud-sidebar-ordering-\(UUID().uuidString)"
     let catalog: SurfaceCatalog
     let provider: CloudPlacementTestProvider
-    let transferRegistry = TabDragTransferRegistry()
+    let transferRegistry: TabDragTransferRegistry
     let coordinator: CloudTreeOutlineView.Coordinator
     let container: CloudTreeContainerView
     let window: NSWindow
 
-    init() {
+    init(transferRegistry: TabDragTransferRegistry? = nil) {
         defaults = UserDefaults(suiteName: defaultsName)!
         provider = CloudPlacementTestProvider(machine: machine)
+        self.transferRegistry = transferRegistry ?? TabDragTransferRegistry()
         catalog = SurfaceCatalog(sidebarOrganization: CloudSidebarOrganizationStore(defaults: defaults))
         let catalog = catalog
         coordinator = CloudTreeOutlineView.Coordinator(
             machineActions: MachineRowActions(
                 openShell: { _ in }, openDesktop: { _ in },
                 runCommand: { _, _ in }, confirmDelete: { _ in },
-                promptRename: { _, _ in }, resizeDisk: { _, _ in }, promptUpgrade: {}
+                promptRename: { _ in }, resizeDisk: { _, _ in }, promptUpgrade: {}
             ),
             nodeActions: CloudTreeNodeActions.bound(
+                navigationHost: AppDelegate.makeCloudTerminalNavigationHost(),
                 catalog: { catalog }, selectedWorkspaceID: { nil },
                 selectLocalWorkspace: { _ in }, onWillMutate: { _ in },
                 onDidMutate: {}, onFailure: { _ in }, refresh: {}
@@ -192,6 +257,8 @@ final class CloudSidebarOrderingFixture {
             expansionStore: CloudTreeExpansionStore(defaults: defaults), organization: catalog.sidebarOrganization,
             tabDragTransferRegistry: { [transferRegistry] in transferRegistry }
         )
+        // These tests drive AppKit's row proposals and the insertion line.
+        coordinator.machineLiftEnabled = false
         container = CloudTreeContainerView(coordinator: coordinator)
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 560), styleMask: [.titled], backing: .buffered, defer: false)
         window.contentView = container
@@ -207,11 +274,26 @@ final class CloudSidebarOrderingFixture {
         defaults.removePersistentDomain(forName: defaultsName)
     }
 
-    func attachScreenshot(named name: String) throws {
+    func attachScreenshot(named name: String, of view: NSView? = nil) throws {
+        let container = view ?? self.container
         container.layoutSubtreeIfNeeded()
         let bitmap = try #require(container.bitmapImageRepForCachingDisplay(in: container.bounds))
         container.cacheDisplay(in: container.bounds, to: bitmap)
-        let png = try #require(bitmap.representation(using: .png, properties: [:]))
+        // NSView caching preserves transparency. Composite onto the window's
+        // background so black sidebar ink stays readable in artifact viewers.
+        let context = try #require(CGContext(
+            data: nil, width: bitmap.pixelsWide, height: bitmap.pixelsHigh,
+            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        let bounds = CGRect(x: 0, y: 0, width: CGFloat(bitmap.pixelsWide), height: CGFloat(bitmap.pixelsHigh))
+        window.effectiveAppearance.performAsCurrentDrawingAppearance {
+            context.setFillColor(window.backgroundColor.cgColor)
+        }
+        context.fill(bounds)
+        context.draw(try #require(bitmap.cgImage), in: bounds)
+        let opaque = NSBitmapImageRep(cgImage: try #require(context.makeImage()))
+        let png = try #require(opaque.representation(using: .png, properties: [:]))
         #if compiler(>=6.2)
         Attachment.record(png, named: name + ".png")
         #endif

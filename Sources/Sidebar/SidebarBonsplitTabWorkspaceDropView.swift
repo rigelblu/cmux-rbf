@@ -13,6 +13,11 @@ final class SidebarBonsplitTabWorkspaceDropView: NSView {
     }
 
     var targetBridge: SidebarBonsplitTabWorkspaceDropOverlay.TargetBridge?
+    /// The sidebar reorder destination beneath this view. AppKit picks a drag
+    /// destination by registered type and geometry, not `hitTest`, and a
+    /// workspace row drag also carries the Bonsplit pane-merge capability, so
+    /// this view receives row reorders and hands them to that destination.
+    weak var reorderDestination: SidebarWorkspaceReorderDropView?
     var canPerformAction: (SidebarDropPlanner.WorkspaceDropAction, BonsplitTabDragPayload.Transfer) -> Bool = { _, _ in false }
     var updateAutoscroll: () -> Void = {}
     var setWorkspaceDropTargetCollectionActive: (Bool) -> Void = { _ in }
@@ -48,7 +53,12 @@ final class SidebarBonsplitTabWorkspaceDropView: NSView {
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
 
-    override func draggingEnded(_ sender: any NSDraggingInfo) { ownershipFeedback.clear() }
+    override func draggingEnded(_ sender: any NSDraggingInfo) {
+        // The reorder view does not implement `draggingEnded:`; forwarding it
+        // would raise an unrecognized selector.
+        if reorderDestination(for: sender) != nil { return }
+        ownershipFeedback.clear()
+    }
 
     override func viewWillMove(toSuperview newSuperview: NSView?) {
         if newSuperview == nil { ownershipFeedback.clear() }
@@ -79,16 +89,19 @@ final class SidebarBonsplitTabWorkspaceDropView: NSView {
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        if let reorder = reorderDestination(for: sender) { return reorder.draggingEntered(sender) }
         updateWorkspaceDropTargetCollection(sender, isActive: true)
         return updateDrag(sender, phase: "entered")
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        if let reorder = reorderDestination(for: sender) { return reorder.draggingUpdated(sender) }
         updateWorkspaceDropTargetCollection(sender, isActive: true)
         return updateDrag(sender, phase: "updated")
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        if let reorder = reorderDestination(for: sender) { return reorder.draggingExited(sender) }
         ownershipFeedback.clear()
         guard pendingDrop == nil else {
             completeOrClearPendingDropAfterDragTeardown()
@@ -103,6 +116,7 @@ final class SidebarBonsplitTabWorkspaceDropView: NSView {
     }
 
     override func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        if let reorder = reorderDestination(for: sender) { return reorder.prepareForDragOperation(sender) }
         let action = action(for: sender)
         let accepted = acceptedTransfer(sender, action: action) != nil || pendingTransfer(sender) != nil
 #if DEBUG
@@ -115,6 +129,7 @@ final class SidebarBonsplitTabWorkspaceDropView: NSView {
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        if let reorder = reorderDestination(for: sender) { return reorder.performDragOperation(sender) }
         defer { ownershipFeedback.clear() }
         let action = action(for: sender)
         if let action, let transfer = acceptedTransfer(sender, action: action) {
@@ -218,6 +233,7 @@ final class SidebarBonsplitTabWorkspaceDropView: NSView {
     }
 
     override func concludeDragOperation(_ sender: (any NSDraggingInfo)?) {
+        if let reorder = reorderDestination(for: sender) { return reorder.concludeDragOperation(sender) }
         ownershipFeedback.clear()
         guard pendingDrop == nil else {
             completeOrClearPendingDropAfterDragTeardown()
@@ -380,6 +396,13 @@ final class SidebarBonsplitTabWorkspaceDropView: NSView {
             registry: AppDelegate.shared?.tabDragTransferRegistry
         ) != nil else { return false }
         return true
+    }
+
+    /// The reorder destination when the drag is a sidebar workspace row.
+    private func reorderDestination(for sender: (any NSDraggingInfo)?) -> SidebarWorkspaceReorderDropView? {
+        guard let reorderDestination else { return nil }
+        let types = (sender?.draggingPasteboard ?? NSPasteboard(name: .drag)).types
+        return DragOverlayRoutingPolicy.hasSidebarTabReorder(types) ? reorderDestination : nil
     }
 
     private func localPoint(_ sender: any NSDraggingInfo) -> CGPoint {

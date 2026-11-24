@@ -112,6 +112,8 @@ extension TabManager: SidebarGitHosting {
     }
 
     func updateReportedSurfaceDirectory(tabId: UUID, surfaceId: UUID, directory: String, displayLabel: String? = nil) {
+        // A Cloud pane's local renderer/launcher cannot outrank the revisioned daemon graph.
+        if tabs.first(where: { $0.id == tabId })?.cloudDirectoryProvenanceRequired(panelId: surfaceId) == true { return }
         if let workspace = tabs.first(where: { $0.id == tabId }),
            !workspace.allowsLocalDirectoryFallback(panelId: surfaceId) {
             updateRemoteSurfaceDirectory(tabId: tabId, surfaceId: surfaceId, directory: directory, displayLabel: displayLabel)
@@ -188,6 +190,20 @@ extension TabManager: SidebarGitHosting {
 
     func mobileHostQuietDelay(for interval: TimeInterval) -> TimeInterval {
         MobileHostRequestActivity.quietDelay(for: interval)
+    }
+
+    /// Reports whether the app-wide terminal input admission window is active.
+    func terminalTypingIsActive(within interval: TimeInterval) -> Bool {
+        terminalTypingQuietDelay(for: interval) > 0
+    }
+
+    /// Returns the remaining terminal input quiet period from the shared typing timestamp.
+    func terminalTypingQuietDelay(for interval: TimeInterval) -> TimeInterval {
+        guard let lastTypingActivityAt = AppDelegate.shared?.lastTypingActivityAt,
+              lastTypingActivityAt > 0 else {
+            return 0
+        }
+        return max(0, interval - (ProcessInfo.processInfo.systemUptime - lastTypingActivityAt))
     }
 }
 

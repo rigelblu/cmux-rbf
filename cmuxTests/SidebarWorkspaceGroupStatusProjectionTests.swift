@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import CmuxNotifications
+import CmuxSettings // cmux-rbf: changed on purpose (#cm-142.1): BetaFeaturesCatalogSection for the controls key
 import CmuxWorkspaces
 import Foundation
 import Testing
@@ -237,6 +238,12 @@ struct SidebarWorkspaceGroupStatusProjectionTests {
     }
 
     @Test func selectingAMemberRevealsItsWholeGroupsStatusInsteadOfTheMembersOwnStatus() throws {
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's TestProcessDefaults gives each test process empty defaults, so
+        // Workspace Todo Controls is off unless the test turns it on, and statusSidePlace reveals nothing with it off.
+        let key = BetaFeaturesCatalogSection().workspaceTodoControls.userDefaultsKey
+        let previous = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.set(true, forKey: key)
+        defer { if let previous { UserDefaults.standard.set(previous, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
         let f = Fixture()
         f.member.setOwnStatus(try #require(list.entry(id: "doing")), list: list)
         let state = SidebarState(statusGroups: .init(areaCollapsed: true, collapsedStatusIds: ["parked", "doing"]))

@@ -28,11 +28,83 @@ struct SidebarWorkspaceSnapshotFactory {
     var statusList: WorkspaceStatusList = .cmuxFive
     /// The color the app resolved for each status of the list, by id, for the rows' dots. (#cm-109)
     var statusColorHexes: [String: String] = [:]
+    /// Resolved per-host origin color (hex), or nil when the beta flag is off or
+    /// the workspace has no host. Resolved by the caller above the row boundary
+    /// and passed in as a plain value; a manual `workspace.customColor` still wins.
+    var originColorHex: String? = nil
+    /// Remote host to name after the title because another workspace shares it (beta), else nil.
+    /// Resolved by the caller over the whole workspace list, since it depends on the other titles.
+    var hostTitleSuffix: String? = nil
+    let catalog: SurfaceCatalog
+
+    /// Builds snapshots from the app's shared surface catalog. The fork's `todoControlsEnabled` stays required (#cm-22);
+    /// its status list and colours default as before (#cm-109).
+    @MainActor
+    init(
+        workspace: Workspace,
+        settings: SidebarTabItemSettingsSnapshot,
+        showsAgentActivity: Bool,
+        todoControlsEnabled: Bool,
+        statusList: WorkspaceStatusList = .cmuxFive,
+        statusColorHexes: [String: String] = [:],
+        originColorHex: String? = nil,
+        hostTitleSuffix: String? = nil
+    ) {
+        self.init(
+            workspace: workspace,
+            settings: settings,
+            showsAgentActivity: showsAgentActivity,
+            todoControlsEnabled: todoControlsEnabled,
+            statusList: statusList,
+            statusColorHexes: statusColorHexes,
+            originColorHex: originColorHex,
+            hostTitleSuffix: hostTitleSuffix,
+            catalog: SurfaceCatalog.shared
+        )
+    }
+
+    /// Builds snapshots from an explicit catalog, including isolated test catalogs.
+    @MainActor
+    init(
+        workspace: Workspace,
+        settings: SidebarTabItemSettingsSnapshot,
+        showsAgentActivity: Bool,
+        todoControlsEnabled: Bool,
+        statusList: WorkspaceStatusList = .cmuxFive,
+        statusColorHexes: [String: String] = [:],
+        originColorHex: String? = nil,
+        hostTitleSuffix: String? = nil,
+        catalog: SurfaceCatalog
+    ) {
+        self.workspace = workspace
+        self.settings = settings
+        self.showsAgentActivity = showsAgentActivity
+        self.todoControlsEnabled = todoControlsEnabled
+        self.statusList = statusList
+        self.statusColorHexes = statusColorHexes
+        self.originColorHex = originColorHex
+        self.hostTitleSuffix = hostTitleSuffix
+        self.catalog = catalog
+    }
 
     /// Creates the current immutable presentation snapshot for the workspace row.
     func makeSnapshot() -> SidebarWorkspaceSnapshotBuilder.Snapshot {
         let detailVisibility = settings.visibleAuxiliaryDetails
+        // Compact status folds the lines cmux generates for you into the
+        // glyph's tooltip: the branch/directory line and the pull request
+        // rows. The visibility itself stays, since it also drives git and PR
+        // polling, which the glyph reads.
+        let showsBranchDirectoryRows = detailVisibility.showsBranchDirectory && !settings.compactsAgentStatus
+        let showsPullRequestRows = detailVisibility.showsPullRequests && !settings.compactsAgentStatus
         let orderedPanelIds = workspace.sidebarOrderedPanelIds()
+        let cloud = CloudWorkspaceSidebarPresentation(
+            workspace: workspace,
+            orderedPanelIDs: orderedPanelIds,
+            usesLastSegmentPath: settings.usesLastSegmentPath,
+            catalog: catalog
+        )
+        let hasCloudProjection = workspace.cloudVMID != nil
+            || workspace.cloudBindingState.projectedResources.values.contains { $0.machine.cloudMachineID != nil }
         let taskStatusInput = SidebarWorkspaceTaskStatusSnapshot.capture(
             workspace: workspace,
             orderedPanelIds: orderedPanelIds,
@@ -40,7 +112,7 @@ struct SidebarWorkspaceSnapshotFactory {
             colorHexes: statusColorHexes
         ) // (#cm-109)
         let compactGitBranchSummaryText: String? = {
-            guard detailVisibility.showsBranchDirectory,
+            guard showsBranchDirectoryRows,
                   settings.branchDirectory.branchLayout == .inline,
                   settings.showsGitBranch else {
                 return nil
@@ -48,25 +120,34 @@ struct SidebarWorkspaceSnapshotFactory {
             return gitBranchSummaryText(orderedPanelIds: orderedPanelIds)
         }()
         let compactDirectoryCandidates: [String] = {
-            guard detailVisibility.showsBranchDirectory,
+            guard showsBranchDirectoryRows,
                   settings.branchDirectory.branchLayout == .inline else {
                 return []
             }
-            return compactDirectoryCandidatesList(orderedPanelIds: orderedPanelIds)
+            let candidates = cloud?.directoryCandidates ?? (hasCloudProjection ? [] : compactDirectoryCandidatesList(orderedPanelIds: orderedPanelIds))
+            return Self.droppingTitleEcho(candidates, title: workspace.title)
         }()
         let compactBranchDirectoryCandidates = compactBranchDirectoryCandidatesList(
             gitSummary: compactGitBranchSummaryText,
             directoryCandidates: compactDirectoryCandidates
         )
         let branchDirectoryLines: [SidebarWorkspaceSnapshotBuilder.VerticalBranchDirectoryLine] = {
-            guard detailVisibility.showsBranchDirectory,
+            guard showsBranchDirectoryRows,
                   settings.branchDirectory.branchLayout == .vertical else {
                 return []
             }
-            return verticalBranchDirectoryLines(orderedPanelIds: orderedPanelIds)
+            if let cloud { return [.init(branch: nil, directoryCandidates: cloud.directoryCandidates)] }
+            if hasCloudProjection { return [] }
+            // A lone directory line that only repeats the title ("~" under "~") says nothing.
+            let lines = verticalBranchDirectoryLines(orderedPanelIds: orderedPanelIds)
+            if lines.count == 1, let line = lines.first, line.branch == nil,
+               Self.droppingTitleEcho(line.directoryCandidates, title: workspace.title).isEmpty {
+                return []
+            }
+            return lines
         }()
         let pullRequestRows: [SidebarWorkspaceSnapshotBuilder.PullRequestDisplay] = {
-            guard detailVisibility.showsPullRequests else { return [] }
+            guard showsPullRequestRows else { return [] }
             return pullRequestDisplays(orderedPanelIds: orderedPanelIds)
         }()
         let workspaceStatusVisible = todoControlsEnabled && !workspace.todoState.statusHidden
@@ -111,20 +192,43 @@ struct SidebarWorkspaceSnapshotFactory {
             todoControlsEnabled: todoControlsEnabled, // (#cm-109.4)
             list: statusList // (#cm-109.4)
         )
+        // cm-128.6: for each state a mark draws, the agents in it. Each list keeps its mark's gate: waiting and error behind
+        // the setting, running, monitoring and idle behind `showsAgentActivity` (Tom's item 9: a status list gates neither).
+        // The lists take the one pane order read above; the workspace's agent signals read the same per-agent states.
+        let agentLists = SidebarAgentActivitySummary.lists(
+            showsNeedsYouMarks: settings.details.showAgentActivity,
+            showsAgentActivity: showsAgentActivity,
+            paneStates: workspace.agentPaneStates(panelIds: orderedPanelIds)
+        )
+        let statusEntries = SidebarCompactStatusGlyph.partition(
+            detailVisibility.showsMetadata || settings.compactsAgentStatus
+                ? workspace.sidebarStatusEntriesInDisplayOrder()
+                : [],
+            compacts: settings.compactsAgentStatus
+        )
+        let compactStatusGlyph = settings.compactsAgentStatus
+            ? SidebarCompactStatusGlyph.resolve(compactStatusInput(
+                agentEntries: statusEntries.agent,
+                hasActiveAgent: agentLists.activeCodingAgentCount > 0, // (cm-128.6) the spinner's count
+                // The directory toggle itself, like the branch and PR ones, so
+                // the tooltip keeps it under Hide All Details.
+                directory: settings.details.showBranchDirectory
+                    ? (cloud?.directoryCandidates ?? (hasCloudProjection ? [] : compactDirectoryCandidatesList(orderedPanelIds: orderedPanelIds))).first
+                    : nil,
+                orderedPanelIds: orderedPanelIds
+            ))
+            : nil
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
             title: workspace.title,
             customDescription: settings.showsWorkspaceDescription ? visibleCustomDescription : nil,
             isPinned: workspace.isPinned,
             isMuted: workspace.isMuted,
-            customColorHex: workspace.customColor,
-            cloudWorkspaceLabel: workspace.cloudVMID.map { machine in
-                let template = String(
-                    localized: "sidebar.cloudWorkspace.label",
-                    defaultValue: "Cloud workspace on %@"
-                )
-                return String.localizedStringWithFormat(template, machine)
-            },
+            // A manual workspace color always wins; the per-host origin color
+            // (nil when the flag is off) is the fallback.
+            customColorHex: workspace.customColor ?? originColorHex,
+            hasManualCustomColor: workspace.customColor != nil,
+            cloudWorkspaceLabel: cloud?.isDeviceWorkspace == true ? nil : cloud?.machineLabel,
             remoteWorkspaceSidebarText: remoteWorkspaceSidebarText,
             remoteConnectionStatusText: remoteConnectionStatusText,
             remoteStateHelpText: remoteStateHelpText,
@@ -133,9 +237,21 @@ struct SidebarWorkspaceSnapshotFactory {
                     || workspace.remoteConnectionState == .disconnected),
             copyableSidebarSSHError: copyableSidebarSSHError,
             latestConversationMessage: workspace.latestConversationMessage,
-            // cm-128.6 (Tom's item 10): cmux's agent pills leave the row; the store and every other reader keep them.
+            // `SidebarAgentUsageFormatter()` reads `Locale.current`, so it is
+            // built only when usage is actually shown; this runs for every row
+            // on every sidebar rebuild. Decorates `statusEntries.rows` rather
+            // than the unpartitioned list so compact status still folds the
+            // agent rows away: with compaction on, the folded agent entries
+            // carry no usage text because they are no longer rows.
             metadataEntries: detailVisibility.showsMetadata
-                ? workspace.sidebarStatusEntriesInDisplayOrder().filter { !Workspace.isAgentStatusPillKey($0.key) }
+                // cm-128.6 (Tom's item 10): cmux's agent pills leave the row after upstream's partition and usage text;
+                // the store, the compact glyph and every other reader keep them.
+                ? (detailVisibility.showsAgentUsage
+                    ? SidebarAgentUsageFormatter().decorate(
+                        statusEntries.rows,
+                        usageByStatusKey: workspace.sidebarMetadata.agentUsageByStatusKey
+                    )
+                    : statusEntries.rows).filter { !Workspace.isAgentStatusPillKey($0.key) }
                 : [],
             metadataBlocks: detailVisibility.showsMetadata
                 ? workspace.sidebarMetadataBlocksInDisplayOrder()
@@ -161,24 +277,29 @@ struct SidebarWorkspaceSnapshotFactory {
             checklistTotalCount: checklistProgress.totalCount,
             checklistFirstUncheckedText: checklistProgress.firstUncheckedText,
             taskStatusInput: taskStatusInput,
-            // cm-128.6: Tom's item 9, a status list no longer gates the hand or the triangle. Each list keeps its mark's gate:
-            // waiting and error behind the setting, running, monitoring and idle behind `showsAgentActivity`. The lists take the
-            // one pane order read above; the workspace's agent signals read the same per-agent states, in no particular order.
-            agentLists: SidebarAgentActivitySummary.lists(
-                showsNeedsYouMarks: settings.details.showAgentActivity,
-                showsAgentActivity: showsAgentActivity,
-                paneStates: workspace.agentPaneStates(panelIds: orderedPanelIds)
-            )
+            agentLists: agentLists, // (cm-128.6)
+            deviceWorkspaceLabel: cloud?.deviceLabel,
+            compactStatusGlyph: compactStatusGlyph,
+            hostTitleSuffix: hostTitleSuffix
         )
     }
 
     private var presentationKey: SidebarWorkspaceSnapshotBuilder.PresentationKey {
-        Self.presentationKey(settings: settings, showsAgentActivity: showsAgentActivity)
+        Self.presentationKey(
+            settings: settings,
+            showsAgentActivity: showsAgentActivity,
+            customColorHex: workspace.customColor ?? originColorHex,
+            hasManualCustomColor: workspace.customColor != nil,
+            hostTitleSuffix: hostTitleSuffix
+        )
     }
 
     static func presentationKey(
         settings: SidebarTabItemSettingsSnapshot,
-        showsAgentActivity: Bool
+        showsAgentActivity: Bool,
+        customColorHex: String?,
+        hasManualCustomColor: Bool = false,
+        hostTitleSuffix: String? = nil
     ) -> SidebarWorkspaceSnapshotBuilder.PresentationKey {
         SidebarWorkspaceSnapshotBuilder.PresentationKey(
             showsWorkspaceDescription: settings.showsWorkspaceDescription,
@@ -186,7 +307,12 @@ struct SidebarWorkspaceSnapshotFactory {
             showsGitBranch: settings.showsGitBranch,
             usesViewportAwarePath: settings.usesLastSegmentPath,
             showsAgentActivity: showsAgentActivity,
-            visibleAuxiliaryDetails: settings.visibleAuxiliaryDetails
+            compactsAgentStatus: settings.compactsAgentStatus,
+            compactStatusIcons: settings.compactStatusIcons,
+            visibleAuxiliaryDetails: settings.visibleAuxiliaryDetails,
+            customColorHex: customColorHex,
+            hasManualCustomColor: hasManualCustomColor,
+            hostTitleSuffix: hostTitleSuffix
         )
     }
 
@@ -300,6 +426,14 @@ struct SidebarWorkspaceSnapshotFactory {
         )
     }
 
+    /// No directory subtitle when its only text is the title itself (a workspace titled by its
+    /// shell's `~` shows "~" once, not "~" over "~").
+    static func droppingTitleEcho(_ candidates: [String], title: String) -> [String] {
+        let shown = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !shown.isEmpty, !candidates.isEmpty, candidates.allSatisfy({ $0 == shown }) else { return candidates }
+        return []
+    }
+
     private func compactBranchDirectoryCandidatesList(
         gitSummary: String?,
         directoryCandidates: [String]
@@ -383,6 +517,54 @@ struct SidebarWorkspaceSnapshotFactory {
             indices[index] += 1
         }
         return result
+    }
+
+    /// Inputs for the compact status glyph. Read independently of detail
+    /// visibility: like the loading spinner, the glyph is a live status
+    /// signal that stays on the title line when the detail rows are hidden.
+    /// Only the branch and PR toggles themselves turn their part off.
+    private func compactStatusInput(
+        agentEntries: [SidebarStatusEntry],
+        hasActiveAgent: Bool,
+        directory: String?,
+        orderedPanelIds: [UUID]
+    ) -> SidebarCompactStatusGlyph.Input {
+        SidebarCompactStatusGlyph.Input(
+            agentEntries: agentEntries,
+            lifecycleStates: workspace.agentLifecycleStatesByPanelId.values.flatMap { states in
+                states.filter { !AgentHibernationLifecycleStatusKeys.isManualKey($0.key) }.values
+            },
+            hasActiveAgent: hasActiveAgent,
+            // Honor the user's branch and PR toggles themselves (not detail
+            // visibility), so the glyph still works under Hide All Details.
+            pullRequests: settings.details.showPullRequests
+                ? workspace.sidebarPullRequestsInDisplayOrder(orderedPanelIds: orderedPanelIds).map {
+                    .init(label: $0.label, number: $0.number, status: $0.status, isStale: $0.isStale)
+                }
+                : [],
+            branch: settings.showsGitBranch
+                ? workspace.sidebarGitBranchesInDisplayOrder(orderedPanelIds: orderedPanelIds).first?.branch
+                : nil,
+            directory: directory,
+            iconOverrides: settings.compactStatusIcons,
+            profiles: agentProfileLabels(orderedPanelIds: orderedPanelIds)
+        )
+    }
+
+    /// Unique config-profile labels of the workspace's live agents, in panel order.
+    private func agentProfileLabels(orderedPanelIds: [UUID]) -> [String] {
+        guard let index = SharedLiveAgentIndex.shared.index else { return [] }
+        let home = NSHomeDirectory()
+        var labels: [String] = []
+        for panelId in orderedPanelIds {
+            let environment = index.entry(workspaceId: workspace.id, panelId: panelId)?
+                .snapshot.launchCommand?.environment
+            if let label = SidebarAgentProfileLabel.label(environment: environment, homeDirectory: home),
+               !labels.contains(label) {
+                labels.append(label)
+            }
+        }
+        return labels
     }
 
     private func pullRequestDisplays(

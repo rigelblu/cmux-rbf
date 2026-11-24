@@ -1,5 +1,7 @@
 import CmuxSettings
+import CmuxSurfaceCatalogModel
 import CryptoKit
+import Darwin
 import Foundation
 
 /// Cloud file transfer. Push streams through OpenSSH/SFTP over the app's
@@ -13,6 +15,8 @@ extension CMUXCLI {
     static let vmTransferExecTimeoutMs = 100_000
     static let vmTransferExecResponseTimeout: TimeInterval = 120
     static let vmPushWatchSettleTimeoutSeconds: TimeInterval = 10
+    /// What `vm push` sends without `--allow-large` (the files under the path, after excludes).
+    static let vmPushLargeInputBytes = 500 * 1000 * 1000
     /// Directory entries skipped by default on `vm push` of a directory. Every
     /// entry here is cheap to recreate on the machine (installs, build output)
     /// or meaningless there (VCS internals, OS litter); `--no-default-excludes`
@@ -27,14 +31,20 @@ extension CMUXCLI {
 
     static var vmPushUsage: String {
         """
-        Usage: cmux vm push <id> <local-path> [remote-path] [--exclude <pattern>]... [--no-default-excludes]
-               cmux vm push <id> <local-path> [remote-path] --watch [--interval <seconds>] [--exclude <pattern>]...
+        Usage: cmux vm push <id> <local-path> [remote-path] [--exclude <pattern>]... [--no-default-excludes] [--allow-large]
+               cmux vm push <id> <local-path> [remote-path] --watch [--interval <seconds>] [--exclude <pattern>]... [--no-default-excludes] [--allow-large]
                cmux vm push --secret <id> <local-file> [remote-path] [--mode <octal>]
 
         Copy a local file or directory onto a cloud machine over its private
         WireGuard connection with SSH/SCP. Directories travel as tarballs; by default \(vmPushDefaultExcludes.joined(separator: ", "))
         are skipped. The remote path defaults to the local basename in the exec
         working directory (the machine user's home).
+
+        Before packing, the push adds up what it would send (after excludes) and
+        refuses more than \(formatByteCount(vmPushLargeInputBytes)) unless --allow-large. For a repo with a pushed
+        branch, cloning on the machine copies nothing from this Mac:
+        `cmux vm exec <id> -- git clone --depth 1 --branch <branch> <url> work/<name>`.
+        Ctrl-C or a stop removes the local archive.
 
         --watch keeps syncing: after the first push it pushes again whenever a file
         under <local-path> changes (polled every --interval seconds, default 1;
@@ -110,10 +120,14 @@ extension CMUXCLI {
         var modeOption: String?
         var watch = false
         var intervalOption: String?
+        var allowLarge = false
         var index = 0
         while index < rest.count {
             let arg = rest[index]
             switch arg {
+            case "--allow-large":
+                allowLarge = true
+                index += 1
             case "--exclude":
                 guard index + 1 < rest.count else {
                     throw CLIError(message: "--exclude requires a pattern\n\n\(Self.vmPushUsage)")
@@ -192,6 +206,12 @@ extension CMUXCLI {
             intervalSeconds = parsed
         }
         let excludes = isDirectory.boolValue ? (useDefaultExcludes ? Self.vmPushDefaultExcludes : []) + extraExcludes : []
+        // Size first: a 17 GB checkout must not start a multi-GB archive in the temp folder.
+        if !allowLarge {
+            let measured = Self.vmPushInputBytes(root: localURL, isDirectory: isDirectory.boolValue, excludes: excludes,
+                                                 stoppingAbove: Self.vmPushLargeInputBytes)
+            try Self.vmPushCheckInputSize(measured, localPath: localPath, vmID: vmID)
+        }
         let initialWatchSignature = watch
             ? Self.vmPushTreeSignature(root: localURL, isDirectory: isDirectory.boolValue, excludes: excludes)
             : nil
@@ -305,6 +325,24 @@ extension CMUXCLI {
         excludes: [String],
         client: SocketClient
     ) throws -> VMPushOutcome {
+        var phase = "snapshot"
+        do {
+            return try performVMPushTransfer(vmID: vmID, localURL: localURL, localPath: localPath, isDirectory: isDirectory,
+                                            remotePath: remotePath, excludes: excludes, client: client, phase: &phase)
+        } catch {
+            // Structured API errors are already recorded by the app. Transport
+            // and local subprocess failures need their own authenticated report.
+            if (error as? CLIError)?.isStructuredProtocolResponse != true {
+                reportVMPushFailure(error, phase: phase, client: client)
+            }
+            throw error
+        }
+    }
+
+    private func performVMPushTransfer(
+        vmID: String, localURL: URL, localPath: String, isDirectory: Bool,
+        remotePath: String, excludes: [String], client: SocketClient, phase: inout String
+    ) throws -> VMPushOutcome {
         let destination = remotePath.hasPrefix("/") ? remotePath : "./" + remotePath
         guard !destination.utf8.contains(0), !destination.contains("\n"), !destination.contains("\r") else {
             throw CLIError(message: "Cloud file destination contains an unsupported control character.")
@@ -314,10 +352,12 @@ extension CMUXCLI {
         try FileManager.default.createDirectory(at: transferDirectory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         defer { try? FileManager.default.removeItem(at: transferDirectory) }
         let localFile = transferDirectory.appendingPathComponent("payload")
+        // Ctrl-C, a stop (SIGTERM) or a hang-up mid-transfer removes the archive and this folder too.
+        let signalCleanup = VMPushSignalCleanup.install(directory: transferDirectory,
+                                                        files: ["payload", "identity", "identity.pub", "known_hosts"])
+        defer { signalCleanup.uninstall() }
         if isDirectory {
-            let tarURL = try makeLocalTarball(of: localURL, excludes: excludes)
-            defer { try? FileManager.default.removeItem(at: tarURL) }
-            try FileManager.default.moveItem(at: tarURL, to: localFile)
+            try makeLocalTarball(of: localURL, excludes: excludes, into: localFile)
         } else {
             let source = localURL.resolvingSymlinksInPath()
             let sourceAttributes = try FileManager.default.attributesOfItem(atPath: source.path)
@@ -344,6 +384,7 @@ extension CMUXCLI {
         let generated = CLIProcessRunner.runProcess(executablePath: "/usr/bin/ssh-keygen", arguments: ["-q", "-t", "ed25519", "-N", "", "-C", "cmux-scp", "-f", identity.path], stdinText: "", timeout: 15)
         guard generated.status == 0 else { throw CLIError(message: "Cloud file transfer could not create its SSH key.") }
         let publicKey = try String(contentsOf: identity.appendingPathExtension("pub"), encoding: .utf8)
+        phase = "request"
         var endpoint = try vmSCPTransferEndpoint(vmID: vmID, publicKey: publicKey, client: client)
         func refreshGrantIfNeeded() throws {
             guard endpoint.expiresAtUnix - Date().timeIntervalSince1970 < 60 else { return }
@@ -358,6 +399,7 @@ extension CMUXCLI {
         let parent = (destination as NSString).deletingLastPathComponent
         let template = (parent.isEmpty ? "." : parent) + "/.cmux-push.XXXXXXXXXX"
         let prepare = "umask 077; mkdir -p -- \(shellQuote(parent.isEmpty ? "." : parent)) && mktemp -d -- \(shellQuote(template))"
+        phase = "connect"
         let remoteDirectory = try runSCPProcess(
             "/usr/bin/ssh", arguments: ["-p", String(endpoint.port), "--", endpoint.destination, prepare],
             endpoint: endpoint, directory: transferDirectory
@@ -372,8 +414,12 @@ extension CMUXCLI {
             do {
                 try refreshGrantIfNeeded()
                 _ = try runSCPProcess("/usr/bin/ssh", arguments: ["-p", String(endpoint.port), "--", endpoint.destination, cleanup], endpoint: endpoint, directory: transferDirectory)
-            } catch { cliWriteStderr("Cloud transfer staging cleanup failed.\n") }
+            } catch {
+                cliWriteStderr("Cloud transfer staging cleanup failed.\n")
+                reportVMPushFailure(error, phase: "cleanup", client: client)
+            }
         }
+        phase = "file"
         let remoteStaging = remoteDirectory + "/payload"
         _ = try runSCPProcess(
             "/usr/bin/scp", arguments: ["-q", "-P", String(endpoint.port), "--", localFile.path, endpoint.destination + ":" + remoteStaging],
@@ -381,7 +427,9 @@ extension CMUXCLI {
         )
         // An established SFTP session can outlive its grant. Refresh before
         // opening the next SSH connection, without replaying the uploaded data.
+        phase = "request"
         try refreshGrantIfNeeded()
+        phase = "process"
         let verify = "set -eu; actual=$(sha256sum < \(shellQuote(remoteStaging))); test \"${actual%% *}\" = \(shellQuote(localDigest)); "
         let finalize: String
         if isDirectory {
@@ -404,51 +452,6 @@ extension CMUXCLI {
             seconds: Int(Date().timeIntervalSince(started).rounded()),
             appliedExcludes: excludes
         )
-    }
-
-    private struct VMSCPTransferEndpoint {
-        let host: String
-        let port: Int
-        let username: String
-        let hostPublicKey: String
-        let expiresAtUnix: TimeInterval
-        var destination: String { "\(username)@\(host)" }
-    }
-
-    private func vmSCPTransferEndpoint(vmID: String, publicKey: String, client: SocketClient) throws -> VMSCPTransferEndpoint {
-        let response = try client.sendV2(method: "vm.scp_info", params: ["id": vmID, "public_key": publicKey], responseTimeout: 100)
-        guard let host = response["host"] as? String, host == "127.0.0.1",
-              let port = response["port"] as? Int, (1...65535).contains(port),
-              let username = response["username"] as? String,
-              username.range(of: "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$", options: .regularExpression) != nil,
-              let hostPublicKey = response["host_public_key"] as? String,
-              hostPublicKey.range(of: "^ssh-ed25519 [A-Za-z0-9+/]+={0,2}$", options: .regularExpression) != nil,
-              let expires = response["expires_at_unix"] as? Double,
-              expires.isFinite, expires > Date().timeIntervalSince1970 else {
-            throw CLIError(message: "Cloud SCP requires a private connection and a verified SSH host key.")
-        }
-        return VMSCPTransferEndpoint(host: host, port: port, username: username, hostPublicKey: hostPublicKey, expiresAtUnix: expires)
-    }
-
-    @discardableResult
-    private func runSCPProcess(_ executable: String, arguments: [String], endpoint: VMSCPTransferEndpoint, directory: URL) throws -> String {
-        let options = [
-            "-F", "/dev/null",
-            "-o", "StrictHostKeyChecking=yes",
-            "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "HostKeyAlias=cmux-scp",
-            "-o", "UserKnownHostsFile=" + directory.appendingPathComponent("known_hosts").path.replacingOccurrences(of: "%", with: "%%"),
-            "-o", "GlobalKnownHostsFile=/dev/null",
-            "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3",
-            "-o", "IdentitiesOnly=yes", "-i", directory.appendingPathComponent("identity").path,
-            "-o", "PreferredAuthentications=publickey", "-o", "BatchMode=yes",
-            "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ForwardAgent=no",
-        ]
-        let result = CLIProcessRunner.runProcess(executablePath: executable, arguments: options + arguments, stdinText: "", timeout: 10 * 60)
-        guard result.status == 0 else {
-            let detail = String(result.stderr.suffix(2000))
-            throw CLIError(message: "Cloud SSH file transfer failed (exit \(result.status)): \(detail)")
-        }
-        return result.stdout
     }
 
     // MARK: - push --secret (over the link, never the exec channel)
@@ -474,7 +477,7 @@ extension CMUXCLI {
         guard !isDirectory else {
             throw CLIError(message: "vm push --secret delivers one file; \(localPath) is a directory. Pack it first (tar czf), or push it without --secret if it holds nothing secret.")
         }
-        guard mode.range(of: "^[0-7]{3,4}$", options: .regularExpression) != nil else {
+        guard mode.range(of: "^[0-7]{3,4}\\z", options: .regularExpression) != nil else {
             throw CLIError(message: "--mode must be three or four octal digits such as 600 or 0644 (got '\(mode)')")
         }
         let data = try Data(contentsOf: localURL)
@@ -612,6 +615,7 @@ extension CMUXCLI {
             cliWriteStderr("watching \(localPath) (\(last.count) files) — every change is pushed to \(vmID):\(remotePath); Ctrl-C stops\n")
         }
         var syncs = 0
+        var retryDelaySeconds = 1.0
         let clock = DateFormatter()
         clock.dateFormat = "HH:mm:ss"
         while true {
@@ -628,17 +632,42 @@ extension CMUXCLI {
             }
             // A transient edit may disappear while settling.
             guard current != last else { continue }
-            let outcome = try performVMPush(
-                vmID: vmID,
-                localURL: localURL,
-                localPath: localPath,
-                isDirectory: isDirectory,
-                remotePath: remotePath,
-                excludes: excludes,
-                client: client
-            )
+            let outcome: VMPushOutcome
+            do {
+                outcome = try performVMPush(
+                    vmID: vmID,
+                    localURL: localURL,
+                    localPath: localPath,
+                    isDirectory: isDirectory,
+                    remotePath: remotePath,
+                    excludes: excludes,
+                    client: client
+                )
+            } catch let error as VMSCPGrantTransportFailure {
+                // A dropped grant request is recoverable while watching: keep
+                // the settled local snapshot pending and retry without making
+                // the user edit the file again. Other failures remain fatal so
+                // host-key, policy, and malformed-response errors stay visible.
+                let delay = retryDelaySeconds
+                let errorDescription = String(describing: error)
+                if jsonOutput {
+                    print(jsonString([
+                        "event": "retrying",
+                        "error": errorDescription,
+                        "files": current.count,
+                        "delay_seconds": delay,
+                    ], prettyPrinted: false))
+                    fflush(stdout)
+                } else {
+                    cliWriteStderr("Cloud transfer failed (\(errorDescription)); retrying in \(String(format: "%.1f", delay))s.\n")
+                }
+                Thread.sleep(forTimeInterval: delay)
+                retryDelaySeconds = min(delay * 2, 10.0)
+                continue
+            }
             last = current
             syncs += 1
+            retryDelaySeconds = 1.0
             if jsonOutput {
                 var payload = outcome.jsonPayload
                 payload["event"] = "synced"
@@ -850,8 +879,18 @@ extension CMUXCLI {
             guard Date() < deadline else {
                 throw CLIError(message: "Timed out after \(timeoutSeconds)s waiting for \(vmID) (last status: \(status)). Re-run with --timeout <seconds> to wait longer.")
             }
-            Thread.sleep(forTimeInterval: 3)
+            let remainingSeconds = deadline.timeIntervalSinceNow
+            if remainingSeconds > 0 {
+                Thread.sleep(forTimeInterval: min(Self.vmReadyPollInterval(), remainingSeconds))
+            }
         }
+    }
+
+    /// Seconds between `vm.status` polls; see ``VMReadyPollInterval``.
+    static func vmReadyPollInterval(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> TimeInterval {
+        VMReadyPollInterval.resolve(environment: environment)
     }
 
     // MARK: - transfer plumbing
@@ -975,7 +1014,7 @@ extension CMUXCLI {
 
     static var vmRunUsage: String {
         """
-        Usage: cmux vm run [--sync] [--pull <remote-path>] [--machine <id>] [--new] [--size <8g>] [--timeout <seconds>] -- <command...>
+        Usage: cmux vm run [--sync] [--pull <remote-path>] [--machine <id>] [--new] [--size <4g|8g|16g|24g|32g|64g|MB>] [--timeout <seconds>] -- <command...>
 
         Run a command on a cloud machine without naming one: reuses an idle
         machine the router itself provisioned earlier (shown as "\(vmRunPoolLabel)"
@@ -991,8 +1030,9 @@ extension CMUXCLI {
                                 current directory.
           --machine <id>        Skip routing and use this machine.
           --new                 Force a fresh pool machine.
-          --size <s>            Memory preset for a machine this run creates
-                                (4g to 24g on Pro; 32g and 64g need cmux Max).
+          --size <4g|8g|16g|24g|32g|64g|MB>
+                                Memory preset for a machine this run creates
+                                (4g to 16g on Pro; 24g, 32g, and 64g need cmux Max).
           --timeout <seconds>   Command timeout (default \(vmRunDefaultTimeoutSeconds)s, max 15 minutes).
           --wait, --output      Accepted for symmetry with `vm agent`; `vm run` always
                                 blocks on the command and prints its output.
@@ -1063,7 +1103,7 @@ extension CMUXCLI {
         var memoryMb: Int?
         if let sizeOption {
             guard let parsed = Self.parseCloudVMSize(sizeOption) else {
-                throw CLIError(message: "vm run: unknown size '\(sizeOption)'. Sizes: 4g, 8g, 16g, 24g on Pro (32g and 64g need cmux Max), or memory in MB (at least 512).")
+                throw CLIError(message: "vm run: unknown size '\(sizeOption)'. Sizes: 4g, 8g, 16g on Pro (24g, 32g, and 64g need cmux Max), or memory in MB (at least 512).")
             }
             memoryMb = parsed
         }
@@ -1387,23 +1427,67 @@ extension CMUXCLI {
         }
     }
 
+    private struct ActiveVMRunCreateIdempotency {
+        let signature: String
+        let key: String
+    }
+
+    private struct VMRunCreateIdempotencyRecord: Codable {
+        let key: String
+        var createdAt: TimeInterval
+        var ownerPID: Int32
+        var uncertain: Bool
+    }
+
+    private struct VMRunCreateIdempotencyStore: Codable {
+        var records: [String: [VMRunCreateIdempotencyRecord]] = [:]
+    }
+
+    private static let vmRunCreateIdempotencyTTLSeconds: TimeInterval = 30 * 60
+
+    /// Provisions a pool VM and retains its idempotency key across ambiguous replies.
     private func createPoolVM(memoryMb: Int?, client: SocketClient) throws -> String {
+        let idempotency = try activeVMRunCreateIdempotency(memoryMb: memoryMb)
         var params: [String: Any] = [
             // Pool machines are shell boxes; the backend maps the kind to its image.
             "kind": VMMachineKind.base.rawValue,
             // Freestyle has no persistent-volume capability; keep pool creation usable.
-            // Fresh key per run: a failed create is simply retried by the next
-            // `vm run`, and the interactive `vm new` store stays untouched.
-            "idempotency_key": UUID().uuidString,
+            // The key survives an unknown response so a retry joins the same backend
+            // create instead of charging for a second pool machine.
+            "idempotency_key": idempotency.key,
         ]
         if let memoryMb { params["memory_mb"] = memoryMb }
-        let response = try client.sendV2(
-            method: "vm.create",
-            params: params,
-            responseTimeout: Self.vmCreateResponseTimeoutSeconds
-        )
+        let response: [String: Any]
+        do {
+            response = try client.sendV2(
+                method: "vm.create",
+                params: params,
+                responseTimeout: Self.vmCreateResponseTimeoutSeconds
+            )
+        } catch {
+            // A structured response is definitive: the backend rejected this key,
+            // so retaining it would replay a permanent failure. A transport or
+            // malformed-response error is ambiguous because the create may have
+            // reached the backend; retain the key for the next invocation.
+            if let cliError = error as? CLIError,
+               cliError.vmBackendCode == "vm_create_in_progress" {
+                markVMRunCreateIdempotencyUncertain(idempotency)
+            } else if let cliError = error as? CLIError, cliError.isStructuredProtocolResponse {
+                clearVMRunCreateIdempotency(idempotency)
+            } else {
+                markVMRunCreateIdempotencyUncertain(idempotency)
+            }
+            throw error
+        }
         guard let id = response["id"] as? String, !id.isEmpty else {
-            throw CLIError(message: "vm run: create returned no machine id")
+            // The provider may have created the machine despite the missing id.
+            // Keep the key reusable even while this process is still alive.
+            markVMRunCreateIdempotencyUncertain(idempotency)
+            let message = CMUXDiffViewerLocalization.string(
+                "cli.vm.run.createMissingMachineID",
+                defaultValue: "vm run: create returned no machine id"
+            )
+            throw CLIError(message: message)
         }
         // Membership is recorded before anything else can fail: this is what
         // makes the machine eligible for reuse by later runs.
@@ -1420,6 +1504,10 @@ extension CMUXCLI {
             )
             throw CLIError(message: String(format: template, id))
         }
+        // The machine is now recoverable through the pool store. Clear the create
+        // key before cosmetic labeling/readiness work so a later invocation cannot
+        // replay a machine that is already recorded and reusable.
+        clearVMRunCreateIdempotency(idempotency)
         // The label is cosmetic (membership is already recorded), but without it
         // the machine is not recognizable as pool in `vm ls`, so say so.
         do {
@@ -1435,6 +1523,119 @@ extension CMUXCLI {
         return id
     }
 
+    private func activeVMRunCreateIdempotency(memoryMb: Int?) throws -> ActiveVMRunCreateIdempotency {
+        let url = Self.vmRunCreateIdempotencyStoreURL()
+        let lockURL = url.appendingPathExtension("lock")
+        let directory = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let lockFD = open(lockURL.path, O_CREAT | O_RDWR | O_CLOEXEC, 0o600)
+        guard lockFD >= 0 else {
+            throw CLIError(message: "vm run: could not open the create idempotency lock")
+        }
+        defer { close(lockFD) }
+        guard flock(lockFD, LOCK_EX) == 0 else {
+            throw CLIError(message: "vm run: could not lock the create idempotency store")
+        }
+        defer { _ = flock(lockFD, LOCK_UN) }
+
+        let signature = "kind=\(VMMachineKind.base.rawValue)\u{1f}memory=\(memoryMb.map(String.init) ?? "default")"
+        let now = Date().timeIntervalSince1970
+        var store = try Self.loadVMRunCreateIdempotencyStore(from: url)
+        store.records = store.records.mapValues { records in
+            records.filter { !$0.key.isEmpty && now - $0.createdAt < Self.vmRunCreateIdempotencyTTLSeconds }
+        }.filter { !$0.value.isEmpty }
+
+        if var reusable = store.records[signature]?.first(where: { $0.uncertain || !Self.processExists($0.ownerPID) }) {
+            reusable.createdAt = now
+            reusable.ownerPID = getpid()
+            reusable.uncertain = false
+            store.records[signature] = (store.records[signature] ?? []).map { record in
+                record.key == reusable.key ? reusable : record
+            }
+            try Self.saveVMRunCreateIdempotencyStore(store, to: url)
+            return ActiveVMRunCreateIdempotency(signature: signature, key: reusable.key)
+        }
+
+        let record = VMRunCreateIdempotencyRecord(
+            key: UUID().uuidString.lowercased(),
+            createdAt: now,
+            ownerPID: getpid(),
+            uncertain: false
+        )
+        store.records[signature, default: []].append(record)
+        try Self.saveVMRunCreateIdempotencyStore(store, to: url)
+        return ActiveVMRunCreateIdempotency(signature: signature, key: record.key)
+    }
+
+    private func markVMRunCreateIdempotencyUncertain(_ active: ActiveVMRunCreateIdempotency) {
+        Self.updateVMRunCreateIdempotency(active) { record in
+            record.uncertain = true
+            return true
+        }
+    }
+
+    private func clearVMRunCreateIdempotency(_ active: ActiveVMRunCreateIdempotency) {
+        Self.updateVMRunCreateIdempotency(active) { _ in false }
+    }
+
+    private static func updateVMRunCreateIdempotency(
+        _ active: ActiveVMRunCreateIdempotency,
+        _ mutate: (inout VMRunCreateIdempotencyRecord) -> Bool
+    ) {
+        let url = vmRunCreateIdempotencyStoreURL()
+        let lockURL = url.appendingPathExtension("lock")
+        let directory = url.deletingLastPathComponent()
+        guard (try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)) != nil else { return }
+        let lockFD = open(lockURL.path, O_CREAT | O_RDWR | O_CLOEXEC, 0o600)
+        guard lockFD >= 0 else { return }
+        defer { close(lockFD) }
+        guard flock(lockFD, LOCK_EX) == 0 else { return }
+        defer { _ = flock(lockFD, LOCK_UN) }
+        guard var store = try? loadVMRunCreateIdempotencyStore(from: url) else { return }
+        guard var records = store.records[active.signature],
+              let index = records.firstIndex(where: { $0.key == active.key }) else { return }
+        if !mutate(&records[index]) {
+            records.remove(at: index)
+        }
+        if records.isEmpty {
+            store.records.removeValue(forKey: active.signature)
+        } else {
+            store.records[active.signature] = records
+        }
+        try? saveVMRunCreateIdempotencyStore(store, to: url)
+    }
+
+    private static func processExists(_ pid: Int32) -> Bool {
+        guard pid > 0 else { return false }
+        return Darwin.kill(pid, 0) == 0 || errno == EPERM
+    }
+
+    private static func vmRunCreateIdempotencyStoreURL() -> URL {
+        URL(fileURLWithPath: vmRunStateHomeDirectory(), isDirectory: true)
+            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent("vm-run-create-idempotency.json", isDirectory: false)
+    }
+
+    private static func loadVMRunCreateIdempotencyStore(from url: URL) throws -> VMRunCreateIdempotencyStore {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return VMRunCreateIdempotencyStore()
+        }
+        do {
+            let data = try Data(contentsOf: url)
+            return try JSONDecoder().decode(VMRunCreateIdempotencyStore.self, from: data)
+        } catch {
+            throw CLIError(message: "vm run: could not read the create idempotency store")
+        }
+    }
+
+    private static func saveVMRunCreateIdempotencyStore(_ store: VMRunCreateIdempotencyStore, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(store)
+        try data.write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+
     /// `report` is either `"<sha256hex>  <path>"` (sha256sum) or a bare byte
     /// count (wc -c fallback).
     static func verifyTransferIntegrity(
@@ -1444,7 +1645,7 @@ extension CMUXCLI {
         subject: String
     ) throws {
         let firstToken = report.split(separator: " ").first.map(String.init) ?? ""
-        if firstToken.count == 64, firstToken.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil {
+        if firstToken.count == 64, firstToken.range(of: "^[0-9a-f]{64}\\z", options: .regularExpression) != nil {
             guard firstToken == expectedDigest else {
                 throw CLIError(message: "Digest mismatch on \(subject) — expected \(expectedDigest), machine reports \(firstToken)")
             }
@@ -1459,10 +1660,12 @@ extension CMUXCLI {
         throw CLIError(message: "Could not verify \(subject): unexpected report \"\(report)\"")
     }
 
-    private func makeLocalTarball(of directory: URL, excludes: [String]) throws -> URL {
-        let tarURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cmux-push-\(UUID().uuidString.prefix(8)).tgz")
-        var arguments = ["-czf", tarURL.path, "-C", directory.path]
+    /// Packs `directory` into `output` (in the push's private folder): tar streams to this
+    /// process, which writes the archive and stops tar as soon as it passes the transfer limit,
+    /// so an oversized tree never fills the disk. When this process dies, tar's pipe closes and
+    /// it ends too.
+    private func makeLocalTarball(of directory: URL, excludes: [String], into output: URL) throws {
+        var arguments = ["-czf", "-", "-C", directory.path]
         for pattern in excludes {
             arguments.append("--exclude")
             arguments.append(pattern)
@@ -1474,12 +1677,82 @@ extension CMUXCLI {
         // macOS tar otherwise emits AppleDouble `._*` sidecars for extended
         // attributes, which land as junk files on the Linux machine.
         tar.environment = ProcessInfo.processInfo.environment.merging(["COPYFILE_DISABLE": "1"]) { _, new in new }
+        let pipe = Pipe()
+        tar.standardOutput = pipe
+        guard FileManager.default.createFile(atPath: output.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
+            throw CLIError(message: "Could not create the vm push archive in \(output.deletingLastPathComponent().path).")
+        }
+        let sink = try FileHandle(forWritingTo: output)
+        defer { try? sink.close() }
         try cliRunProcess(tar)
+        let source = pipe.fileHandleForReading
+        var written = 0
+        var oversized = false
+        while let chunk = try source.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            written += chunk.count
+            guard written <= Self.vmTransferMaxBytes else {
+                oversized = true
+                tar.terminate()
+                break
+            }
+            try sink.write(contentsOf: chunk)
+        }
+        try? source.close()
         tar.waitUntilExit()
+        if oversized {
+            throw CLIError(message: "\(directory.path) packs to more than the vm push limit of \(Self.formatByteCount(Self.vmTransferMaxBytes)). \(Self.vmPushCloneHint)")
+        }
         guard tar.terminationStatus == 0 else {
             throw CLIError(message: "tar failed packing \(directory.path) (exit \(tar.terminationStatus))")
         }
-        return tarURL
+    }
+
+    // MARK: - push size preflight
+
+    /// The bytes `vm push` would read: the regular files under `root` that the excludes keep
+    /// (`vmPushIsExcluded`, the tar rule), or the file itself. Stops counting once past
+    /// `limit` (nil: counts everything), so a huge tree is refused after a short walk.
+    static func vmPushInputBytes(root: URL, isDirectory: Bool, excludes: [String], stoppingAbove limit: Int? = nil) -> Int {
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .fileSizeKey]
+        guard isDirectory else {
+            return (try? root.resolvingSymlinksInPath().resourceValues(forKeys: Set(keys)))?.fileSize ?? 0
+        }
+        let rootPath = root.standardizedFileURL.path
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: []) else { return 0 }
+        var total = 0
+        while let next = enumerator.nextObject() as? URL {
+            let fullPath = next.standardizedFileURL.path
+            var relative = fullPath.hasPrefix(rootPath) ? String(fullPath.dropFirst(rootPath.count)) : next.lastPathComponent
+            if relative.hasPrefix("/") { relative.removeFirst() }
+            let values = try? next.resourceValues(forKeys: Set(keys))
+            if vmPushIsExcluded(relative, excludes: excludes) {
+                if values?.isDirectory == true { enumerator.skipDescendants() }
+                continue
+            }
+            guard values?.isRegularFile == true else { continue }
+            total += values?.fileSize ?? 0
+            if let limit, total > limit { return total }
+        }
+        return total
+    }
+
+    /// Refuses a push whose input passes `vmPushLargeInputBytes` (without `--allow-large`).
+    static func vmPushCheckInputSize(_ bytes: Int, localPath: String, vmID: String) throws {
+        guard bytes > vmPushLargeInputBytes else { return }
+        let template = CMUXDiffViewerLocalization.string(
+            "cli.vm.push.tooLarge",
+            defaultValue: "%1$@ holds more than %2$@ to send (%3$@ counted after excludes). Nothing was sent to %4$@."
+        )
+        let head = String(format: template, localPath, formatByteCount(vmPushLargeInputBytes), formatByteCount(bytes), vmID)
+        throw CLIError(message: head + " " + vmPushCloneHint)
+    }
+
+    /// What to do instead of a large push.
+    static var vmPushCloneHint: String {
+        CMUXDiffViewerLocalization.string(
+            "cli.vm.push.cloneHint",
+            defaultValue: "Clone the repo on the machine instead (cmux vm exec <id> -- git clone --depth 1 --branch <branch> <url> work/<name>), push a smaller folder or add --exclude, or pass --allow-large to send it anyway."
+        )
     }
 
     static func formatByteCount(_ bytes: Int) -> String {
@@ -1495,7 +1768,7 @@ extension CMUXCLI {
 extension CMUXCLI {
     static var vmRouteUsage: String {
         """
-        Usage: cmux vm route [--cwd <dir>] [--new] [--provision] [--size <8g>] [--json]
+        Usage: cmux vm route [--cwd <dir>] [--new] [--provision] [--size <4g|8g|16g|24g|32g|64g|MB>] [--json]
 
         Print the machine `cmux vm run` / `cmux vm agent` would use for work in a
         directory, and why — without running anything. The policy is the router's
@@ -1508,8 +1781,9 @@ extension CMUXCLI {
           --cwd <dir>    Route for this directory (default: the current one).
           --new          Ignore the pool and report a fresh machine.
           --provision    Actually create the machine when routing would.
-          --size <s>     Memory preset for a machine --provision creates
-                         (4g to 24g on Pro; 32g and 64g need cmux Max).
+          --size <4g|8g|16g|24g|32g|64g|MB>
+                         Memory preset for a machine --provision creates
+                         (4g to 16g on Pro; 24g, 32g, and 64g need cmux Max).
           --json         {machine, created, reason, would_provision, directory}
         """
     }
@@ -1518,7 +1792,7 @@ extension CMUXCLI {
 
     static var vmAgentUsage: String {
         """
-        Usage: cmux vm agent --agent <claude|codex|opencode|pi> [--machine <id>] [--sync] [--cwd <dir>] [--name <name>] [--no-open] [--remote-workspace <ws>] [--wait [--output] [--timeout <seconds>]] [--new] [--size <s>] [--json] -- <prompt or args...>
+        Usage: cmux vm agent --agent <claude|codex|opencode|pi> [--machine <id>] [--sync] [--cwd <dir>] [--name <name>] [--no-open] [--focus|--no-focus] [--remote-workspace <ws>] [--wait] [--output] [--timeout <seconds>] [--new] [--size <4g|8g|16g|24g|32g|64g|MB>] [--json] -- <prompt or args...>
 
         Short forms:
           cmux agent <claude|codex|opencode|pi> [vm-agent-options] -- <prompt or args...>
@@ -1542,6 +1816,9 @@ extension CMUXCLI {
           --cwd <dir>      Local directory to route for (and sync with --sync).
           --name <name>    Terminal name in the tree (default: "<agent>: <prompt…>").
           --no-open        Do not open a pane in this app; just start it.
+          --focus, --no-focus
+                           Focus the opened pane, or open it in the background.
+                           \(openFocusDefaultHelp)
           --remote-workspace <ws>
                            Land the agent's terminal in this machine workspace
                            (a `ws_…` id from `vm tree`, e.g. one staged with
@@ -1549,13 +1826,15 @@ extension CMUXCLI {
           --wait           Block until the agent's process exits and pass its exit
                            code through (`exited code=<n>`; 1 for a signal). Ctrl-C
                            stops waiting only — the agent keeps running detached.
-          --output         With --wait: print the agent's whole terminal output on
-                           stdout when it ends (the launch lines move to stderr).
-          --timeout <s>    With --wait: give up waiting after this many seconds
-                           (exit 1, the agent is not stopped). Default: no limit.
+          --output         Wait for the agent to exit and print its whole terminal
+                           output on stdout (the launch lines move to stderr).
+          --timeout <s>    Requires --wait or --output. Give up waiting after this
+                           many seconds (exit 1; the agent is not stopped).
+                           Default: no limit.
           --new            Force a fresh pool machine.
-          --size <s>       Memory preset for a machine this call creates
-                           (4g to 24g on Pro; 32g and 64g need cmux Max).
+          --size <4g|8g|16g|24g|32g|64g|MB>
+                           Memory preset for a machine this call creates
+                           (4g to 16g on Pro; 24g, 32g, and 64g need cmux Max).
 
         Examples:
           cmux vm agent --agent claude --sync -- "run the test suite and fix failures"
@@ -1658,7 +1937,7 @@ extension CMUXCLI {
         var memoryMb: Int?
         if let sizeOption {
             guard let parsed = Self.parseCloudVMSize(sizeOption) else {
-                throw CLIError(message: "vm route: unknown size '\(sizeOption)'. Sizes: 4g, 8g, 16g, 24g on Pro (32g and 64g need cmux Max), or memory in MB (at least 512).")
+                throw CLIError(message: "vm route: unknown size '\(sizeOption)'. Sizes: 4g, 8g, 16g on Pro (24g, 32g, and 64g need cmux Max), or memory in MB (at least 512).")
             }
             memoryMb = parsed
         }
@@ -1711,6 +1990,7 @@ extension CMUXCLI {
         var cwdOption: String?
         var nameOption: String?
         var noOpen = false
+        var focus: Bool?
         var remoteWorkspaceOption: String?
         var forceNew = false
         var sizeOption: String?
@@ -1726,6 +2006,11 @@ extension CMUXCLI {
                 }
                 index += 1
                 return flags[index]
+            }
+            if let flag = try Self.openFocusFlag(in: flags, at: index, command: "vm agent") {
+                focus = flag.focus
+                index += flag.consumed
+                continue
             }
             switch arg {
             case "--agent": agent = try takeValue().lowercased()
@@ -1757,7 +2042,7 @@ extension CMUXCLI {
         var memoryMb: Int?
         if let sizeOption {
             guard let parsed = Self.parseCloudVMSize(sizeOption) else {
-                throw CLIError(message: "vm agent: unknown size '\(sizeOption)'. Sizes: 4g, 8g, 16g, 24g on Pro (32g and 64g need cmux Max), or memory in MB (at least 512).")
+                throw CLIError(message: "vm agent: unknown size '\(sizeOption)'. Sizes: 4g, 8g, 16g on Pro (24g, 32g, and 64g need cmux Max), or memory in MB (at least 512).")
             }
             memoryMb = parsed
         }
@@ -1814,6 +2099,7 @@ extension CMUXCLI {
             "command": vmAgentShellCommand(argv: argv, workDirectory: syncedRemoteDir),
             "name": name,
             "open": !noOpen,
+            "focus": focus ?? Self.defaultFocusForUserOpen(),
         ]
         // --remote-workspace: land the agent's terminal in a staged machine
         // workspace (from `vm workspace new --no-open` or `vm tree`), so it joins
@@ -1821,7 +2107,21 @@ extension CMUXCLI {
         if let remoteWorkspaceOption, !remoteWorkspaceOption.isEmpty {
             params["remote_workspace_id"] = remoteWorkspaceOption
         }
-        let response = try client.sendV2(method: "surface.new_terminal", params: params, responseTimeout: 240)
+        // The pane opens in the caller's own workspace when run inside cmux, not in
+        // whichever workspace happens to be selected. The server rejects an unknown
+        // workspace before it creates anything, so a stale CMUX_WORKSPACE_ID (the tab
+        // moved or its workspace closed) retries once in the selected workspace.
+        var callerParams = params
+        if !noOpen,
+           let callerWorkspace = try? normalizeWorkspaceHandle(ProcessInfo.processInfo.environment["CMUX_WORKSPACE_ID"], client: client) {
+            callerParams["workspace_id"] = callerWorkspace
+        }
+        let response: [String: Any]
+        do {
+            response = try client.sendV2(method: "surface.new_terminal", params: callerParams, responseTimeout: 240)
+        } catch let error as CLIError where error.v2Code == "invalid_params" && callerParams["workspace_id"] != nil {
+            response = try client.sendV2(method: "surface.new_terminal", params: params, responseTimeout: 240)
+        }
         let terminalId = (response["terminal_id"] as? String) ?? "?"
         let workspaceId = (response["remote_workspace_id"] as? String) ?? "?"
         let surfaceId = (response["surface_id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
@@ -1980,5 +2280,99 @@ extension CMUXCLI {
         let code = (outcome["code"] as? Int) ?? 1
         if code == 0 { return 0 }
         return Int32((1...255).contains(code) ? code : 1)
+    }
+}
+
+
+/// Removes a push's local temp files when a signal ends the CLI mid-transfer (Ctrl-C, a
+/// stop's SIGTERM, a hang-up), where `defer` never runs. The paths are C strings allocated
+/// before the handlers go in, so the handler only calls `unlink`, `rmdir`, `signal`, `raise`
+/// and the handler it replaced (all async-signal-safe): a handler that was there before
+/// (`vm push --watch` ends with `_exit(0)` on Ctrl-C) still runs after the cleanup, else the
+/// signal's default action ends the process with its usual status. An ignored signal stays
+/// ignored. `uninstall()` restores the previous handlers and frees the paths. One push runs
+/// at a time per process.
+struct VMPushSignalCleanup {
+    typealias Handler = @convention(c) (Int32) -> Void
+
+    static let signals: [Int32] = [SIGINT, SIGTERM, SIGHUP]
+    nonisolated(unsafe) static var paths: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+    nonisolated(unsafe) static var fileCount: Int = 0
+    nonisolated(unsafe) static var directory: UnsafeMutablePointer<CChar>?
+    nonisolated(unsafe) static var chainedINT: Handler?
+    nonisolated(unsafe) static var chainedTERM: Handler?
+    nonisolated(unsafe) static var chainedHUP: Handler?
+
+    private var previous: [Int32: sigaction] = [:]
+
+    /// The handler a previous `sigaction` held, nil for SIG_DFL (0) and SIG_IGN (1).
+    private static func installedHandler(_ action: sigaction) -> Handler? {
+        guard let handler = action.__sigaction_u.__sa_handler, unsafeBitCast(handler, to: Int.self) > 1 else { return nil }
+        return handler
+    }
+
+    private static func isIgnored(_ action: sigaction) -> Bool {
+        guard let handler = action.__sigaction_u.__sa_handler else { return false }
+        return unsafeBitCast(handler, to: Int.self) == 1
+    }
+
+    static func install(directory: URL, files: [String]) -> VMPushSignalCleanup {
+        let list = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: max(1, files.count))
+        for (index, name) in files.enumerated() { list[index] = strdup(directory.appendingPathComponent(name).path) }
+        paths = list
+        fileCount = files.count
+        Self.directory = strdup(directory.path)
+        var cleanup = VMPushSignalCleanup()
+        for sig in signals {
+            var old = sigaction()
+            guard sigaction(sig, nil, &old) == 0, !isIgnored(old) else { continue }
+            switch sig {
+            case SIGINT: chainedINT = installedHandler(old)
+            case SIGTERM: chainedTERM = installedHandler(old)
+            default: chainedHUP = installedHandler(old)
+            }
+            var action = sigaction()
+            action.__sigaction_u.__sa_handler = { sig in
+                if let list = VMPushSignalCleanup.paths {
+                    for index in 0..<VMPushSignalCleanup.fileCount { if let path = list[index] { unlink(path) } }
+                }
+                if let dir = VMPushSignalCleanup.directory { rmdir(dir) }
+                let chained: Handler?
+                switch sig {
+                case SIGINT: chained = VMPushSignalCleanup.chainedINT
+                case SIGTERM: chained = VMPushSignalCleanup.chainedTERM
+                default: chained = VMPushSignalCleanup.chainedHUP
+                }
+                if let chained {
+                    chained(sig)
+                    return
+                }
+                signal(sig, SIG_DFL)
+                raise(sig)
+            }
+            sigemptyset(&action.sa_mask)
+            action.sa_flags = 0
+            if sigaction(sig, &action, nil) == 0 { cleanup.previous[sig] = old }
+        }
+        return cleanup
+    }
+
+    func uninstall() {
+        for (sig, old) in previous {
+            var restored = old
+            sigaction(sig, &restored, nil)
+        }
+        let list = Self.paths, count = Self.fileCount, dir = Self.directory
+        Self.paths = nil
+        Self.fileCount = 0
+        Self.directory = nil
+        Self.chainedINT = nil
+        Self.chainedTERM = nil
+        Self.chainedHUP = nil
+        if let list {
+            for index in 0..<count { free(list[index]) }
+            list.deallocate()
+        }
+        free(dir)
     }
 }
