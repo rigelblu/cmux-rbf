@@ -2584,6 +2584,7 @@ struct SidebarGroupHeaderBadgeColorTests {
             name: "Group",
             iconSymbol: "folder",
             tintHex: nil,
+            customColorHex: nil, // cmux-rbf (#cm-142.1): the fork's required field; these headers carry no colour
             isCollapsed: false,
             isPinned: false,
             isAnchorActive: false,

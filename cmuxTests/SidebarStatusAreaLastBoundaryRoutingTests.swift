@@ -112,7 +112,7 @@ struct SidebarStatusAreaLastBoundaryRoutingTests {
             qa = manager.addWorkspace(autoWelcomeIfNeeded: false)
             statusMember = manager.addWorkspace(autoWelcomeIfNeeded: false)
             p = try #require(manager.createWorkspaceGroup(name: "P"))
-            q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [qa.id]))
+            q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [qa.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             state = SidebarState(statusGroups: .init(areaCollapsed: area == .collapsedArea,
                 collapsedStatusIds: area == .foldedGroups ? ["parked", "not-listed"] : ["not-listed"], order: ["parked", "not-listed"], last: true))
             let session = drag.beginDragging(tabId: source.id); token = session.id

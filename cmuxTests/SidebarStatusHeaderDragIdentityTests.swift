@@ -86,7 +86,9 @@ struct SidebarStatusHeaderDragIdentityTests {
             defer { restoreStatusList() }
             let pinUUID = SidebarStatusHeaderIdentity.pinnedAreaUUID
             let sidebar = VerticalTabsSidebar(
-                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: CmuxFeatureFlags(),
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(),
+                sessionIndexStore: SessionIndexStore(), // cmux-rbf (#cm-142.1): upstream's new parameter, as its own tests pass it
+                featureFlags: CmuxFeatureFlags(),
                 sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
                 windowId: UUID(), onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
                 observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,
@@ -103,7 +105,9 @@ struct SidebarStatusHeaderDragIdentityTests {
             defer { restoreStatusList() }
             let windowId = UUID()
             let sidebar = VerticalTabsSidebar(
-                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: CmuxFeatureFlags(),
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(),
+                sessionIndexStore: SessionIndexStore(), // cmux-rbf (#cm-142.1): upstream's new parameter, as its own tests pass it
+                featureFlags: CmuxFeatureFlags(),
                 sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
                 windowId: windowId, onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
                 observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,
@@ -132,7 +136,9 @@ struct SidebarStatusHeaderDragIdentityTests {
             defer { UserDefaults.standard.set(prev, forKey: key) }
 
             let sidebar = VerticalTabsSidebar(
-                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: CmuxFeatureFlags(),
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(),
+                sessionIndexStore: SessionIndexStore(), // cmux-rbf (#cm-142.1): upstream's new parameter, as its own tests pass it
+                featureFlags: CmuxFeatureFlags(),
                 sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
                 windowId: UUID(), onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
                 observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,

@@ -40,10 +40,18 @@ struct ClaudeStopFailureHookTests {
         let settings = try #require(try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
         let hooks = try #require(settings["hooks"] as? [String: [[String: Any]]])
         let groups = try #require(hooks["StopFailure"], "no StopFailure hook in \(hooks.keys.sorted())")
-        #expect(groups.count == 1)
-        #expect((groups.first?["matcher"] as? String) == "")
-        let commands = (groups.first?["hooks"] as? [[String: Any]])?.compactMap { $0["command"] as? String } ?? []
-        #expect(commands.contains { $0.contains("hooks enqueue claude stop-failure") }, "commands \(commands)")
+        // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1): upstream's agent-messages inbox-wait (#15279) is a second,
+        // separate group. Exactly one group runs stop-failure, with the empty matcher; the only other group is the
+        // inbox-wait, so no group routes StopFailure to upstream's `stop`.
+        let commandsOf = { (group: [String: Any]) -> [String] in
+            (group["hooks"] as? [[String: Any]])?.compactMap { $0["command"] as? String } ?? []
+        }
+        let stopFailureGroups = groups.filter { commandsOf($0).contains { $0.contains("hooks enqueue claude stop-failure") } }
+        let inboxWaitGroups = groups.filter { commandsOf($0).contains { $0.contains("hooks claude inbox-wait") } }
+        #expect(stopFailureGroups.count == 1, "groups \(groups)")
+        #expect((stopFailureGroups.first?["matcher"] as? String) == "")
+        #expect(inboxWaitGroups.count == 1, "groups \(groups)")
+        #expect(groups.count == 2, "only stop-failure and inbox-wait may run on StopFailure: \(groups)")
     }
 
     @Test(arguments: documentedErrorTypes)

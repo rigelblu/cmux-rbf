@@ -7,8 +7,77 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 # 🔵⋯ [Unreleased]
 
 ## 🟠⋯ Added for End Users
+- 2026-11-20 - feat | see my agent's Agent Pane under the name I give that agent in `cmux.json`, and keep it there when I write back (#cm-126.15). Set `"agentPane": {"names": {"claude": "wg-still Outie", "*": "Agent Outie"}}`: each key is an agent, `*` covers every other agent, and the caption changes on the next save of the file. Each pane saves its agent, so the name holds when the agent exits, after Clear Agent State and through a restart. A name from Rename Tab still wins; with no name for its agent the pane reads "Agent Pane". "You wrote <time>" no longer appears on the caption
 - 2026-11-19 - feat | see how many workspaces sit in each status on its sidebar header, like `Next (5)`, folded or open (#cm-145). Nested workspace groups count; a status with no workspaces shows its name alone; a long name truncates before the number
 - 2026-10-24 - feat | watch a frame's motion play in my Figma pane's preview, not only see the still frame (#cm-73.32)
+
+# 🔵⋯ v<version> (<date>) — #cm-142.1, #cm-142.2, #cm-142.3
+
+*Run upstream cmux's `main` as of 2026-11-22, two months of upstream fixes past v0.64.25, with every fork feature kept; and go back to the app you had before an install with one command.*
+
+## 🟠⋯ Changed for End Users
+- 2026-11-23 - feat | get upstream's fixes and features since September in my everyday cmux, without losing a fork feature (#cm-142.1). The fork now carries upstream `main` at `3167a90f59ad` (2026-11-22), 7,129 upstream commits past `v0.64.25` (2026-09-17), which it replaces. That is past upstream's newest release, `v0.65.2.2` (2026-10-27), and holds every fix that release had. **About now reports `0.65.2 (111)`**, upstream's version at that commit; before the sync it reported `0.64.25 (106)`
+- What you will notice from upstream:
+  - **Autosave no longer freezes cmux while one terminal is wedged.** The session snapshot reads a terminal's close confirmation without waiting on its renderer lock (`ea5a166672`, `#14784`; `Sources/Workspace.swift:767`, `Sources/DockSplitStore+SessionSnapshot.swift:361`). This answers `#cm-130`, which planned to port that fix
+  - **An Accent Color setting**, one accent across cmux's chrome (`bee385d0ca`, `#14988`). The fork's sidebar rows follow it
+  - **Memory Saver frees a hidden browser pane under a memory budget, and the page keeps its state when it comes back** (`e96920bdaa`, `#15154`). A hidden Figma pane is kept, as before
+  - **Automatic workspace reordering has a third choice.** `app.reorderOnNotification` now takes `off`, `notifications` or `agentActivity`, which also moves a workspace when a prompt is sent or an agent finishes a turn, needs input or fails (`94a6387e8a`, `#15216`). The default is `notifications`, the old `true`, and a `true` or `false` in your `cmux.json` keeps its meaning, so nothing moves differently until you pick `agentActivity`
+  - **A Claude pane stays idle when one of its helpers runs a tool after the turn ends,** instead of showing running again (`063a134cfc`, `#20262`). cmux no longer counts that tool call as new work for the idle reminder either (#cm-128.1)
+  - **Claude's own completion notification sends no banner.** The turn's Stop sends the one Finished banner (`#10233`)
+  - **Claude launched through cmux skips a Node check of cmux's hook settings** (`5bf1b45c11`, `#14872`). The wrapper's copy of the settings now matches the fork's (#cm-128.1, #cm-128.3, #cm-128.5, #cm-124.6)
+  - **Renaming a cmux Cloud terminal's tab shows the new name once the machine accepts it,** as upstream has it, not before. The fork's last sync had dropped upstream's path for this by mistake; it is back (#cm-97, #cm-142.1)
+- Fork behaviour that moved to fit upstream:
+  - **Making a group from chosen workspaces makes the first one you chose the group's own workspace**, behind the group's name; no new workspace is made for it (`3e3edb72bf`, `#15892`). A group made inside a group is still made in place, nested (#cm-106)
+  - **Move Up and Move Down on a pinned group's header now move it where you asked.** Before, a pinned group holding only its own workspace went last, so Move Up could send it down: a side effect of the fork's crash fix (#cm-113). Upstream fixed the same crash at its cause (`c895b03af7`, `#13688`), and the fork takes it
+  - **An idle signal ends a running agent turn only while that agent watches background work.** Otherwise the turn shows running until the agent's next hook, as upstream now keeps it (`ea6e02be16`, `#15887`)
+  - **A workspace group header's unread count takes upstream's Notification Badge color.** Status group headers keep the accent they drew before
+  - **The status glyph follows your Accent Color everywhere**, since upstream's Accent Color reaches every accent mark
+  - **Compact sidebar rows show unread as upstream's blue glyph, not a count badge.** Your marked-unread dot still shows there
+  - **A pane watching a background job now shows in upstream's new places too:** the sidebar's shared-status ranking, compact mode's status glyph and Chief's first-run agent list. In compact mode a Claude pane watching background work shows the same pulsing gray dot as a working pane, tooltip `Claude Code: Running`, where it showed no agent glyph; the full row keeps the fork's waveform (#cm-128.3). Chief also reads a pane stopped on an error as needing you
+  - **A Claude pane whose background work ends while it is idle now settles,** through upstream's drain (`#26358`), which the fork widened to its own watching state (#cm-128.3)
+- Kept as the fork had it, so you don't read it as a regression:
+  - A Claude session that stops with background work still shows **Running** with the bolt, not upstream's new "background work pending" Waiting (#cm-128.3, #cm-128.6)
+  - After a cmux restart, a running pane keeps showing running until its next hook. Upstream resets it to unknown when the session id comes back (`f915364730`, `#18970`); the fork keeps the state, because Claude keeps running in herdr through the restart (#cm-128.3, #cm-136.9)
+  - A finished Claude turn you left unread gets one reminder, cmux's own, 60 s after it finishes. Upstream now also posts Claude's own "waiting for your input" prompt for it (`43de24d51f`, `#20547`); the fork drops that prompt whenever the turn's banner was delivered (#cm-128.4)
+- Upstream changes not taken, because a fork Decision won:
+  - the Workspace Color Indicator (Left Rail, Solid Fill), Subtle Selection Highlight, and the selection drawing that serves them (#cm-10, #cm-22)
+  - **Brighten Colors in Dark Mode, unselected fill opacity and the Increase Contrast wash keep their rows in Settings, but don't change rows the fork's palette paints** (#cm-22). Whether to wire them in is yours to decide
+  - `⌘⇧Y` for New Cloud Machine: Reply keeps it (#cm-78.1, #cm-97)
+  - Claude's StopFailure mapped onto `stop` (`0f2d3d3a4d`, `#15232`): the fork's own `stop-failure` route stays (#cm-128.5)
+  - the workspace name in front of Claude's banner title (`7b54936314`, `#16869`): banners keep `Claude Code · <kind>` with the folder as subtitle (#cm-128.4)
+  - upstream's notification-type cases and idle-reminder overrides in the CLI: the fork's notification-type table decides (#cm-124.5, #cm-128.5)
+  - a 750 ms deadline on the quit-time scan, which would save without restart context (#cm-137.2)
+  - minimal mode's always-shown tab bar: the fork's adaptive pane header (#cm-3)
+  - the "Jump to Latest Unread" label: the fork's "Jump to Oldest Unread" (#cm-128.11)
+  - upstream's rebuilt colour submenus, group header band colours and status glyph colour: the fork's shared colour menu, band palette and floored glyph colour (#cm-97, #cm-49, #cm-109.7)
+  - the agent spinner flag: agent activity is always shown (#cm-128.3)
+  - `combinePrecedence` and the visible agent counts, which the fork removed (#cm-128.6)
+  - build settings: `SWIFT_ENABLE_BATCH_MODE = NO` (#cm-123), the `vendor/bonsplit` path (Bonsplit lives in `Packages/macOS/Bonsplit`), `reload.sh`'s personal-profile sign-in gate for a tagged launch (#cm-97), and its bundle id on the Release line (#cm-123)
+  - upstream's text about CI, its build fleet and release artifacts in `CLAUDE.md` and the skills: no CI runs here (`rbf/AGENTS.md`)
+  - the full list, one row per change, is the sync's resolution ledger, kept with `#cm-142`'s evidence
+- 2026-11-23 - feat | go back to the app and state I had before an install, with one command (#cm-142.2). `RBF_KEEP_PREVIOUS=1 make install-dogfood` keeps the app it replaces and everything it owned under its bundle id but its caches, and `bash rbf/scripts/restore-rbf-install.sh "<kept folder>"`, run from Terminal with the app quit, puts them back
+
+## 🟠⋯ Changed for Developers
+- 2026-11-23 - chore | keep upstream's workflows from starting in my fork, and check it with one command (#cm-142.3). `python3 rbf/scripts/disarm-workflows.py .github/workflows` leaves only manual triggers, and `python3 rbf/scripts/audit-workflows.py .github/workflows` counts what is left: on the merge, 226 workflow files, 0 with an automatic trigger, 0 with a schedule
+- `make test` runs `cmux-unit`, then `cmux-cli-tests`, the second scheme upstream added for its CLI tests; `make test-packages` runs every package in `rbf/scripts/lib/rbf-package-tests.sh`'s list, now with the packages upstream moved 35 app test files into, the ones the sync notes said to run by hand, and `CMUXAgentLaunch`; a package with a known red runs with that test skipped, by name, never left out (#cm-142.1)
+- `make build` and `make run` set `CMUX_DEV_BACKEND_MODE=local` and use upstream's published cmux-tui client for the upstream commit last merged, since upstream's `reload.sh` needs both and this fork has neither on its own (#cm-142.1). `rbf/AGENTS.md`, Landmines 6 and 7
+- Upstream dropped XcodeProj and PathKit (`fcad43f225`, `#13111`), so the fork's XcodeProj cap in `Packages/macOS/CMUXProjectModel/Package.swift` retired with it (#cm-142.1)
+- ghostty is merged with the pin's ghostty `ef4f1570d621`, keeping the fork's IO-thread fix (#cm-120.2), on branch `cm-142-ghostty`; the submodule pointer moves when that branch is pushed to `rigelblu/ghostty-rbf` at landing (#cm-142.1)
+- Upstream tests changed on purpose, and the rulings the next sync must keep: `rbf/AGENTS.md`, "The cm-142 sync"
+- Claude's hook settings now live in three copies that must match byte for byte: the CLI's builder, the Claude wrapper's literal and the wrapper test's generator. After any change to them, run `tests/test_claude_wrapper_generated_settings_fast_path.py` with `CMUX_CLI_BIN` set; `make test` doesn't. `rbf/AGENTS.md`, "Claude's hooks" (#cm-142.1)
+- `CLAUDE.md` now carries upstream's rule that an independent review subagent passes a PR's head before merge (`CLAUDE.md:79`), where the earlier text said second-model review is opt-in. Kept, because the fork prunes only CI claims from `CLAUDE.md`; it changes what an agent does before every merge (#cm-142.1)
+
+## 🟠⋯ Known Issues
+- **Test comparison pending:** the merge's `make test` and `make test-packages` runs, read against the pre-sync tree and the upstream pin, are not in yet. This entry claims no test result (#cm-142.1)
+- **Human verification pending:** nothing above has been checked by hand in the merged app yet (#cm-142.1)
+- The fork's right-click link on a terminal ignores upstream's new embedder link filter, so a link the filter hides on hover still opens from the context menu. Left as the fork had it; yours to decide (#cm-142.1)
+- **ghostty's own test suite is unmeasured on the merge.** Before it, `zig build test` failed 4 tests that fail on the fork's ghostty base as well, and upstream's `subprocess stop kills a distinct foreground process group` kills the shell that runs it. On 2026-11-23 WindowServer was killed by its watchdog while the suite ran, ending your session; nothing proves the suite caused it, and it is no longer run on your Mac. Run it elsewhere, or accept it unmeasured (#cm-142.1)
+- `make test`'s test host reads your real `~/.config/cmux/cmux.json` and `~/.config/ghostty/config`, so some upstream tests likely fail here and pass on upstream's CI. Clean-config reruns are pending (#cm-142.1)
+- Custom sidebars (beta) draw nested workspace groups flat: their group data carries no parent. An old gap from #cm-106, not opened by this sync
+- Whether `make install-rbf`'s Release build needs a cmux-tui client is unmeasured until the dogfood build runs: the installer builds through its own `xcodebuild` and calls neither of `make build`'s two new helpers (#cm-142.1)
+- Upstream holds both `examples/` and `Examples/`, which collide on a case-insensitive disk; the merge keeps one `Examples/` folder. Nothing reading the lowercase path has been checked yet (#cm-142.1)
+- A Figma page held behind the one on show forgets a form posted inside one of its frames: when it is shown again, the pane doesn't know the page had a form submission, so reopening it may not warn before posting again. A follow-up slice carries the flag with the held page (#cm-73.3, #cm-142.1)
+- An automatic title on a terminal that projects a cmux Cloud resource follows the fork's older rule, which applies it where upstream now refuses. No caller reaches that path today; recorded for a follow-up (#cm-142.1)
 
 # 🔵⋯ v0.34.2 (2026-10-29) — #cm-110.13
 

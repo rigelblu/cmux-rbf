@@ -20,8 +20,9 @@ struct ClaudeRestoreSettingsPathTests {
             arguments: ["/opt/homebrew/bin/claude", "--settings", livePath, "--settings=\(livePath)", "--model", "opus"],
             readable: [livePath]
         ))
+        // cmux-rbf: changed on purpose (#cm-30, #cm-142.1): Claude restores its own model and effort on --resume
         #expect(invocation.arguments == [
-            "claude", "--resume", sessionID, "--settings", livePath, "--settings=\(livePath)", "--model", "opus"
+            "claude", "--resume", sessionID, "--settings", livePath, "--settings=\(livePath)"
         ])
     }
 
@@ -32,7 +33,8 @@ struct ClaudeRestoreSettingsPathTests {
             arguments: ["/opt/homebrew/bin/claude", "--settings", deadPath, "--settings=\(deadPath)", "--model", "opus"],
             readable: []
         ))
-        #expect(invocation.arguments == ["claude", "--resume", sessionID, "--model", "opus"])
+        // cmux-rbf: changed on purpose (#cm-30, #cm-142.1): Claude restores its own model and effort on --resume
+        #expect(invocation.arguments == ["claude", "--resume", sessionID])
     }
 
     @Test("Only the dead path is dropped when a readable one is captured alongside it")
@@ -63,8 +65,9 @@ struct ClaudeRestoreSettingsPathTests {
             arguments: ["/opt/homebrew/bin/claude", "--settings", "", "--settings=", "--model", "opus"],
             readable: []
         ))
+        // cmux-rbf: changed on purpose (#cm-30, #cm-142.1): Claude restores its own model and effort on --resume
         #expect(invocation.arguments == [
-            "claude", "--resume", sessionID, "--settings", "", "--settings=", "--model", "opus"
+            "claude", "--resume", sessionID, "--settings", "", "--settings="
         ])
     }
 

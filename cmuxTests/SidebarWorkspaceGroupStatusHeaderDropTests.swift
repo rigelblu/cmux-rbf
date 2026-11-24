@@ -18,9 +18,9 @@ struct SidebarWorkspaceGroupStatusHeaderDropTests {
     private func fixture(sourceAfter: Bool = false) throws -> (F, UUID) {
         let f = try F(scene: .f2b, role: .colorOnlyOwn)
         f.projectsWorkspaceGroups = true
-        let group = try #require(f.manager.createWorkspaceGroup(name: "Dragged", childWorkspaceIds: [f.w("u").id]))
+        let group = try #require(f.manager.createWorkspaceGroupWithOwnAnchor(name: "Dragged", childWorkspaceIds: [f.w("u").id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let anchor = try #require(f.manager.workspaceGroupAnchor(for: group))
-        let parent = try #require(f.manager.createWorkspaceGroup(name: "Nested source parent", childWorkspaceIds: [f.w("color").id]))
+        let parent = try #require(f.manager.createWorkspaceGroupWithOwnAnchor(name: "Nested source parent", childWorkspaceIds: [f.w("color").id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         _ = f.manager.moveWorkspaceGroup(groupId: f.q, intoParent: parent)
         let parentAnchor = try #require(f.manager.workspaceGroupAnchor(for: parent))
         let p = try #require(f.manager.workspaceGroups.firstIndex { $0.id == f.p })

@@ -6,6 +6,7 @@ import AppKit
 /// surface that intrudes across a divider centerline would hide the divider
 /// the split view draws underneath. The overlay redraws only those segments,
 /// in each split view's own divider color, and never takes hit tests.
+// cmux-rbf #cm-73.2a
 final class SplitDividerOverlayView: NSView {
     private struct DividerSegment {
         let rect: NSRect
@@ -53,38 +54,40 @@ final class SplitDividerOverlayView: NSView {
         guard !view.isHidden else { return }
 
         if let splitView = view as? NSSplitView {
-            let dividerCount = max(0, splitView.arrangedSubviews.count - 1)
-            let dividerColor = overlayDividerColor(for: splitView)
-            for dividerIndex in 0..<dividerCount {
-                let first = splitView.arrangedSubviews[dividerIndex].frame
-                let thickness = max(splitView.dividerThickness, 1)
-                let dividerRectInSplit: NSRect
-                if splitView.isVertical {
-                    dividerRectInSplit = NSRect(
-                        x: first.maxX,
-                        y: 0,
-                        width: thickness,
-                        height: splitView.bounds.height
-                    )
-                } else {
-                    dividerRectInSplit = NSRect(
-                        x: 0,
-                        y: first.maxY,
-                        width: splitView.bounds.width,
-                        height: thickness
-                    )
-                }
-
-                let dividerRectInWindow = splitView.convert(dividerRectInSplit, to: nil)
-                let dividerRectInOverlay = convert(dividerRectInWindow, from: nil)
-                if dividerRectInOverlay.intersects(bounds) {
-                    result.append(
-                        DividerSegment(
-                            rect: dividerRectInOverlay,
-                            color: dividerColor,
-                            isVertical: splitView.isVertical
+            // cmux-rbf #cm-73.2a
+            if let dividerColor = Self.overlayDividerColor(for: splitView) {
+                let dividerCount = max(0, splitView.arrangedSubviews.count - 1)
+                for dividerIndex in 0..<dividerCount {
+                    let first = splitView.arrangedSubviews[dividerIndex].frame
+                    let thickness = max(splitView.dividerThickness, 1)
+                    let dividerRectInSplit: NSRect
+                    if splitView.isVertical {
+                        dividerRectInSplit = NSRect(
+                            x: first.maxX,
+                            y: 0,
+                            width: thickness,
+                            height: splitView.bounds.height
                         )
-                    )
+                    } else {
+                        dividerRectInSplit = NSRect(
+                            x: 0,
+                            y: first.maxY,
+                            width: splitView.bounds.width,
+                            height: thickness
+                        )
+                    }
+
+                    let dividerRectInWindow = splitView.convert(dividerRectInSplit, to: nil)
+                    let dividerRectInOverlay = convert(dividerRectInWindow, from: nil)
+                    if dividerRectInOverlay.intersects(bounds) {
+                        result.append(
+                            DividerSegment(
+                                rect: dividerRectInOverlay,
+                                color: dividerColor,
+                                isVertical: splitView.isVertical
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -153,9 +156,11 @@ final class SplitDividerOverlayView: NSView {
         needsDisplay = true
     }
 
-    private func overlayDividerColor(for splitView: NSSplitView) -> NSColor {
+    // cmux-rbf #cm-73.2a
+    static func overlayDividerColor(for splitView: NSSplitView) -> NSColor? {
         let divider = splitView.dividerColor.usingColorSpace(.deviceRGB) ?? splitView.dividerColor
         let alpha = divider.alphaComponent
+        guard alpha > 0.001 else { return nil }
         guard alpha < 0.999 else { return divider }
 
         guard let bgColor = splitView.layer?.backgroundColor.flatMap(NSColor.init(cgColor:)),

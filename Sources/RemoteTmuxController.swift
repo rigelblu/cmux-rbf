@@ -1245,13 +1245,14 @@ final class RemoteTmuxController {
     /// Installs a fully constructed mirror without launching SSH. Test-only
     /// seam for exercising app actions against the real session-mirror route.
     func installSessionMirrorForTesting(_ mirror: RemoteTmuxSessionMirror) {
-        sessionMirrors[Self.connectionKey(host: mirror.host, sessionName: mirror.sessionName)] = mirror
+        // cmux-rbf (#cm-142.1): through upstream's one insert path, so membership and the generation follow.
+        insertSessionMirror(mirror, forKey: Self.connectionKey(host: mirror.host, sessionName: mirror.sessionName))
     }
 
     func removeSessionMirrorForTesting(_ mirror: RemoteTmuxSessionMirror) {
         let key = Self.connectionKey(host: mirror.host, sessionName: mirror.sessionName)
         if sessionMirrors[key] === mirror {
-            sessionMirrors.removeValue(forKey: key)
+            removeSessionMirror(forKey: key) // cmux-rbf (#cm-142.1): upstream's one remove path
         }
     }
 #endif

@@ -933,6 +933,16 @@ import WebKit
             return
         }
 
+        // cmux-rbf (#cm-73.3, #cm-142.1): upstream's #14502 below allows a main-frame action only in the panel's web view
+        // on show and cancels it in any other. The Figma pane's held page is this panel's too, and its Reload and repair
+        // (#cm-73.40) load cmux's page in it. Decide it as before #14502: no probe, because the probe's policy belongs to
+        // the web view on show, and no restoration note, in any frame, because the pane's one restoration state
+        // describes the page on show: a form posted in a held page's frame must not mark it.
+        if let owner, owner.webView !== webView, owner.holdsRetainedFigmaPage(webView) {
+            decisionHandler(.allow)
+            return
+        }
+
         if navigationAction.targetFrame?.isMainFrame == true,
            let url = navigationAction.request.url,
            let owner {

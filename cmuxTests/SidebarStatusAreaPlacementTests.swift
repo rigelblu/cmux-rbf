@@ -287,8 +287,8 @@ struct SidebarStatusAreaPlacementTests {
             let m1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let m2 = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let l1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
-            let g1 = try #require(manager.createWorkspaceGroup(name: "G1", childWorkspaceIds: [m1.id]))
-            let g2 = try #require(manager.createWorkspaceGroup(name: "G2", childWorkspaceIds: [m2.id]))
+            let g1 = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G1", childWorkspaceIds: [m1.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+            let g2 = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G2", childWorkspaceIds: [m2.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             let anchor1 = try #require(manager.workspaceGroupAnchor(for: g1)), anchor2 = try #require(manager.workspaceGroupAnchor(for: g2))
             manager.tabs = [home, anchor1, m1, anchor2, m2, l1]
             let state = SidebarState(statusGroups: .init(last: false, aboveRow: "group:\(g1.uuidString)", belowRow: "group:\(g2.uuidString)"))
@@ -330,7 +330,7 @@ struct SidebarStatusAreaPlacementTests {
             let home = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let m1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
             let l1 = manager.addWorkspace(autoWelcomeIfNeeded: false)
-            let g1 = try #require(manager.createWorkspaceGroup(name: "G1", childWorkspaceIds: [m1.id]))
+            let g1 = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G1", childWorkspaceIds: [m1.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             let anchor1 = try #require(manager.workspaceGroupAnchor(for: g1))
             manager.tabs = [home, anchor1, m1, l1]
             let state = SidebarState(statusGroups: .init(last: false, aboveRow: "group:\(g1.uuidString)", belowRow: key(l1.id)))

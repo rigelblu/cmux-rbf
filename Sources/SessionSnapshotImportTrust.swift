@@ -295,6 +295,10 @@ enum SessionSnapshotImportTrust {
         // would bypass the history filter above.
         sanitized.interactionState = nil
         sanitized.keepsPageActive = nil
+        // cmux-rbf (#cm-142.1): the fork's Keep Page Loaded (#cm-74.1) grants an imported page more than its
+        // descriptive state, as `keepsPageActive` does. Its Figma pages, Agent Pane kind and agent describe the
+        // panel, and `ownerTerminalSurfaceId` is a surface id like the panel's own ids, which pass through here.
+        sanitized.keepLoaded = false
         sanitized.transparentBackground = nil
         sanitized.developerToolsVisible = false
         let changed = sanitized.urlString != browser.urlString
@@ -307,6 +311,7 @@ enum SessionSnapshotImportTrust {
             || browser.diffViewerRequestPath != nil
             || browser.interactionState != nil
             || browser.keepsPageActive != nil
+            || browser.keepLoaded // cmux-rbf (#cm-142.1)
             || browser.transparentBackground != nil
             || browser.developerToolsVisible
         return (sanitized, changed)

@@ -23,7 +23,7 @@ struct SidebarCloudWorkspaceBadgeTests {
         workspace.updateCloudPanelDirectory(panelId: panelID, directory: nil)
 
         let settings = SidebarTabItemSettingsSnapshot(defaults: Self.makeDefaults())
-        let factory = SidebarWorkspaceSnapshotFactory(workspace: workspace, settings: settings, showsAgentActivity: false)
+        let factory = SidebarWorkspaceSnapshotFactory(workspace: workspace, settings: settings, showsAgentActivity: false, todoControlsEnabled: false)
         let loading = factory.makeSnapshot()
         #expect(loading.cloudWorkspaceLabel == nil)
         #expect(loading.compactDirectoryCandidates.isEmpty)
@@ -54,7 +54,7 @@ struct SidebarCloudWorkspaceBadgeTests {
         )
         workspace.updateCloudPanelDirectory(panelId: panelID, directory: "/Users/remote/project")
         let snapshot = SidebarWorkspaceSnapshotFactory(workspace: workspace,
-            settings: SidebarTabItemSettingsSnapshot(defaults: defaults), showsAgentActivity: false).makeSnapshot()
+            settings: SidebarTabItemSettingsSnapshot(defaults: defaults), showsAgentActivity: false, todoControlsEnabled: false).makeSnapshot()
         let candidates = snapshot.compactDirectoryCandidates + snapshot.branchDirectoryLines.flatMap(\.directoryCandidates)
         #expect(!candidates.isEmpty)
         #expect(candidates.contains { $0.contains("Studio Mac") && $0.contains("/Users/remote/project") })
@@ -67,7 +67,7 @@ struct SidebarCloudWorkspaceBadgeTests {
         let workspace = Workspace(title: "Project", initialSurface: .cloudVMLoading)
         let panelID = try #require(workspace.focusedPanelId)
         let machine = SurfaceMachineID.device(SurfaceDeviceInstanceID(deviceID: UUID().uuidString, tag: "default"))
-        let factory = SidebarWorkspaceSnapshotFactory(workspace: workspace, settings: SidebarTabItemSettingsSnapshot(defaults: Self.makeDefaults()), showsAgentActivity: false)
+        let factory = SidebarWorkspaceSnapshotFactory(workspace: workspace, settings: SidebarTabItemSettingsSnapshot(defaults: Self.makeDefaults()), showsAgentActivity: false, todoControlsEnabled: false)
         workspace.cloudBindingState.updateCatalogMetadata(
             resources: [panelID: SurfaceResourceID(machine: machine, kind: .terminal, key: "terminal")],
             machineNames: [machine.rawValue: "Studio Mac"]
@@ -99,7 +99,7 @@ struct SidebarCloudWorkspaceBadgeTests {
         let snapshot = SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: SidebarTabItemSettingsSnapshot(defaults: Self.makeDefaults()),
-            showsAgentActivity: false
+            showsAgentActivity: false, todoControlsEnabled: false
         ).makeSnapshot()
 
         #expect(snapshot.remoteWorkspaceBadgeSymbol == "desktopcomputer")
@@ -161,7 +161,7 @@ struct SidebarCloudWorkspaceBadgeTests {
             defaults.set(hideAll || !hidden, forKey: sidebar.showBranchDirectory.userDefaultsKey)
             let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
             let snapshot = SidebarWorkspaceSnapshotFactory(
-                workspace: workspace, settings: settings, showsAgentActivity: false
+                workspace: workspace, settings: settings, showsAgentActivity: false, todoControlsEnabled: false
             ).makeSnapshot()
             let directories = snapshot.compactDirectoryCandidates + snapshot.branchDirectoryLines.flatMap(\.directoryCandidates)
             #expect(directories.isEmpty == hidden)
@@ -196,7 +196,7 @@ struct SidebarCloudWorkspaceBadgeTests {
         workspace.cloudVMBinding = WorkspaceCloudVMBinding(vmID: "vivid-newt", isBase: true)
         workspace.updateCloudPanelDirectory(panelId: try #require(workspace.focusedPanelId), directory: "/home/cmux")
         let factory = SidebarWorkspaceSnapshotFactory(
-            workspace: workspace, settings: defaultSettings, showsAgentActivity: false
+            workspace: workspace, settings: defaultSettings, showsAgentActivity: false, todoControlsEnabled: false
         )
         let snapshot = factory.makeSnapshot()
         let shown = SidebarAppKitRowCellTests.configuredCell(

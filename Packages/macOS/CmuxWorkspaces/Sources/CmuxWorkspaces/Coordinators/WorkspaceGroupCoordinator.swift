@@ -127,6 +127,8 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
            selectAnchor,
            let anchor = model.tabs.first(where: { $0.id == anchorId }) {
             host.selectWorkspace(anchor)
+            // The anchor is selected only now, after the nested placement, so a folded parent opens here (#cm-106).
+            if model.parentGroupIdIfNested(of: group.id) != nil { model.expandWorkspaceGroupForSelectionIfNeeded() } // (#cm-106)
         }
         placeNewWorkspaceGroupAtCreationPosition(
             groupId: group.id,
@@ -702,6 +704,9 @@ public final class WorkspaceGroupCoordinator<Tab: WorkspaceTabRepresenting> {
         childWorkspaceIds: [UUID],
         originalTabOrder: [UUID]
     ) {
+        // A group made inside a group was put in place by `nestedPlaceNewWorkspaceGroup`; the flat normalize below would
+        // re-sort the nested run now that the anchor is one of the children (#cm-106).
+        if model.parentGroupIdIfNested(of: groupId) != nil { return } // (#cm-106)
         let childIdSet = Set(childWorkspaceIds)
         let orderedChildIds = originalTabOrder.filter {
             childIdSet.contains($0) && $0 != anchorId

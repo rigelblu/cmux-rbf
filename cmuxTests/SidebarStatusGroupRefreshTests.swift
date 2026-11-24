@@ -70,7 +70,9 @@ struct SidebarStatusGroupRefreshTests {
                 MobileWorkspaceListObserver.subscriberPresenceOverrideForTesting = previousMobilePresence
             }
             let root = VerticalTabsSidebar(
-                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: flags,
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(),
+                sessionIndexStore: SessionIndexStore(), // cmux-rbf (#cm-142.1): upstream's new parameter, as its own tests pass it
+                featureFlags: flags,
                 sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
                 windowId: windowId, onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
                 observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,

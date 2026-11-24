@@ -102,7 +102,8 @@ struct ClaudeStopHookPendingWorkTests {
         try fixture.run(["hooks", "claude", "stop"], event: "Stop", extra: ["last_assistant_message": "Done"])
     }
 
-    @Test(arguments: [("prompt-submit", "UserPromptSubmit"), ("pre-tool-use", "PreToolUse")])
+    // cmux-rbf: changed on purpose (#cm-128.1, #cm-142.1): a PreToolUse after a settled Stop is a Claude helper (upstream #20262), not activity
+    @Test(arguments: [("prompt-submit", "UserPromptSubmit")])
     func activitySinceLastStopMakesIdleReminderPending(activity: (String, String)) throws {
         let fixture = try Fixture()
         try stoppedSession(fixture)
@@ -119,6 +120,46 @@ struct ClaudeStopHookPendingWorkTests {
         let idle = AgentJournalEvent(sequence: 2, committedAtMs: 2, draft: try #require(events.first))
         #expect(reconciler.apply(idle).disposition == .delayed)
         #expect(reconciler.lifecycleEvent(idle).draft.declaredPhase == .unknown)
+    }
+
+    /// cmux-rbf: changed on purpose (#cm-128.1, #cm-142.1): a PreToolUse after a settled Stop is a Claude helper (upstream #20262), not
+    /// activity. Upstream's fence returns before the store, so the Stop's "nothing pending" answer stays as it was, and the idle
+    /// reminder that follows is a settled observation, not a delayed one.
+    @Test func preToolUseAfterASettledStopLeavesTheStopsAnswer() throws {
+        let fixture = try Fixture()
+        try stoppedSession(fixture)
+        try fixture.run(["hooks", "claude", "pre-tool-use"], event: "PreToolUse",
+            extra: ["tool_input": ["command": "sleep 60", "run_in_background": true]])
+        let record = try fixture.support.readClaudeHookSession("session", context: fixture.context)
+        #expect(record["turnSettled"] as? Bool == true)
+        #expect(record["hadPendingBackgroundWorkAtStop"] as? Bool == false)
+        let events = try idleEvents(fixture)
+        #expect(events.allSatisfy { !$0.pendingWork })
+        var reconciler = AgentNotificationReconciler()
+        let reset = AgentJournalEventDraft(kind: .stateChanged, occurredAtMs: events.first?.occurredAtMs ?? 0,
+            source: "claude", agentKey: "claude_code", sessionId: "session",
+            workspaceId: fixture.context.workspaceId, surfaceId: fixture.context.surfaceId,
+            nativeEvent: "PaneInput", declaredPhase: .unknown)
+        _ = reconciler.apply(AgentJournalEvent(sequence: 1, committedAtMs: 1, draft: reset))
+        let idle = AgentJournalEvent(sequence: 2, committedAtMs: 2, draft: try #require(events.first))
+        #expect(reconciler.apply(idle).disposition == .observation)
+        #expect(reconciler.lifecycleEvent(idle).draft.declaredPhase == .idle)
+    }
+
+    /// cmux-rbf (#cm-128.1, #cm-142.1): a tool call before the turn settles is still activity. A started session answers
+    /// "nothing pending" (false); its first PreToolUse, with no Stop yet, passes upstream's #20262 fence and makes that
+    /// answer stale (nil), so the next idle reminder is pending.
+    @Test func preToolUseBeforeTheTurnSettlesMakesIdleReminderPending() throws {
+        let fixture = try Fixture()
+        try fixture.run(["hooks", "claude", "session-start"], event: "SessionStart")
+        let started = try fixture.support.readClaudeHookSession("session", context: fixture.context)
+        #expect(started["hadPendingBackgroundWorkAtStop"] as? Bool == false)
+        #expect(started["turnSettled"] as? Bool != true)
+        try fixture.run(["hooks", "claude", "pre-tool-use"], event: "PreToolUse",
+            extra: ["tool_input": ["command": "sleep 60", "run_in_background": true]])
+        let record = try fixture.support.readClaudeHookSession("session", context: fixture.context)
+        #expect(record["hadPendingBackgroundWorkAtStop"] == nil)
+        #expect(try idleEvents(fixture).allSatisfy { $0.pendingWork })
     }
 
     /// cm-128.1: a fresh session waiting at its first prompt has nothing pending, so its first `idle_prompt` is a

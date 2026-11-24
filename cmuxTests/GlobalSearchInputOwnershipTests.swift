@@ -520,6 +520,7 @@ private final class GlobalSearchPaletteRequestRecorder {
         installedController = appDelegate.menuBarExtraController
         let controller = MenuBarExtraController(
             notificationStore: TerminalNotificationStore.shared,
+            restartSummaryStore: appDelegate.restartCommandSummaryStore, // cmux-rbf: changed on purpose (#cm-54, #cm-142.1): the fork's required store
             caffeineController: appDelegate.caffeineController,
             onShowGlobalSearch: { [weak self] _, _ in self?.count += 1 },
             onShowMainWindow: {},

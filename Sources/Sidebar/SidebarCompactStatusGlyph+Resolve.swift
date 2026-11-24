@@ -66,7 +66,8 @@ extension SidebarCompactStatusGlyph {
             kind = .subagents
         } else if everyAgentIsWaiting {
             kind = .waiting
-        } else if input.hasActiveAgent || input.lifecycleStates.contains(.running) || input.lifecycleStates.contains(.backgroundWorkPending) {
+        } else if input.hasActiveAgent || input.lifecycleStates.contains(.running) || input.lifecycleStates.contains(.backgroundWorkPending)
+                    || input.lifecycleStates.contains(.monitoring) { // cmux-rbf (#cm-142.1): the fork's backgroundWorkPending (cm-128.3)
             kind = .running
         } else if input.lifecycleStates.contains(.unknown) {
             kind = .pending
@@ -121,7 +122,7 @@ extension SidebarCompactStatusGlyph {
         if states.contains(.running) {
             return String(localized: "agent.generic.status.running", defaultValue: "Running")
         }
-        if states.contains(.backgroundWorkPending) {
+        if states.contains(.backgroundWorkPending) || states.contains(.monitoring) { // cmux-rbf (#cm-142.1)
             return String(localized: "agent.generic.notification.subtitle.waiting", defaultValue: "Waiting")
         }
         if states.contains(.needsInput) {

@@ -946,6 +946,11 @@ html { scroll-behavior: smooth; }
   // nodes, which are inserted directly so nothing is re-parsed live.
   var markdownSanitizerProfile = CmuxMarkdownSanitizer.markdownProfile({
     extraAttributes: { div: ['data-vega-mode'] },
+    // cmux-rbf (#cm-15): keep ymd.js's heading colour (`ymd-head-<colour>`) and
+    // highlight (`ymd-highlight`, `ymd-highlight-<colour>`) classes; the shared
+    // markdown allowlist would strip them. The rest is the shared pattern.
+    // cmux-rbf (#cm-69.1, #cm-142.1): and the Reply panel's reasoning disclosure, which the find and the annotation skip.
+    classToken: /^(?:hljs(?:-[\w-]+)?|[a-z][a-z0-9]*_|language-[\w+#.-]+|cmux-(?:mermaid|vega|source|frontmatter|reply-thinking)|ymd-[a-z][a-z0-9-]*)$/,
     inlineSVGAsImage: true,
     url: function(ctx) {
       var value = String(ctx.value == null ? '' : ctx.value);

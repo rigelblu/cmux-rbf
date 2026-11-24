@@ -244,8 +244,7 @@ enum SettingsSearchIndex {
         setting(.keyboardShortcuts, "pane-resize-step", String(localized: "settings.shortcuts.paneResizeStep", defaultValue: "Pane Resize Step"), "resize pane split step pixels keyboard repeat"),
         setting(.keyboardShortcuts, "reset-defaults", String(localized: "settings.shortcuts.resetDefaults", defaultValue: "Reset Default Shortcuts"), "restore built in builtin defaults keybindings hotkeys chords commands"),
         setting(.keyboardShortcuts, "shortcuts", String(localized: "settings.section.keyboardShortcuts", defaultValue: "Keyboard Shortcuts"), "keybindings commands"),
-        setting(.workspaceColors, "indicator", String(localized: "settings.workspaceColors.indicator", defaultValue: "Workspace Color Indicator"), "tab color indicator"),
-        setting(.workspaceColors, "subtle-selection", String(localized: "settings.workspaceColors.subtleSelection", defaultValue: "Subtle Selection Highlight"), "calm selected workspace tint"),
+        // cmux-rbf (#cm-142.1): no entry for upstream's Workspace Color Indicator or Subtle Selection Highlight rows; the fork removed both (#cm-10, #cm-22). Reject a re-add on upstream sync.
         setting(.workspaceColors, "brighten-dark-mode", String(localized: "settings.workspaceColors.brightenInDarkMode", defaultValue: "Brighten Colors in Dark Mode"), "lighten dark mode workspace color fill"),
         setting(.workspaceColors, "unselected-fill-opacity", String(localized: "settings.workspaceColors.unselectedFillOpacity", defaultValue: "Unselected Fill Opacity"), "workspace color fill opacity unselected rows"),
         setting(.workspaceColors, "selection", String(localized: "settings.workspaceColors.selectionColor", defaultValue: "Selection Highlight"), "selected workspace background"),
@@ -376,7 +375,6 @@ enum SettingsSearchIndex {
         "terminal.rendererRealization.idleSeconds": settingID(for: .terminal, idSuffix: "renderer-realization"),
         "terminal.rendererRealization.maxWarmRenderers": settingID(for: .terminal, idSuffix: "renderer-realization"),
         "workspaceColors.selectionColor": settingID(for: .workspaceColors, idSuffix: "selection"),
-        "workspaceColors.subtleSelection": settingID(for: .workspaceColors, idSuffix: "subtle-selection"),
         "workspaceColors.brightenInDarkMode": settingID(for: .workspaceColors, idSuffix: "brighten-dark-mode"),
         "workspaceColors.unselectedFillOpacity": settingID(for: .workspaceColors, idSuffix: "unselected-fill-opacity"),
         "workspaceColors.notificationBadgeColor": settingID(for: .workspaceColors, idSuffix: "badge"),

@@ -39,7 +39,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             context: context,
             agent: "pi",
             subcommand: "notification",
-            standardInput: #"{"session_id":"\#(sessionId)","turn_id":"pi-turn-1","cwd":"\#(context.root.path)","hook_event_name":"questionAsked","event":"questionAsked","message":"Which option should I take?"}"#,
+            // cmux-rbf: changed on purpose (#cm-124.2, #cm-142.1): a declared ask needs a string request_id, or it is dropped.
+            standardInput: #"{"session_id":"\#(sessionId)","turn_id":"pi-turn-1","cwd":"\#(context.root.path)","hook_event_name":"questionAsked","event":"questionAsked","request_id":"pi-question-1","message":"Which option should I take?"}"#,
             extraEnvironment: launchEnvironment
         )
         XCTAssertEqual(question.status, 0, question.stderr)

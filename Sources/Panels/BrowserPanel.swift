@@ -2179,6 +2179,8 @@ final class BrowserPanel: Panel, ObservableObject {
     private var discardedFigmaPageAddress: URL?
     var figmaPageWrapper = FigmaPaneURL.previewPageURL // cmux-rbf #cm-73.40: cmux's page loaded from its own bytes at the https address, not the legacy file
     var retainedFigmaPageAddress: URL? { retainedFigmaPage?.address ?? discardedFigmaPageAddress }
+    /// cmux-rbf (#cm-73.3, #cm-142.1): whether `candidate` is the Figma page held behind the one on show, this pane's too.
+    func holdsRetainedFigmaPage(_ candidate: WKWebView) -> Bool { retainedFigmaPage?.webView === candidate }
     // cmux-rbf (#cm-73.32): Play state for this panel (reset to still on every exchange), and whether a goto --play is waiting for load. Reject a revert of this hunk on upstream sync.
     // cmux-rbf (#cm-73.37): the served page owns motion; native surfaces mirror its reports.
     var figmaMotionState: FigmaMotionState = .still

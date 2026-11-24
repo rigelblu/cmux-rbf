@@ -28,7 +28,8 @@ struct TabContextMenuSnapshot {
             stateProvider: { state },
             moveDestinationsProvider: moveDestinationsProvider,
             forkConversationAvailabilityProvider: forkConversationAvailabilityProvider,
-            forkConversationAvailabilityRefreshHandler: forkConversationAvailabilityRefreshHandler
+            forkConversationAvailabilityRefreshHandler: forkConversationAvailabilityRefreshHandler,
+            sendToBackAvailabilityProvider: sendToBackAvailabilityProvider // (cm-128.13)
         )
     }
 
@@ -37,7 +38,8 @@ struct TabContextMenuSnapshot {
         stateProvider: @escaping () -> TabContextMenuState,
         moveDestinationsProvider: @escaping () -> [TabContextMoveDestination],
         forkConversationAvailabilityProvider: @escaping () -> TabContextForkConversationAvailability,
-        forkConversationAvailabilityRefreshHandler: @escaping @MainActor () async -> Void = {}
+        forkConversationAvailabilityRefreshHandler: @escaping @MainActor () async -> Void = {},
+        sendToBackAvailabilityProvider: @escaping () -> Bool // (cm-128.13) required here too: upstream's lazy-state init (#cm-142.1)
     ) {
         self.tabId = tabId
         self.stateProvider = stateProvider
@@ -54,7 +56,8 @@ struct TabContextMenuSnapshot {
             state: state,
             moveDestinationsProvider: moveDestinationsProvider,
             forkConversationAvailabilityProvider: forkConversationAvailabilityProvider,
-            forkConversationAvailabilityRefreshHandler: forkConversationAvailabilityRefreshHandler
+            forkConversationAvailabilityRefreshHandler: forkConversationAvailabilityRefreshHandler,
+            sendToBackAvailabilityProvider: sendToBackAvailabilityProvider // (cm-128.13)
         )
     }
 }

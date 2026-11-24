@@ -1686,6 +1686,8 @@ if [[ "$RBF_STABLE_SIGNING_ENABLED" == "1" ]]; then
 fi
 if [[ "$BUILD_CONFIGURATION" == Release ]]; then
   XCODEBUILD_ARGS+=(CODE_SIGN_ENTITLEMENTS=)
+  # cmux-rbf (#cm-123): the omission is Debug-only; a Release build must never carry upstream's com.cmuxterm.app
+  XCODEBUILD_ARGS+=(PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID")
 fi
 if [[ "$PROD_AUTH" -eq 1 ]]; then
   XCODEBUILD_ARGS+=(-xcconfig "$SCRIPT_DIR/../config/IrohRelayPolicyProduction.xcconfig")

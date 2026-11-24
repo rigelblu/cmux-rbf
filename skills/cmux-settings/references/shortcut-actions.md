@@ -14,6 +14,9 @@ Values for `shortcuts.bindings.<action>`:
 
 - `shortcuts.bindings.closeWindow`
 - `shortcuts.bindings.globalSearch`
+- `shortcuts.bindings.globalZoomIn`
+- `shortcuts.bindings.globalZoomOut`
+- `shortcuts.bindings.globalZoomReset`
 - `shortcuts.bindings.newWindow`
 - `shortcuts.bindings.openFolder`
 - `shortcuts.bindings.openSettings`
@@ -147,6 +150,7 @@ Values for `shortcuts.bindings.<action>`:
 - `shortcuts.bindings.focusRightSidebar`
 - `shortcuts.bindings.focusRightSidebarInReply`
 - `shortcuts.bindings.focusSidebar`
+- `shortcuts.bindings.insertReplyLabelByNumber`
 - `shortcuts.bindings.showWindowHints`
 - `shortcuts.bindings.nextSidebarTab`
 - `shortcuts.bindings.nextSidebarTabInGroup`
@@ -177,6 +181,16 @@ Values for `shortcuts.bindings.<action>`:
 - `shortcuts.bindings.toggleBrowserDesignMode`
 - `shortcuts.bindings.toggleBrowserDeveloperTools`
 - `shortcuts.bindings.toggleBrowserFocusMode`
+
+## Figma and Design Focus
+
+<!-- cmux-rbf (#cm-142.1): the fork's Figma pane and Design Focus actions (#cm-73), listed so this file equals the schema's enum. -->
+
+- `shortcuts.bindings.flipDesignFocusLayout`
+- `shortcuts.bindings.showFigmaStill`
+- `shortcuts.bindings.switchFigmaPreviewAndEditor`
+- `shortcuts.bindings.toggleDesignFocus`
+- `shortcuts.bindings.toggleFigmaMotion`
 
 ## Find
 

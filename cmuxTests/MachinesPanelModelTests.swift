@@ -192,11 +192,11 @@ final class MachinesPanelModelTests: XCTestCase {
         )
         XCTAssertEqual(
             RightSidebarMode.availableModes(feedEnabled: false, machinesEnabled: true),
-            [.files, .find, .sessions, .dock, .machines, .reply]
+            [.files, .find, .sessions, .dock, .machines, .reply] // cmux-rbf: changed on purpose (#cm-142.1): the fork's Reply mode (#cm-69) is always available
         )
         XCTAssertEqual(
             RightSidebarMode.availableModes(feedEnabled: false, machinesEnabled: false),
-            [.files, .find, .sessions, .dock, .reply]
+            [.files, .find, .sessions, .dock, .reply] // cmux-rbf: changed on purpose (#cm-142.1): the fork's Reply mode (#cm-69) is always available
         )
     }
 

@@ -199,7 +199,8 @@ public struct AgentLifecycleReducer: Sendable {
     ) -> (phase: AgentLifecyclePhase, ended: Bool)? {
         switch draft.kind {
         case .sessionStarted:
-            return (.unknown, false)
+            // cmux-rbf: a start the reconciler carried a live phase through declares it. (#cm-128.3, #cm-142.1)
+            return (draft.declaredPhase ?? .unknown, false)
         case .turnStarted:
             // A new turn is active even when the session still reports work
             // from an earlier watcher or background task. Pending work only

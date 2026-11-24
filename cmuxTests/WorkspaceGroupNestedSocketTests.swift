@@ -23,10 +23,10 @@ struct WorkspaceGroupNestedSocketTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<4 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let b = try #require(manager.createWorkspaceGroup(name: "B", childWorkspaceIds: [ids[1]]))
-        let a = try #require(manager.createWorkspaceGroup(name: "A", childWorkspaceIds: [ids[2]]))
-        let a1 = try #require(manager.createWorkspaceGroup(name: "A1", childWorkspaceIds: [ids[3]]))
-        let c = try #require(manager.createWorkspaceGroup(name: "C", childWorkspaceIds: [ids[4]]))
+        let b = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "B", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let a = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "A", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let a1 = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "A1", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let c = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "C", childWorkspaceIds: [ids[4]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         return (manager, b, a, a1, c)
     }
 
@@ -153,7 +153,7 @@ struct WorkspaceGroupNestedSocketTests {
         let ids = manager.tabs.map(\.id)
         // P holds only Q (its own workspace is closed); Q holds a workspace; E is a pinned header that holds nothing.
         let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: []))
-        let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[1]]))
+        let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: q, intoParent: p) == .moved)
         manager.closeWorkspace(try #require(manager.workspaceGroupAnchor(for: p)))
         let e = try #require(manager.createWorkspaceGroup(name: "E", childWorkspaceIds: []))
@@ -179,9 +179,9 @@ struct WorkspaceGroupNestedSocketTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let q = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
-        let r = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ids[3]]))
+        let p = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let q = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let r = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: q, intoParent: p) == .moved)
         #expect(manager.moveWorkspaceGroup(groupId: r, intoParent: q) == .moved)
         #expect(manager.workspaces.hasNestedWorkspaceGroup)

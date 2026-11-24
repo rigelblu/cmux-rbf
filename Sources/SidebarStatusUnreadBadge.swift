@@ -8,6 +8,8 @@ struct SidebarStatusUnreadBadge: View {
     let fontScale: CGFloat
     let globalFontMagnificationPercent: Int
     var markColor: Color? = nil
+    /// The count capsule's fill: the Notification Badge color where the caller resolves it, else the accent (cm-142.1).
+    var fillColor: Color? = nil
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.sidebarContrastBackgroundHex) private var sidebarContrastBackgroundHex
@@ -40,7 +42,7 @@ struct SidebarStatusUnreadBadge: View {
             .foregroundStyle(.white)
             .padding(.horizontal, metrics.unreadHorizontalPadding)
             .padding(.vertical, metrics.unreadVerticalPadding)
-            .background(Capsule().fill(Color.accentColor))
+            .background(Capsule().fill(fillColor ?? Color.accentColor))
             .accessibilityLabel(Text(String.localizedStringWithFormat(
                 String(localized: "workspaceGroup.unread.a11y", defaultValue: "%lld unread"), count
             )))

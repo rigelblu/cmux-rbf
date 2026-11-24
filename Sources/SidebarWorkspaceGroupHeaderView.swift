@@ -119,8 +119,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
     var groupStatusMenu: SidebarWorkspaceGroupStatusMenu? = nil // (#cm-110.2)
     /// Notification Badge color setting; nil falls back to the cmux accent.
     let notificationBadgeColorHex: String?
-    /// Shared group-header actions used by both the lazy SwiftUI row and the
-    /// retained AppKit table cell.
+    /// Shared actions for SwiftUI and AppKit group headers.
     let actions: SidebarGroupHeaderRowActions
     let onContextMenuAppear: () -> Void
     let onContextMenuDisappear: () -> Void
@@ -333,7 +332,9 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                 } else if anchorUnreadCount > 0 || anchorMarkedUnread, !compactsAgentStatus {
                     SidebarStatusUnreadBadge(count: anchorUnreadCount, markedUnread: anchorMarkedUnread,
                         fontScale: fontScale, globalFontMagnificationPercent: globalFontMagnificationPercent,
-                        markColor: Color(nsColor: bandPalette.unreadMarkColor(isActive: isAnchorActive, colorScheme: colorScheme, sidebarStandIn: sidebarContrastBackgroundHex.flatMap { NSColor(hex: $0) })))
+                        markColor: Color(nsColor: bandPalette.unreadMarkColor(isActive: isAnchorActive, colorScheme: colorScheme, sidebarStandIn: sidebarContrastBackgroundHex.flatMap { NSColor(hex: $0) })),
+                        fillColor: Color(nsColor: cmuxNotificationBadgeNSColor(hex: notificationBadgeColorHex,
+                            fallback: accentColor.nsColor(for: colorScheme)))) // cmux-rbf (#cm-142.1): upstream's Notification Badge color, as the AppKit header draws it
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

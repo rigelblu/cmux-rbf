@@ -529,9 +529,9 @@ struct WorkspaceGroupTests {
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let originalIds = manager.tabs.map(\.id)
 
-        let firstPinnedId = try #require(manager.createWorkspaceGroup(name: "Pinned A", childWorkspaceIds: [originalIds[1]]))
+        let firstPinnedId = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Pinned A", childWorkspaceIds: [originalIds[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.toggleWorkspaceGroupPinned(groupId: firstPinnedId)
-        let secondPinnedId = try #require(manager.createWorkspaceGroup(name: "Pinned B", childWorkspaceIds: [originalIds[2]]))
+        let secondPinnedId = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Pinned B", childWorkspaceIds: [originalIds[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.toggleWorkspaceGroupPinned(groupId: secondPinnedId)
 
         let newGroupId = try #require(manager.createWorkspaceGroup(name: "Unpinned", childWorkspaceIds: [originalIds[1]]))

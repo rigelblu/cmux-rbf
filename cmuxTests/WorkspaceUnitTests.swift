@@ -8800,37 +8800,23 @@ final class ExtensionWorktreePrototypeTests: XCTestCase {
     }
 }
 
-/// cmux-rbf (#cm-74.1): Keep Page Loaded survives a session save and restore, and a snapshot written before the key
-/// existed decodes as not kept. This sat in `BrowserHiddenWebViewDiscardMemoryPressureTests` until upstream moved that
-/// file into CmuxBrowser, where the app's `SessionBrowserPanelSnapshot` isn't visible.
-final class BrowserKeepLoadedSessionSnapshotTests: XCTestCase {
-    func testSessionBrowserPanelSnapshotKeepLoadedPersistenceRoundTrip() throws {
-        let original = SessionBrowserPanelSnapshot(
-            urlString: "https://example.com",
-            profileID: UUID(),
-            shouldRenderWebView: true,
-            pageZoom: 1.0,
-            developerToolsVisible: false,
-            isMuted: false,
-            keepLoaded: true,
-            backHistoryURLStrings: nil,
-            forwardHistoryURLStrings: nil
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(SessionBrowserPanelSnapshot.self, from: data)
-        XCTAssertTrue(decoded.keepLoaded)
+// cmux-rbf (#cm-142.1): the refined `.monitoring` ruling in upstream-new phase code. The fork's `.monitoring` is
+// upstream's `.backgroundWorkPending` as Claude reaches it (cm-128.3), so it takes that state's arm.
+@MainActor
+final class MonitoringPhaseInUpstreamSwitchesTests: XCTestCase {
+    // The sidebar's shared status entry: `.monitoring` ranks with `.backgroundWorkPending`, below running.
+    func testSidebarStatusUrgencyRanksMonitoringWithBackgroundWorkPending() {
+        XCTAssertEqual(Workspace.sidebarStatusUrgencyRank(.monitoring), Workspace.sidebarStatusUrgencyRank(.backgroundWorkPending))
+        XCTAssertLessThan(Workspace.sidebarStatusUrgencyRank(.monitoring), Workspace.sidebarStatusUrgencyRank(.running))
+    }
 
-        let jsonWithoutKey = Data("""
-        {
-            "urlString": "https://example.com",
-            "shouldRenderWebView": true,
-            "pageZoom": 1.0,
-            "developerToolsVisible": false
-        }
-        """.utf8)
-        let decodedWithoutKey = try decoder.decode(SessionBrowserPanelSnapshot.self, from: jsonWithoutKey)
-        XCTAssertFalse(decodedWithoutKey.keepLoaded)
+    // Chief's glance reads a watching agent as working, as it reads backgroundWorkPending.
+    func testChiefGlanceReadsMonitoringAsWorking() {
+        XCTAssertEqual(ChiefAgentGlance.status(lifecycles: [UUID(): ["claude_code": .monitoring]], unread: false), .working)
+    }
+
+    // cmux-rbf (#cm-142.1, cm-128.5): a pane stopped on an error reads as needs-you in Chief's glance, as its own doc says.
+    func testChiefGlanceReadsErrorAsNeedsYou() {
+        XCTAssertEqual(ChiefAgentGlance.status(lifecycles: [UUID(): ["claude_code": .error]], unread: false), .needsYou)
     }
 }

@@ -8,6 +8,10 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
     case feed
     case dock
     case machines
+    // cmux-rbf `#cm-69`: Reply sorts after upstream's modes, so it stays the
+    // last tab (as before the v0.64.25 sync) and upstream's tab order and
+    // ctrl+1…6 digits are unchanged. Reject this hunk on upstream sync.
+    case reply
     case customSidebar = "custom-sidebar"
 
     var label: String {
@@ -17,6 +21,7 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return String(localized: "rightSidebar.mode.sessions", defaultValue: "Vault")
         case .feed: return String(localized: "rightSidebar.mode.feed", defaultValue: "Feed")
         case .dock: return String(localized: "rightSidebar.mode.dock", defaultValue: "Dock")
+        case .reply: return String(localized: "rightSidebar.mode.reply", defaultValue: "Reply")
         case .machines: return String(localized: "rightSidebar.mode.machines", defaultValue: "Cloud")
         case .customSidebar: return String(localized: "rightSidebar.mode.customSidebar", defaultValue: "Custom")
         }
@@ -30,6 +35,7 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return "books.vertical"
         case .feed: return "dot.radiowaves.left.and.right"
         case .dock: return "dock.rectangle"
+        case .reply: return "arrowshape.turn.up.left"
         case .machines: return "cloud"
         case .customSidebar: return "wand.and.stars"
         }
@@ -42,6 +48,7 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return .switchRightSidebarToSessions
         case .feed: return .switchRightSidebarToFeed
         case .dock: return .switchRightSidebarToDock
+        case .reply: return nil
         case .machines: return .switchRightSidebarToMachines
         case .customSidebar: return nil
         }
@@ -49,7 +56,7 @@ enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
 }
 
 extension RightSidebarMode {
-    static let paneModes: [RightSidebarMode] = [.files, .find, .sessions, .machines]
+    static let paneModes: [RightSidebarMode] = [.files, .find, .sessions, .reply, .machines]
 
     var canOpenAsPane: Bool {
         Self.paneModes.contains(self)

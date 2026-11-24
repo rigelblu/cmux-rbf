@@ -145,7 +145,9 @@ struct AgentSessionRecoveryPlannerTests {
         let flaggedArguments = try #require(flagged.launcherResumeArguments)
         #expect(Array(flaggedArguments.prefix(7)) == ["sr", "claude", "proxy", "--account", "me@example.com", "--resume", "s1"])
         #expect(flaggedArguments.contains("--dangerously-skip-permissions"))
-        #expect(flaggedArguments.contains("opus"))
+        // cmux-rbf: changed on purpose (#cm-30, #cm-142.1): Claude restores its own model and effort on --resume
+        #expect(!flaggedArguments.contains("--model"))
+        #expect(!flaggedArguments.contains("opus"))
         // A launcher declared in agents.launchers wins; the normal resume path applies it.
         var declared = candidates[0]
         declared.launchCommand?.externalLauncher = "sr"
@@ -178,7 +180,9 @@ struct AgentSessionRecoveryPlannerTests {
         #expect(!arguments.contains("/tmp/subrouter-claude-settings-abc/settings.json"))
         #expect(!arguments.contains("/tmp/gone.json"))
         #expect(arguments.contains("/tmp/kept.json"))
-        #expect(arguments.contains("opus"))
+        // cmux-rbf: changed on purpose (#cm-30, #cm-142.1): Claude restores its own model and effort on --resume
+        #expect(!arguments.contains("--model"))
+        #expect(!arguments.contains("opus"))
 
         // A recorded prefix that selects a session itself is never replayed.
         candidate.launchCommand?.launcherPrefix = prefix + ["--resume", "old"]

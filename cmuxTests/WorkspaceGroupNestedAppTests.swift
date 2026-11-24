@@ -19,8 +19,8 @@ struct WorkspaceGroupNestedAppTests {
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let inner = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let inner = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let index = try #require(manager.workspaceGroups.firstIndex { $0.id == inner })
         manager.workspaceGroups[index].parentGroupId = outer
         manager.workspaces.normalizeWorkspaceGroupContiguity()
@@ -221,7 +221,7 @@ struct WorkspaceGroupNestedAppTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<2 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let group = try #require(manager.createWorkspaceGroup(name: "F", childWorkspaceIds: [ids[0], ids[1]]))
+        let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "F", childWorkspaceIds: [ids[0], ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let confirmation = try confirmation(manager, group)
         #expect(deleteGroupAsk(isPinned: false, confirmation: confirmation)
             == DeleteGroupAsk(groupName: "F", memberCount: 3, groupsInside: 0))
@@ -292,7 +292,7 @@ struct WorkspaceGroupNestedAppTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<2 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let d = try #require(manager.createWorkspaceGroup(name: "D", childWorkspaceIds: [ids[1]]))
+        let d = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "D", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let n = try #require(manager.createWorkspaceGroup(name: "N", childWorkspaceIds: []))
         let m = try #require(manager.createWorkspaceGroup(name: "M", childWorkspaceIds: []))
         #expect(manager.moveWorkspaceGroup(groupId: n, intoParent: d) == .moved)
@@ -333,9 +333,9 @@ struct WorkspaceGroupNestedAppTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<4 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let pinnedGroup = try #require(manager.createWorkspaceGroup(name: "D", childWorkspaceIds: [ids[3]]))
+        let pinnedGroup = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "D", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.toggleWorkspaceGroupPinned(groupId: pinnedGroup)
-        let group = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ids[1], ids[2]]))
+        let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ids[1], ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         _ = manager.setPinned(workspaceIds: [ids[1]], pinned: true)
         let header = try #require(manager.workspaceGroupAnchor(for: group)).id
         #expect(!manager.workspaces.hasNestedWorkspaceGroup)
@@ -346,5 +346,57 @@ struct WorkspaceGroupNestedAppTests {
         _ = try #require(manager.detachWorkspace(tabId: header))
         #expect(manager.tabs.map(\.id) != orderBefore.filter { $0 != header }, "the rows left behind changed order")
         #expect(notices == 0, "a flat window sends nothing, as v0.31.0 does")
+    }
+
+    // MARK: - A generated anchor inside a nested group (cmux-rbf (#cm-106, #cm-142.1))
+
+    /// cmux-rbf (#cm-106, #cm-142.1): `w0 | P[a, b, Q[g, q]]`, built through the real `TabManager` path. Q is made with no
+    /// children, so its anchor `g` is generated (upstream's `createGroupAnchorWorkspace`); it is moved into P, then
+    /// gets one real member `q`, which is selected. Since upstream #15892 no other app test makes a generated anchor
+    /// inside a nested group.
+    private func nestedGeneratedAnchorWorld() throws
+        -> (manager: TabManager, outer: UUID, inner: UUID, generated: UUID, member: UUID, kept: [UUID]) {
+        let manager = TabManager(autoWelcomeIfNeeded: false)
+        manager.addWorkspace(autoWelcomeIfNeeded: false)
+        manager.addWorkspace(autoWelcomeIfNeeded: false)
+        manager.addWorkspace(autoWelcomeIfNeeded: false)
+        let ids = manager.tabs.map(\.id)
+        try #require(ids.count == 4)
+        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1], ids[2]]))
+        let inner = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: []))
+        let generated = try #require(manager.workspaceGroups.first { $0.id == inner }?.anchorWorkspaceId)
+        try #require(manager.workspaceGroups.first { $0.id == inner }?.isGeneratedAnchor == true)
+        let moved: Bool
+        if case .moved = manager.moveWorkspaceGroup(groupId: inner, intoParent: outer) { moved = true } else { moved = false }
+        try #require(moved, "Q moves into P")
+        manager.addWorkspaceToGroup(workspaceId: ids[3], groupId: inner)
+        try #require(manager.tabs.first { $0.id == ids[3] }?.groupId == inner)
+        try #require(manager.workspaceGroups.first { $0.id == inner }?.parentGroupId == outer)
+        manager.selectWorkspace(try #require(manager.tabs.first { $0.id == ids[3] }))
+        return (manager, outer, inner, generated, ids[3], [ids[0], ids[1], ids[2]])
+    }
+
+    @Test func closingTheLastMemberOfANestedGroupRemovesItsUntouchedGeneratedAnchor() throws {
+        let w = try nestedGeneratedAnchorWorld()
+        w.manager.closeWorkspace(try #require(w.manager.tabs.first { $0.id == w.member }))
+        #expect(!w.manager.workspaceGroups.contains { $0.id == w.inner }, "Q is gone")
+        #expect(!w.manager.tabs.contains { $0.id == w.generated }, "and so is its generated anchor")
+        #expect(w.manager.workspaceGroups.contains { $0.id == w.outer }, "P stays")
+        #expect(w.kept.allSatisfy { id in w.manager.tabs.contains { $0.id == id } }, "w0, a and b stay")
+        #expect(w.manager.tabs.filter { $0.groupId == w.outer }.map(\.id) == [w.kept[1], w.kept[2]], "P holds a and b")
+        let selected = try #require(w.manager.selectedTabId, "a workspace is selected after the close")
+        #expect(w.manager.tabs.contains { $0.id == selected } && selected != w.generated && selected != w.member)
+    }
+
+    /// The control: the same window, but Q's anchor holds Dock content (as upstream's
+    /// `removingLastRealMemberPreservesGeneratedAnchorWithDockContent` does), so it is not untouched and stays.
+    @Test func aNestedGroupsGeneratedAnchorWithDockContentStaysWhenItsLastMemberCloses() throws {
+        let w = try nestedGeneratedAnchorWorld()
+        let anchor = try #require(w.manager.tabs.first { $0.id == w.generated })
+        _ = anchor.dockSplit
+        anchor._dockSplit?.panels[UUID()] = CloudVMLoadingPanel(workspaceId: anchor.id)
+        w.manager.closeWorkspace(try #require(w.manager.tabs.first { $0.id == w.member }))
+        #expect(w.manager.tabs.contains { $0.id == w.generated }, "the touched anchor stays")
+        #expect(w.manager.workspaceGroups.first { $0.id == w.inner }?.parentGroupId == w.outer, "and Q stays inside P")
     }
 }

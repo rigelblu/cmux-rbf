@@ -27,7 +27,7 @@ struct WorkspaceGroupNestedCreateInPlaceTests {
         #expect(w.compact(lab) == "x | G[g: a, b, c, d] | y")
         let created = create(w, &lab, children: ["b", "c"])
         #expect(created != nil)
-        // The new group's own workspace stands behind its name; the nested name n is the generated one.
+        // The new group's own workspace stands behind its name: b, the first chosen (upstream #15892; cm-142.1).
         #expect(w.window.groups.first { $0.id == created }?.parentId == lab.id("G"))
         #expect(w.violations(lab).isEmpty)
         // b and c are inside the new group, between a and d.

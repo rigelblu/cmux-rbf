@@ -1417,7 +1417,9 @@ final class CmuxSettingsFileStore {
             // the key must not undo that change (Tom, dogfood 2026-09-11 — a
             // Reset reverted to labels from before the file ever set them).
             if let imported = importedManagedDefaults[identifier],
-               !settingStillHoldsImportedValue(identifier, imported: imported, defaults: .standard) {
+               // cmux-rbf (#cm-69.3, #cm-142.1): the store's own defaults, which a test or a second store injects; `.standard` read
+               // another domain and kept a removed key's value (upstream's cmuxJSONFontSettingsOverrideGhosttyAliasesThroughWatcher).
+               !settingStillHoldsImportedValue(identifier, imported: imported, defaults: userDefaults) {
                 backups.removeValue(forKey: identifier)
                 continue
             }

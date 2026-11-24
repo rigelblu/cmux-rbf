@@ -902,7 +902,7 @@ final class KeyboardShortcutSettingsFileStoreStartupTests: XCTestCase {
         XCTAssertEqual(Workspace.tabBarVisibility(defaults: defaults), .multipleTabs)
 
         defaults.set(WorkspacePresentationModeSettings.Mode.minimal.rawValue, forKey: WorkspacePresentationModeSettings.modeKey)
-        XCTAssertEqual(Workspace.tabBarVisibility(defaults: defaults), .always)
+        XCTAssertEqual(Workspace.tabBarVisibility(defaults: defaults), .adaptive) // cmux-rbf: changed on purpose (#cm-142.1): the fork's #cm-3 rule maps minimal mode to the adaptive pane header
     }
 
     func testTabBarVisibilityRejectsInvalidValueFromCmuxJSON() throws {

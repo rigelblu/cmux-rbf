@@ -277,7 +277,9 @@ struct ClaudeHookFeedTelemetrySwiftTests {
         )
         let sentAtMs = try #require((event["_hook_sent_at_ms"] as? NSNumber)?.int64Value, "event=\(event)")
         #expect(sentAtMs >= startedAtMs, "event=\(event)")
-        #expect(event["agent_id"] as? String == "subagent-7", "event=\(event)")
+        // cmux-rbf: changed on purpose (#cm-73.24, #cm-142.1): Claude's helper id travels as helper_agent_id, never agent_id.
+        #expect(event["helper_agent_id"] as? String == "subagent-7", "event=\(event)")
+        #expect(event.keys.contains("agent_id") == false, "event=\(event)")
     }
 }
 

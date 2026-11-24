@@ -4966,10 +4966,13 @@ class TerminalController {
                 return
             }
             foundPanel = true
+            // cmux-rbf (#cm-9, #cm-142.1): the seed keeps the path it had before the merge; the restored upstream overload
+            // would drop an .auto seed on a cloud panel, and Codex Teams can't reach a cloud panel today.
             panelApplied = workspace.setPanelCustomTitle(
                 panelId: panelId,
                 title: title,
-                source: .auto
+                source: .auto,
+                catalog: SurfaceCatalog.shared
             )
         }
 

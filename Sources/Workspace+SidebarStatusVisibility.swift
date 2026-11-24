@@ -96,8 +96,10 @@ extension Workspace {
     static func sidebarStatusUrgencyRank(_ lifecycle: AgentHibernationLifecycleState?) -> Int {
         switch lifecycle {
         case .running: 4
+        case .monitoring: 3 // cmux-rbf (#cm-142.1): the fork's monitoring is upstream's backgroundWorkPending as Claude reaches it (cm-128.3; the refined ruling)
         case .backgroundWorkPending: 3
         case .needsInput: 2
+        case .error: 2 // cmux-rbf (#cm-142.1): the fork's error (cm-128.5) is a needs-you state, ranked with needs input
         case .unknown, nil: 1
         case .idle: 0
         }

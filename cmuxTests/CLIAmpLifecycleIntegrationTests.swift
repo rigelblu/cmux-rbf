@@ -219,7 +219,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let errorCommands = Array(context.state.snapshot().dropFirst(beforeError))
         XCTAssertTrue(
             errorCommands.contains {
-                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp|")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                $0.hasPrefix("notify_target_async \(context.workspaceId) \(context.surfaceId) Amp · Stopped on an error|\(context.root.lastPathComponent)|")
                     && $0.contains("Amp turn failed")
             },
             "Amp error did not use the generic error notification path: \(errorCommands)"

@@ -45,25 +45,15 @@ func presentSidebarWorkspaceGroupCustomColorPrompt(
     tabManager.setWorkspaceGroupColor(groupId: groupId, hex: normalized)
 }
 
-/// "That is not a hex colour" alert for the group's custom-colour prompt. Its text matches
-/// upstream's `WorkspaceCustomColorPrompt`, so a workspace and a group say the same thing
-/// about the same bad hex.
+/// "That is not a hex colour" alert for the group's custom-colour prompt. It is
+/// upstream's `WorkspaceCustomColorPrompt` alert, so a workspace and a group say the same
+/// thing about the same bad hex. One alert body for every custom-colour prompt: the
+/// SwiftUI row and the AppKit row (both through `WorkspaceCustomColorPrompt`) and the group
+/// header. There were three identical copies before `#cm-60`; a wording fix to one of them
+/// would have left the others saying something different about the same bad hex.
 @MainActor
 func presentInvalidWorkspaceColorAlert(_ value: String, presentingWindow: NSWindow?) {
-    let alert = NSAlert()
-    alert.alertStyle = .warning
-    alert.messageText = String(localized: "alert.invalidColor.title", defaultValue: "Invalid Color")
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    if trimmed.isEmpty {
-        alert.informativeText = String(localized: "alert.invalidColor.emptyMessage", defaultValue: "Enter a hex color in the format #RRGGBB.")
-    } else {
-        alert.informativeText = String(
-            format: String(localized: "alert.invalidColor.invalidMessage", defaultValue: "\"%@\" is not a valid hex color. Use #RRGGBB."),
-            trimmed
-        )
-    }
-    alert.addButton(withTitle: String(localized: "alert.invalidColor.ok", defaultValue: "OK"))
-    _ = alert.runCmuxModal(presentingWindow: presentingWindow)
+    WorkspaceCustomColorPrompt.showInvalidColorAlert(value, presentingWindow: presentingWindow) // cmux-rbf (#cm-60)
 }
 
 /// Confirmation dialog for destructive group deletion.

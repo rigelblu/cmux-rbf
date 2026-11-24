@@ -25,6 +25,26 @@ SETTINGS_SECTIONS = (
     "workspaceColors", "automation", "agentMessages", "chief", "browser", "markdown", "fileEditor",
     "fileExplorer", "diffViewer", "shortcuts",
 )
+# cmux-rbf: changed on purpose (#cm-142.1): all-keys.md also documents the fork's
+# own settings sections, and lists three fork paths below their root. Each list
+# is exact, so a new drift still fails.
+FORK_SETTINGS_SECTIONS = ("panes", "reply", "agentPane", "figma")
+# Schema paths the reference lists by their fields instead of at the root.
+FORK_LISTED_BY_FIELDS = {
+    # #cm-110.19: the three section names.
+    "sidebar.sectionNames": (
+        "sidebar.sectionNames.pinned",
+        "sidebar.sectionNames.workspaces",
+        "sidebar.sectionNames.statuses",
+    ),
+    # #cm-136.2: the object holds one switch.
+    "reply.inline": ("reply.inline.enabled",),
+}
+# Top-level arrays of rows (#cm-109, #cm-124.5/.6): the reference lists each row's fields.
+FORK_ROW_SECTIONS = ("workspaceStatuses", "agentEvents")
+# #cm-10 retired the indicator style; the schema keeps both keys so old configs
+# validate, the parsers read past them, and the reference does not advertise them.
+FORK_SCHEMA_ONLY = frozenset({"workspaceColors.indicatorStyle", "sidebar.activeTabIndicatorStyle"})
 
 
 class SupportedPathsTests(unittest.TestCase):
@@ -103,9 +123,18 @@ class SupportedPathsTests(unittest.TestCase):
         schema = json.loads((REPO_ROOT / "web" / "data" / "cmux.schema.json").read_text())
         expected = {
             f"{section}.{key}"
-            for section in SETTINGS_SECTIONS
+            for section in SETTINGS_SECTIONS + FORK_SETTINGS_SECTIONS
             for key in schema["properties"][section]["properties"]
         }
+        # cmux-rbf: changed on purpose (#cm-142.1): the fork's lists above.
+        expected -= FORK_SCHEMA_ONLY
+        for root, fields in FORK_LISTED_BY_FIELDS.items():
+            expected.discard(root)
+            expected.update(fields)
+        for section in FORK_ROW_SECTIONS:
+            row = schema["properties"][section]["items"]
+            for variant in row.get("oneOf") or row.get("anyOf") or [row]:
+                expected.update(f"{section}.{key}" for key in variant.get("properties", {}))
         result = self.run_helper(self.helper("installed"), "list-supported")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         actual = set(result.stdout.splitlines())

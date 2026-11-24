@@ -237,6 +237,7 @@ extension TerminalController {
             "workspace.prompt_submit",
             "workspace.rename",
             "workspace.set_auto_title",
+            "workspace.clear_agent_state", // cm-128.2
             "surface.sync_codex_native_title",
             "workspace.group.list",
             "workspace.group.create",
@@ -377,6 +378,10 @@ extension TerminalController {
             "file.open",
             "markdown.open",
             "browser.open_split",
+            "agent_pane.show",
+            "agent_pane.list",
+            "agent_pane.clear",
+            "figma.goto",
             "browser.navigate",
             "browser.back",
             "browser.forward",

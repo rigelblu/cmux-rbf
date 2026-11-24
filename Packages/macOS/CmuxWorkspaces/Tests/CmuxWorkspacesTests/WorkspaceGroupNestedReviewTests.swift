@@ -122,6 +122,8 @@ struct WorkspaceGroupNestedReviewTests {
             check("deleteWorkspaceGroup") { w in _ = w.groups.deleteWorkspaceGroup(groupId: group.id) }
             check("moveTabsToTop") { w in w.reorder.moveTabsToTop(Set(ids.prefix(2))) }
             check("moveTabToTopForNotification") { w in w.reorder.moveTabToTopForNotification(ids[1]) }
+            check("isAtTopOfUnpinnedTier") { w in for id in ids { _ = w.reorder.isAtTopOfUnpinnedTier(id) } } // (cm-142.1)
+            check("selectionTargetAfterClose") { w in _ = w.model.selectionTargetAfterClose(closedIndex: 0) } // (cm-142.1) hands over at WorkspacesModel+CloseSelection.swift:26
             // The drop entrances: a flat window gives the result, the answer and the notice v0.31.0 gives (the frozen copy of
             // v0.31.0's coordinator, run on a second copy of the same window).
             func againstBase(_ names: String..., live: (WorkspaceReorderCoordinator<NestingStubTab>) -> Bool, base: (FrozenV0_31_0ReorderCoordinator<NestingStubTab>) -> Bool) {
@@ -175,7 +177,8 @@ struct WorkspaceGroupNestedReviewTests {
             // that is the one case that differs from upstream by design, so the check makes it from ungrouped ones.
             let ungrouped = window.tabs.filter { $0.groupId == nil && !window.isAnchor($0.id) }.prefix(2).map(\.id)
             if !ungrouped.isEmpty {
-                check("createWorkspaceGroup: the first eligible workspace in a group") { w in
+                check("createWorkspaceGroup: the first eligible workspace in a group", "createWorkspaceGroup: a new group inside a folded parent opens it", // (cm-142.1)
+                      "placeNewWorkspaceGroupAtCreationPosition: a group made inside a group") { w in // (cm-142.1)
                     _ = w.groups.createWorkspaceGroup(name: "New", childWorkspaceIds: Array(ungrouped), collapseSidebarSelection: false)
                 }
             }

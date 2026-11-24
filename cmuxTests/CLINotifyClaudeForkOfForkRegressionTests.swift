@@ -51,7 +51,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertNil(afterStart["lastBody"])
         XCTAssertNil(afterStart["lastNotificationStatus"])
         XCTAssertEqual(afterStart["runtimeStatus"] as? String, "idle")
-        XCTAssertNil(afterStart["hadPendingBackgroundWorkAtStop"])
+        XCTAssertEqual(afterStart["hadPendingBackgroundWorkAtStop"] as? Bool, false) // cmux-rbf: changed on purpose (#cm-128.1, #cm-142.1): a clear start begins with nothing pending
 
         let notification = runForkOfForkHook(
             context: context,
@@ -66,7 +66,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertNil(recovered["lastBody"])
         XCTAssertNil(recovered["lastNotificationStatus"])
         XCTAssertEqual(recovered["runtimeStatus"] as? String, "idle")
-        XCTAssertNil(recovered["hadPendingBackgroundWorkAtStop"])
+        XCTAssertEqual(recovered["hadPendingBackgroundWorkAtStop"] as? Bool, false) // cmux-rbf: changed on purpose (#cm-128.1, #cm-142.1): a clear start begins with nothing pending
     }
 
     func testClaudeSecondLevelForkSessionStartImmediatelyPromotesChildIdentity() throws {

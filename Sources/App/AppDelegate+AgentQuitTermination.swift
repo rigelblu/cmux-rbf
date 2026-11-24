@@ -4,11 +4,13 @@ extension AppDelegate {
     enum TerminateCleanupPhase: Equatable, Sendable {
         case ownedRuntimeCleanup
         case freshSnapshot
+        // cmux-rbf #cm-137.2: the fresh save is written; a deadline from here quits at once (the fork's former .finalDrain).
         case agentTermination
     }
 
     enum TerminateCleanupDeadlineDisposition: Equatable, Sendable {
         case persistCachedSnapshotAndTerminate
+        // cmux-rbf #cm-137.2
         case terminateWithSavedSnapshot
         case cancelTerminationAfterRuntimeCleanupFailure
     }
@@ -105,6 +107,7 @@ extension AppDelegate {
         phase: TerminateCleanupPhase?,
         hasOwnedRuntimeCleanup: Bool
     ) -> TerminateCleanupDeadlineDisposition {
+        // cmux-rbf #cm-137.2
         if phase == .agentTermination { return .terminateWithSavedSnapshot }
         if phase == .freshSnapshot || !hasOwnedRuntimeCleanup {
             return .persistCachedSnapshotAndTerminate

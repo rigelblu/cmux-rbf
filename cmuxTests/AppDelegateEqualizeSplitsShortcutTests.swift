@@ -1,4 +1,3 @@
-import CmuxBrowser
 import AppKit
 import Bonsplit
 import CmuxBrowser // cmux-rbf #cm-73.2a
@@ -742,8 +741,14 @@ final class AppDelegateEqualizeSplitsShortcutTests {
         guard let window = window(withId: windowId),
               let manager = appDelegate.tabManagerFor(windowId: windowId),
               let workspace = manager.selectedWorkspace,
-              let firstPanelId = workspace.focusedPanelId,
-              let secondPanel = workspace.newTerminalSplit(from: firstPanelId, orientation: .horizontal),
+              let firstPanelId = workspace.focusedPanelId else {
+            XCTFail("Expected a main window and workspace")
+            return
+        }
+        // cmux-rbf (#cm-66, #cm-142.1): upstream's split admission (#15392) refuses a pane under 160 pt, and an earlier
+        // app-host test can leave a 320-pt main window that a new one inherits. Size it as upstream's split tests do.
+        Self.prepareSplitFixture(window: window, workspace: workspace)
+        guard let secondPanel = workspace.newTerminalSplit(from: firstPanelId, orientation: .horizontal),
               workspace.newTerminalSplit(from: secondPanel.id, orientation: .horizontal) != nil else {
             XCTFail("Expected three-column split setup")
             return
@@ -864,8 +869,13 @@ final class AppDelegateEqualizeSplitsShortcutTests {
         guard let window = window(withId: windowId),
               let manager = appDelegate.tabManagerFor(windowId: windowId),
               let workspace = manager.selectedWorkspace,
-              let leftPanelId = workspace.focusedPanelId,
-              let rightPanel = workspace.newTerminalSplit(from: leftPanelId, orientation: .horizontal),
+              let leftPanelId = workspace.focusedPanelId else {
+            XCTFail("Expected a main window and workspace")
+            return
+        }
+        // cmux-rbf (#cm-66, #cm-142.1): sized as upstream's split tests are, for its split admission (#15392).
+        Self.prepareSplitFixture(window: window, workspace: workspace)
+        guard let rightPanel = workspace.newTerminalSplit(from: leftPanelId, orientation: .horizontal),
               workspace.newTerminalSplit(from: rightPanel.id, orientation: .vertical) != nil else {
             XCTFail("Expected mixed-orientation split setup")
             return

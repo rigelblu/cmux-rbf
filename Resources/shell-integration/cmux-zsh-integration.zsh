@@ -2494,7 +2494,10 @@ _cmux_keep_agent_shims_first() {
     local shim_root="${CMUX_CLAUDE_WRAPPER_SHIM_ROOT:-}"
     [[ -n "$shim_root" && "${shim_root:h:t}" == cmux-cli-shims ]] || return 0
     [[ "$PATH" == "$shim_root" || "$PATH" == "$shim_root":* ]] && return 0
-    PATH="$(_cmux_path_prepend_unique_directory "$shim_root" "${PATH-}")"
+    # cmux-rbf (#cm-128.8, #cm-142.1): no subshell on the prompt path, as upstream's #14847 does at the shim install.
+    local REPLY
+    _cmux_path_prepend_unique_directory_into_reply "$shim_root" "${PATH-}"
+    PATH="$REPLY"
 }
 
 _cmux_chpwd() {

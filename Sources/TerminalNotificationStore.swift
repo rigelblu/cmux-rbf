@@ -56,6 +56,7 @@ final class TerminalNotificationStore: ObservableObject {
         )
     )
     let notificationHookCache = CmuxNotificationHookCache()
+    // cmux-rbf (#cm-128.4): unattended-turn reminders and phone forwarding are the fork's own; upstream has neither.
     lazy var unattendedNudges = AgentUnattendedNudgeDelivery(store: self, clock: ContinuousClock())
     private var phoneForwardingEnabledProvider: () -> Bool = {
         PhonePushClient.shared.configuration().forwardingEnabled
@@ -613,8 +614,8 @@ final class TerminalNotificationStore: ObservableObject {
             totalUnreadCount: unreadCount
         )
         guard ownerUnreadChanged else { return }
-        // Preserve the existing owner identity: a window-Dock mark is not
-        // reassigned to whichever workspace happens to be selected.
+        // cmux-rbf (#cm-128.4): preserve the existing owner identity: a window-Dock mark is not
+        // reassigned to whichever workspace happens to be selected. Upstream's function stops at the totals.
         sidebarUnread.applyWorkspaceSummaryProjection(
             forWorkspaceId: key.workspaceId,
             summary: buildSidebarUnreadSummary(forTabId: key.workspaceId),

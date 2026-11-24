@@ -4,7 +4,7 @@ import WebKit
 
 extension BrowserPanel {
     func automationReloadTargetURL() -> URL? {
-        restorableDisplayURLForCurrentErrorPage(liveURL: webView.url)
+        restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: webView)) // cmux-rbf #cm-73.40: reject a revert on upstream sync
             ?? Self.remoteProxyDisplayURL(for: navigationDelegate?.lastAttemptedURL)
             ?? navigationDelegate?.lastAttemptedURL
             ?? resolvedCurrentSessionHistoryURL()

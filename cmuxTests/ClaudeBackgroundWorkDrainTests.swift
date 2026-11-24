@@ -170,6 +170,9 @@ struct ClaudeBackgroundWorkDrainTests {
         #expect(!check(lifecycle: .running))
         #expect(!check(kind: .codex))
         #expect(!check(hibernated: true))
+        #expect(check(lifecycle: .monitoring)) // cmux-rbf (#cm-142.1): the fork's watching Claude pane (cm-128.3) is checked too
+        #expect(!check(kind: .codex, lifecycle: .monitoring)) // cmux-rbf (#cm-142.1): selection stays Claude-only
+        #expect(!check(kind: .gemini, lifecycle: .monitoring)) // cmux-rbf (#cm-142.1)
     }
 
     // MARK: Journal projection
@@ -180,7 +183,7 @@ struct ClaudeBackgroundWorkDrainTests {
         pipeline.apply(Self.draft(.sessionStarted, atMs: 1_000))
         pipeline.apply(Self.draft(.turnStarted, atMs: 2_000))
         let stop = pipeline.apply(Self.draft(.turnCompleted, atMs: 3_000, pendingWork: true))
-        #expect(stop?.assignment.phase == .backgroundWorkPending)
+        #expect(stop?.assignment.phase == .monitoring) // cmux-rbf: changed on purpose (#cm-142.1): the fork's pending Claude Stop watches (cm-128.3, the .backgroundWorkPending ruling)
 
         let drain = pipeline.apply(ClaudeBackgroundWorkDrain.drainedDraft(
             sessionId: Self.sessionId,
@@ -270,6 +273,38 @@ struct ClaudeBackgroundWorkDrainTests {
 
         #expect(stop?.assignment.phase == .idle)
         #expect(stop?.settledDrainedBackgroundWork == false)
+    }
+
+    /// cmux-rbf (#cm-142.1): the drain, widened to the fork's watching state, never settles another agent watching on the
+    /// same pane: it is admitted only against Claude's own session (`admittingBackgroundWorkDrain`).
+    @Test
+    func aDrainNeverSettlesAnotherAgentsWatchingPane() {
+        var pipeline = Pipeline()
+        func agy(_ kind: AgentJournalEventKind, atMs: Int64, pendingWork: Bool = false) -> AgentJournalEventDraft {
+            AgentJournalEventDraft(
+                kind: kind,
+                occurredAtMs: atMs,
+                source: "agy",
+                agentKey: "agy",
+                sessionId: "agy-session",
+                workspaceId: Self.workspaceId.uuidString,
+                surfaceId: Self.panelId.uuidString,
+                pendingWork: pendingWork,
+                nativeEvent: kind.rawValue
+            )
+        }
+        pipeline.apply(agy(.sessionStarted, atMs: 1_000))
+        pipeline.apply(agy(.turnStarted, atMs: 2_000))
+        let stop = pipeline.apply(agy(.turnCompleted, atMs: 3_000, pendingWork: true))
+        #expect(stop?.assignment.phase == .monitoring, "fixture: agy is not watching")
+
+        let drain = pipeline.apply(ClaudeBackgroundWorkDrain.drainedDraft(
+            sessionId: "agy-session",
+            workspaceId: Self.workspaceId,
+            panelId: Self.panelId,
+            observedAt: Date(timeIntervalSince1970: 60)
+        ))
+        #expect(drain == nil, "a Claude drain was admitted against agy's watching session")
     }
 
     // MARK: Helpers

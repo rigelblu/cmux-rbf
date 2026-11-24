@@ -169,14 +169,14 @@ struct ClaudeBackgroundWorkNotifyTests {
         default:
             let tasks = pendingWork ? #"[{"status":"running"}]"# : "[]"
             runHook("stop", #"{"session_id":"\#(session)","cwd":"/tmp/x","hook_event_name":"Stop","last_assistant_message":"done","background_tasks":\#(tasks),"session_crons":[]}"#)
-            #expect(try lifecycle() == (pendingWork ? "backgroundWorkPending" : "idle"))
+            #expect(try lifecycle() == (pendingWork ? "running" : "idle")) // cmux-rbf: changed on purpose (#cm-142.1, cm-128.3): pending work stays running, pill Running
         }
         let commandCountAfterBoundary = context.state.snapshot().count
 
         // This helper has no subagent marker or turn id, matching #19781.
         runHook("pre-tool-use", tool)
         let afterTool = Array(context.state.snapshot().dropFirst(commandCountAfterBoundary))
-        let expectedLifecycle = expectRunning ? "running" : (pendingWork ? "backgroundWorkPending" : "idle")
+        let expectedLifecycle = expectRunning ? "running" : (pendingWork ? "running" : "idle") // cmux-rbf: changed on purpose (#cm-142.1, cm-128.3): pending work stays running, pill Running
         #expect(try lifecycle() == expectedLifecycle)
         let runningEvents = AgentJournalAppendCapture.captures(in: afterTool).filter {
             $0.kind == "agent.state.changed" && $0.draft["declared_phase"] as? String == "running"
@@ -184,10 +184,10 @@ struct ClaudeBackgroundWorkNotifyTests {
         #expect(!runningEvents.isEmpty == expectRunning)
         #expect((statusLine(afterTool, value: "Running") != nil) == expectRunning)
         if !expectRunning {
-            let expectedSettledStatus = pendingWork ? "Waiting" : "Idle"
+            let expectedSettledStatus = pendingWork ? "Running" : "Idle" // cmux-rbf: changed on purpose (#cm-142.1, cm-128.3): pending work stays running, pill Running
             #expect(lastLine(context.state.snapshot(), prefix: "set_status claude_code ")?.hasPrefix("set_status claude_code \(expectedSettledStatus) ") == true)
             if pendingWork {
-                #expect(try lifecycle() == "backgroundWorkPending")
+                #expect(try lifecycle() == "running") // cmux-rbf: changed on purpose (#cm-142.1, cm-128.3): pending work stays running, pill Running
             }
 
             // The completed-turn guard must release on the next user prompt.
@@ -287,14 +287,14 @@ struct ClaudeBackgroundWorkNotifyTests {
             "Stop with a running background task must tag the done-ping pending; saw \(snapshot)"
         )
         #expect(cached == true)
-        // Sidebar pill must not say "Idle" while background work is live. A
-        // live background task is a deterministic wakeup, so the pane reads as
-        // Waiting rather than Running, and reports that to the compact glyph.
-        #expect(statusLine(snapshot, value: "Waiting") != nil,
-                "Pending stop must show a Waiting pill, not Idle; saw \(snapshot)")
+        // Sidebar pill must not say "Idle" while background work is live.
+        // cmux-rbf: changed on purpose (#cm-142.1, cm-128.3): the pill is Running, matching the lifecycle,
+        // where upstream shows Waiting.
+        #expect(statusLine(snapshot, value: "Running") != nil,
+                "Pending stop must show a Running pill, not Idle; saw \(snapshot)")
         #expect(statusLine(snapshot, value: "Idle") == nil)
-        #expect(lastLine(snapshot, prefix: "set_status claude_code Waiting ")?.contains("--work=waiting") == true,
-                "The Waiting pill must carry the work state the sidebar glyph reads; saw \(snapshot)")
+        #expect(lastLine(snapshot, prefix: "set_status claude_code Running ")?.contains("--work=running") == true,
+                "The Running pill must carry the work state the sidebar glyph reads; saw \(snapshot)")
         // And the journaled turn boundary must carry pending_work=true so the
         // reduced lifecycle stays running (non-hibernatable) while the
         // background task is live.

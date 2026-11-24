@@ -519,7 +519,7 @@ struct SidebarNewWorkspaceTabIndexTests {
         try await AppContextSerialGate.withExclusiveAppContext {
             let manager = TabManager()
             let member = manager.addWorkspace(), second = manager.addWorkspace()
-            let group = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [member.id, second.id]))
+            let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [member.id, second.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             manager.setWorkspaceGroupPinned(groupId: group, isPinned: true)
             try #require(!member.isPinned && !second.isPinned, "The members are not pinned one by one")
             let held = manager.tabs.filter { $0.groupId == group }.count

@@ -452,7 +452,8 @@
     return createProfile({
       html: html,
       htmlGlobalAttributes: MARKDOWN_GLOBAL_ATTRIBUTES,
-      classToken: MARKDOWN_CLASS_TOKEN,
+      // cmux-rbf (#cm-15): a caller may widen the class allowlist; shell.html adds ymd.js's classes.
+      classToken: spec.classToken || MARKDOWN_CLASS_TOKEN,
       url: spec.url,
       inlineSVGAsImage: spec.inlineSVGAsImage === true,
       element: function(source, clean) {

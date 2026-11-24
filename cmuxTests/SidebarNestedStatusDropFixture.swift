@@ -70,8 +70,8 @@ final class SidebarNestedStatusDropFixture {
             let workspace = Workspace(); workspace.hideTaskStatus(); data[key] = workspace
         }
         model.tabs = Array(data.keys.sorted().compactMap { data[$0] })
-        let parent = try #require(model.createWorkspaceGroup(name: "P", childWorkspaceIds: [data["pa"]!.id]))
-        let child = try #require(model.createWorkspaceGroup(name: "Q", childWorkspaceIds: [data["qa"]!.id]))
+        let parent = try #require(model.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [data["pa"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let child = try #require(model.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [data["qa"]!.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         p = parent; q = child
         _ = model.moveWorkspaceGroup(groupId: child, intoParent: parent)
         data["pAnchor"] = try #require(model.workspaceGroupAnchor(for: parent))
@@ -378,6 +378,64 @@ extension SidebarNestedStatusDropFixture {
             AppDelegate.shared = previous
             defaults.removePersistentDomain(forName: suite)
             try? FileManager.default.removeItem(at: directory)
+        }
+    }
+}
+
+// cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor. The fork's nested and status
+// fixtures (#cm-106, #cm-110, #cm-110.14) were written for a group whose anchor is a workspace of its own, named apart
+// from its children and listed beside them when a fixture writes `tabs` by hand. Under the new rule that list holds one
+// workspace twice, and every builder keyed by workspace traps ("Duplicate values for key"). This helper builds the old
+// shape on purpose: a new workspace stands at the first child's place, in the child's group, and becomes the anchor, so
+// the group lands where it did before (in place inside the child's group, #cm-106) and every expectation keeps its meaning.
+// The anchor's provenance is the user's (upstream sets it for a chosen anchor), so upstream's orphan cleanup leaves it.
+extension TabManager {
+    @discardableResult
+    func createWorkspaceGroupWithOwnAnchor(
+        name: String,
+        childWorkspaceIds: [UUID] = [],
+        anchorWorkingDirectory: String? = nil,
+        selectAnchor: Bool = true,
+        collapseSidebarSelection: Bool = true,
+        externalID: String? = nil
+    ) -> UUID? {
+        guard let index = tabs.firstIndex(where: { childWorkspaceIds.contains($0.id) }) else {
+            return createWorkspaceGroup(
+                name: name,
+                childWorkspaceIds: childWorkspaceIds,
+                anchorWorkingDirectory: anchorWorkingDirectory,
+                selectAnchor: selectAnchor,
+                collapseSidebarSelection: collapseSidebarSelection,
+                externalID: externalID
+            )
+        }
+        let anchor = Workspace()
+        anchor.groupId = tabs[index].groupId
+        tabs.insert(anchor, at: index)
+        return createWorkspaceGroup(
+            name: name,
+            childWorkspaceIds: [anchor.id] + childWorkspaceIds,
+            anchorWorkingDirectory: anchorWorkingDirectory,
+            selectAnchor: selectAnchor,
+            collapseSidebarSelection: collapseSidebarSelection,
+            externalID: externalID
+        )
+    }
+}
+
+// cmux-rbf: changed on purpose (#cm-142.1): upstream's ContentView makes Chief Home on appear (restoreConversations ->
+// ensureHome), and an app-host test process runs with Chief on (FeatureFlags.chiefDefault). A mounted-sidebar fixture that
+// counts or reads rows turns Chief off for the mount, as upstream's own mounted-window tests do
+// (MainWindowCloseConfirmationTests, ReopenLastClosedTests). Returns the restore.
+@MainActor
+enum ChiefOffForMountedSidebar {
+    static func turnOff() -> () -> Void {
+        let defaults = UserDefaults.standard
+        let key = ChiefCatalogSection().enabled.userDefaultsKey
+        let original = defaults.object(forKey: key)
+        ChiefSettings.setEnabled(false, in: defaults)
+        return {
+            if let original { defaults.set(original, forKey: key) } else { defaults.removeObject(forKey: key) }
         }
     }
 }

@@ -248,7 +248,7 @@ struct WorkspaceStatusActionsTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let child = try #require(manager.tabs.first)
-        let groupId = try #require(manager.createWorkspaceGroup(name: "Group", childWorkspaceIds: [child.id]))
+        let groupId = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Group", childWorkspaceIds: [child.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(child.groupId == groupId)
         let plain = Workspace(), pinned = Workspace()
         pinned.isPinned = true

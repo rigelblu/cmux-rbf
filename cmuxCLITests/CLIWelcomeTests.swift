@@ -22,6 +22,7 @@ struct CLIWelcomeTests {
         #expect(result.status == 0, Comment(rawValue: result.stderr))
 
         let output = stripANSI(from: result.stdout)
+        // cmux-rbf: changed on purpose (#cm-142.1): ⌘⇧U jumps to the oldest unread in the fork (#cm-128.11).
         let expectedShortcuts = """
           Shortcuts
           ⌘N                  New workspace
@@ -34,7 +35,7 @@ struct CLIWelcomeTests {
           ⌘⇧P                 Command Palette…
           ⌘⇧R                 Rename Workspace
           ⌘⇧L                 New browser
-          ⌘⇧U                 Jump to Latest Unread
+          ⌘⇧U                 Jump to Oldest Unread
           ⌥⌘U                 Toggle Unread
         """
         // The reference block is intentionally exact: these labels describe the

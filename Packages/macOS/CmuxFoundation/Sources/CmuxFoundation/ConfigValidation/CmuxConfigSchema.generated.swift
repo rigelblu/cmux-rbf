@@ -1494,7 +1494,7 @@ enum CmuxEmbeddedConfigSchema {
           "type": "boolean",
           "default": true,
           "descriptionKey": "schemaDescriptions.notifications.agentIdleReminder",
-          "description": "Notify when an agent has been idle waiting for your input (about 60s after a turn ends). Suppressed while background work from the last turn is still pending, so a running build or watcher does not trigger a false waiting alert."
+          "description": "Notify when an agent is waiting for input, and remind once after 1 min if a finished turn is still unread. Suppressed while background work is running."
         },
         "sound": {
           "x-cmux-scopes": ["global"],
@@ -1610,6 +1610,28 @@ enum CmuxEmbeddedConfigSchema {
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "sectionNames": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Names for the sidebar section headers. Defaults are localized. Omitted, blank or non-string names use their section's default; a non-object sectionNames uses all three defaults.",
+          "properties": {
+            "pinned": {
+              "type": "string",
+              "default": "Pinned",
+              "description": "The name of the Pinned sidebar section's header."
+            },
+            "workspaces": {
+              "type": "string",
+              "default": "Workspaces",
+              "description": "The name of the Workspaces sidebar section's header."
+            },
+            "statuses": {
+              "type": "string",
+              "default": "Workblocks",
+              "description": "The name of the status sidebar section's header."
+            }
+          }
+        },
         "fontSize": {
           "type": "number",
           "minimum": 10.0,
@@ -1786,7 +1808,7 @@ enum CmuxEmbeddedConfigSchema {
           "type": "string",
           "enum": ["leading", "trailing"],
           "default": "leading",
-          "description": "Which side of the workspace row the loading spinner appears on: leading (left, sharing the unread-badge slot) or trailing (right)."
+          "description": "Which side of the workspace row the loading spinner appears on: leading (left, with the agent marks on the line under the workspace name) or trailing (right)."
         },
         "notificationBadgePosition": {
           "type": "string",
@@ -1851,6 +1873,25 @@ enum CmuxEmbeddedConfigSchema {
         }
       }
     },
+    "panes": {
+      "title": "panes",
+      "description": "Pane layout settings that are not part of the inherited root-level pane chrome keys.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "arrangePatterns": {
+          "type": "object",
+          "description": "Your own Arrange Splits patterns, keyed by the name shown in the menu and the command palette, valued by the colon ratio notation the menu already prints as its hints (for example \"1:1:0.5\"). They appear beside the four built-ins, marked (Custom). Weights are shares, not percentages, and the second weight repeats to fill when a workspace has more splits than you wrote. An entry with fewer than two weights, or any weight that is non-numeric, zero, negative, or infinite, is dropped on its own and leaves the rest working.",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "description": "Colon-separated weights, at least two, each finite and greater than zero.",
+            "pattern": "^\\s*[0-9]*\\.?[0-9]+\\s*(:\\s*[0-9]*\\.?[0-9]+\\s*)+$",
+            "examples": ["2:1", "1:1:0.5", "0.5:1:0.5"]
+          }
+        }
+      }
+    },
     "workspaceColors": {
       "x-cmux-scopes": ["global"],
       "title": "workspaceColors",
@@ -1859,20 +1900,8 @@ enum CmuxEmbeddedConfigSchema {
       "additionalProperties": false,
       "properties": {
         "indicatorStyle": {
-          "type": "string",
-          "enum": [
-            "leftRail",
-            "solidFill",
-            "rail",
-            "border",
-            "wash",
-            "lift",
-            "typography",
-            "washRail",
-            "blueWashColorRail"
-          ],
-          "default": "leftRail",
-          "description": "Active workspace indicator style. Legacy aliases are accepted and normalized."
+          "deprecated": true,
+          "description": "Retired. cmux has one workspace color treatment, so this no longer selects anything. It is accepted and ignored so existing config files stay valid; you can delete it."
         },
         "selectionColor": {
           "$ref": "#/$defs/colorHexOrNull",
@@ -1926,6 +1955,25 @@ enum CmuxEmbeddedConfigSchema {
             "$ref": "#/$defs/colorHex"
           }
         },
+        "labels": {
+          "type": "object",
+          "description": "Optional semantic labels for palette colors, keyed by the raw color name. Shown as \"Label (Raw Name)\" wherever a workspace color is picked. A label never changes a color's value: raw names and hex values keep working in config, commands, and the CLI. Clear or omit a label to show the raw name alone.",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "displayNames": {
+          "type": "object",
+          "descriptionKey": "schemaDescriptions.workspaceColors.displayNames",
+          "description": "Optional editable names for custom palette entries, keyed by stable raw color name. Display names, semantic labels, and raw names share one case-insensitive namespace. Clear or omit a value to show the raw Custom N name again.",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
         "paletteOverrides": {
           "type": "object",
           "description": "Legacy workspace color overrides for built-in palette names. Prefer workspaceColors.colors for new configs.",
@@ -1944,6 +1992,122 @@ enum CmuxEmbeddedConfigSchema {
             "$ref": "#/$defs/colorHex"
           }
         }
+      }
+    },
+    "workspaceStatuses": {
+      "title": "workspaceStatuses",
+      "description": "Your own list of workspace statuses, in the order the Status menu and Cycle Status use. Each entry has an id, a name, the cmux status it behaves as, and optionally an icon and the name of a workspace color that setting it applies.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The status's stable id, used by cmux workspace status set. One of cmux's five ids (todo, working, needs-attention, review, done) makes that status behave as itself."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name shown for the status."
+          },
+          "extends": {
+            "type": "string",
+            "enum": ["todo", "working", "needs-attention", "review", "done"],
+            "description": "The cmux status this one behaves as. Required for your own ids; ignored for one of cmux's five."
+          },
+          "color": {
+            "type": "string",
+            "description": "The color setting this status applies, written as the label of one of your workspace colors, a palette or display name, or a hex color such as #1565C0; setting this status replaces the workspace's color with it."
+          },
+          "icon": {
+            "type": ["string", "null"],
+            "anyOf": [
+              {
+                "enum": ["dotted-ring", "ring", "quarter", "half", "three-quarters", "full", "check", "pause", null]
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(\\.[a-z0-9]+)*$"
+              }
+            ],
+            "description": "The shape or symbol drawn for this status: one of cmux's shapes (dotted-ring, ring, quarter, half, three-quarters, full, check, pause), or the lowercase name of an SF Symbol on this Mac, such as moon.zzz.fill. An editor flags uppercase letters (such as Zzz) and emoji (such as 💤). Leave it out, or write null, and the status draws the glyph of the cmux status it extends."
+          }
+        }
+      }
+    },
+    "agentEvents": {
+      "title": "agentEvents",
+      "$comment": "cmux-rbf (#cm-124.5, #cm-124.6): a fork-only key. Upstream's schema does not have it; keep it on every upstream sync.",
+      "description": "Tell cmux what a notification type or a Claude tool means, without rebuilding it. A notification row names an agent, a notification type exactly as the agent sends it, and what it means: question and approval raise the agent's hand, resolved retires a lone id-less wait that a typed question raised, ignore gives nothing. A tool row names claude (or *), one of Claude's tools by its exact name, and question or plan-review, which raises the hand while the tool waits; you answer it in Claude's own prompt, with no Feed card. Read from this global file only: rows in a repo's own cmux.json are ignored. An edit applies whole or not at all: one bad row keeps the last valid rows. A row has notification or tool, never both, and no other field is allowed.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "title": "Notification row",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "agent",
+              "notification",
+              "means"
+            ],
+            "properties": {
+              "agent": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The agent's slug, such as claude, or * for every agent. A row reaches claude, antigravity, kimi and grok; a row for pi, copilot, codebuddy, factory or hermes-agent is valid and does nothing."
+              },
+              "notification": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The notification type exactly as the agent sends it, such as worker_permission_prompt. cmux config doctor lists the ones it saw with no row."
+              },
+              "means": {
+                "type": "string",
+                "enum": [
+                  "question",
+                  "approval",
+                  "resolved",
+                  "ignore"
+                ],
+                "description": "What the next notification of that type does: question or approval raises the hand, resolved retires a lone id-less wait that a typed question raised, ignore gives no banner and no hand. Your row beats a built-in row for the same agent and type, and an exact agent beats *."
+              }
+            }
+          },
+          {
+            "title": "Tool row",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "agent",
+              "tool",
+              "means"
+            ],
+            "properties": {
+              "agent": {
+                "type": "string",
+                "minLength": 1,
+                "description": "claude or *. A tool row for any other agent is valid and does nothing: only Claude's tool hooks read tool rows."
+              },
+              "tool": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Claude's tool name exactly, case included, such as AskUserQuestion. Claude prints it above its prompt as a bullet followed by the name and the call, and Claude Code's release notes name new tools."
+              },
+              "means": {
+                "type": "string",
+                "enum": [
+                  "question",
+                  "plan-review"
+                ],
+                "description": "What the tool's call does when it starts: question or plan-review raises the hand, the Needs input status and one banner, in every permission mode. The hand drops at your first key in the pane or when the tool ends. A row tool gets no Feed card: answer it in Claude's own prompt. Your row beats a built-in row for the same tool, and an exact agent beats *."
+              }
+            }
+          }
+        ]
       }
     },
     "sidebarAppearance": {
@@ -2430,6 +2594,12 @@ enum CmuxEmbeddedConfigSchema {
           "default": 980,
           "description": "Default maximum reading column width, in CSS pixels, for newly opened markdown viewers.",
           "descriptionKey": "schemaDescriptions.markdown.maxWidth"
+        },
+        "background": {
+          "type": "string",
+          "enum": ["terminal", "solid"],
+          "default": "terminal",
+          "description": "What the markdown viewer paints its page on. \"terminal\" leaves the canvas transparent so the terminal background shows through; \"solid\" paints the canvas github-markdown.css was designed against (#ffffff light, #0d1117 dark), which makes the page's contrast fixed and checkable instead of dependent on the terminal theme."
         }
       }
     },
@@ -2536,6 +2706,91 @@ enum CmuxEmbeddedConfigSchema {
         }
       }
     },
+    "agentPane": {
+      "title": "agentPane",
+      "$comment": "cmux-rbf (#cm-126.15): a fork-only key. Upstream's schema does not have it; keep it on every upstream sync.",
+      "description": "Agent Pane settings.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "names": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The name each agent's Agent Pane shows in place of \"Agent Pane\": each key is an agent's slug, such as claude or codex, or * for every agent, and each value is the text of the caption. An exact slug beats *. A value that is not text, or is empty, is skipped. Saving the file renames the open panes, with no restart."
+        }
+      }
+    },
+    "figma": {
+      "title": "figma",
+      "description": "Figma settings.",
+      "descriptionKey": "schemaDescriptions.figma.description",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultFolder": {
+          "type": "string",
+          "default": "",
+          "description": "Link to the Figma folder where new designs go when figma.folders has no entry for their directory. Use the link from Figma's address bar on the folder's page. Agents read it with \"cmux figma folder\".",
+          "descriptionKey": "schemaDescriptions.figma.defaultFolder"
+        },
+        "folders": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Figma folders for directories: each key is a directory, each value the link to the Figma folder where new designs made in that directory, or inside it, should go. The nearest matching directory wins; elsewhere figma.defaultFolder applies. Agents read it with \"cmux figma folder\".",
+          "descriptionKey": "schemaDescriptions.figma.folders"
+        },
+        "showFileNameInHeader": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the name of the file a Figma pane shows in its header, as Figma (name). Off, the header reads Figma.",
+          "descriptionKey": "schemaDescriptions.figma.showFileNameInHeader"
+        }
+      }
+    },
+    "reply": {
+      "title": "reply",
+      "description": "Reply panel settings.",
+      "descriptionKey": "schemaDescriptions.reply.description",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxMessagesBack": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 5,
+          "description": "How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable.",
+          "descriptionKey": "schemaDescriptions.reply.maxMessagesBack"
+        },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["lgtm", "why?", "redline"],
+          "description": "Quick labels offered above an open note, in order. As many as fit are chips; the rest are in the ⌄ menu. Clicking one puts its text in the note. An empty list means no labels.",
+          "descriptionKey": "schemaDescriptions.reply.labels"
+        },
+        "inline": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Show a Reply button over text selected in an agent's pane. Set enabled to false to turn it off in every window. ⌘⇧-drag still starts a reply in the panel.",
+          "descriptionKey": "schemaDescriptions.reply.inline",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Show a Reply button over text selected in an agent's pane. Set enabled to false to turn it off in every window. ⌘⇧-drag still starts a reply in the panel.",
+              "descriptionKey": "schemaDescriptions.reply.inline"
+            }
+          }
+        }
+      }
+    },
     "rightSidebar": {
       "title": "rightSidebar",
       "description": "Legacy and extension-owned right-sidebar configuration preserved in cmux.json.",
@@ -2612,11 +2867,13 @@ enum CmuxEmbeddedConfigSchema {
               "focusSidebar",
               "showWindowHints",
               "focusRightSidebar",
+              "focusRightSidebarInReply",
               "switchRightSidebarToFiles",
               "switchRightSidebarToFind",
               "switchRightSidebarToSessions",
               "switchRightSidebarToFeed",
               "switchRightSidebarToDock",
+              "insertReplyLabelByNumber",
               "switchRightSidebarToMachines",
               "triggerFlash",
               "nextSurface",
@@ -2674,15 +2931,24 @@ enum CmuxEmbeddedConfigSchema {
               "focusDown",
               "focusPreviousPane",
               "focusNextPane",
+              "splitLeft",
               "focusPaneByNumber",
               "splitRight",
+              "splitUp",
               "splitDown",
               "newPaneAutoLayout",
               "toggleSplitZoom",
+              "toggleDesignFocus",
+              "switchFigmaPreviewAndEditor",
+              "toggleFigmaMotion",
+              "showFigmaStill",
+              "flipDesignFocusLayout",
               "increaseWorkspaceTerminalFontSize",
               "decreaseWorkspaceTerminalFontSize",
               "resetWorkspaceTerminalFontSize",
               "equalizeSplits",
+              "equalizeSplitWidths",
+              "equalizeSplitHeights",
               "resize-pane-left",
               "resize-pane-right",
               "resize-pane-up",
@@ -2721,6 +2987,9 @@ enum CmuxEmbeddedConfigSchema {
               "markdownZoomIn",
               "markdownZoomOut",
               "markdownZoomReset",
+              "globalZoomIn",
+              "globalZoomOut",
+              "globalZoomReset",
               "find",
               "findInDirectory",
               "findNext",
@@ -2806,7 +3075,7 @@ enum CmuxEmbeddedConfigSchema {
         "when": {
           "type": "object",
           "default": {},
-          "description": "Optional per-action context predicates (VS Code-style `when` clauses), keyed by cmux action id. Each value is a boolean expression over context keys combined with !, &&, ||, and parentheses. Boolean keys: sidebarFocus, browserFocus, markdownFocus, filePreviewTextEditorFocus, simulatorFocus, terminalFocus, commandPaletteVisible, terminalFindVisible, terminalAlternateScreen, workspaceCanvasLayout. Typed keys support comparisons: the string sidebarMode (files, find, sessions, feed, or dock) and the integers paneCount and workspaceCount. Comparison operators are ==, !=, =~ (regex), <, <=, >, >=, and `in [a, b]`; an unknown or absent key reads as false. The boolean literals true and false are also accepted; `key == false` is the same as `!key`. The action's shortcut only fires (and only conflicts with other shortcuts) when the clause holds. Examples: { \"selectWorkspaceByNumber\": \"!sidebarFocus\" } selects workspaces with Ctrl+1–9 everywhere except when the right sidebar is focused; { \"selectSurfaceByNumber\": \"sidebarMode == 'find' && paneCount > 1\" } scopes a binding to the Find sidebar when the workspace has multiple panes.",
+          "description": "Optional per-action context predicates (VS Code-style `when` clauses), keyed by cmux action id. Each value is a boolean expression over context keys combined with !, &&, ||, and parentheses. Boolean keys: sidebarFocus, browserFocus, markdownFocus, filePreviewTextEditorFocus, simulatorFocus, terminalFocus, commandPaletteVisible, terminalFindVisible, terminalAlternateScreen, workspaceCanvasLayout. Typed keys support comparisons: the string sidebarMode (files, find, sessions, feed, dock, or reply) and the integers paneCount and workspaceCount. Comparison operators are ==, !=, =~ (regex), <, <=, >, >=, and `in [a, b]`; an unknown or absent key reads as false. The boolean literals true and false are also accepted; `key == false` is the same as `!key`. The action's shortcut only fires (and only conflicts with other shortcuts) when the clause holds. Examples: { \"selectWorkspaceByNumber\": \"!sidebarFocus\" } selects workspaces with Ctrl+1–9 everywhere except when the right sidebar is focused; { \"selectSurfaceByNumber\": \"sidebarMode == 'find' && paneCount > 1\" } scopes a binding to the Find sidebar when the workspace has multiple panes.",
           "descriptionKey": "schemaDescriptions.shortcuts.when",
           "additionalProperties": {
             "type": "string"

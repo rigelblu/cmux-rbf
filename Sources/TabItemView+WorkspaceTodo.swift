@@ -272,7 +272,7 @@ enum WorkspaceTodoPaletteCommands {
         registry.register(
             commandId: cycleWorkspaceStatusCommandId,
             handler: withSelectedWorkspace { workspace in
-                guard WorkspaceTodoFeature.isEnabled else {
+                guard isEnabled() else { // cmux-rbf (#cm-109.2, #cm-142.1): the injected switch, as the three status handlers above
                     NSSound.beep()
                     return
                 }

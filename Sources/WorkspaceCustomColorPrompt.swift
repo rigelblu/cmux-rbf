@@ -37,7 +37,8 @@ enum WorkspaceCustomColorPrompt {
         return normalized
     }
 
-    private static func showInvalidColorAlert(_ value: String, presentingWindow: NSWindow?) {
+    // cmux-rbf (#cm-60): not private, so the group prompt shares this alert.
+    static func showInvalidColorAlert(_ value: String, presentingWindow: NSWindow?) {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "alert.invalidColor.title", defaultValue: "Invalid Color")

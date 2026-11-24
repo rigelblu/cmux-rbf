@@ -34,7 +34,7 @@ struct SidebarRowSnapshotCacheTests {
         let disabledFactory = SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: SidebarTabItemSettingsSnapshot(defaults: defaults),
-            showsAgentActivity: false
+            showsAgentActivity: false, todoControlsEnabled: false
         )
         let disabledSnapshot = disabledFactory.makeSnapshot()
         #expect(disabledSnapshot.customColorHex == nil)
@@ -43,7 +43,7 @@ struct SidebarRowSnapshotCacheTests {
         let factory = SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: SidebarTabItemSettingsSnapshot(defaults: defaults),
-            showsAgentActivity: false,
+            showsAgentActivity: false, todoControlsEnabled: false,
             originColorHex: originColor
         )
         let cache = SidebarRowSnapshotCache()

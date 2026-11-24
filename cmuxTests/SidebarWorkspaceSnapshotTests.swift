@@ -184,6 +184,49 @@ import Testing
         #expect(tinted == Self.presentationKey(customColorHex: "#1565C0"))
         #expect(Self.presentationKey(customColorHex: "#922B21") != tinted)
     }
+
+    // cmux-rbf: changed on purpose (#cm-142.1): the fork's three refresh-policy tests (#cm-109.3, #cm-128.5, #cm-128.6:
+    // the attention lane, the hand and the triangle apply at once while the context menu is open) tested
+    // `SidebarWorkspaceSnapshotRefreshPolicy`, which upstream deleted (40160ee0f4) and which had no production caller
+    // here either, so no frozen menu state exists any more. What still decides a redraw is the row cell's
+    // `guard self.model != model`: each change below must make the two row models differ, and the same snapshot must not.
+    @MainActor
+    private static func rowModelsDiffer(
+        _ current: SidebarWorkspaceSnapshotBuilder.Snapshot,
+        _ next: SidebarWorkspaceSnapshotBuilder.Snapshot
+    ) throws -> (same: Bool, changed: Bool) {
+        let suite = "cmux.snapshot.redraw.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        let id = UUID()
+        let model = { (snapshot: SidebarWorkspaceSnapshotBuilder.Snapshot) in
+            SidebarAppKitRowCellTests.makeModel(workspaceId: id, settings: settings, snapshot: snapshot)
+        }
+        return (model(current) == model(current), model(current) != model(next))
+    }
+
+    @Test @MainActor
+    func attentionLaneChangeRedrawsTheRow() throws {
+        let result = try Self.rowModelsDiffer(Self.snapshot(), Self.snapshot(attentionTaskStatus: .todo))
+        #expect(result.same, "control: one snapshot gives one model")
+        #expect(result.changed, "a parked workspace's strip suppression redraws at once")
+    }
+
+    @Test @MainActor
+    func agentWaitingChangeRedrawsTheRow() throws {
+        let result = try Self.rowModelsDiffer(Self.snapshot(showsRaisedHand: false), Self.snapshot(showsRaisedHand: true))
+        #expect(result.same, "control: one snapshot gives one model")
+        #expect(result.changed, "the raised hand appears at once")
+    }
+
+    @Test @MainActor
+    func agentErrorChangeRedrawsTheRow() throws {
+        let error = SidebarAgentStateEntry(statusKey: "claude_code", displayName: "Claude Code", paneCount: 1, usageLimit: true)
+        let result = try Self.rowModelsDiffer(Self.snapshot(), Self.snapshot(errors: [error]))
+        #expect(result.same, "control: one snapshot gives one model")
+        #expect(result.changed, "the triangle appears at once")
+    }
 }
 
 @Suite struct SidebarSelectedWorkspaceScrollPolicyTests {

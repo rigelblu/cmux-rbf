@@ -23,6 +23,7 @@ extension WorkspacesModel {
     /// Returns nil when no workspace remains.
     public func selectionTargetAfterClose(closedIndex: Int) -> UUID? {
         guard !tabs.isEmpty else { return nil }
+        if hasNestedWorkspaceGroup { return nestedSelectionTarget(for: tabs[min(closedIndex, max(0, tabs.count - 1))]) } // (#cm-106, #cm-142.1)
         let newIndex = min(closedIndex, max(0, tabs.count - 1))
         let candidate = tabs[newIndex]
         guard let groupId = candidate.groupId,

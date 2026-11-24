@@ -1195,6 +1195,7 @@ extension SidebarGroupHeaderTableCellView { // (#cm-110.1)
         let colorResolver = SidebarAppearanceColorResolver() // (#cm-110.1)
 
         pinImageView.isHidden = true // (#cm-110.1)
+        statusGlyphView.isHidden = true // (#cm-110.1, #cm-142.1) upstream's compact glyph belongs to group headers; a status header draws its own glyph and mark
         chevronButton.glyphImage = RenderableSystemSymbol.configuredAppKitImage( // (#cm-110.1)
             systemName: model.isCollapsed ? "chevron.right" : "chevron.down", // (#cm-110.1)
             pointSize: GlobalFontMagnification.scaledSize(metrics.chevronFontSize, percent: percent), // (#cm-110.1)

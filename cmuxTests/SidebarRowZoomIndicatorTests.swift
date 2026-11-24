@@ -63,13 +63,15 @@ struct SidebarRowZoomIndicatorTests {
         var snapshot = SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: SidebarWorkspaceSnapshotFactory.presentationKey(
                 settings: settings,
-                showsAgentActivity: showsAgentActivity
+                showsAgentActivity: showsAgentActivity,
+                customColorHex: nil // cmux-rbf (#cm-142.1): upstream's new parameter; these rows carry no colour
             ),
             title: title,
             customDescription: nil,
             isPinned: isPinned,
             isMuted: false,
             customColorHex: nil,
+            hasManualCustomColor: false, // cmux-rbf (#cm-142.1): upstream's new parameter; no manual colour
             cloudWorkspaceLabel: nil,
             remoteWorkspaceSidebarText: nil,
             remoteConnectionStatusText: "",
@@ -232,7 +234,8 @@ struct SidebarRowZoomIndicatorTests {
             depth: 0,
             hasOwnWorkspace: hasOwnWorkspace,
             isFoldedOverSelection: false,
-            holdsGroups: false
+            holdsGroups: false,
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): upstream made it required
         )
         model.groupStatusGlyph = groupStatusGlyph
         return model

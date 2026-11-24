@@ -2836,6 +2836,7 @@ class GhosttyApp {
         )
     }
 
+    // cmux-rbf (#cm-13): one background image across the window. This block is fork-only.
     /// Reads the terminal `background-image` family out of a loaded config.
     ///
     /// Returns nil when no image is configured. The defaults below mirror

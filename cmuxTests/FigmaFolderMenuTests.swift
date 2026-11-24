@@ -99,7 +99,9 @@ private extension FileManager {
         let w = Workspace(); defer { w.teardownAllPanels() }
         let pane = try #require(w.bonsplitController.allPaneIds.first)
         w.currentDirectory = fixture.aInner
-        w.cloudVMBinding = WorkspaceCloudVMBinding(vmID: "b", isBase: false)
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's #19032 opens a cmux Cloud workspace's browser on the
+        // machine, so the page never loads here. An SSH-hosted binding is remote too and still opens locally.
+        w.cloudVMBinding = WorkspaceCloudVMBinding(vmID: "ssh:b", isBase: false)
         #expect(w.usesRemoteDirectoryProvenance)
         #expect(try newDesignAddress(w, in: fixture, pane: pane)
                 == "https://www.figma.com/design/new?folder_id=643299150&team_id=764866853003674551")

@@ -181,7 +181,13 @@ def generated_claude_hook_settings() -> str:
             direct(f"{direct_cli} hooks claude cron-create-guard", 5, matcher="CronCreate"),
             queued("pre-tool-use"),
         ],
-        "PostToolUse": [queued("push-notification", matcher="PushNotification")],
+        # cmux-rbf: changed on purpose (#cm-128.1, #cm-124.6, #cm-142.1): the fork's CLI also queues post-tool-use and sends
+        # the form tools to the Feed, so the wrapper's fast path compares against this exact document.
+        "PostToolUse": [
+            queued("post-tool-use"),
+            direct(f"{direct_cli} hooks feed --source claude", 125, matcher="AskUserQuestion|ExitPlanMode"),
+            queued("push-notification", matcher="PushNotification"),
+        ],
         "PermissionRequest": [direct(f"{direct_cli} hooks feed --source claude", 125)],
     }
     return json.dumps(

@@ -1671,6 +1671,18 @@ struct TabBarView: View {
         }
     }
 
+    // cmux-rbf (#cm-142.1): the fork's caption item builds its menu state up front; upstream's tab
+    // items moved to `contextMenuStateProvider` and dropped this helper in the bonsplit sync.
+    private func contextMenuState(for tab: TabItem, at index: Int) -> TabContextMenuState {
+        return TabContextMenuState(
+            tab: tab,
+            index: index,
+            pane: pane,
+            controller: controller,
+            splitViewController: splitViewController
+        )
+    }
+
     private func tabControlShortcutDigit(for index: Int, tabCount: Int) -> Int? {
         for digit in 1...9 {
             if tabIndexForControlShortcutDigit(digit, tabCount: tabCount) == index {

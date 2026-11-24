@@ -162,9 +162,9 @@ struct SidebarDebugSectionHeaderTests {
                 let pinned = tabs.addWorkspace(title: "Pinned", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
                 pinned.isPinned = true
                 let rootMember = tabs.addWorkspace(title: "Root member", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
-                let root = try #require(tabs.createWorkspaceGroup(name: "Root", childWorkspaceIds: [rootMember.id]))
+                let root = try #require(tabs.createWorkspaceGroupWithOwnAnchor(name: "Root", childWorkspaceIds: [rootMember.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
                 let nestedMember = tabs.addWorkspace(title: "Nested member", select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
-                let nested = try #require(tabs.createWorkspaceGroup(name: "Nested", childWorkspaceIds: [nestedMember.id]))
+                let nested = try #require(tabs.createWorkspaceGroupWithOwnAnchor(name: "Nested", childWorkspaceIds: [nestedMember.id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
                 let nestedIndex = try #require(tabs.workspaceGroups.firstIndex { $0.id == nested })
                 tabs.workspaceGroups[nestedIndex].parentGroupId = root
                 refusalGroups = [root, nested]
@@ -181,7 +181,9 @@ struct SidebarDebugSectionHeaderTests {
             #expect(WorkspaceTodoFeature.isEnabled)
             #expect(VerticalTabsSidebar.currentStatusGroupProjection(tabs: tabs.tabs, groups: tabs.workspaceGroups) != nil)
             let root = VerticalTabsSidebar(
-                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(), featureFlags: flags,
+                updateViewModel: UpdateStateModel(), fileExplorerState: FileExplorerState(),
+                sessionIndexStore: SessionIndexStore(), // cmux-rbf (#cm-142.1): upstream's new parameter, as its own tests pass it
+                featureFlags: flags,
                 sidebarUnread: SidebarUnreadModel(), titlebarControlsLayoutModel: TitlebarControlsLayoutModel(),
                 windowId: windowId, onSendFeedback: {}, onToggleSidebar: {}, onNewTab: {},
                 observedWindowReference: WeakWindowReference(), chromeBackgroundColor: .black,

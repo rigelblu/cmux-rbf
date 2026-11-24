@@ -245,7 +245,8 @@ struct WorkspaceGroupStatusEntrancesTests {
             shortcutHintText: nil, shortcutHintXOffset: 0, shortcutHintYOffset: 0,
             fontScale: 1, globalFontMagnificationPercent: 100, cwdContextMenuItems: [], rowSpacing: 2,
             isFirstRow: true, isBeingDragged: false, topDropIndicatorVisible: false,
-            bottomDropIndicatorVisible: false, colorSchemeIsDark: false
+            bottomDropIndicatorVisible: false, colorSchemeIsDark: false,
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): upstream made it required
         )
         model.groupStatusGlyph = .init(status: .working, name: "Doing", glyph: .shape(.half), colorHex: "#00C65F")
         model.groupStatusMenu = menu(f)

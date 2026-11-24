@@ -584,3 +584,76 @@ struct FigmaPaneOwnerTests {
         }
     }
 }
+
+// cmux-rbf (#cm-74.1): Keep Page Loaded survives a session save, and a snapshot written before it existed loads unkept.
+// On PRE this test sat in cmuxTests/BrowserHiddenWebViewDiscardMemoryPressureTests.swift; upstream moved that file into
+// the CmuxBrowser package, which cannot see the app's SessionBrowserPanelSnapshot, so it lives beside the other
+// SessionBrowserPanelSnapshot round trips here (#cm-142.1). Reject a removal on upstream sync.
+@Suite("SessionBrowserPanelSnapshot keepLoaded")
+struct SessionBrowserPanelSnapshotKeepLoadedTests {
+    @Test func sessionBrowserPanelSnapshotKeepLoadedPersistenceRoundTrip() throws {
+        let original = SessionBrowserPanelSnapshot(
+            urlString: "https://example.com",
+            profileID: UUID(),
+            shouldRenderWebView: true,
+            pageZoom: 1.0,
+            developerToolsVisible: false,
+            isMuted: false,
+            keepLoaded: true,
+            backHistoryURLStrings: nil,
+            forwardHistoryURLStrings: nil
+        )
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(SessionBrowserPanelSnapshot.self, from: data)
+        #expect(decoded.keepLoaded == true)
+
+        let jsonWithoutKey = """
+        {
+            "urlString": "https://example.com",
+            "shouldRenderWebView": true,
+            "pageZoom": 1.0,
+            "developerToolsVisible": false
+        }
+        """.data(using: .utf8)!
+        let decodedWithoutKey = try decoder.decode(SessionBrowserPanelSnapshot.self, from: jsonWithoutKey)
+        #expect(decodedWithoutKey.keepLoaded == false)
+        #expect(decodedWithoutKey.keepsPageActive == nil)
+    }
+
+    // cmux-rbf (#cm-142.1): the fork's Keep Page Loaded (`keepLoaded`, #cm-74.1) and upstream's keep-active pin
+    // (`keepsPageActive`) are two fields; each survives a save on its own, both survive together.
+    private func roundTrip(keepLoaded: Bool, keepsPageActive: Bool?) throws -> SessionBrowserPanelSnapshot {
+        let original = SessionBrowserPanelSnapshot(
+            urlString: "https://example.com",
+            profileID: nil,
+            shouldRenderWebView: true,
+            pageZoom: 1.0,
+            developerToolsVisible: false,
+            keepLoaded: keepLoaded,
+            backHistoryURLStrings: nil,
+            forwardHistoryURLStrings: nil,
+            keepsPageActive: keepsPageActive
+        )
+        return try JSONDecoder().decode(SessionBrowserPanelSnapshot.self, from: JSONEncoder().encode(original))
+    }
+
+    @Test func keepLoadedAloneRoundTripsWithoutKeepsPageActive() throws {
+        let decoded = try roundTrip(keepLoaded: true, keepsPageActive: nil)
+        #expect(decoded.keepLoaded == true)
+        #expect(decoded.keepsPageActive == nil)
+    }
+
+    @Test func keepsPageActiveAloneRoundTripsWithoutKeepLoaded() throws {
+        let decoded = try roundTrip(keepLoaded: false, keepsPageActive: true)
+        #expect(decoded.keepLoaded == false)
+        #expect(decoded.keepsPageActive == true)
+    }
+
+    @Test func keepLoadedAndKeepsPageActiveRoundTripTogether() throws {
+        let decoded = try roundTrip(keepLoaded: true, keepsPageActive: true)
+        #expect(decoded.keepLoaded == true)
+        #expect(decoded.keepsPageActive == true)
+    }
+}

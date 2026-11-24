@@ -9,6 +9,7 @@ extension TerminalPanelCreationOutcome {
         case .created(let panel): return .created(panelID: panel.id)
         case .routedToRemote: return .routedToRemote
         case .failed: return .failed
+        case .noSpace: return .noSpace // cmux-rbf (#cm-142.1): upstream's #15371
         }
     }
 }

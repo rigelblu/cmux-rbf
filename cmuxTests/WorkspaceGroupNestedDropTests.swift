@@ -28,6 +28,7 @@ struct WorkspaceGroupNestedDropTests {
         try await AppContextSerialGate.withExclusiveAppContext {
             let restore = try SidebarNestedRootStatusTests.installStatusList(controls: false)
             defer { restore() }
+            let restoreChief = ChiefOffForMountedSidebar.turnOff(); defer { restoreChief() } // cmux-rbf: changed on purpose (#cm-142.1): upstream's ContentView makes Chief Home on appear
             try await body()
         }
     }
@@ -54,9 +55,9 @@ struct WorkspaceGroupNestedDropTests {
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
         let (l, a1, a2, p1) = (ids[0], ids[1], ids[2], ids[3])
-        let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [a1, p1]))
+        let p = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [a1, p1])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         // The first workspace to join sits in P, so the new group is made inside P at its place.
-        let a = try #require(manager.createWorkspaceGroup(name: "A", childWorkspaceIds: [a1]))
+        let a = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "A", childWorkspaceIds: [a1])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.addWorkspaceToGroup(workspaceId: a2, groupId: a)
         manager.selectWorkspace(manager.tabs[0])
         var window = Window(manager: manager, l: l, a1: a1, a2: a2, p1: p1, p: p, a: a)
@@ -72,10 +73,10 @@ struct WorkspaceGroupNestedDropTests {
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
         let (l, a1, b1, p1) = (ids[0], ids[1], ids[2], ids[3])
-        let p = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [a1, b1, p1]))
-        let a = try #require(manager.createWorkspaceGroup(name: "A", childWorkspaceIds: [a1]))
+        let p = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [a1, b1, p1])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let a = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "A", childWorkspaceIds: [a1])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.addWorkspaceToGroup(workspaceId: b1, groupId: a)
-        let b = try #require(manager.createWorkspaceGroup(name: "B", childWorkspaceIds: [b1]))
+        let b = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "B", childWorkspaceIds: [b1])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         manager.selectWorkspace(manager.tabs[0])
         var window = Window(manager: manager, l: l, a1: a1, a2: b1, p1: p1, p: p, a: a)
         window.names = [l: "L", a1: "a1", b1: "b1", p1: "p1"]
@@ -433,7 +434,7 @@ struct WorkspaceGroupNestedDropTests {
             // A window with no nested group keeps the direct members: the function answers nothing and the caller does as before.
             let flat = TabManager(autoWelcomeIfNeeded: false)
             flat.addWorkspace(autoWelcomeIfNeeded: false)
-            let group = try #require(flat.createWorkspaceGroup(name: "F", childWorkspaceIds: [flat.tabs[1].id]))
+            let group = try #require(flat.createWorkspaceGroupWithOwnAnchor(name: "F", childWorkspaceIds: [flat.tabs[1].id])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             #expect(SidebarNestedDropLine.runRowIds(groupId: group, tabs: flat.tabs, groups: flat.workspaceGroups, visibleRowIds: flat.tabs.map(\.id)) == nil)
         }
     }
@@ -511,7 +512,7 @@ struct WorkspaceGroupNestedDropTests {
             let manager = TabManager(autoWelcomeIfNeeded: false)
             for _ in 0..<2 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
             let ids = manager.tabs.map(\.id)
-            let group = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ids[2]]))
+            let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
             manager.selectWorkspace(manager.tabs[0])
             let mounted = try await mount(manager)
             defer { close(mounted); cleanUp(mounted, dragged: ids[0]) }

@@ -1,3 +1,4 @@
+import CmuxRestartCommands
 import Foundation
 
 /// Coordinates periodic and typing-debounced session autosave work.
@@ -19,6 +20,18 @@ final class SessionAutosaveCoordinator {
         SurfaceResumeBindingIndex.PanelKey: Int64
     ]
     typealias SaveCurrentSnapshot = @MainActor () -> Bool
+    /// cmux-rbf #cm-54: what the autosave scan needs to see restart-approved pane commands. Read once
+    /// per tick, before the scan, so the scan and the save carry the same capture context.
+    typealias RestartCommandScanInputs = @MainActor () -> (
+        panelTTYDevices: [RestartCommandPanelKey: Int64],
+        captureContext: RestartCommandCaptureContext?
+    )
+    /// cmux-rbf #cm-54: ``Save`` with the tick's restart-command capture context.
+    typealias SaveWithRestartCommandContext = @MainActor (
+        RestorableAgentSessionIndex,
+        SurfaceResumeBindingIndex,
+        RestartCommandCaptureContext?
+    ) -> Bool
 
     private let isTerminatingApp: @MainActor () -> Bool
     private let isStartupSessionRestorePending: @MainActor () -> Bool
@@ -27,6 +40,8 @@ final class SessionAutosaveCoordinator {
     private let save: Save
     private let saveCurrentSnapshot: SaveCurrentSnapshot
     private let onTimerTick: @MainActor () -> Void
+    private let restartCommandScanInputs: RestartCommandScanInputs // cmux-rbf #cm-54
+    private let saveWithRestartCommandContext: SaveWithRestartCommandContext? // cmux-rbf #cm-54
 
     private static let typingQuietPeriod: TimeInterval = 0.65
 
@@ -51,7 +66,9 @@ final class SessionAutosaveCoordinator {
         fingerprint: @escaping Fingerprint,
         save: @escaping Save,
         saveCurrentSnapshot: @escaping SaveCurrentSnapshot,
-        onTimerTick: @escaping @MainActor () -> Void = {}
+        onTimerTick: @escaping @MainActor () -> Void = {},
+        restartCommandScanInputs: @escaping RestartCommandScanInputs = { ([:], nil) },
+        saveWithRestartCommandContext: SaveWithRestartCommandContext? = nil
     ) {
         self.isTerminatingApp = isTerminatingApp
         self.isStartupSessionRestorePending = isStartupSessionRestorePending
@@ -60,6 +77,8 @@ final class SessionAutosaveCoordinator {
         self.save = save
         self.saveCurrentSnapshot = saveCurrentSnapshot
         self.onTimerTick = onTimerTick
+        self.restartCommandScanInputs = restartCommandScanInputs
+        self.saveWithRestartCommandContext = saveWithRestartCommandContext
     }
 
     deinit {
@@ -255,8 +274,11 @@ final class SessionAutosaveCoordinator {
         let loadStart = ProcessInfo.processInfo.systemUptime
 #endif
         let ttyDeviceBindings = currentTTYDeviceBindings()
+        let restartInputs = restartCommandScanInputs() // cmux-rbf #cm-54
         let resumeIndexes = await ProcessDetectedResumeIndexes.load(
-            ttyDeviceBindings: ttyDeviceBindings
+            ttyDeviceBindings: ttyDeviceBindings,
+            restartCommandPanelTTYDevices: restartInputs.panelTTYDevices,
+            restartCommandCaptureContext: restartInputs.captureContext
         )
 #if DEBUG
         loadMs = (ProcessInfo.processInfo.systemUptime - loadStart) * 1000.0
@@ -299,7 +321,13 @@ final class SessionAutosaveCoordinator {
 #if DEBUG
         let saveStart = ProcessInfo.processInfo.systemUptime
 #endif
-        let didSave = save(
+        let didSave = saveWithRestartCommandContext.map { // cmux-rbf #cm-54
+            $0(
+                resumeIndexes.restorableAgentIndex,
+                resumeIndexes.surfaceResumeBindingIndex,
+                restartInputs.captureContext
+            )
+        } ?? save(
             resumeIndexes.restorableAgentIndex,
             resumeIndexes.surfaceResumeBindingIndex
         )

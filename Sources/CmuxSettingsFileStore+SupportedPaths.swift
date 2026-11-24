@@ -116,6 +116,8 @@ extension CmuxSettingsFileStore {
         "notifications.agentPermissionPrompt",
         "notifications.agentTurnComplete",
         "notifications.agentIdleReminder",
+        // cmux-rbf (#cm-142.1): the root is the catalog key's id, which the parser reads as one object.
+        "sidebar.sectionNames",
         "sidebar.sectionNames.pinned",
         "sidebar.sectionNames.workspaces",
         "sidebar.sectionNames.statuses",
@@ -154,6 +156,7 @@ extension CmuxSettingsFileStore {
         RightSidebarWidthSettings.settingsPath,
         "panes.arrangePatterns",
         "workspaceColors.displayNames",
+        "workspaceColors.labels", // cmux-rbf (#cm-142.1)
         "sidebar.selectionColor",
         "sidebar.notificationBadgeColor",
         "workspaceColors.selectionColor",

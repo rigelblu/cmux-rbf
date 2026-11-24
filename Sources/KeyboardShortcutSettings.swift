@@ -193,9 +193,9 @@ enum KeyboardShortcutSettings {
         case focusDown
         case focusPreviousPane
         case focusNextPane, focusPaneByNumber
-        case splitLeft
+        case splitLeft // cmux-rbf (#cm-2)
         case splitRight
-        case splitUp
+        case splitUp // cmux-rbf (#cm-2)
         case splitDown, toggleSplitZoom, newPaneAutoLayout
         // cmux-rbf #cm-73.2a
         case toggleDesignFocus
@@ -978,7 +978,7 @@ enum KeyboardShortcutSettings {
                 )
             case .globalSearch:
                 return .accepted(shortcut)
-            case .selectSurfaceByNumber, .selectWorkspaceByNumber, .insertReplyLabelByNumber, .focusPaneByNumber:
+            case .selectSurfaceByNumber, .selectWorkspaceByNumber, .insertReplyLabelByNumber, .focusPaneByNumber: // cmux-rbf (#cm-83.1)
                 return resolvedNumberedDigitShortcut(shortcut)
             default:
                 return .accepted(shortcut)

@@ -28,10 +28,11 @@ struct RightSidebarReplyModeTests {
 
     @Test("Reply is not beta-gated")
     func replyIsAvailableWithBetaFeaturesOff() {
-        // An unavailable mode beeps instead of opening. Feed and Dock are the
-        // gated pair; Reply ships on, like Files/Find/Vault.
-        #expect(RightSidebarMode.reply.isAvailable(feedEnabled: false, dockEnabled: false, machinesEnabled: false))
-        #expect(RightSidebarMode.availableModes(feedEnabled: false, dockEnabled: false, machinesEnabled: false).contains(.reply))
+        // An unavailable mode beeps instead of opening. Feed and Cloud are the
+        // gated modes (upstream no longer gates Dock); Reply ships on, like
+        // Files/Find/Vault. cmux-rbf (#cm-69, #cm-142.1): upstream dropped `dockEnabled:`.
+        #expect(RightSidebarMode.reply.isAvailable(feedEnabled: false, machinesEnabled: false))
+        #expect(RightSidebarMode.availableModes(feedEnabled: false, machinesEnabled: false).contains(.reply))
     }
 
     @Test("Reply promotes to a pane, and both palette descriptors exist for it")

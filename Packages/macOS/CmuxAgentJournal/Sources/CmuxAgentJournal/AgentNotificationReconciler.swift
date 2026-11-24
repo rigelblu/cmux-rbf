@@ -213,7 +213,18 @@ public struct AgentNotificationReconciler: Sendable {
             let seenTurns = session.seenTurns
             let retiredSurfaceIDs = session.retiredSurfaceIDs
             let previousSurfaceID = session.surfaceID
+            // cmux-rbf: a SessionStart for a live session that is running, watching background work or settled keeps that
+            // projection; only an error or a hand is reset, as upstream's #18970 retires them. (#cm-128.3, #cm-142.1)
+            let carriedPhase: AgentLifecyclePhase? = !session.ended && (session.phase == .running || session.phase == .idle)
+                ? session.phase : nil
+            let carriedWatching = session.watching
+            let carriedRootStopped = session.rootStopped
             session = Session()
+            if let carriedPhase { // (#cm-128.3)
+                session.phase = carriedPhase
+                session.watching = carriedWatching
+                session.rootStopped = carriedRootStopped
+            }
             session.surfaceID = draft.surfaceId
             session.agentKey = draft.agentKey
             session.retiredSurfaceIDs = retiredSurfaceIDs
@@ -445,8 +456,12 @@ public struct AgentNotificationReconciler: Sendable {
             session.reopenedSinceCompletion = false
         }
         if draft.kind == .idleObserved {
+            // cmux-rbf: an idle observation for the native turn settles it while that turn only watches background work,
+            // so a watching turn can end. An active turn stays running, as upstream's #15887 keeps it. (#cm-128.3, #cm-142.1)
+            let settlesWatchingTurn = session.phase == .running && session.watching
+                && context?.turnIdentity != nil && context?.turnIdentity == session.nativeTurn
             guard !draft.pendingWork, session.attentionIdentities.isEmpty, session.children.isEmpty,
-                  session.phase == .idle || session.phase == .unknown,
+                  session.phase == .idle || session.phase == .unknown || settlesWatchingTurn, // (#cm-128.3)
                   !session.ended else {
                 // Even a delayed idle observation commits a pane move so the
                 // origin receipt invalidations cannot be lost on this early exit.
@@ -689,7 +704,8 @@ public struct AgentNotificationReconciler: Sendable {
         let phase: AgentLifecyclePhase = session.phase == .running && session.watching ? .monitoring : session.phase
         switch draft.kind {
         case .sessionStarted where session.phase != .unknown:
-            draft.kind = .stateChanged
+            // cmux-rbf: the start keeps its kind, so the reducer still records upstream's session boundary, and declares the
+            // phase it carries. (#cm-128.3, #cm-142.1)
             draft.declaredPhase = phase
         case .turnCompleted:
             if phase == .needsInput || phase == .monitoring {

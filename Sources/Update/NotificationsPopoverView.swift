@@ -3,6 +3,7 @@ import Bonsplit
 import Combine
 import CmuxFoundation
 import CmuxNotifications
+import CmuxRestartCommands
 import CmuxSettings
 import CmuxSettingsUI
 import CmuxTestSupport
@@ -40,6 +41,7 @@ final class NotificationsPopoverDrawnRows {
 
 struct NotificationsPopoverView: View {
     @ObservedObject var notificationStore: TerminalNotificationStore
+    @ObservedObject private var restartSummaryStore = RestartCommandRestoreSummaryStore.shared
     let drawnRows: NotificationsPopoverDrawnRows
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
     @Environment(\.cmuxAccentColor) private var cmuxAccent
@@ -108,10 +110,14 @@ struct NotificationsPopoverView: View {
         }
     }
 
-    /// The ids of the rows ``content`` lists, in order: empty while it shows an empty state.
+    /// The ids of the numbered rows ``content`` lists, in order: empty while it shows an empty state.
+    /// Only terminal notifications are numbered; a restart summary row (cmux-rbf #cm-54) has no digit.
     private var drawnRowIds: [UUID] {
-        guard notificationStore.notificationMenuSnapshot.hasNotifications else { return [] }
-        return notificationStore.notifications.map(\.id)
+        guard macMenuProjection.hasNotifications else { return [] }
+        return feedItems.compactMap { item in
+            if case .terminal(let notification, _, _) = item { return notification.id }
+            return nil
+        }
     }
 
     // Cap against the current screen so the popover (and especially the bottom-right resize
@@ -197,7 +203,7 @@ struct NotificationsPopoverView: View {
                     .background(Capsule().fill(cmuxAccent.color))
             }
             Spacer()
-            Button(action: jumpToLatestUnread) {
+            Button(action: jumpToOldestUnread) {
                 HStack(spacing: 5) {
                     CmuxSystemSymbolImage(
                         systemName: "arrow.down.to.line",
@@ -205,7 +211,7 @@ struct NotificationsPopoverView: View {
                         weight: .semibold,
                         tint: hasUnreadNotifications ? .primary : .secondary
                     )
-                    Text(String(localized: "notifications.jumpToLatest", defaultValue: "Jump to Latest"))
+                    Text(String(localized: "notifications.jumpToLatest", defaultValue: "Oldest Unread"))
                         .cmuxFont(size: 11)
                     if !jumpToUnreadShortcut.displayString.isEmpty {
                         Text(jumpToUnreadShortcut.displayString)
@@ -235,12 +241,12 @@ struct NotificationsPopoverView: View {
             .accessibilityValue(jumpToUnreadShortcut.displayString)
             .safeHelp(
                 KeyboardShortcutSettings.Action.jumpToUnread.tooltip(
-                    String(localized: "notifications.jumpToLatest", defaultValue: "Jump to Latest")
+                    String(localized: "notifications.jumpToLatest", defaultValue: "Oldest Unread")
                 )
             )
             .disabled(!hasUnreadNotifications)
 
-            Button(action: { notificationStore.clearAll() }) {
+            Button(action: { AppDelegate.shared?.clearAllMacNotifications() }) {
                 Text(String(localized: "notifications.clearAll", defaultValue: "Clear All"))
                     .cmuxFont(size: 11)
                     .padding(.horizontal, 8)
@@ -249,11 +255,11 @@ struct NotificationsPopoverView: View {
             .buttonStyle(.plain)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(Color.secondary.opacity(notificationStore.notificationMenuSnapshot.hasNotifications ? 0.12 : 0.05))
+                    .fill(Color.secondary.opacity(macMenuProjection.hasNotifications ? 0.12 : 0.05))
             )
-            .foregroundColor(notificationStore.notificationMenuSnapshot.hasNotifications ? .primary : .secondary)
+            .foregroundColor(macMenuProjection.hasNotifications ? .primary : .secondary)
             .accessibilityIdentifier("notificationsPopover.clearAll")
-            .disabled(notificationStore.notificationMenuSnapshot.hasNotifications == false)
+            .disabled(!macMenuProjection.hasNotifications)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -289,13 +295,13 @@ struct NotificationsPopoverView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !notificationStore.notificationMenuSnapshot.hasNotifications {
+        if !macMenuProjection.hasNotifications {
             emptyState(
                 systemImage: "bell.slash",
                 title: String(localized: "notifications.empty.title", defaultValue: "No notifications yet"),
                 subtitle: String(localized: "notifications.empty.subtitle", defaultValue: "Desktop notifications will appear here.")
             )
-        } else if notificationStore.notifications.isEmpty {
+        } else if feedItems.isEmpty {
             emptyState(
                 systemImage: "bell.badge",
                 title: notificationStore.notificationMenuSnapshot.stateHintTitle,
@@ -307,51 +313,75 @@ struct NotificationsPopoverView: View {
             // store from inside the ForEach builder reintroduces a store dependency below
             // the list boundary, which is the same anti-pattern CLAUDE.md flags for the
             // sidebar/sessions panel (https://github.com/manaflow-ai/cmux/issues/2586).
-            let snapshot = notificationStore.notifications
+            let snapshot = feedItems
             let lastIndex = snapshot.count - 1
             // One tabId -> title index per render, not an O(tabs) scan per row (#5794).
             let titleSnapshot = loadedWorkspaceTitles ?? currentWorkspaceTitles()
-            let numbering = NotificationListShortcutDigit(rowCount: snapshot.count)
+            // cmux-rbf #cm-54: digits number the terminal rows only, in order, skipping restart summaries.
+            let numberedIds = drawnRowIds
+            let numberedIndexById = Dictionary(
+                uniqueKeysWithValues: numberedIds.enumerated().map { ($0.element, $0.offset) }
+            )
+            let numbering = NotificationListShortcutDigit(rowCount: numberedIds.count)
             let shortcutPrefix = rowShortcutPrefix
             let showsHints = showsRowShortcutHints
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(snapshot.enumerated()), id: \.element.id) { index, notification in
-                        NotificationPopoverRow(
-                            notification: notification,
-                            workspaceTitle: titleSnapshot[notification.tabId],
-                            shortcut: shortcutPrefix.flatMap { prefix in
-                                numbering.digit(forRowIndex: index).map { "\(prefix)\($0)" }
-                            },
-                            showsShortcutHint: showsHints,
-                            onOpen: { open(notification) },
-                            onClear: {
-                                withAnimation(.easeOut(duration: 0.18)) {
-                                    notificationStore.remove(id: notification.id)
-                                }
-                            },
-                            onToggleRead: {
-                                if notification.isRead {
-                                    notificationStore.markUnread(id: notification.id)
-                                } else {
-                                    notificationStore.markRead(id: notification.id)
-                                    // A user-initiated "Mark as Read" on a pane-scoped
-                                    // notification should also clear the pane's focused-read
-                                    // indicator so the pane badge disappears. For
-                                    // workspace-level notifications (surfaceId == nil), do not
-                                    // call clearFocusedReadIndicator — it treats nil as
-                                    // "clear any pane indicator on this tab" and would wipe
-                                    // an unrelated pane badge.
-                                    if let surfaceId = notification.surfaceId {
-                                        notificationStore.clearFocusedReadIndicator(
-                                            forTabId: notification.tabId,
-                                            surfaceId: surfaceId
-                                        )
+                    ForEach(Array(snapshot.enumerated()), id: \.element.id) { index, item in
+                        switch item {
+                        case .terminal(let notification, _, _):
+                            NotificationPopoverRow(
+                                notification: notification,
+                                workspaceTitle: titleSnapshot[notification.tabId],
+                                shortcut: shortcutPrefix.flatMap { prefix in
+                                    numberedIndexById[notification.id]
+                                        .flatMap { numbering.digit(forRowIndex: $0) }
+                                        .map { "\(prefix)\($0)" }
+                                },
+                                showsShortcutHint: showsHints,
+                                onOpen: { open(notification) },
+                                onClear: {
+                                    withAnimation(.easeOut(duration: 0.18)) {
+                                        notificationStore.remove(id: notification.id)
+                                    }
+                                },
+                                onToggleRead: {
+                                    if notification.isRead {
+                                        notificationStore.markUnread(id: notification.id)
+                                    } else {
+                                        notificationStore.markRead(id: notification.id)
+                                        // A user-initiated "Mark as Read" on a pane-scoped
+                                        // notification should also clear the pane's focused-read
+                                        // indicator so the pane badge disappears. For
+                                        // workspace-level notifications (surfaceId == nil), do not
+                                        // call clearFocusedReadIndicator — it treats nil as
+                                        // "clear any pane indicator on this tab" and would wipe
+                                        // an unrelated pane badge.
+                                        if let surfaceId = notification.surfaceId {
+                                            notificationStore.clearFocusedReadIndicator(
+                                                forTabId: notification.tabId,
+                                                surfaceId: surfaceId
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        )
-                        .equatable()  // snapshot-boundary: skip unchanged rows (#5794)
+                            )
+                            .equatable()  // snapshot-boundary: skip unchanged rows (#5794)
+                        case .restartSummary(let summary):
+                            RestartCommandRestoreSummaryRowView(
+                                summary: summary,
+                                isFocused: false,
+                                onClear: {
+                                    withAnimation(.easeOut(duration: 0.18)) {
+                                        restartSummaryStore.remove(id: summary.id)
+                                    }
+                                },
+                                onToggleRead: {
+                                    restartSummaryStore.setRead(!summary.isRead, id: summary.id)
+                                }
+                            )
+                            .equatable()
+                        }
                         if index < lastIndex {
                             Divider()
                                 .opacity(0.4)
@@ -450,18 +480,30 @@ struct NotificationsPopoverView: View {
     }
 
     private var hasUnreadNotifications: Bool {
-        notificationStore.notificationMenuSnapshot.hasUnreadNotifications
+        macMenuProjection.hasUnreadNotifications
     }
 
     private var unreadCount: Int {
-        notificationStore.notificationMenuSnapshot.unreadCount
+        macMenuProjection.unreadCount
     }
 
-    private func jumpToLatestUnread() {
+    private func jumpToOldestUnread() {
         DispatchQueue.main.async {
-            AppDelegate.shared?.jumpToLatestUnread()
+            _ = AppDelegate.shared?.jumpToOldestUnread() // (cm-128.11)
             onDismiss()
         }
+    }
+
+    private var feedItems: [MacNotificationFeedItem<TerminalNotification>] {
+        restartSummaryStore.feedItems(
+            terminalNotifications: notificationStore.notifications
+        )
+    }
+
+    private var macMenuProjection: MacNotificationMenuProjection {
+        restartSummaryStore.menuProjection(
+            terminal: notificationStore.notificationMenuSnapshot
+        )
     }
 
     private func open(_ notification: TerminalNotification) {

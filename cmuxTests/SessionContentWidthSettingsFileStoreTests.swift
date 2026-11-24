@@ -109,7 +109,7 @@ struct SessionContentWidthSettingsFileStoreTests {
         let keys = [
             catalog.betaFeatures.remoteTmux.userDefaultsKey,
             catalog.sidebar.branchVerticalLayout.userDefaultsKey,
-            catalog.sidebar.activeTabIndicatorStyle.userDefaultsKey,
+            retiredIndicatorStyleDefaultsKey, // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
             catalog.sidebar.selectionColorHex.userDefaultsKey,
             settingsFileBackupsDefaultsKey,
             importedManagedDefaultsKey,
@@ -130,7 +130,8 @@ struct SessionContentWidthSettingsFileStoreTests {
 
             #expect(defaults.bool(forKey: catalog.betaFeatures.remoteTmux.userDefaultsKey))
             #expect(defaults.bool(forKey: catalog.sidebar.branchVerticalLayout.userDefaultsKey) == false)
-            #expect(defaults.string(forKey: catalog.sidebar.activeTabIndicatorStyle.userDefaultsKey) == "solidFill")
+            // cmux-rbf: changed on purpose (#cm-10, #cm-142.1): the retired indicator style is accepted (no issue) and never written.
+            #expect(defaults.object(forKey: retiredIndicatorStyleDefaultsKey) == nil)
             #expect(defaults.string(forKey: catalog.sidebar.selectionColorHex.userDefaultsKey) == "#123456")
         }
     }
@@ -214,9 +215,11 @@ struct SessionContentWidthSettingsFileStoreTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let file = directory.appendingPathComponent("cmux.json")
         let catalog = SettingCatalog()
-        try #"{"sidebar":{"activeTabIndicatorStyle":"leftRail"},"integrations":{"codex":{"hooksEnabled":true}}}"#
+        // cmux-rbf: changed on purpose (#cm-10, #cm-142.1): upstream's JSON plus `selectionColor`, a sidebar key the fork applies, observed where upstream
+        // observed the retired indicator style.
+        try ##"{"sidebar":{"activeTabIndicatorStyle":"leftRail","selectionColor":"#111111"},"integrations":{"codex":{"hooksEnabled":true}}}"##
             .write(to: file, atomically: true, encoding: .utf8)
-        let indicatorKey = catalog.sidebar.activeTabIndicatorStyle.userDefaultsKey
+        let sidebarKey = catalog.sidebar.selectionColorHex.userDefaultsKey // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
         let hooksKey = catalog.integrations.codexHooksEnabled.userDefaultsKey
         let (updates, continuation) = AsyncStream<(String?, Bool)>.makeStream()
         defer { continuation.finish() }
@@ -227,17 +230,18 @@ struct SessionContentWidthSettingsFileStoreTests {
             userDefaults: defaults,
             startWatching: true,
             onWatchedFileReload: { _ in
-                continuation.yield((defaults.string(forKey: indicatorKey), defaults.bool(forKey: hooksKey)))
+                continuation.yield((defaults.string(forKey: sidebarKey), defaults.bool(forKey: hooksKey))) // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
             }
         )
-        #expect(defaults.string(forKey: catalog.sidebar.activeTabIndicatorStyle.userDefaultsKey) == "leftRail")
-        try #"{"workspaceColors":{"indicatorStyle":"leftRail"},"sidebar":{"activeTabIndicatorStyle":"solidFill"},"automation":{"codexIntegration":true},"integrations":{"codex":{"hooksEnabled":false}}}"#
+        #expect(defaults.string(forKey: sidebarKey) == "#111111") // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
+        #expect(defaults.object(forKey: retiredIndicatorStyleDefaultsKey) == nil) // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
+        try ##"{"workspaceColors":{"indicatorStyle":"leftRail"},"sidebar":{"activeTabIndicatorStyle":"solidFill","selectionColor":"#222222"},"automation":{"codexIntegration":true},"integrations":{"codex":{"hooksEnabled":false}}}"## // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
             .write(to: file, atomically: true, encoding: .utf8)
         var iterator = updates.makeAsyncIterator()
         let update = await iterator.next()
-        #expect(update?.0 == "solidFill")
+        #expect(update?.0 == "#222222") // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
         #expect(update?.1 == false)
-        #expect(defaults.string(forKey: catalog.sidebar.activeTabIndicatorStyle.userDefaultsKey) == "solidFill")
+        #expect(defaults.object(forKey: retiredIndicatorStyleDefaultsKey) == nil) // cmux-rbf: changed on purpose (#cm-10, #cm-142.1)
         #expect(store.configurationIssues.isEmpty)
         withExtendedLifetime(store) {}
     }
@@ -397,6 +401,10 @@ struct SessionContentWidthSettingsFileStoreTests {
             try verify(defaults)
         }
     }
+
+    // cmux-rbf: changed on purpose (#cm-10, #cm-142.1): upstream's UserDefaults key for the retired
+    // `sidebar.activeTabIndicatorStyle` / `workspaceColors.indicatorStyle`. The fork's catalog no longer has it.
+    private let retiredIndicatorStyleDefaultsKey = "sidebarActiveTabIndicatorStyle"
 
     private func preservingDefaults(keys: [String], _ body: () throws -> Void) throws {
         let defaults = UserDefaults.standard

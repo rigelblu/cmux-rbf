@@ -94,7 +94,18 @@ extension Workspace {
             browser = panels[panelId] as? BrowserPanel
         }
         guard let browser else { return nil }
+        let before = browser.webView.url // cmux-rbf (#cm-126.3, #cm-142.1)
         browser.navigate(to: url)
+        // cmux-rbf (#cm-142.1): upstream's #18318 moved the web view's URL observer onto a later main-actor turn. The
+        // Agent Pane's own steer publishes the address WebKit took at once, as that observer did before, so a clear, a
+        // move or the next show in the same turn reads the page it steered to (#cm-126.3, #cm-126.14). Only a change is
+        // published, as that observer fired only on a change: a navigate that loads nothing (a remote workspace's queue,
+        // a cloud address) leaves the web view on the old page, and the address those paths set stands. Known gap: a
+        // steer to the address the web view already took earlier in the same turn, by a load nothing published,
+        // publishes nothing, so the pane's address trails until the load commits.
+        if !browser.isMainFrameProvisionalNavigationActive, let taken = browser.webView.url, taken != before {
+            browser.publishObservedDocumentURL(taken)
+        }
         if !isClear { browser.agentPaneLastPostURL = url }
         agentPaneClearedFlags[browser.id] = isClear
         // cmux-rbf #cm-126.15: a show records its agent and then refreshes the caption, which names the pane for it; a clear

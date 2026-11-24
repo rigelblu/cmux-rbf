@@ -32,6 +32,6 @@ A function called from `body`, directly or through a helper, must not write obse
 
 ## OS-version repros
 
-Foundation, SwiftUI, AttributeGraph, and WebKit behavior changes silently between macOS majors. From https://github.com/manaflow-ai/cmux/issues/4529: `URL(fileURLWithPath: "/").deletingLastPathComponent().path` returns `"/.."` on macOS 14 and 15 but `"/"` on macOS 26, because Apple fixed CFURL normalization. The repo's `macos-26` CI and every maintainer's machine were on the fixed side; every reporter was on the broken side.
+Foundation, SwiftUI, AttributeGraph, and WebKit behavior changes silently between macOS majors. From https://github.com/manaflow-ai/cmux/issues/4529: `URL(fileURLWithPath: "/").deletingLastPathComponent().path` returns `"/.."` on macOS 14 and 15 but `"/"` on macOS 26, because Apple fixed CFURL normalization. Every maintainer's machine was on the fixed side; every reporter was on the broken side. <!-- cmux-rbf: pruned upstream text — removed "The repo's `macos-26` CI and" — no CI in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 Test on the reporter's macOS before declaring a repro disproven. <!-- cmux-rbf: pruned upstream text — removed the pre-provisioned AWS M4 Pro builder fleet (`cmux-aws-mac`, `cmux-aws-m4pro`, `aws-m4pro-1..6`) as the preferred empirical-repro path — not reachable from this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->

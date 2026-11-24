@@ -19,7 +19,8 @@ struct SettingsTaxonomyTests {
         #expect(SettingsTaxonomyGroup.terminal.sections == [.terminal, .textBox])
         #expect(SettingsTaxonomyGroup.workspace.sections == [.workspaceColors])
         #expect(SettingsTaxonomyGroup.sidebarAndDock.sections == [.sidebarAppearance, .customSidebars])
-        #expect(SettingsTaxonomyGroup.agentsAndAutomation.sections == [.automation, .computerUse])
+        // cmux-rbf: changed on purpose (#cm-136.2, #cm-142.1): the fork's Reply section sits in Agents & Automation
+        #expect(SettingsTaxonomyGroup.agentsAndAutomation.sections == [.automation, .computerUse, .reply])
         #expect(SettingsTaxonomyGroup.browserAndFiles.sections == [.browser, .browserImport])
         #expect(SettingsTaxonomyGroup.remoteAndDevices.sections == [.mobile, .cloudMachines, .computers, .networking])
         #expect(

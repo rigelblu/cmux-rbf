@@ -1,3 +1,4 @@
+import CmuxBrowser
 import Foundation
 import Testing
 import WebKit
@@ -119,6 +120,10 @@ struct FigmaHiddenUnloadTests {
     func hiddenFigmaPaneIsKeptAcrossScheduledDiscard() async throws {
         let panel = try await makePanel(url: Self.figmaEditorURL, showsAddressBar: false)
         defer { panel.close() }
+        // cmux-rbf (#cm-142.1): upstream's default mode is now the memory budget, which arms no countdown; these
+        // scheduled-discard checks run in timer mode, through upstream's own test helper.
+        let previousPolicy = enableHiddenWebViewDiscardTimerPolicy()
+        defer { restoreHiddenWebViewDiscardPolicy(previousPolicy) }
 
         let originalInstanceID = panel.webViewInstanceID
         panel.noteWebViewVisibility(
@@ -126,6 +131,8 @@ struct FigmaHiddenUnloadTests {
             reason: "test.hide",
             now: Date().addingTimeInterval(-(BrowserHiddenWebViewDiscardPolicy.hiddenDelay + 1))
         )
+        // cmux-rbf (#cm-142.1): the memory budget, upstream's default mode, keeps a hidden Figma pane too.
+        #expect(!panel.hiddenWebViewDiscardManager.isEligibleForMemoryBudgetDiscard())
         panel.reevaluateHiddenWebViewDiscardScheduling(reason: "test.replan")
 
         #expect(panel.webViewLifecycleTopPayload()["discard_eligible"] as? Bool == true)
@@ -137,6 +144,10 @@ struct FigmaHiddenUnloadTests {
     func hiddenOrdinaryPaneIsDiscardedAcrossScheduledDiscard() async throws {
         let panel = try await makePanel(url: Self.ordinaryURL, showsAddressBar: false)
         defer { panel.close() }
+        // cmux-rbf (#cm-142.1): upstream's default mode is now the memory budget, which arms no countdown; these
+        // scheduled-discard checks run in timer mode, through upstream's own test helper.
+        let previousPolicy = enableHiddenWebViewDiscardTimerPolicy()
+        defer { restoreHiddenWebViewDiscardPolicy(previousPolicy) }
 
         let originalInstanceID = panel.webViewInstanceID
         panel.noteWebViewVisibility(
@@ -144,6 +155,8 @@ struct FigmaHiddenUnloadTests {
             reason: "test.hide",
             now: Date().addingTimeInterval(-(BrowserHiddenWebViewDiscardPolicy.hiddenDelay + 1))
         )
+        // cmux-rbf (#cm-142.1): control for the Figma pane's budget check: an ordinary hidden pane is eligible.
+        #expect(panel.hiddenWebViewDiscardManager.isEligibleForMemoryBudgetDiscard())
         panel.reevaluateHiddenWebViewDiscardScheduling(reason: "test.replan")
 
         #expect(panel.webViewInstanceID != originalInstanceID)
@@ -153,6 +166,10 @@ struct FigmaHiddenUnloadTests {
     func hiddenFigmaPaneWithVisibleOmnibarIsDiscardedAcrossScheduledDiscard() async throws {
         let panel = try await makePanel(url: Self.figmaEditorURL, showsAddressBar: true)
         defer { panel.close() }
+        // cmux-rbf (#cm-142.1): upstream's default mode is now the memory budget, which arms no countdown; these
+        // scheduled-discard checks run in timer mode, through upstream's own test helper.
+        let previousPolicy = enableHiddenWebViewDiscardTimerPolicy()
+        defer { restoreHiddenWebViewDiscardPolicy(previousPolicy) }
 
         let originalInstanceID = panel.webViewInstanceID
         panel.noteWebViewVisibility(
@@ -216,7 +233,7 @@ struct FigmaHiddenUnloadTests {
             reason: "test.hide",
             now: Date().addingTimeInterval(-(BrowserHiddenWebViewDiscardPolicy.hiddenDelay + 1))
         )
-        let blockers = panel.hiddenWebViewDiscardManager.blockers(for: panel.hiddenWebViewDiscardSnapshot, allowingRecoverableWebContentTermination: true)
+        let blockers = panel.hiddenWebViewDiscardManager.blockers(for: panel.hiddenWebViewDiscardSnapshot, urgency: .systemMemoryPressure) /* cmux-rbf (#cm-142.1): upstream's urgency replaces allowingRecoverableWebContentTermination */
         try #require(panel.discardHiddenWebViewForSystemMemoryPressure(), "fixture: the preview was not discarded; blockers \(blockers), web view loading \(panel.webView.isLoading), pane loading \(panel.isLoading)")
         try #require(panel.webViewInstanceID != originalInstanceID, "fixture: the web view was not replaced")
 

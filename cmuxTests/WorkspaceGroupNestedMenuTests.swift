@@ -17,9 +17,9 @@ struct WorkspaceGroupNestedMenuTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let inner = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
-        let other = try #require(manager.createWorkspaceGroup(name: "R", childWorkspaceIds: [ids[3]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let inner = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let other = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "R", childWorkspaceIds: [ids[3]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         return (manager, outer, inner, other)
     }
 
@@ -121,7 +121,8 @@ struct WorkspaceGroupNestedMenuTests {
             canMarkAllUnread: false, shortcutHintText: nil, shortcutHintXOffset: 0, shortcutHintYOffset: 0, fontScale: 1,
             globalFontMagnificationPercent: 100, cwdContextMenuItems: [], rowSpacing: 2, isFirstRow: true,
             isBeingDragged: false, topDropIndicatorVisible: false, bottomDropIndicatorVisible: false,
-            colorSchemeIsDark: false, holdsGroups: holdsGroups
+            colorSchemeIsDark: false, holdsGroups: holdsGroups,
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): upstream made it required
         )
         let cell = SidebarGroupHeaderTableCellView(frame: NSRect(x: 0, y: 0, width: 240, height: 28))
         let actions = SidebarGroupHeaderRowActions(
@@ -157,7 +158,8 @@ struct WorkspaceGroupNestedMenuTests {
             shortcutHintText: nil, shortcutHintXOffset: 0, shortcutHintYOffset: 0, fontScale: 1,
             globalFontMagnificationPercent: 100, cwdContextMenuItems: [], rowSpacing: 2, isFirstRow: true,
             isBeingDragged: false, topDropIndicatorVisible: false, bottomDropIndicatorVisible: false,
-            colorSchemeIsDark: false
+            colorSchemeIsDark: false,
+            notificationBadgeColorHex: nil // cmux-rbf (#cm-142.1): upstream made it required
         )
     }
 }

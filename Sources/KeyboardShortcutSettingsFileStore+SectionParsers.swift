@@ -281,12 +281,8 @@ extension CmuxSettingsFileStore {
         } else if section.keys.contains("branchVerticalLayout") {
             logInvalid(SidebarCatalogSection().branchVerticalLayout.id, sourcePath: sourcePath)
         }
-        if let raw = jsonString(section["activeTabIndicatorStyle"]),
-           let indicator = WorkspaceIndicatorStyle.decodeFromJSON(raw) {
-            snapshot.managedUserDefaults[SettingCatalog().workspaceColors.indicatorStyle.userDefaultsKey] = .string(indicator.rawValue)
-        } else if section.keys.contains("activeTabIndicatorStyle") {
-            logInvalid(SidebarCatalogSection().activeTabIndicatorStyle.id, sourcePath: sourcePath)
-        }
+        // cmux-rbf (#cm-10, #cm-142.1): `sidebar.activeTabIndicatorStyle` is read past silently, like
+        // `workspaceColors.indicatorStyle`: the fork has one workspace colour treatment, so the key selects nothing.
         if section.keys.contains("selectionColor"),
            let value = parseCanonicalNullableHex(
                section["selectionColor"],

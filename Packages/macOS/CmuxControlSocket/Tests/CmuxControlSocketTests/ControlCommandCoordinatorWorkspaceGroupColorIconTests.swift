@@ -386,9 +386,9 @@ private final class FakeWorkspaceGroupColorIconContext: ControlCommandContext {
         routing: ControlRoutingSelectors,
         groupID: UUID,
         hex: String?
-    ) -> Bool? {
+    ) -> (found: Bool, storedHex: String?)? { // cmux-rbf: changed on purpose (#cm-142.1): the fork's (#cm-110.2) return shape
         setColors.append(ColorCall(groupID: groupID, hex: hex))
-        return true
+        return (true, hex) // cmux-rbf: changed on purpose (#cm-142.1): the app stores the hex it was given
     }
 
     func controlSetWorkspaceGroupIcon(

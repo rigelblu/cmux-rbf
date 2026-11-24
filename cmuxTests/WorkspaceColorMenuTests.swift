@@ -187,17 +187,20 @@ struct WorkspaceColorMenuTests {
     @Test
     func paletteSwatchesOptIntoVisibleImages() {
         guard #available(macOS 27.0, *) else { return }
-        let menu = NSMenu()
-        SidebarWorkspaceRowColorMenu(
-            currentColorHex: nil,
-            colorScheme: .light
-        ).addPaletteItems(
-            to: menu,
-            palette: [WorkspaceTabColorEntry(name: "Teal", hex: "#006B6B")],
-            apply: { _ in }
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's `SidebarWorkspaceRowColorMenu` stays deleted (#cm-97);
+        // the fork's shared `SidebarColorSubmenu` draws the swatches, so the opt-in is checked there.
+        let menu = SidebarColorSubmenu.make(
+            targetHexes: [nil],
+            apply: { _ in },
+            promptCustomColor: {}
         )
-
-        #expect(menu.items.map(\.preferredImageVisibility) == [.visible])
+        let visiblePalette = WorkspaceTabColorSettings.colorMenuCandidates(targetHexes: [nil]).compactMap {
+            if case let .paletteEntry(entry) = $0.kind { return entry }; return nil
+        }
+        #expect(!visiblePalette.isEmpty)
+        let swatches = Array(menu.items.dropFirst(3).prefix(visiblePalette.count))
+        #expect(swatches.map(\.title) == visiblePalette.map(\.displayName))
+        #expect(swatches.allSatisfy { $0.preferredImageVisibility == .visible })
     }
     #endif
 

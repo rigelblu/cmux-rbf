@@ -1392,7 +1392,7 @@ struct BrowserPanelView: View {
                 systemName: "arrow.up.right.square",
                 pointSize: devToolsButtonIconSize,
                 weight: .medium,
-                tint: devToolsColorOption.color
+                tint: devToolsColorOption.color(accent: cmuxAccent)
             )
             .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
@@ -1581,7 +1581,7 @@ struct BrowserPanelView: View {
                 assetName: panel.keepLoaded ? "BrowserIcons/MugSteam" : "BrowserIcons/Mug",
                 pointSize: devToolsButtonIconSize
             )
-            .foregroundStyle(panel.keepLoaded ? Color.accentColor : devToolsColorOption.color)
+            .foregroundStyle(panel.keepLoaded ? Color.accentColor : devToolsColorOption.color(accent: cmuxAccent))
             .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
         .buttonStyle(OmnibarAddressButtonStyle())

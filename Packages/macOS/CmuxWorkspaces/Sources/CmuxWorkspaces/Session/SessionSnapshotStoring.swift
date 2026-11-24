@@ -132,7 +132,7 @@ extension SessionSnapshotStoring {
         _ restorable: (SnapshotValue) -> Restored?
     ) -> Restored? {
         for entry in historyEntries() {
-            if case .loaded(let snapshot) = loadOutcome(fileURL: entry.fileURL),
+            if case .loaded(let snapshot, _) = loadOutcome(fileURL: entry.fileURL), // cmux-rbf (#cm-54): `.loaded` carries (snapshot:data:)
                let restored = restorable(snapshot) {
                 return restored
             }

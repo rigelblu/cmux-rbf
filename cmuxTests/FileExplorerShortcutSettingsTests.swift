@@ -58,6 +58,7 @@ private final class ShortcutNoopFileSearchController: FileSearchControlling {
         let visibleActions = KeyboardShortcutSettings.settingsVisibleActions
         let expectedActions: [KeyboardShortcutSettings.Action] = [
             .focusRightSidebar,
+            .focusRightSidebarInReply, // cmux-rbf: changed on purpose (#cm-142.1): the fork's Reply focus sits here (#cm-78.1)
             .toggleRightSidebar,
             .findInDirectory,
             .fileExplorerOpenSelection,
@@ -74,6 +75,7 @@ private final class ShortcutNoopFileSearchController: FileSearchControlling {
         let visibleActions = ShortcutAction.settingsVisibleActions
         let expectedActions: [ShortcutAction] = [
             .focusRightSidebar,
+            .focusRightSidebarInReply, // cmux-rbf: changed on purpose (#cm-142.1): the fork's Reply focus sits here (#cm-78.1)
             .toggleRightSidebar,
             .findInDirectory,
             .fileExplorerOpenSelection,

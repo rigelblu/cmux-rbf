@@ -960,7 +960,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let finalCommands = Array(state.commands.dropFirst(finalCommandStart))
         XCTAssertTrue(
             finalCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent|Completed in ")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Hermes Agent · Finished|\(root.lastPathComponent)|")
                     && $0.contains("|\(finalResponse)")
             },
             "Hermes must notify from the final post_llm_call after automatic tool approval, saw \(finalCommands)"
@@ -1457,7 +1458,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(try pendingApprovalKeys(), [thirdApprovalKey])
         let remainingCandidates = remainingCompletionCommands.compactMap(AgentHookTestNotificationPipeline.candidatePresentation)
         XCTAssertEqual(remainingCandidates.count, 1)
-        XCTAssertTrue(remainingCandidates.first?.contains("Cursor|Permission|Approval needed") == true)
+        // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+        XCTAssertTrue(remainingCandidates.first?.contains("Cursor · Needs your approval|\(root.lastPathComponent)|Approval needed") == true)
         XCTAssertTrue(remainingCandidates.first?.contains(";s=needsInput;k=\(thirdApprovalKey)") == true,
             "The retained request must keep its identity and sound context, saw \(remainingCandidates)")
         XCTAssertFalse(remainingCompletionCommands.contains { $0.hasPrefix("notify_target_async ") },
@@ -3270,6 +3272,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(session["lastBody"] as? String, waitingMessage)
         // cmux-rbf: changed on purpose (#cm-128.5): words write no needs-input record.
         XCTAssertNotEqual(session["lastNotificationStatus"] as? String, "needsInput")
+        XCTAssertEqual(session["agentLifecycle"] as? String, "idle") // upstream (#18631), holds under cm-128.5
+        XCTAssertEqual(session["runtimeStatus"] as? String, "idle") // upstream (#18631), holds under cm-128.5
 
         for neutralMessage in ["Invalid input format", "Question mark rendered"] {
             let neutralCommandStart = state.commands.count
@@ -3949,7 +3953,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let stopCommands = Array(state.commands.dropFirst(stopCommandStart))
         XCTAssertTrue(
             stopCommands.contains {
-                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok|Completed|Task completed")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                $0.contains("notify_target_async \(workspaceId) \(surfaceId) Grok · Finished||Task completed")
             },
             "Expected Grok Stop without cwd to notify with a generic completion body, saw \(stopCommands)"
         )
@@ -4164,7 +4169,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
             // rather than requiring a blanket clear when there was nothing pending.
             let attention = runGrokHook(
                 "notification",
-                input: #"{"sessionId":"\#(sessionId)","cwd":"\#(root.path)","hookEventName":"Notification","reason":"permission_prompt","request_id":"request-\#(index)","message":"Grok needs permission to continue"}"#
+                // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1): the fork reads Grok's type from notificationType, not reason.
+                input: #"{"sessionId":"\#(sessionId)","cwd":"\#(root.path)","hookEventName":"Notification","notificationType":"permission_prompt","request_id":"request-\#(index)","message":"Grok needs permission to continue"}"#
             )
             XCTAssertFalse(attention.timedOut, attention.stderr)
             XCTAssertEqual(attention.status, 0, attention.stderr)
@@ -4386,11 +4392,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertFalse(completingStart.timedOut, completingStart.stderr)
         XCTAssertEqual(completingStart.status, 0, completingStart.stderr)
 
-        // Grok emits a native completion Notification. A bare Stop with cwd
-        // but no transcript message deliberately has no completion fallback.
+        // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1): a Notification's completion words ping nothing; the session's
+        // Stop pings ("Task completed"), as for the completing session below.
         let runningCompletion = runGrokHook(
-            "notification",
-            input: #"{"sessionId":"\#(runningSessionId)","cwd":"\#(root.path)","hookEventName":"Notification","message":"Turn complete in 1.0s."}"#
+            "stop",
+            input: #"{"sessionId":"\#(runningSessionId)","cwd":"\#(root.path)","hookEventName":"Stop"}"#
         )
         XCTAssertFalse(runningCompletion.timedOut, runningCompletion.stderr)
         XCTAssertEqual(runningCompletion.status, 0, runningCompletion.stderr)

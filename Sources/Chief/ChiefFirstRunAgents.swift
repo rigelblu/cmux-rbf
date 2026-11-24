@@ -75,8 +75,9 @@ struct ChiefAgentGlance: Equatable {
     /// built-in agent reports in it.
     static func status(lifecycles: [UUID: [String: AgentHibernationLifecycleState]], unread: Bool) -> Status? {
         let states = lifecycles.values.flatMap { $0.filter { AgentHibernationLifecycleStatusKeys.isAllowed($0.key) }.values }
-        if states.contains(.needsInput) { return .needsYou }
-        if states.contains(.running) || states.contains(.backgroundWorkPending) { return .working }
+        // cmux-rbf (#cm-142.1, cm-128.5): an agent stopped on an error needs the user, as this function's own doc says.
+        if states.contains(.needsInput) || states.contains(.error) { return .needsYou }
+        if states.contains(.running) || states.contains(.backgroundWorkPending) || states.contains(.monitoring) { return .working } // cmux-rbf (#cm-142.1): the fork's backgroundWorkPending (cm-128.3)
         if states.contains(.idle) { return unread ? .done : .idle }
         return nil
     }

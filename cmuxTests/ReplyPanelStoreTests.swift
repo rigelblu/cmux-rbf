@@ -1,6 +1,7 @@
 import AppKit
 import CMUXAgentLaunch
 import CmuxAgentChat
+import CmuxMobileHost
 import Foundation
 import Testing
 

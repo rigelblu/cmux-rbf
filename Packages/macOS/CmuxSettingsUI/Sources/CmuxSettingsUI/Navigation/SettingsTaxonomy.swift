@@ -81,7 +81,7 @@ enum SettingsTaxonomyGroup: String, CaseIterable, Identifiable, Sendable {
         case .sidebarAndDock:
             return [.sidebarAppearance, .customSidebars]
         case .agentsAndAutomation:
-            return [.automation, .computerUse]
+            return [.automation, .computerUse, .reply] // cmux-rbf (#cm-136.2, #cm-142.1): the fork's Reply section, which upstream's taxonomy omits
         case .browserAndFiles:
             return [.browser, .browserImport]
         case .remoteAndDevices:

@@ -13,14 +13,14 @@ import SwiftUI
 struct ThemePickerRow: View {
     let selectedMode: AppearanceMode
     let onSelect: (AppearanceMode) -> Void
-    /// A caveat rendered under the "Theme" title, or `nil` for the normal case.
+    /// A caveat rendered under the "Appearance" title, or `nil` for the normal case. (#cm-21)
     ///
     /// The treatment here is *copied* from ``SettingsCardRow``, not inherited:
     /// this row is a bespoke `HStack`, not a `SettingsCardRow`, so it has no
-    /// subtitle slot to fill. The Language row directly above it uses that
-    /// component's subtitle for its own conditional caveat ("Restart cmux to
-    /// apply"), and two caveats in one card that do not look alike read as two
-    /// different kinds of message — so keep `spacing: 3`, `.caption`,
+    /// subtitle slot to fill. It opens the Themes section's first card, and the
+    /// Accent Color row directly below it uses that component's subtitle, so
+    /// two subtitles in one card that do not look alike read as two different
+    /// kinds of message — so keep `spacing: 3`, `.caption`,
     /// `.secondary` and `lineLimit(2)` in step with `SettingsCardRow.body`.
     var subtitle: String?
 

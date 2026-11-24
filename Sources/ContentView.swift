@@ -14391,6 +14391,8 @@ struct VerticalTabsSidebar: View, Equatable {
                     accepted: true,
                     message: String(localized: "sidebar.extensions.action.remoteTmuxPaneRequested", defaultValue: "Remote tmux pane requested")
                 )
+            case .noSpace: // cmux-rbf (#cm-142.1): upstream's #15371 message
+                return .rejected(String(localized: "sidebar.extensions.action.noSpaceForPane", defaultValue: "No space for new pane"))
             case .unsupported, .failed:
                 return .rejected(String(localized: "sidebar.extensions.action.surfaceCreateRejected", defaultValue: "Surface could not be created"))
             }

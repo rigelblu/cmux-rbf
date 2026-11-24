@@ -995,8 +995,8 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
 
         }
 
-        // A notification without the provider's structured idle marker is a
-        // real prose waiting request and must still surface after completion.
+        // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1): words without a notification_type journal an observation and
+        // raise nothing (Tom, grill Q32); the typed permission request below is the wait that still surfaces.
         let realWaitingCommandStart = context.state.commands.count
         let realWaiting = runClaudeHookWithoutServer(
             context: context,
@@ -1006,12 +1006,12 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
         )
         XCTAssertFalse(realWaiting.timedOut, realWaiting.stderr)
         XCTAssertEqual(realWaiting.status, 0, realWaiting.stderr)
-        XCTAssertTrue(context.state.commands.dropFirst(realWaitingCommandStart).contains {
+        XCTAssertFalse(context.state.commands.dropFirst(realWaitingCommandStart).contains { // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1)
             $0.hasPrefix("set_status claude_code Needs input ")
         })
         let waitingRecord = try sessionRecord()
-        XCTAssertEqual(waitingRecord["agentLifecycle"] as? String, "needsInput")
-        XCTAssertEqual(waitingRecord["hookEventName"] as? String, "Notification")
+        XCTAssertEqual(waitingRecord["agentLifecycle"] as? String, "idle") // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1)
+        XCTAssertEqual(waitingRecord["hookEventName"] as? String, "Stop") // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1)
 
         // A real permission request after completion must still surface.
         let permissionCommandStart = context.state.commands.count
@@ -9865,6 +9865,12 @@ final class CLINotifyProcessIntegrationRegressionTests: XCTestCase {
             return v2Response(id: id, ok: true, result: ["resume_binding": [:]])
         case "surface.resume.clear":
             return v2Response(id: id, ok: true, result: ["cleared": true])
+        case "agent.resolve_delivery_target" where context.state.resolvesDeliveryTargetAnswer(): // cmux-rbf (#cm-124.6, #cm-142.1)
+            return v2Response(id: id, ok: true, result: [
+                "source": "surface", "workspace_id": context.workspaceId, "surface_id": context.surfaceId
+            ])
+        case "agent.hook.barrier" where context.state.answersHookBarrierAnswer(): // cmux-rbf (#cm-142.1): stamps blocking requests
+            return v2Response(id: id, ok: true, result: [:])
         case "agent_events.rows": // cmux-rbf (#cm-124.5)
             let answer = context.state.agentEventRowsAnswer()
             guard let rows = answer.rows else {

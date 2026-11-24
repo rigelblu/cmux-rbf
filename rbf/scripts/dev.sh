@@ -97,17 +97,13 @@ derive_build_id() {
 BUILD_ID_VALUE="$(derive_build_id)"
 [[ -n "$BUILD_ID_VALUE" ]] || { echo "dev.sh: could not derive a build-id" >&2; exit 1; }
 
-# --- Landmine 1: XcodeProj resolves forward and breaks the build --------------
-# `Packages/macOS/CMUXProjectModel/Package.swift` declares XcodeProj as
-# `from: "9.0.0"` — an open upper bound — so any build that lets SwiftPM resolve
-# freely will drift the tracked lockfile from 9.13.0 to 9.15.0. 9.15.0 adds a
-# `.fileSystemSynchronizedGroup` case and `XcodeProjectAdapter.swift:706` stops
-# being exhaustive, so the build fails to compile.
-#
-# It is nastier than it sounds: the build that *does* the bump usually succeeds,
-# and the next one fails, so it presents as "it worked yesterday."
-# `reload.sh:715` already honours this env var; default it on so a plain
-# `make run` is reproducible. Set it to 0 when you genuinely add a dependency.
+# --- Landmine 1: SwiftPM resolving forward on its own -------------------------
+# This guarded XcodeProj, which resolved past its cap and broke the build the
+# *next* time ("it worked yesterday"). Upstream dropped XcodeProj and PathKit
+# (fcad43f225, #13111), and the cm-142 sync took upstream's CMUXProjectModel
+# Package.swift, so that dependency is gone (#cm-142.1). The default stays,
+# because it still makes a plain `make run` resolve nothing on its own:
+# reload.sh honours this env var. Set it to 0 when you genuinely add a dependency.
 export CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION="${CMUX_DISABLE_AUTOMATIC_PACKAGE_RESOLUTION:-1}"
 
 # --- Landmine 2: ghostty needs one exact Zig version --------------------------
@@ -146,6 +142,13 @@ ensure_zig() { rbf_ensure_zig; }
 # Defines the function only; the call is in the build|run|test pre-case below.
 # shellcheck source=rbf/scripts/lib/rbf-backend-mode.sh
 . "$REPO_ROOT/rbf/scripts/lib/rbf-backend-mode.sh"
+
+# --- Landmine 7: no published cmux-tui client for a fork commit (#cm-142.1) ---
+# Upstream's reload.sh bundles a cmux-tui client published for a commit with HEAD's
+# client inputs, which include `ghostty` and two workflows this fork changes, so no
+# fork commit has one. Defines the function only; the call is in the build|run case.
+# shellcheck source=rbf/scripts/lib/rbf-tui-client.sh
+. "$REPO_ROOT/rbf/scripts/lib/rbf-tui-client.sh"
 
 # Running-app checks match the executable, never argv. See the lib header.
 # shellcheck source=rbf/scripts/lib/rbf-procs.sh
@@ -216,6 +219,12 @@ case "$cmd" in
     rbf_configure_dev_signing || exit 1
     ;;
 esac
+case "$cmd" in
+  build|run)
+    # Only these reach reload.sh, which bundles the client; `test` runs xcodebuild directly.
+    rbf_tui_client_apply "$REPO_ROOT"
+    ;;
+esac
 
 
 case "$cmd" in
@@ -226,6 +235,7 @@ case "$cmd" in
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
     [[ -z "$RBF_GIT_ENV_NOTE" ]] || echo "==> git $RBF_GIT_ENV_NOTE"
     [[ -z "$RBF_BACKEND_MODE_NOTE" ]] || echo "==> $RBF_BACKEND_MODE_NOTE"
+    [[ -z "$RBF_TUI_CLIENT_NOTE" ]] || echo "==> $RBF_TUI_CLIENT_NOTE"
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig
@@ -244,6 +254,7 @@ case "$cmd" in
     echo "==> build-id: $BUILD_ID_VALUE (from branch)"
     [[ -z "$RBF_GIT_ENV_NOTE" ]] || echo "==> git $RBF_GIT_ENV_NOTE"
     [[ -z "$RBF_BACKEND_MODE_NOTE" ]] || echo "==> $RBF_BACKEND_MODE_NOTE"
+    [[ -z "$RBF_TUI_CLIENT_NOTE" ]] || echo "==> $RBF_TUI_CLIENT_NOTE"
     rbf_require_deriveddata || exit 1
     check_submodule_sync
     ensure_zig

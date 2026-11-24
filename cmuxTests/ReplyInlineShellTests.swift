@@ -328,6 +328,19 @@ struct ReplyInlineShellTests {
     func narrowPane() async throws {
         let rig = try await makeRig(width: 50)
         defer { finish(rig) }
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream's password-input badge (#14867) keeps its label in required
+        // constraints about 142 pt wide, even while hidden, and the pane's autoresizing constraints pass that minimum to
+        // the window, so a 50-pt window opens at 142. Take the hidden badge out and shrink the window again; the subject
+        // here is the Reply toolbar's rule on the pane's real width.
+        rig.hosted.passwordInputIndicatorView.removeFromSuperview()
+        rig.window.setContentSize(NSSize(width: 50, height: 240))
+        rig.window.contentView?.layoutSubtreeIfNeeded()
+        rig.hosted.layoutSubtreeIfNeeded()
+        // cmux-rbf (#cm-142.1): name the fixture when the pane did not stay narrow (the merge's u11 red showed a toolbar).
+        try #require(
+            rig.hosted.sessionContentFrame.width < ReplyInlinePlacement.toolbarSize.width,
+            "fixture: the pane is \(rig.hosted.sessionContentFrame.width) pt wide (window content \(rig.window.contentView?.bounds.width ?? -1)), not narrower than the toolbar"
+        )
         release(rig)
         #expect(rig.controller.shown == nil)
         #expect(rig.world.monitorsInstalled == 0)

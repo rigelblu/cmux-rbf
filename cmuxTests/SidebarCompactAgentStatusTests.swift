@@ -160,6 +160,16 @@ struct SidebarCompactAgentStatusTests {
         }
     }
 
+    // cmux-rbf (#cm-142.1): a pane watching background work (`.monitoring`, cm-128.3) gets the glyph
+    // `.backgroundWorkPending` gets, by the refined `.monitoring` ruling.
+    @Test
+    func monitoringResolvesAsBackgroundWorkPendingDoes() {
+        let watching = Glyph.resolve(Glyph.Input(lifecycleStates: [.monitoring]))
+        let pending = Glyph.resolve(Glyph.Input(lifecycleStates: [.backgroundWorkPending]))
+        #expect(watching.kind == pending.kind)
+        #expect(watching.kind == .running)
+    }
+
     @Test
     func startingAgentIsAHollowRingAbovePullRequests() {
         let glyph = Glyph.resolve(.init(lifecycleStates: [.idle, .unknown], pullRequests: [Self.openPR]))
@@ -481,6 +491,40 @@ struct SidebarCompactAgentStatusTests {
         #expect(visibleBadges.isEmpty)
     }
 
+    // cmux-rbf (#cm-128.4, #cm-142.1): compact status folds the unread count into the glyph (upstream), but a mark is Tom's
+    // own action and nothing else in a compact row shows it, so a marked row with no count keeps its dot (conductor ruling,
+    // P9). The dot and the count share one badge view; in a compact row it shows only the dot, and only with no count.
+    @Test
+    func appKitCompactRowKeepsTheMarkedUnreadDotWhenThereIsNoCount() throws {
+        var model = SidebarAppKitRowCellTests.makeModel(
+            compactStatusGlyph: Glyph.resolve(.init(lifecycleStates: [.idle]))
+        )
+        model.unreadCount = 0
+        model.markedUnread = true
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
+        cell.frame = NSRect(x: 0, y: 0, width: 280, height: 60)
+        _ = cell.layoutContent(model: model, width: 280, apply: true)
+        let visibleBadges = SidebarAppKitRowCellTests.descendants(of: cell)
+            .compactMap { $0 as? SidebarRowUnreadBadgeView }.filter { !$0.isHidden }
+        #expect(visibleBadges.count == 1, "the marked-unread dot stays in a compact row")
+    }
+
+    // cmux-rbf (#cm-128.4, #cm-142.1): with a count, the blue glyph carries unread, so neither the count nor the dot shows.
+    @Test
+    func appKitCompactRowWithACountShowsNeitherTheCountNorTheDot() throws {
+        var model = SidebarAppKitRowCellTests.makeModel(
+            compactStatusGlyph: Glyph.resolve(.init(lifecycleStates: [.idle]))
+        )
+        model.unreadCount = 3
+        model.markedUnread = true
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
+        cell.frame = NSRect(x: 0, y: 0, width: 280, height: 60)
+        _ = cell.layoutContent(model: model, width: 280, apply: true)
+        let visibleBadges = SidebarAppKitRowCellTests.descendants(of: cell)
+            .compactMap { $0 as? SidebarRowUnreadBadgeView }.filter { !$0.isHidden }
+        #expect(visibleBadges.isEmpty)
+    }
+
     @Test
     func aConfiguredSymbolForADotStateDrawsFullSize() {
         let cases: [(Glyph.IconSlot, Glyph.Input)] = [
@@ -584,6 +628,7 @@ struct SidebarCompactAgentStatusTests {
             name: "Group",
             iconSymbol: "folder",
             tintHex: nil,
+            customColorHex: nil, // cmux-rbf (#cm-142.1): the fork's required field; these headers carry no colour
             isCollapsed: false,
             isPinned: false,
             isAnchorActive: false,
@@ -634,7 +679,7 @@ struct SidebarCompactAgentStatusTests {
         let factory = SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: settings,
-            showsAgentActivity: false
+            showsAgentActivity: false, todoControlsEnabled: false
         )
 
         workspace.updatePanelPullRequest(panelId: panelId, number: 42, label: "cmux", url: url, status: .open)
@@ -662,7 +707,7 @@ struct SidebarCompactAgentStatusTests {
         let plain = SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: SidebarTabItemSettingsSnapshot(defaults: Self.makeDefaults()),
-            showsAgentActivity: false
+            showsAgentActivity: false, todoControlsEnabled: false
         ).makeSnapshot()
         #expect(plain.compactStatusGlyph == nil)
         #expect(!plain.pullRequestRows.isEmpty)
@@ -696,7 +741,7 @@ struct SidebarCompactAgentStatusTests {
             return SidebarWorkspaceSnapshotFactory(
                 workspace: workspace,
                 settings: SidebarTabItemSettingsSnapshot(defaults: defaults),
-                showsAgentActivity: false
+                showsAgentActivity: false, todoControlsEnabled: false
             ).makeSnapshot()
         }
 
@@ -714,9 +759,11 @@ struct SidebarCompactAgentStatusTests {
         #expect(on.compactStatusGlyph?.kind == .idle)
         #expect(on.compactStatusGlyph?.tooltip.contains("Needs input") == true)
 
-        // Off: both keys are rows and no glyph is built at all.
+        // Off: no glyph is built at all.
+        // cmux-rbf: changed on purpose (#cm-142.1): upstream expects both keys as rows here; the fork's cm-128.6 rule (Tom's
+        // item 10) takes cmux's agent pills out of the row in both modes (Sources/SidebarWorkspaceSnapshotFactory.swift:247-254).
         let off = snapshot(compact: false)
-        #expect(Set(off.metadataEntries.map(\.key)) == ["claude_code", "deploy"])
+        #expect(Set(off.metadataEntries.map(\.key)) == ["deploy"])
         #expect(off.compactStatusGlyph == nil)
     }
 }

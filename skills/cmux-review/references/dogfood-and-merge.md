@@ -3,12 +3,9 @@
 **First pass.** A first pass ends when the change is implemented,
 [scoped verification](../../cmux-testing/references/local-vs-ci-validation.md)
 passed, and the PR is open. Native app and build-input changes need the tagged
-build on the pushed HEAD and focused tests; `web/` PRs also need the live Vercel
-preview URL. Docs and portable contributor tooling use their relevant checks
-without an unrelated app build. Then hand off; do not sit watching CI or running
-speculative review passes. Let required GitHub checks and review bots run
-asynchronously, then address only concrete check failures and actionable
-findings before merge.
+build on the pushed HEAD and focused tests. Docs and portable contributor tooling
+use their relevant checks without an unrelated app build. Then hand off; do not
+sit running speculative review passes. <!-- cmux-rbf: pruned upstream text — removed the `web/` Vercel preview URL requirement, 'watching CI', and the sentence letting required GitHub checks and review bots run before merge — no Vercel deploys, no CI and no review bots in this fork, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 **Evidence on the PR.** A clip or screenshot belongs in the PR, not in a local
 directory or a chat message. `scripts/pr-media.py --pr <number> <files>` puts
@@ -20,18 +17,7 @@ needs no conversion. A gif has to stay under 5 MiB or GitHub renders a broken
 image, so lower `--gif-fps` or `--gif-width` if the tool refuses one; replacing
 evidence already uploaded for that PR needs `--force`.
 
-**Merge fast, not blind.** `main` is our nightly: stack fixes, do not revert.
-Look at the checks that judge the change (macOS compile admission plus the
-app-host suites CI selected for it) and skip slow unrelated lanes. Only a red the
-PR causes holds the merge; base reds, flakes and pending checks don't. If you
-merge before the judging checks finish, say on the PR what was not verified; the
-merge receipt (`merge_receipt.py`) records it and labels the PR `merged-unverified`.
-`gh-merge-green` waits for the checks it requires. Do not stop on a stuck,
-irrelevant or known red one: waive it with `--override "<reason>"`, which posts
-the reason on the PR. It never waives a missing or running check (except a pending
-preview-deploy status the reason names), a freeze or the review receipt ([exact-head merging](../../../docs/ci-runners.md#exact-head-merging)). A
-main-regression comment on your PR (`main_regression_attribution.py`) is a
-fix-forward ask.
+<!-- cmux-rbf: pruned upstream text — removed 'Merge fast, not blind' (judging checks, `merged-unverified` receipts, `gh-merge-green` and `--override` waivers, main-regression comments) — no CI and no checks in this fork; the gate is the manual suite plus Tom's dogfood, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 **Look at the PR media.** App PRs get screenshots and a GIF of their build in
 the dogfood comment ([PR media](../../cmux-testing/references/dogfood-scenarios.md#pr-media)).
@@ -40,14 +26,13 @@ critically; a blank or wrong frame, or no tour that reaches the change, is a
 finding to fix, not a pass.
 
 **When to merge.** The main agent owns dogfood, mergeability, the merge and
-every pushed fix. A PR merges when an independent review subagent passes it and
-it causes no red of its own. Don't wait for a person, for app, runtime and UI
-changes too. Ship risky user-visible behavior behind a setting or Debug toggle,
-and fix a bad default in the next nightly. Merge freezes still hold.
+every pushed fix. A PR merges when an independent review subagent passes it.
+Merging app/runtime/UI changes requires the user's explicit approval after
+dogfood. Ship risky user-visible behavior behind a setting or Debug toggle.
+Merge freezes still hold. <!-- cmux-rbf: pruned upstream text — removed 'it causes no red of its own', 'Don't wait for a person, for app, runtime and UI changes too' and 'fix a bad default in the next nightly'; the approval sentence matches CLAUDE.md — no CI here, and Tom approves after dogfood, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
-**Red base.** A base that doesn't compile, or CI that's red on every PR, is
-priority zero. Fix it directly in its own PR instead of noting it and leaving it
-for an owner.
+**Red base.** A base that doesn't compile is priority zero. Fix it directly in
+its own PR instead of noting it and leaving it for an owner. <!-- cmux-rbf: pruned upstream text — removed 'or CI that's red on every PR' — no CI here, see rbf/AGENTS.md. Reject this hunk on upstream sync. -->
 
 **Scope verification to the feature.** Local-backend builds can dogfood desktop
 state, menus, and release-note rendering without a shared Cloud backend. Require

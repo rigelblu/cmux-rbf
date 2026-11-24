@@ -191,7 +191,7 @@ struct WorkspaceSidebarObservationTests {
         let factory = SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: settings,
-            showsAgentActivity: false
+            showsAgentActivity: false, todoControlsEnabled: false
         )
         cache.replace(with: [workspace.id: factory.makeSnapshot()])
 

@@ -35,7 +35,9 @@ extension WorkstreamEvent {
 
     /// The agent's subagent identity; `nil` for the main agent thread.
     var feedAgentID: String? {
-        guard let value = feedExtraFields?["agent_id"] as? String,
+        // cmux-rbf (#cm-73.24, #cm-128.1, #cm-142.1): a Claude helper's id travels as `helper_agent_id` on both the blocking
+        // request and the telemetry, so upstream's supersede still tells a helper from its parent.
+        guard let value = (feedExtraFields?["helper_agent_id"] as? String) ?? (feedExtraFields?["agent_id"] as? String),
               !value.isEmpty else { return nil }
         return value
     }

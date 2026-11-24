@@ -47,7 +47,7 @@ extension AgentJournalLifecycleCenter {
                 surfaceId: surfaceId,
                 agentKey: canonical.agentKey,
                 phase: phase,
-                usageLimit: state.hasUsageLimit(surfaceId: surfaceId, agentKey: canonical.agentKey)
+                usageLimit: state.hasUsageLimit(surfaceId: surfaceId, agentKey: canonical.agentKey) // cmux-rbf (#cm-128.5)
             ),
             workspaceHint: canonical.draft.workspaceId,
             activity: AgentLifecycleActivity.classify(
@@ -55,7 +55,7 @@ extension AgentJournalLifecycleCenter {
                 from: previousPhase,
                 to: phase
             ),
-            settledDrainedBackgroundWork: previousPhase == .backgroundWorkPending
+            settledDrainedBackgroundWork: (previousPhase == .backgroundWorkPending || previousPhase == .monitoring) // cmux-rbf (#cm-142.1, cm-128.3)
                 && phase == .idle
                 && canonical.draft.nativeEvent == ClaudeBackgroundWorkDrain.nativeEvent
         )
@@ -73,14 +73,15 @@ extension AgentJournalLifecycleCenter {
     ) -> AgentJournalEvent? {
         guard event.draft.nativeEvent == ClaudeBackgroundWorkDrain.nativeEvent else { return event }
         guard let surfaceId = event.draft.surfaceId,
-              state.combinedPhase(surfaceId: surfaceId, agentKey: event.agentKey) == .backgroundWorkPending,
+              let combined = state.combinedPhase(surfaceId: surfaceId, agentKey: event.agentKey),
+              combined == .backgroundWorkPending || combined == .monitoring, // cmux-rbf (#cm-142.1, cm-128.3)
               let session = state.session(
                   surfaceId: surfaceId,
                   agentKey: event.agentKey,
                   sessionKey: AgentLifecycleReducerState.sessionKey(for: event.draft)
               ),
               !session.ended,
-              session.phase == .backgroundWorkPending else { return nil }
+              session.phase == .backgroundWorkPending || session.phase == .monitoring else { return nil } // cmux-rbf (#cm-142.1, cm-128.3)
         var draft = event.draft
         draft.occurredAtMs = session.lastOccurredAtMs
         return AgentJournalEvent(sequence: event.sequence, committedAtMs: event.committedAtMs, draft: draft)

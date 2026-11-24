@@ -4135,7 +4135,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
         XCTAssertEqual(result.stdout, "{}\n")
         XCTAssertTrue(
             state.commands.contains { command in
-                command.contains("notify_target_async \(workspaceId) \(surfaceId) Codex|Rate limit|")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                command.contains("notify_target_async \(workspaceId) \(surfaceId) Codex · Stopped on an error|\(root.lastPathComponent)|")
             },
             "Expected Codex failure notification, saw \(state.commands)"
         )

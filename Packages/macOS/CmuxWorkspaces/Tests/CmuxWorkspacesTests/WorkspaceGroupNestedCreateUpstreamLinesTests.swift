@@ -39,19 +39,21 @@ struct WorkspaceGroupNestedCreateUpstreamLinesTests {
         wholeLab.name(created, as: "N")
         wholeLab.name(whole.model.workspaceGroups.first { $0.id == created }!.anchorWorkspaceId, as: "n")
 
-        // Only what comes before upstream's lines: the group and its workspace stored, then the nested placement.
+        // Only what comes before upstream's lines: the group stored, then the nested placement.
+        // cmux-rbf: changed on purpose (#cm-142.1): built the way createWorkspaceGroup now builds it. Upstream's #15892 makes
+        // the first chosen workspace the anchor (provenance `.user`) with no generated workspace and no groupId set before
+        // the placement; this used to build a generated anchor first, as the fork's base did.
         let placed = NestedWorld(start)
         var placedLab = lab
-        let anchor = placed.host.createGroupAnchorWorkspace(title: "N", workingDirectory: nil, inheritWorkingDirectory: true, select: true)!
+        let anchorId = eligible[0]
         let group = WorkspaceGroup(
-            id: UUID(), name: "N", isCollapsed: false, isPinned: false, anchorWorkspaceId: anchor.id,
-            customColor: nil, iconSymbol: nil, externalID: nil, anchorWorkspaceProvenance: .generated
+            id: UUID(), name: "N", isCollapsed: false, isPinned: false, anchorWorkspaceId: anchorId,
+            customColor: nil, iconSymbol: nil, externalID: nil, anchorWorkspaceProvenance: .user
         )
         placed.model.workspaceGroups.append(group)
-        anchor.groupId = group.id
-        #expect(placed.groups.nestedPlaceNewWorkspaceGroup(groupId: group.id, anchorId: anchor.id, eligibleChildren: eligible), "\(c.name): the nested placement ran")
+        #expect(placed.groups.nestedPlaceNewWorkspaceGroup(groupId: group.id, anchorId: anchorId, eligibleChildren: eligible), "\(c.name): the nested placement ran")
         placedLab.name(group.id, as: "N")
-        placedLab.name(anchor.id, as: "n")
+        placedLab.name(anchorId, as: "n")
 
         #expect(whole.compact(wholeLab) == placed.compact(placedLab), "\(c.name): upstream's lines after the nested placement changed the window")
         #expect(whole.window.tabs.map { $0.groupId.map { wholeLab.name($0) } } == placed.window.tabs.map { $0.groupId.map { placedLab.name($0) } }, "\(c.name): group of each workspace")

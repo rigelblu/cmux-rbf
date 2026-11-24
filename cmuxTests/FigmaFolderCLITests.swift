@@ -2,6 +2,13 @@ import Darwin
 import Foundation
 import Testing
 
+// cmux-rbf (#cm-73.42, #cm-142.1): for JSONCParser, to read back a cmux.json that keeps its comments.
+#if canImport(cmux_DEV)
+@testable import cmux_DEV
+#elseif canImport(cmux)
+@testable import cmux
+#endif
+
 private final class FigmaFolderCLIBundleToken {}
 
 /// `cmux figma folder`, `folder set <folder-url>` and `folder clear`, read from
@@ -84,7 +91,9 @@ struct FigmaFolderCLITests {
         }
         var object: [String: Any]? {
             guard let bytes else { return nil }
-            return try? JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+            // cmux-rbf: changed on purpose (#cm-73.42, #cm-142.1): upstream's store keeps JSONC comments, so read as JSONC.
+            guard let sanitized = try? JSONCParser.preprocess(data: bytes) else { return nil }
+            return try? JSONSerialization.jsonObject(with: sanitized) as? [String: Any]
         }
     }
 

@@ -108,7 +108,10 @@ struct CloudFeatureFlagTests {
             )
             flags.applyLoadedFlags()
             for (key, accessor) in accessors {
-                #expect(flags[keyPath: accessor] == (key == enabledKey))
+                // cmux-rbf: changed on purpose (#cm-142.1): the fork shows agent activity whatever the remote experiment
+                // says (#cm-128.3), so the spinner accessor reads true for every key.
+                let alwaysOn = key == "sidebar-workspace-agent-spinner-experiment"
+                #expect(flags[keyPath: accessor] == (alwaysOn || key == enabledKey))
             }
         }
     }

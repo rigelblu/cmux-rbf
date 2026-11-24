@@ -23,14 +23,18 @@ struct WorkspaceGroupNestedGapTests {
         )
         let id = w.groups.createWorkspaceGroup(name: "N", childWorkspaceIds: [lab.id("d"), lab.id("b"), lab.id("c")], collapseSidebarSelection: false)
         lab.name(id!, as: "N")
-        // The new group's own workspace stands behind its name; b, c and d follow in sidebar order.
+        // cmux-rbf: changed on purpose (#cm-142.1): this expected the generated own workspace and then b, c, d. Upstream's
+        // #15892 makes the first chosen workspace (d) the group's own workspace, behind its name; the others, b and c,
+        // still follow in sidebar order whatever order they were given.
         let rows = w.window.tabs.filter { $0.groupId == id }.map { lab.name($0.id) }
-        #expect(rows.suffix(3) == ["b", "c", "d"])
-        #expect(w.compact(lab).contains("b, c, d"))
+        #expect(rows == ["d", "b", "c"])
+        #expect(w.compact(lab).contains("N[d: b, c]"))
     }
 
     @Test
-    func aPinnedAndAnUnpinnedChosenWorkspaceKeepTheirTiersInTheNewGroup() {
+    // cmux-rbf: changed on purpose (#cm-142.1): renamed from `aPinnedAndAnUnpinnedChosenWorkspaceKeepTheirTiersInTheNewGroup`;
+    // the unpinned chosen workspace is now the group's own workspace, which has no tier, so only the pinned one keeps a tier.
+    func aPinnedChosenWorkspaceKeepsItsTierBehindTheNewGroupsOwnWorkspace() {
         var lab = Labels()
         let w = world(
             &lab,
@@ -40,7 +44,10 @@ struct WorkspaceGroupNestedGapTests {
         let id = w.groups.createWorkspaceGroup(name: "N", childWorkspaceIds: [lab.id("b"), lab.id("p")], collapseSidebarSelection: false)
         lab.name(id!, as: "N")
         let rows = w.window.tabs.filter { $0.groupId == id }.map { lab.name($0.id) }
-        #expect(rows.suffix(2) == ["p", "b"])
+        // cmux-rbf: changed on purpose (#cm-142.1): this expected ["p", "b"], which baked in the layout's own workspace (the
+        // first moved in, pinned `p`) disagreeing with the stored `anchorWorkspaceId` (`b`, the first chosen). Upstream's
+        // anchor rule (#15892) makes them agree: `b` is the group's own workspace and leads the run, then the pinned `p`.
+        #expect(rows.suffix(2) == ["b", "p"])
         #expect(w.violations(lab).isEmpty)
     }
 

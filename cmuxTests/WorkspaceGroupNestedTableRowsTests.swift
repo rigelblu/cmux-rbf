@@ -20,7 +20,7 @@ struct WorkspaceGroupNestedTableRowsTests {
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let ids = manager.tabs.map(\.id)
         let parent = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: []))
-        let child = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[1]]))
+        let child = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: child, intoParent: parent) == .moved)
         let ownWorkspace = try #require(manager.workspaceGroupAnchor(for: parent))
         manager.closeWorkspace(ownWorkspace)
@@ -66,7 +66,7 @@ struct WorkspaceGroupNestedTableRowsTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         manager.addWorkspace(autoWelcomeIfNeeded: false)
         let ids = manager.tabs.map(\.id)
-        let group = try #require(manager.createWorkspaceGroup(name: "G", childWorkspaceIds: [ids[1]]))
+        let group = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "G", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         let anchor = try #require(manager.workspaceGroupAnchor(for: group))
         manager.selectWorkspace(manager.tabs[0])
         click(manager, group)
@@ -98,8 +98,8 @@ struct WorkspaceGroupNestedTableRowsTests {
         let manager = TabManager(autoWelcomeIfNeeded: false)
         for _ in 0..<3 { manager.addWorkspace(autoWelcomeIfNeeded: false) }
         let ids = manager.tabs.map(\.id)
-        let outer = try #require(manager.createWorkspaceGroup(name: "P", childWorkspaceIds: [ids[1]]))
-        let inner = try #require(manager.createWorkspaceGroup(name: "Q", childWorkspaceIds: [ids[2]]))
+        let outer = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "P", childWorkspaceIds: [ids[1]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
+        let inner = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "Q", childWorkspaceIds: [ids[2]])) // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
         #expect(manager.moveWorkspaceGroup(groupId: inner, intoParent: outer) == .moved)
         func numbered(_ id: UUID) -> Bool {
             let eligibility = WorkspaceShortcutEligibility.resolve(

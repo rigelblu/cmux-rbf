@@ -116,6 +116,11 @@ struct ClaudeHookAttentionResolutionTests {
                     arrived.signal()
                     _ = release.wait(timeout: .now() + 10)
                 }
+                if method == "agent.resolve_delivery_target" { // cmux-rbf: changed on purpose (#cm-124.6, #cm-142.1): upstream's Feed resolves its target before a blocking card
+                    return fixture.support.v2Response(id: id, ok: true, result: [
+                        "source": "surface", "workspace_id": context.workspaceId, "surface_id": context.surfaceId
+                    ])
+                }
                 if method == "surface.list" {
                     return fixture.support.surfaceListResponse(id: id, surfaceId: context.surfaceId)
                 }
@@ -307,5 +312,70 @@ struct ClaudeHookAttentionResolutionTests {
             #expect(AgentHookDeliveryPolicy().supportsQueuedDelivery(agent: "claude", subcommand: subcommand),
                 "installed `hooks enqueue claude \(subcommand)` is refused by the queued policy")
         }
+    }
+
+    /// cmux-rbf (#cm-73.24, #cm-128.1, #cm-142.1): upstream's supersede (#15170) retires a pending Feed request only for a later
+    /// hook from the same agent context. Built from the frames the CLI sends: a helper's pending permission is not retired by a
+    /// main-thread PreToolUse, and is retired by a later PreToolUse from the same helper.
+    @Test func aHelpersPendingPermissionIsRetiredOnlyByThatHelper() throws {
+        let fixture = try Fixture()
+        // cmux-rbf (#cm-142.1): the app answers the CLI's ordering barrier, so the blocking request carries its send stamp;
+        // supersede never retires an unstamped request.
+        fixture.context.state.setAnswersHookBarrier(true)
+        func feedFrame(_ hook: String, after run: () throws -> Void) throws -> (wire: [String: Any], event: WorkstreamEvent) {
+            let before = fixture.context.state.snapshot().count
+            try run()
+            let deadline = Date().addingTimeInterval(2) // the telemetry frame arrives on its own one-way connection
+            while true {
+                if let wire = fixture.context.state.snapshot().dropFirst(before).compactMap({ line -> [String: Any]? in
+                    guard let data = line.data(using: .utf8),
+                          let frame = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          frame["method"] as? String == "feed.push",
+                          let params = frame["params"] as? [String: Any] else { return nil }
+                    return params["event"] as? [String: Any]
+                }).last(where: { $0["hook_event_name"] as? String == hook }) {
+                    return (wire, try JSONDecoder().decode(WorkstreamEvent.self, from: JSONSerialization.data(withJSONObject: wire)))
+                }
+                guard Date() < deadline else { throw CancellationError() }
+                Thread.sleep(forTimeInterval: 0.02)
+            }
+        }
+        let request = try feedFrame("PermissionRequest") {
+            try fixture.run(["hooks", "feed", "--source", "claude"], event: "PermissionRequest", helper: "helper-1")
+        }
+        let requestID = try #require(request.wire["_opencode_request_id"] as? String)
+        try #require(request.event.feedHookSentAtMs != nil, "fixture: the blocking request carries no send stamp (barrier unanswered)")
+        let registry = FeedWaiterRegistry()
+        let registration = try #require(registry.register(requestID: requestID, event: request.event))
+        registry.accepted(registration, event: request.event, item: WorkstreamItem(workstreamId: request.event.sessionId,
+            source: .claude, kind: .permissionRequest, status: .pending,
+            payload: .permissionRequest(requestId: requestID, toolName: "Bash", toolInputJSON: "{}", pattern: nil)))
+
+        let mainThread = try feedFrame("PreToolUse") {
+            try fixture.run(["hooks", "claude", "pre-tool-use"], event: "PreToolUse")
+        }
+        #expect(registry.supersede(by: mainThread.event).isEmpty, "a main-thread tool call must not retire a helper's request")
+        #expect(registry.isAwaiting(requestID))
+
+        let sameHelper = try feedFrame("PreToolUse") {
+            try fixture.run(["hooks", "claude", "pre-tool-use"], event: "PreToolUse", helper: "helper-1")
+        }
+        #expect(registry.supersede(by: sameHelper.event).map { $0.0.requestID } == [requestID])
+
+        // Control: a main-thread request is retired by a later main-thread tool call, so these frames reach supersede at all.
+        let mainRequest = try feedFrame("PermissionRequest") {
+            try fixture.run(["hooks", "feed", "--source", "claude"], event: "PermissionRequest")
+        }
+        let mainRequestID = try #require(mainRequest.wire["_opencode_request_id"] as? String)
+        let control = FeedWaiterRegistry()
+        let controlRegistration = try #require(control.register(requestID: mainRequestID, event: mainRequest.event))
+        control.accepted(controlRegistration, event: mainRequest.event, item: WorkstreamItem(workstreamId: mainRequest.event.sessionId,
+            source: .claude, kind: .permissionRequest, status: .pending,
+            payload: .permissionRequest(requestId: mainRequestID, toolName: "Bash", toolInputJSON: "{}", pattern: nil)))
+        let laterMainThread = try feedFrame("PreToolUse") {
+            try fixture.run(["hooks", "claude", "pre-tool-use"], event: "PreToolUse")
+        }
+        #expect(control.supersede(by: laterMainThread.event).map { $0.0.requestID } == [mainRequestID],
+            "control: a later main-thread tool call retires a main-thread request")
     }
 }

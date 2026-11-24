@@ -283,12 +283,15 @@ public struct WindowAppearanceSnapshot {
     /// With Reduce Transparency on, this is the already-composited window
     /// color at full opacity, so the root layer matches the opaque window
     /// fill instead of painting the translucent terminal color a second time.
+    /// cmux-rbf (#cm-13, #cm-142.1): the host-drawn background image still lies over that opaque color.
+    /// Reduce Transparency is about seeing through the window, and nothing shows through the image.
     public func terminalBackdropPolicy() -> WindowBackdropPolicy {
         if reducesTransparency {
             return .ghosttyTerminalBackdrop(
                 color: compositedTerminalBackgroundColor,
                 opacity: 1,
-                renderingMode: terminalRenderingMode
+                renderingMode: terminalRenderingMode,
+                backgroundImage: hostDrawnTerminalBackgroundImage // cmux-rbf (#cm-13, #cm-142.1)
             )
         }
         if terminalBackgroundBlur.isMacOSGlassStyle {

@@ -425,7 +425,7 @@ struct CmuxSelectionFill: Equatable {
 func sidebarSelectedWorkspaceBackgroundNSColor(
     for colorScheme: ColorScheme,
     sidebarSelectionColorHex: String? = UserDefaults.standard.string(forKey: "sidebarSelectionColorHex"),
-    accent: CmuxAccentColor = CmuxAccentColor()
+    accent: CmuxAccentColor = CmuxAccentColor.stored() // cmux-rbf (#cm-142.1): the fork's row palette passes no accent; follow the Accent Color setting
 ) -> NSColor {
     if let hex = sidebarSelectionColorHex,
        let parsed = NSColor(hex: hex) {

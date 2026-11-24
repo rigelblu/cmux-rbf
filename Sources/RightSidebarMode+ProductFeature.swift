@@ -10,6 +10,8 @@ extension RightSidebarMode {
         case .feed: .feed
         case .dock: .dock
         case .machines: .cloudSidebar
+        // cmux-rbf (#cm-142.1): Reply (#cm-69) has no ProductFeature of its own; counted with Feed
+        case .reply: .feed
         case .customSidebar: .customSidebar
         }
     }

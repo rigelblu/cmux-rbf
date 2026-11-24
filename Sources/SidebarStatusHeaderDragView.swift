@@ -21,6 +21,13 @@ struct SidebarStatusHeaderDropPaint: Equatable {
     }
 }
 
+/// The accent drop line, read from the window root's `cmuxAccentColor`. cmux-rbf (#cm-142.1): upstream
+/// removed the global accent function (#14988).
+private struct SidebarStatusHeaderAccentLine: View {
+    @Environment(\.cmuxAccentColor) private var cmuxAccent
+    var body: some View { Rectangle().fill(cmuxAccent.color) }
+}
+
 /// The source gap belongs to the list overlay, outside the header captured for the drag image.
 struct SidebarStatusHeaderSourceGapOverlay: View {
     let frame: CGRect?
@@ -28,7 +35,7 @@ struct SidebarStatusHeaderSourceGapOverlay: View {
         ZStack(alignment: .topLeading) {
             Color.clear
             if let frame {
-                Rectangle().fill(cmuxAccentColor()).frame(width: frame.width, height: frame.height)
+                SidebarStatusHeaderAccentLine().frame(width: frame.width, height: frame.height)
                     .offset(x: frame.minX, y: frame.minY)
             }
         }.allowsHitTesting(false)
@@ -62,10 +69,10 @@ private struct SidebarStatusHeaderDragView<Content: View>: View {
             .sidebarWorkspaceFrameAnchor(id: id, isEnabled: collectTargets)
             .sidebarPointerFrameReporting(onFrameChange: frameChanged, onDisappear: disappeared)
             .overlay(alignment: .top) {
-                if top { Rectangle().fill(cmuxAccentColor()).frame(height: 2).padding(.leading, inset).padding(.horizontal, 8) }
+                if top { SidebarStatusHeaderAccentLine().frame(height: 2).padding(.leading, inset).padding(.horizontal, 8) }
             }
             .overlay(alignment: .bottom) {
-                if bottom { Rectangle().fill(cmuxAccentColor()).frame(height: 2).padding(.leading, inset).padding(.horizontal, 8) }
+                if bottom { SidebarStatusHeaderAccentLine().frame(height: 2).padding(.leading, inset).padding(.horizontal, 8) }
             }
     }
 }
@@ -185,10 +192,10 @@ extension VerticalTabsSidebar {
             onToggle: { toggle(section.id.normalizedHex) }, indentLevels: indentLevels) // (#cm-110.12)
             .sidebarWorkspaceFrameAnchor(id: row.colorHeaderDropIdentity!, isEnabled: collectTargets)
             .overlay(alignment: .top) {
-                if paint.top { Rectangle().fill(cmuxAccentColor()).frame(height: 2).padding(.leading, paint.inset).padding(.horizontal, 8) }
+                if paint.top { SidebarStatusHeaderAccentLine().frame(height: 2).padding(.leading, paint.inset).padding(.horizontal, 8) }
             }
             .overlay(alignment: .bottom) {
-                if paint.bottom { Rectangle().fill(cmuxAccentColor()).frame(height: 2).padding(.leading, paint.inset).padding(.horizontal, 8) }
+                if paint.bottom { SidebarStatusHeaderAccentLine().frame(height: 2).padding(.leading, paint.inset).padding(.horizontal, 8) }
             }
 #if DEBUG
         return header.sidebarPointerFrameReporting(onFrameChange: { frameChanged(row, $0) }, onDisappear: { disappeared(row) })

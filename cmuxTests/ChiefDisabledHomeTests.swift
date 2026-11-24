@@ -493,3 +493,79 @@ struct ChiefDisabledHomeTests {
         #expect(manager.workspaceGroups.first { $0.id == groupId }?.isPinned == true)
     }
 }
+
+// MARK: - Chief Home with nested groups (#cm-106, #cm-142.1)
+// This suite lives here, not in a file of its own, because this file already has the Chief and TabManager setup and is
+// already wired into the test target; a new cmuxTests file would need project-file wiring.
+
+/// Chief Home meeting nested workspace groups (#cm-106, #cm-142.1), upstream code new in the 2026-11 sync (cm-142.1). P2: Home is a
+/// top-level group even after it was put inside another; P5: a conversation that sits in a group inside Home is still found.
+/// Each was run red on the unfixed tip first.
+@MainActor
+@Suite("Chief Home with nested groups", .serialized)
+struct ChiefHomeNestedGroupTests {
+    /// Restores `chief.enabled` after a test changes it.
+    private struct ChiefEnabledOverride {
+        let key = ChiefCatalogSection().enabled.userDefaultsKey
+        let original: Any?
+
+        init(_ enabled: Bool) {
+            original = UserDefaults.standard.object(forKey: key)
+            ChiefSettings.setEnabled(enabled)
+        }
+
+        func restore() {
+            if let original {
+                UserDefaults.standard.set(original, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+    }
+
+    @Test func ensureHomeBringsAHomeGroupPutInsideAnotherGroupBackToTheTop() throws {
+        let setting = ChiefEnabledOverride(true)
+        defer { setting.restore() }
+        let manager = TabManager()
+        let home = try #require(ChiefHomeNavigation.ensureHome(in: manager))
+        let homeGroupId = try #require(home.groupId)
+        let other = try #require(manager.tabs.first { $0.id != home.id })
+        let outerId = try #require(manager.createWorkspaceGroup(
+            name: "Outer", childWorkspaceIds: [other.id], selectAnchor: false, collapseSidebarSelection: false
+        ))
+        _ = manager.moveWorkspaceGroup(groupId: homeGroupId, intoParent: outerId)
+        try #require(
+            manager.workspaceGroups.first { $0.id == homeGroupId }?.parentGroupId == outerId,
+            "precondition: Home now sits inside Outer"
+        )
+
+        _ = ChiefHomeNavigation.ensureHome(in: manager)
+
+        #expect(manager.workspaceGroups.first { $0.id == homeGroupId }?.parentGroupId == nil, "Home is a top-level group again")
+        #expect(manager.tabs.first?.id == home.id, "Home's row is the first row")
+    }
+
+    @Test func openConversationReusesAConversationThatSitsInAGroupInsideHome() throws {
+        let setting = ChiefEnabledOverride(true)
+        defer { setting.restore() }
+        let manager = TabManager()
+        let home = try #require(ChiefHomeNavigation.ensureHome(in: manager))
+        let homeGroupId = try #require(home.groupId)
+        let conversation = ConversationID("cm-142-nested-\(UUID().uuidString)")
+        let first = try #require(ChiefHomeNavigation.openConversation(conversation, in: manager, select: false))
+        #expect(first.groupId == homeGroupId, "control: a new conversation opens directly in Home")
+        let innerId = try #require(manager.createWorkspaceGroup(
+            name: "Inner", childWorkspaceIds: [first.id], selectAnchor: false, collapseSidebarSelection: false
+        ))
+        try #require(
+            manager.workspaceGroups.first { $0.id == innerId }?.parentGroupId == homeGroupId,
+            "precondition: the new group was made inside Home (#cm-106)"
+        )
+        let countBefore = manager.tabs.count
+
+        let again = ChiefHomeNavigation.openConversation(conversation, in: manager, select: false)
+
+        #expect(again?.id == first.id, "the same workspace is reused")
+        #expect(manager.tabs.count == countBefore, "no second workspace for the same conversation")
+    }
+}

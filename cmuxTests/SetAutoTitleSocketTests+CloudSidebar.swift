@@ -80,6 +80,29 @@ extension SetAutoTitleSocketTests {
         }
     }
 
+    /// cmux-rbf (#cm-9, #cm-142.1): a title seed (`agent.session_title.seed`) on a cmux Cloud terminal keeps the path
+    /// it had before the merge: the title applies locally at once, as the agent's, and the daemon's tab gets the rename.
+    @Test("A title seed on a cloud terminal applies locally and reaches its daemon placement")
+    func cloudSessionTitleSeedAppliesLocallyAndReachesTheDaemon() async throws {
+        try await withManagerAsync { manager, workspace in
+            let fixture = try CloudSidebarRenameFixture(manager: manager, workspace: workspace, catalog: .shared)
+            defer { fixture.close() }
+            let response = try await callAsync(method: "agent.session_title.seed", params: [
+                "workspace_id": workspace.id.uuidString,
+                "surface_id": fixture.panelID.uuidString,
+                "title": "Teammate: review"
+            ])
+            #expect(response["ok"] as? Bool == true)
+            #expect((response["result"] as? [String: Any])?["panel_applied"] as? Bool == true, "the seed was dropped")
+            #expect(workspace.panelCustomTitles[fixture.panelID] == "Teammate: review")
+            #expect(workspace.panelCustomTitleSources[fixture.panelID] == .auto)
+            // Drain before close(), so no daemon write outlives the test.
+            try await fixture.drain()
+            #expect(fixture.provider.renamedTabs.map(\.id) == ["tab_main"])
+            #expect(fixture.provider.tabRenames == ["Teammate: review"])
+        }
+    }
+
     @Test("An exact tab ID resolves Cmd+R ownership when one terminal has several workspace placements")
     func exactTabSelectsWorkspaceOwnership() throws {
         let fixture = CloudSidebarOrderingFixture()

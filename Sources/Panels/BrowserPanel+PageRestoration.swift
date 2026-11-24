@@ -52,7 +52,7 @@ extension BrowserPanel {
             }
         }
         let restoreURL = pendingRecoveryURL
-            ?? restorableDisplayURLForCurrentErrorPage(liveURL: webView.url)
+            ?? restorableDisplayURLForCurrentErrorPage(liveURL: figmaCheckedLiveURL(of: webView)) // cmux-rbf #cm-73.40: reject a revert on upstream sync
         return DiscardRestoreTarget(
             restoreURL: restoreURL,
             historyCurrentURLString: pendingRecoveryURL?.absoluteString

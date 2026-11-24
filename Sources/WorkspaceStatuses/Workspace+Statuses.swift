@@ -50,6 +50,7 @@ extension Workspace {
         todoState.statusHidden = false
         todoState.statusOverride = nil
         todoState.ownStatus = WorkspaceOwnStatus(id: entry.id)
+        persistTodoState() // cmux-rbf (#cm-142.1): every todo write saves, as upstream's writers do
         return true
     }
 
@@ -86,6 +87,7 @@ extension Workspace {
         guard setDuringWait else { return }
         guard inferredTaskStatus(list: list) != .needsAttention else { return }
         todoState.statusOverride = nil
+        persistTodoState() // cmux-rbf (#cm-142.1): every todo write saves, as upstream's writers do
     }
 
     /// Restores his own status from a saved session. An id equal to one of cmux's five is dropped, and his id wins

@@ -80,7 +80,7 @@ private final class CloudWorkspaceRenameParityHarness {
     func surfaces(of workspace: Workspace? = nil) -> CloudWorkspaceNameSurfaces {
         let workspace = workspace ?? fixture.workspace
         let sidebarRow = SidebarWorkspaceSnapshotFactory(
-            workspace: workspace, settings: settings, showsAgentActivity: false
+            workspace: workspace, settings: settings, showsAgentActivity: false, todoControlsEnabled: false
         ).makeSnapshot().title
         let titleBar = manager.resolvedWorkspaceDisplayTitle(for: workspace)
         let nodes = CloudTreeNodeBuilder.flattened(CloudTreeNodeBuilder.nodes(

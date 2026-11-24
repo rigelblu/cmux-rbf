@@ -566,7 +566,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         // Compact status draws running and unread as its one glyph instead.
         let compacts = snapshot.compactStatusGlyph != nil
         let showsSpinner = !compacts && model.showsAgentActivity && snapshot.activeCodingAgentCount > 0
-        let badgeVisible = !compacts && (model.unreadCount > 0 || model.markedUnread) // (cm-128.4) marked-unread dot
+        let badgeVisible = !compacts && model.unreadCount > 0
         configureStatusSlot(
             model: model,
             palette: palette,
@@ -790,8 +790,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     ) {
         let badgeFill = palette.visual.badgeFillColor
         let badgeText = palette.visual.badgeTextColor
+        let shownCount = badgeVisible ? model.unreadCount : 0 // (#cm-109.3, #cm-128.4, #cm-142.1)
+        let shownMark = model.markedUnread && (badgeVisible || model.unreadCount == 0) // (#cm-109.3, #cm-128.4, #cm-142.1)
         let markColor: NSColor
-        if model.unreadCount == 0 && model.markedUnread {
+        if shownCount == 0 && shownMark { // (#cm-109.3, #cm-128.4, #cm-142.1)
             markColor = palette.visual.unreadMarkColor(sidebarStandIn:
                 model.contrastBackgroundHex.flatMap { NSColor(hex: $0) }
                     ?? SidebarAppearanceColorResolver().resolvedColor(.windowBackgroundColor, for: palette.colorScheme))
@@ -803,7 +805,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let slotResolution = SidebarWorkspaceSlotResolution.resolve( // (#cm-109.3)
             showsHand: model.snapshot.showsRaisedHand, // (#cm-109.3)
             showsSpinner: spinnerVisible, // (#cm-109.3)
-            unreadCount: model.unreadCount, markedUnread: model.markedUnread, // (#cm-109.3)
+            unreadCount: shownCount, markedUnread: shownMark, // (#cm-109.3, #cm-128.4, #cm-142.1)
             loadingSpinnerPosition: model.settings.loadingSpinnerPosition, // (#cm-109.3)
             notificationBadgePosition: model.settings.notificationBadgePosition, // (#cm-109.3)
             showsCloseButton: showsCloseNow // (#cm-109.3)
@@ -814,21 +816,21 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let markSpinnerVisible = slotResolution.markSpinner // (#cm-128.1)
         let trailingSpinnerVisible = slotResolution.trailing == .spinner || slotResolution.trailingInner == .spinner // (#cm-128.1)
         let restingResolution = showsCloseNow ? SidebarWorkspaceSlotResolution.resolve( // (#cm-128.1)
-            showsHand: slotResolution.showsHand, showsSpinner: spinnerVisible, unreadCount: model.unreadCount, markedUnread: model.markedUnread, // (#cm-128.1)
+            showsHand: slotResolution.showsHand, showsSpinner: spinnerVisible, unreadCount: shownCount, markedUnread: shownMark, // (#cm-128.1) (#cm-109.3, #cm-128.4, #cm-142.1)
             loadingSpinnerPosition: model.settings.loadingSpinnerPosition, // (#cm-128.1)
             notificationBadgePosition: model.settings.notificationBadgePosition, showsCloseButton: false // (#cm-128.1)
         ) : slotResolution // (#cm-128.1)
         restingTrailingMarks = (restingResolution.trailing, restingResolution.trailingInner) // (#cm-128.1)
         leadingBadge.isHidden = !leadingBadgeVisible // (#cm-109.3)
         trailingBadge.isHidden = !trailingBadgeVisible // (#cm-109.3)
-        let badgeAlpha = model.unreadCount == 0 && model.markedUnread ? 1 : SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: model.snapshot.taskStatus)
+        let badgeAlpha = shownCount == 0 && shownMark ? 1 : SidebarWorkspaceRowVisualPalette.contentAlpha(taskStatus: model.snapshot.taskStatus) // (#cm-109.3, #cm-128.4, #cm-142.1)
         leadingBadge.alphaValue = badgeAlpha
         trailingBadge.alphaValue = badgeAlpha
         if !leadingBadge.isHidden {
-            leadingBadge.configure(count: model.unreadCount, markedUnread: model.markedUnread, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont) // (cm-128.16)
+            leadingBadge.configure(count: shownCount, markedUnread: shownMark, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont) // (cm-128.16) (#cm-109.3, #cm-128.4, #cm-142.1)
         }
         if !trailingBadge.isHidden {
-            trailingBadge.configure(count: model.unreadCount, markedUnread: model.markedUnread, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont) // (cm-128.16)
+            trailingBadge.configure(count: shownCount, markedUnread: shownMark, markColor: markColor, markDiameter: SidebarWorkspaceSlotResolution.unreadMarkDiameter(fontScale: model.indicatorScale), fillColor: badgeFill, textColor: badgeText, font: badgeFont) // (cm-128.16) (#cm-109.3, #cm-128.4, #cm-142.1)
         }
 
         let spinnerColor = palette.visual.agentActivityColor() // (#cm-128.3)

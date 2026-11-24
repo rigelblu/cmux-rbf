@@ -1680,6 +1680,10 @@ final class ClaudeHookSessionStore {
             // A new authoritative boundary cannot inherit a prior turn's
             // summary or notification dedupe receipt, even when it reuses the
             // same native session id after recovery.
+            // (#cm-128.1, #cm-142.1) The pending-work answer is not a receipt: startup, resume and clear begin with
+            // nothing pending (false), and compact keeps the cache. The reset below must not wipe it to nil, which
+            // the idle-reminder gate reads as "activity since the last Stop".
+            let pendingWorkAtBoundary = record.hadPendingBackgroundWorkAtStop
             record.lastEmittedNotificationFingerprint = nil
             record.lastEmittedNotificationAt = nil
             record.recentEmittedNotificationFingerprints = nil
@@ -1687,7 +1691,7 @@ final class ClaudeHookSessionStore {
             record.lastBody = nil
             record.lastNotificationStatus = nil
             record.runtimeStatus = .idle
-            record.hadPendingBackgroundWorkAtStop = nil
+            record.hadPendingBackgroundWorkAtStop = pendingWorkAtBoundary // (#cm-128.1, #cm-142.1)
             record.hadSessionCronsAtStop = nil
             state.sessions[normalizedSessionId] = record
 
@@ -2193,7 +2197,8 @@ final class ClaudeHookSessionStore {
         if updateRuntimeStatus {
             record.runtimeStatus = runtimeStatus
         }
-        // cm-128.1: a prompt or a tool call is activity since the last Stop, so the Stop's pending-work answer is stale (nil).
+        // cmux-rbf (#cm-128.1, #cm-142.1): a prompt, or a tool call before the turn settles, is activity since the last Stop, so the
+        // Stop's pending-work answer is stale (nil). A PreToolUse after a settled Stop never gets here: upstream's #20262 fence takes it.
         if hookEventName == "UserPromptSubmit" || hookEventName == "PreToolUse" {
             record.hadPendingBackgroundWorkAtStop = nil
         }
@@ -32011,19 +32016,17 @@ struct CMUXCLI {
                     // still live, so the pane is not idle — show it as still
                     // running rather than the misleading "Idle". Reuse the shared
                     // generic-agent status strings so the pill stays localized.
-                    //
-                    // A background task or cron is a deterministic wakeup the pane
-                    // is parked on, which reads as Waiting. A re-entrant Stop
-                    // (`stop_hook_active`) does not change this decision because
-                    // it is not pending background work.
+                    // cmux-rbf (#cm-142.1, cm-128.3): Running, not upstream's Waiting, so the pill agrees with
+                    // the lifecycle, which stays .running for pending background work. A re-entrant Stop
+                    // (`stop_hook_active`) does not change this decision because it is not pending background work.
                     try? setClaudeStatus(
                         client: client,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
-                        value: String(localized: "agent.generic.status.waiting", defaultValue: "Waiting"),
-                        icon: "hourglass",
-                        color: "#8E8E93",
-                        workState: .waiting
+                        value: String(localized: "agent.generic.status.running", defaultValue: "Running"),
+                        icon: "bolt.fill",
+                        color: "#4C8DFF",
+                        workState: .running
                     )
                 } else {
                     try? setClaudeStatus(
@@ -32456,7 +32459,7 @@ struct CMUXCLI {
                     notifyPending = false
                 case .idle?:
                     notifyCategory = .idleReminder
-                    // cm-128.1: a prompt or tool observation invalidates the previous Stop.
+                    // cmux-rbf (#cm-128.1, #cm-142.1): a prompt, or a tool call before the turn settles, invalidates the previous Stop.
                     // Until the current turn records another Stop, an idle reminder
                     // cannot prove the pane safe to hibernate after Escape.
                     // cm-128.1: a session with no record gives no evidence of activity, so it is not pending.
@@ -42784,7 +42787,9 @@ export default {
         )
         enrichStopFeedEvent(&event, hookEventName: hookEventName, rawObject: parsedInput.rawObject)
         event["_opencode_request_id"] = "\(source)-\(sessionId)-\(hookEventName)-\(Int(Date().timeIntervalSince1970 * 1000))"
-        if let agentID = firstString(in: fallbackObject, keys: ["agent_id", "agentId"]) {
+        // cmux-rbf (#cm-73.24, #cm-142.1): Claude's helper id travels as `helper_agent_id` (above); `agent_id` is a request id to
+        // the agent journal (AgentFeedSemanticInput). Upstream's #15170 key stays for the other agents.
+        if source != "claude", let agentID = firstString(in: fallbackObject, keys: ["agent_id", "agentId"]) {
             event["agent_id"] = agentID
         }
         event["_hook_sent_at_ms"] = Self.feedHookSentAtMs()

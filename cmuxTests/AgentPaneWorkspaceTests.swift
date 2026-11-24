@@ -317,6 +317,31 @@ struct AgentPaneWorkspaceTests {
         }
     }
 
+    // cmux-rbf (#cm-126.3, #cm-142.1): review-b D1. A show that a `cmux ssh` workspace queues until its proxy is up sets
+    // the pane's address and loads nothing, so the web view still holds the last page; the steer must not publish it back.
+    @Test("a show queued in a remote workspace whose proxy is not up keeps the address it asked for")
+    func queuedRemoteShowKeepsItsAddress() async throws {
+        let rig = try Rig()
+        defer { rig.cleanup() }
+        let remoteWorkspaceId = UUID()
+        let pane = BrowserPanel(workspaceId: remoteWorkspaceId, isRemoteWorkspace: true, remoteWebsiteDataStoreIdentifier: remoteWorkspaceId)
+        defer { rig.workspace.panels[pane.id] = nil; pane.close() }
+        // The page the proxy showed before it dropped: loaded from a string, so no network and no proxy. The user agent
+        // goes on first, as the funnel sets it; without it the delegate restarts the load as a request, and this pane queues it.
+        pane.webView.applyBrowserUserAgentPolicy(for: Self.page1)
+        pane.webView.loadHTMLString("<html><body>one</body></html>", baseURL: Self.page1)
+        let deadline = Date().addingTimeInterval(5)
+        while pane.webView.url != Self.page1 || pane.webView.isLoading || pane.isMainFrameProvisionalNavigationActive, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        try #require(pane.webView.url == Self.page1 && !pane.webView.isLoading, "fixture: the web view did not settle on page 1")
+        await oneMainQueueTurn()
+        rig.workspace.panels[pane.id] = pane
+        try #require(rig.workspace.navigateAgentPane(pane.id, to: Self.page2) === pane)
+        try #require(pane.webView.url == Self.page1, "fixture: the show loaded instead of queueing: \(String(describing: pane.webView.url))")
+        #expect(pane.currentURL == Self.page2, "the steer published the old page: \(String(describing: pane.currentURL))")
+    }
+
     @Test("show steers the first of multiple owned panes, reports the others, and list counts them too")
     func multipleOwnedPanesReportOthers() throws {
         try withRig { rig in
@@ -401,6 +426,9 @@ struct AgentPaneWorkspaceTests {
             let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
             rig.defaults.set(true, forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
             rig.defaults.set(300, forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
+            // cmux-rbf: changed on purpose (#cm-142.1): upstream's default mode is now the memory budget, which arms no
+            // countdown; this checks the timer path, so it asks for timer mode.
+            rig.defaults.set("timer", forKey: BrowserHiddenWebViewDiscardPolicy.modeKey)
             let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: rig.defaults)
             defer { manager.cancel() }
             let now = Date()
@@ -417,6 +445,32 @@ struct AgentPaneWorkspaceTests {
             delegate.hiddenWebViewDiscardKeepLoaded = plain.hiddenWebViewDiscardKeepLoaded
             manager.scheduleIfNeeded(reason: "plain_control_test", now: now)
             #expect(manager.hasScheduledDiscard, "the same hidden, unblocked plain-page control must arm a timer")
+            #expect(delegate.discardRequests == 0)
+        }
+    }
+
+    // cmux-rbf (#cm-142.1): under upstream's default mode, the memory budget, a hidden Agent Pane is never picked; the same
+    // hidden page of a plain pane is (the control).
+    @Test("an Agent Pane is never eligible for the hidden-page memory budget; a plain page is")
+    func agentPaneExemptFromMemoryBudget() throws {
+        try withRig { rig in
+            let plain = try rig.addPlainBrowser()
+            let agentPane = try rig.browser(rig.show(from: rig.terminalA, Self.page1)?.surfaceID)
+            rig.defaults.set(true, forKey: BrowserHiddenWebViewDiscardPolicy.enabledKey)
+            rig.defaults.set(300, forKey: BrowserHiddenWebViewDiscardPolicy.hiddenDelayKey)
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: rig.defaults)
+            defer { manager.cancel() }
+            let now = Date()
+            let delegate = AgentPaneHiddenDiscardDelegate(
+                keepLoaded: agentPane.hiddenWebViewDiscardKeepLoaded,
+                hiddenAt: now.addingTimeInterval(-301)
+            )
+            manager.delegate = delegate
+            #expect(manager.blockers(for: delegate.hiddenWebViewDiscardSnapshot).isEmpty)
+            #expect(!manager.isEligibleForMemoryBudgetDiscard(now: now), "the Agent Pane's keep-loaded term must exempt it")
+
+            delegate.hiddenWebViewDiscardKeepLoaded = plain.hiddenWebViewDiscardKeepLoaded
+            #expect(manager.isEligibleForMemoryBudgetDiscard(now: now), "the same hidden plain page must be eligible")
             #expect(delegate.discardRequests == 0)
         }
     }
@@ -1353,6 +1407,11 @@ struct AgentPaneWorkspaceTests {
             #expect(agentPane.currentURL == Self.page1)
             #expect(rig.clearedPageText(of: agentPane.id) == nil)
             agentPane.navigate(to: Self.page2)
+            // cmux-rbf: changed on purpose (#cm-142.1): upstream's #18318 publishes the web view's address on a later
+            // main-actor turn, and not while the load is provisional. Publish what the observer published here before,
+            // the address the web view took, through its seam: a refused load leaves page 1 and fails below. The subject
+            // is the link the held clear computes when it applies.
+            agentPane.publishObservedDocumentURL(agentPane.webView.url)
             rig.workspace.exitDesignFocus(reason: "test")
             #expect(rig.workspace.agentPaneIsCleared(agentPane.id))
             #expect(fileURLsMatch(agentPane.currentURL, rig.clearedPage(of: agentPane.id)))
@@ -1480,6 +1539,11 @@ struct AgentPaneWorkspaceTests {
             _ = try #require(rig.show(from: rig.terminalA, Self.page2))
             // Tom swipes back: the pane shows the cleared page again, the state is still a post, and he writes.
             agentPane.navigate(to: cleared)
+            // cmux-rbf: changed on purpose (#cm-142.1): upstream's #18318 publishes the web view's address on a later
+            // main-actor turn, and not while the load is provisional. Publish what the observer published here before,
+            // the address the web view took, through its seam: a refused load leaves page 2 and fails below. The subject
+            // is the link the next clear writes.
+            agentPane.publishObservedDocumentURL(agentPane.webView.url)
             #expect(fileURLsMatch(agentPane.currentURL, cleared))
             let applied = try #require(rig.clear(from: rig.terminalA))
             #expect(applied.action == .cleared)

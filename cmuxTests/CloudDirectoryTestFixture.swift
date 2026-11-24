@@ -100,7 +100,7 @@ final class CloudDirectoryTestFixture {
         return SidebarWorkspaceSnapshotFactory(
             workspace: workspace,
             settings: SidebarTabItemSettingsSnapshot(defaults: defaults),
-            showsAgentActivity: false,
+            showsAgentActivity: false, todoControlsEnabled: false,
             catalog: catalog
         ).makeSnapshot()
     }

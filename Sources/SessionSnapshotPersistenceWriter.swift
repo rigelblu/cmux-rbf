@@ -36,12 +36,20 @@ struct SessionSnapshotPersistenceWriter: @unchecked Sendable {
 
     var snapshotStore: Store { store }
 
+    /// cmux-rbf #cm-54: what one write did to the primary file, reported on the writer's queue right
+    /// after it, so the restart-command receipt follows the bytes on disk.
+    enum WriteOutcome: Sendable {
+        case saved(AppSessionSnapshot)
+        case removed
+    }
+
     func persist(
         _ snapshot: AppSessionSnapshot?,
         removeWhenEmpty: Bool,
         persistedGeometryData: Data?,
         synchronously: Bool,
-        preserveManualRestoreBackupOnMissingPrimary: Bool = false
+        preserveManualRestoreBackupOnMissingPrimary: Bool = false,
+        afterWrite: (@Sendable (WriteOutcome) -> Void)? = nil // cmux-rbf #cm-54
     ) {
         guard snapshot != nil || removeWhenEmpty || persistedGeometryData != nil else { return }
 
@@ -61,6 +69,7 @@ struct SessionSnapshotPersistenceWriter: @unchecked Sendable {
             if let snapshot {
                 if store.save(snapshot, fileURL: nil) {
                     Self.clearCrashOnlyPrimarySnapshotRemovalMarker(defaults: defaults)
+                    afterWrite?(.saved(snapshot)) // cmux-rbf #cm-54
                 }
             } else if removeWhenEmpty {
                 if preserveManualRestoreBackupOnMissingPrimary {
@@ -69,6 +78,7 @@ struct SessionSnapshotPersistenceWriter: @unchecked Sendable {
                     Self.clearCrashOnlyPrimarySnapshotRemovalMarker(defaults: defaults)
                 }
                 store.removeSnapshot(fileURL: nil)
+                afterWrite?(.removed) // cmux-rbf #cm-54
             }
         }
 

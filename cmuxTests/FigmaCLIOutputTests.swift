@@ -153,9 +153,24 @@ struct FigmaCLIOutputTests {
                     self.lock.unlock()
                     let request = Self.parse(line)
                     let surfaceID = request?.params["surface_id"] as? String
-                    return reply(request?.method ?? "", surfaceID)
+                    // cmux-rbf: changed on purpose (#cm-73, #cm-142.1): upstream's v2 client refuses a reply whose
+                    // id is not the request's (SocketClient+V2.swift), so every canned answer carries the request id.
+                    return Self.echoingRequestID(reply(request?.method ?? "", surfaceID), from: line)
                 }
             }, onListenerClosed: {})
+        }
+
+        /// The canned reply with the request's `id` in place of its `null`. (cmux-rbf #cm-142.1)
+        private static func echoingRequestID(_ answer: String, from line: String) -> String {
+            guard let requestData = line.data(using: .utf8),
+                  let request = try? JSONSerialization.jsonObject(with: requestData) as? [String: Any],
+                  let id = request["id"],
+                  let answerData = answer.data(using: .utf8),
+                  var object = try? JSONSerialization.jsonObject(with: answerData) as? [String: Any]
+            else { return answer }
+            object["id"] = id
+            guard let encoded = try? JSONSerialization.data(withJSONObject: object) else { return answer }
+            return String(decoding: encoded, as: UTF8.self)
         }
 
         private static func parse(_ line: String) -> Request? {

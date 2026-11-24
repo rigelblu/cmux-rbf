@@ -83,7 +83,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 "CMUX_CLI_SENTRY_DISABLED": "1",
                 "CMUX_CLAUDE_HOOK_SENTRY_DISABLED": "1",
             ],
-            standardInput: #"{"session_id":"\#(sessionId)","hook_event_name":"Notification","message":"Claude needs your input"}"#,
+            // cmux-rbf: changed on purpose (#cm-128.5, #cm-142.1): untyped words raise nothing, so the routed wait is a typed one.
+            standardInput: #"{"session_id":"\#(sessionId)","hook_event_name":"Notification","notification_type":"permission_prompt","message":"Claude needs your input"}"#,
             timeout: 5
         )
 
@@ -302,7 +303,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
         )
         XCTAssertTrue(
             state.commands.contains {
-                $0.hasPrefix("notify_target_async \(targetWorkspaceId) \(targetSurfaceId) Claude Code|Permission|Claude needs your input")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): source line and working folder.
+                $0.hasPrefix("notify_target_async \(targetWorkspaceId) \(targetSurfaceId) Claude Code · Needs your approval||Claude needs your input")
             },
             "The admitted permission notification must keep the explicit target and original content, saw \(state.commands)"
         )

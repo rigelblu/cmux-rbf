@@ -2254,7 +2254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// when the app resigned, so Esc reaches the route that leaves it. Meant to skip a click activation, but a real click
     /// rarely reads as one (see `applicationDidBecomeActive`).
     func keyFigmaFullscreenWindow(activatedByClick: Bool) {
-        guard let window = allBrowserPanelsForInspectorWindowClose().lazy
+        guard let window = allLiveBrowserPanels().lazy
             .compactMap({ $0.figmaFullscreenWindowToKey(currentKey: NSApp.keyWindow, activatedByClick: activatedByClick) }).first else { return }
         window.makeKey()
 #if DEBUG
@@ -2463,11 +2463,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             terminateCleanupWatchdogTask = Task { @MainActor in
                 try? await ContinuousClock().sleep(for: cleanupDeadline)
                 guard !Task.isCancelled else { return }
-                if self.terminateCleanupPhase == .agentTermination {
-                    self.terminationWatchdog.arm()
-                    await cleanupTask.value
-                    return
-                }
+                // cmux-rbf #cm-137.2: no arm-and-await in `.agentTermination`. The fresh save is
+                // written by then, so a deadline quits at once and only skips the cached re-save
+                // (`.terminateWithSavedSnapshot` below); upstream's wait on agent termination and
+                // the cloud drain would hold the quit past the deadline.
                 cleanupTask.cancel()
                 let disposition = Self.terminateCleanupDeadlineDisposition(
                     phase: self.terminateCleanupPhase,
@@ -2792,7 +2791,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationWillResignActive(_ notification: Notification) {
         guard !isTerminatingApp else { return }
         let keyWindowAtResign = NSApp.keyWindow // cmux-rbf (#cm-73.52): for the one re-key on activation
-        for panel in allBrowserPanelsForInspectorWindowClose() { panel.noteAppResigned(keyWindow: keyWindowAtResign) }
+        for panel in allLiveBrowserPanels() { panel.noteAppResigned(keyWindow: keyWindowAtResign) }
         PortScanner.shared.setTrackedAgentScanningPaused(true)
         clearConfiguredShortcutChordState()
         if Self.shouldSaveSessionSnapshotOnApplicationResign(isTerminatingApp: isTerminatingApp) {
@@ -15907,7 +15906,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         if isPlainEscape {
             // cmux-rbf (#cm-73.52): WebKit never sees this Esc, so cmux's own Figma full screen leaves here, from its own window.
-            if let owner = allBrowserPanelsForInspectorWindowClose().first(where: { $0.figmaFullscreenTakesEscape(from: event.window) }) {
+            if let owner = allLiveBrowserPanels().first(where: { $0.figmaFullscreenTakesEscape(from: event.window) }) {
                 owner.requestFigmaFullscreen(enter: false)
 #if DEBUG
                 cmuxDebugLog("shortcut.escape figmaFullscreenLeave consumed=1 panel=\(owner.id.uuidString.prefix(5))")

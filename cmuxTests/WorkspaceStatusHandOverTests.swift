@@ -323,7 +323,7 @@ struct WorkspaceStatusHandOverTests {
             defer { restore() }
             try inATabManager { manager, workspace, customizations in
                 if placement == "pinned" { manager.setPinned(workspace, pinned: true) }
-                else { _ = try #require(manager.createWorkspaceGroup(name: "None clear", childWorkspaceIds: [workspace.id])) }
+                else { _ = try #require(manager.createWorkspaceGroupWithOwnAnchor(name: "None clear", childWorkspaceIds: [workspace.id])) } // cmux-rbf: changed on purpose (#cm-142.1): upstream #15892 made the first child the anchor
                 let groupBefore = workspace.groupId
                 WorkspaceTodoActions.applyStatusOverride(.status(id: "next"), to: [workspace])
                 try #require(workspace.customColor == "#334455")

@@ -71,7 +71,8 @@ import Testing
         )
 
         for policy in [reduced.policy(for: .windowRoot), plan.rootPolicy] {
-            guard case let .ghosttyTerminalBackdrop(color, opacity, _) = policy else {
+            // cmux-rbf: changed on purpose (#cm-142.1): the fork's #cm-13 case also carries backgroundImage.
+            guard case let .ghosttyTerminalBackdrop(color, opacity, _, _) = policy else {
                 Issue.record("Expected an opaque terminal backdrop")
                 continue
             }

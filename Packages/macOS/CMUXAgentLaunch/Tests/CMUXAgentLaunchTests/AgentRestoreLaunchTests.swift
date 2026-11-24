@@ -661,8 +661,9 @@ import Testing
             ambientEnvironment: ["CMUX_CLAUDE_WRAPPER_SHIM": "/shim/claude"]
         ))
 
+        // cmux-rbf: changed on purpose (#cm-30, #cm-142.1): Claude restores its own model and effort on --resume
         #expect(invocation.arguments == [
-            "/shim/claude", "--resume", sessionID, "--model", "sonnet",
+            "/shim/claude", "--resume", sessionID,
             "--permission-mode", "bypassPermissions",
         ])
         #expect(

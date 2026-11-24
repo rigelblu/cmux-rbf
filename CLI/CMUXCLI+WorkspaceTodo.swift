@@ -419,6 +419,8 @@ extension CMUXCLI {
 
     // MARK: - Usage
 
+    // cmux-rbf (#cm-109, #cm-142.1): `status` lists the fork's ids, cycle and list, as `cmux workspace status --help` does;
+    // the same edit is in every locale of `cli.workspace.usage` in Resources/Localizable.xcstrings.
     static let workspaceCommandUsage = String(localized: "cli.workspace.usage", defaultValue: """
     Usage: cmux workspace <subcommand> [flags]
 
@@ -436,7 +438,7 @@ extension CMUXCLI {
       close <workspace>       Close a workspace
       rename <workspace> --title <new>
       select <workspace>      Make a workspace active
-      status [set <lane|auto>]
+      status [set <id|auto|none> | cycle | list]
                               Show or pin the workspace todo status
       reconnect [workspace]   Reconnect a remote (SSH) workspace, including one
                               whose automatic reconnect paused because the host

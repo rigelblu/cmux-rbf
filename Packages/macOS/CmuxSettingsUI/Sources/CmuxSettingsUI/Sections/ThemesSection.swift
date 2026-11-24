@@ -17,6 +17,9 @@ public struct ThemesSection: View {
     @State private var appIcon: DefaultsValueModel<AppIconMode>
     @State private var adaptiveDefaultTheme: DefaultsValueModel<Bool>
     @State private var browserTheme: DefaultsValueModel<BrowserThemeMode>
+    /// Host-derived, not a catalog setting: whether the terminal theme is
+    /// pinned to one theme across both appearances, and which one. (#cm-21)
+    @State private var terminalThemePin: TerminalThemePinModel
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -38,6 +41,7 @@ public struct ThemesSection: View {
         hostActions: SettingsHostActions
     ) {
         self.hostActions = hostActions
+        _terminalThemePin = State(initialValue: TerminalThemePinModel(hostActions: hostActions)) // (#cm-21)
         _accentColorWriter = State(initialValue: AccentColorSettingsFileWriter(
             write: { value in
                 _ = try await jsonStore.setWithReceipt(value, for: AccentColorSettingsFileWriter.settingsFileKey)
@@ -69,7 +73,7 @@ public struct ThemesSection: View {
                 TerminalThemeSettingsRows(hostActions: hostActions)
             }
         }
-        .task { startSettingsObservation([appearance, accentColor, accentColorCustomHex, appIcon, adaptiveDefaultTheme, browserTheme]) }
+        .task { startSettingsObservation([appearance, accentColor, accentColorCustomHex, appIcon, adaptiveDefaultTheme, browserTheme, terminalThemePin]) } // (#cm-21): terminalThemePin
     }
 
     @ViewBuilder
@@ -77,7 +81,12 @@ public struct ThemesSection: View {
         SettingsCard {
             ThemePickerRow(
                 selectedMode: appearance.current,
-                onSelect: { appearance.set($0) }
+                onSelect: { appearance.set($0) },
+                // (#cm-21): the caveat moved here with upstream's Appearance picker (204a11dfcc).
+                subtitle: ThemePickerCaveat.subtitle(
+                    selectedMode: appearance.current,
+                    pinnedThemeName: terminalThemePin.pinnedThemeName
+                )
             )
             .settingsSearchAnchors(["setting:themes:appearance"])
             SettingsCardDivider()

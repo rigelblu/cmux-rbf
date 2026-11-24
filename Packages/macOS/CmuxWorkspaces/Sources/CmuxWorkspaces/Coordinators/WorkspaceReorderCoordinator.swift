@@ -72,6 +72,7 @@ public final class WorkspaceReorderCoordinator<Tab: WorkspaceTabRepresenting> {
     /// return `false`; callers check pinning separately.
     public func isAtTopOfUnpinnedTier(_ tabId: UUID) -> Bool {
         guard let tab = model.tabs.first(where: { $0.id == tabId }), !tab.isPinned else { return false }
+        if model.hasNestedWorkspaceGroup { return model.nestedIsAtTopOfUnpinnedTier(tab) } // (#cm-106)
         if !model.workspaceGroups.isEmpty {
             guard let topLevelId = model.topLevelWorkspaceIds(for: [tab]).first else { return false }
             let pinnedTopLevelIds = model.sidebarTopLevelPinnedWorkspaceIdsIncludingEmptyGroups()

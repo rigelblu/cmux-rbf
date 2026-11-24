@@ -1,5 +1,6 @@
 import AppKit
 import CmuxNotifications
+import CmuxSettings // cmux-rbf: changed on purpose (#cm-142.1): BetaFeaturesCatalogSection for withTodoControls
 import CmuxWorkspaces
 import Foundation
 import SwiftUI
@@ -62,13 +63,15 @@ struct SidebarStatusGroupFoldingTests {
     }
 
     @Test func theSelectedGroupIsOpenAfterTheFirstCopy() throws {
-        let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
-        state.prepareStatusGroupsForSelection(
-            list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: try Self.selectedWorkspace()
-        , workspaceGroups: [])
-        let folds = try #require(state.statusGroups)
-        #expect(!folds.collapsedStatusIds.contains("parked"))
-        #expect(!folds.areaCollapsed)
+        try withTodoControls { // cmux-rbf: changed on purpose (#cm-142.1): runs with Workspace Todo Controls on (TestProcessDefaults)
+            let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
+            state.prepareStatusGroupsForSelection(
+                list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: try Self.selectedWorkspace()
+            , workspaceGroups: [])
+            let folds = try #require(state.statusGroups)
+            #expect(!folds.collapsedStatusIds.contains("parked"))
+            #expect(!folds.areaCollapsed)
+        }
     }
 
     @Test func aNewWindowDoesNotCopyItsColorFolds() throws {
@@ -86,47 +89,53 @@ struct SidebarStatusGroupFoldingTests {
     }
 
     @Test func selectingASeededMemberUnfoldsItsGroupAndArea() throws {
-        let state = SidebarState(statusGroups: .init(areaCollapsed: true, collapsedStatusIds: ["parked", "done"]))
-        state.revealStatusGroup(
-            containing: try Self.selectedWorkspace(), list: Self.list, resolvedHexByStatusId: Self.colors
-        , workspaceGroups: [])
-        let folds = try #require(state.statusGroups)
-        #expect(!folds.areaCollapsed)
-        #expect(!folds.collapsedStatusIds.contains("parked"))
-        #expect(folds.collapsedStatusIds.contains("done"))
+        try withTodoControls { // cmux-rbf: changed on purpose (#cm-142.1): runs with Workspace Todo Controls on (TestProcessDefaults)
+            let state = SidebarState(statusGroups: .init(areaCollapsed: true, collapsedStatusIds: ["parked", "done"]))
+            state.revealStatusGroup(
+                containing: try Self.selectedWorkspace(), list: Self.list, resolvedHexByStatusId: Self.colors
+            , workspaceGroups: [])
+            let folds = try #require(state.statusGroups)
+            #expect(!folds.areaCollapsed)
+            #expect(!folds.collapsedStatusIds.contains("parked"))
+            #expect(folds.collapsedStatusIds.contains("done"))
+        }
     }
 
     @Test(arguments: [1, 3])
     func aSelectedWorkspaceAtRestoreDoesNotEraseTheLaterCopySource(_ automaticReveals: Int) throws {
-        let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
-        let selected = try Self.selectedWorkspace()
-        for _ in 0..<automaticReveals {
-            state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
+        try withTodoControls { // cmux-rbf: changed on purpose (#cm-142.1): runs with Workspace Todo Controls on (TestProcessDefaults)
+            let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
+            let selected = try Self.selectedWorkspace()
+            for _ in 0..<automaticReveals {
+                state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
+            }
+            #expect(state.statusGroups == nil)
+            #expect(state.collapsedColorSectionHexes.isEmpty)
+            state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected, workspaceGroups: [])
+            let folds = try #require(state.statusGroups)
+            #expect(folds.collapsedStatusIds.contains("done"))
+            #expect(!folds.collapsedStatusIds.contains("parked"))
+            #expect(!folds.areaCollapsed)
         }
-        #expect(state.statusGroups == nil)
-        #expect(state.collapsedColorSectionHexes.isEmpty)
-        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected, workspaceGroups: [])
-        let folds = try #require(state.statusGroups)
-        #expect(folds.collapsedStatusIds.contains("done"))
-        #expect(!folds.collapsedStatusIds.contains("parked"))
-        #expect(!folds.areaCollapsed)
     }
 
     @Test(arguments: [false, true])
     func aDeliberateColorToggleUpdatesThePendingCopySource(_ deliberatelyFolded: Bool) throws {
-        let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
-        let selected = try Self.selectedWorkspace()
-        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
-        state.toggleColorSection(hex: "#AABBCC")
-        if !deliberatelyFolded { state.toggleColorSection(hex: "#AABBCC") }
-        #expect(state.collapsedColorSectionHexes.contains("#AABBCC") == deliberatelyFolded)
-        // Automatic selection reveals the color again but must preserve the explicit choice for the pending copy.
-        state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
-        state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected, workspaceGroups: [])
-        let folds = try #require(state.statusGroups)
-        #expect(folds.collapsedStatusIds.contains("done") == deliberatelyFolded)
-        #expect(!folds.collapsedStatusIds.contains("parked"))
-        #expect(!folds.areaCollapsed)
+        try withTodoControls { // cmux-rbf: changed on purpose (#cm-142.1): runs with Workspace Todo Controls on (TestProcessDefaults)
+            let state = SidebarState(collapsedColorSectionHexes: ["#AABBCC"], statusGroups: nil)
+            let selected = try Self.selectedWorkspace()
+            state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
+            state.toggleColorSection(hex: "#AABBCC")
+            if !deliberatelyFolded { state.toggleColorSection(hex: "#AABBCC") }
+            #expect(state.collapsedColorSectionHexes.contains("#AABBCC") == deliberatelyFolded)
+            // Automatic selection reveals the color again but must preserve the explicit choice for the pending copy.
+            state.prepareStatusGroupsForSelection(list: .cmuxFive, resolvedHexByStatusId: [:], selectedWorkspace: selected, workspaceGroups: [])
+            state.prepareStatusGroupsOnListArrival(list: Self.list, resolvedHexByStatusId: Self.colors, selectedWorkspace: selected, workspaceGroups: [])
+            let folds = try #require(state.statusGroups)
+            #expect(folds.collapsedStatusIds.contains("done") == deliberatelyFolded)
+            #expect(!folds.collapsedStatusIds.contains("parked"))
+            #expect(!folds.areaCollapsed)
+        }
     }
 
     @Test func anEmptyFileListCompletesTheOneTimeCopy() throws {
@@ -248,6 +257,17 @@ struct SidebarStatusGroupFoldingTests {
         #expect(repainted.appKitGroupHeaderModel?.anchorUnreadCount == 3)
         repainted.colorSectionToggle?()
         #expect(toggled == 1)
+    }
+
+    /// cmux-rbf: changed on purpose (#cm-110.1, #cm-142.1): upstream's TestProcessDefaults gives each test process empty
+    /// defaults, so Workspace Todo Controls is off unless a test turns it on, and a status group is revealed only with the
+    /// controls on (`statusSidePlace`). These tests passed before on the developer domain's saved setting.
+    private func withTodoControls<T>(_ body: () throws -> T) rethrows -> T {
+        let key = BetaFeaturesCatalogSection().workspaceTodoControls.userDefaultsKey
+        let previous = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.set(true, forKey: key)
+        defer { if let previous { UserDefaults.standard.set(previous, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
+        return try body()
     }
 
     private static func selectedWorkspace() throws -> Workspace {

@@ -92,6 +92,9 @@ struct ChiefHomeNavigation {
             if !group.isPinned { manager.setWorkspaceGroupPinned(groupId: groupID, isPinned: true) }
             if group.iconSymbol != "house" { _ = manager.setWorkspaceGroupIcon(groupId: groupID, symbol: "house") }
         }
+        if manager.workspaceGroups.first(where: { $0.id == groupID })?.parentGroupId != nil { // (#cm-106, #cm-142.1) Home stays a top-level group
+            _ = manager.moveWorkspaceGroup(groupId: groupID, intoParent: nil)
+        }
         if manager.tabs.first?.id != home.id {
             manager.moveWorkspaceGroup(groupId: groupID, toIndex: 0)
         }
@@ -153,8 +156,9 @@ struct ChiefHomeNavigation {
         }
         let row = ChiefService.shared.conversations.first { $0.id == id }
         let title = row?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let insideHome = Set(manager.workspaces.workspaceIdsInside(groupID)) // (#cm-106, #cm-142.1) a conversation can sit in a group inside Home
         if let existing = manager.tabs.first(where: { workspace in
-            workspace.groupId == groupID && workspace.panels.values.contains {
+            insideHome.contains(workspace.id) && workspace.panels.values.contains { // (#cm-106, #cm-142.1)
                 ($0 as? ChiefPanel)?.conversationID == id
             }
         }) {

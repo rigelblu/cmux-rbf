@@ -35,7 +35,8 @@ struct CLICodexResumeNotificationTests {
         #expect(outcome.result.status == 0, Comment(rawValue: outcome.result.stderr))
         #expect(
             outcome.commands.contains {
-                $0.hasPrefix("notify_target_async \(workspaceID) \(surfaceID) Codex|")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): resumed completion source line and folder.
+                $0.hasPrefix("notify_target_async \(workspaceID) \(surfaceID) Codex · Finished|\(root.lastPathComponent)|")
             },
             "A resumed turn completion must reach the notification command"
         )
@@ -72,7 +73,8 @@ struct CLICodexResumeNotificationTests {
         #expect(outcome.result.status == 0, Comment(rawValue: outcome.result.stderr))
         #expect(
             outcome.commands.contains {
-                $0.hasPrefix("notify_target_async \(workspaceID) \(surfaceID) Codex|")
+                // cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): resumed completion source line and folder.
+                $0.hasPrefix("notify_target_async \(workspaceID) \(surfaceID) Codex · Finished|\(root.lastPathComponent)|")
             },
             "Without the excluded record there is no timestamp boundary, so suppression must fail closed"
         )

@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import CmuxFoundation
 import SwiftUI
 
 /// The loading line on a Figma pane's top edge (`cm-73.11`).
@@ -347,6 +348,19 @@ struct FigmaLoadBarView: View {
             }
         }
         .accessibilityHidden(true)
+        // cmux-rbf (#cm-142.1): upstream removed the global accent function (#14988). The portal
+        // hosts this view outside a window root, so it injects the accent itself, as upstream's search
+        // overlay does, and `AccentLine` reads it.
+        .cmuxAccentColorEnvironment()
+    }
+
+    /// The accent-coloured line, read from the injected `cmuxAccentColor`. cmux-rbf (#cm-142.1)
+    private struct AccentLine: View {
+        @Environment(\.cmuxAccentColor) private var cmuxAccent
+
+        var body: some View {
+            Rectangle().fill(cmuxAccent.color)
+        }
     }
 
     private func remember(_ style: FigmaLoadBar.Style) {
@@ -373,14 +387,12 @@ struct FigmaLoadBarView: View {
                     slideSeconds: Self.slideSeconds,
                     segmentFraction: Self.segmentFraction
                 )
-                Rectangle()
-                    .fill(cmuxAccentColor())
+                AccentLine()
                     .frame(width: segment, height: Self.height)
                     .offset(x: offset)
             }
         case let .still(opacity):
-            Rectangle()
-                .fill(cmuxAccentColor())
+            AccentLine()
                 .opacity(opacity)
                 .frame(width: width, height: Self.height)
         }
@@ -391,8 +403,7 @@ struct FigmaLoadBarView: View {
         let width: CGFloat
 
         var body: some View {
-            Rectangle()
-                .fill(cmuxAccentColor())
+            AccentLine()
                 .frame(width: width * CGFloat(fraction), height: FigmaLoadBarView.height)
                 .animation(.linear(duration: 0.15), value: fraction)
         }

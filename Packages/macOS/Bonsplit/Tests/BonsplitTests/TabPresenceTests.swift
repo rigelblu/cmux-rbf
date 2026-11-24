@@ -99,7 +99,8 @@ final class TabPresenceTests: XCTestCase {
             let snapshot = TabContextMenuSnapshot(
                 tabId: UUID(), state: state,
                 moveDestinationsProvider: { [] },
-                forkConversationAvailabilityProvider: { .hidden }
+                forkConversationAvailabilityProvider: { .hidden },
+                sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
             )
             return TabContextMenuBuilder.makeMenu(snapshot: snapshot, target: target)
         }

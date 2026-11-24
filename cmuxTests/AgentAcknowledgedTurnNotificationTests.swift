@@ -140,9 +140,9 @@ extension AgentNotificationRegressionTests {
         #expect(await harness.center.admitNotification(idleReminder(fixture, at: 60_003)))
     }
 
-    /// The reminder is still the nag the user enabled while the completion is
-    /// unread, and a later turn or a permission request is real new attention.
-    @Test func claudeUnreadCompletionNewTurnAndPermissionStillNotify() async throws {
+    /// cmux-rbf: changed on purpose (#cm-128.4, #cm-142.1): an unread recorded completion gets no idle reminder (cmux's
+    /// own reminder covers it), while a later turn or a permission request is still real new attention.
+    @Test func claudeUnreadCompletionGetsNoIdleReminderButNewTurnAndPermissionNotify() async throws {
         let fixture = try makeFixture()
         defer { fixture.restore() }
         let harness = try makeJournalHarness(fixture, source: "claude")
@@ -154,7 +154,10 @@ extension AgentNotificationRegressionTests {
             draft(fixture, .turnCompleted, source: "claude", at: 3, category: "turn-complete", nativeEvent: "Stop"),
         ])
         #expect(unreadCount(fixture) == 1)
-        #expect(await harness.center.admitNotification(idleReminder(fixture, at: 60_003)))
+        // cmux-rbf: changed on purpose (#cm-142.1): Tom's rule gives an unread finished turn "one banner-only reminder
+        // 60 s after it finishes, in cmux's words" (#cm-128.4; 2026-11-02, d189e4fafd). Reading "one" as cmux's own,
+        // the agent's idle reminder for a recorded completion is not admitted: the conductor's reading (cm-142.1).
+        #expect(await !harness.center.admitNotification(idleReminder(fixture, at: 60_003)))
 
         fixture.store.markRead(forTabId: fixture.source.id, surfaceId: fixture.panelId)
         await settle(harness, fixture, [

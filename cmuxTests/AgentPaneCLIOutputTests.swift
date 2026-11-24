@@ -652,8 +652,14 @@ struct AgentPaneCLIOutputTests {
             reply: Self.listReply(owner: "surface:1")
         )
         #expect(run.status == 0, "\(run.stderr)")
-        #expect(run.requests.count == 1)
-        let request = try #require(run.requests.first)
+        // cmux-rbf: changed on purpose (#cm-126, #cm-142.1): upstream's normalizeWorkspaceHandle resolves a ref
+        // through the shared resolver (workspace.list, then window.list) before the list call; this stand-in
+        // answers neither, so the ref goes through unresolved. One list call, and it is the last request.
+        let lists = run.requests.filter { $0.method == "agent_pane.list" }
+        #expect(lists.count == 1)
+        #expect(run.requests.dropLast().allSatisfy { $0.method == "workspace.list" || $0.method == "window.list" },
+                "only the resolver's reads may precede the list call: \(run.requests.map(\.method))")
+        let request = try #require(run.requests.last)
         #expect(request.method == "agent_pane.list")
         #expect(request.params["workspace_id"] as? String == "workspace:7")
         let object = try #require(try JSONSerialization.jsonObject(with: Data(run.stdout.utf8)) as? [String: Any])

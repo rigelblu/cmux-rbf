@@ -24,6 +24,9 @@ extension BrowserPanel {
             }
         }
         pageRestoration.formStateMessageHandler = handler
+        // cmux-rbf (#cm-73.3, #cm-142.1): a kept Figma page is bound again on its own content controller, which still
+        // holds this handler; upstream's #15154 adds it on every bind. Remove it first, in its world, as the siblings do.
+        webView.configuration.userContentController.removeBrowserFormStateHandler()
         webView.configuration.userContentController.addBrowserFormStateHandler(handler)
     }
 

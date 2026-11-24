@@ -32,8 +32,8 @@ final class SidebarRowTaskStatusGlyphButton: NSControl {
         /// None replaces the status, icon and color with the neutral dot. (#cm-110.13)
         var isNone: Bool = false // (#cm-110.13)
         /// The accent setting for the Working colour (upstream). Defaulted, not required, so the fork's many
-        /// fixed-colour constructions (status headers, group glyphs, icon drawing, tests) keep compiling (cm-142 sync).
-        var accent = CmuxAccentColor()
+        /// constructions (status headers, group glyphs, icon drawing, tests) keep compiling (cm-142 sync).
+        var accent = CmuxAccentColor.stored() // cmux-rbf (#cm-142.1): the default follows the Accent Color setting (#14988), as the selected row does
         var differentiateWithoutColor = false
 
         var glyph: SidebarWorkspaceTaskStatusGlyphModel {

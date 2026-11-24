@@ -34,9 +34,9 @@ public struct AgentNotificationDecision: Sendable, Equatable {
 
     /// The turn completion an idle reminder repeats.
     ///
-    /// The reconciler cannot see read state. The app delivers the reminder only
-    /// while this completion was never recorded or is still unread, so a turn
-    /// the user already acknowledged stays quiet.
+    /// The reconciler cannot see read state. cmux-rbf (#cm-128.4, #cm-142.1): the app delivers the reminder only
+    /// while this completion was never recorded; a recorded one, read or unread, stays quiet. An unread one may get
+    /// cmux's own reminder instead, which arms only with the idle-reminder setting on and fires only while the user is away.
     public struct RemindedCompletion: Sendable, Equatable {
         /// Receipt identity of the completion.
         public let identity: String

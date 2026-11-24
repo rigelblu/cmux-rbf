@@ -132,7 +132,8 @@ import Testing
 
     private func snapshot(
         usesHostLayerBackground: Bool,
-        backgroundImage: TerminalBackdropImage?
+        backgroundImage: TerminalBackdropImage?,
+        reducesTransparency: Bool = false // cmux-rbf (#cm-13, #cm-142.1)
     ) -> WindowAppearanceSnapshot {
         WindowAppearanceSnapshot(
             terminalBackgroundColor: NSColor(hex: "#272822") ?? .black,
@@ -162,7 +163,8 @@ import Testing
                 tintOpacity: 0.0,
                 terminalBackgroundBlur: .disabled,
                 terminalGlassTintColor: .black
-            )
+            ),
+            reducesTransparency: reducesTransparency // cmux-rbf (#cm-13, #cm-142.1)
         )
     }
 
@@ -184,6 +186,24 @@ import Testing
         let snapshot = snapshot(usesHostLayerBackground: false, backgroundImage: backdropImage)
 
         #expect(snapshot.hostDrawnTerminalBackgroundImage == nil)
+        #expect(backgroundImage(of: snapshot.policy(for: .windowRoot)) == nil)
+    }
+
+    // cmux-rbf (#cm-13, #cm-142.1): Reduce Transparency is about seeing through the window. The host-drawn image lies over
+    // the opaque color upstream's branch paints, so it stays on the window root.
+    @Test func reduceTransparencyKeepsTheHostDrawnImageOnTheWindowRoot() {
+        let snapshot = snapshot(usesHostLayerBackground: true, backgroundImage: backdropImage, reducesTransparency: true)
+
+        // backdropPlan's rootPolicy is terminalBackdropPolicy(), so this reaches the plan too.
+        #expect(backgroundImage(of: snapshot.policy(for: .windowRoot)) == backdropImage)
+        #expect(backgroundImage(of: snapshot.terminalBackdropPolicy()) == backdropImage)
+    }
+
+    // cmux-rbf (#cm-13, #cm-142.1): with Reduce Transparency on, an image Ghostty draws itself still stays off the window
+    // root, so it is never drawn twice.
+    @Test func reduceTransparencyStillKeepsARendererOwnedImageOutOfTheWindowRoot() {
+        let snapshot = snapshot(usesHostLayerBackground: false, backgroundImage: backdropImage, reducesTransparency: true)
+
         #expect(backgroundImage(of: snapshot.policy(for: .windowRoot)) == nil)
     }
 

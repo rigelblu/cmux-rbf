@@ -80,8 +80,11 @@ struct SidebarWorkspaceContextMenuTargetAggregate: Equatable {
         // contributes nothing, while a resolved-but-uncolored one contributes `nil`.
         // Flattening those two cases together would make a fully-coloured selection
         // report No Color as mixed.
+        // cmux-rbf (#cm-142.1): only a manual colour counts. Upstream's origin tint now
+        // reaches `customColorHex`, and a tint is only a rendering fallback, so it must
+        // not appear selected in the shared colour rows.
         targetColorHexes = targetWorkspaceIds.compactMap { id in
-            workspaceRowsById[id].map(\.workspace.customColorHex)
+            workspaceRowsById[id].map { $0.hasManualCustomColor ? $0.workspace.customColorHex : nil }
         }
     }
 

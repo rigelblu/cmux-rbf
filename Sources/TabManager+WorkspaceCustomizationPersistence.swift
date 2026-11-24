@@ -99,7 +99,7 @@ extension TabManager {
 
     func setTabColor(tabId: UUID, color: String?) {
         guard let tab = tabs.first(where: { $0.id == tabId }) else { return }
-        applyWorkspaceColor(color, to: [tab])
+        revealingMoves(of: [tab], cause: .color) { applyWorkspaceColor(color, to: [tab]) } // (#cm-110.14)
     }
 
     func applyWorkspaceColor(_ color: String?, to workspaces: [Workspace]) {

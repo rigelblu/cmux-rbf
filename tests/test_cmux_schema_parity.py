@@ -92,6 +92,11 @@ NOT_IN_CMUX_JSON = frozenset({
     # Terminal remembered UI state remains UserDefaults-only.
     "terminal.sessionContentMaxWidth.remembered",
     "workspaceGroups.anchorCloseSuppressed",
+    # cmux-rbf: changed on purpose (#cm-142.1): the fork's UserDefaults-only
+    # workspace color state. The highest `Custom N` index ever minted (#cm-61),
+    # and the color menu's order and hidden colors (#cm-107, #cm-108).
+    "workspaceColors.customNameHighWaterMark",
+    "workspaceColors.menuPreferences",
 })
 
 # Catalog defaults that intentionally differ from the schema default because
@@ -189,7 +194,9 @@ def shortcut_action_ids():
     body = re.search(r"public enum ShortcutAction\b[^{]*\{(.*?)\n\}", text, re.S).group(1)
     ids = []
     for line in body.splitlines():
-        line = line.strip()
+        # cmux-rbf: changed on purpose (#cm-142.1): drop a trailing `//` comment, as on
+        # the fork's `case showFigmaStill // cmux-rbf (#cm-73.37)`.
+        line = line.split("//", 1)[0].strip()
         if not line.startswith("case "):
             continue
         for part in line[len("case "):].split(","):

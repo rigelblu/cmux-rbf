@@ -11,7 +11,10 @@ import CmuxWorkspaces
 @testable import cmux
 #endif
 
-@Suite(.serialized)
+// cmux-rbf: changed on purpose (#cm-142.1): hibernationRecordsDoNotReusePanelIDFallbackForMovedLiveProcess builds AppDelegate(),
+// which replaces AppDelegate.shared; the trait puts it back (AppDelegateMainWindowTestingSupport.swift:313-314), so a later suite
+// doesn't inherit a windowless delegate.
+@Suite(.serialized, .exclusiveAppContext)
 struct AgentHibernationTerminationFailureTests {
     @Test(arguments: [Int32?.none, Int32(EPERM)])
     func escalationFailureOrPostKillDeadlineFailsClosed(signalError: Int32?) async {

@@ -5,7 +5,8 @@ import Testing
 struct ShortcutActionNumberedDigitTests {
     @Test func onlyNumberedSelectionActionsUseDigitMatching() {
         for action in ShortcutAction.allCases {
-            let expected = [.selectSurfaceByNumber, .selectWorkspaceByNumber, .focusPaneByNumber].contains(action)
+            // cmux-rbf: changed on purpose (#cm-142.1): #cm-69's numbered Reply labels match digits too.
+            let expected = [.selectSurfaceByNumber, .selectWorkspaceByNumber, .focusPaneByNumber, .insertReplyLabelByNumber].contains(action)
             #expect(
                 action.usesNumberedDigitMatching == expected,
                 "\(action) usesNumberedDigitMatching should be \(expected)"

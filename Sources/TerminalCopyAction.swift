@@ -24,7 +24,8 @@ extension CmuxSurfaceTabBarBuiltInAction {
         case .copyProjectRoot: return .projectRoot
         case .copyScreen: return .visibleScreen
         case .newWorkspace, .newAgentChat, .cloudVM, .newCloudWorkspace, .newCloudMachine,
-             .mobileConnect, .newTerminal, .newBrowser, .newSimulator, .splitRight, .splitDown:
+             .mobileConnect, .newTerminal, .newBrowser, .newSimulator, .splitRight, .splitDown,
+             .splitLeft, .splitUp, .newFigma: // cmux-rbf (#cm-142.1): the fork's built-ins (cm-2, cm-73.9)
             return nil
         }
     }

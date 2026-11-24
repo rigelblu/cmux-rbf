@@ -86,7 +86,8 @@ final class TabBarRenderWorkTests: XCTestCase {
                 )
             },
             moveDestinationsProvider: { [] },
-            forkConversationAvailabilityProvider: { .hidden }
+            forkConversationAvailabilityProvider: { .hidden },
+            sendToBackAvailabilityProvider: { false } // cmux-rbf: changed on purpose (#cm-128.13): no Send to Back host in this test
         )
         XCTAssertEqual(stateEvaluations, 0, "Creating a snapshot must not compute the menu state")
 

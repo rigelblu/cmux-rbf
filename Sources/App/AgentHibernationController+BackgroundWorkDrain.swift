@@ -101,8 +101,8 @@ extension AgentHibernationController {
                       panelId: candidate.key.panelId,
                       preferredWorkspaceId: candidate.key.workspaceId
                   )?.workspace,
-                  workspace.agentLifecycleStatesByPanelId[candidate.key.panelId]?[ClaudeBackgroundWorkDrain.statusKey]
-                    == .backgroundWorkPending else {
+                  let claudeLifecycle = workspace.agentLifecycleStatesByPanelId[candidate.key.panelId]?[ClaudeBackgroundWorkDrain.statusKey],
+                  claudeLifecycle == .backgroundWorkPending || claudeLifecycle == .monitoring else { // cmux-rbf (#cm-142.1, cm-128.3): Claude's pending Stop is `.monitoring` here
                 continue
             }
             backgroundWorkDrainsJournaled[candidate.key] = .some(candidate.lifecycleChangedAt)
@@ -175,7 +175,7 @@ enum ClaudeBackgroundWorkDrain {
         now: TimeInterval
     ) -> Bool {
         guard agentKind == .claude,
-              claudeLifecycle == .backgroundWorkPending,
+              claudeLifecycle == .backgroundWorkPending || claudeLifecycle == .monitoring, // cmux-rbf (#cm-142.1, cm-128.3): Claude's pending Stop is `.monitoring` here
               !isHibernated else { return false }
         // No recorded change (an app relaunch restored the state) is old enough.
         guard let lifecycleChangedAt else { return true }

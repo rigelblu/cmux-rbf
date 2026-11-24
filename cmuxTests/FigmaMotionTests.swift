@@ -437,7 +437,7 @@ struct FigmaMotionNativeTests {
         let address = try FigmaPaneURL.destination(for: URL(string: "https://www.figma.com/design/KEY/slug")!, node: "12-2", wrapper: base).url
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(MotionPageFixture(), forURLScheme: "cmux-motion-test")
-        let view = CmuxWebView(frame: .zero, configuration: config)
+        let view = CmuxWebView(frame: .zero, configuration: config, host: CmuxWebViewAppHost()) // cmux-rbf (#cm-142.1): upstream's init requires the app host
         p.webView = view; p.figmaPageWrapper = base; p.publishObservedDocumentURL(address)
         p.bindWebView(view)
         view.navigationDelegate = nil

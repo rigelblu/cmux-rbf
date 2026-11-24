@@ -156,7 +156,6 @@ Sidebar content and metadata visibility from Settings > Sidebar.
 | `sidebar.wrapWorkspaceTitles` | boolean | `false` | Allow workspace titles in the sidebar to wrap to multiple lines instead of truncating after one line. |
 | `sidebar.beta` | object | — | Experimental sidebar features. |
 | `sidebar.branchVerticalLayout` | boolean | `true` | Show git branch details stacked vertically when true, or inline when false. |
-| `sidebar.activeTabIndicatorStyle` | string | `"leftRail"` | Active workspace indicator style in the sidebar. |
 | `sidebar.selectionColor` | colorHexOrNull | `null` | Override the selected workspace background color in the sidebar. |
 | `sidebar.notificationBadgeColor` | colorHexOrNull | `null` | Override the unread notification badge color in the sidebar. |
 | `sidebar.notificationMessageLineLimit` | integer | `12` | Maximum lines shown for the latest notification below each workspace title. |
@@ -186,6 +185,8 @@ Workspace tab and badge colors from Settings > Workspace Colors.
 | `workspaceColors.unselectedFillOpacity` | number (0–1) | `0.7` | Opacity of the workspace color on rows that are not selected (`solidFill` only). `1` shows the full color. |
 | `workspaceColors.notificationBadgeColor` | colorHexOrNull | `null` | Override the unread notification badge color. |
 | `workspaceColors.colors` | object | `{"Red": "#C0392B", "Crimson": "#922B21", "Orange": "#A04000", "Amber": "#7D6608", "Olive": "#4A5C18", "Green": "#196F3D", "Teal": "#006B6B", "Aqua": "#0E6B8C", "Blue": "#1565C0", "Navy": "#1A5276", "Indigo": "#283593", "Purple": "#6A1B9A", "Magenta": "#AD1457", "Rose": "#880E4F", "Brown": "#7B3F00", "Charcoal": "#3E4B5E"}` | Full named workspace color palette. Include built-in entries you want to keep, remove keys to remove colors, and add more named entries to extend the picker. |
+| `workspaceColors.labels` | object | `{}` | Optional semantic labels for palette colors, keyed by the raw color name. Shown as "Label (Raw Name)" wherever a workspace color is picked. A label never changes a color's value: raw names and hex values keep working in config, commands, and the CLI. Clear or omit a label to show the raw name alone. |
+| `workspaceColors.displayNames` | object | `{}` | Optional editable names for custom palette entries, keyed by stable raw color name. Display names, semantic labels, and raw names share one case-insensitive namespace. Clear or omit a value to show the raw `Custom N` name again. |
 | `workspaceColors.paletteOverrides` | object | `{}` | Legacy workspace color overrides for built-in palette names. Prefer workspaceColors.colors for new configs. |
 | `workspaceColors.customColors` | array<colorHex> | `[]` | Legacy list of custom workspace colors. Prefer workspaceColors.colors for new configs. |
 
@@ -316,6 +317,7 @@ Built-in Markdown viewer settings from Settings > App.
 | `markdown.fontSize` | integer (8–96) | `15` | Default body font size, in points, for newly opened Markdown viewers. Zoom a viewer live with Cmd-+ / Cmd-- / Cmd-0. |
 | `markdown.fontFamily` | string | `""` | Default body font family for newly opened Markdown viewers. Leave empty for the system Markdown font stack. |
 | `markdown.maxWidth` | integer (320–2400) | `980` | Default maximum reading column width, in CSS pixels, for newly opened Markdown viewers. |
+| `markdown.background` | `"terminal"` or `"solid"` | `"terminal"` | What the markdown viewer paints its page on. `"terminal"` leaves the canvas transparent so the terminal background shows through; `"solid"` paints the canvas github-markdown.css was designed against (`#ffffff` light, `#0d1117` dark), so the page's contrast is fixed instead of dependent on the terminal theme. |
 
 ## fileEditor
 
@@ -353,6 +355,7 @@ Reply panel settings — the right sidebar's Reply mode. Top-level rather than u
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `reply.maxMessagesBack` | integer | `5` | How many replies without unsent notes the back arrow steps through. Replies carrying unsent notes always stay reachable. |
+| `reply.labels` | array<string> | `["lgtm", "why?", "redline"]` | Quick labels offered above an open note, in order. As many as fit are chips; the rest are in the ⌄ menu. Clicking one puts its text in the note. An empty list means no labels. |
 | `reply.inline.enabled` | boolean | `true` | Show a Reply button over text selected in an agent's pane. Set `false` to turn it off in every window. `⌘⇧`-drag still starts a reply in the panel. |
 
 ## agentPane

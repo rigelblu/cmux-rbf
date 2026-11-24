@@ -199,9 +199,11 @@ struct BrowserHiddenWebViewDiscardMemoryPressureTests {
     // cmux-rbf (#cm-74.1): Keep Page Loaded. These came with this file when upstream moved it
     // into CmuxBrowser; the session round-trip test that sat beside them reads the app's
     // `SessionBrowserPanelSnapshot`, which this package can't see, so it lives in
-    // `cmuxTests/WorkspaceUnitTests.swift` (`BrowserKeepLoadedSessionSnapshotTests`).
+    // `cmuxTests/FigmaPaneOwnerTests.swift` (`SessionBrowserPanelSnapshotKeepLoadedTests`).
     @Test func keepLoadedSuppressesScheduledHiddenWebViewDiscard() {
         withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            // cmux-rbf (#cm-142.1): the timer path, which upstream's default mode (the memory budget) never arms.
+            defaults.set("timer", forKey: BrowserHiddenWebViewDiscardPolicy.modeKey)
             let now = Date(timeIntervalSince1970: 1_000)
             let snapshot = makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot()
             let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
@@ -236,6 +238,27 @@ struct BrowserHiddenWebViewDiscardMemoryPressureTests {
             #expect(!manager.hasScheduledDiscard)
             #expect(delegate.discardRequestCount == 1)
             #expect(delegate.lastDiscardReason == "system_memory_pressure")
+        }
+    }
+
+    // cmux-rbf (#cm-142.1, #cm-74.1): the memory budget, upstream's default mode, is routine, not pressure: a kept page is
+    // never eligible, and the same page unkept is (the control).
+    @Test func keepLoadedIsNeverEligibleForTheMemoryBudget() {
+        withMemoryPressureHiddenWebViewDiscardPolicyEnabled { defaults in
+            let now = Date(timeIntervalSince1970: 1_000)
+            let manager = BrowserHiddenWebViewDiscardManager(policyDefaults: defaults)
+            let delegate = MemoryPressureHiddenWebViewDiscardTestDelegate(
+                snapshot: makeMemoryPressureHiddenWebViewDiscardBlockerSnapshot(),
+                hiddenAt: now.addingTimeInterval(-(BrowserHiddenWebViewDiscardPolicy.defaultHiddenDelay + 1))
+            )
+            manager.delegate = delegate
+
+            #expect(manager.isEligibleForMemoryBudgetDiscard(now: now), "control: the same page unkept is eligible")
+
+            delegate.hiddenWebViewDiscardKeepLoaded = true
+            #expect(!manager.isEligibleForMemoryBudgetDiscard(now: now))
+            #expect(!manager.requestMemoryBudgetDiscard(now: now))
+            #expect(delegate.discardRequestCount == 0)
         }
     }
 
