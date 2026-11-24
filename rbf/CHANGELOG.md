@@ -68,13 +68,14 @@ Fork releases use the version in `rbf/VERSION`; upstream release history remains
 - `CLAUDE.md` now carries upstream's rule that an independent review subagent passes a PR's head before merge (`CLAUDE.md:79`), where the earlier text said second-model review is opt-in. Kept, because the fork prunes only CI claims from `CLAUDE.md`; it changes what an agent does before every merge (#cm-142.1)
 
 ## 🟠⋯ Known Issues
-- **Test comparison pending:** the merge's `make test` and `make test-packages` runs, read against the pre-sync tree and the upstream pin, are not in yet. This entry claims no test result (#cm-142.1)
-- **Human verification pending:** nothing above has been checked by hand in the merged app yet (#cm-142.1)
+- **Tests, compared:** every test that fails on the merge also fails on the pre-sync tree, so the sync adds no new red. `make test-packages` passes 15 of 16 packages, with 3 skips named by test; the one lint that fails also fails on the pre-sync tree (#cm-142.1)
+- **Checked by hand (2026-11-24):** installed as the everyday app, your 1 window, 100 workspaces, 11 groups and 56 statuses came back unchanged, and your agents came back in their panes on their own sessions (#cm-142.1)
+- **Still unread:** the full second reading of the sync ledger's 1,313 open line rows (#cm-142.1)
 - The fork's right-click link on a terminal ignores upstream's new embedder link filter, so a link the filter hides on hover still opens from the context menu. Left as the fork had it; yours to decide (#cm-142.1)
 - **ghostty's own test suite is unmeasured on the merge.** Before it, `zig build test` failed 4 tests that fail on the fork's ghostty base as well, and upstream's `subprocess stop kills a distinct foreground process group` kills the shell that runs it. On 2026-11-23 WindowServer was killed by its watchdog while the suite ran, ending your session; nothing proves the suite caused it, and it is no longer run on your Mac. Run it elsewhere, or accept it unmeasured (#cm-142.1)
 - `make test`'s test host reads your real `~/.config/cmux/cmux.json` and `~/.config/ghostty/config`, so some upstream tests likely fail here and pass on upstream's CI. Clean-config reruns are pending (#cm-142.1)
 - Custom sidebars (beta) draw nested workspace groups flat: their group data carries no parent. An old gap from #cm-106, not opened by this sync
-- Whether `make install-rbf`'s Release build needs a cmux-tui client is unmeasured until the dogfood build runs: the installer builds through its own `xcodebuild` and calls neither of `make build`'s two new helpers (#cm-142.1)
+- The first `make install-dogfood` after the sync failed in IrohLib, on a module cache from the earlier install's build folder. Deleting the install's whole derived folder fixed it; the Release build needed no cmux-tui client (#cm-142.1)
 - Upstream holds both `examples/` and `Examples/`, which collide on a case-insensitive disk; the merge keeps one `Examples/` folder. Nothing reading the lowercase path has been checked yet (#cm-142.1)
 - A Figma page held behind the one on show forgets a form posted inside one of its frames: when it is shown again, the pane doesn't know the page had a form submission, so reopening it may not warn before posting again. A follow-up slice carries the flag with the held page (#cm-73.3, #cm-142.1)
 - An automatic title on a terminal that projects a cmux Cloud resource follows the fork's older rule, which applies it where upstream now refuses. No caller reaches that path today; recorded for a follow-up (#cm-142.1)
